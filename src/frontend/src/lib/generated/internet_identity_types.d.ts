@@ -2,7 +2,7 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export interface Account {
+export interface AccountInfo {
   'name' : [] | [string],
   'origin' : string,
   'account_number' : [] | [AccountNumber],
@@ -423,7 +423,7 @@ export interface _SERVICE {
   'config' : ActorMethod<[], InternetIdentityInit>,
   'create_account' : ActorMethod<
     [UserNumber, FrontendHostname, string],
-    { 'Ok' : Account } |
+    { 'Ok' : AccountInfo } |
       { 'Err' : CreateAccountError }
   >,
   'create_challenge' : ActorMethod<[], Challenge>,
@@ -435,7 +435,10 @@ export interface _SERVICE {
     [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
     GetDelegationResponse
   >,
-  'get_accounts' : ActorMethod<[UserNumber, FrontendHostname], Array<Account>>,
+  'get_accounts' : ActorMethod<
+    [UserNumber, FrontendHostname],
+    Array<AccountInfo>
+  >,
   'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
   'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
   'get_delegation' : ActorMethod<
@@ -535,7 +538,7 @@ export interface _SERVICE {
   'update' : ActorMethod<[UserNumber, DeviceKey, DeviceData], undefined>,
   'update_account' : ActorMethod<
     [UserNumber, FrontendHostname, [] | [AccountNumber], AccountUpdate],
-    { 'Ok' : Account } |
+    { 'Ok' : AccountInfo } |
       { 'Err' : UpdateAccountError }
   >,
   'verify_tentative_device' : ActorMethod<
