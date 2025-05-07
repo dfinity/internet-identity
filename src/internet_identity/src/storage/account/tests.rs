@@ -9,7 +9,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 
 #[test]
-fn should_write_additional_account() {
+fn should_create_additional_account() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
@@ -118,7 +118,7 @@ fn should_list_accounts() {
 }
 
 #[test]
-fn should_list_identity_accounts() {
+fn should_list_all_identity_accounts() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
@@ -180,21 +180,14 @@ fn should_update_default_account() {
     let account_name = "account name".to_string();
 
     // 2. Default account exists withuot creating it
-    let default_account = storage
-        .read_account(ReadAccountParams {
-            account_number: None,
-            anchor_number,
-            origin: origin.clone(),
-        })
+    let initial_accounts = storage
+        .list_accounts(&anchor_number, &origin)
         .unwrap();
-    let expected_unreserved_account = Account {
+    let expected_unreserved_account = AccountReference {
         account_number: None,
-        anchor_number,
-        origin: origin.clone(),
         last_used: None,
-        name: None,
     };
-    assert_eq!(default_account, expected_unreserved_account);
+    assert_eq!(initial_accounts, vec![expected_unreserved_account]);
 
     // 3. Update default account
     let updated_account_params = UpdateAccountParams {
@@ -206,21 +199,14 @@ fn should_update_default_account() {
     let new_account_number = storage.update_account(updated_account_params).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
-    let updated_account = storage
-        .read_account(ReadAccountParams {
-            account_number: Some(new_account_number),
-            anchor_number,
-            origin: origin.clone(),
-        })
+    let updated_accounts = storage
+        .list_accounts(&anchor_number, &origin)
         .unwrap();
-    let expected_updated_account = Account {
+    let expected_updated_account = AccountReference {
         account_number: Some(new_account_number),
-        anchor_number,
-        origin: origin.clone(),
         last_used: None,
-        name: Some(account_name),
     };
-    assert_eq!(updated_account, expected_updated_account);
+    assert_eq!(updated_accounts, vec![expected_updated_account]);
 }
 
 #[test]
