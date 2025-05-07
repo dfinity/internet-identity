@@ -229,7 +229,6 @@ fn should_prevent_mutation_when_invariants_are_violated() {
         openid_credentials: vec![],
         metadata: None,
         name: None,
-        application_accounts: None,
     };
 
     device1.alias = "new alias".to_string();
@@ -249,7 +248,6 @@ fn should_prevent_addition_when_invariants_are_violated() {
         openid_credentials: vec![],
         metadata: None,
         name: None,
-        application_accounts: None,
     };
 
     let result = anchor.add_device(sample_device());
@@ -269,7 +267,6 @@ fn should_allow_removal_when_invariants_are_violated() {
         openid_credentials: vec![],
         metadata: None,
         name: None,
-        application_accounts: None,
     };
 
     anchor.remove_device(&device1.pubkey).unwrap();

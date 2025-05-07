@@ -17,6 +17,15 @@ pub struct InternalAccountReference {
 }
 
 impl InternalAccountReference {
+    pub fn create(
+        anchor_number: AnchorNumber,
+    ) -> Self {
+        Self {
+            account_number: None,
+            anchor_number,
+            last_used: None,
+        }
+    }
     pub fn to_storable(&self) -> StorableAccountReference {
         StorableAccountReference {
             account_number: self.account_number,
@@ -38,7 +47,7 @@ impl From<(&AnchorNumber, &StorableAccountReference)> for InternalAccountReferen
     }
 }
 
-#[derive(Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct StorableAccountReference {
     pub account_number: Option<AccountNumber>,
     pub last_used: Option<Timestamp>,

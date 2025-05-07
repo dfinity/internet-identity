@@ -5,7 +5,7 @@ use crate::stats::activity_stats::activity_counter::active_anchor_counter::Activ
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
 use crate::storage::account::{Application, InternalAccount, InternalAccountReference};
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::{Header, StorageError, MAX_ENTRIES};
+use crate::storage::{CreateAdditionalAccountParams, Header, StorageError, MAX_ENTRIES};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -318,87 +318,61 @@ fn should_not_overwrite_device_credential_lookup() {
 }
 
 #[test]
-fn should_write_account() {
+fn should_write_additioanl_account() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    // 1. Define anchor number and origin
+    // 1. Define additional account parameters
     let anchor_number: AnchorNumber = 10_000;
     let origin: FrontendHostname = "https://some.origin".to_string();
-    let account_name = None;
+    let account_name = "account name".to_string();
 
     // 2. Save anchor to stable memory
     let anchor = storage.allocate_anchor().unwrap();
-
     storage.create(anchor).unwrap();
 
-    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
-    let app = Application {
-        origin: origin.to_string(),
-        total_accounts: 0u64,
+    // 3. Additional account and application don't exist yet.
+    let acc_ref = InternalAccountReference {
+        account_number: None,
+        anchor_number,
+        last_used: None,
     };
-    assert_eq!(
-        storage.lookup_application_with_application_number(&app_num),
-        Some(app),
-    );
-
-    // 3. Read anchor and check that application_accounts is empty
-    let read_anchor_1 = storage.read(anchor_number).unwrap();
+    let additional_account_1 = storage.read_account(&acc_ref, &origin);
     assert!(
-        read_anchor_1.application_accounts(app_num).is_none(),
+        additional_account_1.is_none(),
         "Initial anchor should have no accounts"
     );
+    assert!(
+        storage.lookup_application_with_origin(&origin).is_none(),
+    );
 
-    // 4. Create new account
-    let new_account =
-        InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
-
-    // 5. Check that read_account returns None
-    // Create AccountReference for lookup
-    let account_ref_lookup = InternalAccountReference {
-        account_number: None, // Default account ID
+    // 4. Create additional account
+    let new_account_params = CreateAdditionalAccountParams {
         anchor_number,
-        last_used: None, // Not relevant for lookup by ID
+        origin: origin.clone(),
+        name: account_name.clone(),
     };
+    storage.create_additional_account(new_account_params).unwrap();
+
+    // 5. Check that read_account returns additional account and creates application.
+    let account_ref_lookup = InternalAccountReference {
+        account_number: Some(1), // First account created
+        anchor_number,
+        last_used: None,
+    };
+    let additional_account = storage.read_account(&account_ref_lookup, &origin).unwrap();
+    let expected_account = InternalAccount {
+        account_number: Some(1),
+        anchor_number,
+        origin: origin.clone(),
+        name: Some(account_name.clone()),
+        last_used: None,
+    };
+    assert_eq!(additional_account, expected_account);
     assert!(
-        storage.read_account(&account_ref_lookup, &origin).is_none(),
-        "Account should not exist before writing"
+        storage.lookup_application_with_origin(&origin).is_some(),
     );
-
-    // Reconstruct the expected account as it would be retrieved (including potentially updated last_used)
-    // Account::new sets last_used to None. Assuming read_account does not modify it on read for this test.
-    let expected_retrieved_account = InternalAccount::reconstruct(
-        new_account.account_number, // None for default account
-        new_account.anchor_number,
-        new_account.origin.clone(),
-        new_account.last_used, // Should be None initially
-        new_account.name.clone(),
-    );
-
-    // 6. Write account using write_account
-    storage.write_account(new_account).unwrap();
-
-    // 7. Use read_account to read the account and check that it's present.
-    let retrieved_account = storage
-        .read_account(&account_ref_lookup, &origin)
-        .expect("Account should exist after writing");
-
-    assert_eq!(
-        retrieved_account, expected_retrieved_account,
-        "Retrieved account does not match written account"
-    );
-
-    // 8. Read anchor and check that the new account is present in application_accounts
-    let read_anchor_2 = storage.read(anchor_number).unwrap();
-    let application_accounts = read_anchor_2.application_accounts(app_num);
-    assert!(
-        application_accounts.is_some(),
-        "Anchor should have accounts after writing"
-    );
-    for acc_ref in application_accounts.unwrap() {
-        assert_eq!(acc_ref, expected_retrieved_account.to_reference());
-    }
 }
 
 #[test]
@@ -407,38 +381,54 @@ fn should_list_accounts() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    // 1. Define anchor number and origin
+    // 1. Define additional account parameters
     let anchor_number: AnchorNumber = 10_000;
     let origin: FrontendHostname = "https://some.origin".to_string();
-    let account_name = None;
+    let account_name = "account name".to_string();
 
     // 2. Save anchor to stable memory
     let anchor = storage.allocate_anchor().unwrap();
     storage.create(anchor).unwrap();
 
-    // Look up or insert application number
-    let _app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+    // 3. List accounts returns default account
+    let listed_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
+    assert_eq!(listed_accounts.len(), 1);
+    assert!(listed_accounts[0].account_number.is_none());
 
-    // 3. Create new account
-    let new_account =
-        InternalAccount::new(anchor_number, origin.clone(), account_name.clone(), None);
-    let expected_account_ref = new_account.to_reference();
+    // 4. Create new account
+    let new_account = CreateAdditionalAccountParams {
+        anchor_number,
+        origin: origin.clone(),
+        name: account_name.clone(),
+    };
+    let expected_additional_account_ref = InternalAccountReference {
+        account_number: Some(1),
+        anchor_number,
+        last_used: None,
+    };
+    let expected_default_account_ref = InternalAccountReference {
+        account_number: None,
+        anchor_number,
+        last_used: None,
+    };
+    storage.create_additional_account(new_account).unwrap();
 
-    // 4. Write account using write_account
-    storage.write_account(new_account).unwrap();
-
-    // 5. Use list_accounts to read the account and check that it's present.
+    // 5. List accounts returns default account
     let listed_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
 
-    // 6. Assert that the list contains exactly one account and it matches the expected one
+    // 6. Assert that the list contains exactly two accounts and it matches the expected one
     assert_eq!(
         listed_accounts.len(),
-        1,
-        "Expected exactly one account to be listed"
+        2,
+        "Expected exactly two accounts to be listed"
     );
     assert_eq!(
-        listed_accounts[0], expected_account_ref,
-        "Listed account reference does not match the written account reference"
+        listed_accounts[0], expected_default_account_ref,
+        "Default account reference is missing from the listed accounts."
+    );
+    assert_eq!(
+        listed_accounts[1], expected_additional_account_ref,
+        "Additional account reference is missing from the listed accounts."
     );
 }
 

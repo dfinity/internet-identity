@@ -82,6 +82,7 @@
 use account::{InternalAccount, StorableAccountReference};
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
+use storable_account_reference_list::StorableAccountReferenceList;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
@@ -121,6 +122,7 @@ pub mod account;
 
 pub mod stable_anchor;
 /// module for the internal serialization format of anchors
+mod storable_account_reference_list;
 mod storable_anchor;
 mod storable_anchor_number_list;
 mod storable_credential_id;
@@ -153,6 +155,7 @@ const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
 const STABLE_APPLICATION_MEMORY_INDEX: u8 = 11u8;
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 12u8;
+const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX: u8 = 13u8;
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -165,6 +168,8 @@ const REGISTRATION_CURRENT_RATE_MEMORY_ID: MemoryId =
 const STABLE_ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ANCHOR_MEMORY_INDEX);
 const STABLE_ACCOUNT_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ACCOUNT_MEMORY_INDEX);
 const STABLE_APPLICATION_MEMORY_ID: MemoryId = MemoryId::new(STABLE_APPLICATION_MEMORY_INDEX);
+const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID: MemoryId =
+    MemoryId::new(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID: MemoryId =
@@ -239,6 +244,10 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the stable application memory.
     stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_application_memory: StableBTreeMap<ApplicationNumber, Application, ManagedMemory<M>>,
+    /// Memory wrapper used to report the size of the stable account reference list memory.
+    stable_account_reference_list_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    stable_account_reference_list_memory:
+        StableBTreeMap<(AccountNumber, ApplicationNumber), StorableAccountReferenceList, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -263,6 +272,12 @@ struct Header {
     id_range_hi: u64,
     entry_size: u16,
     salt: [u8; 32],
+}
+
+struct CreateAdditionalAccountParams {
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    name: String,
 }
 
 impl<M: Memory + Clone> Storage<M> {
@@ -314,6 +329,7 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_anchor_memory = memory_manager.get(STABLE_ANCHOR_MEMORY_ID);
         let stable_account_memory = memory_manager.get(STABLE_ACCOUNT_MEMORY_ID);
         let stable_application_memory = memory_manager.get(STABLE_APPLICATION_MEMORY_ID);
+        let stable_account_reference_list_memory = memory_manager.get(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_with_device_credential_memory =
@@ -360,6 +376,10 @@ impl<M: Memory + Clone> Storage<M> {
                 stable_application_memory.clone(),
             ),
             stable_application_memory: StableBTreeMap::init(stable_application_memory),
+            stable_account_reference_list_memory_wrapper: MemoryWrapper::new(
+                stable_account_reference_list_memory.clone(),
+            ),
+            stable_account_reference_list_memory: StableBTreeMap::init(stable_account_reference_list_memory),
             lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_openid_credential_memory.clone(),
             ),
@@ -667,6 +687,10 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&OriginHash::from_origin(origin))
     }
 
+    pub fn lookup_account_references(&self, anchor_number: AnchorNumber, application_number: ApplicationNumber) -> Option<Vec<StorableAccountReference>> {
+        self.stable_account_reference_list_memory.get(&(anchor_number, application_number)).map(|list| list.into())
+    }
+
     pub fn lookup_application_with_application_number(
         &self,
         application_number: &ApplicationNumber,
@@ -681,35 +705,10 @@ impl<M: Memory + Clone> Storage<M> {
             })
     }
 
-    /// Writes or updates an Account in stable storage, linking it to an anchor and application (origin).
-    /// - Looks up or creates an Application entry based on the account's origin.
-    /// - Retrieves the StableAnchor associated with the account's anchor_number.
-    /// - Checks if an AccountReference already exists for this anchor/app pair.
-    ///   - If yes: Updates the `last_used` timestamp.
-    ///   - If no: Adds a new AccountReference and increments the application's `total_accounts`.
-    /// - Saves the updated StableAnchor and Application data.
-    /// - If the account has a `name` (unreserved account):
-    ///   - Creates a new permanent StorableAccount entry.
-    ///   - Assigns a globally unique AccountNumber.
-    ///   - Returns the Account with the new AccountNumber.
-    /// - Otherwise (reserved account): Returns the Account with `account_number = None`.
     #[allow(dead_code)]
-    pub fn write_account(&mut self, acc: InternalAccount) -> Result<InternalAccount, StorageError> {
-        // TODO: LM what if this is called with an account_number?
-
-        // How about expecting the following instead of the whole Account
-        // - anchor_number
-        // - origin
-        // - name: Option<String>
-        // This way we don't have the questions with account_number. It's only generated here.
-        // It would follow more the allocate_anchor pattern.
-
-        // We should raise an error if the default account already exists for this anchor.
-
-        // Should we use the length of the application_accounts to determine the account_number?
-
-        let anchor_number = acc.anchor_number;
-        let origin = &acc.origin;
+    pub fn create_additional_account(&mut self, params: CreateAdditionalAccountParams) -> Result<InternalAccount, StorageError> {
+        let anchor_number = params.anchor_number;
+        let origin = &params.origin;
 
         // 1. & 2. Get ApplicationNumber, creating Application entry if new
         let app_num = self.lookup_or_insert_application_number_with_origin(origin);
@@ -720,87 +719,62 @@ impl<M: Memory + Clone> Storage<M> {
             .lookup_application_with_application_number(&app_num)
             .expect("Application data should exist after lookup_or_insert");
 
-        // 4. Manually construct StorableAccountReference
-        let storable_ref = StorableAccountReference {
-            account_number: acc.account_number,
-            // We don't consider it used at this point.
-            last_used: None,
+        // 4. Get next account number
+        // Add 1 to avoid having an account number 0
+        let account_number = self.stable_account_memory.len() + 1;
+
+        // 5. Create StorableAccount
+        let storable_account = StorableAccount {
+            name: params.name.clone(),
+            seed_from_anchor: None,
         };
 
-        // 5. Get StableAnchor
-        let mut stable_anchor = self
-            .stable_anchor_memory
-            .get(&anchor_number)
-            .ok_or_else(|| StorageError::AnchorNotFound { anchor_number })?;
+        // 6. Insert StorableAccount into stable memory
+        self.stable_account_memory.insert(account_number, storable_account);
 
-        // 6. Update application_accounts in StableAnchor
-        let app_accounts_map = stable_anchor
-            .application_accounts
-            .get_or_insert_with(HashMap::new);
-        let account_refs_vec = app_accounts_map.entry(app_num).or_insert_with(Vec::new);
-
-        let mut account_exists = false;
-        // Should we raise an error if the account already exists?
-        for existing_ref in account_refs_vec.iter_mut() {
-            match (existing_ref.account_number, acc.account_number) {
-                // Case 1: Both have account numbers and they match
-                // This part would never happen if we don't have an account number in the parameters.
-                (Some(existing_num), Some(new_num)) if existing_num == new_num => {
-                    *existing_ref = storable_ref.clone();
-                    account_exists = true;
-                    break;
-                }
-                // Case 2: Both lack account numbers (match for the default/unreserved account)
-                // If there is no name, but the anchor already has a default account, we should raise an error.
-                (None, None) => {
-                    *existing_ref = storable_ref.clone();
-                    account_exists = true;
-                    break;
-                }
-                // Other cases (e.g., one has number, other doesn't, or numbers don't match) are not considered matches
-                _ => {}
-            }
-        }
-
-        // 5. Update memory in case the account was created
-        if !account_exists {
-            account_refs_vec.push(storable_ref);
-        }
-        
-        
-        // 6. Write updated StableAnchor and Application data
+        // 7. Update application data
         application_data.total_accounts += 1;
-        self.stable_application_memory
-            .insert(app_num, application_data);
-        self.stable_anchor_memory
-            .insert(anchor_number, stable_anchor);
+        self.stable_application_memory.insert(app_num, application_data);
 
-        // 7. If it has a name, it's an unreserved account and it must be created also in the accounts memory.
-        if let Some(name) = acc.name {
-            let account_number = self.stable_account_memory.len() as AccountNumber;
-            self.stable_account_memory.insert(
-                account_number,
-                StorableAccount {
-                    name: name.clone(),
-                    seed_from_anchor: None,
-                },
-            );
-            // 7.1 Return Ok
-            return Ok(InternalAccount::new(
-                anchor_number,
-                origin.clone(),
-                Some(name.clone()),
-                Some(account_number),
-            ));
+        // 8. Read AccountReferences
+        let account_references = self.lookup_account_references(anchor_number, app_num);
+
+        if account_references.is_none() {
+            let default_account_reference = StorableAccountReference {
+                account_number: None,
+                last_used: None,
+            };
+            let additional_account_reference = StorableAccountReference {
+                account_number: Some(account_number),
+                last_used: None,
+            };
+            self.stable_account_reference_list_memory.insert((anchor_number, app_num), vec![default_account_reference, additional_account_reference].into());
+        } else {
+            let mut account_references = account_references.unwrap();
+            account_references.push(StorableAccountReference {
+                account_number: Some(account_number),
+                last_used: None,
+            });
+            self.stable_account_reference_list_memory.insert((anchor_number, app_num), account_references.into());
         }
 
-        // 8. Return Ok
-        Ok(InternalAccount::new(
+        // 9. Insert additional account
+        let additional_storable_account = StorableAccount {
+            name: params.name.clone(),
+            seed_from_anchor: None,
+        };
+        self.stable_account_memory.insert(account_number, additional_storable_account);
+
+        // 8. Create InternalAccount
+        let internal_account = InternalAccount::reconstruct(
+            Some(account_number),
             anchor_number,
             origin.clone(),
             None,
-            None,
-        ))
+            Some(params.name.clone()),
+        );
+
+        Ok(internal_account)
     }
 
     #[allow(dead_code)]
@@ -809,24 +783,42 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: &AnchorNumber,
         origin: &FrontendHostname,
     ) -> Result<Vec<InternalAccountReference>, StorageError> {
-        let application_number = self
-            .lookup_application_number_with_origin(origin)
-            .ok_or(StorageError::ApplicationNotFound { origin: origin.clone() })?;
-
-        let anchor = self.stable_anchor_memory
-        .get(anchor_number).ok_or(StorageError::AnchorNotFound { anchor_number: *anchor_number })?;
-
-
-        Ok(anchor.application_accounts
-            .and_then(|app_map| app_map.get(&application_number).cloned())
-            .map(|maybe_storable_acc_ref_vec| {
-                maybe_storable_acc_ref_vec
-                    .iter()
-                    .map(|storable_acc_ref| (anchor_number, storable_acc_ref).into())
-                    .collect()
-            })
-            .unwrap_or_default()
-        )
+        match self.lookup_application_number_with_origin(origin) {
+            None => {
+                // Application doesn't exist for this origin.
+                // Return a vector with a new InternalAccountReference representing the default account.
+                Ok(vec![InternalAccountReference {
+                    account_number: None, // Default account for the application/anchor
+                    anchor_number: *anchor_number,
+                    last_used: None,      // No usage info for a new/default account reference
+                }])
+            }
+            Some(app_num) => {
+                // Application exists, look up its account references.
+                match self.lookup_account_references(*anchor_number, app_num) {
+                    None => {
+                        // No account references found for this application and anchor.
+                        // Return a vector with a new InternalAccountReference representing the default account.
+                        Ok(vec![InternalAccountReference {
+                            account_number: None,
+                            anchor_number: *anchor_number,
+                            last_used: None,
+                        }])
+                    }
+                    Some(refs) => {
+                        let internal_refs = refs
+                            .into_iter()
+                            .map(|s_ref| InternalAccountReference {
+                                account_number: s_ref.account_number,
+                                anchor_number: *anchor_number, // All refs for this anchor share the same anchor_number
+                                last_used: s_ref.last_used,
+                            })
+                            .collect();
+                        Ok(internal_refs)
+                    }
+                }
+            }
+        }
     }
 
     #[allow(dead_code)]
@@ -835,47 +827,46 @@ impl<M: Memory + Clone> Storage<M> {
         acc_ref: &InternalAccountReference,
         origin: &FrontendHostname,
     ) -> Option<InternalAccount> {
-        if let Some(application) = self.lookup_application_with_origin(origin) {
-            match acc_ref.account_number {
-                Some(account_number) => {
-                    // Account number is present, try to read from stable memory
-                    return self
-                        .stable_account_memory
-                        .get(&account_number)
-                        .map(|storable_acc| {
-                            InternalAccount::reconstruct(
-                                Some(account_number),
-                                acc_ref.anchor_number,
-                                application.origin.clone(),
-                                acc_ref.last_used,
-                                Some(storable_acc.name),
-                            )
-                        });
-                }
-                None => {
-                    let anchor = self.read(acc_ref.anchor_number).unwrap();
-                    // TODO LM: Improve this part by looking up at the same time the application and the number
-                    let application_number =
-                        self.lookup_application_number_with_origin(origin).unwrap();
-                    if let Some(accounts) = anchor.application_accounts(application_number) {
-                        return accounts
-                            .iter()
-                            .find(|storable_acc_ref| storable_acc_ref.account_number.is_none())
-                            .map(|storable_acc_ref| {
-                                InternalAccount::reconstruct(
-                                    None,
-                                    storable_acc_ref.anchor_number,
-                                    application.origin.clone(),
-                                    storable_acc_ref.last_used,
-                                    None,
-                                )
-                            });
+        match self.lookup_application_number_with_origin(origin) {
+            None => {
+                // Application number doesn't exist, return a default InternalAccount
+                Some(InternalAccount::new(
+                    acc_ref.anchor_number,
+                    origin.clone(),
+                    None, // name
+                    acc_ref.account_number,
+                ))
+            }
+            Some(application_number) => {
+                match self.lookup_account_references(acc_ref.anchor_number, application_number) {
+                    None => {
+                        // Account references don't exist, return a default InternalAccount
+                        Some(InternalAccount::new(
+                            acc_ref.anchor_number,
+                            origin.clone(),
+                            None, // name
+                            acc_ref.account_number,
+                        ))
                     }
-                    return None;
+                    Some(storable_account_refs) => {
+                        for storable_ref in storable_account_refs {
+                            if storable_ref.account_number == acc_ref.account_number {
+                                // Found a matching account reference, convert to InternalAccount
+                                return Some(InternalAccount {
+                                    account_number: storable_ref.account_number,
+                                    anchor_number: acc_ref.anchor_number,
+                                    origin: origin.clone(),
+                                    last_used: storable_ref.last_used,
+                                    name: None, // StorableAccountReference does not have a name field
+                                });
+                            }
+                        }
+                        // No matching account reference found
+                        None
+                    }
                 }
             }
         }
-        None
     }
 
     /// Make sure all the required metadata is recorded to stable memory.
@@ -1057,6 +1048,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_application_with_origin".to_string(),
                 self.lookup_application_with_origin_memory_wrapper.size(),
+            ),
+            (
+                "stable_account_reference_list".to_string(),
+                self.stable_account_reference_list_memory_wrapper.size(),
             ),
         ])
     }
