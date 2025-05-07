@@ -281,13 +281,13 @@ struct Header {
 
 pub struct CreateAdditionalAccountParams {
     anchor_number: AnchorNumber,
-    origin: FrontendHostname,
     name: String,
+    origin: FrontendHostname,
 }
 
 pub struct UpdateAccountParams {
-    anchor_number: AnchorNumber,
     account_number: Option<AccountNumber>,
+    anchor_number: AnchorNumber,
     name: String,
     origin: FrontendHostname,
 }
@@ -299,8 +299,8 @@ struct UpdateExistinAccountParams {
 
 struct CreateDefaultAccountParams {
     anchor_number: AnchorNumber,
-    name: String,
     application_number: ApplicationNumber,
+    name: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]

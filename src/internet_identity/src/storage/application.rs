@@ -1,6 +1,7 @@
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
     hash::{DefaultHasher, Hash, Hasher},
@@ -48,11 +49,17 @@ impl Storable for OriginHash {
 
 impl OriginHash {
     pub fn from_origin(origin: &FrontendHostname) -> Self {
-        let mut hasher = DefaultHasher::new();
-        origin.hash(&mut hasher);
-        let hash_u64 = hasher.finish();
+        let mut hasher = Sha256::new();
+        hasher.update(origin.as_bytes());
+        let full_hash_result = hasher.finalize();
+        // Truncate the 32-byte SHA-256 hash to the first 8 bytes.
+        let truncated_hash_slice: &[u8] = &full_hash_result[0..8];
+        let hash_8_bytes: [u8; 8] = truncated_hash_slice
+            .try_into()
+            .expect("Failed to truncate SHA256 hash to 8 bytes; slice length should be 8.");
+
         Self {
-            hash: hash_u64.to_le_bytes(),
+            hash: hash_8_bytes,
         }
     }
 }
