@@ -3,9 +3,9 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
-use crate::storage::account::{Application, InternalAccount, InternalAccountReference};
+use crate::storage::account::{InternalAccount, InternalAccountReference};
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::{CreateAdditionalAccountParams, Header, StorageError, MAX_ENTRIES};
+use crate::storage::{CreateAdditionalAccountParams, Header, StorageError, UpdateAccountParams, MAX_ENTRIES};
 use crate::Storage;
 use candid::Principal;
 use ic_stable_structures::{Memory, VectorMemory};
@@ -318,7 +318,7 @@ fn should_not_overwrite_device_credential_lookup() {
 }
 
 #[test]
-fn should_write_additioanl_account() {
+fn should_write_additional_account() {
     // Setup storage
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
@@ -430,6 +430,96 @@ fn should_list_accounts() {
         listed_accounts[1], expected_additional_account_ref,
         "Additional account reference is missing from the listed accounts."
     );
+}
+
+#[test]
+fn should_list_identity_accounts() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define additional account parameters
+    let anchor_number: AnchorNumber = 10_000;
+    let account_name = "account name".to_string();
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let origin_2: FrontendHostname = "https://some-other.origin".to_string();
+
+    // 2. Save anchor to stable memory
+    let anchor = storage.allocate_anchor().unwrap();
+    storage.create(anchor).unwrap();
+
+    // 3. List accounts returns default account
+    let listed_accounts = storage.list_identity_accounts(anchor_number);
+    assert_eq!(listed_accounts.len(), 0);
+
+    // 4. Create additional account
+    let new_account_params = CreateAdditionalAccountParams {
+        anchor_number,
+        origin: origin.clone(),
+        name: account_name.clone(),
+    };
+    storage.create_additional_account(new_account_params).unwrap();
+
+    // 5. List accounts returns default account
+    let listed_accounts = storage.list_identity_accounts(anchor_number);
+    // Default account + additional account for the origin application.
+    assert_eq!(listed_accounts.len(), 2);
+
+    // 6. Create additional account
+    let new_account_params = CreateAdditionalAccountParams {
+        anchor_number,
+        origin: origin_2.clone(),
+        name: account_name.clone(),
+    };
+    storage.create_additional_account(new_account_params).unwrap();
+
+    // 7. List accounts returns default account
+    let listed_accounts = storage.list_identity_accounts(anchor_number);
+    // Default account + additional account for the origin_2 application.
+    assert_eq!(listed_accounts.len(), 4);
+}
+
+#[test]
+fn should_update_default_account() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define parameters
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let account_name = "account name".to_string();
+
+    // 2. Default account exists withuot creating it
+    let default_account = storage.read_account(&InternalAccountReference { account_number: None, anchor_number, last_used: None }, &origin).unwrap();
+    let expected_unreserved_account = InternalAccount {
+        account_number: None,
+        anchor_number,
+        origin: origin.clone(),
+        last_used: None,
+        name: None,
+    };
+    assert_eq!(default_account, expected_unreserved_account);
+
+    // 3. Update default account
+    let updated_account_params = UpdateAccountParams {
+        anchor_number,
+        origin: origin.clone(),
+        name: account_name.clone(),
+        account_number: None,
+    };
+    let new_account_number = storage.update_account(updated_account_params).unwrap();
+
+    // 4. Check that the default account has been created with the updated values.
+    let updated_account = storage.read_account(&InternalAccountReference { account_number: Some(new_account_number), anchor_number, last_used: None }, &origin).unwrap();
+    let expected_updated_account = InternalAccount {
+        account_number: Some(new_account_number),
+        anchor_number,
+        origin: origin.clone(),
+        last_used: None,
+        name: Some(account_name),
+    };
+    assert_eq!(updated_account, expected_updated_account);
 }
 
 fn sample_device() -> Device {

@@ -298,19 +298,19 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(_anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<Account> {
+fn get_accounts(_anchor_number: AnchorNumber, _origin: FrontendHostname) -> Vec<Account> {
     vec![
         Account {
-            origin: origin.clone(),
-            name: Some("Default Mock Account".to_string()),
             account_number: None,
-            last_used: None,
+            origin: "example.com".to_string(),
+            last_used: Some(0u64),
+            name: Some("Default Mock Account".to_string()),
         },
         Account {
-            origin,
-            name: Some("Additinal Mock Account".to_string()),
             account_number: Some(1),
-            last_used: None,
+            origin: "example.com".to_string(),
+            last_used: Some(0u64),
+            name: Some("Additional Mock Account".to_string()),
         },
     ]
 }
@@ -318,29 +318,29 @@ fn get_accounts(_anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<A
 #[update]
 fn create_account(
     _anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    _origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
     Ok(Account {
-        origin,
-        name: Some(name),
-        account_number: None,
+        account_number: Some(ic_cdk::api::time()),
+        origin: "example.com".to_string(),
         last_used: None,
+        name: Some(name),
     })
 }
 
 #[update]
 fn update_account(
     _anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    _origin: FrontendHostname,
     _account_number: Option<AccountNumber>,
     _update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     Ok(Account {
-        origin,
-        name: None,
         account_number: None,
-        last_used: None,
+        origin: "example.com".to_string(),
+        last_used: Some(0u64),
+        name: Some("Default Mock Account".to_string()),
     })
 }
 
