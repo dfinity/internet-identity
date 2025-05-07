@@ -339,7 +339,6 @@ fn openid_credential(n: u8) -> OpenIdCredential {
         metadata: HashMap::default(),
     }
 }
-
 fn sample_persistent_state() -> PersistentState {
     PersistentState {
         archive_state: ArchiveState::Created {

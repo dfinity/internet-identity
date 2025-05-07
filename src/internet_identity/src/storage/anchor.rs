@@ -159,7 +159,7 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
                 .map(|anchor| anchor.openid_credentials)
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
-            name: stable_anchor.clone().and_then(|anchor| anchor.name),
+            name: stable_anchor.and_then(|anchor| anchor.name),
         }
     }
 }
