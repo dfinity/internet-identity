@@ -785,7 +785,7 @@ impl<M: Memory + Clone> Storage<M> {
         // 2. Get next account number
         let account_number = self.get_next_account_number();
 
-        // 3. Create StorableAccount
+        // 3. Create and insert StorableAccount
         let storable_account = StorableAccount {
             name: params.name.clone(),
             seed_from_anchor: None,
@@ -808,13 +808,18 @@ impl<M: Memory + Clone> Storage<M> {
         {
             None => {
                 // If no list exists for this anchor & application,
-                // Create and insert the default account.
-                let new_ref = AccountReference {
+                // Create and insert the default and additional account.
+                // This is because we don't create default accounts explicitly.
+                let additional_account_reference = AccountReference {
                     account_number: Some(account_number),
                     last_used: None,
                 };
+                let default_account_reference = AccountReference {
+                    account_number: None,
+                    last_used: None,
+                };
                 self.stable_account_reference_list_memory
-                    .insert((anchor_number, app_num), vec![new_ref].into());
+                    .insert((anchor_number, app_num), vec![default_account_reference, additional_account_reference].into());
             }
             Some(existing_storable_list) => {
                 let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();

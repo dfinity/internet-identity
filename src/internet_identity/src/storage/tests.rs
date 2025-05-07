@@ -531,6 +531,74 @@ fn should_update_default_account() {
     assert_eq!(updated_account, expected_updated_account);
 }
 
+#[test]
+fn should_update_additional_account() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define additional account parameters
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let account_name = "account name".to_string();
+    let new_account_name = "new account name".to_string();
+    let account_number = 1;
+
+    // 2. Additional account and application don't exist yet.
+    let read_params = ReadAccountParams {
+        account_number: Some(account_number), // First account created is 1
+        anchor_number,
+        origin: origin.clone(),
+    };
+    let additional_account_1 = storage.read_account(read_params.clone());
+    assert!(
+        additional_account_1.is_none(),
+        "Additional account should not exist yet"
+    );
+    assert!(storage.lookup_application_number_with_origin(&origin).is_none(), "Application should not exist yet");
+
+    // 3. Create additional account
+    let new_account_params = CreateAdditionalAccountParams {
+        anchor_number,
+        origin: origin.clone(),
+        name: account_name.clone(),
+    };
+    storage
+        .create_additional_account(new_account_params)
+        .unwrap();
+    assert!(storage.read_account(read_params.clone()).is_some());
+
+    // 4. Update additional account
+    let updated_account_params = UpdateAccountParams {
+        anchor_number,
+        origin: origin.clone(),
+        name: new_account_name.clone(),
+        account_number: Some(1),
+    };
+    let update_account_return_value = storage.update_account(updated_account_params).unwrap();
+
+    assert_eq!(update_account_return_value, account_number);
+
+    // 5. Check that the additional account has been created with the updated values.
+    let updated_account = storage
+        .read_account(
+            ReadAccountParams {
+                account_number: Some(update_account_return_value),
+                anchor_number,
+                origin: origin.clone(),
+            },
+        )
+        .unwrap();
+    let expected_updated_account = Account {
+        account_number: Some(update_account_return_value),
+        anchor_number,
+        origin: origin.clone(),
+        last_used: None,
+        name: Some(new_account_name),
+    };
+    assert_eq!(updated_account, expected_updated_account);
+}
+
 fn sample_device() -> Device {
     Device {
         pubkey: ByteBuf::from("hello world, I am a public key"),

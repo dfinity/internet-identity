@@ -2,10 +2,7 @@ use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::{
-    borrow::Cow,
-    hash::{DefaultHasher, Hash, Hasher},
-};
+use std::borrow::Cow;
 
 #[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Application {
