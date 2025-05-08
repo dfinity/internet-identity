@@ -7,10 +7,7 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, Fronte
 
 use super::AccountsCounter;
 
-fn assert_empty_counters(
-    storage: &Storage<VectorMemory>,
-    anchor_number: AnchorNumber,
-) {
+fn assert_empty_counters(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) {
     assert_eq!(
         storage.get_account_counter(anchor_number),
         AccountsCounter::default()
