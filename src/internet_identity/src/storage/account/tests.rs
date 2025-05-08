@@ -10,7 +10,6 @@ use super::AccountsCounter;
 fn assert_empty_counters(
     storage: &Storage<VectorMemory>,
     anchor_number: AnchorNumber,
-    origin: &FrontendHostname,
 ) {
     assert_eq!(
         storage.get_account_counter(anchor_number),
