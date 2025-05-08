@@ -43,7 +43,7 @@ pub enum AccountType {
 
 // Types stored in memory.
 
-#[derive(Clone, Debug, Deserialize, CandidType, serde::Serialize, PartialEq)]
+#[derive(Default, Clone, Debug, Deserialize, CandidType, serde::Serialize, PartialEq)]
 pub struct AccountsCounter {
     pub stored_accounts: u64,
     pub stored_account_references: u64,
@@ -60,15 +60,6 @@ impl AccountsCounter {
                 stored_accounts: self.stored_accounts + 1,
                 stored_account_references: self.stored_account_references,
             },
-        }
-    }
-}
-
-impl Default for AccountsCounter {
-    fn default() -> Self {
-        Self {
-            stored_accounts: 0,
-            stored_account_references: 0,
         }
     }
 }
