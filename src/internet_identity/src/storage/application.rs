@@ -8,6 +8,7 @@ use std::borrow::Cow;
 pub struct Application {
     pub origin: FrontendHostname,
     pub stored_accounts: u64,
+    pub stored_account_references: u64,
 }
 
 impl Storable for Application {
