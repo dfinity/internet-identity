@@ -49,7 +49,7 @@ fn should_create_additional_account() {
             .is_none(),
         "Application should not exist yet"
     );
-    assert_empty_counters(&storage, anchor_number, &origin);
+    assert_empty_counters(&storage, anchor_number);
 
     // 3. Create additional account
     let new_account_params = CreateAccountParams {
@@ -114,7 +114,7 @@ fn should_list_accounts() {
     let listed_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
     assert_eq!(listed_accounts.len(), 1);
     assert!(listed_accounts[0].account_number.is_none());
-    assert_empty_counters(&storage, anchor_number, &origin);
+    assert_empty_counters(&storage, anchor_number);
 
     // 4. Create new account
     let new_account = CreateAccountParams {
@@ -391,6 +391,7 @@ fn should_count_accounts_different_anchors() {
         accounts_anchor_1_initial[0].account_number.is_none(),
         "Initial account should be default"
     );
+    assert_empty_counters(&storage, anchor_number_1);
 
     // Check counters for anchor 1 - should be 0
     assert_eq!(
