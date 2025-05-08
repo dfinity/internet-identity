@@ -7,9 +7,19 @@ use internet_identity_interface::internet_identity::types::{AnchorNumber, Fronte
 
 use super::AccountsCounter;
 
-fn assert_empty_counters(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber, origin: &FrontendHostname) {
-    assert_eq!(storage.get_account_counter(anchor_number), AccountsCounter::default());
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter::default());
+fn assert_empty_counters(
+    storage: &Storage<VectorMemory>,
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+) {
+    assert_eq!(
+        storage.get_account_counter(anchor_number),
+        AccountsCounter::default()
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter::default()
+    );
 }
 
 #[test]
@@ -70,14 +80,20 @@ fn should_create_additional_account() {
             stored_account_references: 2,
         }
     );
-    assert_eq!(storage.get_account_counter(anchor_number), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 2,
-    });
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 2,
-    });
+    assert_eq!(
+        storage.get_account_counter(anchor_number),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 2,
+        }
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 2,
+        }
+    );
 }
 
 #[test]
@@ -134,14 +150,20 @@ fn should_list_accounts() {
         listed_accounts[1], expected_additional_account_ref,
         "Additional account reference is missing from the listed accounts."
     );
-    assert_eq!(storage.get_account_counter(anchor_number), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 2,
-    });
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 2,
-    });
+    assert_eq!(
+        storage.get_account_counter(anchor_number),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 2,
+        }
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 2,
+        }
+    );
 }
 
 #[test]
@@ -194,14 +216,20 @@ fn should_list_all_identity_accounts() {
     // Default account + additional account for the origin_2 application.
     assert_eq!(listed_accounts.len(), 4);
 
-    assert_eq!(storage.get_account_counter(anchor_number), AccountsCounter {
-        stored_accounts: 4,
-        stored_account_references: 4,
-    });
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter {
-        stored_accounts: 4,
-        stored_account_references: 4,
-    });
+    assert_eq!(
+        storage.get_account_counter(anchor_number),
+        AccountsCounter {
+            stored_accounts: 4,
+            stored_account_references: 4,
+        }
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter {
+            stored_accounts: 4,
+            stored_account_references: 4,
+        }
+    );
 }
 
 #[test]
@@ -239,14 +267,20 @@ fn should_update_default_account() {
         last_used: None,
     };
     assert_eq!(updated_accounts, vec![expected_updated_account]);
-    assert_eq!(storage.get_account_counter(anchor_number), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 1,
-    });
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 1,
-    });
+    assert_eq!(
+        storage.get_account_counter(anchor_number),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 1,
+        }
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 1,
+        }
+    );
 }
 
 #[test]
@@ -318,14 +352,20 @@ fn should_update_additional_account() {
         name: Some(new_account_name),
     };
     assert_eq!(updated_account, expected_updated_account);
-    assert_eq!(storage.get_account_counter(anchor_number), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 2,
-    });
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter {
-        stored_accounts: 1,
-        stored_account_references: 2,
-    });
+    assert_eq!(
+        storage.get_account_counter(anchor_number),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 2,
+        }
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter {
+            stored_accounts: 1,
+            stored_account_references: 2,
+        }
+    );
 }
 
 #[test]
@@ -334,7 +374,7 @@ fn should_count_accounts_different_anchors() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    // --- Anchor 1 --- 
+    // --- Anchor 1 ---
     let anchor_1 = storage.allocate_anchor().unwrap();
     storage.create(anchor_1.clone()).unwrap();
     let anchor_number_1 = anchor_1.anchor_number();
@@ -343,12 +383,27 @@ fn should_count_accounts_different_anchors() {
 
     // List accounts for anchor 1 - should return 1 (default)
     let accounts_anchor_1_initial = storage.list_accounts(&anchor_number_1, &origin_1).unwrap();
-    assert_eq!(accounts_anchor_1_initial.len(), 1, "Initial list for anchor 1 should have 1 account");
-    assert!(accounts_anchor_1_initial[0].account_number.is_none(), "Initial account should be default");
+    assert_eq!(
+        accounts_anchor_1_initial.len(),
+        1,
+        "Initial list for anchor 1 should have 1 account"
+    );
+    assert!(
+        accounts_anchor_1_initial[0].account_number.is_none(),
+        "Initial account should be default"
+    );
 
     // Check counters for anchor 1 - should be 0
-    assert_eq!(storage.get_account_counter(anchor_number_1), AccountsCounter::default(), "Counters for anchor 1 should be 0");
-    assert_eq!(*storage.get_total_accounts_counter(), AccountsCounter::default(), "Total counters should be 0");
+    assert_eq!(
+        storage.get_account_counter(anchor_number_1),
+        AccountsCounter::default(),
+        "Counters for anchor 1 should be 0"
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        AccountsCounter::default(),
+        "Total counters should be 0"
+    );
 
     // Create an additional account for anchor 1
     let create_params_1 = CreateAccountParams {
@@ -360,17 +415,29 @@ fn should_count_accounts_different_anchors() {
 
     // List accounts for anchor 1 - should return 2
     let accounts_anchor_1_after_add = storage.list_accounts(&anchor_number_1, &origin_1).unwrap();
-    assert_eq!(accounts_anchor_1_after_add.len(), 2, "List for anchor 1 after additional account should have 2 accounts");
+    assert_eq!(
+        accounts_anchor_1_after_add.len(),
+        2,
+        "List for anchor 1 after additional account should have 2 accounts"
+    );
 
     // Check counters for anchor 1 and total counters
     let expected_counters_anchor_1 = AccountsCounter {
         stored_accounts: 1,
         stored_account_references: 2,
     };
-    assert_eq!(storage.get_account_counter(anchor_number_1), expected_counters_anchor_1, "Counters for anchor 1 after additional account mismatch");
-    assert_eq!(*storage.get_total_accounts_counter(), expected_counters_anchor_1, "Total counters after anchor 1 additional account mismatch");
+    assert_eq!(
+        storage.get_account_counter(anchor_number_1),
+        expected_counters_anchor_1,
+        "Counters for anchor 1 after additional account mismatch"
+    );
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        expected_counters_anchor_1,
+        "Total counters after anchor 1 additional account mismatch"
+    );
 
-    // --- Anchor 2 --- 
+    // --- Anchor 2 ---
     let anchor_2 = storage.allocate_anchor().unwrap();
     storage.create(anchor_2.clone()).unwrap();
     let anchor_number_2 = anchor_2.anchor_number();
@@ -379,11 +446,22 @@ fn should_count_accounts_different_anchors() {
 
     // List accounts for anchor 2 - should return 1 (default)
     let accounts_anchor_2_initial = storage.list_accounts(&anchor_number_2, &origin_2).unwrap();
-    assert_eq!(accounts_anchor_2_initial.len(), 1, "Initial list for anchor 2 should have 1 account");
-    assert!(accounts_anchor_2_initial[0].account_number.is_none(), "Initial account for anchor 2 should be default");
-    
+    assert_eq!(
+        accounts_anchor_2_initial.len(),
+        1,
+        "Initial list for anchor 2 should have 1 account"
+    );
+    assert!(
+        accounts_anchor_2_initial[0].account_number.is_none(),
+        "Initial account for anchor 2 should be default"
+    );
+
     // Check counters for anchor 2 - should be 0 (total counters still reflect anchor 1)
-    assert_eq!(storage.get_account_counter(anchor_number_2), AccountsCounter::default(), "Counters for anchor 2 should be default 0");
+    assert_eq!(
+        storage.get_account_counter(anchor_number_2),
+        AccountsCounter::default(),
+        "Counters for anchor 2 should be default 0"
+    );
 
     // Create an additional account for anchor 2
     let create_params_2 = CreateAccountParams {
@@ -395,19 +473,31 @@ fn should_count_accounts_different_anchors() {
 
     // List accounts for anchor 2 - should return 2
     let accounts_anchor_2_after_add = storage.list_accounts(&anchor_number_2, &origin_2).unwrap();
-    assert_eq!(accounts_anchor_2_after_add.len(), 2, "List for anchor 2 after additional account should have 2 accounts");
+    assert_eq!(
+        accounts_anchor_2_after_add.len(),
+        2,
+        "List for anchor 2 after additional account should have 2 accounts"
+    );
 
     // Check counters for anchor 2
     let expected_counters_anchor_2 = AccountsCounter {
         stored_accounts: 1,
         stored_account_references: 2,
     };
-    assert_eq!(storage.get_account_counter(anchor_number_2), expected_counters_anchor_2, "Counters for anchor 2 after additional account mismatch");
+    assert_eq!(
+        storage.get_account_counter(anchor_number_2),
+        expected_counters_anchor_2,
+        "Counters for anchor 2 after additional account mismatch"
+    );
 
     // Check total counters - should be sum of anchor 1 and anchor 2
     let expected_total_counters = AccountsCounter {
-        stored_accounts: 2, // 1 from anchor_1 + 1 from anchor_2
+        stored_accounts: 2,           // 1 from anchor_1 + 1 from anchor_2
         stored_account_references: 4, // 2 from anchor_1 + 2 from anchor_2
     };
-    assert_eq!(*storage.get_total_accounts_counter(), expected_total_counters, "Total counters after anchor 2 additional account mismatch");
+    assert_eq!(
+        *storage.get_total_accounts_counter(),
+        expected_total_counters,
+        "Total counters after anchor 2 additional account mismatch"
+    );
 }

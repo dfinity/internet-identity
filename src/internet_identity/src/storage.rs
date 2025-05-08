@@ -79,7 +79,10 @@
 //!
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
-use account::{Account, AccountType, CreateAccountParams, AccountsCounter, ReadAccountParams, UpdateAccountParams, UpdateExistinAccountParams};
+use account::{
+    Account, AccountType, AccountsCounter, CreateAccountParams, ReadAccountParams,
+    UpdateAccountParams, UpdateExistinAccountParams,
+};
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use std::borrow::Cow;
@@ -174,8 +177,10 @@ const STABLE_ACCOUNT_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ACCOUNT_MEMORY_I
 const STABLE_APPLICATION_MEMORY_ID: MemoryId = MemoryId::new(STABLE_APPLICATION_MEMORY_INDEX);
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX);
-const STABLE_ACCOUNT_COUNTER_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ACCOUNT_COUNTER_MEMORY_INDEX);
-const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX);
+const STABLE_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
+    MemoryId::new(STABLE_ACCOUNT_COUNTER_MEMORY_INDEX);
+const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
+    MemoryId::new(STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID: MemoryId =
@@ -252,7 +257,8 @@ pub struct Storage<M: Memory> {
     stable_application_memory: StableBTreeMap<ApplicationNumber, Application, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account counter memory.
     stable_anchor_account_counter_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_anchor_account_counter_memory: StableBTreeMap<AccountNumber, AccountsCounter, ManagedMemory<M>>,
+    stable_anchor_account_counter_memory:
+        StableBTreeMap<AccountNumber, AccountsCounter, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account reference list memory.
     stable_account_reference_list_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_reference_list_memory: StableBTreeMap<
@@ -286,10 +292,6 @@ struct Header {
     entry_size: u16,
     salt: [u8; 32],
 }
-
-
-
-
 
 impl<M: Memory + Clone> Storage<M> {
     /// Creates a new empty storage that manages the data of anchors in
@@ -340,7 +342,8 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_anchor_memory = memory_manager.get(STABLE_ANCHOR_MEMORY_ID);
         let stable_account_memory = memory_manager.get(STABLE_ACCOUNT_MEMORY_ID);
         let stable_application_memory = memory_manager.get(STABLE_APPLICATION_MEMORY_ID);
-        let stable_anchor_account_counter_memory = memory_manager.get(STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID);
+        let stable_anchor_account_counter_memory =
+            memory_manager.get(STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID);
         let stable_account_reference_list_memory =
             memory_manager.get(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
@@ -393,7 +396,9 @@ impl<M: Memory + Clone> Storage<M> {
             stable_anchor_account_counter_memory_wrapper: MemoryWrapper::new(
                 stable_anchor_account_counter_memory.clone(),
             ),
-            stable_anchor_account_counter_memory: StableBTreeMap::init(stable_anchor_account_counter_memory),
+            stable_anchor_account_counter_memory: StableBTreeMap::init(
+                stable_anchor_account_counter_memory,
+            ),
             stable_account_reference_list_memory_wrapper: MemoryWrapper::new(
                 stable_account_reference_list_memory.clone(),
             ),
@@ -403,7 +408,8 @@ impl<M: Memory + Clone> Storage<M> {
             stable_account_counter_memory: StableCell::init(
                 stable_account_counter_memory,
                 AccountsCounter::default(),
-            ).expect("stable_account_counter_memory"),
+            )
+            .expect("stable_account_counter_memory"),
             lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_openid_credential_memory.clone(),
             ),
@@ -714,10 +720,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    pub fn lookup_application_with_origin(
-        &self,
-        origin: &FrontendHostname,
-    ) -> Option<Application> {
+    pub fn lookup_application_with_origin(&self, origin: &FrontendHostname) -> Option<Application> {
         self.lookup_application_number_with_origin(origin)
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
     }
@@ -735,22 +738,36 @@ impl<M: Memory + Clone> Storage<M> {
     /// Updates the anchor account, application and account counters.
     /// It doesn't update the account conter for Account type.
     /// Because that one is updated when a new account number is allocated with `allocate_account_number`.
-    fn update_counters(&mut self, application_number: ApplicationNumber, anchor_number: AnchorNumber, account_type: AccountType) -> Result<(), StorageError> {
-        let anchor_account_counter = self.stable_anchor_account_counter_memory.get(&anchor_number).unwrap_or(AccountsCounter {
-            stored_accounts: 0,
-            stored_account_references: 0,
-        });
-        self.stable_anchor_account_counter_memory.insert(anchor_number, anchor_account_counter.increment(&account_type));
+    fn update_counters(
+        &mut self,
+        application_number: ApplicationNumber,
+        anchor_number: AnchorNumber,
+        account_type: AccountType,
+    ) -> Result<(), StorageError> {
+        let anchor_account_counter = self
+            .stable_anchor_account_counter_memory
+            .get(&anchor_number)
+            .unwrap_or(AccountsCounter {
+                stored_accounts: 0,
+                stored_account_references: 0,
+            });
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            anchor_account_counter.increment(&account_type),
+        );
 
         // The account counter is updated when a new account number is allocated with `allocate_account_number`.
         if account_type == AccountType::AccountReference {
             let account_number = self.stable_account_counter_memory.get();
-            self.stable_account_counter_memory.set(account_number.increment(&account_type)).map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
+            self.stable_account_counter_memory
+                .set(account_number.increment(&account_type))
+                .map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
         }
 
         if let Some(mut application) = self.stable_application_memory.get(&application_number) {
             application.stored_accounts += 1;
-            self.stable_application_memory.insert(application_number, application);
+            self.stable_application_memory
+                .insert(application_number, application);
         }
         Ok(())
     }
@@ -758,10 +775,12 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
-        self.stable_anchor_account_counter_memory.get(&anchor_number).unwrap_or(AccountsCounter {
-            stored_accounts: 0,
-            stored_account_references: 0,
-        })
+        self.stable_anchor_account_counter_memory
+            .get(&anchor_number)
+            .unwrap_or(AccountsCounter {
+                stored_accounts: 0,
+                stored_account_references: 0,
+            })
     }
 
     #[allow(dead_code)]
@@ -775,7 +794,8 @@ impl<M: Memory + Clone> Storage<M> {
         let account_conter = self.stable_account_counter_memory.get();
         let updated_accounts_counter = account_conter.increment(&AccountType::Account);
         let next_account_number = updated_accounts_counter.stored_accounts;
-        self.stable_account_counter_memory.set(updated_accounts_counter)
+        self.stable_account_counter_memory
+            .set(updated_accounts_counter)
             .map_err(|_| StorageError::ErrorUpdatingAccountCounter)?;
         Ok(next_account_number)
     }
@@ -863,9 +883,8 @@ impl<M: Memory + Clone> Storage<M> {
                 self.stable_account_reference_list_memory
                     .insert((anchor_number, app_num), refs_vec.into());
                 self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
-
             }
-        }            
+        }
 
         // Return the new account
         Ok(Account {
@@ -994,12 +1013,15 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_account_memory
             .insert(new_account_number, storable_account);
 
-
         // Get or create an application number from the account's origin.
         let application_number =
             self.lookup_or_insert_application_number_with_origin(&params.origin);
         // Update counters with one more account.
-        self.update_counters(application_number, params.anchor_number, AccountType::Account)?;
+        self.update_counters(
+            application_number,
+            params.anchor_number,
+            AccountType::Account,
+        )?;
 
         // Update the account references list.
         let account_references_key = (params.anchor_number, application_number);
@@ -1018,7 +1040,11 @@ impl<M: Memory + Clone> Storage<M> {
                 self.stable_account_reference_list_memory
                     .insert(account_references_key, vec![new_ref].into());
                 // One new account reference was created.
-                self.update_counters(application_number, params.anchor_number, AccountType::AccountReference)?;
+                self.update_counters(
+                    application_number,
+                    params.anchor_number,
+                    AccountType::AccountReference,
+                )?;
             }
             Some(existing_storable_list) => {
                 // If the list exists, update the default account reference with the new account number.

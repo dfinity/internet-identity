@@ -43,9 +43,7 @@ pub enum AccountType {
 
 // Types stored in memory.
 
-#[derive(
-    Clone, Debug, Deserialize, CandidType, serde::Serialize, PartialEq
-)]
+#[derive(Clone, Debug, Deserialize, CandidType, serde::Serialize, PartialEq)]
 pub struct AccountsCounter {
     pub stored_accounts: u64,
     pub stored_account_references: u64,
