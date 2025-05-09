@@ -765,7 +765,10 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         if let Some(mut application) = self.stable_application_memory.get(&application_number) {
-            application.stored_accounts += 1;
+            match account_type {
+                AccountType::Account => application.stored_accounts += 1,
+                AccountType::AccountReference => application.stored_account_references += 1,
+            }
             self.stable_application_memory
                 .insert(application_number, application);
         }
