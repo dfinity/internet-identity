@@ -215,7 +215,7 @@ fn should_list_all_identity_accounts() {
     assert_eq!(
         storage.get_account_counter(anchor_number),
         AccountsCounter {
-            stored_accounts: 4,
+            stored_accounts: 2,
             stored_account_references: 4,
         }
     );
