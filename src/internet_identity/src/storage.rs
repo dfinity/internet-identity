@@ -875,7 +875,6 @@ impl<M: Memory + Clone> Storage<M> {
                     (anchor_number, app_num),
                     vec![default_account_reference, additional_account_reference].into(),
                 );
-                
             }
             Some(existing_storable_list) => {
                 self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
