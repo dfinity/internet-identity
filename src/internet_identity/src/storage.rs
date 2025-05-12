@@ -857,6 +857,9 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&(anchor_number, app_num))
         {
             None => {
+                // Two new account references were created.
+                self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
+                self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
                 // If no list exists for this anchor & application,
                 // Create and insert the default and additional account.
                 // This is because we don't create default accounts explicitly.
@@ -872,11 +875,10 @@ impl<M: Memory + Clone> Storage<M> {
                     (anchor_number, app_num),
                     vec![default_account_reference, additional_account_reference].into(),
                 );
-                // Two new account references were created.
-                self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
-                self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
+                
             }
             Some(existing_storable_list) => {
+                self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
                 // If the list exists, push the new account and reinsert it to memory
                 let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
                 refs_vec.push(AccountReference {
@@ -885,7 +887,6 @@ impl<M: Memory + Clone> Storage<M> {
                 });
                 self.stable_account_reference_list_memory
                     .insert((anchor_number, app_num), refs_vec.into());
-                self.update_counters(app_num, anchor_number, AccountType::AccountReference)?;
             }
         }
 
