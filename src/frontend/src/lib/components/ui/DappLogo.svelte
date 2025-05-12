@@ -18,8 +18,7 @@
   aria-hidden="true"
   {...props}
   class={[
-    "flex h-16 min-w-16 shrink-0 items-center justify-center overflow-hidden",
-    isNullish(img) ? "rounded-full" : "rounded-2xl",
+    "flex h-16 min-w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl",
     isNullish(img) && "border",
     isNullish(img) && "border-gray-light-200 text-gray-light-900 bg-white",
     isNullish(img) &&
