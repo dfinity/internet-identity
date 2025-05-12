@@ -1,5 +1,9 @@
 <script lang="ts">
   import { nonNullish } from "@dfinity/utils";
+  import Button from "$lib/components/ui/Button.svelte";
+  import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
+  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
+  import Alert from "$lib/components/ui/Alert.svelte";
 
   type Props = {
     connectOrCreatePasskey: () => void;
@@ -11,19 +15,26 @@
   const supportsPasskeys = nonNullish(window.PublicKeyCredential);
 </script>
 
-<div class="flex flex-col items-stretch gap-4">
+<div class="flex flex-col items-stretch gap-6">
   {#if !supportsPasskeys}
-    <div class="card preset-filled-surface-100-900 p-4">
-      <p class="font-semibold">Passkeys are unavailable on this browser</p>
-      <p class="text-sm">Please choose another sign-in method</p>
-    </div>
+    <Alert
+      title="Passkeys not available here"
+      description="Passkeys are unavailable on this device or browser. Please choose
+        another sign-in method to continue."
+    />
   {/if}
-  <button
-    onclick={connectOrCreatePasskey}
-    class="btn preset-filled py-2"
-    disabled={!supportsPasskeys}>Continue with Passkey</button
-  >
-  <button onclick={continueWithGoogle} class="btn preset-outlined py-2"
-    >Continue with Google</button
-  >
+  <div class="flex flex-col items-stretch gap-3">
+    <Button
+      onclick={connectOrCreatePasskey}
+      disabled={!supportsPasskeys}
+      size="xl"
+    >
+      <PasskeyIcon />
+      Continue with Passkey
+    </Button>
+    <Button onclick={continueWithGoogle} variant="secondary" size="xl">
+      <GoogleIcon />
+      Continue with Google
+    </Button>
+  </div>
 </div>

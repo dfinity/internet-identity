@@ -16,7 +16,7 @@
   import ConnectOrCreatePasskey from "./components/ConnectOrCreatePasskey.svelte";
   import CreatePasskey from "./components/CreatePasskey.svelte";
   import SolveCaptcha from "./components/SolveCaptcha.svelte";
-  import Dialog from "$lib/components/UI/Dialog.svelte";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
   import { handleError } from "./error";
   import {
     AuthenticationV2Events,
@@ -40,6 +40,10 @@
     authorizationStore,
     authorizationContextStore,
   } from "$lib/stores/authorization.store";
+  import Badge from "$lib/components/ui/Badge.svelte";
+  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
+  import { toaster } from "$lib/components/utils/toaster";
+  import DappLogo from "$lib/components/ui/DappLogo.svelte";
 
   let currentState = $state<State>({ state: "pickAuthenticationMethod" });
 
@@ -159,7 +163,12 @@
         identityNumber,
         accountNumber: undefined,
       });
-      await authorizationStore.authorize(undefined);
+      toaster.success({
+        title: "You're all set. Your account has been created.",
+        duration: 4000,
+        closable: false,
+      });
+      await authorizationStore.authorize(undefined, 4000);
     } catch (error) {
       if (isCanisterError<IdRegFinishError>(error)) {
         switch (error.type) {
@@ -270,6 +279,7 @@
               .then(throwCanisterError);
             resolve();
           } catch (error) {
+            console.log("error", error);
             if (
               isCanisterError<CheckCaptchaError>(error) &&
               error.type === "WrongSolution"
@@ -315,7 +325,12 @@
         identityNumber,
         accountNumber: undefined,
       });
-      await authorizationStore.authorize(undefined);
+      toaster.success({
+        title: "You're all set. Your account has been created.",
+        duration: 4000,
+        closable: false,
+      });
+      await authorizationStore.authorize(undefined, 4000);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -336,22 +351,28 @@
 </script>
 
 {#if currentState.state === "solveCaptcha"}
-  <Dialog
-    title={currentState.state === "solveCaptcha"
-      ? "Prove you're not a robot"
-      : "Continue with Passkey"}
-    class="min-h-96 w-100"
-  >
-    <SolveCaptcha {...currentState} />
-  </Dialog>
+  <SolveCaptcha {...currentState} />
 {:else}
+  <div class="flex flex-col items-center gap-6 py-8">
+    <DappLogo origin={$authorizationContextStore.requestOrigin} />
+    <Badge size="sm" class="max-w-full">
+      <Ellipsis
+        text={$authorizationContextStore.requestOrigin}
+        position="middle"
+      />
+    </Badge>
+  </div>
+  <div class="mb-6 flex flex-col gap-2">
+    <h1 class="text-gray-light-900 dark:text-gray-dark-25 text-2xl font-medium">
+      Sign in
+    </h1>
+    <p class="text-gray-light-700 dark:text-gray-dark-50 text-sm">
+      with Internet Identity
+    </p>
+  </div>
   <PickAuthenticationMethod {connectOrCreatePasskey} {continueWithGoogle} />
   {#if currentState.state !== "pickAuthenticationMethod"}
-    <Dialog
-      title={"Continue with Passkey"}
-      onClose={pickAuthenticationMethod}
-      class="min-h-100 w-100"
-    >
+    <Dialog onClose={pickAuthenticationMethod}>
       {#if currentState.state === "connectOrCreatePasskey"}
         <ConnectOrCreatePasskey {...currentState} />
       {:else if currentState.state === "createPasskey"}
