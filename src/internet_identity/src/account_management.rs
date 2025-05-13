@@ -100,7 +100,7 @@ fn should_get_accounts_for_origin() {
             Account {
                 account_number: Some(2),
                 anchor_number,
-                origin: origin,
+                origin,
                 last_used: None,
                 name: Some("Bob".to_string())
             }
@@ -159,7 +159,7 @@ fn should_only_get_own_accounts_for_origin() {
             Account {
                 account_number: Some(2),
                 anchor_number: anchor_number_two,
-                origin: origin,
+                origin,
                 last_used: None,
                 name: Some("Bob".to_string())
             }
