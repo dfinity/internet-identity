@@ -31,9 +31,9 @@ fn should_create_additional_account() {
 
     // 2. Additional account and application don't exist yet.
     let read_params = ReadAccountParams {
-        account_number: Some(1), // First account created
-        anchor_number,
-        origin: origin.clone(),
+        account_number: &Some(1), // First account created
+        anchor_number: &anchor_number,
+        origin: &origin,
     };
     let additional_account_1 = storage.read_account(read_params.clone());
     assert!(
@@ -108,7 +108,7 @@ fn should_list_accounts() {
     storage.create(anchor).unwrap();
 
     // 3. List accounts returns default account
-    let listed_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
+    let listed_accounts = storage.list_accounts(&anchor_number, &origin);
     assert_eq!(listed_accounts.len(), 1);
     assert!(listed_accounts[0].account_number.is_none());
     assert_empty_counters(&storage, anchor_number);
@@ -130,7 +130,7 @@ fn should_list_accounts() {
     storage.create_additional_account(new_account).unwrap();
 
     // 5. List accounts returns default account
-    let listed_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
+    let listed_accounts = storage.list_accounts(&anchor_number, &origin);
 
     // 6. Assert that the list contains exactly two accounts and it matches the expected one
     assert_eq!(
@@ -240,7 +240,7 @@ fn should_update_default_account() {
     let account_name = "account name".to_string();
 
     // 2. Default account exists withuot creating it
-    let initial_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
+    let initial_accounts = storage.list_accounts(&anchor_number, &origin);
     let expected_unreserved_account = AccountReference {
         account_number: None,
         last_used: None,
@@ -257,7 +257,7 @@ fn should_update_default_account() {
     let new_account_number = storage.update_account(updated_account_params).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
-    let updated_accounts = storage.list_accounts(&anchor_number, &origin).unwrap();
+    let updated_accounts = storage.list_accounts(&anchor_number, &origin);
     let expected_updated_account = AccountReference {
         account_number: Some(new_account_number),
         last_used: None,
@@ -294,9 +294,9 @@ fn should_update_additional_account() {
 
     // 2. Additional account and application don't exist yet.
     let read_params = ReadAccountParams {
-        account_number: Some(account_number), // First account created is 1
-        anchor_number,
-        origin: origin.clone(),
+        account_number: &Some(account_number), // First account created is 1
+        anchor_number: &anchor_number,
+        origin: &origin,
     };
     let additional_account_1 = storage.read_account(read_params.clone());
     assert!(
@@ -335,9 +335,9 @@ fn should_update_additional_account() {
     // 5. Check that the additional account has been created with the updated values.
     let updated_account = storage
         .read_account(ReadAccountParams {
-            account_number: Some(update_account_return_value),
-            anchor_number,
-            origin: origin.clone(),
+            account_number: &Some(update_account_return_value),
+            anchor_number: &anchor_number,
+            origin: &origin,
         })
         .unwrap();
     let expected_updated_account = Account {
@@ -378,7 +378,7 @@ fn should_count_accounts_different_anchors() {
     let account_name_1 = "account_anchor1".to_string();
 
     // List accounts for anchor 1 - should return 1 (default)
-    let accounts_anchor_1_initial = storage.list_accounts(&anchor_number_1, &origin_1).unwrap();
+    let accounts_anchor_1_initial = storage.list_accounts(&anchor_number_1, &origin_1);
     assert_eq!(
         accounts_anchor_1_initial.len(),
         1,
@@ -411,7 +411,7 @@ fn should_count_accounts_different_anchors() {
     storage.create_additional_account(create_params_1).unwrap();
 
     // List accounts for anchor 1 - should return 2
-    let accounts_anchor_1_after_add = storage.list_accounts(&anchor_number_1, &origin_1).unwrap();
+    let accounts_anchor_1_after_add = storage.list_accounts(&anchor_number_1, &origin_1);
     assert_eq!(
         accounts_anchor_1_after_add.len(),
         2,
@@ -442,7 +442,7 @@ fn should_count_accounts_different_anchors() {
     let account_name_2 = "account_anchor2".to_string();
 
     // List accounts for anchor 2 - should return 1 (default)
-    let accounts_anchor_2_initial = storage.list_accounts(&anchor_number_2, &origin_2).unwrap();
+    let accounts_anchor_2_initial = storage.list_accounts(&anchor_number_2, &origin_2);
     assert_eq!(
         accounts_anchor_2_initial.len(),
         1,
@@ -469,7 +469,7 @@ fn should_count_accounts_different_anchors() {
     storage.create_additional_account(create_params_2).unwrap();
 
     // List accounts for anchor 2 - should return 2
-    let accounts_anchor_2_after_add = storage.list_accounts(&anchor_number_2, &origin_2).unwrap();
+    let accounts_anchor_2_after_add = storage.list_accounts(&anchor_number_2, &origin_2);
     assert_eq!(
         accounts_anchor_2_after_add.len(),
         2,

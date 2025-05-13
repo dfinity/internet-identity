@@ -30,6 +30,7 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use storage::{Salt, Storage};
 
+mod account_management;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -298,21 +299,11 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(_anchor_number: AnchorNumber, _origin: FrontendHostname) -> Vec<AccountInfo> {
-    vec![
-        AccountInfo {
-            account_number: None,
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Default Mock Account".to_string()),
-        },
-        AccountInfo {
-            account_number: Some(1),
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Additional Mock Account".to_string()),
-        },
-    ]
+fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<AccountInfo> {
+    account_management::get_accounts_for_origin(&anchor_number, &origin)
+        .iter()
+        .map(|acc| acc.to_info())
+        .collect()
 }
 
 #[update]

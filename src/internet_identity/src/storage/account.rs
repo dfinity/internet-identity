@@ -1,7 +1,7 @@
 use candid::CandidType;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
+    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
 };
 use serde::Deserialize;
 use std::borrow::Cow;
@@ -29,10 +29,10 @@ pub struct UpdateExistinAccountParams {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ReadAccountParams {
-    pub account_number: Option<AccountNumber>,
-    pub anchor_number: AnchorNumber,
-    pub origin: FrontendHostname,
+pub struct ReadAccountParams<'a> {
+    pub account_number: &'a Option<AccountNumber>,
+    pub anchor_number: &'a AnchorNumber,
+    pub origin: &'a FrontendHostname,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -148,6 +148,15 @@ impl Account {
         AccountReference {
             account_number: self.account_number,
             last_used: self.last_used,
+        }
+    }
+
+    pub fn to_info(&self) -> AccountInfo {
+        AccountInfo {
+            account_number: self.account_number,
+            origin: self.origin.clone(),
+            last_used: self.last_used,
+            name: self.name.clone(),
         }
     }
 }
