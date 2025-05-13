@@ -97,7 +97,8 @@ fn should_create_account_for_origin() {
             anchor_number: anchor.anchor_number(),
             origin,
             last_used: None,
-            name: Some(name)
+            name: Some(name),
+            seed_from_anchor: None
         })
     );
 }
@@ -126,21 +127,24 @@ fn should_get_accounts_for_origin() {
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(1),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Alice".to_string())
+                name: Some("Alice".to_string()),
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(2),
                 anchor_number,
                 origin,
                 last_used: None,
-                name: Some("Bob".to_string())
+                name: Some("Bob".to_string()),
+                seed_from_anchor: None
             }
         ]
     )
@@ -172,14 +176,16 @@ fn should_only_get_own_accounts_for_origin() {
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(1), // because of how allocate_account_number is implemented, this starts at 1
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Alice".to_string())
+                name: Some("Alice".to_string()),
+                seed_from_anchor: None
             },
         ]
     );
@@ -192,14 +198,16 @@ fn should_only_get_own_accounts_for_origin() {
                 anchor_number: anchor_number_two,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(2),
                 anchor_number: anchor_number_two,
                 origin,
                 last_used: None,
-                name: Some("Bob".to_string())
+                name: Some("Bob".to_string()),
+                seed_from_anchor: None
             }
         ]
     )
@@ -229,21 +237,24 @@ fn should_update_account_for_origin() {
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(1),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Alice".to_string())
+                name: Some("Alice".to_string()),
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(2),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Bob".to_string())
+                name: Some("Bob".to_string()),
+                seed_from_anchor: None
             }
         ]
     );
@@ -262,7 +273,8 @@ fn should_update_account_for_origin() {
             anchor_number,
             origin: origin.clone(),
             last_used: None,
-            name: Some("Becky".to_string())
+            name: Some("Becky".to_string()),
+            seed_from_anchor: None
         })
     );
 
@@ -274,21 +286,24 @@ fn should_update_account_for_origin() {
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(1),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Becky".to_string())
+                name: Some("Becky".to_string()),
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(2),
                 anchor_number,
                 origin,
                 last_used: None,
-                name: Some("Bob".to_string())
+                name: Some("Bob".to_string()),
+                seed_from_anchor: None
             }
         ]
     );
@@ -318,21 +333,24 @@ fn should_update_default_account_for_origin() {
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(1),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Alice".to_string())
+                name: Some("Alice".to_string()),
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(2),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Bob".to_string())
+                name: Some("Bob".to_string()),
+                seed_from_anchor: None
             }
         ]
     );
@@ -351,7 +369,8 @@ fn should_update_default_account_for_origin() {
             anchor_number,
             origin: origin.clone(),
             last_used: None,
-            name: Some("Becky".to_string())
+            name: Some("Becky".to_string()),
+            seed_from_anchor: Some(anchor_number)
         })
     );
 
@@ -363,21 +382,24 @@ fn should_update_default_account_for_origin() {
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Becky".to_string())
+                name: Some("Becky".to_string()),
+                seed_from_anchor: Some(anchor_number)
             },
             Account {
                 account_number: Some(1),
                 anchor_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some("Alice".to_string())
+                name: Some("Alice".to_string()),
+                seed_from_anchor: None
             },
             Account {
                 account_number: Some(2),
                 anchor_number,
                 origin,
                 last_used: None,
-                name: Some("Bob".to_string())
+                name: Some("Bob".to_string()),
+                seed_from_anchor: None
             }
         ]
     );

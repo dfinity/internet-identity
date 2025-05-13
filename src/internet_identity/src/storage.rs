@@ -896,6 +896,7 @@ impl<M: Memory + Clone> Storage<M> {
             origin: origin.clone(),
             last_used: None,
             name: Some(params.name),
+            seed_from_anchor: None,
         })
     }
 

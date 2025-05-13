@@ -124,6 +124,7 @@ pub struct Account {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
+    pub seed_from_anchor: Option<AnchorNumber>,
 }
 
 impl Account {
@@ -139,6 +140,7 @@ impl Account {
             origin,
             last_used: None,
             name,
+            seed_from_anchor: None,
         }
     }
 
