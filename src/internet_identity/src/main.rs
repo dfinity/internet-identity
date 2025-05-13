@@ -312,16 +312,12 @@ fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<Ac
 
 #[update]
 fn create_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
     name: String,
 ) -> Result<AccountInfo, CreateAccountError> {
-    Ok(AccountInfo {
-        account_number: Some(ic_cdk::api::time()),
-        origin: "example.com".to_string(),
-        last_used: None,
-        name: Some(name),
-    })
+    account_management::create_account_for_origin(anchor_number, origin, name)
+        .map(|acc| acc.to_info())
 }
 
 #[update]
