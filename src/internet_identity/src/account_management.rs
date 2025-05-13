@@ -73,9 +73,9 @@ pub fn update_account_for_origin(
                 })
                 .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
         }),
-        None => Err(UpdateAccountError::InternalCanisterError(format!(
-            "No name was provided."
-        ))),
+        None => Err(UpdateAccountError::InternalCanisterError(
+            "No name was provided.".to_string(),
+        )),
     }
 }
 
