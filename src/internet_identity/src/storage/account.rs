@@ -124,7 +124,7 @@ pub struct Account {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
-    pub seed_from_anchor: Option<AnchorNumber>,
+    seed_from_anchor: Option<AnchorNumber>,
 }
 
 impl Account {
@@ -142,6 +142,27 @@ impl Account {
             name,
             seed_from_anchor: None,
         }
+    }
+
+    pub fn new_with_seed_anchor(
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        name: Option<String>,
+        account_number: Option<AccountNumber>,
+        seed_from_anchor: Option<AnchorNumber>,
+    ) -> Account {
+        Self {
+            account_number,
+            anchor_number,
+            origin,
+            last_used: None,
+            name,
+            seed_from_anchor,
+        }
+    }
+
+    pub fn get_seed_anchor(&self) -> Option<AnchorNumber> {
+        self.seed_from_anchor
     }
 
     // Used in tests (for now)

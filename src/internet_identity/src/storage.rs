@@ -890,14 +890,20 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         // Return the new account
-        Ok(Account {
-            account_number: Some(account_number),
+        // Ok(Account {
+        //     account_number: Some(account_number),
+        //     anchor_number,
+        //     origin: origin.clone(),
+        //     last_used: None,
+        //     name: Some(params.name),
+        //     seed_from_anchor: None,
+        // })
+        Ok(Account::new(
             anchor_number,
-            origin: origin.clone(),
-            last_used: None,
-            name: Some(params.name),
-            seed_from_anchor: None,
-        })
+            origin.to_string(),
+            Some(params.name),
+            Some(account_number),
+        ))
     }
 
     #[allow(dead_code)]
@@ -924,7 +930,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     /// Returns the requested account.
     /// If the account number doesn't esist, returns a default Account.
     /// If the account number exists but the account doesn't exist, returns None.
@@ -943,11 +948,12 @@ impl<M: Memory + Clone> Storage<M> {
             }
             Some(account_number) => match self.stable_account_memory.get(account_number) {
                 None => None,
-                Some(storable_account) => Some(Account::new(
+                Some(storable_account) => Some(Account::new_with_seed_anchor(
                     *params.anchor_number,
                     params.origin.clone(),
-                    Some(storable_account.name.clone()),
+                    Some(storable_account.name),
                     Some(*account_number),
+                    storable_account.seed_from_anchor,
                 )),
             },
         }
@@ -956,7 +962,6 @@ impl<M: Memory + Clone> Storage<M> {
     /// Updates an account.
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
-    #[allow(dead_code)]
     pub fn update_account(
         &mut self,
         params: UpdateAccountParams,
@@ -978,7 +983,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     /// Used in `update_account` to update an existing account.
     fn update_existing_account(
         &mut self,
@@ -998,7 +1002,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     /// Used in `update_account` to create a default account.
     /// Default account are not initially stored. They are stored when updated.
     /// If the default account reference does not exist, it must be created.
