@@ -322,17 +322,13 @@ fn create_account(
 
 #[update]
 fn update_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
-    _update: AccountUpdate,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
-    Ok(AccountInfo {
-        account_number: None,
-        origin: "example.com".to_string(),
-        last_used: Some(0u64),
-        name: Some("Default Mock Account".to_string()),
-    })
+    account_management::update_account_for_origin(anchor_number, account_number, origin, update)
+        .map(|acc| acc.to_info())
 }
 
 #[update]
