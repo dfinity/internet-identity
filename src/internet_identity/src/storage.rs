@@ -933,20 +933,20 @@ impl<M: Memory + Clone> Storage<M> {
             None => {
                 // Application number doesn't exist, return a default Account
                 Some(Account::new(
-                    params.anchor_number.clone(),
+                    *params.anchor_number,
                     params.origin.clone(),
                     // Default accounts have no name
                     None,
-                    params.account_number.clone(),
+                    *params.account_number,
                 ))
             }
-            Some(account_number) => match self.stable_account_memory.get(&account_number) {
+            Some(account_number) => match self.stable_account_memory.get(account_number) {
                 None => None,
                 Some(storable_account) => Some(Account::new(
-                    params.anchor_number.clone(),
+                    *params.anchor_number,
                     params.origin.clone(),
                     Some(storable_account.name.clone()),
-                    Some(account_number.clone()),
+                    Some(*account_number),
                 )),
             },
         }
