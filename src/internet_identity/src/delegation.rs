@@ -132,7 +132,7 @@ pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) ->
     Principal::self_authenticating(public_key)
 }
 
-fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
+pub fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
