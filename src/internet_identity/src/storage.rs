@@ -742,8 +742,8 @@ impl<M: Memory + Clone> Storage<M> {
         account_number: &Option<AccountNumber>,
     ) -> Option<AccountReference> {
         self.stable_account_reference_list_memory
-            .get(&(anchor_number.clone(), application_number.clone()))
-            .and_then(|acc_ref_list| Some(acc_ref_list.to_acc_ref_vec()))
+            .get(&(*anchor_number, *application_number))
+            .map(|acc_ref_list| acc_ref_list.to_acc_ref_vec())
             .and_then(|acc_ref_vec| {
                 acc_ref_vec
                     .iter()
