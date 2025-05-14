@@ -346,5 +346,5 @@ pub enum UpdateAccountError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetAccountsError {
     InternalCanisterError(String),
-    Unauthorized,
+    Unauthorized(Principal),
 }
