@@ -567,6 +567,11 @@ type UpdateAccountError = variant {
     InternalCanisterError : text;
 };
 
+type GetAccountsError = variant {
+    InternalCanisterError : text;
+    Unauthorized : principal;
+}
+
 type PrepareIdAliasRequest = record {
     // Origin of the issuer in the attribute sharing flow.
     issuer : FrontendHostname;
@@ -843,7 +848,7 @@ service : (opt InternetIdentityInit) -> {
     get_accounts : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
-    ) -> (vec AccountInfo) query;
+    ) -> (variant { Ok : vec AccountInfo; Err: GetAccountsError }) query;
 
     create_account : (
         anchor_number : UserNumber,
