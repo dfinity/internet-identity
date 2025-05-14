@@ -36,7 +36,7 @@
     onClose={api.closable ? api.dismiss : undefined}
     direction={mobile ? "vertical" : "horizontal"}
     class={[
-      "bg-clip-padding shadow-lg max-sm:w-[calc(100vw_-_2rem)] sm:w-100",
+      "shadow-lg not-dark:bg-clip-padding max-sm:w-[calc(100vw_-_2rem)] sm:w-100",
       "!border-black/[0.08]",
       "dark:!border-surface-dark-700",
     ]}
