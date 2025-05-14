@@ -1,13 +1,11 @@
 use crate::{
     state::{storage_borrow, storage_borrow_mut},
-<<<<<<< HEAD
     storage::{
-        account::{Account, CreateAccountParams, ReadAccountParams, UpdateAccountParams},
+        account::{
+            Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
+        },
         StorageError,
     },
-=======
-    storage::account::{Account, AccountsCounter, CreateAccountParams, ReadAccountParams},
->>>>>>> andri/implement-create-account
 };
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname,
@@ -67,6 +65,18 @@ pub fn update_account_for_origin(
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(name) => storage_borrow_mut(|storage| {
+            // Check against max if it is a
+            if account_number.is_none() {
+                let AccountsCounter {
+                    stored_accounts,
+                    stored_account_references: _,
+                } = storage.get_account_counter(anchor_number);
+
+                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+                    return Err(UpdateAccountError::MaximumAccountNumberReached);
+                }
+            }
+
             storage
                 .update_account(UpdateAccountParams {
                     account_number,

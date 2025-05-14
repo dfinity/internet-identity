@@ -342,6 +342,7 @@ pub enum CreateAccountError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
     InternalCanisterError(String),
+    MaximumAccountNumberReached,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
