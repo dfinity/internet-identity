@@ -344,6 +344,7 @@ pub enum CreateAccountError {
 pub enum UpdateAccountError {
     InternalCanisterError(String),
     MaximumAccountNumberReached,
+    Unauthorized(Principal),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

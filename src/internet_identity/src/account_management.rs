@@ -2,13 +2,13 @@ use crate::{
     state::{storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-        
             Account, AccountReference, AccountsCounter, CreateAccountParams, ReadAccountParams,
-    , UpdateAccountParams,
+            UpdateAccountParams,
         },
         StorageError,
     },
 };
+use ic_cdk::caller;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname,
     UpdateAccountError,
@@ -16,7 +16,6 @@ use internet_identity_interface::internet_identity::types::{
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
-#[allow(dead_code)]
 pub fn anchor_has_account(
     anchor_number: &AnchorNumber,
     origin: &FrontendHostname,
@@ -94,6 +93,11 @@ pub fn update_account_for_origin(
                 if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
                     return Err(UpdateAccountError::MaximumAccountNumberReached);
                 }
+            }
+
+            // If the anchor doesn't own this account, we return unauthorized.
+            if anchor_has_account(&anchor_number, &origin, &account_number).is_none() {
+                return Err(UpdateAccountError::Unauthorized(caller()));
             }
 
             storage

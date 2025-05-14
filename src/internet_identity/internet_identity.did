@@ -567,6 +567,8 @@ type CreateAccountError = variant {
 
 type UpdateAccountError = variant {
     InternalCanisterError : text;
+    MaximumAccountNumberReached;
+    Unauthorized : principal;
 };
 
 type GetAccountsError = variant {
