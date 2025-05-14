@@ -310,7 +310,7 @@ fn get_accounts(
                 .map(|acc| acc.to_info())
                 .collect(),
         ),
-        Err(_) => Err(GetAccountsError::Unauthorized),
+        Err(err) => Err(GetAccountsError::Unauthorized(err.principal)),
     }
 }
 
