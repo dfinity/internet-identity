@@ -2,7 +2,9 @@ use crate::{
     state::{storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
+        
+            Account, AccountReference, AccountsCounter, CreateAccountParams, ReadAccountParams,
+    , UpdateAccountParams,
         },
         StorageError,
     },
@@ -13,6 +15,22 @@ use internet_identity_interface::internet_identity::types::{
 };
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
+
+#[allow(dead_code)]
+pub fn anchor_has_account(
+    anchor_number: &AnchorNumber,
+    origin: &FrontendHostname,
+    account_number: &Option<AccountNumber>,
+) -> Option<AccountReference> {
+    // check if anchor has acc
+    storage_borrow(|storage| {
+        storage
+            .lookup_application_number_with_origin(origin)
+            .and_then(|application_number| {
+                storage.has_account_reference(anchor_number, &application_number, account_number)
+            })
+    })
+}
 
 pub fn get_accounts_for_origin(
     anchor_number: &AnchorNumber,
@@ -47,6 +65,7 @@ pub fn create_account_for_origin(
         if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
             return Err(CreateAccountError::MaximumAccountNumberReached);
         }
+
         storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
