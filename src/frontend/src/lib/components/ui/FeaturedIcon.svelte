@@ -18,9 +18,7 @@
 <div
   {...props}
   class={[
-    "flex shrink-0 items-center justify-center rounded-lg border",
-    "border-gray-light-300 text-gray-light-700 bg-white",
-    "dark:border-gray-light-600 dark:bg-gray-dark-950 dark:text-gray-light-300",
+    "bg-bg-primary text-fg-secondary border-border-secondary flex shrink-0 items-center justify-center rounded-lg border",
     sizes[size],
     className,
   ]}

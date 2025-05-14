@@ -1,11 +1,14 @@
 <script lang="ts">
-  import { type State } from "../state";
   import { tick } from "svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
-  type Props = Extract<State, { state: "solveCaptcha" }>;
+  interface Props {
+    image: string;
+    attempt: number;
+    solve: (solution: string) => void;
+  }
 
   const { image, attempt, solve }: Props = $props();
 
@@ -39,21 +42,15 @@
   });
 </script>
 
-<form class="flex flex-col pt-1">
-  <div class="mb-6 flex flex-col gap-2">
-    <h1 class="text-gray-light-900 dark:text-gray-dark-25 text-2xl font-medium">
-      Verify you are human
-    </h1>
-    <p class="text-gray-light-700 dark:text-gray-dark-50 text-sm">
+<form class="flex flex-1 flex-col">
+  <div class="mt-auto mb-6 flex flex-col gap-2">
+    <h1 class="text-text-primary text-2xl font-medium">Verify you are human</h1>
+    <p class="text-text-tertiary text-sm">
       Type the characters exactly as shown below
     </p>
   </div>
   <div
-    class={[
-      "relative mb-3 flex items-center justify-center rounded-lg border",
-      "border-gray-light-300 bg-white",
-      "dark:border-gray-light-600 dark:bg-gray-dark-950",
-    ]}
+    class="border-border-secondary bg-bg-primary relative mb-3 flex items-center justify-center rounded-lg border"
   >
     <img
       src={image}
@@ -61,11 +58,7 @@
       alt="CAPTCHA Characters"
     />
     <div
-      class={[
-        "absolute h-30 w-55",
-        "bg-gray-light-700 mix-blend-lighten",
-        "dark:bg-gray-light-300 dark:mix-blend-darken",
-      ]}
+      class={"bg-text-primary absolute inset-0 mix-blend-lighten dark:mix-blend-darken"}
     ></div>
   </div>
   <Input

@@ -74,4 +74,5 @@ export const handleError = (error: unknown) => {
     title: "Unexpected error",
     description: error instanceof Error ? error.message : undefined,
   });
+  console.error(error);
 };

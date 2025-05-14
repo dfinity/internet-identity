@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { HTMLAttributes } from "svelte/elements";
+  import type { SVGAttributes } from "svelte/elements";
   import { isNullish } from "@dfinity/utils";
 
-  type Props = HTMLAttributes<HTMLElement> & {
+  type Props = SVGAttributes<SVGSVGElement> & {
     value?: number;
   };
 
@@ -17,7 +17,7 @@
 
 <svg
   bind:clientWidth
-  viewBox={`0 0 ${clientWidth} ${clientWidth}`}
+  viewBox="0 0 {clientWidth} {clientWidth}"
   class={[
     "size-5 -rotate-90 rounded-full",
     className,

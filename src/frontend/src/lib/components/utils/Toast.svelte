@@ -38,7 +38,7 @@
     class={[
       "bg-clip-padding shadow-lg max-sm:w-[calc(100vw_-_2rem)] sm:w-100",
       "!border-black/[0.08]",
-      "dark:!border-gray-light-700",
+      "dark:!border-surface-dark-700",
     ]}
   />
 </div>

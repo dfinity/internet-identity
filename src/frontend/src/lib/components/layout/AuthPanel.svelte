@@ -9,7 +9,9 @@
 <div
   {...props}
   class={[
-    "sm:bg-gray-light-50 sm:border-gray-light-300 sm:dark:bg-gray-light-900 sm:dark:border-gray-light-600 w-full rounded-xl px-4 pt-5 pb-6 sm:max-w-100 sm:border sm:px-6",
+    "flex w-full flex-col rounded-xl px-4 pt-5 pb-6",
+    "max-sm:flex-1",
+    "sm:bg-bg-secondary sm:border-border-secondary sm:max-w-100 sm:border sm:px-6",
     className,
   ]}
 >

@@ -33,38 +33,21 @@
 <div
   {...props}
   class={[
-    "grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] items-start gap-4 rounded-xl border p-4",
-    "bg-gray-light-25 border-gray-light-200",
-    "dark:bg-gray-dark-800 dark:border-gray-light-700",
+    "bg-bg-primary_alt border-border-tertiary grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] items-start gap-4 rounded-xl border p-4",
     className,
   ]}
 >
   <div class={[direction === "horizontal" && "row-span-2"]}>
     {#if variant === "info"}
-      <InfoIcon
-        size="1.25rem"
-        class={["text-gray-light-600", "dark:text-gray-light-500"]}
-      />
+      <InfoIcon size="1.25rem" class="text-fg-brand-primary" />
     {:else if variant === "success"}
-      <CircleCheckIcon
-        size="1.25rem"
-        class={["text-success-600", "dark:text-success-500"]}
-      />
+      <CircleCheckIcon size="1.25rem" class="text-fg-success-primary" />
     {:else if variant === "warning"}
-      <CircleAlertIcon
-        size="1.25rem"
-        class={["text-warning-600", "dark:text-warning-500"]}
-      />
+      <CircleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
     {:else if variant === "error"}
-      <CircleAlertIcon
-        size="1.25rem"
-        class={["text-error-600", "dark:text-error-500"]}
-      />
+      <CircleAlertIcon size="1.25rem" class="text-fg-error-primary" />
     {:else if variant === "loading"}
-      <ProgressRing
-        value={null}
-        class={["text-gray-light-600", "dark:text-gray-light-500"]}
-      />
+      <ProgressRing class="text-fg-brand-primary" />
     {/if}
   </div>
   {#if nonNullish(onClose)}
@@ -90,25 +73,13 @@
       direction === "horizontal" && isNullish(onClose) && "col-span-2",
     ]}
   >
-    <div
-      class={[
-        "text-sm font-semibold",
-        "text-gray-light-900",
-        "dark:text-gray-dark-25",
-      ]}
-    >
+    <div class="text-text-primary text-sm font-semibold">
       {title}
     </div>
     {#if nonNullish(description) || nonNullish(children)}
       <div class="flex flex-col gap-3">
         {#if nonNullish(description)}
-          <div
-            class={[
-              "text-sm font-medium",
-              "text-gray-light-600",
-              "dark:text-gray-dark-50",
-            ]}
-          >
+          <div class="text-text-tertiary text-sm font-medium">
             {description}
           </div>
         {/if}

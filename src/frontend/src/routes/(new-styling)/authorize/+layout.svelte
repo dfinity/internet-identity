@@ -22,10 +22,8 @@
 <CenterLayout data-page="new-authorize-view">
   {#if status === "init" || status === "waiting" || status === "validating" || status === "authorizing"}
     <div class="flex flex-col items-center justify-center gap-4">
-      <ProgressRing
-        class="text-gray-light-900 dark:text-gray-dark-25 size-14"
-      />
-      <p class="text-gray-light-900 dark:text-gray-dark-50 text-lg">
+      <ProgressRing class="text-fg-primary size-14" />
+      <p class="text-text-secondary text-lg">
         {status === "authorizing" ? "Redirecting to the app" : "Loading"}
       </p>
     </div>

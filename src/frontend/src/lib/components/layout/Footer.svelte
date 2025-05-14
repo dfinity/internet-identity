@@ -14,22 +14,8 @@
     className,
   ]}
 >
-  <div
-    class={[
-      "text-sm font-medium",
-      "text-gray-light-600",
-      "dark:text-gray-dark-50",
-    ]}
-  >
-    © Internet Identity
-  </div>
-  <nav
-    class={[
-      "flex gap-4 text-sm font-semibold",
-      "text-gray-light-900",
-      "dark:text-gray-dark-25",
-    ]}
-  >
+  <div class="text-text-tertiary text-sm font-medium">© Internet Identity</div>
+  <nav class="text-text-primary flex gap-4 text-sm font-semibold">
     <a href={SUPPORT_URL} target="_blank" rel="noopener">Support</a>
     <a href={SOURCE_CODE_URL} target="_blank" rel="noopener">Source code</a>
   </nav>

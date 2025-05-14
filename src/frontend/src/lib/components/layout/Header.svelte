@@ -9,22 +9,11 @@
 
 <header
   {...props}
-  class={[
-    "flex h-14 items-center border-b px-4 py-3 md:px-6 lg:px-8",
-    "border-gray-light-200",
-    "dark:border-gray-light-700",
-    className,
-  ]}
+  class={["flex h-14 items-center px-4 py-3 md:px-6 lg:px-8", className]}
 >
   <a href="/" class="flex h-14 items-center gap-4">
-    <Logo class={["h-5.5", "text-gray-light-900", "dark:text-gray-dark-25"]} />
-    <h1
-      class={[
-        "text-md hidden font-semibold md:block",
-        "text-gray-light-900",
-        "dark:text-gray-dark-25",
-      ]}
-    >
+    <Logo class="text-fg-primary h-5.5" />
+    <h1 class="text-md text-text-primary hidden font-semibold md:block">
       Internet Identity
     </h1>
   </a>

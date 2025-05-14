@@ -1,16 +1,16 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
-  import { type State } from "../state";
   import { onMount } from "svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { User } from "@lucide/svelte";
+  import { UserPlusIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
-  type Props = Extract<State, { state: "createPasskey" }>;
+  interface Props {
+    create: (name: string) => void;
+  }
 
-  const { create, cancel }: Props = $props();
+  const { create }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
@@ -23,34 +23,30 @@
 
   onMount(() => {
     inputRef?.focus();
-    // Make sure mobile keyboard does not overlap the input
-    setTimeout(() => inputRef?.scrollIntoView(), 100);
   });
 </script>
 
 <form class="flex flex-1 flex-col">
-  <div class="mb-8 flex flex-col" in:fly={{ duration: 200, x: 10 }}>
+  <div class="mb-8 flex flex-col">
     <FeaturedIcon size="lg" class="mb-4 self-start">
-      <User size="1.5rem" />
+      <UserPlusIcon size="1.5rem" />
     </FeaturedIcon>
-    <h1
-      class="text-gray-light-900 dark:text-gray-dark-25 mb-3 text-2xl font-medium"
-    >
-      Name your identity
+    <h1 class="text-text-primary mb-3 text-2xl font-medium">
+      Create additional account
     </h1>
-    <p
-      class="text-md text-gray-light-600 dark:text-gray-dark-50 mb-6 font-medium"
-    >
-      To spot it faster later.
+    <p class="text-md text-text-tertiary mb-6 font-medium">
+      Specify a name for your new account.
     </p>
     <Input
       bind:element={inputRef}
       bind:value={name}
-      placeholder="Identity name"
-      hint="This name is permanent, so make it meaningful."
+      inputmode="text"
+      placeholder="Account name"
+      hint="You can rename this account later if needed."
       type="text"
       size="md"
       autocomplete="off"
+      autocorrect="off"
       spellcheck="false"
       disabled={loading}
     />
@@ -65,9 +61,9 @@
     >
       {#if loading}
         <ProgressRing />
-        <span>Creating Passkey...</span>
+        <span>Creating account...</span>
       {:else}
-        <span>Create Passkey</span>
+        <span>Create account</span>
       {/if}
     </Button>
   </div>

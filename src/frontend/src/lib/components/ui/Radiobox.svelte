@@ -1,12 +1,11 @@
 <script lang="ts">
-  import type {
-    ChangeEventHandler,
-    HTMLInputAttributes,
-  } from "svelte/elements";
+  import type { HTMLInputAttributes } from "svelte/elements";
   import { DotIcon } from "@lucide/svelte";
 
+  type Size = "sm" | "md";
+
   type Props = Omit<HTMLInputAttributes, "type" | "size"> & {
-    size?: keyof typeof sizes;
+    size?: Size;
   };
 
   let {
@@ -16,43 +15,20 @@
     size = "md",
     ...props
   }: Props = $props();
-
-  const sizes = {
-    sm: "size-4",
-    md: "size-5",
-  };
-
-  const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {
-    console.log("event", event);
-    group = event.currentTarget.getAttribute("value");
-  };
 </script>
 
 <label
   class={[
-    "relative flex items-center justify-center rounded-full border",
-    "border-gray-light-400 text-gray-dark-25 bg-white",
-    "dark:border-gray-light-500 dark:text-gray-dark-950 dark:bg-gray-dark-950",
-    // Checked base/light/dark
-    value === group && "border-none",
-    value === group && "!bg-gray-light-900",
-    value === group && "dark:!bg-gray-dark-25",
-    // Hover light/dark
-    "hover:bg-gray-light-200",
-    "dark:hover:bg-gray-light-700/50",
-    // Disabled light/dark
-    "has-disabled:border-gray-light-300 has-disabled:bg-gray-light-50",
-    "dark:has-disabled:border-gray-dark-700 dark:has-disabled:bg-gray-dark-900",
-    // Checked disabled light/dark
-    value === group &&
-      "has-disabled:!bg-gray-light-300 has-disabled:!text-gray-light-400/50",
-    value === group &&
-      "dark:has-disabled:!bg-gray-dark-700 dark:has-disabled:!text-gray-light-700",
-    // Focus base/light/dark
-    "outline-none has-focus-visible:ring-2 has-focus-visible:ring-offset-2",
-    "has-focus-visible:ring-gray-light-500 has-focus-visible:ring-offset-white",
-    "dark:has-focus-visible::ring-gray-dark-300 dark:has-focus-visible:ring-offset-gray-dark-950",
-    sizes[size],
+    "relative flex items-center justify-center rounded-sm border",
+    "border-border-primary text-fg-primary-inversed bg-bg-primary",
+    "hover:bg-bg-primary_hover",
+    "has-checked:bg-bg-brand-solid has-checked:hover:bg-bg-brand-solid_hover has-checked:border-none",
+    "has-disabled:border-border-disabled has-disabled:bg-bg-disabled_subtle has-disabled:text-fg-disabled_subtle",
+    "has-focus-visible:ring-focus-ring has-focus-visible:ring-offset-bg-primary outline-none has-focus-visible:ring-2 has-focus-visible:ring-offset-2",
+    {
+      sm: "size-4",
+      md: "size-5",
+    }[size],
     className,
   ]}
 >

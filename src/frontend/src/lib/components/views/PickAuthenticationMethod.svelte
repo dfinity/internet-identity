@@ -5,12 +5,12 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
 
-  type Props = {
-    connectOrCreatePasskey: () => void;
+  interface Props {
+    setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => void;
-  };
+  }
 
-  const { connectOrCreatePasskey, continueWithGoogle }: Props = $props();
+  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
 
   const supportsPasskeys = nonNullish(window.PublicKeyCredential);
 </script>
@@ -25,7 +25,7 @@
   {/if}
   <div class="flex flex-col items-stretch gap-3">
     <Button
-      onclick={connectOrCreatePasskey}
+      onclick={setupOrUseExistingPasskey}
       disabled={!supportsPasskeys}
       size="xl"
     >

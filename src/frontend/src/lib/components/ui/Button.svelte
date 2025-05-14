@@ -5,11 +5,14 @@
     HTMLButtonAttributes,
   } from "svelte/elements";
 
+  type Variant = "primary" | "secondary" | "tertiary";
+  type Size = "sm" | "md" | "lg" | "xl";
+
   type Props = HTMLButtonAttributes &
     HTMLAnchorAttributes & {
       element?: HTMLElement;
-      variant?: keyof typeof variants;
-      size?: keyof typeof sizes;
+      variant?: Variant;
+      size?: Size;
       iconOnly?: boolean;
     };
 
@@ -22,49 +25,6 @@
     iconOnly,
     ...props
   }: Props = $props();
-
-  const focus = [
-    // Focus base/light/dark
-    "focus-visible:ring-2 focus-visible:ring-offset-2 outline-none",
-    "focus-visible:ring-gray-light-500 focus-visible:ring-offset-white",
-    "dark:focus-visible:ring-gray-dark-300 dark:focus-visible:ring-offset-gray-dark-950",
-  ];
-  const variants = {
-    primary: [
-      // Default light/dark
-      "bg-gray-light-900 text-gray-light-50",
-      "dark:bg-gray-dark-25 dark:text-gray-dark-900",
-      // Hover light/dark
-      "not-disabled:hover:bg-gray-dark-700",
-      "dark:not-disabled:hover:bg-gray-light-200",
-      // Disabled light/dark
-      "disabled:bg-gray-light-200 disabled:text-gray-light-400",
-      "disabled:bg-gray-dark-700 dark:disabled:text-gray-light-500",
-    ],
-    secondary: [
-      "border",
-      "bg-white border-gray-light-300 text-gray-light-900",
-      "dark:bg-gray-dark-950 dark:border-gray-light-600 dark:text-gray-dark-25",
-      "not-disabled:hover:bg-gray-light-200",
-      "dark:not-disabled:hover:bg-gray-light-900",
-      "disabled:text-gray-light-400 disabled:border-gray-light-200",
-      "dark:disabled:text-gray-light-500 dark:disabled:border-gray-light-800",
-    ],
-    tertiary: [
-      "text-gray-light-900",
-      "dark:text-gray-dark-25",
-      "not-disabled:hover:bg-gray-light-200",
-      "dark:not-disabled:hover:bg-gray-light-700/50",
-      "disabled:text-gray-light-400",
-      "dark:disabled:text-gray-light-500",
-    ],
-  };
-  const sizes = {
-    sm: iconOnly ? "size-9" : "px-3 text-sm gap-1.5 h-9",
-    md: iconOnly ? "size-10" : "px-3.5 text-sm gap-1.5 h-10",
-    lg: iconOnly ? "size-11" : "px-4 text-md gap-2.5 h-11",
-    xl: iconOnly ? "size-12" : "px-4.5 text-md gap-2.5 h-12",
-  };
 </script>
 
 <ButtonOrAnchor
@@ -72,9 +32,30 @@
   {...props}
   class={[
     "box-border flex items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100",
-    variants[variant],
-    focus,
-    sizes[size],
+    {
+      primary: [
+        "bg-bg-brand-solid text-text-primary-inversed",
+        "not-disabled:hover:bg-bg-brand-solid_hover",
+        "disabled:bg-bg-disabled disabled:text-fg-disabled",
+      ],
+      secondary: [
+        "bg-bg-primary border-border-secondary text-fg-primary border",
+        "not-disabled:hover:bg-bg-primary_hover",
+        "disabled:border-border-disabled disabled:text-fg-disabled",
+      ],
+      tertiary: [
+        "text-fg-primary",
+        "not-disabled:hover:bg-bg-primary_hover",
+        "disabled:text-fg-disabled",
+      ],
+    }[variant],
+    "focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+    {
+      sm: iconOnly ? "size-9" : "h-9 gap-1.5 px-3 text-sm",
+      md: iconOnly ? "size-10" : "h-10 gap-1.5 px-3.5 text-sm",
+      lg: iconOnly ? "size-11" : "text-md h-11 gap-2.5 px-4",
+      xl: iconOnly ? "size-12" : "text-md h-12 gap-2.5 px-4.5",
+    }[size],
     className,
   ]}
 >
