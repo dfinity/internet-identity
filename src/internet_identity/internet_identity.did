@@ -838,3 +838,5 @@ service : (opt InternetIdentityInit) -> {
 
     // Discoverable passkeys protocol
     lookup_device_key : (credential_id : blob) -> (opt DeviceKeyWithAnchor) query;
+
+};
