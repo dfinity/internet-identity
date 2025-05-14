@@ -570,7 +570,7 @@ type UpdateAccountError = variant {
 type GetAccountsError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
-}
+};
 
 type PrepareIdAliasRequest = record {
     // Origin of the issuer in the attribute sharing flow.
