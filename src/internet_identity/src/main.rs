@@ -299,15 +299,19 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<AccountInfo> {
-    let Ok(_) = check_authorization(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-
-    account_management::get_accounts_for_origin(&anchor_number, &origin)
-        .iter()
-        .map(|acc| acc.to_info())
-        .collect()
+fn get_accounts(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<Vec<AccountInfo>, GetAccountsError> {
+    match check_authorization(anchor_number) {
+        Ok(_) => Ok(
+            account_management::get_accounts_for_origin(&anchor_number, &origin)
+                .iter()
+                .map(|acc| acc.to_info())
+                .collect(),
+        ),
+        Err(_) => Err(GetAccountsError::Unauthorized),
+    }
 }
 
 #[update]
