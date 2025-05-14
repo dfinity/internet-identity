@@ -6,6 +6,8 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, CreateAccountError, FrontendHostname,
 };
 
+const MAX_ANCHOR_ACCOUNTS: usize = 500;
+
 pub fn get_accounts_for_origin(
     anchor_number: &AnchorNumber,
     origin: &FrontendHostname,
