@@ -1,6 +1,6 @@
 use crate::{
     state::{storage_borrow, storage_borrow_mut},
-    storage::account::{Account, CreateAccountParams, ReadAccountParams},
+    storage::account::{Account, AccountsCounter, CreateAccountParams, ReadAccountParams},
 };
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, CreateAccountError, FrontendHostname,
@@ -33,6 +33,14 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
+        let AccountsCounter {
+            stored_accounts,
+            stored_account_references: _,
+        } = storage.get_account_counter(anchor_number);
+
+        if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+            return Err(CreateAccountError::MaximumAccountNumberReached);
+        }
         storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
@@ -64,6 +72,25 @@ fn should_create_account_for_origin() {
             name: Some(name)
         })
     );
+}
+
+#[test]
+fn should_fail_to_create_accounts_above_max() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let name = "Alice".to_string();
+    for i in 0..=MAX_ANCHOR_ACCOUNTS {
+        let origin = format!("https://example-{}.com", i);
+        let result =
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        if i == MAX_ANCHOR_ACCOUNTS {
+            assert_eq!(result, Err(CreateAccountError::MaximumAccountNumberReached))
+        }
+    }
 }
 
 #[test]
