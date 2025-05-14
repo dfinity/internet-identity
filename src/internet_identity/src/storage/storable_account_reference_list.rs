@@ -10,6 +10,12 @@ use std::borrow::Cow;
 #[derive(Deserialize, CandidType, Clone, Ord, Eq, PartialEq, PartialOrd, Default)]
 pub struct StorableAccountReferenceList(Vec<AccountReference>);
 
+impl StorableAccountReferenceList {
+    pub fn to_acc_ref_vec(self) -> Vec<AccountReference> {
+        self.0
+    }
+}
+
 impl From<StorableAccountReferenceList> for Vec<AccountReference> {
     fn from(value: StorableAccountReferenceList) -> Self {
         value.0

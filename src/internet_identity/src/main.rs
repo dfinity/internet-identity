@@ -320,8 +320,14 @@ fn create_account(
     origin: FrontendHostname,
     name: String,
 ) -> Result<AccountInfo, CreateAccountError> {
-    account_management::create_account_for_origin(anchor_number, origin, name)
-        .map(|acc| acc.to_info())
+    match check_authorization(anchor_number) {
+        Ok(_) => {
+            // check if this anchor and acc are actually linked
+            account_management::create_account_for_origin(anchor_number, origin, name)
+                .map(|acc| acc.to_info())
+        }
+        Err(err) => Err(CreateAccountError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]

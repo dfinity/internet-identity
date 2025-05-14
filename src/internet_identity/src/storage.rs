@@ -735,6 +735,23 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|list| list.into())
     }
 
+    pub fn has_account_reference(
+        &self,
+        anchor_number: &AnchorNumber,
+        application_number: &ApplicationNumber,
+        account_number: &Option<AccountNumber>,
+    ) -> Option<AccountReference> {
+        self.stable_account_reference_list_memory
+            .get(&(anchor_number.clone(), application_number.clone()))
+            .and_then(|acc_ref_list| Some(acc_ref_list.to_acc_ref_vec()))
+            .and_then(|acc_ref_vec| {
+                acc_ref_vec
+                    .iter()
+                    .find(|acc_ref| acc_ref.account_number == *account_number)
+                    .cloned()
+            })
+    }
+
     /// Updates the anchor account, application and account counters.
     /// It doesn't update the account conter for Account type.
     /// Because that one is updated when a new account number is allocated with `allocate_account_number`.
