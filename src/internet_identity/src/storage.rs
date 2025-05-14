@@ -775,7 +775,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    #[allow(dead_code)]
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
