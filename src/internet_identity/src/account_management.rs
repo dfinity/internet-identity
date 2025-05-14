@@ -8,7 +8,6 @@ use crate::{
         StorageError,
     },
 };
-use ic_cdk::caller;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname,
     UpdateAccountError,
@@ -95,11 +94,6 @@ pub fn update_account_for_origin(
                 }
             }
 
-            // If the anchor doesn't own this account, we return unauthorized.
-            if anchor_has_account(&anchor_number, &origin, &account_number).is_none() {
-                return Err(UpdateAccountError::Unauthorized(caller()));
-            }
-
             storage
                 .update_account(UpdateAccountParams {
                     account_number,
@@ -166,6 +160,30 @@ fn should_fail_to_create_accounts_above_max() {
             assert_eq!(result, Err(CreateAccountError::MaximumAccountNumberReached))
         }
     }
+}
+
+#[test]
+fn should_fail_to_update_default_accounts_above_max() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let name = "Alice".to_string();
+    for i in 0..MAX_ANCHOR_ACCOUNTS {
+        let origin = format!("https://example-{}.com", i);
+        let _ = create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+    }
+    let result = update_account_for_origin(
+        anchor.anchor_number(),
+        None,
+        "https://example-1.com".to_string(),
+        AccountUpdate {
+            name: Some("Gabriel".to_string()),
+        },
+    );
+    assert_eq!(result, Err(UpdateAccountError::MaximumAccountNumberReached))
 }
 
 #[test]

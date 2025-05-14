@@ -337,6 +337,11 @@ fn update_account(
     account_number: Option<AccountNumber>,
     update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
+    // If the anchor doesn't own this account, we return unauthorized.
+    if account_management::anchor_has_account(&anchor_number, &origin, &account_number).is_none() {
+        return Err(UpdateAccountError::Unauthorized(caller()));
+    }
+
     account_management::update_account_for_origin(anchor_number, account_number, origin, update)
         .map(|acc| acc.to_info())
 }
