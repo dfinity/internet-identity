@@ -838,39 +838,3 @@ service : (opt InternetIdentityInit) -> {
 
     // Discoverable passkeys protocol
     lookup_device_key : (credential_id : blob) -> (opt DeviceKeyWithAnchor) query;
-
-    // Multiple accounts
-    get_accounts : (
-        anchor_number : UserNumber,
-        origin : FrontendHostname,
-    ) -> (vec AccountInfo) query;
-
-    create_account : (
-        anchor_number : UserNumber,
-        origin : FrontendHostname,
-        name : text
-    ) -> (variant { Ok : AccountInfo; Err: CreateAccountError });
-
-    update_account : (
-        anchor_number : UserNumber,
-        origin : FrontendHostname,
-        account_number : opt AccountNumber, // Null is unreserved default account
-        update : AccountUpdate
-    ) ->  (variant { Ok : AccountInfo; Err: UpdateAccountError });
-
-    prepare_account_delegation : (
-        anchor_number : UserNumber,
-        origin : FrontendHostname,
-        account_number : opt AccountNumber, // Null is unreserved default account
-        session_key : SessionKey,
-        max_ttl : opt nat64
-    ) -> (UserKey, Timestamp);
-    
-    get_account_delegation : (
-        anchor_number : UserNumber,
-        origin : FrontendHostname,
-        account_number : AccountNumber, // Null is unreserved default account
-        session_key : SessionKey,
-        expiration : Timestamp
-    ) -> (GetDelegationResponse) query;
-};
