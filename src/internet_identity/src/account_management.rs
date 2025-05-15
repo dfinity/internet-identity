@@ -8,7 +8,8 @@ use crate::{
     storage::{
         account::{
             Account, AccountDelegationError, AccountReference, AccountsCounter,
-            CreateAccountParams, ReadAccountParams, UpdateAccountParams,
+            CreateAccountParams, PrepareAccountDelegationOk, ReadAccountParams,
+            UpdateAccountParams,
         },
         StorageError,
     },
@@ -180,7 +181,7 @@ pub async fn prepare_account_delegation(
     session_key: SessionKey,
     max_ttl: Option<u64>,
     ii_domain: &Option<IIDomain>,
-) -> Result<(UserKey, Timestamp), AccountDelegationError> {
+) -> Result<PrepareAccountDelegationOk, AccountDelegationError> {
     // If the anchor doesn't own this account, we return unauthorized.
     if anchor_has_account(anchor_number, &origin, account_number).is_none() {
         return Err(AccountDelegationError::Unauthorized(caller()));
@@ -214,10 +215,10 @@ pub async fn prepare_account_delegation(
 
     delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
 
-    Ok((
-        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        expiration,
-    ))
+    Ok(PrepareAccountDelegationOk {
+        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        timestamp: expiration,
+    })
 }
 
 #[test]

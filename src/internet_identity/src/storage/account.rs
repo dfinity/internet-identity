@@ -2,7 +2,7 @@ use candid::{CandidType, Principal};
 
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
+    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -206,4 +206,10 @@ impl From<IdentityUpdateError> for AccountDelegationError {
             }
         }
     }
+}
+
+#[derive(CandidType, Serialize)]
+pub struct PrepareAccountDelegationOk {
+    pub user_key: UserKey,
+    pub timestamp: Timestamp,
 }
