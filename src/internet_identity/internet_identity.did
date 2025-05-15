@@ -576,10 +576,7 @@ type AccountDelegationError = variant {
     Unauthorized : principal;
 };
 
-type PrepareAccountDelegationOk = record {
-    user_key : UserKey;
-    timestamp : Timestamp;
-};
+type PrepareAccountDelegationOk = (UserKey, Timestamp);
 
 type GetAccountsError = variant {
     InternalCanisterError : text;
