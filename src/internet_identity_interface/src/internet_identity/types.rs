@@ -336,13 +336,15 @@ pub struct AccountUpdate {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum CreateAccountError {
     InternalCanisterError(String),
-    MaximumAccountNumberReached,
+    AccountLimitReached,
     Unauthorized(Principal),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
     InternalCanisterError(String),
+    AccountLimitReached,
+    Unauthorized(Principal),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -561,12 +561,14 @@ type IdentityMetadataReplaceError = variant {
 
 type CreateAccountError = variant {
     InternalCanisterError : text;
-    MaximumAccountNumberReached;
+    AccountLimitReached;
     Unauthorized : principal;
 };
 
 type UpdateAccountError = variant {
     InternalCanisterError : text;
+    AccountLimitReached;
+    Unauthorized : principal;
 };
 
 type GetAccountsError = variant {

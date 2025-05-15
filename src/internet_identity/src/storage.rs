@@ -910,7 +910,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the account references doesn't exist, returns a list with a default account reference.
     pub fn list_accounts(
         &self,
-        anchor_number: &AnchorNumber,
+        anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<AccountReference> {
         match self.lookup_application_number_with_origin(origin) {
@@ -918,7 +918,7 @@ impl<M: Memory + Clone> Storage<M> {
                 account_number: None,
                 last_used: None,
             }],
-            Some(app_num) => match self.lookup_account_references(*anchor_number, app_num) {
+            Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
                 None => vec![AccountReference {
                     account_number: None,
                     last_used: None,
@@ -938,20 +938,20 @@ impl<M: Memory + Clone> Storage<M> {
             None => {
                 // Application number doesn't exist, return a default Account
                 Some(Account::new(
-                    *params.anchor_number,
+                    params.anchor_number,
                     params.origin.clone(),
                     // Default accounts have no name
                     None,
-                    *params.account_number,
+                    params.account_number,
                 ))
             }
-            Some(account_number) => match self.stable_account_memory.get(account_number) {
+            Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
                 Some(storable_account) => Some(Account::new(
-                    *params.anchor_number,
+                    params.anchor_number,
                     params.origin.clone(),
                     Some(storable_account.name.clone()),
-                    Some(*account_number),
+                    Some(account_number),
                 )),
             },
         }
