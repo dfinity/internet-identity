@@ -743,8 +743,8 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<AccountReference> {
         self.stable_account_reference_list_memory
             .get(&(anchor_number, application_number))
-            .map(|acc_ref_list| acc_ref_list.to_acc_ref_vec())
-            .and_then(|acc_ref_vec| {
+            .map(|acc_ref_list| acc_ref_list.into())
+            .and_then(|acc_ref_vec: Vec<AccountReference>| {
                 acc_ref_vec
                     .iter()
                     .find(|acc_ref| acc_ref.account_number == account_number)
@@ -828,7 +828,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_account_reference_list_memory
             .range(range_start..=range_end)
             .flat_map(|(_, storable_account_ref_list_val)| {
-                storable_account_ref_list_val.to_acc_ref_vec()
+                storable_account_ref_list_val.into_acc_ref_vec()
             })
             .collect()
     }

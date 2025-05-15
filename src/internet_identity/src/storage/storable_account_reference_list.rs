@@ -11,7 +11,7 @@ use std::borrow::Cow;
 pub struct StorableAccountReferenceList(Vec<AccountReference>);
 
 impl StorableAccountReferenceList {
-    pub fn to_acc_ref_vec(self) -> Vec<AccountReference> {
+    pub fn into_acc_ref_vec(self) -> Vec<AccountReference> {
         self.0
     }
 }
