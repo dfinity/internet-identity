@@ -34,8 +34,8 @@ pub struct UpdateExistinAccountParams {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReadAccountParams<'a> {
-    pub account_number: &'a Option<AccountNumber>,
-    pub anchor_number: &'a AnchorNumber,
+    pub account_number: Option<AccountNumber>,
+    pub anchor_number: AnchorNumber,
     pub origin: &'a FrontendHostname,
 }
 

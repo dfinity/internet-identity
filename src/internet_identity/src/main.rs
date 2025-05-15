@@ -299,15 +299,19 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(anchor_number: AnchorNumber, origin: FrontendHostname) -> Vec<AccountInfo> {
-    let Ok(_) = check_authorization(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-
-    account_management::get_accounts_for_origin(&anchor_number, &origin)
-        .iter()
-        .map(|acc| acc.to_info())
-        .collect()
+fn get_accounts(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<Vec<AccountInfo>, GetAccountsError> {
+    match check_authorization(anchor_number) {
+        Ok(_) => Ok(
+            account_management::get_accounts_for_origin(anchor_number, &origin)
+                .iter()
+                .map(|acc| acc.to_info())
+                .collect(),
+        ),
+        Err(err) => Err(GetAccountsError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]
@@ -316,8 +320,14 @@ fn create_account(
     origin: FrontendHostname,
     name: String,
 ) -> Result<AccountInfo, CreateAccountError> {
-    account_management::create_account_for_origin(anchor_number, origin, name)
-        .map(|acc| acc.to_info())
+    match check_authorization(anchor_number) {
+        Ok(_) => {
+            // check if this anchor and acc are actually linked
+            account_management::create_account_for_origin(anchor_number, origin, name)
+                .map(|acc| acc.to_info())
+        }
+        Err(err) => Err(CreateAccountError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]
@@ -327,6 +337,11 @@ fn update_account(
     account_number: Option<AccountNumber>,
     update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
+    // If the anchor doesn't own this account, we return unauthorized.
+    if account_management::anchor_has_account(anchor_number, &origin, account_number).is_none() {
+        return Err(UpdateAccountError::Unauthorized(caller()));
+    }
+
     account_management::update_account_for_origin(anchor_number, account_number, origin, update)
         .map(|acc| acc.to_info())
 }

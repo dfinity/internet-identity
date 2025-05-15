@@ -1,7 +1,10 @@
 use crate::{
     state::{storage_borrow, storage_borrow_mut},
     storage::{
-        account::{Account, CreateAccountParams, ReadAccountParams, UpdateAccountParams},
+        account::{
+            Account, AccountReference, AccountsCounter, CreateAccountParams, ReadAccountParams,
+            UpdateAccountParams,
+        },
         StorageError,
     },
 };
@@ -10,8 +13,25 @@ use internet_identity_interface::internet_identity::types::{
     UpdateAccountError,
 };
 
+const MAX_ANCHOR_ACCOUNTS: usize = 500;
+
+pub fn anchor_has_account(
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> Option<AccountReference> {
+    // check if anchor has acc
+    storage_borrow(|storage| {
+        storage
+            .lookup_application_number_with_origin(origin)
+            .and_then(|application_number| {
+                storage.has_account_reference(anchor_number, application_number, account_number)
+            })
+    })
+}
+
 pub fn get_accounts_for_origin(
-    anchor_number: &AnchorNumber,
+    anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
     storage_borrow(|storage| {
@@ -20,7 +40,7 @@ pub fn get_accounts_for_origin(
             .iter()
             .filter_map(|acc_ref| {
                 storage.read_account(ReadAccountParams {
-                    account_number: &acc_ref.account_number,
+                    account_number: acc_ref.account_number,
                     anchor_number,
                     origin,
                 })
@@ -35,6 +55,15 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
+        let AccountsCounter {
+            stored_accounts,
+            stored_account_references: _,
+        } = storage.get_account_counter(anchor_number);
+
+        if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+            return Err(CreateAccountError::AccountLimitReached);
+        }
+
         storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
@@ -53,6 +82,20 @@ pub fn update_account_for_origin(
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(name) => storage_borrow_mut(|storage| {
+            // If the account to be updated is a default account
+            // Check if whe have reached account limit
+            // Because editing a default account turns it into a stored account
+            if account_number.is_none() {
+                let AccountsCounter {
+                    stored_accounts,
+                    stored_account_references: _,
+                } = storage.get_account_counter(anchor_number);
+
+                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+                    return Err(UpdateAccountError::AccountLimitReached);
+                }
+            }
+
             storage
                 .update_account(UpdateAccountParams {
                     account_number,
@@ -63,8 +106,8 @@ pub fn update_account_for_origin(
                 .and_then(|acc_num| {
                     storage
                         .read_account(ReadAccountParams {
-                            account_number: &Some(acc_num),
-                            anchor_number: &anchor_number,
+                            account_number: Some(acc_num),
+                            anchor_number,
                             origin: &origin,
                         })
                         .ok_or(StorageError::AccountNotFound {
@@ -103,6 +146,49 @@ fn should_create_account_for_origin() {
 }
 
 #[test]
+fn should_fail_to_create_accounts_above_max() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let name = "Alice".to_string();
+    for i in 0..=MAX_ANCHOR_ACCOUNTS {
+        let origin = format!("https://example-{}.com", i);
+        let result =
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        if i == MAX_ANCHOR_ACCOUNTS {
+            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
+        }
+    }
+}
+
+#[test]
+fn should_fail_to_update_default_accounts_above_max() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let name = "Alice".to_string();
+    for i in 0..MAX_ANCHOR_ACCOUNTS {
+        let origin = format!("https://example-{}.com", i);
+        let _ = create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+    }
+    let result = update_account_for_origin(
+        anchor.anchor_number(),
+        None,
+        "https://example-1.com".to_string(),
+        AccountUpdate {
+            name: Some("Gabriel".to_string()),
+        },
+    );
+    assert_eq!(result, Err(UpdateAccountError::AccountLimitReached))
+}
+
+#[test]
 fn should_get_accounts_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
     use crate::storage::Storage;
@@ -119,7 +205,7 @@ fn should_get_accounts_for_origin() {
     let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
             Account::new_with_seed_anchor(
@@ -159,7 +245,7 @@ fn should_only_get_own_accounts_for_origin() {
     let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
             Account::new_with_seed_anchor(
@@ -173,7 +259,7 @@ fn should_only_get_own_accounts_for_origin() {
     );
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number_two, &origin),
+        get_accounts_for_origin(anchor_number_two, &origin),
         vec![
             Account::new_with_seed_anchor(anchor_number_two, origin.clone(), None, None, None),
             Account::new_with_seed_anchor(
@@ -204,7 +290,7 @@ fn should_update_account_for_origin() {
     let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
             Account::new_with_seed_anchor(
@@ -243,7 +329,7 @@ fn should_update_account_for_origin() {
     );
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
             Account::new_with_seed_anchor(
@@ -281,7 +367,7 @@ fn should_update_default_account_for_origin() {
     let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
             Account::new_with_seed_anchor(
@@ -320,7 +406,7 @@ fn should_update_default_account_for_origin() {
     );
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::new_with_seed_anchor(
                 anchor_number,

@@ -735,6 +735,23 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|list| list.into())
     }
 
+    pub fn has_account_reference(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
+    ) -> Option<AccountReference> {
+        self.stable_account_reference_list_memory
+            .get(&(anchor_number, application_number))
+            .map(|acc_ref_list| acc_ref_list.to_acc_ref_vec())
+            .and_then(|acc_ref_vec| {
+                acc_ref_vec
+                    .iter()
+                    .find(|acc_ref| acc_ref.account_number == account_number)
+                    .cloned()
+            })
+    }
+
     /// Updates the anchor account, application and account counters.
     /// It doesn't update the account conter for Account type.
     /// Because that one is updated when a new account number is allocated with `allocate_account_number`.
@@ -775,7 +792,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    #[allow(dead_code)]
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
@@ -912,7 +928,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the account references doesn't exist, returns a list with a default account reference.
     pub fn list_accounts(
         &self,
-        anchor_number: &AnchorNumber,
+        anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<AccountReference> {
         match self.lookup_application_number_with_origin(origin) {
@@ -920,7 +936,7 @@ impl<M: Memory + Clone> Storage<M> {
                 account_number: None,
                 last_used: None,
             }],
-            Some(app_num) => match self.lookup_account_references(*anchor_number, app_num) {
+            Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
                 None => vec![AccountReference {
                     account_number: None,
                     last_used: None,
@@ -939,21 +955,20 @@ impl<M: Memory + Clone> Storage<M> {
             None => {
                 // Application number doesn't exist, return a default Account
                 Some(Account::new(
-                    *params.anchor_number,
+                    params.anchor_number,
                     params.origin.clone(),
                     // Default accounts have no name
                     None,
-                    *params.account_number,
+                    params.account_number,
                 ))
             }
-            Some(account_number) => match self.stable_account_memory.get(account_number) {
+            Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
-                Some(storable_account) => Some(Account::new_with_seed_anchor(
-                    *params.anchor_number,
+                Some(storable_account) => Some(Account::new(
+                    params.anchor_number,
                     params.origin.clone(),
-                    Some(storable_account.name),
-                    Some(*account_number),
-                    storable_account.seed_from_anchor,
+                    Some(storable_account.name.clone()),
+                    Some(account_number),
                 )),
             },
         }
