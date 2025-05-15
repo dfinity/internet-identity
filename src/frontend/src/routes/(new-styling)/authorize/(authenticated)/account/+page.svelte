@@ -29,7 +29,14 @@
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
 
-  let selectedAccount = $state.raw(untrack(() => accounts[0]));
+  let selectedAccountNumber = $state.raw(
+    untrack(() => accounts[0].account_number[0]),
+  );
+  const selectedAccount = $derived(
+    accounts.find(
+      (account) => account.account_number[0] === selectedAccountNumber,
+    )!,
+  );
   let dialog = $state(false);
 
   const createAccount = async (name: string) => {
@@ -43,7 +50,7 @@
         )
         .then(throwCanisterError);
       accounts = [...accounts, account];
-      selectedAccount = accounts.slice(-1)[0];
+      selectedAccountNumber = account.account_number[0];
       dialog = false;
       await invalidateAll();
     } catch (error) {
@@ -95,7 +102,7 @@
   >
     {#each accounts as account}
       <RadioCard
-        onclick={() => (selectedAccount = account)}
+        onclick={() => (selectedAccountNumber = account.account_number[0])}
         checked={account === selectedAccount}
       >
         <Avatar size="sm">
