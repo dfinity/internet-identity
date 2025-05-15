@@ -32,7 +32,7 @@ fn should_create_additional_account() {
     // 2. Additional account and application don't exist yet.
     let read_params = ReadAccountParams {
         account_number: Some(1), // First account created
-        anchor_number: anchor_number,
+        anchor_number,
         origin: &origin,
     };
     let additional_account_1 = storage.read_account(read_params.clone());
@@ -295,7 +295,7 @@ fn should_update_additional_account() {
     // 2. Additional account and application don't exist yet.
     let read_params = ReadAccountParams {
         account_number: Some(account_number), // First account created is 1
-        anchor_number: anchor_number,
+        anchor_number,
         origin: &origin,
     };
     let additional_account_1 = storage.read_account(read_params.clone());
@@ -336,7 +336,7 @@ fn should_update_additional_account() {
     let updated_account = storage
         .read_account(ReadAccountParams {
             account_number: Some(update_account_return_value),
-            anchor_number: anchor_number,
+            anchor_number,
             origin: &origin,
         })
         .unwrap();
