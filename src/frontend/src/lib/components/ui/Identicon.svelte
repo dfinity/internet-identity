@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { SVGAttributes } from "svelte/elements";
-  import { Principal } from "@dfinity/principal";
 
   type Props = Omit<SVGAttributes<SVGSVGElement>, "seed"> & {
     seed: bigint;
@@ -9,7 +8,6 @@
 
   const { class: className, seed, elements = 4, ...props }: Props = $props();
 
-  // const elements = 8;
   const colors = [
     "#29abe2",
     "#f15a24",
@@ -18,12 +16,6 @@
     "#6923bd",
     "#ed1e79",
   ];
-  // const seed = $derived.by(() => {
-  //   const bytes = principal.toUint8Array();
-  //   const view = new DataView(bytes.buffer);
-  //   const value = view.getBigUint64(0, false);
-  //   return Number(value % BigInt(Number.MAX_SAFE_INTEGER));
-  // });
 </script>
 
 <svg
