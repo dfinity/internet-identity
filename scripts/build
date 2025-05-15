@@ -196,12 +196,13 @@ function build_internet_identity() {
       
       # Add preload links for all css files in every html file
       CSS_LINKS=""
+      TMP_HTML_FILE=$(mktemp)
       while IFS= read -r css_file; do
           css_file_relative="/${css_file#$DIST_DIR/}"
           CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">\n"
       done < <(find "$DIST_DIR" -type f -name "*.css")
       find "$DIST_DIR" -type f -name "*.html" | while read -r html_file; do
-        awk -v val="$CSS_LINKS" '{gsub("</head>", val "</head>")}1' "$html_file" > tmp && mv tmp "$html_file"
+        awk -v val="$CSS_LINKS" '{gsub("</head>", val "</head>")}1' "$html_file" > "$TMP_HTML_FILE" && mv "$TMP_HTML_FILE" "$html_file"
       done
       
       # II canister only supports one content type per resource. 
