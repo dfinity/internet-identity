@@ -19,6 +19,7 @@
   import CreateAccount from "$lib/components/views/CreateAccount.svelte";
   import { untrack } from "svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
+  import { invalidateAll } from "$app/navigation";
 
   const { data }: PageProps = $props();
   let accounts = $derived(data.accounts);
@@ -44,7 +45,7 @@
       accounts = [...accounts, account];
       selectedAccount = accounts.slice(-1)[0];
       dialog = false;
-      // await invalidateAll(); TODO: uncomment this once backend is updated
+      await invalidateAll();
     } catch (error) {
       handleError(error);
       dialog = false;
