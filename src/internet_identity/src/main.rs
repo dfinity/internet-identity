@@ -28,6 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use storage::account::AccountDelegationError;
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -347,14 +348,27 @@ fn update_account(
 }
 
 #[update]
-fn prepare_account_delegation(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
-    _session_key: SessionKey,
-    _max_ttl: Option<u64>,
-) -> (UserKey, Timestamp) {
-    (ByteBuf::new(), 0)
+async fn prepare_account_delegation(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<(UserKey, Timestamp), AccountDelegationError> {
+    match check_authz_and_record_activity(anchor_number) {
+        Ok(ii_domain) => {
+            account_management::prepare_account_delegation(
+                anchor_number,
+                origin,
+                account_number,
+                session_key,
+                max_ttl,
+                &ii_domain,
+            )
+            .await
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 #[query]

@@ -18,11 +18,11 @@ use std::net::IpAddr;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
+pub const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 
 // The maximum expiration time for delegation
 // (calculated as now() + this)
-const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
+pub const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
 pub async fn prepare_delegation(
     anchor_number: AnchorNumber,
@@ -55,7 +55,7 @@ pub async fn prepare_delegation(
 }
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(
+pub fn delegation_bookkeeping(
     frontend: FrontendHostname,
     ii_domain: Option<IIDomain>,
     session_duration_ns: u64,

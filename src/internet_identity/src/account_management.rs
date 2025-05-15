@@ -1,17 +1,27 @@
 use crate::{
-    state::{storage_borrow, storage_borrow_mut},
+    delegation::{
+        self, add_delegation_signature, check_frontend_length, delegation_bookkeeping,
+        der_encode_canister_sig_key,
+    },
+    ii_domain::{self, IIDomain},
+    state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            Account, AccountReference, AccountsCounter, CreateAccountParams, ReadAccountParams,
-            UpdateAccountParams,
+            Account, AccountDelegationError, AccountReference, AccountsCounter,
+            CreateAccountParams, ReadAccountParams, UpdateAccountParams,
         },
         StorageError,
     },
+    update_root_hash,
 };
+use ic_canister_sig_creation::hash_bytes;
+use ic_cdk::{api::time, caller};
+use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname,
-    UpdateAccountError,
+    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname, SessionKey,
+    Timestamp, UpdateAccountError, UserKey,
 };
+use serde_bytes::ByteBuf;
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
@@ -120,6 +130,94 @@ pub fn update_account_for_origin(
             "No name was provided.".to_string(),
         )),
     }
+}
+
+/// Create `Hash` used for a delegation that can make calls on behalf of an `Account`.
+/// If the `Account` is a non-stored default account or has a `seed_from_anchor` (and thus is a stored default account),
+/// the respective anchor number will be used as a seed input. Otherwise, the `AccountNumber` is used.
+///
+/// # Arguments
+///
+/// * `account` is the `Account` we're using for this delegation
+fn calculate_account_delegation_seed(account: Account) -> Hash {
+    let salt = state::salt();
+    let mut blob: Vec<u8> = vec![];
+    blob.push(salt.len() as u8);
+    blob.extend_from_slice(&salt);
+
+    // If this is a non-stored default account, we derive from frontend and anchor
+    if let None = account.account_number {
+        return delegation::calculate_seed(account.anchor_number, &account.origin);
+    }
+
+    match account.get_seed_anchor() {
+        Some(seed_from_anchor) => {
+            // If this is a stored default account, we derive from frontend and anchor
+            delegation::calculate_seed(seed_from_anchor, &account.origin)
+        }
+        None => {
+            // If this is an added account, we derive from the account number.
+            let salt = state::salt();
+
+            let mut blob: Vec<u8> = vec![];
+            blob.push(salt.len() as u8);
+            blob.extend_from_slice(&salt);
+
+            let account_number_str = account.account_number.unwrap().to_string(); // XXX: this should be safe because an account without a seed_from_anchor must always have an account_number
+            let account_number_blob = account_number_str.bytes();
+            blob.push(account_number_blob.len() as u8);
+            blob.extend(account_number_blob);
+
+            hash_bytes(blob)
+        }
+    }
+}
+
+pub async fn prepare_account_delegation(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+    ii_domain: &Option<IIDomain>,
+) -> Result<(UserKey, Timestamp), AccountDelegationError> {
+    // If the anchor doesn't own this account, we return unauthorized.
+    if anchor_has_account(anchor_number, &origin, account_number).is_none() {
+        return Err(AccountDelegationError::Unauthorized(caller()));
+    }
+    state::ensure_salt_set().await;
+    check_frontend_length(&origin);
+
+    let session_duration_ns = u64::min(
+        max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
+        crate::delegation::MAX_EXPIRATION_PERIOD_NS,
+    );
+    let expiration = time().saturating_add(session_duration_ns);
+
+    let account = storage_borrow(|storage| {
+        storage.read_account(ReadAccountParams {
+            account_number,
+            anchor_number,
+            origin: &origin,
+        })
+    })
+    .ok_or(AccountDelegationError::InternalCanisterError(
+        "Could not retrieve account".to_string(),
+    ))?;
+
+    let seed = calculate_account_delegation_seed(account);
+
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+    });
+    update_root_hash();
+
+    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
+
+    Ok((
+        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        expiration,
+    ))
 }
 
 #[test]
