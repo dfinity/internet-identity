@@ -12,16 +12,16 @@ const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
 #[allow(dead_code)]
 pub fn anchor_has_account(
-    anchor_number: &AnchorNumber,
+    anchor_number: AnchorNumber,
     origin: &FrontendHostname,
-    account_number: &Option<AccountNumber>,
+    account_number: Option<AccountNumber>,
 ) -> Option<AccountReference> {
     // check if anchor has acc
     storage_borrow(|storage| {
         storage
             .lookup_application_number_with_origin(origin)
             .and_then(|application_number| {
-                storage.has_account_reference(anchor_number, &application_number, account_number)
+                storage.has_account_reference(anchor_number, application_number, account_number)
             })
     })
 }

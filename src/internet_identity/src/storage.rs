@@ -737,17 +737,17 @@ impl<M: Memory + Clone> Storage<M> {
 
     pub fn has_account_reference(
         &self,
-        anchor_number: &AnchorNumber,
-        application_number: &ApplicationNumber,
-        account_number: &Option<AccountNumber>,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        account_number: Option<AccountNumber>,
     ) -> Option<AccountReference> {
         self.stable_account_reference_list_memory
-            .get(&(*anchor_number, *application_number))
+            .get(&(anchor_number, application_number))
             .map(|acc_ref_list| acc_ref_list.to_acc_ref_vec())
             .and_then(|acc_ref_vec| {
                 acc_ref_vec
                     .iter()
-                    .find(|acc_ref| acc_ref.account_number == *account_number)
+                    .find(|acc_ref| acc_ref.account_number == account_number)
                     .cloned()
             })
     }
