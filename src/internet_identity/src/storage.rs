@@ -955,11 +955,12 @@ impl<M: Memory + Clone> Storage<M> {
             }
             Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
-                Some(storable_account) => Some(Account::new(
+                Some(storable_account) => Some(Account::new_with_seed_anchor(
                     params.anchor_number,
                     params.origin.clone(),
                     Some(storable_account.name.clone()),
                     Some(account_number),
+                    storable_account.seed_from_anchor,
                 )),
             },
         }

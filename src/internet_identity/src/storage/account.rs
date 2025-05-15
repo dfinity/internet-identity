@@ -147,8 +147,6 @@ impl Account {
         }
     }
 
-    // right now only used in tests
-    #[allow(dead_code)]
     pub fn new_with_seed_anchor(
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
