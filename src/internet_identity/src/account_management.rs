@@ -43,7 +43,6 @@ pub fn anchor_has_account(
 
 pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
-    anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
     storage_borrow(|storage| {
@@ -52,7 +51,6 @@ pub fn get_accounts_for_origin(
             .iter()
             .filter_map(|acc_ref| {
                 storage.read_account(ReadAccountParams {
-                    account_number: acc_ref.account_number,
                     account_number: acc_ref.account_number,
                     anchor_number,
                     origin,
