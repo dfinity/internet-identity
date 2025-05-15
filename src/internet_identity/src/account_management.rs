@@ -8,6 +8,7 @@ use crate::{
         StorageError,
     },
 };
+use ic_cdk::caller;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname,
     UpdateAccountError,
@@ -80,6 +81,10 @@ pub fn update_account_for_origin(
     origin: FrontendHostname,
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
+    // If the anchor doesn't own this account, we return unauthorized.
+    if anchor_has_account(anchor_number, &origin, account_number).is_none() {
+        return Err(UpdateAccountError::Unauthorized(caller()));
+    }
     match update.name {
         Some(name) => storage_borrow_mut(|storage| {
             // If the account to be updated is a default account
