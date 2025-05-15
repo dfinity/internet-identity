@@ -16,22 +16,22 @@ use internet_identity_interface::internet_identity::types::{
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
 pub fn anchor_has_account(
-    anchor_number: &AnchorNumber,
+    anchor_number: AnchorNumber,
     origin: &FrontendHostname,
-    account_number: &Option<AccountNumber>,
+    account_number: Option<AccountNumber>,
 ) -> Option<AccountReference> {
     // check if anchor has acc
     storage_borrow(|storage| {
         storage
             .lookup_application_number_with_origin(origin)
             .and_then(|application_number| {
-                storage.has_account_reference(anchor_number, &application_number, account_number)
+                storage.has_account_reference(anchor_number, application_number, account_number)
             })
     })
 }
 
 pub fn get_accounts_for_origin(
-    anchor_number: &AnchorNumber,
+    anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
     storage_borrow(|storage| {
@@ -40,7 +40,7 @@ pub fn get_accounts_for_origin(
             .iter()
             .filter_map(|acc_ref| {
                 storage.read_account(ReadAccountParams {
-                    account_number: &acc_ref.account_number,
+                    account_number: acc_ref.account_number,
                     anchor_number,
                     origin,
                 })
@@ -106,8 +106,8 @@ pub fn update_account_for_origin(
                 .and_then(|acc_num| {
                     storage
                         .read_account(ReadAccountParams {
-                            account_number: &Some(acc_num),
-                            anchor_number: &anchor_number,
+                            account_number: Some(acc_num),
+                            anchor_number: anchor_number,
                             origin: &origin,
                         })
                         .ok_or(StorageError::AccountNotFound {
@@ -205,7 +205,7 @@ fn should_get_accounts_for_origin() {
     let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account {
                 account_number: None, // default account gets created when additional account gets created
@@ -251,7 +251,7 @@ fn should_only_get_own_accounts_for_origin() {
     let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account {
                 account_number: None, // default account gets created when additional account gets created
@@ -271,7 +271,7 @@ fn should_only_get_own_accounts_for_origin() {
     );
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number_two, &origin),
+        get_accounts_for_origin(anchor_number_two, &origin),
         vec![
             Account {
                 account_number: None, // default account gets created when additional account gets created
@@ -308,7 +308,7 @@ fn should_update_account_for_origin() {
     let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account {
                 account_number: None, // default account gets created when additional account gets created
@@ -353,7 +353,7 @@ fn should_update_account_for_origin() {
     );
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account {
                 account_number: None, // default account gets created when additional account gets created
@@ -397,7 +397,7 @@ fn should_update_default_account_for_origin() {
     let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account {
                 account_number: None, // default account gets created when additional account gets created
@@ -442,7 +442,7 @@ fn should_update_default_account_for_origin() {
     );
 
     assert_eq!(
-        get_accounts_for_origin(&anchor_number, &origin),
+        get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account {
                 account_number: Some(3),

@@ -305,7 +305,7 @@ fn get_accounts(
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
     match check_authorization(anchor_number) {
         Ok(_) => Ok(
-            account_management::get_accounts_for_origin(&anchor_number, &origin)
+            account_management::get_accounts_for_origin(anchor_number, &origin)
                 .iter()
                 .map(|acc| acc.to_info())
                 .collect(),
@@ -338,7 +338,7 @@ fn update_account(
     update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
     // If the anchor doesn't own this account, we return unauthorized.
-    if account_management::anchor_has_account(&anchor_number, &origin, &account_number).is_none() {
+    if account_management::anchor_has_account(anchor_number, &origin, account_number).is_none() {
         return Err(UpdateAccountError::Unauthorized(caller()));
     }
 
