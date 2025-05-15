@@ -12,7 +12,7 @@ const config = {
       pages: "dist",
       assets: "dist",
       fallback: "index.html",
-      precompress: true,
+      precompress: false,
     }),
     files: {
       appTemplate: "src/frontend/src/app.html",
