@@ -43,6 +43,7 @@ pub fn anchor_has_account(
 
 pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
+    anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
     storage_borrow(|storage| {
@@ -51,6 +52,7 @@ pub fn get_accounts_for_origin(
             .iter()
             .filter_map(|acc_ref| {
                 storage.read_account(ReadAccountParams {
+                    account_number: acc_ref.account_number,
                     account_number: acc_ref.account_number,
                     anchor_number,
                     origin,
@@ -73,6 +75,7 @@ pub fn create_account_for_origin(
 
         if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
             return Err(CreateAccountError::AccountLimitReached);
+            return Err(CreateAccountError::AccountLimitReached);
         }
 
         storage
@@ -91,6 +94,10 @@ pub fn update_account_for_origin(
     origin: FrontendHostname,
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
+    // If the anchor doesn't own this account, we return unauthorized.
+    if anchor_has_account(anchor_number, &origin, account_number).is_none() {
+        return Err(UpdateAccountError::Unauthorized(caller()));
+    }
     match update.name {
         Some(name) => storage_borrow_mut(|storage| {
             // If the account to be updated is a default account
