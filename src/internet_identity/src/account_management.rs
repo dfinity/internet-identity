@@ -61,7 +61,7 @@ pub fn create_account_for_origin(
         } = storage.get_account_counter(anchor_number);
 
         if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-            return Err(CreateAccountError::MaximumAccountNumberReached);
+            return Err(CreateAccountError::AccountLimitReached);
         }
 
         storage
@@ -82,7 +82,9 @@ pub fn update_account_for_origin(
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(name) => storage_borrow_mut(|storage| {
-            // Check against max if it is a
+            // If the account to be updated is a default account
+            // Check if whe have reached account limit
+            // Because editing a default account turns it into a stored account
             if account_number.is_none() {
                 let AccountsCounter {
                     stored_accounts,
@@ -90,7 +92,7 @@ pub fn update_account_for_origin(
                 } = storage.get_account_counter(anchor_number);
 
                 if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-                    return Err(UpdateAccountError::MaximumAccountNumberReached);
+                    return Err(UpdateAccountError::AccountLimitReached);
                 }
             }
 
@@ -157,7 +159,7 @@ fn should_fail_to_create_accounts_above_max() {
         let result =
             create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {
-            assert_eq!(result, Err(CreateAccountError::MaximumAccountNumberReached))
+            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
         }
     }
 }
@@ -183,7 +185,7 @@ fn should_fail_to_update_default_accounts_above_max() {
             name: Some("Gabriel".to_string()),
         },
     );
-    assert_eq!(result, Err(UpdateAccountError::MaximumAccountNumberReached))
+    assert_eq!(result, Err(UpdateAccountError::AccountLimitReached))
 }
 
 #[test]
