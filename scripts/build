@@ -188,13 +188,24 @@ function build_canister() {
 function build_internet_identity() {
   if [ "$ONLY_DEPS" != "1" ]
   then
+      DIST_DIR="$SCRIPTS_DIR/../dist"
+      
       # Compile frontend assets to dist
       echo Compiling internet_identity frontend assets
       npm run build
       
+      # Add preload links for all css files in every html file
+      CSS_LINKS=""
+      while IFS= read -r css_file; do
+          css_file_relative="/${css_file#$DIST_DIR/}"
+          CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">\n"
+      done < <(find "$DIST_DIR" -type f -name "*.css")
+      find "$DIST_DIR" -type f -name "*.html" | while read -r html_file; do
+        awk -v val="$CSS_LINKS" '{gsub("</head>", val "</head>")}1' "$html_file" > tmp && mv tmp "$html_file"
+      done
+      
       # II canister only supports one content type per resource. 
       # That is why we only keep either compressed or uncompressed.
-      DIST_DIR="$SCRIPTS_DIR/../dist"
       find "$DIST_DIR" -type f -name "*.gz" | while read -r gz_file; do
           # Remove the .gz suffix to get the base filename
           base_file="${gz_file%.gz}"
