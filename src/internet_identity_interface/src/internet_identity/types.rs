@@ -10,6 +10,7 @@ pub type UserKey = PublicKey;
 pub type SessionKey = PublicKey;
 pub type CanisterSigPublicKeyDer = PublicKey;
 pub type FrontendHostname = String;
+pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
 pub type Signature = ByteBuf;
 pub type DeviceVerificationCode = String;
@@ -320,8 +321,8 @@ pub struct DeviceKeyWithAnchor {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct Account {
-    pub account_number: Option<AccountNumber>, // Null is unreserved default account
+pub struct AccountInfo {
+    pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
@@ -335,9 +336,19 @@ pub struct AccountUpdate {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum CreateAccountError {
     InternalCanisterError(String),
+    AccountLimitReached,
+    Unauthorized(Principal),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
     InternalCanisterError(String),
+    AccountLimitReached,
+    Unauthorized(Principal),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum GetAccountsError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
 }

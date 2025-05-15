@@ -178,7 +178,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const FrontendHostname = IDL.Text;
   const AccountNumber = IDL.Nat64;
-  const Account = IDL.Record({
+  const AccountInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'origin' : IDL.Text,
     'account_number' : IDL.Opt(AccountNumber),
@@ -519,7 +519,7 @@ export const idlFactory = ({ IDL }) => {
     'config' : IDL.Func([], [InternetIdentityInit], ['query']),
     'create_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Text],
-        [IDL.Variant({ 'Ok' : Account, 'Err' : CreateAccountError })],
+        [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : CreateAccountError })],
         [],
       ),
     'create_challenge' : IDL.Func([], [Challenge], []),
@@ -534,7 +534,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_accounts' : IDL.Func(
         [UserNumber, FrontendHostname],
-        [IDL.Vec(Account)],
+        [IDL.Vec(AccountInfo)],
         ['query'],
       ),
     'get_anchor_credentials' : IDL.Func(
@@ -664,7 +664,7 @@ export const idlFactory = ({ IDL }) => {
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
         [UserNumber, FrontendHostname, IDL.Opt(AccountNumber), AccountUpdate],
-        [IDL.Variant({ 'Ok' : Account, 'Err' : UpdateAccountError })],
+        [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : UpdateAccountError })],
         [],
       ),
     'verify_tentative_device' : IDL.Func(

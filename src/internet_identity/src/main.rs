@@ -30,6 +30,7 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use storage::{Salt, Storage};
 
+mod account_management;
 mod anchor_management;
 mod archive;
 mod assets;
@@ -298,50 +299,54 @@ fn get_delegation(
 }
 
 #[query]
-fn get_accounts(_anchor_number: AnchorNumber, _origin: FrontendHostname) -> Vec<Account> {
-    vec![
-        Account {
-            account_number: None,
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Default Mock Account".to_string()),
-        },
-        Account {
-            account_number: Some(1),
-            origin: "example.com".to_string(),
-            last_used: Some(0u64),
-            name: Some("Additional Mock Account".to_string()),
-        },
-    ]
+fn get_accounts(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<Vec<AccountInfo>, GetAccountsError> {
+    match check_authorization(anchor_number) {
+        Ok(_) => Ok(
+            account_management::get_accounts_for_origin(anchor_number, &origin)
+                .iter()
+                .map(|acc| acc.to_info())
+                .collect(),
+        ),
+        Err(err) => Err(GetAccountsError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]
 fn create_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
     name: String,
-) -> Result<Account, CreateAccountError> {
-    Ok(Account {
-        account_number: Some(ic_cdk::api::time()),
-        origin: "example.com".to_string(),
-        last_used: None,
-        name: Some(name),
-    })
+) -> Result<AccountInfo, CreateAccountError> {
+    match check_authorization(anchor_number) {
+        Ok(_) => {
+            // check if this anchor and acc are actually linked
+            account_management::create_account_for_origin(anchor_number, origin, name)
+                .map(|acc| acc.to_info())
+        }
+        Err(err) => Err(CreateAccountError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]
 fn update_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
-    _update: AccountUpdate,
-) -> Result<Account, UpdateAccountError> {
-    Ok(Account {
-        account_number: None,
-        origin: "example.com".to_string(),
-        last_used: Some(0u64),
-        name: Some("Default Mock Account".to_string()),
-    })
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    update: AccountUpdate,
+) -> Result<AccountInfo, UpdateAccountError> {
+    match check_authorization(anchor_number) {
+        Ok(_) => account_management::update_account_for_origin(
+            anchor_number,
+            account_number,
+            origin,
+            update,
+        )
+        .map(|acc| acc.to_info()),
+        Err(err) => Err(UpdateAccountError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]
