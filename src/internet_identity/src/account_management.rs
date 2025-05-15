@@ -20,7 +20,7 @@ use ic_cdk::{api::time, caller};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname, SessionKey,
-    Timestamp, UpdateAccountError, UserKey,
+    UpdateAccountError,
 };
 use serde_bytes::ByteBuf;
 
