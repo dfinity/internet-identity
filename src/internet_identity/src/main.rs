@@ -305,7 +305,7 @@ fn get_accounts(
 ) -> Result<Vec<AccountInfo>, GetAccountsError> {
     match check_authorization(anchor_number) {
         Ok(_) => Ok(
-            account_management::get_accounts_for_origin(&anchor_number, &origin)
+            account_management::get_accounts_for_origin(anchor_number, &origin)
                 .iter()
                 .map(|acc| acc.to_info())
                 .collect(),
@@ -332,17 +332,21 @@ fn create_account(
 
 #[update]
 fn update_account(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
-    _update: AccountUpdate,
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
-    Ok(AccountInfo {
-        account_number: None,
-        origin: "example.com".to_string(),
-        last_used: Some(0u64),
-        name: Some("Default Mock Account".to_string()),
-    })
+    match check_authorization(anchor_number) {
+        Ok(_) => account_management::update_account_for_origin(
+            anchor_number,
+            account_number,
+            origin,
+            update,
+        )
+        .map(|acc| acc.to_info()),
+        Err(err) => Err(UpdateAccountError::Unauthorized(err.principal)),
+    }
 }
 
 #[update]
