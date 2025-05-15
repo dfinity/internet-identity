@@ -107,7 +107,7 @@ pub fn update_account_for_origin(
                     storage
                         .read_account(ReadAccountParams {
                             account_number: Some(acc_num),
-                            anchor_number: anchor_number,
+                            anchor_number,
                             origin: &origin,
                         })
                         .ok_or(StorageError::AccountNotFound {
