@@ -73,7 +73,6 @@ pub fn create_account_for_origin(
 
         if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
             return Err(CreateAccountError::AccountLimitReached);
-            return Err(CreateAccountError::AccountLimitReached);
         }
 
         storage
