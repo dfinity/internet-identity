@@ -3,7 +3,7 @@ use crate::{
         self, add_delegation_signature, check_frontend_length, delegation_bookkeeping,
         der_encode_canister_sig_key,
     },
-    ii_domain::{self, IIDomain},
+    ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
@@ -146,7 +146,7 @@ fn calculate_account_delegation_seed(account: Account) -> Hash {
     blob.extend_from_slice(&salt);
 
     // If this is a non-stored default account, we derive from frontend and anchor
-    if let None = account.account_number {
+    if account.account_number.is_none() {
         return delegation::calculate_seed(account.anchor_number, &account.origin);
     }
 

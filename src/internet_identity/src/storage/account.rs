@@ -2,15 +2,12 @@ use candid::{CandidType, Principal};
 
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, IdentityNumber, Timestamp,
+    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::to_string;
 use std::borrow::Cow;
 
 use crate::authz_utils::IdentityUpdateError;
-
-use super::StorageError;
 
 #[cfg(test)]
 mod tests;
