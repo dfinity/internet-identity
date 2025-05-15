@@ -6,8 +6,7 @@ import {
   CosePublicKey,
   DiscoverablePasskeyIdentity,
 } from "$lib/utils/discoverablePasskeyIdentity";
-import { isNullish, nonNullish } from "@dfinity/utils";
-import { creationOptions } from "$lib/utils/iiConnection";
+import { isNullish } from "@dfinity/utils";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { Session } from "$lib/stores/session.store";
 

@@ -1,11 +1,7 @@
 import type { PageLoad } from "./$types";
-import {
-  authenticatedStore,
-  isAuthenticatedStore,
-} from "$lib/stores/authentication.store";
+import { authenticatedStore } from "$lib/stores/authentication.store";
 import { get } from "svelte/store";
 import { authorizationContextStore } from "$lib/stores/authorization.store";
-import { redirect } from "@sveltejs/kit";
 
 export const load: PageLoad = async () => {
   const { identityNumber, actor } = get(authenticatedStore);
