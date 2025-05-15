@@ -52,7 +52,6 @@
       accounts = [...accounts, account];
       selectedAccountNumber = account.account_number[0];
       dialog = false;
-      await invalidateAll();
     } catch (error) {
       handleError(error);
       dialog = false;
