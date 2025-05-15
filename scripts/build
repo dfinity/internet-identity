@@ -199,8 +199,8 @@ function build_internet_identity() {
       TMP_HTML_FILE=$(mktemp)
       while IFS= read -r css_file; do
           css_file_relative="/${css_file#$DIST_DIR/}"
-          CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">\n"
-      done < <(find "$DIST_DIR" -type f -name "*.css")
+          CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">"
+      done < <(find "$DIST_DIR" -type f -name "*.css" | sort)
       find "$DIST_DIR" -type f -name "*.html" | while read -r html_file; do
         sed "s#</head>#${CSS_LINKS}</head>#" "$html_file" > "$TMP_HTML_FILE" && mv "$TMP_HTML_FILE" "$html_file"
       done
