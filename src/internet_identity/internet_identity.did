@@ -579,7 +579,7 @@ type AccountDelegationError = variant {
 type PrepareAccountDelegationOk = record {
     user_key : UserKey;
     timestamp : Timestamp;
-}
+};
 
 type GetAccountsError = variant {
     InternalCanisterError : text;
