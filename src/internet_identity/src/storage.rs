@@ -844,7 +844,6 @@ impl<M: Memory + Clone> Storage<M> {
         all_accounts
     }
 
-    #[allow(dead_code)]
     pub fn create_additional_account(
         &mut self,
         params: CreateAccountParams,
@@ -906,14 +905,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         // Return the new account
-        // Ok(Account {
-        //     account_number: Some(account_number),
-        //     anchor_number,
-        //     origin: origin.clone(),
-        //     last_used: None,
-        //     name: Some(params.name),
-        //     seed_from_anchor: None,
-        // })
         Ok(Account::new(
             anchor_number,
             origin.to_string(),
