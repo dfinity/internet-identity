@@ -784,11 +784,19 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
         account_number: Option<AccountNumber>,
-    ) -> Option<AccountReference> {
+    ) -> Option<Account> {
         // check if anchor has acc
         self.lookup_application_number_with_origin(origin)
             .and_then(|application_number| {
-                self.has_account_reference(anchor_number, application_number, account_number)
+                match self.has_account_reference(anchor_number, application_number, account_number)
+                {
+                    Some(_acc_ref) => self.read_account(ReadAccountParams {
+                        account_number,
+                        anchor_number,
+                        origin,
+                    }),
+                    None => None,
+                }
             })
     }
 
