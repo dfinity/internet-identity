@@ -304,7 +304,15 @@ fn get_delegation(
     let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
-    delegation::get_delegation(anchor_number, frontend, session_key, expiration)
+    account_management::get_account_delegation(
+        anchor_number,
+        &frontend,
+        None,
+        session_key,
+        expiration,
+    )
+    .map(|signed_delegation| GetDelegationResponse::SignedDelegation(signed_delegation))
+    .unwrap_or(GetDelegationResponse::NoSuchDelegation)
 }
 
 #[query]

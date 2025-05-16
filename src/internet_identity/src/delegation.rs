@@ -65,34 +65,6 @@ fn is_dev_frontend(frontend: &FrontendHostname) -> bool {
     false
 }
 
-pub fn get_delegation(
-    anchor_number: AnchorNumber,
-    frontend: FrontendHostname,
-    session_key: SessionKey,
-    expiration: Timestamp,
-) -> GetDelegationResponse {
-    check_frontend_length(&frontend);
-
-    state::assets_and_signatures(|certified_assets, sigs| {
-        let inputs = CanisterSigInputs {
-            domain: DELEGATION_SIG_DOMAIN,
-            seed: &calculate_seed(anchor_number, &frontend),
-            message: &delegation_signature_msg(&session_key, expiration, None),
-        };
-        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
-            Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
-                delegation: Delegation {
-                    pubkey: session_key,
-                    expiration,
-                    targets: None,
-                },
-                signature: ByteBuf::from(signature),
-            }),
-            Err(_) => GetDelegationResponse::NoSuchDelegation,
-        }
-    })
-}
-
 pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
