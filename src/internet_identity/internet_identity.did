@@ -574,6 +574,7 @@ type UpdateAccountError = variant {
 type AccountDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
+    NoSuchDelegation;
 };
 
 type PrepareAccountDelegation = record {
