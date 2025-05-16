@@ -276,14 +276,22 @@ async fn prepare_delegation(
 ) -> (UserKey, Timestamp) {
     let ii_domain = check_authz_and_record_activity(anchor_number)
         .unwrap_or_else(|err| trap(&format!("{err}")));
-    delegation::prepare_delegation(
+
+    let PrepareAccountDelegation {
+        user_key,
+        timestamp,
+    } = account_management::prepare_account_delegation(
         anchor_number,
         frontend,
+        None,
         session_key,
         max_time_to_live,
         &ii_domain,
     )
     .await
+    .unwrap_or_else(|_err| trap("Failed to prepare account!"));
+
+    (user_key, timestamp)
 }
 
 #[query]

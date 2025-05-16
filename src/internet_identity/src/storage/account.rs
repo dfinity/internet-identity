@@ -196,11 +196,6 @@ impl Account {
     ///
     /// * `account` is the `Account` we're using for this delegation
     pub fn calculate_seed(&self) -> Hash {
-        let salt = state::salt();
-        let mut blob: Vec<u8> = vec![];
-        blob.push(salt.len() as u8);
-        blob.extend_from_slice(&salt);
-
         // If this is a non-stored default account, we derive from frontend and anchor
         if self.account_number.is_none() {
             return delegation::calculate_seed(self.anchor_number, &self.origin);
