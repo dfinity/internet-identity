@@ -7,12 +7,15 @@ use crate::{
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            Account, AccountDelegationError, AccountReference, AccountsCounter,
-            CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
+            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
         },
         StorageError,
     },
     update_root_hash,
+};
+use ic_canister_sig_creation::{
+    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
 use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
@@ -183,84 +186,45 @@ pub fn get_account_delegation(
     session_key: SessionKey,
     expiration: Timestamp,
 ) -> Result<SignedDelegation, AccountDelegationError> {
-    // If the anchor doesn't own this account, we return unauthorized.
-    if anchor_has_account(anchor_number, origin, account_number).is_none() {
-        return Err(AccountDelegationError::Unauthorized(caller()));
-    }
     check_frontend_length(origin);
 
-    let account = storage_borrow(|storage| {
-        storage.read_account(ReadAccountParams {
-            account_number,
-            anchor_number,
-            origin,
-        })
-    })
-    .ok_or(AccountDelegationError::InternalCanisterError(
-        "Could not retrieve account".to_string(),
-    ))?;
-
-    state::assets_and_signatures(|certified_assets, sigs| {
-        let inputs = CanisterSigInputs {
-            domain: DELEGATION_SIG_DOMAIN,
-            seed: &account.calculate_seed(),
-            message: &delegation_signature_msg(&session_key, expiration, None),
-        };
-        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
-            Ok(signature) => Ok(SignedDelegation {
-                delegation: Delegation {
-                    pubkey: session_key,
-                    expiration,
-                    targets: None,
-                },
-                signature: ByteBuf::from(signature),
-            }),
-            Err(_) => Err(AccountDelegationError::NoSuchDelegation),
+    storage_borrow(|storage| {
+        // If the anchor doesn't own this account, we return unauthorized.
+        if storage
+            .anchor_has_account(anchor_number, origin, account_number)
+            .is_none()
+        {
+            return Err(AccountDelegationError::Unauthorized(caller()));
         }
-    })
-}
 
-pub fn get_account_delegation(
-    anchor_number: AnchorNumber,
-    origin: &FrontendHostname,
-    account_number: Option<AccountNumber>,
-    session_key: SessionKey,
-    expiration: Timestamp,
-) -> Result<SignedDelegation, AccountDelegationError> {
-    // If the anchor doesn't own this account, we return unauthorized.
-    if anchor_has_account(anchor_number, origin, account_number).is_none() {
-        return Err(AccountDelegationError::Unauthorized(caller()));
-    }
-    check_frontend_length(origin);
+        let account = storage
+            .read_account(ReadAccountParams {
+                account_number,
+                anchor_number,
+                origin,
+            })
+            .ok_or(AccountDelegationError::InternalCanisterError(
+                "Could not retrieve account".to_string(),
+            ))?;
 
-    let account = storage_borrow(|storage| {
-        storage.read_account(ReadAccountParams {
-            account_number,
-            anchor_number,
-            origin,
+        state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: DELEGATION_SIG_DOMAIN,
+                seed: &account.calculate_seed(),
+                message: &delegation_signature_msg(&session_key, expiration, None),
+            };
+            match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
+                Ok(signature) => Ok(SignedDelegation {
+                    delegation: Delegation {
+                        pubkey: session_key,
+                        expiration,
+                        targets: None,
+                    },
+                    signature: ByteBuf::from(signature),
+                }),
+                Err(_) => Err(AccountDelegationError::NoSuchDelegation),
+            }
         })
-    })
-    .ok_or(AccountDelegationError::InternalCanisterError(
-        "Could not retrieve account".to_string(),
-    ))?;
-
-    state::assets_and_signatures(|certified_assets, sigs| {
-        let inputs = CanisterSigInputs {
-            domain: DELEGATION_SIG_DOMAIN,
-            seed: &account.calculate_seed(),
-            message: &delegation_signature_msg(&session_key, expiration, None),
-        };
-        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
-            Ok(signature) => Ok(SignedDelegation {
-                delegation: Delegation {
-                    pubkey: session_key,
-                    expiration,
-                    targets: None,
-                },
-                signature: ByteBuf::from(signature),
-            }),
-            Err(_) => Err(AccountDelegationError::NoSuchDelegation),
-        }
     })
 }
 
