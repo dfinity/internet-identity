@@ -381,10 +381,10 @@ fn get_account_delegation(
     _account_number: AccountNumber,
     _session_key: SessionKey,
     _expiration: Timestamp,
-) -> Result<GetDelegationResponse> {
+) -> Result<GetDelegationResponse, AccountDelegationError> {
     match check_authorization(anchor_number) {
-        Ok(_) => {},
-        Err(err)
+        Ok(_) => {}
+        Err(err) => Err(err.into()),
     }
 }
 
