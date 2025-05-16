@@ -73,13 +73,9 @@ export class CosePublicKey implements PublicKey {
  * @param credential The credential created previously
  */
 function parseCredential(
-  credential: Credential | null,
-): PublicKeyCredentialWithAttachment | null {
-  const creds = credential as PublicKeyCredentialWithAttachment | null;
-
-  if (creds === null) {
-    return null;
-  }
+  credential: Credential,
+): PublicKeyCredentialWithAttachment {
+  const creds = credential as PublicKeyCredentialWithAttachment;
 
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore This type error is probably also in agent-js
@@ -229,23 +225,25 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
       ? navigator.credentials.create({
           ...this.#credentialCreationOptions,
           publicKey: {
-            ...this.#credentialCreationOptions!.publicKey,
+            ...this.#credentialCreationOptions.publicKey,
             challenge: blob,
           },
         })
-      : navigator.credentials.get({
-          ...this.#credentialRequestOptions,
-          publicKey: {
-            ...this.#credentialRequestOptions!.publicKey,
-            challenge: blob,
-          },
-        }));
+      : nonNullish(this.#credentialRequestOptions)
+        ? navigator.credentials.get({
+            ...this.#credentialRequestOptions,
+            publicKey: {
+              ...this.#credentialRequestOptions.publicKey,
+              challenge: blob,
+            },
+          })
+        : Promise.reject(new Error("Missing credential options")));
+
+    if (credential === null) {
+      throw Error("WebAuthn credential is missing");
+    }
 
     const result = parseCredential(credential);
-
-    if (result === null) {
-      throw Error("WebAuthn result is missing");
-    }
 
     if (result.authenticatorAttachment !== null) {
       this.#authenticatorAttachment = result.authenticatorAttachment;

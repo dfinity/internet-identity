@@ -50,6 +50,7 @@
       autocorrect="off"
       spellcheck="false"
       disabled={loading}
+      error={name.length > 64 ? "Maximum length is 64 characters." : undefined}
     />
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">
@@ -58,7 +59,7 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={name.length === 0 || loading}
+      disabled={name.length === 0 || name.length > 64 || loading}
     >
       {#if loading}
         <ProgressRing />
