@@ -743,7 +743,7 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<AccountReference> {
         self.stable_account_reference_list_memory
             .get(&(anchor_number, application_number))
-            .map(|acc_ref_list| acc_ref_list.to_acc_ref_vec())
+            .map(|acc_ref_list| acc_ref_list.into_acc_ref_vec())
             .and_then(|acc_ref_vec| {
                 acc_ref_vec
                     .iter()
@@ -822,26 +822,15 @@ impl<M: Memory + Clone> Storage<M> {
     #[allow(dead_code)]
     /// Returns all account references associated with a single anchor number, across all applications.
     pub fn list_identity_accounts(&self, anchor_number: AnchorNumber) -> Vec<AccountReference> {
-        let mut all_accounts: Vec<AccountReference> = Vec::new();
-
         let range_start = (anchor_number, ApplicationNumber::MIN);
         let range_end = (anchor_number, ApplicationNumber::MAX);
 
-        for ((_found_anchor, _app_num), storable_account_ref_list_val) in self
-            .stable_account_reference_list_memory
+        self.stable_account_reference_list_memory
             .range(range_start..=range_end)
-        {
-            let storable_refs_vec: Vec<AccountReference> = storable_account_ref_list_val.into();
-
-            for storable_ref in storable_refs_vec {
-                all_accounts.push(AccountReference {
-                    account_number: storable_ref.account_number,
-                    last_used: storable_ref.last_used,
-                });
-            }
-        }
-
-        all_accounts
+            .flat_map(|(_, storable_account_ref_list_val)| {
+                storable_account_ref_list_val.into_acc_ref_vec()
+            })
+            .collect()
     }
 
     pub fn create_additional_account(
