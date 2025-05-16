@@ -1,10 +1,18 @@
-use candid::CandidType;
+use candid::{CandidType, Principal};
+
+use ic_canister_sig_creation::hash_bytes;
+use ic_certification::Hash;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
+    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp, UserKey,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+
+use crate::{
+    authz_utils::{AuthorizationError, IdentityUpdateError},
+    delegation, state,
+};
 
 #[cfg(test)]
 mod tests;
@@ -124,6 +132,7 @@ pub struct Account {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
+    seed_from_anchor: Option<AnchorNumber>,
 }
 
 impl Account {
@@ -139,7 +148,29 @@ impl Account {
             origin,
             last_used: None,
             name,
+            seed_from_anchor: None,
         }
+    }
+
+    pub fn new_with_seed_anchor(
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        name: Option<String>,
+        account_number: Option<AccountNumber>,
+        seed_from_anchor: Option<AnchorNumber>,
+    ) -> Account {
+        Self {
+            account_number,
+            anchor_number,
+            origin,
+            last_used: None,
+            name,
+            seed_from_anchor,
+        }
+    }
+
+    fn get_seed_anchor(&self) -> Option<AnchorNumber> {
+        self.seed_from_anchor
     }
 
     // Used in tests (for now)
@@ -159,4 +190,72 @@ impl Account {
             name: self.name.clone(),
         }
     }
+
+    /// Create `Hash` used for a delegation that can make calls on behalf of an `Account`.
+    /// If the `Account` is a non-stored default account or has a `seed_from_anchor` (and thus is a stored default account),
+    /// the respective anchor number will be used as a seed input. Otherwise, the `AccountNumber` is used.
+    ///
+    /// # Arguments
+    ///
+    /// * `account` is the `Account` we're using for this delegation
+    pub fn calculate_seed(&self) -> Hash {
+        // If this is a non-stored default account, we derive from frontend and anchor
+        if self.account_number.is_none() {
+            return delegation::calculate_seed(self.anchor_number, &self.origin);
+        }
+
+        match self.get_seed_anchor() {
+            Some(seed_from_anchor) => {
+                // If this is a stored default account, we derive from frontend and anchor
+                delegation::calculate_seed(seed_from_anchor, &self.origin)
+            }
+            None => {
+                // If this is an added account, we derive from the account number.
+                let salt = state::salt();
+
+                let mut blob: Vec<u8> = vec![];
+                blob.push(salt.len() as u8);
+                blob.extend_from_slice(&salt);
+
+                let account_number_str = self.account_number.unwrap().to_string(); // XXX: this should be safe because an account without a seed_from_anchor must always have an account_number
+                let account_number_blob = account_number_str.bytes();
+                blob.push(account_number_blob.len() as u8);
+                blob.extend(account_number_blob);
+
+                hash_bytes(blob)
+            }
+        }
+    }
+}
+
+#[derive(CandidType, Debug, Serialize, Deserialize)]
+pub enum AccountDelegationError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+    NoSuchDelegation,
+}
+
+impl From<IdentityUpdateError> for AccountDelegationError {
+    fn from(err: IdentityUpdateError) -> Self {
+        match err {
+            IdentityUpdateError::Unauthorized(principal) => {
+                AccountDelegationError::Unauthorized(principal)
+            }
+            IdentityUpdateError::StorageError(_identity_number, storage_error) => {
+                AccountDelegationError::InternalCanisterError(storage_error.to_string())
+            }
+        }
+    }
+}
+
+impl From<AuthorizationError> for AccountDelegationError {
+    fn from(err: AuthorizationError) -> Self {
+        AccountDelegationError::Unauthorized(err.principal)
+    }
+}
+
+#[derive(CandidType, Serialize)]
+pub struct PrepareAccountDelegation {
+    pub user_key: UserKey,
+    pub timestamp: Timestamp,
 }

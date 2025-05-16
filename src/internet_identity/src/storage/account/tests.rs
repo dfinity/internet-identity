@@ -66,6 +66,7 @@ fn should_create_additional_account() {
         origin: origin.clone(),
         name: Some(account_name.clone()),
         last_used: None,
+        seed_from_anchor: None,
     };
     assert_eq!(additional_account, expected_account);
     assert_eq!(
@@ -346,6 +347,7 @@ fn should_update_additional_account() {
         origin: origin.clone(),
         last_used: None,
         name: Some(new_account_name),
+        seed_from_anchor: None,
     };
     assert_eq!(updated_account, expected_updated_account);
     assert_eq!(

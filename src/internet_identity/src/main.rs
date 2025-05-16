@@ -28,6 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -275,14 +276,22 @@ async fn prepare_delegation(
 ) -> (UserKey, Timestamp) {
     let ii_domain = check_authz_and_record_activity(anchor_number)
         .unwrap_or_else(|err| trap(&format!("{err}")));
-    delegation::prepare_delegation(
+
+    let PrepareAccountDelegation {
+        user_key,
+        timestamp,
+    } = account_management::prepare_account_delegation(
         anchor_number,
         frontend,
+        None,
         session_key,
         max_time_to_live,
         &ii_domain,
     )
     .await
+    .unwrap_or_else(|err| trap(&format!("{:?}", err)));
+
+    (user_key, timestamp)
 }
 
 #[query]
@@ -295,7 +304,15 @@ fn get_delegation(
     let Ok(_) = check_authorization(anchor_number) else {
         trap(&format!("{} could not be authenticated.", caller()));
     };
-    delegation::get_delegation(anchor_number, frontend, session_key, expiration)
+    account_management::get_account_delegation(
+        anchor_number,
+        &frontend,
+        None,
+        session_key,
+        expiration,
+    )
+    .map(GetDelegationResponse::SignedDelegation)
+    .unwrap_or(GetDelegationResponse::NoSuchDelegation)
 }
 
 #[query]
@@ -350,25 +367,47 @@ fn update_account(
 }
 
 #[update]
-fn prepare_account_delegation(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
-    _session_key: SessionKey,
-    _max_ttl: Option<u64>,
-) -> (UserKey, Timestamp) {
-    (ByteBuf::new(), 0)
+async fn prepare_account_delegation(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<PrepareAccountDelegation, AccountDelegationError> {
+    match check_authz_and_record_activity(anchor_number) {
+        Ok(ii_domain) => {
+            account_management::prepare_account_delegation(
+                anchor_number,
+                origin,
+                account_number,
+                session_key,
+                max_ttl,
+                &ii_domain,
+            )
+            .await
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 #[query]
 fn get_account_delegation(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: AccountNumber,
-    _session_key: SessionKey,
-    _expiration: Timestamp,
-) -> GetDelegationResponse {
-    GetDelegationResponse::NoSuchDelegation
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, AccountDelegationError> {
+    match check_authorization(anchor_number) {
+        Ok(_) => account_management::get_account_delegation(
+            anchor_number,
+            &origin,
+            account_number,
+            session_key,
+            expiration,
+        ),
+        Err(err) => Err(err.into()),
+    }
 }
 
 #[query]
