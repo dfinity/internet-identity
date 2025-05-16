@@ -735,21 +735,73 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|list| list.into())
     }
 
-    pub fn has_account_reference(
+    fn has_account_reference(
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
         account_number: Option<AccountNumber>,
     ) -> Option<AccountReference> {
-        self.stable_account_reference_list_memory
-            .get(&(anchor_number, application_number))
-            .map(|acc_ref_list| acc_ref_list.into_acc_ref_vec())
+        self.lookup_account_references(anchor_number, application_number)
             .and_then(|acc_ref_vec| {
                 acc_ref_vec
                     .iter()
                     .find(|acc_ref| acc_ref.account_number == account_number)
                     .cloned()
             })
+    }
+
+    pub fn anchor_has_account(
+        &self,
+        anchor_number: AnchorNumber,
+        origin: &FrontendHostname,
+        account_number: Option<AccountNumber>,
+    ) -> Option<Account> {
+        let application_number = self.lookup_application_number_with_origin(origin);
+        match account_number {
+            // if it is a named account
+            Some(_acc_num) => {
+                // check if anchor has acc ref
+                application_number.and_then(|app_num| {
+                    match self.has_account_reference(anchor_number, app_num, account_number) {
+                        Some(_acc_ref) => self.read_account(ReadAccountParams {
+                            account_number,
+                            anchor_number,
+                            origin,
+                        }),
+                        None => None,
+                    }
+                })
+            }
+            // if it is a default account
+            None => {
+                // if there is no stored application, we return a synthetic default account
+                if application_number.is_none() {
+                    return Some(Account::new(anchor_number, origin.clone(), None, None));
+                }
+                // if there is a list
+                if let Some(acc_ref_vec) =
+                    // we can safely unwrap here
+                    self
+                        .lookup_account_references(anchor_number, application_number.unwrap())
+                {
+                    // if there is a default account in the list, we return it
+                    // else we return None, account has been moved or deleted
+                    acc_ref_vec
+                        .iter()
+                        .find(|acc_ref| acc_ref.account_number.is_none())
+                        .and_then(|_acc_ref| {
+                            self.read_account(ReadAccountParams {
+                                account_number,
+                                anchor_number,
+                                origin,
+                            })
+                        })
+                } else {
+                    //if there is no list, we return a synthetic default account
+                    Some(Account::new(anchor_number, origin.clone(), None, None))
+                }
+            }
+        }
     }
 
     /// Updates the anchor account, application and account counters.
@@ -833,7 +885,6 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
-    #[allow(dead_code)]
     pub fn create_additional_account(
         &mut self,
         params: CreateAccountParams,
@@ -895,13 +946,12 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         // Return the new account
-        Ok(Account {
-            account_number: Some(account_number),
+        Ok(Account::new(
             anchor_number,
-            origin: origin.clone(),
-            last_used: None,
-            name: Some(params.name),
-        })
+            origin.to_string(),
+            Some(params.name),
+            Some(account_number),
+        ))
     }
 
     #[allow(dead_code)]
@@ -928,7 +978,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     /// Returns the requested account.
     /// If the account number doesn't esist, returns a default Account.
     /// If the account number exists but the account doesn't exist, returns None.
@@ -947,11 +996,12 @@ impl<M: Memory + Clone> Storage<M> {
             }
             Some(account_number) => match self.stable_account_memory.get(&account_number) {
                 None => None,
-                Some(storable_account) => Some(Account::new(
+                Some(storable_account) => Some(Account::new_with_seed_anchor(
                     params.anchor_number,
                     params.origin.clone(),
                     Some(storable_account.name.clone()),
                     Some(account_number),
+                    storable_account.seed_from_anchor,
                 )),
             },
         }
@@ -960,7 +1010,6 @@ impl<M: Memory + Clone> Storage<M> {
     /// Updates an account.
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
-    #[allow(dead_code)]
     pub fn update_account(
         &mut self,
         params: UpdateAccountParams,
@@ -982,7 +1031,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     /// Used in `update_account` to update an existing account.
     fn update_existing_account(
         &mut self,
@@ -1002,7 +1050,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    #[allow(dead_code)]
     /// Used in `update_account` to create a default account.
     /// Default account are not initially stored. They are stored when updated.
     /// If the default account reference does not exist, it must be created.

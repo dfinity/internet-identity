@@ -2,13 +2,12 @@ use crate::ii_domain::IIDomain;
 use crate::stats::event_stats::{
     update_event_based_stats, Event, EventData, PrepareDelegationEvent,
 };
-use crate::{state, update_root_hash, DAY_NS, MINUTE_NS};
+use crate::{state, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
 use ic_canister_sig_creation::{
     delegation_signature_msg, CanisterSigPublicKey, DELEGATION_SIG_DOMAIN,
 };
-use ic_cdk::api::time;
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
@@ -18,44 +17,14 @@ use std::net::IpAddr;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
+pub const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 
 // The maximum expiration time for delegation
 // (calculated as now() + this)
-const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
-
-pub async fn prepare_delegation(
-    anchor_number: AnchorNumber,
-    frontend: FrontendHostname,
-    session_key: SessionKey,
-    max_time_to_live: Option<u64>,
-    ii_domain: &Option<IIDomain>,
-) -> (UserKey, Timestamp) {
-    state::ensure_salt_set().await;
-    check_frontend_length(&frontend);
-
-    let session_duration_ns = u64::min(
-        max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
-        MAX_EXPIRATION_PERIOD_NS,
-    );
-    let expiration = time().saturating_add(session_duration_ns);
-    let seed = calculate_seed(anchor_number, &frontend);
-
-    state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
-    });
-    update_root_hash();
-
-    delegation_bookkeeping(frontend, ii_domain.clone(), session_duration_ns);
-
-    (
-        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        expiration,
-    )
-}
+pub const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(
+pub fn delegation_bookkeeping(
     frontend: FrontendHostname,
     ii_domain: Option<IIDomain>,
     session_duration_ns: u64,
@@ -132,7 +101,7 @@ pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) ->
     Principal::self_authenticating(public_key)
 }
 
-fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
+pub fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
