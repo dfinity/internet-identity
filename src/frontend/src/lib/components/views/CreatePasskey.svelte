@@ -36,14 +36,14 @@
       Name your identity
     </h1>
     <p class="text-md text-text-tertiary mb-6 font-medium">
-      To spot it faster later.
+      This will label your passkey, and you can’t rename it later once set.
     </p>
     <Input
       bind:element={inputRef}
       bind:value={name}
       inputmode="text"
       placeholder="Identity name"
-      hint="This name is permanent, so make it meaningful."
+      hint="Pick something recognizable, like your name."
       type="text"
       size="md"
       autocomplete="off"

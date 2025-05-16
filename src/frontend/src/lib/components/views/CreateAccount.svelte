@@ -32,17 +32,17 @@
       <UserPlusIcon size="1.5rem" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      Create additional account
+      Name additional account
     </h1>
     <p class="text-md text-text-tertiary mb-6 font-medium">
-      Specify a name for your new account.
+      You can rename this account later if needed.
     </p>
     <Input
       bind:element={inputRef}
       bind:value={name}
       inputmode="text"
       placeholder="Account name"
-      hint="You can rename this account later if needed."
+      hint={'Label it by how you\'ll use it — e.g., "Work", "Personal".'}
       type="text"
       size="md"
       autocomplete="off"

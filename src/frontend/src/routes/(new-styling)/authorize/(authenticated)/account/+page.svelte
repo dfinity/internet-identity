@@ -19,7 +19,7 @@
   import CreateAccount from "$lib/components/views/CreateAccount.svelte";
   import { untrack } from "svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { invalidateAll } from "$app/navigation";
+  import { GlobeIcon } from "@lucide/svelte";
 
   const { data }: PageProps = $props();
   let accounts = $derived(data.accounts);
@@ -29,9 +29,7 @@
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
 
-  let selectedAccountNumber = $state.raw(
-    untrack(() => accounts[0].account_number[0]),
-  );
+  let selectedAccountNumber = $state<bigint | undefined | null>(null);
   const selectedAccount = $derived(
     accounts.find(
       (account) => account.account_number[0] === selectedAccountNumber,
@@ -80,20 +78,22 @@
     <h1 class="text-text-primary text-2xl font-medium">Select an account</h1>
     <p class="text-text-secondary text-sm">you'd like to sign in with</p>
   </div>
-  <div class="mb-3 flex h-8 items-center justify-between gap-8">
-    <Ellipsis
-      text={hostname}
-      position="middle"
-      class="text-text-primary w-0 max-w-[75%] flex-1 text-sm font-semibold"
-    />
+  <div class="mb-3 flex h-8 items-center gap-2">
     {#if nonNullish(dapp?.logoSrc)}
       <img
         src={dapp.logoSrc}
         alt=""
         aria-hidden="true"
-        class="h-8 rounded-xl"
+        class="h-6 rounded-xl"
       />
+    {:else}
+      <GlobeIcon size="1.25rem" class="text-fg-primary" />
     {/if}
+    <Ellipsis
+      text={hostname}
+      position="middle"
+      class="text-text-primary w-0 max-w-[75%] flex-1 text-sm font-semibold"
+    />
   </div>
   <div
     class="mb-6 flex flex-col items-stretch gap-1.5 self-stretch"
@@ -124,7 +124,7 @@
     variant="primary"
     size="xl"
     type="submit"
-    class="mb-3"
+    disabled={selectedAccountNumber === null}
   >
     Continue
   </Button>
