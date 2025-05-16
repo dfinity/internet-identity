@@ -311,7 +311,7 @@ fn get_delegation(
         session_key,
         expiration,
     )
-    .map(|signed_delegation| GetDelegationResponse::SignedDelegation(signed_delegation))
+    .map(GetDelegationResponse::SignedDelegation)
     .unwrap_or(GetDelegationResponse::NoSuchDelegation)
 }
 
