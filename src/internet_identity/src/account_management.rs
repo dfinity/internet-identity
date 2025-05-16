@@ -7,8 +7,8 @@ use crate::{
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            Account, AccountDelegationError, AccountReference, AccountsCounter,
-            CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
+            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
         },
         StorageError,
     },

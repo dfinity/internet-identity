@@ -225,7 +225,7 @@ impl Account {
     }
 }
 
-#[derive(CandidType, Serialize, Deserialize)]
+#[derive(CandidType, Debug, Serialize, Deserialize)]
 pub enum AccountDelegationError {
     Unauthorized(Principal),
     InternalCanisterError(String),
