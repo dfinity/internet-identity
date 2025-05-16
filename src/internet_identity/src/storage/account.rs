@@ -207,7 +207,7 @@ impl From<IdentityUpdateError> for AccountDelegationError {
 }
 
 #[derive(CandidType, Serialize)]
-pub struct PrepareAccountDelegationOk {
+pub struct PrepareAccountDelegationResponse {
     pub user_key: UserKey,
     pub timestamp: Timestamp,
 }
