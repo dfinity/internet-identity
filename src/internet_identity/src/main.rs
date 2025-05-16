@@ -289,7 +289,7 @@ async fn prepare_delegation(
         &ii_domain,
     )
     .await
-    .unwrap_or_else(|_err| trap("Failed to prepare account!"));
+    .unwrap_or_else(|err| trap(&format!("{:?}", err)));
 
     (user_key, timestamp)
 }

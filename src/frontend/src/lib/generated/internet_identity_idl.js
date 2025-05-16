@@ -185,7 +185,9 @@ export const idlFactory = ({ IDL }) => {
     'last_used' : IDL.Opt(Timestamp),
   });
   const CreateAccountError = IDL.Variant({
+    'AccountLimitReached' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
@@ -216,6 +218,10 @@ export const idlFactory = ({ IDL }) => {
   const GetDelegationResponse = IDL.Variant({
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
+  });
+  const GetAccountsError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const WebAuthnCredential = IDL.Record({
     'pubkey' : PublicKey,
@@ -420,7 +426,9 @@ export const idlFactory = ({ IDL }) => {
   });
   const AccountUpdate = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
   const UpdateAccountError = IDL.Variant({
+    'AccountLimitReached' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -534,7 +542,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'get_accounts' : IDL.Func(
         [UserNumber, FrontendHostname],
-        [IDL.Vec(AccountInfo)],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Vec(AccountInfo),
+            'Err' : GetAccountsError,
+          }),
+        ],
         ['query'],
       ),
     'get_anchor_credentials' : IDL.Func(

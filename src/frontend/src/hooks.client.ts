@@ -42,9 +42,7 @@ const overrideFeatureFlags = () => {
 
 export const init: ClientInit = async () => {
   overrideFeatureFlags();
-  await initGlobals();
-  await Promise.all([
-    sessionStore.init({ canisterId, agentOptions }),
-    authenticationStore.init({ canisterId, agentOptions }),
-  ]);
+  initGlobals();
+  await sessionStore.init({ canisterId, agentOptions });
+  authenticationStore.init({ canisterId, agentOptions });
 };

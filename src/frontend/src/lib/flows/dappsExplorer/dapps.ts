@@ -27,7 +27,7 @@ export class KnownDapp {
   // * the website
   // * any (some) of the authOrigins
   hasOrigin(orig: string): boolean {
-    if (orig === this.descr.website) {
+    if (orig === new URL(this.descr.website).origin) {
       return true;
     }
     if (typeof this.descr.authOrigins === "string") {

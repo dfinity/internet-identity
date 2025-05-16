@@ -741,42 +741,13 @@ impl<M: Memory + Clone> Storage<M> {
         application_number: ApplicationNumber,
         account_number: Option<AccountNumber>,
     ) -> Option<AccountReference> {
-        match account_number {
-            Some(acc_num) => self
-                .stable_account_reference_list_memory
-                .get(&(anchor_number, application_number))
-                .map(|acc_ref_list| acc_ref_list.into_acc_ref_vec())
-                .and_then(|acc_ref_vec| {
-                    acc_ref_vec
-                        .iter()
-                        .find(|acc_ref| acc_ref.account_number == Some(acc_num))
-                        .cloned()
-                }),
-            None => {
-                // If the account number is None, we are dealing with a default account
-                // Or with an identity that does not have accounts and still uses the old flow
-                let acc_ref_list = self
-                    .stable_account_reference_list_memory
-                    .get(&(anchor_number, application_number));
-                if acc_ref_list.as_ref().is_some() && acc_ref_list.as_ref().unwrap().len() > 0 {
-                    // If the list exists and has accounts in it, we check whether it has a default account is in it.
-                    acc_ref_list
-                        .map(|acc_ref_list| acc_ref_list.into_acc_ref_vec())
-                        .and_then(|acc_ref_vec| {
-                            acc_ref_vec
-                                .iter()
-                                .find(|acc_ref| acc_ref.account_number == None)
-                                .cloned()
-                        })
-                } else {
-                    // If the list does not exist or is empty, we return a synthetic default account
-                    Some(AccountReference {
-                        account_number: None,
-                        last_used: None,
-                    })
-                }
-            }
-        }
+        self.lookup_account_references(anchor_number, application_number)
+            .and_then(|acc_ref_vec| {
+                acc_ref_vec
+                    .iter()
+                    .find(|acc_ref| acc_ref.account_number == account_number)
+                    .cloned()
+            })
     }
 
     pub fn anchor_has_account(
@@ -785,19 +756,52 @@ impl<M: Memory + Clone> Storage<M> {
         origin: &FrontendHostname,
         account_number: Option<AccountNumber>,
     ) -> Option<Account> {
-        // check if anchor has acc
-        self.lookup_application_number_with_origin(origin)
-            .and_then(|application_number| {
-                match self.has_account_reference(anchor_number, application_number, account_number)
-                {
-                    Some(_acc_ref) => self.read_account(ReadAccountParams {
-                        account_number,
-                        anchor_number,
-                        origin,
-                    }),
-                    None => None,
+        let application_number = self.lookup_application_number_with_origin(origin);
+        match account_number {
+            // if it is a named account
+            Some(_acc_num) => {
+                // check if anchor has acc ref
+                application_number.and_then(|app_num| {
+                    match self.has_account_reference(anchor_number, app_num, account_number) {
+                        Some(_acc_ref) => self.read_account(ReadAccountParams {
+                            account_number,
+                            anchor_number,
+                            origin,
+                        }),
+                        None => None,
+                    }
+                })
+            }
+            // if it is a default account
+            None => {
+                // if there is no stored application, we return a synthetic default account
+                if application_number.is_none() {
+                    return Some(Account::new(anchor_number, origin.clone(), None, None));
                 }
-            })
+                // if there is a list
+                if let Some(acc_ref_vec) =
+                    // we can safely unwrap here
+                    self
+                        .lookup_account_references(anchor_number, application_number.unwrap())
+                {
+                    // if there is a default account in the list, we return it
+                    // else we return None, account has been moved or deleted
+                    acc_ref_vec
+                        .iter()
+                        .find(|acc_ref| acc_ref.account_number.is_none())
+                        .and_then(|_acc_ref| {
+                            self.read_account(ReadAccountParams {
+                                account_number,
+                                anchor_number,
+                                origin,
+                            })
+                        })
+                } else {
+                    //if there is no list, we return a synthetic default account
+                    Some(Account::new(anchor_number, origin.clone(), None, None))
+                }
+            }
+        }
     }
 
     /// Updates the anchor account, application and account counters.

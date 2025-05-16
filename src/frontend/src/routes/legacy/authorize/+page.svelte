@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Flow from "$lib/components/Flow.svelte";
+  import Flow from "$lib/components/utils/Flow.svelte";
   import { Connection } from "$lib/utils/iiConnection";
   import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
   import { authFlowAuthorize } from "$lib/flows/authorize";

@@ -110,7 +110,9 @@ export interface CheckCaptchaArg { 'solution' : string }
 export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
-export type CreateAccountError = { 'InternalCanisterError' : string };
+export type CreateAccountError = { 'AccountLimitReached' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -153,6 +155,8 @@ export interface DeviceWithUsage {
   'credential_id' : [] | [CredentialId],
 }
 export type FrontendHostname = string;
+export type GetAccountsError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type GetDelegationResponse = { 'no_such_delegation' : null } |
   { 'signed_delegation' : SignedDelegation };
 export type GetIdAliasError = { 'InternalCanisterError' : string } |
@@ -346,7 +350,9 @@ export type StreamingStrategy = {
 export type Sub = string;
 export type Timestamp = bigint;
 export type Token = {};
-export type UpdateAccountError = { 'InternalCanisterError' : string };
+export type UpdateAccountError = { 'AccountLimitReached' : null } |
+  { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export type VerifyTentativeDeviceResponse = {
@@ -437,7 +443,8 @@ export interface _SERVICE {
   >,
   'get_accounts' : ActorMethod<
     [UserNumber, FrontendHostname],
-    Array<AccountInfo>
+    { 'Ok' : Array<AccountInfo> } |
+      { 'Err' : GetAccountsError }
   >,
   'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
   'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
