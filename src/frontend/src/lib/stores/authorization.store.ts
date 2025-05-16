@@ -23,6 +23,7 @@ export type AuthorizationStatus =
   | "validating"
   | "invalid"
   | "authenticating"
+  | "authorizing"
   | "success"
   | "failure";
 
@@ -34,7 +35,10 @@ type AuthorizationStore = Readable<{
     canisterId: Principal;
     canisterConfig: InternetIdentityInit;
   }) => Promise<void>;
-  authorize: (accountNumber: bigint | undefined) => Promise<void>;
+  authorize: (
+    accountNumber: bigint | undefined,
+    artificialDelay?: number,
+  ) => Promise<void>;
 };
 
 const internalStore = writable<{
@@ -42,16 +46,22 @@ const internalStore = writable<{
   status: AuthorizationStatus;
 }>({ status: "init" });
 
-let authorize: (accountNumber: bigint | undefined) => Promise<void>;
+let authorize: (
+  accountNumber: bigint | undefined,
+  artificialDelay?: number,
+) => Promise<void>;
 
 export const authorizationStore: AuthorizationStore = {
   init: async ({ canisterId, canisterConfig }) => {
     const status = await authenticationProtocol({
       authenticate: (context) => {
-        console.log("authenticate", context);
         internalStore.set({ context, status: "authenticating" });
         return new Promise((resolve) => {
-          authorize = async (_accountNumber) => {
+          authorize = async (_accountNumber, artificialDelay) => {
+            internalStore.set({ context, status: "authorizing" });
+            const artificialDelayPromise = new Promise((resolve) =>
+              setTimeout(resolve, artificialDelay),
+            );
             // TODO: use prepare/get account delegation instead of iiConnection
             const { identityNumber, identity } = get(authenticatedStore);
             const { connection } = await new Connection(
@@ -66,6 +76,7 @@ export const authorizationStore: AuthorizationStore = {
               publicKey: context.authRequest.sessionPublicKey,
               maxTimeToLive: context.authRequest.maxTimeToLive,
             });
+            await artificialDelayPromise;
             if ("error" in result) {
               resolve({ kind: "failure", text: "Couldn't fetch delegation" });
               return;
@@ -88,11 +99,11 @@ export const authorizationStore: AuthorizationStore = {
     internalStore.update((value) => ({ ...value, status }));
   },
   subscribe: (...args) => internalStore.subscribe(...args),
-  authorize: (accountNumber) => {
+  authorize: (accountNumber, artificialDelay) => {
     if (isNullish(authorize)) {
       throw new Error("Not ready yet for authorization");
     }
-    return authorize(accountNumber);
+    return authorize(accountNumber, artificialDelay);
   },
 };
 

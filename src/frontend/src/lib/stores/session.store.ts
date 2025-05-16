@@ -12,6 +12,7 @@ import { createAnonymousNonce } from "$lib/utils/openID";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { Principal } from "@dfinity/principal";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
 
 export interface Session {
   identity: SignIdentity;
@@ -36,7 +37,7 @@ export const sessionStore: SessionStore = {
     const identity = await ECDSAKeyIdentity.generate({
       extractable: false,
     });
-    const agent = await HttpAgent.create({ ...agentOptions, identity });
+    const agent = LazyHttpAgent.createLazy({ ...agentOptions, identity });
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,

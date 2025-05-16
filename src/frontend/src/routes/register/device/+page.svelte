@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Flow from "$lib/components/Flow.svelte";
+  import Flow from "$lib/components/utils/Flow.svelte";
   import { AuthenticatedConnection, Connection } from "$lib/utils/iiConnection";
   import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
   import { analytics } from "$lib/utils/analytics/analytics";

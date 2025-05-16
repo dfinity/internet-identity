@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Flow from "$lib/components/Flow.svelte";
+  import Flow from "$lib/components/utils/Flow.svelte";
   import { Connection } from "$lib/utils/iiConnection";
   import { webAuthnInIframeFlow } from "$lib/flows/iframeWebAuthn";
   import { analytics } from "$lib/utils/analytics/analytics";
