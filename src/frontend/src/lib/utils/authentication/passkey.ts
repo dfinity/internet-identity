@@ -42,14 +42,12 @@ export const authenticateWithPasskey = async ({
   const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
     credentialId,
     getPublicKey: async (result) => {
-      console.log("lookup_device_key", result.rawId);
       const lookupResult = (
         await actor.lookup_device_key(new Uint8Array(result.rawId))
       )[0];
       if (isNullish(lookupResult)) {
         throw new IdentityNotMigratedError();
       }
-      console.log("lookupResult", lookupResult);
       identityNumber = lookupResult.anchor_number;
       return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
     },
