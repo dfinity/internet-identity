@@ -14,9 +14,6 @@ use crate::{
     },
     update_root_hash,
 };
-use ic_canister_sig_creation::{
-    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
-};
 use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
@@ -25,21 +22,6 @@ use internet_identity_interface::internet_identity::types::{
 use serde_bytes::ByteBuf;
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
-
-pub fn anchor_has_account(
-    anchor_number: AnchorNumber,
-    origin: &FrontendHostname,
-    account_number: Option<AccountNumber>,
-) -> Option<AccountReference> {
-    // check if anchor has acc
-    storage_borrow(|storage| {
-        storage
-            .lookup_application_number_with_origin(origin)
-            .and_then(|application_number| {
-                storage.has_account_reference(anchor_number, application_number, account_number)
-            })
-    })
-}
 
 pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
@@ -92,49 +74,54 @@ pub fn update_account_for_origin(
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     // If the anchor doesn't own this account, we return unauthorized.
-    if anchor_has_account(anchor_number, &origin, account_number).is_none() {
-        return Err(UpdateAccountError::Unauthorized(caller()));
-    }
-    match update.name {
-        Some(name) => storage_borrow_mut(|storage| {
-            // If the account to be updated is a default account
-            // Check if whe have reached account limit
-            // Because editing a default account turns it into a stored account
-            if account_number.is_none() {
-                let AccountsCounter {
-                    stored_accounts,
-                    stored_account_references: _,
-                } = storage.get_account_counter(anchor_number);
+    storage_borrow_mut(|storage| {
+        if storage
+            .anchor_has_account(anchor_number, &origin, account_number)
+            .is_none()
+        {
+            return Err(UpdateAccountError::Unauthorized(caller()));
+        }
+        match update.name {
+            Some(name) => {
+                // If the account to be updated is a default account
+                // Check if whe have reached account limit
+                // Because editing a default account turns it into a stored account
+                if account_number.is_none() {
+                    let AccountsCounter {
+                        stored_accounts,
+                        stored_account_references: _,
+                    } = storage.get_account_counter(anchor_number);
 
-                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-                    return Err(UpdateAccountError::AccountLimitReached);
+                    if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+                        return Err(UpdateAccountError::AccountLimitReached);
+                    }
                 }
-            }
 
-            storage
-                .update_account(UpdateAccountParams {
-                    account_number,
-                    anchor_number,
-                    name,
-                    origin: origin.clone(),
-                })
-                .and_then(|acc_num| {
-                    storage
-                        .read_account(ReadAccountParams {
-                            account_number: Some(acc_num),
-                            anchor_number,
-                            origin: &origin,
-                        })
-                        .ok_or(StorageError::AccountNotFound {
-                            account_number: acc_num,
-                        })
-                })
-                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
-        }),
-        None => Err(UpdateAccountError::InternalCanisterError(
-            "No name was provided.".to_string(),
-        )),
-    }
+                storage
+                    .update_account(UpdateAccountParams {
+                        account_number,
+                        anchor_number,
+                        name,
+                        origin: origin.clone(),
+                    })
+                    .and_then(|acc_num| {
+                        storage
+                            .read_account(ReadAccountParams {
+                                account_number: Some(acc_num),
+                                anchor_number,
+                                origin: &origin,
+                            })
+                            .ok_or(StorageError::AccountNotFound {
+                                account_number: acc_num,
+                            })
+                    })
+                    .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+            }
+            None => Err(UpdateAccountError::InternalCanisterError(
+                "No name was provided.".to_string(),
+            )),
+        }
+    })
 }
 
 pub async fn prepare_account_delegation(
@@ -145,42 +132,91 @@ pub async fn prepare_account_delegation(
     max_ttl: Option<u64>,
     ii_domain: &Option<IIDomain>,
 ) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    // If the anchor doesn't own this account, we return unauthorized.
-    if anchor_has_account(anchor_number, &origin, account_number).is_none() {
-        return Err(AccountDelegationError::Unauthorized(caller()));
-    }
     state::ensure_salt_set().await;
     check_frontend_length(&origin);
 
-    let session_duration_ns = u64::min(
-        max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
-        crate::delegation::MAX_EXPIRATION_PERIOD_NS,
-    );
-    let expiration = time().saturating_add(session_duration_ns);
+    // If the anchor doesn't own this account, we return unauthorized.
+    storage_borrow(|storage| {
+        if storage
+            .anchor_has_account(anchor_number, &origin, account_number)
+            .is_none()
+        {
+            return Err(AccountDelegationError::Unauthorized(caller()));
+        }
+
+        let session_duration_ns = u64::min(
+            max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
+            crate::delegation::MAX_EXPIRATION_PERIOD_NS,
+        );
+        let expiration = time().saturating_add(session_duration_ns);
+
+        let account = storage
+            .read_account(ReadAccountParams {
+                account_number,
+                anchor_number,
+                origin: &origin,
+            })
+            .ok_or(AccountDelegationError::InternalCanisterError(
+                "Could not retrieve account".to_string(),
+            ))?;
+
+        let seed = account.calculate_seed();
+
+        state::signature_map_mut(|sigs| {
+            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+        });
+        update_root_hash();
+
+        delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
+
+        Ok(PrepareAccountDelegation {
+            user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+            timestamp: expiration,
+        })
+    })
+}
+
+pub fn get_account_delegation(
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, AccountDelegationError> {
+    // If the anchor doesn't own this account, we return unauthorized.
+    if anchor_has_account(anchor_number, origin, account_number).is_none() {
+        return Err(AccountDelegationError::Unauthorized(caller()));
+    }
+    check_frontend_length(origin);
 
     let account = storage_borrow(|storage| {
         storage.read_account(ReadAccountParams {
             account_number,
             anchor_number,
-            origin: &origin,
+            origin,
         })
     })
     .ok_or(AccountDelegationError::InternalCanisterError(
         "Could not retrieve account".to_string(),
     ))?;
 
-    let seed = account.calculate_seed();
-
-    state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
-    });
-    update_root_hash();
-
-    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
-
-    Ok(PrepareAccountDelegation {
-        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        timestamp: expiration,
+    state::assets_and_signatures(|certified_assets, sigs| {
+        let inputs = CanisterSigInputs {
+            domain: DELEGATION_SIG_DOMAIN,
+            seed: &account.calculate_seed(),
+            message: &delegation_signature_msg(&session_key, expiration, None),
+        };
+        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
+            Ok(signature) => Ok(SignedDelegation {
+                delegation: Delegation {
+                    pubkey: session_key,
+                    expiration,
+                    targets: None,
+                },
+                signature: ByteBuf::from(signature),
+            }),
+            Err(_) => Err(AccountDelegationError::NoSuchDelegation),
+        }
     })
 }
 
