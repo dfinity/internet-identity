@@ -1,5 +1,5 @@
 import { isWebAuthnCancel } from "$lib/utils/webAuthnErrorUtils";
-import { toaster } from "$lib/utils/toaster";
+import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
   CheckCaptchaError,
@@ -74,4 +74,5 @@ export const handleError = (error: unknown) => {
     title: "Unexpected error",
     description: error instanceof Error ? error.message : undefined,
   });
+  console.error(error);
 };

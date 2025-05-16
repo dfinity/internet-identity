@@ -6,8 +6,7 @@ import {
   CosePublicKey,
   DiscoverablePasskeyIdentity,
 } from "$lib/utils/discoverablePasskeyIdentity";
-import { isNullish, nonNullish } from "@dfinity/utils";
-import { creationOptions } from "$lib/utils/iiConnection";
+import { isNullish } from "@dfinity/utils";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { Session } from "$lib/stores/session.store";
 
@@ -40,21 +39,17 @@ export const authenticateWithPasskey = async ({
     canisterId,
   });
   let identityNumber: bigint;
-  const passkeyIdentity = new DiscoverablePasskeyIdentity({
-    credentialRequestOptions: {
-      publicKey: nonNullish(credentialId)
-        ? {
-            allowCredentials: [{ type: "public-key", id: credentialId }],
-          }
-        : creationOptions([], undefined, undefined),
-    },
+  const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
+    credentialId,
     getPublicKey: async (result) => {
+      console.log("lookup_device_key", result.rawId);
       const lookupResult = (
         await actor.lookup_device_key(new Uint8Array(result.rawId))
       )[0];
       if (isNullish(lookupResult)) {
         throw new IdentityNotMigratedError();
       }
+      console.log("lookupResult", lookupResult);
       identityNumber = lookupResult.anchor_number;
       return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
     },

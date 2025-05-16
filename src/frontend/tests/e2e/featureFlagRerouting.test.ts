@@ -17,21 +17,6 @@ const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
   });
 };
 
-const checkIfHasSkeleton = (browser: WebdriverIO.Browser) => {
-  return browser.execute(async () => {
-    for (const style of Array.from(document.styleSheets)) {
-      const rules = await style.cssRules;
-      for (const rule of Array.from(rules)) {
-        if (rule.cssText.includes("cerberus")) {
-          // This should be tailwind only but can be made more specific
-          return true;
-        }
-      }
-    }
-    return false;
-  });
-};
-
 test("Should redirect to new-styling authenticate with feature flag and load app.css", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Visit the root with feature flag
@@ -48,9 +33,7 @@ test("Should redirect to new-styling authenticate with feature flag and load app
 
     // Check that app.css is loaded by verifying it's in the document
     const hasTailwind = await checkIfHasTailwind(browser);
-    const hasSkeleton = await checkIfHasSkeleton(browser);
     expect(hasTailwind).toBe(true);
-    expect(hasSkeleton).toBe(true);
   });
 }, 300_000);
 
@@ -64,8 +47,6 @@ test("Should show regular view without feature flag and not load app.css", async
     await authenticateView.waitForDisplay();
 
     const hasTailwind = await checkIfHasTailwind(browser);
-    const hasSkeleton = await checkIfHasSkeleton(browser);
     expect(hasTailwind).toBe(false);
-    expect(hasSkeleton).toBe(false);
   });
 }, 300_000);

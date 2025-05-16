@@ -13,6 +13,7 @@ import {
 import { inferHost } from "$lib/utils/iiConnection";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { features } from "$lib/legacy/features";
+import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
 
 export let canisterId: Principal;
 export let canisterConfig: InternetIdentityInit;
@@ -20,7 +21,7 @@ export let agentOptions: HttpAgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
 
-export const initGlobals = async () => {
+export const initGlobals = () => {
   canisterId = Principal.fromText(readCanisterId());
   canisterConfig = readCanisterConfig();
   agentOptions = {
@@ -28,7 +29,7 @@ export const initGlobals = async () => {
     shouldFetchRootKey:
       features.FETCH_ROOT_KEY || (canisterConfig.fetch_root_key[0] ?? false),
   };
-  anonymousAgent = await HttpAgent.create(agentOptions);
+  anonymousAgent = LazyHttpAgent.createLazy(agentOptions);
   anonymousActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent: anonymousAgent,
     canisterId,
