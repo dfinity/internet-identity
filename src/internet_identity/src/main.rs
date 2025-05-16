@@ -277,10 +277,7 @@ async fn prepare_delegation(
     let ii_domain = check_authz_and_record_activity(anchor_number)
         .unwrap_or_else(|err| trap(&format!("{err}")));
 
-    let PrepareAccountDelegation {
-        user_key,
-        timestamp,
-    } = account_management::prepare_account_delegation(
+    account_management::prepare_account_delegation(
         anchor_number,
         frontend,
         None,
@@ -289,9 +286,13 @@ async fn prepare_delegation(
         &ii_domain,
     )
     .await
-    .unwrap_or_else(|err| trap(&format!("{:?}", err)));
-
-    (user_key, timestamp)
+    .map(
+        |PrepareAccountDelegation {
+             user_key,
+             timestamp,
+         }| (user_key, timestamp),
+    )
+    .unwrap_or_else(|err| trap(&format!("{:?}", err)))
 }
 
 #[query]
