@@ -9,7 +9,10 @@ use internet_identity_interface::internet_identity::types::{
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use crate::{authz_utils::IdentityUpdateError, delegation, state};
+use crate::{
+    authz_utils::{AuthorizationError, IdentityUpdateError},
+    delegation, state,
+};
 
 #[cfg(test)]
 mod tests;
@@ -234,6 +237,7 @@ impl Account {
 pub enum AccountDelegationError {
     Unauthorized(Principal),
     InternalCanisterError(String),
+    NoSuchDelegation,
 }
 
 impl From<IdentityUpdateError> for AccountDelegationError {
@@ -246,6 +250,12 @@ impl From<IdentityUpdateError> for AccountDelegationError {
                 AccountDelegationError::InternalCanisterError(storage_error.to_string())
             }
         }
+    }
+}
+
+impl From<AuthorizationError> for AccountDelegationError {
+    fn from(err: AuthorizationError) -> Self {
+        AccountDelegationError::Unauthorized(err.principal)
     }
 }
 

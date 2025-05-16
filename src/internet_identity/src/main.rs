@@ -376,14 +376,20 @@ async fn prepare_account_delegation(
 
 #[query]
 fn get_account_delegation(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: AccountNumber,
-    _session_key: SessionKey,
-    _expiration: Timestamp,
-) -> Result<GetDelegationResponse, AccountDelegationError> {
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: Timestamp,
+) -> Result<SignedDelegation, AccountDelegationError> {
     match check_authorization(anchor_number) {
-        Ok(_) => {}
+        Ok(_) => account_management::get_account_delegation(
+            anchor_number,
+            &origin,
+            account_number,
+            session_key,
+            expiration,
+        ),
         Err(err) => Err(err.into()),
     }
 }
