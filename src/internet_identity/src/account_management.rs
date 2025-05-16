@@ -136,47 +136,6 @@ pub fn update_account_for_origin(
     }
 }
 
-/// Create `Hash` used for a delegation that can make calls on behalf of an `Account`.
-/// If the `Account` is a non-stored default account or has a `seed_from_anchor` (and thus is a stored default account),
-/// the respective anchor number will be used as a seed input. Otherwise, the `AccountNumber` is used.
-///
-/// # Arguments
-///
-/// * `account` is the `Account` we're using for this delegation
-fn calculate_account_delegation_seed(account: Account) -> Hash {
-    let salt = state::salt();
-    let mut blob: Vec<u8> = vec![];
-    blob.push(salt.len() as u8);
-    blob.extend_from_slice(&salt);
-
-    // If this is a non-stored default account, we derive from frontend and anchor
-    if account.account_number.is_none() {
-        return delegation::calculate_seed(account.anchor_number, &account.origin);
-    }
-
-    match account.get_seed_anchor() {
-        Some(seed_from_anchor) => {
-            // If this is a stored default account, we derive from frontend and anchor
-            delegation::calculate_seed(seed_from_anchor, &account.origin)
-        }
-        None => {
-            // If this is an added account, we derive from the account number.
-            let salt = state::salt();
-
-            let mut blob: Vec<u8> = vec![];
-            blob.push(salt.len() as u8);
-            blob.extend_from_slice(&salt);
-
-            let account_number_str = account.account_number.unwrap().to_string(); // XXX: this should be safe because an account without a seed_from_anchor must always have an account_number
-            let account_number_blob = account_number_str.bytes();
-            blob.push(account_number_blob.len() as u8);
-            blob.extend(account_number_blob);
-
-            hash_bytes(blob)
-        }
-    }
-}
-
 pub async fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -209,7 +168,7 @@ pub async fn prepare_account_delegation(
         "Could not retrieve account".to_string(),
     ))?;
 
-    let seed = calculate_account_delegation_seed(account);
+    let seed = account.calculate_seed();
 
     state::signature_map_mut(|sigs| {
         add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);

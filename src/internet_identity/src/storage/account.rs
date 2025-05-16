@@ -1,5 +1,7 @@
 use candid::{CandidType, Principal};
 
+use ic_canister_sig_creation::hash_bytes;
+use ic_certification::Hash;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp, UserKey,
@@ -7,7 +9,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use crate::authz_utils::IdentityUpdateError;
+use crate::{authz_utils::IdentityUpdateError, delegation, state};
 
 #[cfg(test)]
 mod tests;
@@ -164,7 +166,7 @@ impl Account {
         }
     }
 
-    pub fn get_seed_anchor(&self) -> Option<AnchorNumber> {
+    fn get_seed_anchor(&self) -> Option<AnchorNumber> {
         self.seed_from_anchor
     }
 
@@ -183,6 +185,47 @@ impl Account {
             origin: self.origin.clone(),
             last_used: self.last_used,
             name: self.name.clone(),
+        }
+    }
+
+    /// Create `Hash` used for a delegation that can make calls on behalf of an `Account`.
+    /// If the `Account` is a non-stored default account or has a `seed_from_anchor` (and thus is a stored default account),
+    /// the respective anchor number will be used as a seed input. Otherwise, the `AccountNumber` is used.
+    ///
+    /// # Arguments
+    ///
+    /// * `account` is the `Account` we're using for this delegation
+    pub fn calculate_seed(&self) -> Hash {
+        let salt = state::salt();
+        let mut blob: Vec<u8> = vec![];
+        blob.push(salt.len() as u8);
+        blob.extend_from_slice(&salt);
+
+        // If this is a non-stored default account, we derive from frontend and anchor
+        if self.account_number.is_none() {
+            return delegation::calculate_seed(self.anchor_number, &self.origin);
+        }
+
+        match self.get_seed_anchor() {
+            Some(seed_from_anchor) => {
+                // If this is a stored default account, we derive from frontend and anchor
+                delegation::calculate_seed(seed_from_anchor, &self.origin)
+            }
+            None => {
+                // If this is an added account, we derive from the account number.
+                let salt = state::salt();
+
+                let mut blob: Vec<u8> = vec![];
+                blob.push(salt.len() as u8);
+                blob.extend_from_slice(&salt);
+
+                let account_number_str = self.account_number.unwrap().to_string(); // XXX: this should be safe because an account without a seed_from_anchor must always have an account_number
+                let account_number_blob = account_number_str.bytes();
+                blob.push(account_number_blob.len() as u8);
+                blob.extend(account_number_blob);
+
+                hash_bytes(blob)
+            }
         }
     }
 }
