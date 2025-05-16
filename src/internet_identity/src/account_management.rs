@@ -136,7 +136,7 @@ pub async fn prepare_account_delegation(
     check_frontend_length(&origin);
 
     // If the anchor doesn't own this account, we return unauthorized.
-    storage_borrow(|storage| {
+    let account = storage_borrow(|storage| {
         if storage
             .anchor_has_account(anchor_number, &origin, account_number)
             .is_none()
@@ -144,13 +144,7 @@ pub async fn prepare_account_delegation(
             return Err(AccountDelegationError::Unauthorized(caller()));
         }
 
-        let session_duration_ns = u64::min(
-            max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
-            crate::delegation::MAX_EXPIRATION_PERIOD_NS,
-        );
-        let expiration = time().saturating_add(session_duration_ns);
-
-        let account = storage
+        storage
             .read_account(ReadAccountParams {
                 account_number,
                 anchor_number,
@@ -158,21 +152,26 @@ pub async fn prepare_account_delegation(
             })
             .ok_or(AccountDelegationError::InternalCanisterError(
                 "Could not retrieve account".to_string(),
-            ))?;
+            ))
+    })?;
 
-        let seed = account.calculate_seed();
+    let session_duration_ns = u64::min(
+        max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
+        crate::delegation::MAX_EXPIRATION_PERIOD_NS,
+    );
+    let expiration = time().saturating_add(session_duration_ns);
+    let seed = account.calculate_seed();
 
-        state::signature_map_mut(|sigs| {
-            add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
-        });
-        update_root_hash();
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+    });
+    update_root_hash();
 
-        delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
+    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
 
-        Ok(PrepareAccountDelegation {
-            user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-            timestamp: expiration,
-        })
+    Ok(PrepareAccountDelegation {
+        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        timestamp: expiration,
     })
 }
 
