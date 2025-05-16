@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use storage::account::{AccountDelegationError, PrepareAccountDelegationOk};
+use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -357,7 +357,7 @@ async fn prepare_account_delegation(
     account_number: Option<AccountNumber>,
     session_key: SessionKey,
     max_ttl: Option<u64>,
-) -> Result<PrepareAccountDelegationOk, AccountDelegationError> {
+) -> Result<PrepareAccountDelegation, AccountDelegationError> {
     match check_authz_and_record_activity(anchor_number) {
         Ok(ii_domain) => {
             account_management::prepare_account_delegation(
