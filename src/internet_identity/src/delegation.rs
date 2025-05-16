@@ -11,7 +11,6 @@ use ic_canister_sig_creation::{
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
-use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::net::IpAddr;
 
