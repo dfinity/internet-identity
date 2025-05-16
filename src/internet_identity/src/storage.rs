@@ -775,7 +775,7 @@ impl<M: Memory + Clone> Storage<M> {
             // if it is a default account
             None => {
                 // if there is no stored application, we return a synthetic default account
-                if let None = application_number {
+                if application_number.is_none() {
                     return Some(Account::new(anchor_number, origin.clone(), None, None));
                 }
                 // if there is a list
