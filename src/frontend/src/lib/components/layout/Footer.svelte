@@ -2,7 +2,7 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
 
-  type Props = HTMLAttributes<HTMLHeadElement>;
+  type Props = HTMLAttributes<HTMLElement>;
 
   const { children, class: className, ...props }: Props = $props();
 </script>
