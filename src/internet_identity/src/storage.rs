@@ -783,7 +783,7 @@ impl<M: Memory + Clone> Storage<M> {
                         // else we return None, account has been moved or deleted
                         acc_ref_vec
                             .iter()
-                            .find(|acc_ref| acc_ref.account_number == None)
+                            .find(|acc_ref| acc_ref.account_number.is_none())
                             .and_then(|_acc_ref| {
                                 self.read_account(ReadAccountParams {
                                     account_number,
