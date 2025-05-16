@@ -1,6 +1,6 @@
 use crate::{
     delegation::{
-        self, add_delegation_signature, check_frontend_length, delegation_bookkeeping,
+        add_delegation_signature, check_frontend_length, delegation_bookkeeping,
         der_encode_canister_sig_key,
     },
     ii_domain::IIDomain,
@@ -15,13 +15,12 @@ use crate::{
     update_root_hash,
 };
 use ic_canister_sig_creation::{
-    delegation_signature_msg, hash_bytes, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
+    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
 use ic_cdk::{api::time, caller};
-use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
-    GetDelegationResponse, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
 };
 use serde_bytes::ByteBuf;
 
