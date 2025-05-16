@@ -136,7 +136,7 @@ pub async fn prepare_account_delegation(
     check_frontend_length(&origin);
 
     // If the anchor doesn't own this account, we return unauthorized.
-    storage_borrow(|storage| {
+    storage_borrow_mut(|storage| {
         if storage
             .anchor_has_account(anchor_number, &origin, account_number)
             .is_none()

@@ -774,33 +774,32 @@ impl<M: Memory + Clone> Storage<M> {
             }
             // if it is a default account
             None => {
-                application_number.and_then(|app_num| {
-                    // if there is a list
-                    if let Some(acc_ref_vec) =
-                        self.lookup_account_references(anchor_number, app_num)
-                    {
-                        // if there is a default account in the list, we return it
-                        // else we return None, account has been moved or deleted
-                        acc_ref_vec
-                            .iter()
-                            .find(|acc_ref| acc_ref.account_number.is_none())
-                            .and_then(|_acc_ref| {
-                                self.read_account(ReadAccountParams {
-                                    account_number,
-                                    anchor_number,
-                                    origin,
-                                })
+                // if there is no stored application, we return a synthetic default account
+                if let None = application_number {
+                    return Some(Account::new(anchor_number, origin.clone(), None, None));
+                }
+                // if there is a list
+                if let Some(acc_ref_vec) =
+                    // we can safely unwrap here
+                    self
+                        .lookup_account_references(anchor_number, application_number.unwrap())
+                {
+                    // if there is a default account in the list, we return it
+                    // else we return None, account has been moved or deleted
+                    acc_ref_vec
+                        .iter()
+                        .find(|acc_ref| acc_ref.account_number.is_none())
+                        .and_then(|_acc_ref| {
+                            self.read_account(ReadAccountParams {
+                                account_number,
+                                anchor_number,
+                                origin,
                             })
-                    } else {
-                        //if there is no list, we return a synthetic default account
-                        Some(Account::new(
-                            anchor_number,
-                            origin.clone(),
-                            None,
-                            account_number,
-                        ))
-                    }
-                })
+                        })
+                } else {
+                    //if there is no list, we return a synthetic default account
+                    Some(Account::new(anchor_number, origin.clone(), None, None))
+                }
             }
         }
     }
