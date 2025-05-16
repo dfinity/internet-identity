@@ -891,5 +891,5 @@ service : (opt InternetIdentityInit) -> {
         account_number : AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
         expiration : Timestamp
-    ) -> (GetDelegationResponse) query;
+    ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 };
