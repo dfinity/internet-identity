@@ -14,7 +14,7 @@ use crate::{
     },
     update_root_hash,
 };
-use ic_cdk::api::time;
+use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname, SessionKey,
     UpdateAccountError,
@@ -125,9 +125,7 @@ pub async fn prepare_account_delegation(
                 anchor_number,
                 origin: &origin,
             })
-            .ok_or(AccountDelegationError::InternalCanisterError(
-                "Could not retrieve account".to_string(),
-            ))
+            .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
 
     let session_duration_ns = u64::min(
