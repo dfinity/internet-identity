@@ -11,8 +11,6 @@ use std::borrow::Cow;
 
 use crate::{authz_utils::IdentityUpdateError, delegation, state};
 
-use super::anchor;
-
 #[cfg(test)]
 mod tests;
 
