@@ -17,10 +17,7 @@ use crate::{
 use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
-use ic_cdk::{
-    api::{call, time},
-    caller,
-};
+use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
     SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
