@@ -14,7 +14,7 @@ use crate::{
     },
     update_root_hash,
 };
-use ic_cdk::{api::time, caller};
+use ic_cdk::api::time;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname, SessionKey,
     UpdateAccountError,
@@ -63,12 +63,6 @@ pub fn update_account_for_origin(
 ) -> Result<Account, UpdateAccountError> {
     // If the anchor doesn't own this account, we return unauthorized.
     storage_borrow_mut(|storage| {
-        if storage
-            .anchor_has_account(anchor_number, &origin, account_number)
-            .is_none()
-        {
-            return Err(UpdateAccountError::Unauthorized(caller()));
-        }
         match update.name {
             Some(name) => {
                 // If the account to be updated is a default account
@@ -123,15 +117,7 @@ pub async fn prepare_account_delegation(
     state::ensure_salt_set().await;
     check_frontend_length(&origin);
 
-    // If the anchor doesn't own this account, we return unauthorized.
     let account = storage_borrow(|storage| {
-        if storage
-            .anchor_has_account(anchor_number, &origin, account_number)
-            .is_none()
-        {
-            return Err(AccountDelegationError::Unauthorized(caller()));
-        }
-
         storage
             .read_account(ReadAccountParams {
                 account_number,
