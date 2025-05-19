@@ -251,11 +251,11 @@ fn should_update_default_account() {
 
     // 4. Check that the default account has been created with the updated values.
     let updated_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_updated_account = Account::new(
+    let expected_updated_account = Account::new_full(
         anchor_number,
         origin,
         Some(account_name),
-        Some(new_account_number),
+        Some(new_account_number),None, Some(anchor_number)
     );
     assert_eq!(updated_accounts, vec![expected_updated_account]);
     assert_eq!(
