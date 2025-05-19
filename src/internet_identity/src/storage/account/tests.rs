@@ -1,4 +1,4 @@
-use crate::storage::account::{Account, AccountReference};
+use crate::storage::account::Account;
 use crate::storage::application::Application;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
