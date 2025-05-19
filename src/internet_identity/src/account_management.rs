@@ -74,6 +74,7 @@ pub fn update_account_for_origin(
                         stored_account_references: _,
                     } = storage.get_account_counter(anchor_number);
 
+                    // TODO: also check the actual number and reset if inaccurate
                     if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
                         return Err(UpdateAccountError::AccountLimitReached);
                     }
