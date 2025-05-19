@@ -975,14 +975,14 @@ impl<M: Memory + Clone> Storage<M> {
                     acc_ref_vec
                         .iter()
                         .find(|acc_ref| acc_ref.account_number.is_none())
-                        .and_then(|acc_ref| {
-                            return Some(Account::new_with_last_used(
+                        .map(|acc_ref| {
+                            Account::new_with_last_used(
                                 params.anchor_number,
                                 params.origin.clone(),
                                 None,
                                 acc_ref.account_number,
                                 acc_ref.last_used,
-                            ));
+                            )
                         })
                 } else {
                     //if there is no list, we return a synthetic default account
@@ -1006,15 +1006,15 @@ impl<M: Memory + Clone> Storage<M> {
                         application_number,
                         params.account_number,
                     )
-                    .and_then(|acc_ref| {
-                        Some(Account::new_full(
+                    .map(|acc_ref| {
+                        Account::new_full(
                             params.anchor_number,
                             params.origin.clone(),
                             Some(storable_account.name.clone()),
                             Some(account_number),
                             storable_account.seed_from_anchor,
                             acc_ref.last_used,
-                        ))
+                        )
                     })
                 }
             },

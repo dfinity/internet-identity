@@ -162,11 +162,12 @@ fn should_create_account_for_origin() {
 
     assert_eq!(
         create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone()),
-        Ok(Account::new_with_seed_anchor(
+        Ok(Account::new_full(
             anchor.anchor_number(),
             origin,
             Some(name),
             Some(1),
+            None,
             None
         ))
     );
@@ -234,19 +235,21 @@ fn should_get_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -274,12 +277,13 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
         ]
@@ -288,12 +292,13 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number_two, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number_two, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number_two, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number_two,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -319,19 +324,21 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -346,11 +353,12 @@ fn should_update_account_for_origin() {
                 name: Some("Becky".to_string())
             }
         ),
-        Ok(Account::new_with_seed_anchor(
+        Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(1),
+            None,
             None
         ))
     );
@@ -358,19 +366,21 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -396,19 +406,21 @@ fn should_update_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -423,11 +435,12 @@ fn should_update_default_account_for_origin() {
                 name: Some("Becky".to_string())
             }
         ),
-        Ok(Account::new_with_seed_anchor(
+        Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(3),
+            None,
             Some(anchor_number)
         ))
     );
@@ -435,25 +448,28 @@ fn should_update_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(3),
+                None,
                 Some(anchor_number)
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
