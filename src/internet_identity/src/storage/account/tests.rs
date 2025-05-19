@@ -255,7 +255,9 @@ fn should_update_default_account() {
         anchor_number,
         origin,
         Some(account_name),
-        Some(new_account_number),None, Some(anchor_number)
+        Some(new_account_number),
+        None,
+        Some(anchor_number),
     );
     assert_eq!(updated_accounts, vec![expected_updated_account]);
     assert_eq!(
