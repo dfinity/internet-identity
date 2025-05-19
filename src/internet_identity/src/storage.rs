@@ -1012,8 +1012,8 @@ impl<M: Memory + Clone> Storage<M> {
                             params.origin.clone(),
                             Some(storable_account.name.clone()),
                             Some(account_number),
-                            storable_account.seed_from_anchor,
                             acc_ref.last_used,
+                            storable_account.seed_from_anchor,
                         )
                     })
                 }
