@@ -955,25 +955,28 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    /// Returns a list of account references for a given anchor and application.
-    /// If the application doesn't exist, returns a list with a default account reference.
-    /// If the account references doesn't exist, returns a list with a default account reference.
+    /// Returns a list of accounts for a given anchor and application.
+    /// If the application doesn't exist, returns a list with a synthetic default account.
+    /// If the account references don't exist, returns a list with a synthetic default account.
     pub fn list_accounts(
         &self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
-    ) -> Vec<AccountReference> {
+    ) -> Vec<Account> {
         match self.lookup_application_number_with_origin(origin) {
-            None => vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }],
+            None => vec![Account::new(anchor_number, origin.clone(), None, None)],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
-                None => vec![AccountReference {
-                    account_number: None,
-                    last_used: None,
-                }],
-                Some(refs) => refs,
+                None => vec![Account::new(anchor_number, origin.clone(), None, None)],
+                Some(refs) => refs
+                    .iter()
+                    .filter_map(|acc_ref| {
+                        self.read_account(ReadAccountParams {
+                            account_number: acc_ref.account_number,
+                            anchor_number,
+                            origin,
+                        })
+                    })
+                    .collect(),
             },
         }
     }

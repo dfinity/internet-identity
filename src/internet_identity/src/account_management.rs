@@ -27,19 +27,7 @@ pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
-    storage_borrow(|storage| {
-        storage
-            .list_accounts(anchor_number, origin)
-            .iter()
-            .filter_map(|acc_ref| {
-                storage.read_account(ReadAccountParams {
-                    account_number: acc_ref.account_number,
-                    anchor_number,
-                    origin,
-                })
-            })
-            .collect()
-    })
+    storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
 }
 
 pub fn create_account_for_origin(
