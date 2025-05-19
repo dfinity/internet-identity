@@ -1,4 +1,4 @@
-use crate::storage::account::{Account, AccountReference};
+use crate::storage::account::Account;
 use crate::storage::application::Application;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
@@ -120,14 +120,9 @@ fn should_list_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    let expected_additional_account_ref = AccountReference {
-        account_number: Some(1),
-        last_used: None,
-    };
-    let expected_default_account_ref = AccountReference {
-        account_number: None,
-        last_used: None,
-    };
+    let expected_additional_account =
+        Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
+    let expected_default_account = Account::new(anchor_number, origin.clone(), None, None);
     storage.create_additional_account(new_account).unwrap();
 
     // 5. List accounts returns default account
@@ -140,11 +135,11 @@ fn should_list_accounts() {
         "Expected exactly two accounts to be listed"
     );
     assert_eq!(
-        listed_accounts[0], expected_default_account_ref,
+        listed_accounts[0], expected_default_account,
         "Default account reference is missing from the listed accounts."
     );
     assert_eq!(
-        listed_accounts[1], expected_additional_account_ref,
+        listed_accounts[1], expected_additional_account,
         "Additional account reference is missing from the listed accounts."
     );
     assert_eq!(
@@ -242,10 +237,7 @@ fn should_update_default_account() {
 
     // 2. Default account exists withuot creating it
     let initial_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_unreserved_account = AccountReference {
-        account_number: None,
-        last_used: None,
-    };
+    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, None);
     assert_eq!(initial_accounts, vec![expected_unreserved_account]);
 
     // 3. Update default account
@@ -259,10 +251,14 @@ fn should_update_default_account() {
 
     // 4. Check that the default account has been created with the updated values.
     let updated_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_updated_account = AccountReference {
-        account_number: Some(new_account_number),
-        last_used: None,
-    };
+    let expected_updated_account = Account::new_full(
+        anchor_number,
+        origin,
+        Some(account_name),
+        Some(new_account_number),
+        None,
+        Some(anchor_number),
+    );
     assert_eq!(updated_accounts, vec![expected_updated_account]);
     assert_eq!(
         storage.get_account_counter(anchor_number),

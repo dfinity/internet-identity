@@ -152,18 +152,36 @@ impl Account {
         }
     }
 
-    pub fn new_with_seed_anchor(
+    pub fn new_with_last_used(
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
         account_number: Option<AccountNumber>,
+        last_used: Option<Timestamp>,
+    ) -> Account {
+        Self {
+            account_number,
+            anchor_number,
+            origin,
+            last_used,
+            name,
+            seed_from_anchor: None,
+        }
+    }
+
+    pub fn new_full(
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        name: Option<String>,
+        account_number: Option<AccountNumber>,
+        last_used: Option<Timestamp>,
         seed_from_anchor: Option<AnchorNumber>,
     ) -> Account {
         Self {
             account_number,
             anchor_number,
             origin,
-            last_used: None,
+            last_used,
             name,
             seed_from_anchor,
         }

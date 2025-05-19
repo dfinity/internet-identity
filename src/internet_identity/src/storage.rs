@@ -738,70 +738,18 @@ impl<M: Memory + Clone> Storage<M> {
     fn has_account_reference(
         &self,
         anchor_number: AnchorNumber,
-        application_number: ApplicationNumber,
+        application_number: Option<ApplicationNumber>,
         account_number: Option<AccountNumber>,
     ) -> Option<AccountReference> {
-        self.lookup_account_references(anchor_number, application_number)
-            .and_then(|acc_ref_vec| {
-                acc_ref_vec
-                    .iter()
-                    .find(|acc_ref| acc_ref.account_number == account_number)
-                    .cloned()
-            })
-    }
-
-    pub fn anchor_has_account(
-        &self,
-        anchor_number: AnchorNumber,
-        origin: &FrontendHostname,
-        account_number: Option<AccountNumber>,
-    ) -> Option<Account> {
-        let application_number = self.lookup_application_number_with_origin(origin);
-        match account_number {
-            // if it is a named account
-            Some(_acc_num) => {
-                // check if anchor has acc ref
-                application_number.and_then(|app_num| {
-                    match self.has_account_reference(anchor_number, app_num, account_number) {
-                        Some(_acc_ref) => self.read_account(ReadAccountParams {
-                            account_number,
-                            anchor_number,
-                            origin,
-                        }),
-                        None => None,
-                    }
-                })
-            }
-            // if it is a default account
-            None => {
-                // if there is no stored application, we return a synthetic default account
-                if application_number.is_none() {
-                    return Some(Account::new(anchor_number, origin.clone(), None, None));
-                }
-                // if there is a list
-                if let Some(acc_ref_vec) =
-                    // we can safely unwrap here
-                    self
-                        .lookup_account_references(anchor_number, application_number.unwrap())
-                {
-                    // if there is a default account in the list, we return it
-                    // else we return None, account has been moved or deleted
+        application_number.and_then(|app_num| {
+            self.lookup_account_references(anchor_number, app_num)
+                .and_then(|acc_ref_vec| {
                     acc_ref_vec
                         .iter()
-                        .find(|acc_ref| acc_ref.account_number.is_none())
-                        .and_then(|_acc_ref| {
-                            self.read_account(ReadAccountParams {
-                                account_number,
-                                anchor_number,
-                                origin,
-                            })
-                        })
-                } else {
-                    //if there is no list, we return a synthetic default account
-                    Some(Account::new(anchor_number, origin.clone(), None, None))
-                }
-            }
-        }
+                        .find(|acc_ref| acc_ref.account_number == account_number)
+                        .cloned()
+                })
+        })
     }
 
     /// Updates the anchor account, application and account counters.
@@ -955,54 +903,120 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    /// Returns a list of account references for a given anchor and application.
-    /// If the application doesn't exist, returns a list with a default account reference.
-    /// If the account references doesn't exist, returns a list with a default account reference.
+    /// Returns a list of accounts for a given anchor and application.
+    /// If the application doesn't exist, returns a list with a synthetic default account.
+    /// If the account references don't exist, returns a list with a synthetic default account.
     pub fn list_accounts(
         &self,
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
-    ) -> Vec<AccountReference> {
+    ) -> Vec<Account> {
         match self.lookup_application_number_with_origin(origin) {
-            None => vec![AccountReference {
-                account_number: None,
-                last_used: None,
-            }],
+            None => vec![Account::new(anchor_number, origin.clone(), None, None)],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
-                None => vec![AccountReference {
-                    account_number: None,
-                    last_used: None,
-                }],
-                Some(refs) => refs,
+                None => vec![Account::new(anchor_number, origin.clone(), None, None)],
+                Some(refs) => refs
+                    .iter()
+                    .filter_map(|acc_ref| {
+                        self.read_account(ReadAccountParams {
+                            account_number: acc_ref.account_number,
+                            anchor_number,
+                            origin,
+                        })
+                    })
+                    .collect(),
             },
         }
     }
 
     /// Returns the requested account.
+    /// If the anchor doesn't own this account, returns None.
+    /// If the account is default but has been moved/deleted, returns None.
     /// If the account number doesn't esist, returns a default Account.
     /// If the account number exists but the account doesn't exist, returns None.
     /// If the account exists, returns it as Account.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
+        let application_number = self.lookup_application_number_with_origin(params.origin);
+
         match params.account_number {
+            // If a default account is requested
             None => {
-                // Application number doesn't exist, return a default Account
-                Some(Account::new(
-                    params.anchor_number,
-                    params.origin.clone(),
-                    // Default accounts have no name
-                    None,
-                    params.account_number,
-                ))
+                // if there is no stored application, return a synthetic default account
+                if application_number.is_none() {
+                    return Some(Account::new(
+                        params.anchor_number,
+                        params.origin.clone(),
+                        None,
+                        None,
+                    ));
+                }
+                // check if there is a stored account reference list
+                if let Some(acc_ref_vec) =
+                    // we can safely unwrap here
+                    self.lookup_account_references(
+                        params.anchor_number,
+                        application_number.unwrap(),
+                    )
+                {
+                    // if the list exists but is empty, we should still return a synthetic default account
+                    // this should only happen if a named account was created, and then both it and the
+                    // default account references were moved/deleted.
+                    if acc_ref_vec.is_empty() {
+                        return Some(Account::new(
+                            params.anchor_number,
+                            params.origin.clone(),
+                            None,
+                            None,
+                        ));
+                    }
+
+                    // if there is a default account in the list, we return it
+                    // else we return None, account has been moved or deleted
+                    acc_ref_vec
+                        .iter()
+                        .find(|acc_ref| acc_ref.account_number.is_none())
+                        .map(|acc_ref| {
+                            Account::new_with_last_used(
+                                params.anchor_number,
+                                params.origin.clone(),
+                                None,
+                                acc_ref.account_number,
+                                acc_ref.last_used,
+                            )
+                        })
+                } else {
+                    //if there is no list, we return a synthetic default account
+                    Some(Account::new(
+                        params.anchor_number,
+                        params.origin.clone(),
+                        None,
+                        None,
+                    ))
+                }
             }
+            // if a named/stored account is requested
             Some(account_number) => match self.stable_account_memory.get(&account_number) {
+                // if it does not exist, return None
                 None => None,
-                Some(storable_account) => Some(Account::new_with_seed_anchor(
-                    params.anchor_number,
-                    params.origin.clone(),
-                    Some(storable_account.name.clone()),
-                    Some(account_number),
-                    storable_account.seed_from_anchor,
-                )),
+                Some(storable_account) => {
+                    // if it does exist, check whether it is owned by the caller anchor
+                    // and belongs to the correct origin
+                    self.has_account_reference(
+                        params.anchor_number,
+                        application_number,
+                        params.account_number,
+                    )
+                    .map(|acc_ref| {
+                        Account::new_full(
+                            params.anchor_number,
+                            params.origin.clone(),
+                            Some(storable_account.name.clone()),
+                            Some(account_number),
+                            acc_ref.last_used,
+                            storable_account.seed_from_anchor,
+                        )
+                    })
+                }
             },
         }
     }

@@ -30,19 +30,7 @@ pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
-    storage_borrow(|storage| {
-        storage
-            .list_accounts(anchor_number, origin)
-            .iter()
-            .filter_map(|acc_ref| {
-                storage.read_account(ReadAccountParams {
-                    account_number: acc_ref.account_number,
-                    anchor_number,
-                    origin,
-                })
-            })
-            .collect()
-    })
+    storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
 }
 
 pub fn create_account_for_origin(
@@ -78,12 +66,6 @@ pub fn update_account_for_origin(
 ) -> Result<Account, UpdateAccountError> {
     // If the anchor doesn't own this account, we return unauthorized.
     storage_borrow_mut(|storage| {
-        if storage
-            .anchor_has_account(anchor_number, &origin, account_number)
-            .is_none()
-        {
-            return Err(UpdateAccountError::Unauthorized(caller()));
-        }
         match update.name {
             Some(name) => {
                 // If the account to be updated is a default account
@@ -95,6 +77,7 @@ pub fn update_account_for_origin(
                         stored_account_references: _,
                     } = storage.get_account_counter(anchor_number);
 
+                    // TODO: also check the actual number and reset if inaccurate
                     if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
                         return Err(UpdateAccountError::AccountLimitReached);
                     }
@@ -138,24 +121,14 @@ pub async fn prepare_account_delegation(
     state::ensure_salt_set().await;
     check_frontend_length(&origin);
 
-    // If the anchor doesn't own this account, we return unauthorized.
     let account = storage_borrow(|storage| {
-        if storage
-            .anchor_has_account(anchor_number, &origin, account_number)
-            .is_none()
-        {
-            return Err(AccountDelegationError::Unauthorized(caller()));
-        }
-
         storage
             .read_account(ReadAccountParams {
                 account_number,
                 anchor_number,
                 origin: &origin,
             })
-            .ok_or(AccountDelegationError::InternalCanisterError(
-                "Could not retrieve account".to_string(),
-            ))
+            .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
 
     let session_duration_ns = u64::min(
@@ -240,11 +213,12 @@ fn should_create_account_for_origin() {
 
     assert_eq!(
         create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone()),
-        Ok(Account::new_with_seed_anchor(
+        Ok(Account::new_full(
             anchor.anchor_number(),
             origin,
             Some(name),
             Some(1),
+            None,
             None
         ))
     );
@@ -312,19 +286,21 @@ fn should_get_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -352,12 +328,13 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
         ]
@@ -366,12 +343,13 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number_two, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number_two, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number_two, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number_two,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -397,19 +375,21 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -424,11 +404,12 @@ fn should_update_account_for_origin() {
                 name: Some("Becky".to_string())
             }
         ),
-        Ok(Account::new_with_seed_anchor(
+        Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(1),
+            None,
             None
         ))
     );
@@ -436,19 +417,21 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -474,19 +457,21 @@ fn should_update_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(anchor_number, origin.clone(), None, None, None),
-            Account::new_with_seed_anchor(
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
@@ -501,11 +486,12 @@ fn should_update_default_account_for_origin() {
                 name: Some("Becky".to_string())
             }
         ),
-        Ok(Account::new_with_seed_anchor(
+        Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(3),
+            None,
             Some(anchor_number)
         ))
     );
@@ -513,25 +499,28 @@ fn should_update_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(3),
+                None,
                 Some(anchor_number)
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
+                None,
                 None
             ),
-            Account::new_with_seed_anchor(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
+                None,
                 None
             ),
         ]
