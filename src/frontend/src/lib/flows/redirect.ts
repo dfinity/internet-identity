@@ -17,20 +17,27 @@ export const callbackFlow = (): Promise<never> => {
 };
 
 export const redirectInPopup = (url: string): Promise<string> => {
-  const callbackPromise = new Promise<string>((resolve) => {
-    const listener = (event: MessageEvent) => {
+  const callbackPromise = new Promise<string>((resolve, reject) => {
+    const closeInterval = setInterval(() => {
+      if (redirectWindow?.closed === true) {
+        clearInterval(closeInterval);
+        reject(new Error("Window closed before a response was received"));
+      }
+    }, 500);
+    const responseListener = (event: MessageEvent) => {
       if (
         event.source === redirectWindow &&
         event.origin === window.location.origin &&
         typeof event.data === "string"
       ) {
-        window.removeEventListener("message", listener);
+        window.removeEventListener("message", responseListener);
+        clearInterval(closeInterval);
         redirectWindow?.close();
         window.focus();
         resolve(event.data);
       }
     };
-    window.addEventListener("message", listener);
+    window.addEventListener("message", responseListener);
   });
   const width = 500;
   const height = 600;

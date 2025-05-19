@@ -1,4 +1,4 @@
-import { isWebAuthnCancel } from "$lib/utils/webAuthnErrorUtils";
+import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
@@ -6,23 +6,15 @@ import type {
   IdRegFinishError,
   IdRegStartError,
 } from "$lib/generated/internet_identity_types";
-import { isPermissionError } from "$lib/utils/openID";
+import { isOpenIdCancelError } from "$lib/utils/openID";
 
 export const handleError = (error: unknown) => {
   // Handle browser errors
-  if (isWebAuthnCancel(error)) {
+  if (isWebAuthnCancelError(error) || isOpenIdCancelError(error)) {
     toaster.info({
       title: "Operation canceled",
       description:
         "The interaction was canceled or timed out. Please try again.",
-    });
-    return;
-  }
-  if (isPermissionError(error)) {
-    toaster.error({
-      title: "Permission denied",
-      description:
-        'You need to enable the "Third-party sign-in" browser permission for this site',
     });
     return;
   }

@@ -16,8 +16,8 @@ import { unknownToString, unreachable, unreachableLax } from "$lib/utils/utils";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
-  isWebAuthnCancel,
-  isWebAuthnDuplicateDevice,
+  isWebAuthnCancelError,
+  isWebAuthnDuplicateDeviceError,
 } from "$lib/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 import { deviceRegistrationDisabledInfo } from "./deviceRegistrationModeDisabled";
@@ -56,12 +56,12 @@ export const registerTentativeDevice = async (
   );
 
   if (result instanceof Error) {
-    if (isWebAuthnDuplicateDevice(result)) {
+    if (isWebAuthnDuplicateDeviceError(result)) {
       // Given that this is a remote device where we get the result that authentication should work,
       // let's help the user and fill in their anchor number.
       await setAnchorUsed(userNumber);
       await displayDuplicateDeviceError({ primaryButton: "Ok" });
-    } else if (isWebAuthnCancel(result)) {
+    } else if (isWebAuthnCancelError(result)) {
       await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({
