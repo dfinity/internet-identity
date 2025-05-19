@@ -17,7 +17,10 @@ use crate::{
 use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
-use ic_cdk::{api::time, caller};
+use ic_cdk::{
+    api::{call, time},
+    caller,
+};
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
     SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
@@ -161,23 +164,13 @@ pub fn get_account_delegation(
     check_frontend_length(origin);
 
     storage_borrow(|storage| {
-        // If the anchor doesn't own this account, we return unauthorized.
-        if storage
-            .anchor_has_account(anchor_number, origin, account_number)
-            .is_none()
-        {
-            return Err(AccountDelegationError::Unauthorized(caller()));
-        }
-
         let account = storage
             .read_account(ReadAccountParams {
                 account_number,
                 anchor_number,
                 origin,
             })
-            .ok_or(AccountDelegationError::InternalCanisterError(
-                "Could not retrieve account".to_string(),
-            ))?;
+            .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 
         state::assets_and_signatures(|certified_assets, sigs| {
             let inputs = CanisterSigInputs {
