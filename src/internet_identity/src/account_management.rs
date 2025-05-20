@@ -61,7 +61,6 @@ pub fn update_account_for_origin(
     origin: FrontendHostname,
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    // If the anchor doesn't own this account, we return unauthorized.
     storage_borrow_mut(|storage| {
         match update.name {
             Some(name) => {
