@@ -18,6 +18,11 @@ export const callbackFlow = (): Promise<never> => {
 
 export const redirectInPopup = (url: string): Promise<string> => {
   const callbackPromise = new Promise<string>((resolve, reject) => {
+    // We need to throw an error when the window is closed, else the page and
+    // thus the user will wait indefinitely for a result that never comes.
+    //
+    // We can't listen to close events since the window is likely cross-origin,
+    // so instead we periodically check the closed attribute with an interval.
     const closeInterval = setInterval(() => {
       if (redirectWindow?.closed === true) {
         clearInterval(closeInterval);
