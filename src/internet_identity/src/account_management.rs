@@ -61,49 +61,47 @@ pub fn update_account_for_origin(
     origin: FrontendHostname,
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    storage_borrow_mut(|storage| {
-        match update.name {
-            Some(name) => {
-                // If the account to be updated is a default account
-                // Check if whe have reached account limit
-                // Because editing a default account turns it into a stored account
-                if account_number.is_none() {
-                    let AccountsCounter {
-                        stored_accounts,
-                        stored_account_references: _,
-                    } = storage.get_account_counter(anchor_number);
+    match update.name {
+        Some(name) => storage_borrow_mut(|storage| {
+            // If the account to be updated is a default account
+            // Check if whe have reached account limit
+            // Because editing a default account turns it into a stored account
+            if account_number.is_none() {
+                let AccountsCounter {
+                    stored_accounts,
+                    stored_account_references: _,
+                } = storage.get_account_counter(anchor_number);
 
-                    // TODO: also check the actual number and reset if inaccurate
-                    if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-                        return Err(UpdateAccountError::AccountLimitReached);
-                    }
+                // TODO: also check the actual number and reset if inaccurate
+                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+                    return Err(UpdateAccountError::AccountLimitReached);
                 }
-
-                storage
-                    .update_account(UpdateAccountParams {
-                        account_number,
-                        anchor_number,
-                        name,
-                        origin: origin.clone(),
-                    })
-                    .and_then(|acc_num| {
-                        storage
-                            .read_account(ReadAccountParams {
-                                account_number: Some(acc_num),
-                                anchor_number,
-                                origin: &origin,
-                            })
-                            .ok_or(StorageError::AccountNotFound {
-                                account_number: acc_num,
-                            })
-                    })
-                    .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
             }
-            None => Err(UpdateAccountError::InternalCanisterError(
-                "No name was provided.".to_string(),
-            )),
-        }
-    })
+
+            storage
+                .update_account(UpdateAccountParams {
+                    account_number,
+                    anchor_number,
+                    name,
+                    origin: origin.clone(),
+                })
+                .and_then(|acc_num| {
+                    storage
+                        .read_account(ReadAccountParams {
+                            account_number: Some(acc_num),
+                            anchor_number,
+                            origin: &origin,
+                        })
+                        .ok_or(StorageError::AccountNotFound {
+                            account_number: acc_num,
+                        })
+                })
+                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+        }),
+        None => Err(UpdateAccountError::InternalCanisterError(
+            "No name was provided.".to_string(),
+        )),
+    }
 }
 
 pub async fn prepare_account_delegation(

@@ -929,12 +929,13 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    /// Returns the requested account.
-    /// If the anchor doesn't own this account, returns None.
-    /// If the account is default but has been moved/deleted, returns None.
-    /// If the account number doesn't esist, returns a default Account.
-    /// If the account number exists but the account doesn't exist, returns None.
-    /// If the account exists, returns it as Account.
+    /// Returns the requested `Account`.
+    /// If the anchor doesn't own this `Account`, returns None.
+    /// If the `Account` is default but has been moved/deleted, returns None.
+    /// If the `Account` is default but ALL `Account`s for this origin have been moved or deleted, returns a default `Account`.
+    /// If the `Account` number doesn't esist, returns a default `Account`.
+    /// If the `Account` number exists but the `Account` doesn't exist, returns None.
+    /// If the `Account` exists, returns it as `Account`.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
         let application_number = self.lookup_application_number_with_origin(params.origin);
 
@@ -961,6 +962,11 @@ impl<M: Memory + Clone> Storage<M> {
                     // if the list exists but is empty, we should still return a synthetic default account
                     // this should only happen if a named account was created, and then both it and the
                     // default account references were moved/deleted.
+                    // XXX WARNING: this is done for the case that a user might have moved/deleted a default account
+                    // and then reached the maximum accounts limit. If we don't return a synthetic default account here,
+                    // they would be locked out of their account.
+                    // However: if we implement account transfers at some point, and default accounts can be transfered,
+                    // this would allow a user to regain access to their transferred default account.
                     if acc_ref_vec.is_empty() {
                         return Some(Account::new(
                             params.anchor_number,
