@@ -1,10 +1,6 @@
-use candid::CandidType;
-use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp,
 };
-use serde::Deserialize;
-use std::borrow::Cow;
 
 #[cfg(test)]
 mod tests;
@@ -35,89 +31,15 @@ pub struct ReadAccountParams<'a> {
     pub origin: &'a FrontendHostname,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum AccountType {
-    AccountReference,
-    Account,
-}
+// Types used internally to encapsulate business logic and data.
 
-// Types stored in memory.
-
-#[derive(Default, Clone, Debug, Deserialize, CandidType, serde::Serialize, PartialEq)]
-pub struct AccountsCounter {
-    pub stored_accounts: u64,
-    pub stored_account_references: u64,
-}
-
-impl AccountsCounter {
-    pub fn increment(&self, account_type: &AccountType) -> Self {
-        match account_type {
-            AccountType::AccountReference => Self {
-                stored_account_references: self.stored_account_references + 1,
-                stored_accounts: self.stored_accounts,
-            },
-            AccountType::Account => Self {
-                stored_accounts: self.stored_accounts + 1,
-                stored_account_references: self.stored_account_references,
-            },
-        }
-    }
-}
-
-impl Storable for AccountsCounter {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(serde_cbor::to_vec(&self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        serde_cbor::from_slice(&bytes).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-#[derive(
-    Clone, Debug, Deserialize, CandidType, serde::Serialize, Eq, PartialEq, Ord, PartialOrd,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AccountReference {
     pub account_number: Option<AccountNumber>, // None is the unreserved default account
     pub last_used: Option<Timestamp>,
 }
 
-impl Storable for AccountReference {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(serde_cbor::to_vec(&self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        serde_cbor::from_slice(&bytes).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-#[derive(Clone, Debug, Deserialize, serde::Serialize, Eq, PartialEq)]
-pub struct StorableAccount {
-    pub name: String,
-    // Set if this is a default account
-    pub seed_from_anchor: Option<AnchorNumber>,
-}
-
-impl Storable for StorableAccount {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(serde_cbor::to_vec(&self).unwrap())
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        serde_cbor::from_slice(&bytes).unwrap()
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-// Types used internally to encapsulate business logic and data.
-
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Account {
     pub account_number: Option<AccountNumber>, // None is unreserved default account
     pub anchor_number: AnchorNumber,
