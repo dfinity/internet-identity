@@ -188,7 +188,7 @@
       <FeaturedIcon size="sm">
         <ArrowRightLeftIcon size="1.25rem" />
       </FeaturedIcon>
-      <span>Use or create another account</span>
+      <span>Use another account</span>
     </RadioCard>
   </div>
   <Button
