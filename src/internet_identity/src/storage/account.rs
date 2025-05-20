@@ -240,6 +240,12 @@ pub enum AccountDelegationError {
     NoSuchDelegation,
 }
 
+impl From<AuthorizationError> for AccountDelegationError {
+    fn from(err: AuthorizationError) -> Self {
+        AccountDelegationError::Unauthorized(err.principal)
+    }
+}
+
 impl From<IdentityUpdateError> for AccountDelegationError {
     fn from(err: IdentityUpdateError) -> Self {
         match err {

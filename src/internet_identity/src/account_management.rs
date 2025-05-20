@@ -14,10 +14,13 @@ use crate::{
     },
     update_root_hash,
 };
+use ic_canister_sig_creation::{
+    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
+};
 use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname, SessionKey,
-    UpdateAccountError,
+    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
+    SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
 };
 use serde_bytes::ByteBuf;
 use serde_bytes::ByteBuf;
@@ -79,30 +82,30 @@ pub fn update_account_for_origin(
                 }
             }
 
-                storage
-                    .update_account(UpdateAccountParams {
-                        account_number,
-                        anchor_number,
-                        name,
-                        origin: origin.clone(),
-                    })
-                    .and_then(|acc_num| {
-                        storage
-                            .read_account(ReadAccountParams {
-                                account_number: Some(acc_num),
-                                anchor_number,
-                                origin: &origin,
-                            })
-                            .ok_or(StorageError::AccountNotFound {
-                                account_number: acc_num,
-                            })
-                    })
-                    .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
-            }
-            None => Err(UpdateAccountError::InternalCanisterError(
-                "No name was provided.".to_string(),
-            )),
-        }
+            storage
+                .update_account(UpdateAccountParams {
+                    account_number,
+                    anchor_number,
+                    name,
+                    origin: origin.clone(),
+                })
+                .and_then(|acc_num| {
+                    storage
+                        .read_account(ReadAccountParams {
+                            account_number: Some(acc_num),
+                            anchor_number,
+                            origin: &origin,
+                        })
+                        .ok_or(StorageError::AccountNotFound {
+                            account_number: acc_num,
+                        })
+                })
+                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+        }),
+        None => Err(UpdateAccountError::InternalCanisterError(
+            "No name was provided.".to_string(),
+        )),
+    }
 }
 
 pub async fn prepare_account_delegation(
@@ -182,47 +185,6 @@ pub fn get_account_delegation(
                 Err(_) => Err(AccountDelegationError::NoSuchDelegation),
             }
         })
-    })
-}
-
-pub async fn prepare_account_delegation(
-    anchor_number: AnchorNumber,
-    origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-    session_key: SessionKey,
-    max_ttl: Option<u64>,
-    ii_domain: &Option<IIDomain>,
-) -> Result<PrepareAccountDelegation, AccountDelegationError> {
-    state::ensure_salt_set().await;
-    check_frontend_length(&origin);
-
-    let account = storage_borrow(|storage| {
-        storage
-            .read_account(ReadAccountParams {
-                account_number,
-                anchor_number,
-                origin: &origin,
-            })
-            .ok_or(AccountDelegationError::Unauthorized(caller()))
-    })?;
-
-    let session_duration_ns = u64::min(
-        max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
-        crate::delegation::MAX_EXPIRATION_PERIOD_NS,
-    );
-    let expiration = time().saturating_add(session_duration_ns);
-    let seed = account.calculate_seed();
-
-    state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
-    });
-    update_root_hash();
-
-    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
-
-    Ok(PrepareAccountDelegation {
-        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        timestamp: expiration,
     })
 }
 
