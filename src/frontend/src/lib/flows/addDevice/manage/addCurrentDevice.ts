@@ -11,8 +11,8 @@ import {
 import {
   displayCancelError,
   displayDuplicateDeviceError,
-  isWebAuthnCancel,
-  isWebAuthnDuplicateDevice,
+  isWebAuthnCancelError,
+  isWebAuthnDuplicateDeviceError,
 } from "$lib/utils/webAuthnErrorUtils";
 import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
 import { nonNullish } from "@dfinity/utils";
@@ -54,9 +54,9 @@ export const addCurrentDevice = async (
       publicKey: creationOptions(devices, undefined, rpId),
     });
   } catch (error: unknown) {
-    if (isWebAuthnDuplicateDevice(error)) {
+    if (isWebAuthnDuplicateDeviceError(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Back to manage" });
-    } else if (isWebAuthnCancel(error)) {
+    } else if (isWebAuthnCancelError(error)) {
       await displayCancelError({ primaryButton: "Back to manage" });
     } else {
       await displayFailedToAddDevice(

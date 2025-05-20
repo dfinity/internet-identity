@@ -36,7 +36,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { untrack } from "svelte";
-  import Checkbox from "$lib/components/ui/Checkbox.svelte";
+  import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
 
   let continueButtonRef = $state<HTMLElement>();
   const lastUsedIdentities = $derived(
@@ -56,53 +56,59 @@
   );
   let identitySwitcherVisible = $state(false);
   let loading = $state(false);
+  let systemOverlay = $state(false);
+
+  const authenticateLastUsed = async () => {
+    if ("passkey" in selectedIdentity.authMethod) {
+      const { identity, identityNumber, credentialId } =
+        await authenticateWithPasskey({
+          canisterId,
+          session: $sessionStore,
+          credentialId: selectedIdentity.authMethod.passkey.credentialId,
+        });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { passkey: { credentialId } },
+      });
+    } else if (
+      "openid" in selectedIdentity.authMethod &&
+      selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
+    ) {
+      systemOverlay = true;
+      const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
+      const requestConfig = createGoogleRequestConfig(clientId);
+      const jwt = await requestJWT(requestConfig, {
+        nonce: $sessionStore.nonce,
+        mediation: "required",
+        loginHint: selectedIdentity.authMethod.openid.sub,
+      });
+      systemOverlay = false;
+      const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
+        canisterId,
+        session: $sessionStore,
+        jwt,
+      });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { openid: { iss, sub } },
+      });
+    } else {
+      throw new Error("Unrecognized authentication method");
+    }
+  };
 
   const handleContinue = async () => {
     try {
       loading = true;
-      if ("passkey" in selectedIdentity.authMethod) {
-        const { identity, identityNumber, credentialId } =
-          await authenticateWithPasskey({
-            canisterId,
-            session: $sessionStore,
-            credentialId: selectedIdentity.authMethod.passkey.credentialId,
-          });
-        authenticationStore.set({ identity, identityNumber });
-        const info =
-          await $authenticatedStore.actor.get_anchor_info(identityNumber);
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name: info.name[0],
-          authMethod: { passkey: { credentialId } },
-        });
-      } else if (
-        "openid" in selectedIdentity.authMethod &&
-        selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
-      ) {
-        const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
-        const requestConfig = createGoogleRequestConfig(clientId);
-        const jwt = await requestJWT(requestConfig, {
-          nonce: $sessionStore.nonce,
-          mediation: "required",
-          loginHint: selectedIdentity.authMethod.openid.sub,
-        });
-        const { identity, identityNumber, iss, sub } =
-          await authenticateWithJWT({
-            canisterId,
-            session: $sessionStore,
-            jwt,
-          });
-        authenticationStore.set({ identity, identityNumber });
-        const info =
-          await $authenticatedStore.actor.get_anchor_info(identityNumber);
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name: info.name[0],
-          authMethod: { openid: { iss, sub } },
-        });
-      } else {
-        return handleError(new Error("Unrecognized authentication method"));
-      }
+      await authenticateLastUsed();
 
       switch (continueWith) {
         case "lastUsedAccount":
@@ -118,6 +124,7 @@
       }
     } catch (error) {
       loading = false;
+      systemOverlay = false;
       handleError(error);
     }
   };
@@ -209,6 +216,9 @@
     {/if}
   </Button>
 </div>
+{#if systemOverlay}
+  <SystemOverlayBackdrop />
+{/if}
 {#if identitySwitcherVisible}
   <Dialog onClose={() => showIdentitySwitcher(false)}>
     <h1 class="text-text-primary mb-8 text-2xl font-medium">Switch Identity</h1>
