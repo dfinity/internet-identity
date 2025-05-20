@@ -735,7 +735,7 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|list| list.into())
     }
 
-    fn has_account_reference(
+    fn find_account_reference(
         &self,
         anchor_number: AnchorNumber,
         application_number: Option<ApplicationNumber>,
@@ -1001,7 +1001,7 @@ impl<M: Memory + Clone> Storage<M> {
                 Some(storable_account) => {
                     // if it does exist, check whether it is owned by the caller anchor
                     // and belongs to the correct origin
-                    self.has_account_reference(
+                    self.find_account_reference(
                         params.anchor_number,
                         application_number,
                         params.account_number,

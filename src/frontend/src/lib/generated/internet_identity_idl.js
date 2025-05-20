@@ -387,6 +387,14 @@ export const idlFactory = ({ IDL }) => {
     'expiration' : Timestamp,
     'anchor_number' : UserNumber,
   });
+  const PrepareAccountDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'timestamp' : Timestamp,
+  });
+  const AccountDelegationError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
     'relying_party' : FrontendHostname,
@@ -653,7 +661,12 @@ export const idlFactory = ({ IDL }) => {
           SessionKey,
           IDL.Opt(IDL.Nat64),
         ],
-        [UserKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : PrepareAccountDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
         [],
       ),
     'prepare_delegation' : IDL.Func(

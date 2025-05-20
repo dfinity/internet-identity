@@ -76,7 +76,7 @@ pub fn get_delegation(
     state::assets_and_signatures(|certified_assets, sigs| {
         let inputs = CanisterSigInputs {
             domain: DELEGATION_SIG_DOMAIN,
-            seed: &calculate_seed(anchor_number, &frontend),
+            seed: &calculate_anchor_seed(anchor_number, &frontend),
             message: &delegation_signature_msg(&session_key, expiration, None),
         };
         match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
@@ -96,12 +96,12 @@ pub fn get_delegation(
 pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
-    let seed = calculate_seed(anchor_number, &frontend);
+    let seed = calculate_anchor_seed(anchor_number, &frontend);
     let public_key = der_encode_canister_sig_key(seed.to_vec());
     Principal::self_authenticating(public_key)
 }
 
-pub fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
+pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
@@ -115,6 +115,21 @@ pub fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) 
 
     blob.push(frontend.len() as u8);
     blob.extend(frontend.bytes());
+
+    hash_bytes(blob)
+}
+
+pub fn calculate_account_seed(account_number: AccountNumber) -> Hash {
+    let salt = state::salt();
+
+    let mut blob: Vec<u8> = vec![];
+    blob.push(salt.len() as u8);
+    blob.extend_from_slice(&salt);
+
+    let account_number_str = account_number.to_string();
+    let account_number_blob = account_number_str.bytes();
+    blob.push(account_number_blob.len() as u8);
+    blob.extend(account_number_blob);
 
     hash_bytes(blob)
 }

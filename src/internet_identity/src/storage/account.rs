@@ -1,6 +1,5 @@
 use candid::{CandidType, Principal};
 
-use ic_canister_sig_creation::hash_bytes;
 use ic_certification::Hash;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
@@ -9,7 +8,7 @@ use internet_identity_interface::internet_identity::types::{
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use crate::{authz_utils::IdentityUpdateError, delegation, state};
+use crate::{authz_utils::IdentityUpdateError, delegation};
 
 #[cfg(test)]
 mod tests;
@@ -216,28 +215,18 @@ impl Account {
     pub fn calculate_seed(&self) -> Hash {
         // If this is a non-stored default account, we derive from frontend and anchor
         if self.account_number.is_none() {
-            return delegation::calculate_seed(self.anchor_number, &self.origin);
+            return delegation::calculate_anchor_seed(self.anchor_number, &self.origin);
         }
 
         match self.get_seed_anchor() {
             Some(seed_from_anchor) => {
                 // If this is a stored default account, we derive from frontend and anchor
-                delegation::calculate_seed(seed_from_anchor, &self.origin)
+                delegation::calculate_anchor_seed(seed_from_anchor, &self.origin)
             }
             None => {
                 // If this is an added account, we derive from the account number.
-                let salt = state::salt();
-
-                let mut blob: Vec<u8> = vec![];
-                blob.push(salt.len() as u8);
-                blob.extend_from_slice(&salt);
-
-                let account_number_str = self.account_number.unwrap().to_string(); // XXX: this should be safe because an account without a seed_from_anchor must always have an account_number
-                let account_number_blob = account_number_str.bytes();
-                blob.push(account_number_blob.len() as u8);
-                blob.extend(account_number_blob);
-
-                hash_bytes(blob)
+                delegation::calculate_account_seed(self.account_number.unwrap())
+                // XXX: ^this unwrap should be safe because an account without a seed_from_anchor must always have an account_number
             }
         }
     }

@@ -496,3 +496,68 @@ fn should_count_accounts_different_anchors() {
         "Total counters after anchor 2 additional account mismatch"
     );
 }
+
+#[test]
+fn should_read_default_account_with_empty_reference_list() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define parameters
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+
+    // 2. Create application but with empty account reference list
+    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+    storage.stable_account_reference_list_memory.insert(
+        (anchor_number, app_num),
+        vec![].into(), // Empty reference list
+    );
+
+    // 3. Try to read default account
+    let read_params = ReadAccountParams {
+        account_number: None,
+        anchor_number,
+        origin: &origin,
+    };
+    let default_account = storage.read_account(read_params).unwrap();
+
+    // 4. Verify we get a synthetic default account
+    let expected_account = Account::new(anchor_number, origin, None, None);
+    assert_eq!(default_account, expected_account);
+}
+
+#[test]
+fn should_not_read_account_from_wrong_anchor() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define parameters for two different anchors
+    let anchor_number_1: AnchorNumber = 10_000;
+    let anchor_number_2: AnchorNumber = 10_001;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let account_name = "account name".to_string();
+
+    // 2. Create account for first anchor
+    let create_params = CreateAccountParams {
+        anchor_number: anchor_number_1,
+        origin: origin.clone(),
+        name: account_name,
+    };
+    storage.create_additional_account(create_params).unwrap();
+
+    // 3. Try to read the account with second anchor
+    let read_params = ReadAccountParams {
+        account_number: Some(1),        // First account created
+        anchor_number: anchor_number_2, // Different anchor
+        origin: &origin,
+    };
+    let account = storage.read_account(read_params);
+
+    // 4. Verify we get None since the account doesn't belong to anchor_number_2
+    assert!(
+        account.is_none(),
+        "Should not be able to read account from wrong anchor"
+    );
+}
