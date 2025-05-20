@@ -78,7 +78,7 @@ import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
-import { isWebAuthnCancel } from "./webAuthnErrorUtils";
+import { isWebAuthnCancelError } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
 import {
   webauthnAuthenticationFunnel,
@@ -567,7 +567,7 @@ export class Connection {
     } catch (e: unknown) {
       // Better understand which users don't make it all the way.
       webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Failed);
-      if (isWebAuthnCancel(e)) {
+      if (isWebAuthnCancelError(e)) {
         // Better understand which users don't make it all the way.
         webauthnAuthenticationFunnel.trigger(
           WebauthnAuthenticationEvents.Cancelled,

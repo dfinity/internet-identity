@@ -7,7 +7,7 @@ import { mount, renderPage, TemplateElement } from "$lib/utils/lit-html";
 import { unknownToString } from "$lib/utils/utils";
 import { constructIdentity } from "$lib/utils/webAuthn";
 import {
-  isWebAuthnCancel,
+  isWebAuthnCancelError,
   webAuthnErrorCopy,
 } from "$lib/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
@@ -164,7 +164,7 @@ export const savePasskeyPinOrOpenID = async ({
 
 // Return an appropriate error message depending on the (inferred) type of WebAuthn error
 const errorMessage = (e: unknown): TemplateElement => {
-  if (isWebAuthnCancel(e)) {
+  if (isWebAuthnCancelError(e)) {
     const copy = webAuthnErrorCopy();
     return html`<p class="t-paragraph">
       <strong class="t-strong">${copy.cancel_title}</strong>:

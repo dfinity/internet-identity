@@ -50,6 +50,7 @@ const requestWithCredentials = async (
           loginHint: options.loginHint,
         },
       ],
+      mode: "active",
     },
     mediation: options.mediation,
   });
@@ -75,8 +76,9 @@ export const isNotSupportedError = (error: unknown) =>
 /**
  * @param error to check whether it is a FedCM no permission error
  */
-export const isPermissionError = (error: unknown) =>
-  error instanceof Error && error.name === "NetworkError";
+export const isOpenIdCancelError = (error: unknown) => {
+  return error instanceof Error && error.name === "NetworkError";
+};
 
 /**
  * Request JWT through redirect flow in a popup

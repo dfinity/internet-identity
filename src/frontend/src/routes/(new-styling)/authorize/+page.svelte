@@ -41,6 +41,7 @@
   import SetupOrUseExistingPasskey from "$lib/components/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
   import { onMount } from "svelte";
+  import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
 
   let dialog = $state<"setupOrUseExistingPasskey" | "setupNewPasskey">();
   let captcha = $state<{
@@ -48,6 +49,7 @@
     attempt: number;
     solve: (solution: string) => void;
   }>();
+  let systemOverlay = $state(false);
 
   const setupOrUseExistingPasskey = async () => {
     authenticationV2Funnel.trigger(
@@ -72,7 +74,7 @@
         name: info.name[0],
         authMethod: { passkey: { credentialId } },
       });
-      await goto("/authorize/account");
+      await goto("/authorize/account", { state: { preselectAccount: true } });
     } catch (error) {
       handleError(error);
       dialog = undefined;
@@ -186,10 +188,12 @@
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
       const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
       const requestConfig = createGoogleRequestConfig(clientId);
+      systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
         nonce: $sessionStore.nonce,
         mediation: "required",
       });
+      systemOverlay = false;
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: $sessionStore,
@@ -208,8 +212,9 @@
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      await goto("/authorize/account");
+      await goto("/authorize/account", { state: { preselectAccount: true } });
     } catch (error) {
+      systemOverlay = false;
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor" &&
@@ -294,8 +299,11 @@
         AuthenticationV2Events.SuccessfulGoogleRegistration,
       );
       authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
+        name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
@@ -355,4 +363,7 @@
       {/if}
     </Dialog>
   {/if}
+{/if}
+{#if systemOverlay}
+  <SystemOverlayBackdrop />
 {/if}

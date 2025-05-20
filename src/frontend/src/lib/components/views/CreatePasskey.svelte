@@ -19,7 +19,7 @@
 
   const handleSubmit = () => {
     loading = true;
-    create(name);
+    create(name.trim());
   };
 
   onMount(() => {

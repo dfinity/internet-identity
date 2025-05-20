@@ -35,7 +35,7 @@ export const displayDuplicateDeviceError = (options: {
  *  * https://www.w3.org/TR/webauthn-2/#sctn-op-make-cred (Step 3)
  * @param error error to check
  */
-export const isWebAuthnDuplicateDevice = (error: unknown): boolean => {
+export const isWebAuthnDuplicateDeviceError = (error: unknown): boolean => {
   return error instanceof DOMException && error.name === "InvalidStateError";
 };
 
@@ -50,7 +50,7 @@ export const isWebAuthnDuplicateDevice = (error: unknown): boolean => {
  *
  * @param error error to check
  */
-export const isWebAuthnCancel = (error: unknown): boolean => {
+export const isWebAuthnCancelError = (error: unknown): boolean => {
   return (
     error instanceof DOMException &&
     // According to WebAuthn spec, the browser must throw a NotAllowedError when the user cancels the operation.
