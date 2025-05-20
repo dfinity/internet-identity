@@ -9,7 +9,10 @@ use internet_identity_interface::internet_identity::types::{
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
-use crate::{authz_utils::IdentityUpdateError, delegation};
+use crate::{
+    authz_utils::{AuthorizationError, IdentityUpdateError},
+    delegation,
+};
 
 #[cfg(test)]
 mod tests;

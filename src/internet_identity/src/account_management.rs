@@ -23,7 +23,6 @@ use internet_identity_interface::internet_identity::types::{
     SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
 };
 use serde_bytes::ByteBuf;
-use serde_bytes::ByteBuf;
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
