@@ -1,5 +1,6 @@
 use candid::{CandidType, Principal};
 
+use ic_cdk::trap;
 use ic_certification::Hash;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
@@ -218,15 +219,16 @@ impl Account {
             return delegation::calculate_anchor_seed(self.anchor_number, &self.origin);
         }
 
-        match self.get_seed_anchor() {
-            Some(seed_from_anchor) => {
+        match (self.get_seed_anchor(), self.account_number) {
+            (Some(seed_from_anchor), _) => {
                 // If this is a stored default account, we derive from frontend and anchor
                 delegation::calculate_anchor_seed(seed_from_anchor, &self.origin)
             }
-            None => {
+            (None, Some(account_number)) => {
                 // If this is an added account, we derive from the account number.
-                delegation::calculate_account_seed(self.account_number.expect( "Attempted to calculate an account seed from an account without seed anchor or anchor number - this should never happen!"))
+                delegation::calculate_account_seed(account_number)
             }
+            (None, None) => trap("Attempted to calculate an account seed from an account without seed anchor or anchor number - this should never happen!")
         }
     }
 }
