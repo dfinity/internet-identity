@@ -6,6 +6,8 @@ pub mod accounts_counter;
 pub mod anchor;
 pub mod anchor_number;
 pub mod anchor_number_list;
+pub mod application;
+pub mod application_number;
 pub mod credential_id;
 pub mod fixed_anchor;
 pub mod metadata_v2;

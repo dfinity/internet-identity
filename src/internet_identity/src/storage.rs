@@ -80,8 +80,8 @@
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
 use account::{
-    Account, AccountType, AccountsCounter, CreateAccountParams, ReadAccountParams,
-    UpdateAccountParams, UpdateExistinAccountParams,
+    Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
+    UpdateExistinAccountParams,
 };
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
@@ -109,16 +109,17 @@ use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::AccountReference;
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::application::{Application, OriginHash};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::account_reference::StorableAccountReference;
 use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCounter};
+use crate::storage::storable::application_number::StorableApplicationNumber;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
+use storable::application::{StorableApplication, StorableOriginHash};
 use storable::credential_id::StorableCredentialId;
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::openid_credential::StorableOpenIdCredential;
@@ -129,7 +130,6 @@ pub mod anchor;
 pub mod registration_rates;
 
 pub mod account;
-pub mod application;
 
 mod storable;
 
@@ -154,10 +154,9 @@ const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
 const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
 const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
 const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
-// const DEPRECATED_MEMORY_INDEX: u8 = 7u8;
-const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
-// const DEPRECATED_MEMORY_INDEX: u8 = 8u8;
-const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
+// These memory indexes have been abandoned, do not use them
+// const DEPRECATED_STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
+// const DEPRECATED_LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
 const STABLE_APPLICATION_MEMORY_INDEX: u8 = 11u8;
@@ -165,6 +164,9 @@ const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 12u8;
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX: u8 = 13u8;
 const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 14u8;
 const STABLE_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 15u8;
+const STABLE_ANCHOR_MEMORY_INDEX: u8 = 16u8;
+const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 17u8;
+
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -250,13 +252,14 @@ pub struct Storage<M: Memory> {
     reference_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable anchor memory.
     stable_anchor_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_anchor_memory: StableBTreeMap<AnchorNumber, StorableAnchor, ManagedMemory<M>>,
+    stable_anchor_memory: StableBTreeMap<StorableAnchorNumber, StorableAnchor, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account memory.
     stable_account_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_memory: StableBTreeMap<AccountNumber, StorableAccount, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable application memory.
     stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_application_memory: StableBTreeMap<ApplicationNumber, Application, ManagedMemory<M>>,
+    stable_application_memory:
+        StableBTreeMap<StorableApplicationNumber, StorableApplication, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account counter memory.
     stable_anchor_account_counter_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_anchor_account_counter_memory:
@@ -264,7 +267,7 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the stable account reference list memory.
     stable_account_reference_list_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_reference_list_memory: StableBTreeMap<
-        (StorableAccountNumber, ApplicationNumber),
+        (StorableAccountNumber, StorableApplicationNumber),
         StorableAccountReferenceList,
         ManagedMemory<M>,
     >,
@@ -279,7 +282,7 @@ pub struct Storage<M: Memory> {
         StableBTreeMap<StorableCredentialId, StorableAnchorNumber, ManagedMemory<M>>,
     lookup_application_with_origin_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_application_with_origin_memory:
-        StableBTreeMap<OriginHash, ApplicationNumber, ManagedMemory<M>>,
+        StableBTreeMap<StorableOriginHash, StorableApplicationNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -690,7 +693,7 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         origin: &FrontendHostname,
     ) -> ApplicationNumber {
-        let origin_hash = OriginHash::from_origin(origin);
+        let origin_hash = StorableOriginHash::from_origin(origin);
 
         if let Some(existing_number) = self.lookup_application_with_origin_memory.get(&origin_hash)
         {
@@ -701,7 +704,7 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_application_with_origin_memory
                 .insert(origin_hash, new_number);
 
-            let new_application = Application {
+            let new_application = StorableApplication {
                 origin: origin.to_string(),
                 stored_accounts: 0u64,
                 stored_account_references: 0u64,
@@ -718,11 +721,14 @@ impl<M: Memory + Clone> Storage<M> {
         origin: &FrontendHostname,
     ) -> Option<ApplicationNumber> {
         self.lookup_application_with_origin_memory
-            .get(&OriginHash::from_origin(origin))
+            .get(&StorableOriginHash::from_origin(origin))
     }
 
     #[allow(dead_code)]
-    pub fn lookup_application_with_origin(&self, origin: &FrontendHostname) -> Option<Application> {
+    pub fn lookup_application_with_origin(
+        &self,
+        origin: &FrontendHostname,
+    ) -> Option<StorableApplication> {
         self.lookup_application_number_with_origin(origin)
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
     }
@@ -742,7 +748,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         application_number: Option<ApplicationNumber>,
         account_number: Option<AccountNumber>,
-    ) -> Option<AccountReference> {
+    ) -> Option<StorableAccountReference> {
         application_number.and_then(|app_num| {
             self.lookup_account_references(anchor_number, app_num)
                 .and_then(|acc_ref_vec| {
@@ -798,16 +804,17 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
             .get(&anchor_number)
-            .unwrap_or(AccountsCounter {
+            .unwrap_or(StorableAccountsCounter {
                 stored_accounts: 0,
                 stored_account_references: 0,
             })
+            .into()
     }
 
     #[allow(dead_code)]
     /// Returns the total account counter.
-    pub fn get_total_accounts_counter(&self) -> &AccountsCounter {
-        self.stable_account_counter_memory.get()
+    pub fn get_total_accounts_counter(&self) -> AccountsCounter {
+        self.stable_account_counter_memory.get().clone().into()
     }
 
     // Increments the `stable_account_counter_memory` account counter by one and returns the new number.

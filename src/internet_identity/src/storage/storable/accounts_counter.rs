@@ -1,3 +1,4 @@
+use crate::storage::account::AccountsCounter;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use minicbor::{Decode, Encode};
@@ -45,4 +46,22 @@ impl Storable for StorableAccountsCounter {
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+impl From<StorableAccountsCounter> for AccountsCounter {
+    fn from(value: StorableAccountsCounter) -> Self {
+        AccountsCounter {
+            stored_accounts: value.stored_accounts,
+            stored_account_references: value.stored_account_references,
+        }
+    }
+}
+
+impl From<AccountsCounter> for StorableAccountsCounter {
+    fn from(value: AccountsCounter) -> Self {
+        StorableAccountsCounter {
+            stored_accounts: value.stored_accounts,
+            stored_account_references: value.stored_account_references,
+        }
+    }
 }

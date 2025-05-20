@@ -1,8 +1,12 @@
 use candid::{CandidType, Principal};
 
+use crate::{authz_utils::IdentityUpdateError, delegation};
 use ic_cdk::trap;
 use ic_certification::Hash;
-use crate::{authz_utils::IdentityUpdateError, delegation};
+use internet_identity_interface::internet_identity::types::{
+    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp, UserKey,
+};
+use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
 mod tests;
@@ -34,6 +38,12 @@ pub struct ReadAccountParams<'a> {
 }
 
 // Types used internally to encapsulate business logic and data.
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Default)]
+pub struct AccountsCounter {
+    pub stored_accounts: u64,
+    pub stored_account_references: u64,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AccountReference {
