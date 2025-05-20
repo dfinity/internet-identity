@@ -617,11 +617,11 @@ impl<M: Memory + Clone> Storage<M> {
         let credential_to_be_added = current_set.difference(&previous_set);
         credential_to_be_removed.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .remove(&key.into());
+                .remove(&key);
         });
         credential_to_be_added.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .insert(key.into(), vec![anchor_number].into());
+                .insert(key, vec![anchor_number].into());
         });
     }
 
