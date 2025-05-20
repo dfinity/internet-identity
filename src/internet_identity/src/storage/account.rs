@@ -1,6 +1,5 @@
 use candid::{CandidType, Principal};
 
-use ic_cdk::trap;
 use ic_certification::Hash;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
