@@ -14,14 +14,12 @@ use crate::{
     },
     update_root_hash,
 };
-use ic_canister_sig_creation::{
-    delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
-};
 use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
-    SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, FrontendHostname, SessionKey,
+    UpdateAccountError,
 };
+use serde_bytes::ByteBuf;
 use serde_bytes::ByteBuf;
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
@@ -64,24 +62,22 @@ pub fn update_account_for_origin(
     origin: FrontendHostname,
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    // If the anchor doesn't own this account, we return unauthorized.
-    storage_borrow_mut(|storage| {
-        match update.name {
-            Some(name) => {
-                // If the account to be updated is a default account
-                // Check if whe have reached account limit
-                // Because editing a default account turns it into a stored account
-                if account_number.is_none() {
-                    let AccountsCounter {
-                        stored_accounts,
-                        stored_account_references: _,
-                    } = storage.get_account_counter(anchor_number);
+    match update.name {
+        Some(name) => storage_borrow_mut(|storage| {
+            // If the account to be updated is a default account
+            // Check if whe have reached account limit
+            // Because editing a default account turns it into a stored account
+            if account_number.is_none() {
+                let AccountsCounter {
+                    stored_accounts,
+                    stored_account_references: _,
+                } = storage.get_account_counter(anchor_number);
 
-                    // TODO: also check the actual number and reset if inaccurate
-                    if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-                        return Err(UpdateAccountError::AccountLimitReached);
-                    }
+                // TODO: also check the actual number and reset if inaccurate
+                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+                    return Err(UpdateAccountError::AccountLimitReached);
                 }
+            }
 
                 storage
                     .update_account(UpdateAccountParams {
@@ -107,7 +103,6 @@ pub fn update_account_for_origin(
                 "No name was provided.".to_string(),
             )),
         }
-    })
 }
 
 pub async fn prepare_account_delegation(
@@ -187,6 +182,47 @@ pub fn get_account_delegation(
                 Err(_) => Err(AccountDelegationError::NoSuchDelegation),
             }
         })
+    })
+}
+
+pub async fn prepare_account_delegation(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+    ii_domain: &Option<IIDomain>,
+) -> Result<PrepareAccountDelegation, AccountDelegationError> {
+    state::ensure_salt_set().await;
+    check_frontend_length(&origin);
+
+    let account = storage_borrow(|storage| {
+        storage
+            .read_account(ReadAccountParams {
+                account_number,
+                anchor_number,
+                origin: &origin,
+            })
+            .ok_or(AccountDelegationError::Unauthorized(caller()))
+    })?;
+
+    let session_duration_ns = u64::min(
+        max_ttl.unwrap_or(crate::delegation::DEFAULT_EXPIRATION_PERIOD_NS),
+        crate::delegation::MAX_EXPIRATION_PERIOD_NS,
+    );
+    let expiration = time().saturating_add(session_duration_ns);
+    let seed = account.calculate_seed();
+
+    state::signature_map_mut(|sigs| {
+        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
+    });
+    update_root_hash();
+
+    delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
+
+    Ok(PrepareAccountDelegation {
+        user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
+        timestamp: expiration,
     })
 }
 

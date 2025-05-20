@@ -90,6 +90,10 @@ pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHos
     hash_bytes(blob)
 }
 
+/// Calculate a seed only from an `AccountNumber`.
+/// This is only called when we're not dealing with a default account.
+/// Frontend origin and anchor number are not included because accounts are already stored per-origin and per-user.
+/// Leaving them out allows us to potentially allow account transfer or sharing in the future.
 pub fn calculate_account_seed(account_number: AccountNumber) -> Hash {
     let salt = state::salt();
 
