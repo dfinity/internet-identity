@@ -978,6 +978,7 @@ impl<M: Memory + Clone> Storage<M> {
 
                     // if there is a default account in the list, we return it
                     // else we return None, account has been moved or deleted
+                    // but there is another account in the list, so user can log in with that
                     acc_ref_vec
                         .iter()
                         .find(|acc_ref| acc_ref.account_number.is_none())

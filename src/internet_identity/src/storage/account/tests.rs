@@ -497,6 +497,11 @@ fn should_count_accounts_different_anchors() {
     );
 }
 
+// XXX WARNING: this functionality exists for the case that a user might have moved/deleted a default account
+// and then reached the maximum accounts limit. If we don't return a synthetic default account here,
+// they would be locked out of their account.
+// However: if we implement account transfers at some point, and default accounts can be transfered,
+// this would allow a user to regain access to their transferred default account.
 #[test]
 fn should_read_default_account_with_empty_reference_list() {
     // Setup storage

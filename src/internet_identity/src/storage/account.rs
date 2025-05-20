@@ -1,5 +1,6 @@
 use candid::{CandidType, Principal};
 
+use ic_cdk::trap;
 use ic_certification::Hash;
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::{
@@ -225,8 +226,7 @@ impl Account {
             }
             None => {
                 // If this is an added account, we derive from the account number.
-                delegation::calculate_account_seed(self.account_number.unwrap())
-                // XXX: ^this unwrap should be safe because an account without a seed_from_anchor must always have an account_number
+                delegation::calculate_account_seed(self.account_number.expect( "Attempted to calculate an account seed from an account without seed anchor or anchor number - this should never happen!"))
             }
         }
     }
