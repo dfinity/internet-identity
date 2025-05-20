@@ -81,7 +81,6 @@
           "scroll",
           updateKeyboardInset,
         );
-        updateKeyboardInset();
       }
     };
   });

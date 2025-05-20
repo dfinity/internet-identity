@@ -49,7 +49,7 @@ import {
   createAnonymousNonce,
   createGoogleRequestConfig,
   decodeJWT,
-  isPermissionError,
+  isOpenIdCancelError,
   requestJWT,
 } from "$lib/utils/openID";
 import { PreLoadImage } from "$lib/utils/preLoadImage";
@@ -511,7 +511,7 @@ export const displayManage = async (
         await connection.addOpenIdCredential(jwt, salt);
         resolve();
       } catch (error) {
-        if (isPermissionError(error)) {
+        if (isOpenIdCancelError(error)) {
           toast.error(copy.third_party_sign_in_permission_required);
           return;
         }

@@ -16,8 +16,8 @@ import { constructIdentity } from "$lib/utils/webAuthn";
 import {
   displayCancelError,
   displayDuplicateDeviceError,
-  isWebAuthnCancel,
-  isWebAuthnDuplicateDevice,
+  isWebAuthnCancelError,
+  isWebAuthnDuplicateDeviceError,
 } from "$lib/utils/webAuthnErrorUtils";
 import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
@@ -27,6 +27,7 @@ import { recoverWithDevice } from "./recoverWith/device";
 import { recoverWithPhrase } from "./recoverWith/phrase";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
+
 export const useRecovery = async (
   connection: Connection,
 ): Promise<LoginSuccess | { tag: "canceled" }> => {
@@ -152,9 +153,9 @@ const enrollAuthenticator = async ({
     newDevice = newDeviceData.newDevice;
     newDeviceOrigin = newDeviceData.newDeviceOrigin;
   } catch (error: unknown) {
-    if (isWebAuthnDuplicateDevice(error)) {
+    if (isWebAuthnDuplicateDeviceError(error)) {
       await displayDuplicateDeviceError({ primaryButton: "Ok" });
-    } else if (isWebAuthnCancel(error)) {
+    } else if (isWebAuthnCancelError(error)) {
       await displayCancelError({ primaryButton: "Ok" });
     } else {
       await displayError({
