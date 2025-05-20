@@ -571,6 +571,16 @@ type UpdateAccountError = variant {
     Unauthorized : principal;
 };
 
+type AccountDelegationError = variant {
+    InternalCanisterError : text;
+    Unauthorized : principal;
+};
+
+type PrepareAccountDelegation = record {
+    user_key : UserKey;
+    timestamp : Timestamp;
+};
+
 type GetAccountsError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
@@ -873,7 +883,7 @@ service : (opt InternetIdentityInit) -> {
         account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
         max_ttl : opt nat64
-    ) -> (UserKey, Timestamp);
+    ) -> (variant { Ok : PrepareAccountDelegation; Err : AccountDelegationError });
     
     get_account_delegation : (
         anchor_number : UserNumber,

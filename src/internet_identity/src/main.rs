@@ -28,6 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
 mod account_management;
@@ -275,14 +276,23 @@ async fn prepare_delegation(
 ) -> (UserKey, Timestamp) {
     let ii_domain = check_authz_and_record_activity(anchor_number)
         .unwrap_or_else(|err| trap(&format!("{err}")));
-    delegation::prepare_delegation(
+
+    account_management::prepare_account_delegation(
         anchor_number,
         frontend,
+        None,
         session_key,
         max_time_to_live,
         &ii_domain,
     )
     .await
+    .map(
+        |PrepareAccountDelegation {
+             user_key,
+             timestamp,
+         }| (user_key, timestamp),
+    )
+    .unwrap_or_else(|err| trap(&format!("{:?}", err)))
 }
 
 #[query]
@@ -350,14 +360,27 @@ fn update_account(
 }
 
 #[update]
-fn prepare_account_delegation(
-    _anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
-    _session_key: SessionKey,
-    _max_ttl: Option<u64>,
-) -> (UserKey, Timestamp) {
-    (ByteBuf::new(), 0)
+async fn prepare_account_delegation(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<PrepareAccountDelegation, AccountDelegationError> {
+    match check_authz_and_record_activity(anchor_number) {
+        Ok(ii_domain) => {
+            account_management::prepare_account_delegation(
+                anchor_number,
+                origin,
+                account_number,
+                session_key,
+                max_ttl,
+                &ii_domain,
+            )
+            .await
+        }
+        Err(err) => Err(err.into()),
+    }
 }
 
 #[query]

@@ -14,6 +14,10 @@ impl StorableAccountReferenceList {
     pub fn into_acc_ref_vec(self) -> Vec<AccountReference> {
         self.0
     }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl From<StorableAccountReferenceList> for Vec<AccountReference> {

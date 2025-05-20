@@ -2,6 +2,8 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export type AccountDelegationError = { 'InternalCanisterError' : string } |
+  { 'Unauthorized' : Principal };
 export interface AccountInfo {
   'name' : [] | [string],
   'origin' : string,
@@ -302,6 +304,10 @@ export interface OpenIdPrepareDelegationResponse {
   'expiration' : Timestamp,
   'anchor_number' : UserNumber,
 }
+export interface PrepareAccountDelegation {
+  'user_key' : UserKey,
+  'timestamp' : Timestamp,
+}
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface PrepareIdAliasRequest {
@@ -524,7 +530,8 @@ export interface _SERVICE {
       SessionKey,
       [] | [bigint],
     ],
-    [UserKey, Timestamp]
+    { 'Ok' : PrepareAccountDelegation } |
+      { 'Err' : AccountDelegationError }
   >,
   'prepare_delegation' : ActorMethod<
     [UserNumber, FrontendHostname, SessionKey, [] | [bigint]],

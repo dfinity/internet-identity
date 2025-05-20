@@ -1,4 +1,4 @@
-use crate::storage::account::{Account, AccountReference};
+use crate::storage::account::Account;
 use crate::storage::application::Application;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
@@ -66,6 +66,7 @@ fn should_create_additional_account() {
         origin: origin.clone(),
         name: Some(account_name.clone()),
         last_used: None,
+        seed_from_anchor: None,
     };
     assert_eq!(additional_account, expected_account);
     assert_eq!(
@@ -119,14 +120,9 @@ fn should_list_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    let expected_additional_account_ref = AccountReference {
-        account_number: Some(1),
-        last_used: None,
-    };
-    let expected_default_account_ref = AccountReference {
-        account_number: None,
-        last_used: None,
-    };
+    let expected_additional_account =
+        Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
+    let expected_default_account = Account::new(anchor_number, origin.clone(), None, None);
     storage.create_additional_account(new_account).unwrap();
 
     // 5. List accounts returns default account
@@ -139,11 +135,11 @@ fn should_list_accounts() {
         "Expected exactly two accounts to be listed"
     );
     assert_eq!(
-        listed_accounts[0], expected_default_account_ref,
+        listed_accounts[0], expected_default_account,
         "Default account reference is missing from the listed accounts."
     );
     assert_eq!(
-        listed_accounts[1], expected_additional_account_ref,
+        listed_accounts[1], expected_additional_account,
         "Additional account reference is missing from the listed accounts."
     );
     assert_eq!(
@@ -241,10 +237,7 @@ fn should_update_default_account() {
 
     // 2. Default account exists withuot creating it
     let initial_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_unreserved_account = AccountReference {
-        account_number: None,
-        last_used: None,
-    };
+    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, None);
     assert_eq!(initial_accounts, vec![expected_unreserved_account]);
 
     // 3. Update default account
@@ -258,10 +251,14 @@ fn should_update_default_account() {
 
     // 4. Check that the default account has been created with the updated values.
     let updated_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_updated_account = AccountReference {
-        account_number: Some(new_account_number),
-        last_used: None,
-    };
+    let expected_updated_account = Account::new_full(
+        anchor_number,
+        origin,
+        Some(account_name),
+        Some(new_account_number),
+        None,
+        Some(anchor_number),
+    );
     assert_eq!(updated_accounts, vec![expected_updated_account]);
     assert_eq!(
         storage.get_account_counter(anchor_number),
@@ -346,6 +343,7 @@ fn should_update_additional_account() {
         origin: origin.clone(),
         last_used: None,
         name: Some(new_account_name),
+        seed_from_anchor: None,
     };
     assert_eq!(updated_account, expected_updated_account);
     assert_eq!(
@@ -496,5 +494,75 @@ fn should_count_accounts_different_anchors() {
         *storage.get_total_accounts_counter(),
         expected_total_counters,
         "Total counters after anchor 2 additional account mismatch"
+    );
+}
+
+// XXX WARNING: this functionality exists for the case that a user might have moved/deleted a default account
+// and then reached the maximum accounts limit. If we don't return a synthetic default account here,
+// they would be locked out of their account.
+// However: if we implement account transfers at some point, and default accounts can be transfered,
+// this would allow a user to regain access to their transferred default account.
+#[test]
+fn should_read_default_account_with_empty_reference_list() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define parameters
+    let anchor_number: AnchorNumber = 10_000;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+
+    // 2. Create application but with empty account reference list
+    let app_num = storage.lookup_or_insert_application_number_with_origin(&origin);
+    storage.stable_account_reference_list_memory.insert(
+        (anchor_number, app_num),
+        vec![].into(), // Empty reference list
+    );
+
+    // 3. Try to read default account
+    let read_params = ReadAccountParams {
+        account_number: None,
+        anchor_number,
+        origin: &origin,
+    };
+    let default_account = storage.read_account(read_params).unwrap();
+
+    // 4. Verify we get a synthetic default account
+    let expected_account = Account::new(anchor_number, origin, None, None);
+    assert_eq!(default_account, expected_account);
+}
+
+#[test]
+fn should_not_read_account_from_wrong_anchor() {
+    // Setup storage
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // 1. Define parameters for two different anchors
+    let anchor_number_1: AnchorNumber = 10_000;
+    let anchor_number_2: AnchorNumber = 10_001;
+    let origin: FrontendHostname = "https://some.origin".to_string();
+    let account_name = "account name".to_string();
+
+    // 2. Create account for first anchor
+    let create_params = CreateAccountParams {
+        anchor_number: anchor_number_1,
+        origin: origin.clone(),
+        name: account_name,
+    };
+    storage.create_additional_account(create_params).unwrap();
+
+    // 3. Try to read the account with second anchor
+    let read_params = ReadAccountParams {
+        account_number: Some(1),        // First account created
+        anchor_number: anchor_number_2, // Different anchor
+        origin: &origin,
+    };
+    let account = storage.read_account(read_params);
+
+    // 4. Verify we get None since the account doesn't belong to anchor_number_2
+    assert!(
+        account.is_none(),
+        "Should not be able to read account from wrong anchor"
     );
 }
