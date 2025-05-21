@@ -2,7 +2,8 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
-export type AccountDelegationError = { 'InternalCanisterError' : string } |
+export type AccountDelegationError = { 'NoSuchDelegation' : null } |
+  { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export interface AccountInfo {
   'name' : [] | [string],
@@ -444,8 +445,9 @@ export interface _SERVICE {
   'exit_device_registration_mode' : ActorMethod<[UserNumber], undefined>,
   'fetch_entries' : ActorMethod<[], Array<BufferedArchiveEntry>>,
   'get_account_delegation' : ActorMethod<
-    [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
-    GetDelegationResponse
+    [UserNumber, FrontendHostname, [] | [AccountNumber], SessionKey, Timestamp],
+    { 'Ok' : SignedDelegation } |
+      { 'Err' : AccountDelegationError }
   >,
   'get_accounts' : ActorMethod<
     [UserNumber, FrontendHostname],

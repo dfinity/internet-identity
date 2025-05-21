@@ -574,6 +574,7 @@ type UpdateAccountError = variant {
 type AccountDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
+    NoSuchDelegation;
 };
 
 type PrepareAccountDelegation = record {
@@ -888,8 +889,8 @@ service : (opt InternetIdentityInit) -> {
     get_account_delegation : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
-        account_number : AccountNumber, // Null is unreserved default account
+        account_number : opt AccountNumber, // Null is unreserved default account
         session_key : SessionKey,
         expiration : Timestamp
-    ) -> (GetDelegationResponse) query;
+    ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
 };

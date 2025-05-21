@@ -215,9 +215,10 @@ export const idlFactory = ({ IDL }) => {
     'signature' : IDL.Vec(IDL.Nat8),
     'delegation' : Delegation,
   });
-  const GetDelegationResponse = IDL.Variant({
-    'no_such_delegation' : IDL.Null,
-    'signed_delegation' : SignedDelegation,
+  const AccountDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -262,6 +263,10 @@ export const idlFactory = ({ IDL }) => {
     'devices' : IDL.Vec(DeviceWithUsage),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
+  });
+  const GetDelegationResponse = IDL.Variant({
+    'no_such_delegation' : IDL.Null,
+    'signed_delegation' : SignedDelegation,
   });
   const GetIdAliasRequest = IDL.Record({
     'rp_id_alias_jwt' : IDL.Text,
@@ -390,10 +395,6 @@ export const idlFactory = ({ IDL }) => {
   const PrepareAccountDelegation = IDL.Record({
     'user_key' : UserKey,
     'timestamp' : Timestamp,
-  });
-  const AccountDelegationError = IDL.Variant({
-    'InternalCanisterError' : IDL.Text,
-    'Unauthorized' : IDL.Principal,
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
@@ -544,8 +545,19 @@ export const idlFactory = ({ IDL }) => {
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
     'get_account_delegation' : IDL.Func(
-        [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
-        [GetDelegationResponse],
+        [
+          UserNumber,
+          FrontendHostname,
+          IDL.Opt(AccountNumber),
+          SessionKey,
+          Timestamp,
+        ],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
         ['query'],
       ),
     'get_accounts' : IDL.Func(

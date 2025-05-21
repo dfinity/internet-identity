@@ -1,6 +1,9 @@
 use candid::{CandidType, Principal};
 
-use crate::{authz_utils::IdentityUpdateError, delegation};
+use crate::{
+    authz_utils::{AuthorizationError, IdentityUpdateError},
+    delegation,
+};
 use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
@@ -166,6 +169,13 @@ impl Account {
 pub enum AccountDelegationError {
     Unauthorized(Principal),
     InternalCanisterError(String),
+    NoSuchDelegation,
+}
+
+impl From<AuthorizationError> for AccountDelegationError {
+    fn from(err: AuthorizationError) -> Self {
+        AccountDelegationError::Unauthorized(err.principal)
+    }
 }
 
 impl From<IdentityUpdateError> for AccountDelegationError {
