@@ -725,7 +725,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     #[allow(dead_code)]
-    pub fn lookup_application_with_origin(
+    fn lookup_application_with_origin(
         &self,
         origin: &FrontendHostname,
     ) -> Option<StorableApplication> {
