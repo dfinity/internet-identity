@@ -138,8 +138,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             StorableAnchor {
                 openid_credentials: anchor
                     .openid_credentials
-                    .iter()
-                    .cloned()
+                    .into_iter()
                     .map(Into::into)
                     .collect(),
                 name: anchor.name,
@@ -164,8 +163,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 .map(|anchor| {
                     anchor
                         .openid_credentials
-                        .iter()
-                        .cloned()
+                        .into_iter()
                         .map(Into::into)
                         .collect()
                 })
