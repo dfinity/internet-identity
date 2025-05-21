@@ -16,14 +16,11 @@
   const { children }: LayoutProps = $props();
 
   const { context, status } = $derived($authorizationStore);
-  const origin = $derived(
-    context?.authRequest.derivationOrigin ?? context?.requestOrigin,
-  );
   const lastUsedAccountAvailable = $derived(
-    nonNullish(origin) &&
+    nonNullish(context) &&
       Object.values($lastUsedIdentitiesStore).sort(
         (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
-      )[0]?.accounts?.[origin],
+      )[0]?.accounts?.[context.effectiveOrigin],
   );
 
   $effect.pre(() => {
