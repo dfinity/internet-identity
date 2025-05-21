@@ -3,16 +3,38 @@
   import { onMount } from "svelte";
   import CenterLayout from "$lib/components/layout/CenterLayout.svelte";
   import { canisterConfig, canisterId } from "$lib/globals";
-  import {
-    authorizationStore,
-    authorizationStatusStore,
-  } from "$lib/stores/authorization.store";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { nonNullish } from "@dfinity/utils";
+  import { navigating } from "$app/state";
+  import { goto } from "$app/navigation";
 
   const { children }: LayoutProps = $props();
 
-  const status = $derived($authorizationStatusStore);
+  const { context, status } = $derived($authorizationStore);
+  const origin = $derived(
+    context?.authRequest.derivationOrigin ?? context?.requestOrigin,
+  );
+  const lastUsedAccountAvailable = $derived(
+    nonNullish(origin) &&
+      Object.values($lastUsedIdentitiesStore).sort(
+        (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+      )[0]?.accounts?.[origin],
+  );
+
+  $effect.pre(() => {
+    if (lastUsedAccountAvailable) {
+      // By redirecting within `$effect.pre` we redirect before the page update
+      // is rendered while making sure that we don't render the previous page
+      // by checking `navigating.to.url.pathname !== "/authorize/continue"`.
+      goto("/authorize/continue", {
+        replaceState: true,
+        state: { waitForRedirect: true },
+      });
+    }
+  });
 
   onMount(() => {
     authorizationStore.init({ canisterId, canisterConfig });
@@ -20,14 +42,12 @@
 </script>
 
 <CenterLayout data-page="new-authorize-view">
-  {#if status === "init" || status === "waiting" || status === "validating" || status === "authorizing"}
+  {#if status === "authorizing"}
     <div class="flex flex-col items-center justify-center gap-4">
       <ProgressRing class="text-fg-primary size-14" />
-      <p class="text-text-secondary text-lg">
-        {status === "authorizing" ? "Redirecting to the app" : "Loading"}
-      </p>
+      <p class="text-text-secondary text-lg">Redirecting to the app</p>
     </div>
-  {:else if status === "authenticating"}
+  {:else if status === "authenticating" && navigating.to?.url.pathname !== "/authorize/continue"}
     <AuthPanel>
       {@render children()}
     </AuthPanel>
