@@ -242,6 +242,7 @@ export interface InternetIdentityInit {
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
+  'new_origin_flows' : [] | [Array<string>],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
   'register_rate_limit' : [] | [RateLimitConfig],

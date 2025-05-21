@@ -8,3 +8,4 @@ mod fetch_root_key;
 mod openid_google;
 mod register_rate_limit;
 mod related_origins;
+mod new_flow_origins;
