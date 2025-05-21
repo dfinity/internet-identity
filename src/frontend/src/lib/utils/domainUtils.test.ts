@@ -18,6 +18,7 @@ describe("isOfficialOrigin", () => {
     captcha_config: [],
     register_rate_limit: [],
     is_production: [],
+    new_origin_flows: [],
   });
 
   // Default related origins for most tests

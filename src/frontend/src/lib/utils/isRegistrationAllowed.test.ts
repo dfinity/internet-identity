@@ -18,6 +18,7 @@ describe("isRegistrationAllowed", () => {
       analytics_config: [],
       openid_google: [],
       is_production: [],
+      new_origin_flows: [],
     };
   };
 
