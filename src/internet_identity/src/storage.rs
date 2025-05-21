@@ -80,8 +80,8 @@
 //! The archive buffer memory is managed by the [MemoryManager] and is currently limited to a single
 //! bucket of 128 pages.
 use account::{
-    Account, AccountType, AccountsCounter, CreateAccountParams, ReadAccountParams,
-    UpdateAccountParams, UpdateExistinAccountParams,
+    Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
+    UpdateExistinAccountParams,
 };
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
@@ -90,8 +90,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 use std::io::{Read, Write};
 use std::ops::RangeInclusive;
-use storable_account_reference_list::StorableAccountReferenceList;
-use storable_anchor_number_list::StorableAnchorNumberList;
+use storable::account_reference_list::StorableAccountReferenceList;
+use storable::anchor_number_list::StorableAnchorNumberList;
 
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
@@ -103,36 +103,36 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
-use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
+use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
-use crate::storage::account::{AccountReference, StorableAccount};
+use crate::storage::account::AccountReference;
 use crate::storage::anchor::{Anchor, Device};
-use crate::storage::application::{Application, OriginHash};
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
-use crate::storage::stable_anchor::StableAnchor;
-use crate::storage::storable_anchor::StorableAnchor;
-use crate::storage::storable_credential_id::StorableCredentialId;
-use crate::storage::storable_openid_credential_key::StorableOpenIdCredentialKey;
-use crate::storage::storable_persistent_state::StorablePersistentState;
+use crate::storage::storable::account::StorableAccount;
+use crate::storage::storable::account_number::StorableAccountNumber;
+use crate::storage::storable::account_reference::StorableAccountReference;
+use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCounter};
+use crate::storage::storable::application_number::StorableApplicationNumber;
 use internet_identity_interface::internet_identity::types::*;
+use storable::anchor::StorableAnchor;
+use storable::anchor_number::StorableAnchorNumber;
+use storable::application::{StorableApplication, StorableOriginHash};
+use storable::credential_id::StorableCredentialId;
+use storable::fixed_anchor::StorableFixedAnchor;
+use storable::openid_credential::StorableOpenIdCredential;
+use storable::openid_credential_key::StorableOpenIdCredentialKey;
+use storable::storable_persistent_state::StorablePersistentState;
 
 pub mod anchor;
 pub mod registration_rates;
 
 pub mod account;
-pub mod application;
 
-pub mod stable_anchor;
-/// module for the internal serialization format of anchors
-mod storable_account_reference_list;
-mod storable_anchor;
-mod storable_anchor_number_list;
-mod storable_credential_id;
-mod storable_openid_credential_key;
-mod storable_persistent_state;
+mod storable;
+
 #[cfg(test)]
 mod tests;
 
@@ -154,8 +154,9 @@ const EVENT_DATA_MEMORY_INDEX: u8 = 3u8;
 const STATS_AGGREGATIONS_MEMORY_INDEX: u8 = 4u8;
 const REGISTRATION_REFERENCE_RATE_MEMORY_INDEX: u8 = 5u8;
 const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
-const STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
-const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
+// These memory indexes have been abandoned, do not use them
+// const DEPRECATED_STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
+// const DEPRECATED_LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
 const STABLE_APPLICATION_MEMORY_INDEX: u8 = 11u8;
@@ -163,6 +164,9 @@ const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 12u8;
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX: u8 = 13u8;
 const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 14u8;
 const STABLE_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 15u8;
+const STABLE_ANCHOR_MEMORY_INDEX: u8 = 16u8;
+const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 17u8;
+
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
 const PERSISTENT_STATE_MEMORY_ID: MemoryId = MemoryId::new(PERSISTENT_STATE_MEMORY_INDEX);
@@ -248,25 +252,26 @@ pub struct Storage<M: Memory> {
     reference_registration_rate_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable anchor memory.
     stable_anchor_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_anchor_memory: StableBTreeMap<AnchorNumber, StableAnchor, ManagedMemory<M>>,
+    stable_anchor_memory: StableBTreeMap<StorableAnchorNumber, StorableAnchor, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account memory.
     stable_account_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_memory: StableBTreeMap<AccountNumber, StorableAccount, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable application memory.
     stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_application_memory: StableBTreeMap<ApplicationNumber, Application, ManagedMemory<M>>,
+    stable_application_memory:
+        StableBTreeMap<StorableApplicationNumber, StorableApplication, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account counter memory.
     stable_anchor_account_counter_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_anchor_account_counter_memory:
-        StableBTreeMap<AccountNumber, AccountsCounter, ManagedMemory<M>>,
+        StableBTreeMap<StorableAccountNumber, StorableAccountsCounter, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account reference list memory.
     stable_account_reference_list_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_reference_list_memory: StableBTreeMap<
-        (AccountNumber, ApplicationNumber),
+        (StorableAccountNumber, StorableApplicationNumber),
         StorableAccountReferenceList,
         ManagedMemory<M>,
     >,
-    stable_account_counter_memory: StableCell<AccountsCounter, ManagedMemory<M>>,
+    stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -274,10 +279,10 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the lookup anchor with device credential memory.
     lookup_anchor_with_device_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_device_credential_memory:
-        StableBTreeMap<StorableCredentialId, AnchorNumber, ManagedMemory<M>>,
+        StableBTreeMap<StorableCredentialId, StorableAnchorNumber, ManagedMemory<M>>,
     lookup_application_with_origin_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_application_with_origin_memory:
-        StableBTreeMap<OriginHash, ApplicationNumber, ManagedMemory<M>>,
+        StableBTreeMap<StorableOriginHash, StorableApplicationNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -407,7 +412,7 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             stable_account_counter_memory: StableCell::init(
                 stable_account_counter_memory,
-                AccountsCounter::default(),
+                StorableAccountsCounter::default(),
             )
             .expect("stable_account_counter_memory"),
             lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
@@ -520,7 +525,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// this argument can be removed once `anchor_memory` is removed.
     fn write(&mut self, data: Anchor, is_previously_written: bool) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
-        let (storable_anchor, stable_anchor): (StorableAnchor, StableAnchor) = data.into();
+        let (storable_anchor, stable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
 
         // Get anchor address
         let record_number = self.anchor_number_to_record(anchor_number)?;
@@ -533,7 +538,7 @@ impl<M: Memory + Clone> Storage<M> {
             reader
                 .read_exact(&mut read_buf)
                 .expect("failed to read memory");
-            StorableAnchor::from_bytes(Cow::Owned(read_buf))
+            StorableFixedAnchor::from_bytes(Cow::Owned(read_buf))
         });
 
         // Write current fixed 4KB stable memory anchor
@@ -588,7 +593,7 @@ impl<M: Memory + Clone> Storage<M> {
         reader.read_exact(&mut buf).expect("failed to read memory");
 
         // Read unbounded stable structures anchor
-        let storable_anchor = StorableAnchor::from_bytes(Cow::Owned(buf));
+        let storable_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
         let stable_anchor = self.stable_anchor_memory.get(&anchor_number);
         Ok(Anchor::from((
             anchor_number,
@@ -601,22 +606,22 @@ impl<M: Memory + Clone> Storage<M> {
     fn update_lookup_anchors_with_openid_credential(
         &mut self,
         anchor_number: AnchorNumber,
-        previous: Vec<OpenIdCredential>,
-        current: Vec<OpenIdCredential>,
+        previous: Vec<StorableOpenIdCredential>,
+        current: Vec<StorableOpenIdCredential>,
     ) {
-        let previous_set: BTreeSet<OpenIdCredentialKey> =
+        let previous_set: BTreeSet<StorableOpenIdCredentialKey> =
             previous.into_iter().map(|cred| cred.key()).collect();
-        let current_set: BTreeSet<OpenIdCredentialKey> =
+        let current_set: BTreeSet<StorableOpenIdCredentialKey> =
             current.into_iter().map(|cred| cred.key()).collect();
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
         credential_to_be_removed.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .remove(&key.into());
+                .remove(&key);
         });
         credential_to_be_added.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
-                .insert(key.into(), vec![anchor_number].into());
+                .insert(key, vec![anchor_number].into());
         });
     }
 
@@ -688,7 +693,7 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         origin: &FrontendHostname,
     ) -> ApplicationNumber {
-        let origin_hash = OriginHash::from_origin(origin);
+        let origin_hash = StorableOriginHash::from_origin(origin);
 
         if let Some(existing_number) = self.lookup_application_with_origin_memory.get(&origin_hash)
         {
@@ -699,7 +704,7 @@ impl<M: Memory + Clone> Storage<M> {
             self.lookup_application_with_origin_memory
                 .insert(origin_hash, new_number);
 
-            let new_application = Application {
+            let new_application = StorableApplication {
                 origin: origin.to_string(),
                 stored_accounts: 0u64,
                 stored_account_references: 0u64,
@@ -716,11 +721,14 @@ impl<M: Memory + Clone> Storage<M> {
         origin: &FrontendHostname,
     ) -> Option<ApplicationNumber> {
         self.lookup_application_with_origin_memory
-            .get(&OriginHash::from_origin(origin))
+            .get(&StorableOriginHash::from_origin(origin))
     }
 
     #[allow(dead_code)]
-    pub fn lookup_application_with_origin(&self, origin: &FrontendHostname) -> Option<Application> {
+    fn lookup_application_with_origin(
+        &self,
+        origin: &FrontendHostname,
+    ) -> Option<StorableApplication> {
         self.lookup_application_number_with_origin(origin)
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
     }
@@ -729,10 +737,10 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         anchor_number: AnchorNumber,
         application_number: ApplicationNumber,
-    ) -> Option<Vec<AccountReference>> {
+    ) -> Option<Vec<StorableAccountReference>> {
         self.stable_account_reference_list_memory
             .get(&(anchor_number, application_number))
-            .map(|list| list.into())
+            .map(|list| list.into_vec())
     }
 
     fn find_account_reference(
@@ -740,7 +748,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         application_number: Option<ApplicationNumber>,
         account_number: Option<AccountNumber>,
-    ) -> Option<AccountReference> {
+    ) -> Option<StorableAccountReference> {
         application_number.and_then(|app_num| {
             self.lookup_account_references(anchor_number, app_num)
                 .and_then(|acc_ref_vec| {
@@ -764,7 +772,7 @@ impl<M: Memory + Clone> Storage<M> {
         let anchor_account_counter = self
             .stable_anchor_account_counter_memory
             .get(&anchor_number)
-            .unwrap_or(AccountsCounter {
+            .unwrap_or(StorableAccountsCounter {
                 stored_accounts: 0,
                 stored_account_references: 0,
             });
@@ -796,16 +804,17 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
             .get(&anchor_number)
-            .unwrap_or(AccountsCounter {
+            .unwrap_or(StorableAccountsCounter {
                 stored_accounts: 0,
                 stored_account_references: 0,
             })
+            .into()
     }
 
     #[allow(dead_code)]
     /// Returns the total account counter.
-    pub fn get_total_accounts_counter(&self) -> &AccountsCounter {
-        self.stable_account_counter_memory.get()
+    pub fn get_total_accounts_counter(&self) -> AccountsCounter {
+        self.stable_account_counter_memory.get().clone().into()
     }
 
     // Increments the `stable_account_counter_memory` account counter by one and returns the new number.
@@ -827,9 +836,8 @@ impl<M: Memory + Clone> Storage<M> {
 
         self.stable_account_reference_list_memory
             .range(range_start..=range_end)
-            .flat_map(|(_, storable_account_ref_list_val)| {
-                storable_account_ref_list_val.into_acc_ref_vec()
-            })
+            .flat_map(|(_, storable_account_ref_list_val)| storable_account_ref_list_val.into_vec())
+            .map(AccountReference::from)
             .collect()
     }
 

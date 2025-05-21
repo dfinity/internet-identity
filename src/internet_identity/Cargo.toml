@@ -14,21 +14,22 @@ serde.workspace = true
 serde_bytes.workspace = true
 serde_cbor.workspace = true
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
-sha2 = { workspace = true, features = ["oid"]}
+sha2 = { workspace = true, features = ["oid"] }
 base64.workspace = true
 rsa.workspace = true
+minicbor = { workspace = true, features = ["std", "derive"] }
 
 # Captcha deps
 lodepng = "*"
 
-rand = { version ="*", default-features = false }
+rand = { version = "*", default-features = false }
 
 rand_core = { version = "*", default-features = false }
 rand_chacha = { version = "*", default-features = false }
 captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
 
 # OpenID deps
-identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false}
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false }
 
 # All IC deps
 candid.workspace = true
