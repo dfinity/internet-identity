@@ -113,7 +113,9 @@
       switch (continueWith) {
         case "lastUsedAccount":
           if (isNullish(lastUsedAccount)) {
-            return handleError(new Error("Unreachable"));
+            return handleError(
+              new Error("No last used account could be found"),
+            );
           }
           lastUsedIdentitiesStore.addLastUsedAccount(lastUsedAccount);
           return authorizationStore.authorize(lastUsedAccount.accountNumber);
