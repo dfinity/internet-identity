@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
-  import { type HTMLAttributes } from "svelte/elements";
+  import type { HTMLAttributes } from "svelte/elements";
 
   type Props = HTMLAttributes<HTMLElement>;
 
