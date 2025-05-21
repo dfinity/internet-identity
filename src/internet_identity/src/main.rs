@@ -472,6 +472,7 @@ fn config() -> InternetIdentityInit {
         register_rate_limit: Some(persistent_state.registration_rate_limit.clone()),
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
+        new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_google: Some(persistent_state.openid_google.clone()),
         analytics_config: Some(persistent_state.analytics_config.clone()),
         fetch_root_key: persistent_state.fetch_root_key,
@@ -558,6 +559,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(related_origins) = arg.related_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.related_origins = Some(related_origins);
+            })
+        }
+        if let Some(new_flow_origins) = arg.new_flow_origins {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.new_flow_origins = Some(new_flow_origins);
             })
         }
         if let Some(openid_google) = arg.openid_google {

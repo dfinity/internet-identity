@@ -240,6 +240,7 @@ export interface InternetIdentityInit {
   'is_production' : [] | [boolean],
   'enable_dapps_explorer' : [] | [boolean],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
+  'new_flow_origins' : [] | [Array<string>],
   'archive_config' : [] | [ArchiveConfig],
   'canister_creation_cycles_cost' : [] | [bigint],
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
