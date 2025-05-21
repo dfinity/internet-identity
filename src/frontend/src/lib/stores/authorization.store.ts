@@ -1,6 +1,5 @@
 import { type Readable, derived, writable, get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import type { SignedDelegation } from "$lib/generated/internet_identity_types";
 import {
   authenticationProtocol,
   AuthRequest,
