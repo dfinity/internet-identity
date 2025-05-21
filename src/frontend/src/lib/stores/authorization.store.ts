@@ -8,13 +8,16 @@ import {
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
+  waitFor,
   throwCanisterError,
   transformSignedDelegation,
+  retryFor,
 } from "$lib/utils/utils";
 
 export type AuthorizationContext = {
-  authRequest: AuthRequest;
-  requestOrigin: string;
+  authRequest: AuthRequest; // Additional details e.g. derivation origin
+  requestOrigin: string; // Displayed to the user to identify the app
+  effectiveOrigin: string; // Used for last used storage and delegations
 };
 
 export type AuthorizationStatus =
@@ -54,76 +57,60 @@ export const authorizationStore: AuthorizationStore = {
   init: async () => {
     const status = await authenticationProtocol({
       authenticate: (context) => {
+        const effectiveOrigin = remapToLegacyDomain(
+          context.authRequest.derivationOrigin ?? context.requestOrigin,
+        );
         internalStore.set({
-          context: {
-            authRequest: {
-              ...context.authRequest,
-              derivationOrigin: nonNullish(context.authRequest.derivationOrigin)
-                ? remapToLegacyDomain(context.authRequest.derivationOrigin)
-                : undefined,
-            },
-            requestOrigin: remapToLegacyDomain(context.requestOrigin),
-          },
+          context: { ...context, effectiveOrigin },
           status: "authenticating",
         });
         return new Promise((resolve) => {
-          authorize = async (accountNumber, artificialDelay) => {
-            internalStore.set({ context, status: "authorizing" });
-            const artificialDelayPromise = new Promise((resolve) =>
-              setTimeout(resolve, artificialDelay),
-            );
+          authorize = async (accountNumber, artificialDelay = 0) => {
+            internalStore.update((value) => ({
+              ...value,
+              status: "authorizing",
+            }));
+            const artificialDelayPromise = waitFor(artificialDelay);
             const { identityNumber, actor } = get(authenticatedStore);
-            const derivationOrigin = remapToLegacyDomain(
-              context.authRequest.derivationOrigin ?? context.requestOrigin,
-            );
-            const { user_key, timestamp } = await actor
-              .prepare_account_delegation(
-                identityNumber,
-                derivationOrigin,
-                nonNullish(accountNumber) ? [accountNumber] : [],
-                context.authRequest.sessionPublicKey,
-                nonNullish(context.authRequest.maxTimeToLive)
-                  ? [context.authRequest.maxTimeToLive]
-                  : [],
-              )
-              .then(throwCanisterError);
-            let delegation: SignedDelegation;
-            for (let i = 1; i <= 5; i++) {
-              try {
-                delegation = await actor
+            try {
+              const { user_key, timestamp } = await actor
+                .prepare_account_delegation(
+                  identityNumber,
+                  effectiveOrigin,
+                  nonNullish(accountNumber) ? [accountNumber] : [],
+                  context.authRequest.sessionPublicKey,
+                  nonNullish(context.authRequest.maxTimeToLive)
+                    ? [context.authRequest.maxTimeToLive]
+                    : [],
+                )
+                .then(throwCanisterError);
+              const delegation = await retryFor(5, () =>
+                actor
                   .get_account_delegation(
                     identityNumber,
-                    derivationOrigin,
+                    effectiveOrigin,
                     nonNullish(accountNumber) ? [accountNumber] : [],
                     context.authRequest.sessionPublicKey,
                     timestamp,
                   )
-                  .then(throwCanisterError);
-                break;
-              } catch {
-                if (i === 5) {
-                  resolve({
-                    kind: "failure",
-                    text: "Couldn't fetch delegation",
-                  });
-                  return;
-                }
-                // Linear backoff
-                await new Promise((resolve) => setTimeout(resolve, i * 1000));
-              }
+                  .then(throwCanisterError)
+                  .then(transformSignedDelegation),
+              );
+              await artificialDelayPromise;
+              resolve({
+                kind: "success",
+                delegations: [delegation],
+                userPublicKey: new Uint8Array(user_key),
+                // This is a authnMethod forwarded to the app that requested authorization.
+                // We don't want to leak which authnMethod was used.
+                authnMethod: "passkey",
+              });
+            } catch {
+              resolve({
+                kind: "failure",
+                text: "Couldn't fetch delegation",
+              });
             }
-            const transformedDelegation = transformSignedDelegation(
-              delegation!,
-            );
-            await artificialDelayPromise;
-            resolve({
-              kind: "success",
-              delegations: [transformedDelegation],
-              userPublicKey: new Uint8Array(user_key),
-              // This is a authnMethod forwarded to the app that requested authorization.
-              // We don't want to leak which authnMethod was used.
-              authnMethod: "passkey",
-            });
           };
         });
       },

@@ -21,6 +21,7 @@
   import { GlobeIcon } from "@lucide/svelte";
   import { page } from "$app/state";
   import { untrack } from "svelte";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection.js";
 
   const { data }: PageProps = $props();
   let accounts = $derived(data.accounts);
@@ -50,8 +51,7 @@
       const account = await $authenticatedStore.actor
         .create_account(
           $authenticatedStore.identityNumber,
-          $authorizationContextStore.authRequest.derivationOrigin ??
-            $authorizationContextStore.requestOrigin,
+          $authorizationContextStore.effectiveOrigin,
           name.trim(),
         )
         .then(throwCanisterError);
@@ -67,9 +67,7 @@
   const handleContinue = async () => {
     try {
       lastUsedIdentitiesStore.addLastUsedAccount({
-        origin:
-          $authorizationContextStore.authRequest.derivationOrigin ??
-          $authorizationContextStore.requestOrigin,
+        origin: $authorizationContextStore.effectiveOrigin,
         identityNumber: $authenticatedStore.identityNumber,
         accountNumber: selectedAccount.account_number[0],
         name: selectedAccount.name[0],

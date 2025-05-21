@@ -327,9 +327,9 @@ export function randomString(): string {
 }
 
 // Create a promise that will resolve _after_ this amount of milliseconds.
-export function delayMillis(millis: number) {
+export function waitFor(duration: number) {
   return new Promise<void>((resolve) => {
-    setTimeout(() => resolve(), millis);
+    setTimeout(() => resolve(), duration);
   });
 }
 
@@ -443,4 +443,20 @@ export const transformSignedDelegation = (
       signed_delegation.signature,
     ) as unknown as Signature,
   };
+};
+
+export const retryFor = async <T>(
+  attempts: number,
+  fn: () => Promise<T>,
+): Promise<T> => {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await waitFor(i * 1000); // Linear backoff
+      return await fn();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
 };

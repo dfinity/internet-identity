@@ -141,9 +141,7 @@
         authMethod: { passkey: { credentialId } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
-        origin:
-          $authorizationContextStore.authRequest.derivationOrigin ??
-          $authorizationContextStore.requestOrigin,
+        origin: $authorizationContextStore.effectiveOrigin,
         identityNumber,
         accountNumber: undefined,
       });
@@ -307,9 +305,7 @@
         authMethod: { openid: { iss, sub } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
-        origin:
-          $authorizationContextStore.authRequest.derivationOrigin ??
-          $authorizationContextStore.requestOrigin,
+        origin: $authorizationContextStore.effectiveOrigin,
         identityNumber,
         accountNumber: undefined,
       });
