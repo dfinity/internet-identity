@@ -1,18 +1,15 @@
 use candid::{CandidType, Principal};
 
-use crate::{authz_utils::IdentityUpdateError, delegation};
+use crate::{
+    authz_utils::{AuthorizationError, IdentityUpdateError},
+    delegation,
+};
 use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
     AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
-
-use crate::{
-    authz_utils::{AuthorizationError, IdentityUpdateError},
-    delegation,
-};
 
 #[cfg(test)]
 mod tests;
