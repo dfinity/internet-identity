@@ -273,7 +273,7 @@ type InternetIdentityInit = record {
     related_origins : opt vec text;
     // Configuration for New Origin Flows.
     // If present, list of origins using the new authentication flow.
-    new_origin_flows : opt vec text;
+    new_flow_origins : opt vec text;
     // Configuration for OpenID Google client
     openid_google : opt opt OpenIdConfig;
     // Configuration for Web Analytics
