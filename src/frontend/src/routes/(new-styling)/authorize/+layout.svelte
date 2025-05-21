@@ -2,10 +2,7 @@
   import type { LayoutProps } from "./$types";
   import { onMount } from "svelte";
   import CenterLayout from "$lib/components/layout/CenterLayout.svelte";
-  import {
-    authorizationStore,
-    authorizationStatusStore,
-  } from "$lib/stores/authorization.store";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
