@@ -1,4 +1,4 @@
-import { delayMillis } from "./utils";
+import { waitFor } from "./utils";
 
 /// A one shot countdown timer that emits the remaining time as a formatted string ("mm:ss")
 // through an AsyncIterable.
@@ -71,7 +71,7 @@ export class AsyncCountdown<A> {
 
       // Wait for at least the delay until the next second
       // (fractional part of remaining time in seconds)
-      await delayMillis((remaining % 1) * 1000);
+      await waitFor((remaining % 1) * 1000);
     }
   }
 
