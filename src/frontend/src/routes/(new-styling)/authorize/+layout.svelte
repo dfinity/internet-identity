@@ -42,15 +42,15 @@
 </script>
 
 <CenterLayout data-page="new-authorize-view">
-  {#if status === "authorizing"}
+  {#if status === "authenticating" && navigating.to?.url.pathname !== "/authorize/continue"}
+    <AuthPanel>
+      {@render children()}
+    </AuthPanel>
+  {:else if status === "authorizing"}
     <div class="flex flex-col items-center justify-center gap-4">
       <ProgressRing class="text-fg-primary size-14" />
       <p class="text-text-secondary text-lg">Redirecting to the app</p>
     </div>
-  {:else if status === "authenticating" && navigating.to?.url.pathname !== "/authorize/continue"}
-    <AuthPanel>
-      {@render children()}
-    </AuthPanel>
   {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure"}
     <div>Error</div>
   {:else if status === "success"}
