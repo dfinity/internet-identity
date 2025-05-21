@@ -1,14 +1,16 @@
 import { type Readable, derived, writable, get } from "svelte/store";
-import { isNullish } from "@dfinity/utils";
-import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
-import { Principal } from "@dfinity/principal";
+import { isNullish, nonNullish } from "@dfinity/utils";
+import type { SignedDelegation } from "$lib/generated/internet_identity_types";
 import {
   authenticationProtocol,
   AuthRequest,
 } from "$lib/flows/authorize/postMessageInterface";
 import { authenticatedStore } from "$lib/stores/authentication.store";
-import { Connection } from "$lib/utils/iiConnection";
-import { fetchDelegation } from "$lib/flows/authorize/fetchDelegation";
+import { remapToLegacyDomain } from "$lib/utils/iiConnection";
+import {
+  throwCanisterError,
+  transformSignedDelegation,
+} from "$lib/utils/utils";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest;
@@ -31,10 +33,7 @@ type AuthorizationStore = Readable<{
   context?: AuthorizationContext;
   status: AuthorizationStatus;
 }> & {
-  init: (params: {
-    canisterId: Principal;
-    canisterConfig: InternetIdentityInit;
-  }) => Promise<void>;
+  init: () => Promise<void>;
   authorize: (
     accountNumber: bigint | undefined,
     artificialDelay?: number,
@@ -52,40 +51,75 @@ let authorize: (
 ) => Promise<void>;
 
 export const authorizationStore: AuthorizationStore = {
-  init: async ({ canisterId, canisterConfig }) => {
+  init: async () => {
     const status = await authenticationProtocol({
       authenticate: (context) => {
-        internalStore.set({ context, status: "authenticating" });
+        internalStore.set({
+          context: {
+            authRequest: {
+              ...context.authRequest,
+              derivationOrigin: nonNullish(context.authRequest.derivationOrigin)
+                ? remapToLegacyDomain(context.authRequest.derivationOrigin)
+                : undefined,
+            },
+            requestOrigin: remapToLegacyDomain(context.requestOrigin),
+          },
+          status: "authenticating",
+        });
         return new Promise((resolve) => {
-          authorize = async (_accountNumber, artificialDelay) => {
+          authorize = async (accountNumber, artificialDelay) => {
             internalStore.set({ context, status: "authorizing" });
             const artificialDelayPromise = new Promise((resolve) =>
               setTimeout(resolve, artificialDelay),
             );
-            // TODO: use prepare/get account delegation instead of iiConnection
-            const { identityNumber, identity } = get(authenticatedStore);
-            const { connection } = await new Connection(
-              canisterId.toText(),
-              canisterConfig,
-            ).fromDelegationIdentity(identityNumber, identity);
-            const derivationOrigin =
-              context.authRequest.derivationOrigin ?? context.requestOrigin;
-            const result = await fetchDelegation({
-              connection,
-              derivationOrigin,
-              publicKey: context.authRequest.sessionPublicKey,
-              maxTimeToLive: context.authRequest.maxTimeToLive,
-            });
-            await artificialDelayPromise;
-            if ("error" in result) {
-              resolve({ kind: "failure", text: "Couldn't fetch delegation" });
-              return;
+            const { identityNumber, actor } = get(authenticatedStore);
+            const derivationOrigin = remapToLegacyDomain(
+              context.authRequest.derivationOrigin ?? context.requestOrigin,
+            );
+            const { user_key, timestamp } = await actor
+              .prepare_account_delegation(
+                identityNumber,
+                derivationOrigin,
+                nonNullish(accountNumber) ? [accountNumber] : [],
+                context.authRequest.sessionPublicKey,
+                nonNullish(context.authRequest.maxTimeToLive)
+                  ? [context.authRequest.maxTimeToLive]
+                  : [],
+              )
+              .then(throwCanisterError);
+            let delegation: SignedDelegation;
+            for (let i = 1; i <= 5; i++) {
+              try {
+                delegation = await actor
+                  .get_account_delegation(
+                    identityNumber,
+                    derivationOrigin,
+                    nonNullish(accountNumber) ? [accountNumber] : [],
+                    context.authRequest.sessionPublicKey,
+                    timestamp,
+                  )
+                  .then(throwCanisterError);
+                break;
+              } catch {
+                if (i === 5) {
+                  resolve({
+                    kind: "failure",
+                    text: "Couldn't fetch delegation",
+                  });
+                  return;
+                }
+                // Linear backoff
+                await new Promise((resolve) => setTimeout(resolve, i * 1000));
+              }
             }
-            const [userKey, parsed_signed_delegation] = result;
+            const transformedDelegation = transformSignedDelegation(
+              delegation!,
+            );
+            await artificialDelayPromise;
             resolve({
               kind: "success",
-              delegations: [parsed_signed_delegation],
-              userPublicKey: new Uint8Array(userKey),
+              delegations: [transformedDelegation],
+              userPublicKey: new Uint8Array(user_key),
               // This is a authnMethod forwarded to the app that requested authorization.
               // We don't want to leak which authnMethod was used.
               authnMethod: "passkey",
