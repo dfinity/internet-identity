@@ -63,10 +63,7 @@ const maybeSetDiscoverablePasskeyFlowFlag = () => {
 };
 
 const redirectIfNecessary = (): void => {
-  if (
-    window.location.pathname === "/" &&
-    window.location.hash !== "#authorize"
-  ) {
+  if (window.location.pathname === "/" && window.location.hash === "") {
     // We use location.replace to prevent the user from using the back button to navigate back.
     if (window.location.hostname === "id.ai") {
       window.location.replace("https://identity.internetcomputer.org");
