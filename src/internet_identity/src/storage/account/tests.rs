@@ -1,5 +1,5 @@
 use crate::storage::account::Account;
-use crate::storage::application::Application;
+use crate::storage::storable::application::StorableApplication;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
 use ic_stable_structures::VectorMemory;
@@ -13,7 +13,7 @@ fn assert_empty_counters(storage: &Storage<VectorMemory>, anchor_number: AnchorN
         AccountsCounter::default()
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter::default()
     );
 }
@@ -71,7 +71,7 @@ fn should_create_additional_account() {
     assert_eq!(additional_account, expected_account);
     assert_eq!(
         storage.lookup_application_with_origin(&origin).unwrap(),
-        Application {
+        StorableApplication {
             origin: origin.clone(),
             stored_accounts: 1,
             stored_account_references: 2,
@@ -85,7 +85,7 @@ fn should_create_additional_account() {
         }
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter {
             stored_accounts: 1,
             stored_account_references: 2,
@@ -150,7 +150,7 @@ fn should_list_accounts() {
         }
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter {
             stored_accounts: 1,
             stored_account_references: 2,
@@ -216,7 +216,7 @@ fn should_list_all_identity_accounts() {
         }
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter {
             stored_accounts: 2,
             stored_account_references: 4,
@@ -268,7 +268,7 @@ fn should_update_default_account() {
         }
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter {
             stored_accounts: 1,
             stored_account_references: 1,
@@ -354,7 +354,7 @@ fn should_update_additional_account() {
         }
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter {
             stored_accounts: 1,
             stored_account_references: 2,
@@ -395,7 +395,7 @@ fn should_count_accounts_different_anchors() {
         "Counters for anchor 1 should be 0"
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         AccountsCounter::default(),
         "Total counters should be 0"
     );
@@ -427,7 +427,7 @@ fn should_count_accounts_different_anchors() {
         "Counters for anchor 1 after additional account mismatch"
     );
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         expected_counters_anchor_1,
         "Total counters after anchor 1 additional account mismatch"
     );
@@ -491,7 +491,7 @@ fn should_count_accounts_different_anchors() {
         stored_account_references: 4, // 2 from anchor_1 + 2 from anchor_2
     };
     assert_eq!(
-        *storage.get_total_accounts_counter(),
+        storage.get_total_accounts_counter(),
         expected_total_counters,
         "Total counters after anchor 2 additional account mismatch"
     );

@@ -7,12 +7,12 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Default, CandidType, Deserialize, Eq, PartialEq)]
-pub struct StorableAnchor {
+pub struct StorableFixedAnchor {
     pub devices: Vec<Device>,
     pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
-impl Storable for StorableAnchor {
+impl Storable for StorableFixedAnchor {
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut candid =
             candid::encode_one(self).expect("Failed to serialize StorableAnchor to candid");
