@@ -29,10 +29,7 @@
       // By redirecting within `$effect.pre` we redirect before the page update
       // is rendered while making sure that we don't render the previous page
       // by checking `navigating.to.url.pathname !== "/authorize/continue"`.
-      goto("/authorize/continue", {
-        replaceState: true,
-        state: { waitForRedirect: true },
-      });
+      goto("/authorize/continue", { replaceState: true });
     }
   });
 
