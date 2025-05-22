@@ -9,6 +9,6 @@
 
 <div
   class={[`bg-bg-overlay/80 fixed inset-0 z-999`, className]}
-  transition:fade={{ duration: 0.2 }}
+  transition:fade={{ duration: 100 }}
   {...props}
 ></div>
