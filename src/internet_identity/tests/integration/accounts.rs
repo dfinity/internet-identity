@@ -439,6 +439,8 @@ fn should_only_update_owned_account() {
         name: new_name.clone(),
     };
 
+    // Here we try to update the account created by the first identity using the second identity.
+    // This should fail.
     let _ = update_account(
         &env,
         canister_id,
