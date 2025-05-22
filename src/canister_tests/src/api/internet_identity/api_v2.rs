@@ -279,3 +279,60 @@ pub fn authn_method_confirm(
     )
     .map(|(x,)| x)
 }
+
+pub fn create_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    name: String,
+) -> Result<Result<AccountInfo, CreateAccountError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "create_account",
+        (identity_number, origin, name),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_accounts(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+) -> Result<Result<Vec<AccountInfo>, GetAccountsError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "get_accounts",
+        (identity_number, origin),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn update_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    update: AccountUpdate,
+) -> Result<Result<AccountInfo, UpdateAccountError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "update_account",
+        (identity_number, origin, account_number, update),
+    )
+    .map(|(x,)| x)
+}
