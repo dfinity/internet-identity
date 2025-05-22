@@ -4,7 +4,7 @@ use canister_tests::{
     api::internet_identity::{
         api_v2::{
             create_account, get_account_delegation, get_accounts, prepare_account_delegation,
-            update_account,
+            update_account, AccountDelegationParams,
         },
         get_delegation, prepare_delegation,
     },
@@ -15,7 +15,8 @@ use canister_tests::{
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountUpdate, GetDelegationResponse, PrepareAccountDelegation,
+    AccountDelegationError, AccountInfo, AccountUpdate, GetDelegationResponse,
+    PrepareAccountDelegation,
 };
 use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
@@ -477,10 +478,7 @@ fn should_get_valid_account_delegation() -> Result<(), CallError> {
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
-    let PrepareAccountDelegation {
-        user_key,
-        expiration,
-    } = prepare_account_delegation(
+    let params = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -488,28 +486,21 @@ fn should_get_valid_account_delegation() -> Result<(), CallError> {
         frontend_hostname.clone(),
         None,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(&params, None).unwrap().unwrap();
 
     assert_eq!(
         expiration,
         time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
     );
 
-    let signed_delegation = get_account_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname,
-        None,
-        pub_session_key.clone(),
-        expiration,
-    )
-    .unwrap()
-    .unwrap();
+    let signed_delegation = get_account_delegation(&params, expiration)
+        .unwrap()
+        .unwrap();
 
     verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
@@ -527,10 +518,7 @@ fn should_get_matching_principals() -> Result<(), CallError> {
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
-    let PrepareAccountDelegation {
-        user_key,
-        expiration,
-    } = prepare_account_delegation(
+    let params = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -538,28 +526,21 @@ fn should_get_matching_principals() -> Result<(), CallError> {
         frontend_hostname.clone(),
         None,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(&params, None).unwrap().unwrap();
 
     assert_eq!(
         expiration,
         time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
     );
 
-    let signed_account_delegation = get_account_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname.clone(),
-        None,
-        pub_session_key.clone(),
-        expiration,
-    )
-    .unwrap()
-    .unwrap();
+    let signed_account_delegation = get_account_delegation(&params, expiration)
+        .unwrap()
+        .unwrap();
 
     verify_delegation(
         &env,
@@ -620,10 +601,7 @@ fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), Ca
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
-    let PrepareAccountDelegation {
-        user_key,
-        expiration,
-    } = prepare_account_delegation(
+    let params = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -631,28 +609,23 @@ fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), Ca
         frontend_hostname.clone(),
         None,
         pub_session_key.clone(),
-        Some(3_600_000_000_000), // 1 hour
-    )
-    .unwrap()
-    .unwrap();
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(&params, Some(3_600_000_000_000)) // 1 hour
+        .unwrap()
+        .unwrap();
 
     assert_eq!(
         expiration,
         time(&env) + Duration::from_secs(60 * 60).as_nanos() as u64
     );
 
-    let signed_delegation = get_account_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname,
-        None,
-        pub_session_key.clone(),
-        expiration,
-    )
-    .unwrap()
-    .unwrap();
+    let signed_delegation = get_account_delegation(&params, expiration)
+        .unwrap()
+        .unwrap();
 
     verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
@@ -670,10 +643,7 @@ fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), 
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
-    let PrepareAccountDelegation {
-        user_key,
-        expiration,
-    } = prepare_account_delegation(
+    let params = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -681,8 +651,15 @@ fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), 
         frontend_hostname.clone(),
         None,
         pub_session_key.clone(),
-        Some(Duration::from_secs(31 * 24 * 60 * 60).as_nanos() as u64), // 31 days
-    )
+    );
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(
+        &params,
+        Some(Duration::from_secs(31 * 24 * 60 * 60).as_nanos() as u64),
+    ) // 31 days
     .unwrap()
     .unwrap();
 
@@ -692,18 +669,9 @@ fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), 
         time(&env) + Duration::from_secs(month_seconds).as_nanos() as u64
     );
 
-    let signed_delegation = get_account_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname,
-        None,
-        pub_session_key.clone(),
-        expiration,
-    )
-    .unwrap()
-    .unwrap();
+    let signed_delegation = get_account_delegation(&params, expiration)
+        .unwrap()
+        .unwrap();
 
     verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
@@ -752,10 +720,7 @@ fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
             .into_iter()
             .map(|(session_key, frontend_hostname, time_shift)| {
                 env.advance_time(time_shift);
-                let PrepareAccountDelegation {
-                    user_key,
-                    expiration,
-                } = prepare_account_delegation(
+                let params = AccountDelegationParams::new(
                     &env,
                     canister_id,
                     principal_1(),
@@ -763,10 +728,13 @@ fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
                     frontend_hostname.clone(),
                     None,
                     session_key.clone(),
-                    None,
-                )
-                .unwrap()
-                .expect("prepare_account_delegation failed");
+                );
+                let PrepareAccountDelegation {
+                    user_key,
+                    expiration,
+                } = prepare_account_delegation(&params, None)
+                    .unwrap()
+                    .expect("prepare_account_delegation failed");
 
                 assert_eq!(
                     expiration,
@@ -776,18 +744,18 @@ fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
             });
 
     for (session_key, frontend_hostname, user_key, expiration) in prepare_delegation_results {
-        let signed_delegation = get_account_delegation(
+        let params = AccountDelegationParams::new(
             &env,
             canister_id,
             principal_1(),
             user_number,
-            frontend_hostname,
+            frontend_hostname.clone(),
             None,
             session_key.clone(),
-            expiration,
-        )
-        .unwrap()
-        .unwrap();
+        );
+        let signed_delegation = get_account_delegation(&params, expiration)
+            .unwrap()
+            .unwrap();
 
         verify_delegation(&env, user_key, &signed_delegation, &root_key);
         assert_eq!(signed_delegation.delegation.pubkey, session_key.clone());
@@ -806,10 +774,7 @@ fn should_issue_different_principals_for_account_delegations() -> Result<(), Cal
     let frontend_hostname_1 = "https://dapp1.com".to_string();
     let frontend_hostname_2 = "https://dapp2.com".to_string();
 
-    let PrepareAccountDelegation {
-        user_key: user_key_1,
-        ..
-    } = prepare_account_delegation(
+    let params_1 = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -817,15 +782,9 @@ fn should_issue_different_principals_for_account_delegations() -> Result<(), Cal
         frontend_hostname_1,
         None,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+    );
 
-    let PrepareAccountDelegation {
-        user_key: user_key_2,
-        ..
-    } = prepare_account_delegation(
+    let params_2 = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -833,48 +792,64 @@ fn should_issue_different_principals_for_account_delegations() -> Result<(), Cal
         frontend_hostname_2,
         None,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+    );
+
+    let PrepareAccountDelegation {
+        user_key: user_key_1,
+        ..
+    } = prepare_account_delegation(&params_1, None)
+        .unwrap()
+        .unwrap();
+
+    let PrepareAccountDelegation {
+        user_key: user_key_2,
+        ..
+    } = prepare_account_delegation(&params_2, None)
+        .unwrap()
+        .unwrap();
 
     assert_ne!(user_key_1, user_key_2);
     Ok(())
 }
 
-/// Verifies that account delegations can only be prepared by the matching user.
+/// Verifies that prepare_account_delegation can only be called by the matching user.
 #[test]
-#[should_panic]
-fn can_not_prepare_account_delegation_for_different_user() {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-    let user_number = flows::register_anchor(&env, canister_id);
-
-    let _ = prepare_account_delegation(
-        &env,
-        canister_id,
-        principal_2(),
-        user_number, // belongs to principal_1
-        "https://some-dapp.com".to_string(),
-        None,
-        ByteBuf::from("session key"),
-        None,
-    )
-    .unwrap()
-    .unwrap();
-}
-
-/// Verifies that get_account_delegation can only be called by the matching user.
-#[test]
-#[should_panic]
-fn can_not_get_account_delegation_for_different_user() {
+fn can_not_prepare_account_delegation_for_different_user() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
-    let PrepareAccountDelegation { expiration, .. } = prepare_account_delegation(
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_2(), // different user
+        user_number,
+        frontend_hostname,
+        None,
+        pub_session_key,
+    );
+
+    match prepare_account_delegation(&params, None).unwrap() {
+        Ok(_) => panic!("This should not be possible!"),
+        Err(err) => match err {
+            AccountDelegationError::Unauthorized(_) => return Ok(()),
+            _ => panic!("Wrong error type!"),
+        },
+    }
+}
+
+/// Verifies that get_account_delegation can only be called by the matching user.
+#[test]
+fn can_not_get_account_delegation_for_different_user() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let params = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -882,23 +857,28 @@ fn can_not_get_account_delegation_for_different_user() {
         frontend_hostname.clone(),
         None,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+    );
 
-    let _ = get_account_delegation(
+    let PrepareAccountDelegation { expiration, .. } =
+        prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    let params_wrong_user = AccountDelegationParams::new(
         &env,
         canister_id,
-        principal_2(),
+        principal_2(), // different user
         user_number,
         frontend_hostname,
         None,
         pub_session_key,
-        expiration,
-    )
-    .unwrap()
-    .unwrap();
+    );
+
+    match get_account_delegation(&params_wrong_user, expiration).unwrap() {
+        Ok(_) => panic!("This should not be possible!"),
+        Err(err) => match err {
+            AccountDelegationError::Unauthorized(_) => return Ok(()),
+            _ => panic!("Wrong error type!"),
+        },
+    }
 }
 
 /// Verifies that there is a graceful failure if get_account_delegation is called after the expiration.
@@ -910,7 +890,7 @@ fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError>
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
 
-    let PrepareAccountDelegation { expiration, .. } = prepare_account_delegation(
+    let params = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
@@ -918,40 +898,24 @@ fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError>
         frontend_hostname.clone(),
         None,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
-
-    env.advance_time(Duration::from_secs(30 * 60 + 1)); // one second more than delegation validity of 30 min
-
-    // we have to call prepare again, because expired signatures can only be pruned in update calls
-    prepare_account_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname.clone(),
-        None,
-        pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
-
-    let result = get_account_delegation(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        frontend_hostname,
-        None,
-        pub_session_key,
-        expiration,
     );
 
-    assert!(result.unwrap().is_err());
-    Ok(())
+    let PrepareAccountDelegation { expiration, .. } =
+        prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    // advance time to after expiration
+    env.advance_time(Duration::from_secs(31 * 60)); // 31 minutes
+
+    // we have to call prepare again, because expired signatures can only be pruned in update calls
+    prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    match get_account_delegation(&params, expiration).unwrap() {
+        Ok(_) => panic!("This should not be possible!"),
+        Err(err) => match err {
+            AccountDelegationError::NoSuchDelegation => return Ok(()),
+            _ => panic!("Wrong error type!"),
+        },
+    }
 }
 
 /// Verifies that different accounts on the same origin yield different principals.
@@ -960,65 +924,69 @@ fn should_issue_different_principals_for_different_accounts() -> Result<(), Call
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
-    let frontend_hostname = "https://dapp1.com".to_string();
 
     // Create two different accounts
-    let first_account = create_account(
+    let account_1 = create_account(
         &env,
         canister_id,
         principal_1(),
         user_number,
         frontend_hostname.clone(),
-        "First Account".to_string(),
+        "Account 1".to_string(),
     )
     .unwrap()
     .unwrap();
 
-    let second_account = create_account(
+    let account_2 = create_account(
         &env,
         canister_id,
         principal_1(),
         user_number,
         frontend_hostname.clone(),
-        "Second Account".to_string(),
+        "Account 2".to_string(),
     )
     .unwrap()
     .unwrap();
 
     // Get delegations for both accounts
-    let PrepareAccountDelegation {
-        user_key: user_key_1,
-        ..
-    } = prepare_account_delegation(
+    let params_1 = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
         user_number,
         frontend_hostname.clone(),
-        first_account.account_number,
+        account_1.account_number,
         pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+    );
 
-    let PrepareAccountDelegation {
-        user_key: user_key_2,
-        ..
-    } = prepare_account_delegation(
+    let params_2 = AccountDelegationParams::new(
         &env,
         canister_id,
         principal_1(),
         user_number,
         frontend_hostname,
-        second_account.account_number,
-        pub_session_key.clone(),
-        None,
-    )
-    .unwrap()
-    .unwrap();
+        account_2.account_number,
+        pub_session_key,
+    );
 
+    let PrepareAccountDelegation {
+        user_key: user_key_1,
+        ..
+    } = prepare_account_delegation(&params_1, None)
+        .unwrap()
+        .unwrap();
+
+    let PrepareAccountDelegation {
+        user_key: user_key_2,
+        ..
+    } = prepare_account_delegation(&params_2, None)
+        .unwrap()
+        .unwrap();
+
+    // Verify that the principals are different
     assert_ne!(user_key_1, user_key_2);
+
     Ok(())
 }

@@ -336,27 +336,54 @@ pub fn update_account(
     .map(|(x,)| x)
 }
 
-pub fn prepare_account_delegation(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    sender: Principal,
-    identity_number: IdentityNumber,
-    origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-    session_key: SessionKey,
-    max_ttl: Option<u64>,
-) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, CallError> {
-    call_candid_as(
-        env,
-        canister_id,
-        RawEffectivePrincipal::None,
-        sender,
-        "prepare_account_delegation",
-        (
+#[derive(Clone)]
+pub struct AccountDelegationParams<'a> {
+    pub env: &'a PocketIc,
+    pub canister_id: CanisterId,
+    pub sender: Principal,
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+}
+
+impl<'a> AccountDelegationParams<'a> {
+    pub fn new(
+        env: &'a PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        identity_number: IdentityNumber,
+        origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        session_key: SessionKey,
+    ) -> Self {
+        Self {
+            env,
+            canister_id,
+            sender,
             identity_number,
             origin,
             account_number,
             session_key,
+        }
+    }
+}
+
+pub fn prepare_account_delegation(
+    params: &AccountDelegationParams,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, CallError> {
+    call_candid_as(
+        params.env,
+        params.canister_id,
+        RawEffectivePrincipal::None,
+        params.sender,
+        "prepare_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
             max_ttl,
         ),
     )
@@ -364,25 +391,19 @@ pub fn prepare_account_delegation(
 }
 
 pub fn get_account_delegation(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    sender: Principal,
-    identity_number: IdentityNumber,
-    origin: FrontendHostname,
-    account_number: Option<AccountNumber>,
-    session_key: SessionKey,
+    params: &AccountDelegationParams,
     expiration: u64,
 ) -> Result<Result<SignedDelegation, AccountDelegationError>, CallError> {
     query_candid_as(
-        env,
-        canister_id,
-        sender,
+        params.env,
+        params.canister_id,
+        params.sender,
         "get_account_delegation",
         (
-            identity_number,
-            origin,
-            account_number,
-            session_key,
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
             expiration,
         ),
     )
