@@ -10,7 +10,7 @@ import { setAnchorUsed } from "$lib/legacy/storage";
 import { AsyncCountdown } from "$lib/utils/countdown";
 import { Connection } from "$lib/utils/iiConnection";
 import { renderPage } from "$lib/utils/lit-html";
-import { delayMillis, unknownToString } from "$lib/utils/utils";
+import { waitFor, unknownToString } from "$lib/utils/utils";
 import { nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
@@ -166,7 +166,7 @@ const poll = ({
 
       // Debounce a little; in practice won't be noticed by users but
       // will avoid hot looping in case the credential verification becomes near instantaneous.
-      await delayMillis(100);
+      await waitFor(100);
     }
   });
 
