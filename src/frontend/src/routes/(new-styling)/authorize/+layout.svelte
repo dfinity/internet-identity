@@ -24,6 +24,7 @@
       {@render children()}
     </AuthPanel>
   {:else if status === "authorizing"}
+    <!-- Spinner is not shown for other statuses to avoid flicker -->
     <div class="flex flex-col items-center justify-center gap-4">
       <ProgressRing class="text-fg-primary size-14" />
       <p class="text-text-secondary text-lg">Redirecting to the app</p>
