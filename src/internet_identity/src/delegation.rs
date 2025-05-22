@@ -22,6 +22,10 @@ pub const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 // (calculated as now() + this)
 pub const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
+// The prefix used in all account seed calculations to avoid collisions
+// with the primary acount seed calculations based on anchor number.
+const ACCOUNT_SEED_PREFIX: &str = "<account>";
+
 /// Update metrics and the list of latest front-end origins.
 pub fn delegation_bookkeeping(
     frontend: FrontendHostname,
@@ -90,21 +94,26 @@ pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHos
     hash_bytes(blob)
 }
 
-/// Calculate a seed only from an `AccountNumber`.
+/// Calculate a seed only from an `AccountNumber` and `FrontendHostname`.
 /// This is only called when we're not dealing with a default account.
-/// Frontend origin and anchor number are not included because accounts are already stored per-origin and per-user.
-/// Leaving them out allows us to potentially allow account transfer or sharing in the future.
-pub fn calculate_account_seed(account_number: AccountNumber) -> Hash {
+/// The anchor number is not included because accounts are not tied to specific anchors.
+pub fn calculate_account_seed(account_number: AccountNumber, frontend: &FrontendHostname) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
     blob.push(salt.len() as u8);
     blob.extend_from_slice(&salt);
 
+    blob.push(ACCOUNT_SEED_PREFIX.len() as u8);
+    blob.extend(ACCOUNT_SEED_PREFIX.bytes());
+
     let account_number_str = account_number.to_string();
     let account_number_blob = account_number_str.bytes();
     blob.push(account_number_blob.len() as u8);
     blob.extend(account_number_blob);
+
+    blob.push(frontend.len() as u8);
+    blob.extend(frontend.bytes());
 
     hash_bytes(blob)
 }
