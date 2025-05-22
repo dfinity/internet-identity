@@ -195,7 +195,7 @@ fn should_create_account_for_origin() {
 
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
-    let origin = "https://example.com".to_string();
+    let origin = "https://some-dapp.com".to_string();
     let name = "Alice".to_string();
 
     assert_eq!(
