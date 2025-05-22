@@ -353,3 +353,16 @@ pub enum GetAccountsError {
     InternalCanisterError(String),
     Unauthorized(Principal),
 }
+
+#[derive(CandidType, Deserialize)]
+pub struct PrepareAccountDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum AccountDelegationError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+    NoSuchDelegation,
+}

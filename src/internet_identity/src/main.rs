@@ -289,8 +289,8 @@ async fn prepare_delegation(
     .map(
         |PrepareAccountDelegation {
              user_key,
-             timestamp,
-         }| (user_key, timestamp),
+             expiration,
+         }| (user_key, expiration),
     )
     .unwrap_or_else(|err| trap(&format!("{:?}", err)))
 }

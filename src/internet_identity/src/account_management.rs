@@ -144,7 +144,7 @@ pub async fn prepare_account_delegation(
 
     Ok(PrepareAccountDelegation {
         user_key: ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        timestamp: expiration,
+        expiration,
     })
 }
 

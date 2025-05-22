@@ -1,10 +1,21 @@
+use std::time::Duration;
+
 use canister_tests::{
-    api::internet_identity::api_v2::{create_account, get_accounts, update_account},
+    api::internet_identity::api_v2::{
+        create_account, get_account_delegation, get_accounts, prepare_account_delegation,
+        update_account,
+    },
     flows,
-    framework::{device_data_2, env, install_ii_canister, principal_1, principal_2, II_WASM},
+    framework::{
+        device_data_2, env, install_ii_canister, principal_1, principal_2, time, verify_delegation,
+        II_WASM,
+    },
 };
-use internet_identity_interface::internet_identity::types::{AccountInfo, AccountUpdate};
+use internet_identity_interface::internet_identity::types::{
+    AccountInfo, AccountUpdate, PrepareAccountDelegation,
+};
 use pocket_ic::CallError;
+use serde_bytes::ByteBuf;
 
 /// Verifies that one account can be created
 #[test]
@@ -452,4 +463,54 @@ fn should_only_update_owned_account() {
     )
     .unwrap()
     .unwrap();
+}
+
+/// Verifies that valid account delegations are issued.
+#[test]
+fn should_get_valid_account_delegation() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        expiration,
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
+    );
+
+    let signed_delegation = get_account_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname,
+        None,
+        pub_session_key.clone(),
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+
+    verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
+    assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+    assert_eq!(signed_delegation.delegation.expiration, expiration);
+
+    Ok(())
 }

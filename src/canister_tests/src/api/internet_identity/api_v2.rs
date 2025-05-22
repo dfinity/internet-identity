@@ -2,7 +2,7 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, CallError, PocketIc};
+use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
 use std::collections::HashMap;
 
 pub fn identity_registration_start(
@@ -306,10 +306,9 @@ pub fn get_accounts(
     identity_number: IdentityNumber,
     origin: FrontendHostname,
 ) -> Result<Result<Vec<AccountInfo>, GetAccountsError>, CallError> {
-    call_candid_as(
+    query_candid_as(
         env,
         canister_id,
-        RawEffectivePrincipal::None,
         sender,
         "get_accounts",
         (identity_number, origin),
@@ -333,6 +332,59 @@ pub fn update_account(
         sender,
         "update_account",
         (identity_number, origin, account_number, update),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn prepare_account_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_account_delegation",
+        (
+            identity_number,
+            origin,
+            account_number,
+            session_key,
+            max_ttl,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_delegation(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    session_key: SessionKey,
+    expiration: u64,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, CallError> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_account_delegation",
+        (
+            identity_number,
+            origin,
+            account_number,
+            session_key,
+            expiration,
+        ),
     )
     .map(|(x,)| x)
 }

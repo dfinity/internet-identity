@@ -194,5 +194,5 @@ impl From<IdentityUpdateError> for AccountDelegationError {
 #[derive(CandidType, Serialize)]
 pub struct PrepareAccountDelegation {
     pub user_key: UserKey,
-    pub timestamp: Timestamp,
+    pub expiration: Timestamp,
 }
