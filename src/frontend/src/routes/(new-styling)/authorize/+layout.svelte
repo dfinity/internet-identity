@@ -15,9 +15,11 @@
   const { context, status } = $derived($authorizationStore);
   const lastUsedAccountAvailable = $derived(
     nonNullish(context) &&
-      Object.values($lastUsedIdentitiesStore).sort(
-        (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
-      )[0]?.accounts?.[context.effectiveOrigin],
+      nonNullish(
+        Object.values($lastUsedIdentitiesStore).sort(
+          (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+        )[0]?.accounts?.[context.effectiveOrigin],
+      ),
   );
 
   $effect.pre(() => {
