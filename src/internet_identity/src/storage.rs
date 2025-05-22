@@ -255,7 +255,7 @@ pub struct Storage<M: Memory> {
     stable_anchor_memory: StableBTreeMap<StorableAnchorNumber, StorableAnchor, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account memory.
     stable_account_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_account_memory: StableBTreeMap<AccountNumber, StorableAccount, ManagedMemory<M>>,
+    stable_account_memory: StableBTreeMap<StorableAccountNumber, StorableAccount, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable application memory.
     stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_application_memory:
@@ -263,11 +263,11 @@ pub struct Storage<M: Memory> {
     /// Memory wrapper used to report the size of the stable account counter memory.
     stable_anchor_account_counter_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_anchor_account_counter_memory:
-        StableBTreeMap<StorableAccountNumber, StorableAccountsCounter, ManagedMemory<M>>,
+        StableBTreeMap<StorableAnchorNumber, StorableAccountsCounter, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account reference list memory.
     stable_account_reference_list_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     stable_account_reference_list_memory: StableBTreeMap<
-        (StorableAccountNumber, StorableApplicationNumber),
+        (StorableAnchorNumber, StorableApplicationNumber),
         StorableAccountReferenceList,
         ManagedMemory<M>,
     >,

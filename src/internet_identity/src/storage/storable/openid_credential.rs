@@ -52,8 +52,8 @@ impl From<StorableOpenIdCredential> for OpenIdCredential {
             last_usage_timestamp: value.last_usage_timestamp,
             metadata: value
                 .metadata
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone().into()))
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
                 .collect(),
         }
     }
@@ -68,8 +68,8 @@ impl From<OpenIdCredential> for StorableOpenIdCredential {
             last_usage_timestamp: value.last_usage_timestamp,
             metadata: value
                 .metadata
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone().into()))
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
                 .collect(),
         }
     }
