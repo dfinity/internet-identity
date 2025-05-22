@@ -401,7 +401,7 @@ fn should_update_default_account() -> Result<(), CallError> {
 /// Verifies that only owned accounts can be updated
 #[test]
 #[should_panic]
-fn should_only_update_owned_account() -> () {
+fn should_only_update_owned_account() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -443,7 +443,7 @@ fn should_only_update_owned_account() -> () {
         &env,
         canister_id,
         principal_2(),
-        identity_number,
+        another_identity_number,
         origin.clone(),
         created_account.account_number,
         update,
