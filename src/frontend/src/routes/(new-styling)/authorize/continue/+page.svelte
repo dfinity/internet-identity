@@ -46,10 +46,7 @@
   );
   let selectedIdentity = $state.raw(untrack(() => lastUsedIdentities[0]));
   const lastUsedAccount = $derived(
-    selectedIdentity.accounts?.[
-      $authorizationContextStore.authRequest.derivationOrigin ??
-        $authorizationContextStore.requestOrigin
-    ],
+    selectedIdentity.accounts?.[$authorizationContextStore.effectiveOrigin],
   );
   let continueWith = $state<"lastUsedAccount" | "anotherAccount">(
     "lastUsedAccount",

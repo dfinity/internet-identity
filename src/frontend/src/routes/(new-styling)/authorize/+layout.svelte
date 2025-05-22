@@ -2,7 +2,6 @@
   import type { LayoutProps } from "./$types";
   import { onMount } from "svelte";
   import CenterLayout from "$lib/components/layout/CenterLayout.svelte";
-  import { canisterConfig, canisterId } from "$lib/globals";
   import {
     authorizationStore,
     authorizationStatusStore,
@@ -15,7 +14,7 @@
   const status = $derived($authorizationStatusStore);
 
   onMount(() => {
-    authorizationStore.init({ canisterId, canisterConfig });
+    authorizationStore.init();
   });
 </script>
 

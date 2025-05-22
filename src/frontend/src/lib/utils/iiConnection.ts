@@ -1265,7 +1265,7 @@ export const creationOptions = (
 
 // In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
 // we map back the derivation origin to the ic0.app domain.
-const remapToLegacyDomain = (origin: string): string => {
+export const remapToLegacyDomain = (origin: string): string => {
   const ORIGIN_MAPPING_REGEX =
     /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
   const match = origin.match(ORIGIN_MAPPING_REGEX);

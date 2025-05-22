@@ -6,9 +6,9 @@ import { throwCanisterError } from "$lib/utils/utils";
 
 export const load: PageLoad = async () => {
   const { identityNumber, actor } = get(authenticatedStore);
-  const { authRequest, requestOrigin } = get(authorizationContextStore);
+  const { effectiveOrigin } = get(authorizationContextStore);
   const accounts = await actor
-    .get_accounts(identityNumber, authRequest.derivationOrigin ?? requestOrigin)
+    .get_accounts(identityNumber, effectiveOrigin)
     .then(throwCanisterError);
   return { accounts };
 };
