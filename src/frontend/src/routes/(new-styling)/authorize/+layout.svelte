@@ -13,17 +13,17 @@
   const { children }: LayoutProps = $props();
 
   const { context, status } = $derived($authorizationStore);
-  const lastUsedAccountAvailable = $derived(
+  const lastUsedIdentityAvailable = $derived(
     nonNullish(context) &&
       nonNullish(
         Object.values($lastUsedIdentitiesStore).sort(
           (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
-        )[0]?.accounts?.[context.effectiveOrigin],
+        )[0],
       ),
   );
 
   $effect.pre(() => {
-    if (lastUsedAccountAvailable) {
+    if (lastUsedIdentityAvailable) {
       // By redirecting within `$effect.pre` we redirect before the page update
       // is rendered while making sure that we don't render the previous page
       // by checking `navigating.to.url.pathname !== "/authorize/continue"`.

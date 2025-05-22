@@ -109,13 +109,14 @@
 
       switch (continueWith) {
         case "lastUsedAccount":
-          if (isNullish(lastUsedAccount)) {
-            return handleError(
-              new Error("No last used account could be found"),
-            );
-          }
-          lastUsedIdentitiesStore.addLastUsedAccount(lastUsedAccount);
-          return authorizationStore.authorize(lastUsedAccount.accountNumber);
+          lastUsedIdentitiesStore.addLastUsedAccount(
+            lastUsedAccount ?? {
+              identityNumber: selectedIdentity.identityNumber,
+              accountNumber: undefined,
+              origin: $authorizationContextStore.effectiveOrigin,
+            },
+          );
+          return authorizationStore.authorize(lastUsedAccount?.accountNumber);
         case "anotherAccount":
           return goto("/authorize/account");
         default:
