@@ -1,9 +1,12 @@
 use std::time::Duration;
 
 use canister_tests::{
-    api::internet_identity::api_v2::{
-        create_account, get_account_delegation, get_accounts, prepare_account_delegation,
-        update_account,
+    api::internet_identity::{
+        api_v2::{
+            create_account, get_account_delegation, get_accounts, prepare_account_delegation,
+            update_account,
+        },
+        get_delegation, prepare_delegation,
     },
     flows,
     framework::{
@@ -12,7 +15,7 @@ use canister_tests::{
     },
 };
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountUpdate, PrepareAccountDelegation,
+    AccountInfo, AccountUpdate, GetDelegationResponse, PrepareAccountDelegation,
 };
 use pocket_ic::CallError;
 use serde_bytes::ByteBuf;
@@ -511,6 +514,99 @@ fn should_get_valid_account_delegation() -> Result<(), CallError> {
     verify_delegation(&env, user_key, &signed_delegation, &env.root_key().unwrap());
     assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
     assert_eq!(signed_delegation.delegation.expiration, expiration);
+
+    Ok(())
+}
+
+/// Verifies that default account delegation principals are identical to regular delegation principals.
+#[test]
+fn should_get_matching_principals() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    let PrepareAccountDelegation {
+        user_key,
+        expiration,
+    } = prepare_account_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key.clone(),
+        None,
+    )
+    .unwrap()
+    .unwrap();
+
+    assert_eq!(
+        expiration,
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
+    );
+
+    let signed_account_delegation = get_account_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key.clone(),
+        expiration,
+    )
+    .unwrap()
+    .unwrap();
+
+    verify_delegation(
+        &env,
+        user_key.clone(),
+        &signed_account_delegation,
+        &env.root_key().unwrap(),
+    );
+    assert_eq!(signed_account_delegation.delegation.pubkey, pub_session_key);
+    assert_eq!(signed_account_delegation.delegation.expiration, expiration);
+
+    let (canister_sig_key, expiration) = prepare_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.as_str(),
+        &pub_session_key,
+        None,
+    )?;
+    assert_eq!(
+        expiration,
+        time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
+    );
+
+    let signed_delegation = match get_delegation(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.as_str(),
+        &pub_session_key,
+        expiration,
+    )? {
+        GetDelegationResponse::SignedDelegation(delegation) => delegation,
+        GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+    };
+
+    verify_delegation(
+        &env,
+        canister_sig_key.clone(),
+        &signed_delegation,
+        &env.root_key().unwrap(),
+    );
+    assert_eq!(signed_delegation.delegation.pubkey, pub_session_key);
+    assert_eq!(signed_delegation.delegation.expiration, expiration);
+
+    assert_eq!(user_key, canister_sig_key);
 
     Ok(())
 }
