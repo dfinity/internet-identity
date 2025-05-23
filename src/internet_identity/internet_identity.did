@@ -582,7 +582,7 @@ type AccountDelegationError = variant {
 
 type PrepareAccountDelegation = record {
     user_key : UserKey;
-    timestamp : Timestamp;
+    expiration : Timestamp;
 };
 
 type GetAccountsError = variant {

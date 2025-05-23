@@ -72,7 +72,7 @@ export const authorizationStore: AuthorizationStore = {
             const artificialDelayPromise = waitFor(artificialDelay);
             const { identityNumber, actor } = get(authenticatedStore);
             try {
-              const { user_key, timestamp } = await actor
+              const { user_key, expiration } = await actor
                 .prepare_account_delegation(
                   identityNumber,
                   effectiveOrigin,
@@ -90,7 +90,7 @@ export const authorizationStore: AuthorizationStore = {
                     effectiveOrigin,
                     nonNullish(accountNumber) ? [accountNumber] : [],
                     context.authRequest.sessionPublicKey,
-                    timestamp,
+                    expiration,
                   )
                   .then(throwCanisterError)
                   .then(transformSignedDelegation),

@@ -308,7 +308,7 @@ export interface OpenIdPrepareDelegationResponse {
 }
 export interface PrepareAccountDelegation {
   'user_key' : UserKey,
-  'timestamp' : Timestamp,
+  'expiration' : Timestamp,
 }
 export type PrepareIdAliasError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
