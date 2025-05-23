@@ -5,7 +5,6 @@
     authenticateWithJWT,
     authenticateWithPasskey,
   } from "$lib/utils/authentication";
-  import { isNullish } from "@dfinity/utils";
   import {
     lastUsedIdentitiesStore,
     type LastUsedIdentity,
@@ -37,6 +36,10 @@
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { untrack } from "svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
 
   let continueButtonRef = $state<HTMLElement>();
   const lastUsedIdentities = $derived(
@@ -109,6 +112,15 @@
 
       switch (continueWith) {
         case "lastUsedAccount":
+          if ("passkey" in selectedIdentity.authMethod) {
+            authenticationV2Funnel.trigger(
+              AuthenticationV2Events.ContinueAsPasskey,
+            );
+          } else if ("openid" in selectedIdentity.authMethod) {
+            authenticationV2Funnel.trigger(
+              AuthenticationV2Events.ContinueAsGoogle,
+            );
+          }
           lastUsedIdentitiesStore.addLastUsedAccount(
             lastUsedAccount ?? {
               identityNumber: selectedIdentity.identityNumber,
@@ -118,6 +130,7 @@
           );
           return authorizationStore.authorize(lastUsedAccount?.accountNumber);
         case "anotherAccount":
+          authenticationV2Funnel.trigger(AuthenticationV2Events.UseAnother);
           return goto("/authorize/account");
         default:
           void (continueWith satisfies never);
@@ -150,6 +163,7 @@
   };
 
   $effect(() => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
     continueButtonRef?.focus();
   });
 </script>
