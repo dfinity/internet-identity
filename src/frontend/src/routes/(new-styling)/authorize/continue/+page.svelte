@@ -5,9 +5,9 @@
     authenticateWithJWT,
     authenticateWithPasskey,
   } from "$lib/utils/authentication";
-  import { isNullish } from "@dfinity/utils";
   import {
     lastUsedIdentitiesStore,
+    type LastUsedAccount,
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { canisterConfig, canisterId } from "$lib/globals";
@@ -45,8 +45,11 @@
       .slice(0, 3),
   );
   let selectedIdentity = $state.raw(untrack(() => lastUsedIdentities[0]));
-  const lastUsedAccount = $derived(
-    selectedIdentity.accounts?.[$authorizationContextStore.effectiveOrigin],
+  const lastUsedAccount = $derived<LastUsedAccount | undefined>(
+    Object.values(
+      selectedIdentity.accounts?.[$authorizationContextStore.effectiveOrigin] ??
+        {},
+    ).sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)[0],
   );
   let continueWith = $state<"lastUsedAccount" | "anotherAccount">(
     "lastUsedAccount",
