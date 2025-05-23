@@ -247,19 +247,20 @@ fn should_update_default_account() {
         name: account_name.clone(),
         account_number: None,
     };
-    let new_account_number = storage.update_account(updated_account_params).unwrap();
+    let new_account = storage.update_account(updated_account_params).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
-    let updated_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_updated_account = Account::new_full(
-        anchor_number,
-        origin,
-        Some(account_name),
-        Some(new_account_number),
-        None,
-        Some(anchor_number),
+    assert_eq!(
+        new_account,
+        Account::new_full(
+            anchor_number,
+            origin,
+            Some(account_name),
+            new_account.account_number,
+            None,
+            Some(anchor_number),
+        )
     );
-    assert_eq!(updated_accounts, vec![expected_updated_account]);
     assert_eq!(
         storage.get_account_counter(anchor_number),
         AccountsCounter {
@@ -325,27 +326,20 @@ fn should_update_additional_account() {
         name: new_account_name.clone(),
         account_number: Some(1),
     };
-    let update_account_return_value = storage.update_account(updated_account_params).unwrap();
-
-    assert_eq!(update_account_return_value, account_number);
+    let updated_account = storage.update_account(updated_account_params).unwrap();
 
     // 5. Check that the additional account has been created with the updated values.
-    let updated_account = storage
-        .read_account(ReadAccountParams {
-            account_number: Some(update_account_return_value),
+    assert_eq!(
+        updated_account,
+        Account {
+            account_number: Some(1),
             anchor_number,
-            origin: &origin,
-        })
-        .unwrap();
-    let expected_updated_account = Account {
-        account_number: Some(update_account_return_value),
-        anchor_number,
-        origin: origin.clone(),
-        last_used: None,
-        name: Some(new_account_name),
-        seed_from_anchor: None,
-    };
-    assert_eq!(updated_account, expected_updated_account);
+            origin: origin.clone(),
+            last_used: None,
+            name: Some(new_account_name),
+            seed_from_anchor: None,
+        }
+    );
     assert_eq!(
         storage.get_account_counter(anchor_number),
         AccountsCounter {

@@ -81,7 +81,7 @@
 //! bucket of 128 pages.
 use account::{
     Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
-    UpdateExistinAccountParams,
+    UpdateExistingAccountParams,
 };
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
@@ -1039,14 +1039,13 @@ impl<M: Memory + Clone> Storage<M> {
     /// Updates an account.
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
-    pub fn update_account(
-        &mut self,
-        params: UpdateAccountParams,
-    ) -> Result<AccountNumber, StorageError> {
+    pub fn update_account(&mut self, params: UpdateAccountParams) -> Result<Account, StorageError> {
         match params.account_number {
-            Some(account_number) => self.update_existing_account(UpdateExistinAccountParams {
+            Some(account_number) => self.update_existing_account(UpdateExistingAccountParams {
                 account_number,
+                anchor_number: params.anchor_number,
                 name: params.name,
+                origin: params.origin,
             }),
             None => {
                 // Default accounts are not stored by default.
@@ -1063,20 +1062,48 @@ impl<M: Memory + Clone> Storage<M> {
     /// Used in `update_account` to update an existing account.
     fn update_existing_account(
         &mut self,
-        params: UpdateExistinAccountParams,
-    ) -> Result<AccountNumber, StorageError> {
-        match self.stable_account_memory.get(&params.account_number) {
-            None => Err(StorageError::AccountNotFound {
+        params: UpdateExistingAccountParams,
+    ) -> Result<Account, StorageError> {
+        // Check if account reference exists for given anchor number, origin and account number,
+        // if the account refence exists for a given anchor, that means the anchor has access.
+        let application_number = self.lookup_application_number_with_origin(&params.origin);
+        let account_reference = self
+            .find_account_reference(
+                params.anchor_number,
+                application_number,
+                Some(params.account_number),
+            )
+            .ok_or(StorageError::AccountNotFound {
                 account_number: params.account_number,
-            }),
-            Some(storable_account) => {
-                let mut storable_account = storable_account.clone();
-                storable_account.name = params.name;
-                self.stable_account_memory
-                    .insert(params.account_number, storable_account);
-                Ok(params.account_number)
-            }
-        }
+            })?;
+        // Check if the account reference has an account number,
+        // throw error if it doesn't since we only want to update
+        // accounts with an account number in this function.
+        let account_number =
+            account_reference
+                .account_number
+                .ok_or(StorageError::AccountNotFound {
+                    account_number: params.account_number,
+                })?;
+        // Read account from storage
+        let mut storable_account = self.stable_account_memory.get(&account_number).ok_or(
+            StorageError::AccountNotFound {
+                account_number: params.account_number,
+            },
+        )?;
+        // Update account and write back to storage
+        storable_account.name = params.name;
+        self.stable_account_memory
+            .insert(params.account_number, storable_account.clone());
+        // Return updated account
+        Ok(Account::new_full(
+            params.anchor_number,
+            params.origin,
+            Some(storable_account.name),
+            Some(account_number),
+            account_reference.last_used,
+            storable_account.seed_from_anchor,
+        ))
     }
 
     /// Used in `update_account` to create a default account.
@@ -1086,7 +1113,7 @@ impl<M: Memory + Clone> Storage<M> {
     fn create_default_account(
         &mut self,
         params: CreateAccountParams,
-    ) -> Result<AccountNumber, StorageError> {
+    ) -> Result<Account, StorageError> {
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
@@ -1095,7 +1122,7 @@ impl<M: Memory + Clone> Storage<M> {
             seed_from_anchor: Some(params.anchor_number),
         };
         self.stable_account_memory
-            .insert(new_account_number, storable_account);
+            .insert(new_account_number, storable_account.clone());
 
         // Get or create an application number from the account's origin.
         let application_number =
@@ -1155,7 +1182,15 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
-        Ok(new_account_number)
+        // Return created default account
+        Ok(Account::new_full(
+            params.anchor_number,
+            params.origin,
+            Some(storable_account.name),
+            Some(new_account_number),
+            None,
+            storable_account.seed_from_anchor,
+        ))
     }
 
     /// Make sure all the required metadata is recorded to stable memory.

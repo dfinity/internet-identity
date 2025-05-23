@@ -5,12 +5,9 @@ use crate::{
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
-    storage::{
-        account::{
-            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
-            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
-        },
-        StorageError,
+    storage::account::{
+        Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
+        PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
     },
     update_root_hash,
 };
@@ -51,10 +48,10 @@ pub fn create_account_for_origin(
         storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
-                origin,
                 name,
+                origin,
             })
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{}", err)))
+            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })
 }
 
@@ -87,17 +84,6 @@ pub fn update_account_for_origin(
                     anchor_number,
                     name,
                     origin: origin.clone(),
-                })
-                .and_then(|acc_num| {
-                    storage
-                        .read_account(ReadAccountParams {
-                            account_number: Some(acc_num),
-                            anchor_number,
-                            origin: &origin,
-                        })
-                        .ok_or(StorageError::AccountNotFound {
-                            account_number: acc_num,
-                        })
                 })
                 .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
         }),
