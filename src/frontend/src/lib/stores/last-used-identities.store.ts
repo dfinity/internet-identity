@@ -37,6 +37,8 @@ type LastUsedIdentitiesStore = Readable<LastUsedIdentities> & {
   reset: () => void;
 };
 
+export const PRIMARY_ACCOUNT_KEY = "primary";
+
 export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const { subscribe, set, update } = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
@@ -71,7 +73,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         }
         identity.accounts[params.origin][
           isNullish(params.accountNumber)
-            ? "primary"
+            ? PRIMARY_ACCOUNT_KEY
             : params.accountNumber.toString()
         ] = {
           ...params,
