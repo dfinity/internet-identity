@@ -157,8 +157,8 @@ impl Account {
                 delegation::calculate_anchor_seed(seed_from_anchor, &self.origin)
             }
             (None, Some(account_number)) => {
-                // If this is an added account, we derive from the account number.
-                delegation::calculate_account_seed(account_number)
+                // If this is an added account, we derive from the account number and origin.
+                delegation::calculate_account_seed(account_number, &self.origin)
             }
             (None, None) => trap("Attempted to calculate an account seed from an account without seed anchor or anchor number - this should never happen!")
         }
