@@ -834,7 +834,7 @@ fn can_not_prepare_account_delegation_for_different_user() -> Result<(), CallErr
     match prepare_account_delegation(&params, None).unwrap() {
         Ok(_) => panic!("This should not be possible!"),
         Err(err) => match err {
-            AccountDelegationError::Unauthorized(_) => return Ok(()),
+            AccountDelegationError::Unauthorized(_) => Ok(()),
             _ => panic!("Wrong error type!"),
         },
     }
@@ -875,7 +875,7 @@ fn can_not_get_account_delegation_for_different_user() -> Result<(), CallError> 
     match get_account_delegation(&params_wrong_user, expiration).unwrap() {
         Ok(_) => panic!("This should not be possible!"),
         Err(err) => match err {
-            AccountDelegationError::Unauthorized(_) => return Ok(()),
+            AccountDelegationError::Unauthorized(_) => Ok(()),
             _ => panic!("Wrong error type!"),
         },
     }
@@ -912,7 +912,7 @@ fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError>
     match get_account_delegation(&params, expiration).unwrap() {
         Ok(_) => panic!("This should not be possible!"),
         Err(err) => match err {
-            AccountDelegationError::NoSuchDelegation => return Ok(()),
+            AccountDelegationError::NoSuchDelegation => Ok(()),
             _ => panic!("Wrong error type!"),
         },
     }
