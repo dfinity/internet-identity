@@ -1064,7 +1064,8 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         params: UpdateExistingAccountParams,
     ) -> Result<Account, StorageError> {
-        // Check if account exists for given anchor number, origin and account number
+        // Check if account reference exists for given anchor number, origin and account number,
+        // if the account refence exists for a given anchor, that means the anchor has access.
         let application_number = self.lookup_application_number_with_origin(&params.origin);
         let account_reference = self
             .find_account_reference(
@@ -1075,7 +1076,9 @@ impl<M: Memory + Clone> Storage<M> {
             .ok_or(StorageError::AccountNotFound {
                 account_number: params.account_number,
             })?;
-        // Check if account is an existing account (reserved with an account number)
+        // Check if the account reference has an account number,
+        // throw error if it doesn't since we only want to update
+        // accounts with an account number in this function.
         let account_number =
             account_reference
                 .account_number
