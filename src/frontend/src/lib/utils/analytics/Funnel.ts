@@ -64,7 +64,6 @@ export class Funnel<T extends Record<string, string>> {
       ...(this.#properties || {}),
       ...(additionalProperties || {}),
     };
-    console.log("EVENT", this.#name, event);
 
     analytics.event(
       event,
