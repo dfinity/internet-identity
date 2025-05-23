@@ -5,12 +5,9 @@ use crate::{
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
-    storage::{
-        account::{
-            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
-            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
-        },
-        StorageError,
+    storage::account::{
+        Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
+        PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
     },
     update_root_hash,
 };
