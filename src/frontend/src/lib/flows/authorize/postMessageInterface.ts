@@ -13,7 +13,6 @@ import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
 import { z } from "zod";
-import { waitFor } from "$lib/utils/utils";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
