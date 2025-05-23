@@ -28,9 +28,11 @@ pub struct UpdateAccountParams {
     pub origin: FrontendHostname,
 }
 
-pub struct UpdateExistinAccountParams {
+pub struct UpdateExistingAccountParams {
     pub account_number: AccountNumber,
+    pub anchor_number: AnchorNumber,
     pub name: String,
+    pub origin: FrontendHostname,
 }
 
 #[derive(Clone, Debug, PartialEq)]
