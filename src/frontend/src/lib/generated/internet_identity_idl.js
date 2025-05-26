@@ -395,7 +395,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const PrepareAccountDelegation = IDL.Record({
     'user_key' : UserKey,
-    'timestamp' : Timestamp,
+    'expiration' : Timestamp,
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
