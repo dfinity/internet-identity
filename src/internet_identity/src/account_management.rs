@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
@@ -5,9 +7,12 @@ use crate::{
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
-    storage::account::{
-        Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
-        PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+    storage::{
+        account::{
+            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
+            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+        },
+        Storage,
     },
     update_root_hash,
 };
@@ -16,8 +21,8 @@ use ic_canister_sig_creation::{
 };
 use ic_cdk::{api::time, caller};
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
-    SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
+    Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
 };
 use serde_bytes::ByteBuf;
 
@@ -36,22 +41,16 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
-        let AccountsCounter {
-            stored_accounts,
-            stored_account_references: _,
-        } = storage.get_account_counter(anchor_number);
-
-        if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-            return Err(CreateAccountError::AccountLimitReached);
+        match check_or_rebuild_max_anchor_accounts(storage, anchor_number, true) {
+            Ok(_) => storage
+                .create_additional_account(CreateAccountParams {
+                    anchor_number,
+                    name,
+                    origin,
+                })
+                .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}"))),
+            Err(err) => Err(err.into()),
         }
-
-        storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name,
-                origin,
-            })
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })
 }
 
@@ -67,14 +66,9 @@ pub fn update_account_for_origin(
             // Check if whe have reached account limit
             // Because editing a default account turns it into a stored account
             if account_number.is_none() {
-                let AccountsCounter {
-                    stored_accounts,
-                    stored_account_references: _,
-                } = storage.get_account_counter(anchor_number);
-
-                // TODO: also check the actual number and reset if inaccurate
-                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-                    return Err(UpdateAccountError::AccountLimitReached);
+                if let Err(err) = check_or_rebuild_max_anchor_accounts(storage, anchor_number, true)
+                {
+                    return Err(err.into());
                 }
             }
 
@@ -171,6 +165,30 @@ pub fn get_account_delegation(
             }
         })
     })
+}
+
+/// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
+/// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
+fn check_or_rebuild_max_anchor_accounts(
+    storage: &mut Storage<Rc<RefCell<Vec<u8>>>>,
+    anchor_number: AnchorNumber,
+    first_time: bool, // required for safe recursion
+) -> Result<(), CheckMaxAccountError> {
+    let AccountsCounter {
+        stored_accounts,
+        stored_account_references: _,
+    } = storage.get_account_counter(anchor_number);
+
+    if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+        // check whether we actually have reached the number
+        if first_time {
+            storage.rebuild_identity_counters(anchor_number);
+            return check_or_rebuild_max_anchor_accounts(storage, anchor_number, false);
+        } else {
+            return Err(CheckMaxAccountError::AccountLimitReached);
+        }
+    }
+    Ok(())
 }
 
 #[test]
