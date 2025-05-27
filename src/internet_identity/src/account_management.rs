@@ -181,7 +181,7 @@ fn check_or_rebuild_max_anchor_accounts(
     if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
         // check whether we actually have reached the number
         if first_time {
-            storage.rebuild_identity_counters(anchor_number);
+            storage.rebuild_identity_account_counters(anchor_number);
             return check_or_rebuild_max_anchor_accounts(storage, anchor_number, false);
         } else {
             return Err(CheckMaxAccountError::AccountLimitReached);

@@ -847,7 +847,8 @@ impl<M: Memory + Clone> Storage<M> {
             .collect()
     }
 
-    pub fn rebuild_identity_counters(&mut self, anchor_number: AnchorNumber) {
+    /// Rebuilds the account and account reference counters for a given identity
+    pub fn rebuild_identity_account_counters(&mut self, anchor_number: AnchorNumber) {
         // get actual list of stored references and accounts
         let acc_ref_list = self.list_identity_account_references(anchor_number);
 
