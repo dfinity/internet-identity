@@ -40,16 +40,16 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
-        match check_or_rebuild_max_anchor_accounts(storage, anchor_number, true) {
-            Ok(_) => storage
-                .create_additional_account(CreateAccountParams {
-                    anchor_number,
-                    name,
-                    origin,
-                })
-                .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}"))),
-            Err(err) => Err(err.into()),
-        }
+        check_or_rebuild_max_anchor_accounts(storage, anchor_number, true)
+            .map_err(|err| Into::<CreateAccountError>::into(err))?;
+
+        storage
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name,
+                origin,
+            })
+            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })
 }
 
