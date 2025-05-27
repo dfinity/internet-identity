@@ -521,3 +521,57 @@ fn should_update_default_account_for_origin() {
         ]
     );
 }
+
+#[test]
+// This test is to make sure that the check_or_rebuild_max_anchor_accounts function correctly errors
+// It should error when the counters are at or above max and argument 'first_time' is false
+fn should_fail_check_or_rebuild_when_not_first_time() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        );
+        let res = check_or_rebuild_max_anchor_accounts(storage, anchor.anchor_number(), false);
+        assert!(res.is_err())
+    });
+}
+
+#[test]
+fn should_properly_recalculate_faulty_account_counter() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let name = "Alice".to_string();
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        )
+    });
+
+    for i in 0..=MAX_ANCHOR_ACCOUNTS {
+        let origin = format!("https://example-{}.com", i);
+        let result =
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        if i == MAX_ANCHOR_ACCOUNTS {
+            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
+        } else {
+            assert!(result.is_ok())
+        }
+    }
+}

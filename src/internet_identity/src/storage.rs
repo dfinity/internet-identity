@@ -800,6 +800,24 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// This is for testing purposes only, DO NOT use anywhere else!
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub fn set_counters_for_testing(
+        &mut self,
+        anchor_number: AnchorNumber,
+        stored_accounts: u64,
+        stored_account_references: u64,
+    ) {
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            StorableAccountsCounter {
+                stored_accounts,
+                stored_account_references,
+            },
+        );
+    }
+
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
