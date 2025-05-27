@@ -575,3 +575,32 @@ fn should_properly_recalculate_faulty_account_counter() {
         }
     }
 }
+
+#[test]
+fn should_properly_recalculate_faulty_account_counter_when_updating() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        )
+    });
+
+    let result = update_account_for_origin(
+        anchor.anchor_number(),
+        None,
+        "https://example-1.com".to_string(),
+        AccountUpdate {
+            name: Some("Gabriel".to_string()),
+        },
+    );
+    assert!(result.is_ok())
+}
