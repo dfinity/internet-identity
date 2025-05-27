@@ -854,7 +854,7 @@ impl<M: Memory + Clone> Storage<M> {
             // for every reference, we increment the account references counter
             stored_account_references += 1;
             // if the account reference has an account number and is thus stored, also increment the stored accounts counter
-            if let Some(_) = acc_ref.account_number {
+            if acc_ref.account_number.is_some() {
                 stored_accounts += 1;
             }
         });
