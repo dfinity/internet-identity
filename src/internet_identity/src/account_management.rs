@@ -20,6 +20,7 @@ use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
 use ic_cdk::{api::time, caller};
+use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::{
     AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
     Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
@@ -170,7 +171,7 @@ pub fn get_account_delegation(
 /// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
 /// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
 fn check_or_rebuild_max_anchor_accounts(
-    storage: &mut Storage<Rc<RefCell<Vec<u8>>>>,
+    storage: &mut Storage<DefaultMemoryImpl>,
     anchor_number: AnchorNumber,
     first_time: bool, // required for safe recursion
 ) -> Result<(), CheckMaxAccountError> {
