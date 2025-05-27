@@ -229,6 +229,8 @@ fn should_fail_to_create_accounts_above_max() {
             create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {
             assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
+        } else {
+            assert!(result.is_ok())
         }
     }
 }
@@ -244,7 +246,10 @@ fn should_fail_to_update_default_accounts_above_max() {
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{}.com", i);
-        let _ = create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        let create_result =
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+
+        assert!(create_result.is_ok())
     }
     let result = update_account_for_origin(
         anchor.anchor_number(),
