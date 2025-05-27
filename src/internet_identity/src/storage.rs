@@ -847,22 +847,25 @@ impl<M: Memory + Clone> Storage<M> {
         // get actual list of stored references and accounts
         let acc_ref_list = self.list_identity_account_references(anchor_number);
 
-        let acc_counter = StorableAccountsCounter {
-            stored_accounts: 0,
-            stored_account_references: 0,
-        };
+        let mut stored_accounts = 0;
+        let mut stored_account_references = 0;
 
         acc_ref_list.iter().for_each(|acc_ref| {
             // for every reference, we increment the account references counter
-            acc_counter.increment(&AccountType::AccountReference);
+            stored_account_references += 1;
             // if the account reference has an account number and is thus stored, also increment the stored accounts counter
             if let Some(_) = acc_ref.account_number {
-                acc_counter.increment(&AccountType::Account);
+                stored_accounts += 1;
             }
         });
 
-        self.stable_anchor_account_counter_memory
-            .insert(anchor_number, acc_counter);
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            StorableAccountsCounter {
+                stored_accounts,
+                stored_account_references,
+            },
+        );
     }
 
     pub fn create_additional_account(
