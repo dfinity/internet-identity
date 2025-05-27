@@ -818,7 +818,7 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Returns the total application count.
     pub fn get_total_application_count(&self) -> u64 {
-        self.stable_application_memory.len() as u64
+        self.stable_application_memory.len()
     }
 
     // Increments the `stable_account_counter_memory` account counter by one and returns the new number.
