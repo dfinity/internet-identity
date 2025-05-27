@@ -811,10 +811,14 @@ impl<M: Memory + Clone> Storage<M> {
             .into()
     }
 
-    #[allow(dead_code)]
     /// Returns the total account counter.
     pub fn get_total_accounts_counter(&self) -> AccountsCounter {
         self.stable_account_counter_memory.get().clone().into()
+    }
+
+    /// Returns the total application count.
+    pub fn get_total_application_count(&self) -> u64 {
+        self.stable_application_memory.len()
     }
 
     // Increments the `stable_account_counter_memory` account counter by one and returns the new number.
