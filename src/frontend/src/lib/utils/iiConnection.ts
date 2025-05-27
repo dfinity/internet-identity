@@ -78,7 +78,7 @@ import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
-import { isWebAuthnCancel } from "./webAuthnErrorUtils";
+import { isWebAuthnCancelError } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
 import {
   webauthnAuthenticationFunnel,
@@ -567,7 +567,7 @@ export class Connection {
     } catch (e: unknown) {
       // Better understand which users don't make it all the way.
       webauthnAuthenticationFunnel.trigger(WebauthnAuthenticationEvents.Failed);
-      if (isWebAuthnCancel(e)) {
+      if (isWebAuthnCancelError(e)) {
         // Better understand which users don't make it all the way.
         webauthnAuthenticationFunnel.trigger(
           WebauthnAuthenticationEvents.Cancelled,
@@ -1265,7 +1265,7 @@ export const creationOptions = (
 
 // In order to give dapps a stable principal regardless whether they use the legacy (ic0.app) or the new domain (icp0.io)
 // we map back the derivation origin to the ic0.app domain.
-const remapToLegacyDomain = (origin: string): string => {
+export const remapToLegacyDomain = (origin: string): string => {
   const ORIGIN_MAPPING_REGEX =
     /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
   const match = origin.match(ORIGIN_MAPPING_REGEX);

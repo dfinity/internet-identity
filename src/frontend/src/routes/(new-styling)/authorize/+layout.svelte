@@ -2,7 +2,6 @@
   import type { LayoutProps } from "./$types";
   import { onMount } from "svelte";
   import CenterLayout from "$lib/components/layout/CenterLayout.svelte";
-  import { canisterConfig, canisterId } from "$lib/globals";
   import {
     authorizationStore,
     authorizationStatusStore,
@@ -15,22 +14,21 @@
   const status = $derived($authorizationStatusStore);
 
   onMount(() => {
-    authorizationStore.init({ canisterId, canisterConfig });
+    authorizationStore.init();
   });
 </script>
 
 <CenterLayout data-page="new-authorize-view">
-  {#if status === "init" || status === "waiting" || status === "validating" || status === "authorizing"}
-    <div class="flex flex-col items-center justify-center gap-4">
-      <ProgressRing class="text-fg-primary size-14" />
-      <p class="text-text-secondary text-lg">
-        {status === "authorizing" ? "Redirecting to the app" : "Loading"}
-      </p>
-    </div>
-  {:else if status === "authenticating"}
+  {#if status === "authenticating"}
     <AuthPanel>
       {@render children()}
     </AuthPanel>
+  {:else if status === "authorizing"}
+    <!-- Spinner is not shown for other statuses to avoid flicker -->
+    <div class="flex flex-col items-center justify-center gap-4">
+      <ProgressRing class="text-fg-primary size-14" />
+      <p class="text-text-secondary text-lg">Redirecting to the app</p>
+    </div>
   {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure"}
     <div>Error</div>
   {:else if status === "success"}

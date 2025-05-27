@@ -1,7 +1,7 @@
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::storage::stable_anchor::StableAnchor;
-use crate::storage::storable_anchor::StorableAnchor;
+use crate::storage::storable::anchor::StorableAnchor;
+use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
@@ -128,27 +128,31 @@ impl From<OpenIdCredentialData> for OpenIdCredential {
     }
 }
 
-impl From<Anchor> for (StorableAnchor, StableAnchor) {
+impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
     fn from(anchor: Anchor) -> Self {
         (
-            StorableAnchor {
+            StorableFixedAnchor {
                 devices: anchor.devices,
                 metadata: anchor.metadata,
             },
-            StableAnchor {
-                openid_credentials: anchor.openid_credentials,
+            StorableAnchor {
+                openid_credentials: anchor
+                    .openid_credentials
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
                 name: anchor.name,
             },
         )
     }
 }
 
-impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
+impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Anchor {
     fn from(
         (anchor_number, storable_anchor, stable_anchor): (
             AnchorNumber,
-            StorableAnchor,
-            Option<StableAnchor>,
+            StorableFixedAnchor,
+            Option<StorableAnchor>,
         ),
     ) -> Self {
         Anchor {
@@ -156,7 +160,13 @@ impl From<(AnchorNumber, StorableAnchor, Option<StableAnchor>)> for Anchor {
             devices: storable_anchor.devices,
             openid_credentials: stable_anchor
                 .clone()
-                .map(|anchor| anchor.openid_credentials)
+                .map(|anchor| {
+                    anchor
+                        .openid_credentials
+                        .into_iter()
+                        .map(Into::into)
+                        .collect()
+                })
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
             name: stable_anchor.and_then(|anchor| anchor.name),

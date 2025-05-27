@@ -10,7 +10,7 @@ import { addDeviceLink } from "$lib/utils/addDeviceLink";
 import { AsyncCountdown } from "$lib/utils/countdown";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { mount, renderPage, withRef } from "$lib/utils/lit-html";
-import { delayMillis } from "$lib/utils/utils";
+import { waitFor } from "$lib/utils/utils";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
@@ -183,7 +183,7 @@ const poll = (
 
       // Debounce a little; in practice won't be noticed by users but
       // will avoid hot looping in case the op becomes near instantaneous.
-      await delayMillis(100);
+      await waitFor(100);
     }
   });
 

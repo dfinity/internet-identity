@@ -5,9 +5,9 @@
     authenticateWithJWT,
     authenticateWithPasskey,
   } from "$lib/utils/authentication";
-  import { isNullish } from "@dfinity/utils";
   import {
     lastUsedIdentitiesStore,
+    type LastUsedAccount,
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { canisterConfig, canisterId } from "$lib/globals";
@@ -36,7 +36,11 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { untrack } from "svelte";
-  import Checkbox from "$lib/components/ui/Checkbox.svelte";
+  import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
 
   let continueButtonRef = $state<HTMLElement>();
   const lastUsedIdentities = $derived(
@@ -45,79 +49,99 @@
       .slice(0, 3),
   );
   let selectedIdentity = $state.raw(untrack(() => lastUsedIdentities[0]));
-  const lastUsedAccount = $derived(
-    selectedIdentity.accounts?.[
-      $authorizationContextStore.authRequest.derivationOrigin ??
-        $authorizationContextStore.requestOrigin
-    ],
+  const lastUsedAccount = $derived<LastUsedAccount | undefined>(
+    Object.values(
+      selectedIdentity.accounts?.[$authorizationContextStore.effectiveOrigin] ??
+        {},
+    ).sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)[0],
   );
   let continueWith = $state<"lastUsedAccount" | "anotherAccount">(
     "lastUsedAccount",
   );
   let identitySwitcherVisible = $state(false);
   let loading = $state(false);
+  let systemOverlay = $state(false);
+
+  const authenticateLastUsed = async () => {
+    if ("passkey" in selectedIdentity.authMethod) {
+      const { identity, identityNumber, credentialId } =
+        await authenticateWithPasskey({
+          canisterId,
+          session: $sessionStore,
+          credentialId: selectedIdentity.authMethod.passkey.credentialId,
+        });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { passkey: { credentialId } },
+      });
+    } else if (
+      "openid" in selectedIdentity.authMethod &&
+      selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
+    ) {
+      systemOverlay = true;
+      const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
+      const requestConfig = createGoogleRequestConfig(clientId);
+      const jwt = await requestJWT(requestConfig, {
+        nonce: $sessionStore.nonce,
+        mediation: "required",
+        loginHint: selectedIdentity.authMethod.openid.sub,
+      });
+      systemOverlay = false;
+      const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
+        canisterId,
+        session: $sessionStore,
+        jwt,
+      });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { openid: { iss, sub } },
+      });
+    } else {
+      throw new Error("Unrecognized authentication method");
+    }
+  };
 
   const handleContinue = async () => {
     try {
       loading = true;
-      if ("passkey" in selectedIdentity.authMethod) {
-        const { identity, identityNumber, credentialId } =
-          await authenticateWithPasskey({
-            canisterId,
-            session: $sessionStore,
-            credentialId: selectedIdentity.authMethod.passkey.credentialId,
-          });
-        authenticationStore.set({ identity, identityNumber });
-        const info =
-          await $authenticatedStore.actor.get_anchor_info(identityNumber);
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name: info.name[0],
-          authMethod: { passkey: { credentialId } },
-        });
-      } else if (
-        "openid" in selectedIdentity.authMethod &&
-        selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
-      ) {
-        const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
-        const requestConfig = createGoogleRequestConfig(clientId);
-        const jwt = await requestJWT(requestConfig, {
-          nonce: $sessionStore.nonce,
-          mediation: "required",
-          loginHint: selectedIdentity.authMethod.openid.sub,
-        });
-        const { identity, identityNumber, iss, sub } =
-          await authenticateWithJWT({
-            canisterId,
-            session: $sessionStore,
-            jwt,
-          });
-        authenticationStore.set({ identity, identityNumber });
-        const info =
-          await $authenticatedStore.actor.get_anchor_info(identityNumber);
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name: info.name[0],
-          authMethod: { openid: { iss, sub } },
-        });
-      } else {
-        return handleError(new Error("Unrecognized authentication method"));
-      }
+      await authenticateLastUsed();
 
       switch (continueWith) {
         case "lastUsedAccount":
-          if (isNullish(lastUsedAccount)) {
-            return handleError(new Error("Unreachable"));
+          if ("passkey" in selectedIdentity.authMethod) {
+            authenticationV2Funnel.trigger(
+              AuthenticationV2Events.ContinueAsPasskey,
+            );
+          } else if ("openid" in selectedIdentity.authMethod) {
+            authenticationV2Funnel.trigger(
+              AuthenticationV2Events.ContinueAsGoogle,
+            );
           }
-          lastUsedIdentitiesStore.addLastUsedAccount(lastUsedAccount);
-          return authorizationStore.authorize(lastUsedAccount.accountNumber);
+          lastUsedIdentitiesStore.addLastUsedAccount(
+            lastUsedAccount ?? {
+              identityNumber: selectedIdentity.identityNumber,
+              accountNumber: undefined,
+              origin: $authorizationContextStore.effectiveOrigin,
+            },
+          );
+          return authorizationStore.authorize(lastUsedAccount?.accountNumber);
         case "anotherAccount":
+          authenticationV2Funnel.trigger(AuthenticationV2Events.UseAnother);
           return goto("/authorize/account");
         default:
           void (continueWith satisfies never);
       }
     } catch (error) {
       loading = false;
+      systemOverlay = false;
       handleError(error);
     }
   };
@@ -143,6 +167,7 @@
   };
 
   $effect(() => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
     continueButtonRef?.focus();
   });
 </script>
@@ -209,6 +234,9 @@
     {/if}
   </Button>
 </div>
+{#if systemOverlay}
+  <SystemOverlayBackdrop />
+{/if}
 {#if identitySwitcherVisible}
   <Dialog onClose={() => showIdentitySwitcher(false)}>
     <h1 class="text-text-primary mb-8 text-2xl font-medium">Switch Identity</h1>

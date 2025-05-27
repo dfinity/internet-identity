@@ -2,7 +2,7 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, CallError, PocketIc};
+use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
 use std::collections::HashMap;
 
 pub fn identity_registration_start(
@@ -276,6 +276,136 @@ pub fn authn_method_confirm(
         sender,
         "authn_method_confirm",
         (identity_number, confirmation_code),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn create_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    name: String,
+) -> Result<Result<AccountInfo, CreateAccountError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "create_account",
+        (identity_number, origin, name),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_accounts(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+) -> Result<Result<Vec<AccountInfo>, GetAccountsError>, CallError> {
+    query_candid_as(
+        env,
+        canister_id,
+        sender,
+        "get_accounts",
+        (identity_number, origin),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn update_account(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+    update: AccountUpdate,
+) -> Result<Result<AccountInfo, UpdateAccountError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "update_account",
+        (identity_number, origin, account_number, update),
+    )
+    .map(|(x,)| x)
+}
+
+#[derive(Clone)]
+pub struct AccountDelegationParams<'a> {
+    pub env: &'a PocketIc,
+    pub canister_id: CanisterId,
+    pub sender: Principal,
+    pub identity_number: IdentityNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub session_key: SessionKey,
+}
+
+impl<'a> AccountDelegationParams<'a> {
+    pub fn new(
+        env: &'a PocketIc,
+        canister_id: CanisterId,
+        sender: Principal,
+        identity_number: IdentityNumber,
+        origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        session_key: SessionKey,
+    ) -> Self {
+        Self {
+            env,
+            canister_id,
+            sender,
+            identity_number,
+            origin,
+            account_number,
+            session_key,
+        }
+    }
+}
+
+pub fn prepare_account_delegation(
+    params: &AccountDelegationParams,
+    max_ttl: Option<u64>,
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, CallError> {
+    call_candid_as(
+        params.env,
+        params.canister_id,
+        RawEffectivePrincipal::None,
+        params.sender,
+        "prepare_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            max_ttl,
+        ),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_account_delegation(
+    params: &AccountDelegationParams,
+    expiration: u64,
+) -> Result<Result<SignedDelegation, AccountDelegationError>, CallError> {
+    query_candid_as(
+        params.env,
+        params.canister_id,
+        params.sender,
+        "get_account_delegation",
+        (
+            params.identity_number,
+            params.origin.clone(),
+            params.account_number,
+            params.session_key.clone(),
+            expiration,
+        ),
     )
     .map(|(x,)| x)
 }

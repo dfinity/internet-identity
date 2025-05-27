@@ -10,18 +10,6 @@ use std::borrow::Cow;
 #[derive(Deserialize, CandidType, Clone, Ord, Eq, PartialEq, PartialOrd)]
 pub struct StorableCredentialId(Vec<u8>);
 
-impl From<StorableCredentialId> for CredentialId {
-    fn from(value: StorableCredentialId) -> Self {
-        CredentialId::from(value.0)
-    }
-}
-
-impl From<CredentialId> for StorableCredentialId {
-    fn from(value: CredentialId) -> Self {
-        StorableCredentialId(value.to_vec())
-    }
-}
-
 impl Storable for StorableCredentialId {
     fn to_bytes(&self) -> Cow<[u8]> {
         self.0.to_bytes()
@@ -32,4 +20,16 @@ impl Storable for StorableCredentialId {
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+impl From<StorableCredentialId> for CredentialId {
+    fn from(value: StorableCredentialId) -> Self {
+        CredentialId::from(value.0)
+    }
+}
+
+impl From<CredentialId> for StorableCredentialId {
+    fn from(value: CredentialId) -> Self {
+        StorableCredentialId(value.to_vec())
+    }
 }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { scale, fly } from "svelte/transition";
-  import { type HTMLAttributes } from "svelte/elements";
+  import type { HTMLAttributes } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
   import Button from "$lib/components/ui/Button.svelte";
   import { XIcon } from "@lucide/svelte";
@@ -81,7 +81,6 @@
           "scroll",
           updateKeyboardInset,
         );
-        updateKeyboardInset();
       }
     };
   });

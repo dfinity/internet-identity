@@ -40,6 +40,7 @@ export const idlFactory = ({ IDL }) => {
     'is_production' : IDL.Opt(IDL.Bool),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
+    'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
@@ -215,9 +216,10 @@ export const idlFactory = ({ IDL }) => {
     'signature' : IDL.Vec(IDL.Nat8),
     'delegation' : Delegation,
   });
-  const GetDelegationResponse = IDL.Variant({
-    'no_such_delegation' : IDL.Null,
-    'signed_delegation' : SignedDelegation,
+  const AccountDelegationError = IDL.Variant({
+    'NoSuchDelegation' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
   });
   const GetAccountsError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
@@ -262,6 +264,10 @@ export const idlFactory = ({ IDL }) => {
     'devices' : IDL.Vec(DeviceWithUsage),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
+  });
+  const GetDelegationResponse = IDL.Variant({
+    'no_such_delegation' : IDL.Null,
+    'signed_delegation' : SignedDelegation,
   });
   const GetIdAliasRequest = IDL.Record({
     'rp_id_alias_jwt' : IDL.Text,
@@ -386,6 +392,10 @@ export const idlFactory = ({ IDL }) => {
     'user_key' : UserKey,
     'expiration' : Timestamp,
     'anchor_number' : UserNumber,
+  });
+  const PrepareAccountDelegation = IDL.Record({
+    'user_key' : UserKey,
+    'expiration' : Timestamp,
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
@@ -536,8 +546,19 @@ export const idlFactory = ({ IDL }) => {
     'exit_device_registration_mode' : IDL.Func([UserNumber], [], []),
     'fetch_entries' : IDL.Func([], [IDL.Vec(BufferedArchiveEntry)], []),
     'get_account_delegation' : IDL.Func(
-        [UserNumber, FrontendHostname, AccountNumber, SessionKey, Timestamp],
-        [GetDelegationResponse],
+        [
+          UserNumber,
+          FrontendHostname,
+          IDL.Opt(AccountNumber),
+          SessionKey,
+          Timestamp,
+        ],
+        [
+          IDL.Variant({
+            'Ok' : SignedDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
         ['query'],
       ),
     'get_accounts' : IDL.Func(
@@ -653,7 +674,12 @@ export const idlFactory = ({ IDL }) => {
           SessionKey,
           IDL.Opt(IDL.Nat64),
         ],
-        [UserKey, Timestamp],
+        [
+          IDL.Variant({
+            'Ok' : PrepareAccountDelegation,
+            'Err' : AccountDelegationError,
+          }),
+        ],
         [],
       ),
     'prepare_delegation' : IDL.Func(
@@ -727,6 +753,7 @@ export const init = ({ IDL }) => {
     'is_production' : IDL.Opt(IDL.Bool),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
+    'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),

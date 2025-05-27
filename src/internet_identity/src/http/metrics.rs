@@ -48,6 +48,23 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             storage.event_aggregations.len() as f64,
             "Number of entries in the event_aggregations map.",
         )?;
+        w.encode_gauge(
+            "internet_identity_total_accounts_count",
+            storage.get_total_accounts_counter().stored_accounts as f64,
+            "Number of total accounts registered in this canister.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_total_account_references_count",
+            storage
+                .get_total_accounts_counter()
+                .stored_account_references as f64,
+            "Number of total account references registered in this canister.",
+        )?;
+        w.encode_gauge(
+            "internet_identity_total_application_count",
+            storage.get_total_application_count() as f64,
+            "Number of total applications registered in this canister.",
+        )?;
         if let Some(registration_rates) = storage.registration_rates.registration_rates() {
             w.gauge_vec(
                 "internet_identity_registrations_per_second",

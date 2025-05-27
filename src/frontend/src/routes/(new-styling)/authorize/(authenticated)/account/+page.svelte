@@ -17,9 +17,11 @@
   import { nonNullish } from "@dfinity/utils";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import CreateAccount from "$lib/components/views/CreateAccount.svelte";
-  import { untrack } from "svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { GlobeIcon } from "@lucide/svelte";
+  import { page } from "$app/state";
+  import { untrack } from "svelte";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection.js";
 
   const { data }: PageProps = $props();
   let accounts = $derived(data.accounts);
@@ -28,8 +30,15 @@
   const hostname = $derived(new URL(origin).hostname);
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
+  const preselectedAccount = untrack(() =>
+    "preselectAccount" in page.state && page.state.preselectAccount === true
+      ? accounts[0].account_number[0]
+      : null,
+  );
 
-  let selectedAccountNumber = $state<bigint | undefined | null>(null);
+  let selectedAccountNumber = $state<bigint | undefined | null>(
+    preselectedAccount,
+  );
   const selectedAccount = $derived(
     accounts.find(
       (account) => account.account_number[0] === selectedAccountNumber,
@@ -42,9 +51,8 @@
       const account = await $authenticatedStore.actor
         .create_account(
           $authenticatedStore.identityNumber,
-          $authorizationContextStore.authRequest.derivationOrigin ??
-            $authorizationContextStore.requestOrigin,
-          name,
+          $authorizationContextStore.effectiveOrigin,
+          name.trim(),
         )
         .then(throwCanisterError);
       accounts = [...accounts, account];
@@ -59,9 +67,7 @@
   const handleContinue = async () => {
     try {
       lastUsedIdentitiesStore.addLastUsedAccount({
-        origin:
-          $authorizationContextStore.authRequest.derivationOrigin ??
-          $authorizationContextStore.requestOrigin,
+        origin: $authorizationContextStore.effectiveOrigin,
         identityNumber: $authenticatedStore.identityNumber,
         accountNumber: selectedAccount.account_number[0],
         name: selectedAccount.name[0],
