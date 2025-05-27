@@ -41,7 +41,7 @@ pub fn create_account_for_origin(
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(storage, anchor_number, true)
-            .map_err(|err| Into::<CreateAccountError>::into(err))?;
+            .map_err(Into::<CreateAccountError>::into)?;
 
         storage
             .create_additional_account(CreateAccountParams {
