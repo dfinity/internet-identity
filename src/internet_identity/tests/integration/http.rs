@@ -1365,22 +1365,14 @@ fn should_report_total_account_metrics() -> Result<(), CallError> {
         name.clone(),
     )?;
     let metrics = get_metrics(&env, canister_id);
-    assert_metric(
-        &metrics,
-        "internet_identity_total_accounts_count",
-        1f64,
-    );
+    assert_metric(&metrics, "internet_identity_total_accounts_count", 1f64);
     assert_metric(
         &metrics,
         "internet_identity_total_account_references_count",
         // One for default account, one for created account
         2f64,
     );
-    assert_metric(
-        &metrics,
-        "internet_identity_total_application_count",
-        1f64,
-    );
+    assert_metric(&metrics, "internet_identity_total_application_count", 1f64);
     Ok(())
 }
 

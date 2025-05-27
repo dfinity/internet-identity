@@ -55,7 +55,9 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
         )?;
         w.encode_gauge(
             "internet_identity_total_account_references_count",
-            storage.get_total_accounts_counter().stored_account_references as f64,
+            storage
+                .get_total_accounts_counter()
+                .stored_account_references as f64,
             "Number of total account references registered in this canister.",
         )?;
         w.encode_gauge(
