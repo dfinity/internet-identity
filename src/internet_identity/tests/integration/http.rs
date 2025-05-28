@@ -1355,6 +1355,11 @@ fn should_report_total_account_metrics() -> Result<(), CallError> {
         "internet_identity_total_application_count",
         0f64,
     );
+    assert_metric(
+        &initial_metrics,
+        "internet_identity_account_counter_discrepancy_count",
+        0f64,
+    );
 
     let _ = api_v2::create_account(
         &env,

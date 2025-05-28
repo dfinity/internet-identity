@@ -70,14 +70,13 @@ pub fn update_account_for_origin(
             // Check if whe have reached account limit
             // Because editing a default account turns it into a stored account
             if account_number.is_none() {
-                if let Err(err) = check_or_rebuild_max_anchor_accounts(
+                check_or_rebuild_max_anchor_accounts(
                     storage,
                     anchor_number,
                     MAX_ANCHOR_ACCOUNTS as u64,
                     true,
-                ) {
-                    return Err(err.into());
-                }
+                )
+                .map_err(Into::<UpdateAccountError>::into)?
             }
 
             storage
@@ -623,4 +622,43 @@ fn should_properly_recalculate_faulty_account_counter_when_updating() {
         },
     );
     assert!(result.is_ok())
+}
+
+#[test]
+fn should_increment_discrepancy_counter() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        )
+    });
+
+    storage_borrow(|storage| {
+        let discrepancy_counter_before = storage.get_discrepancy_counter();
+        assert_eq!(discrepancy_counter_before.account_counter_rebuilds, 0);
+    });
+
+    let result = update_account_for_origin(
+        anchor.anchor_number(),
+        None,
+        "https://example-1.com".to_string(),
+        AccountUpdate {
+            name: Some("Gabriel".to_string()),
+        },
+    );
+    assert!(result.is_ok());
+
+    storage_borrow(|storage| {
+        let discrepancy_counter_after = storage.get_discrepancy_counter();
+        assert_eq!(discrepancy_counter_after.account_counter_rebuilds, 1);
+    });
 }

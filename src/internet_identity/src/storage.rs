@@ -85,6 +85,7 @@ use account::{
 };
 use candid::{CandidType, Deserialize};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
+use ic_stable_structures::cell::ValueError;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
@@ -121,6 +122,7 @@ use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
 use storable::application::{StorableApplication, StorableOriginHash};
 use storable::credential_id::StorableCredentialId;
+use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
 use storable::fixed_anchor::StorableFixedAnchor;
 use storable::openid_credential::StorableOpenIdCredential;
 use storable::openid_credential_key::StorableOpenIdCredentialKey;
@@ -166,6 +168,7 @@ const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 14u8;
 const STABLE_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 15u8;
 const STABLE_ANCHOR_MEMORY_INDEX: u8 = 16u8;
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 17u8;
+const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -181,6 +184,8 @@ const STABLE_ACCOUNT_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ACCOUNT_MEMORY_I
 const STABLE_APPLICATION_MEMORY_ID: MemoryId = MemoryId::new(STABLE_APPLICATION_MEMORY_INDEX);
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX);
+const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID: MemoryId =
+    MemoryId::new(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX);
 const STABLE_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_COUNTER_MEMORY_INDEX);
 const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
@@ -272,6 +277,9 @@ pub struct Storage<M: Memory> {
         ManagedMemory<M>,
     >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
+    /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
+    stable_account_counter_discrepancy_counter_memory:
+        StableCell<StorableDiscrepancyCounter, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with OpenID credential memory.
     lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     lookup_anchor_with_openid_credential_memory:
@@ -352,6 +360,8 @@ impl<M: Memory + Clone> Storage<M> {
         let stable_account_reference_list_memory =
             memory_manager.get(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
+        let stable_account_counter_discrepancy_counter_memory =
+            memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_with_device_credential_memory =
@@ -415,6 +425,11 @@ impl<M: Memory + Clone> Storage<M> {
                 StorableAccountsCounter::default(),
             )
             .expect("stable_account_counter_memory"),
+            stable_account_counter_discrepancy_counter_memory: StableCell::init(
+                stable_account_counter_discrepancy_counter_memory,
+                StorableDiscrepancyCounter::default(),
+            )
+            .expect("failed to initialize discrepancy counter"),
             lookup_anchor_with_openid_credential_memory_wrapper: MemoryWrapper::new(
                 lookup_anchor_with_openid_credential_memory.clone(),
             ),
@@ -867,6 +882,9 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Rebuilds the account and account reference counters for a given identity
     pub fn rebuild_identity_account_counters(&mut self, anchor_number: AnchorNumber) {
+        // increment metrics
+        let _ = self.increment_discrepancy_counter(&DiscrepancyType::AccountRebuild);
+
         // get actual list of stored references and accounts
         let acc_ref_list = self.list_identity_account_references(anchor_number);
 
@@ -889,6 +907,22 @@ impl<M: Memory + Clone> Storage<M> {
                 stored_account_references,
             },
         );
+    }
+
+    /// Increments the discrepancy counter (this is so we can ascertain correctness of our counters - ideally, this is never actually called)
+    fn increment_discrepancy_counter(
+        &mut self,
+        discrepancy_type: &DiscrepancyType,
+    ) -> Result<StorableDiscrepancyCounter, ValueError> {
+        let counters = self.stable_account_counter_discrepancy_counter_memory.get();
+
+        self.stable_account_counter_discrepancy_counter_memory
+            .set(counters.increment(discrepancy_type))
+    }
+
+    /// Retrieves the discrepancy counter
+    pub fn get_discrepancy_counter(&self) -> &StorableDiscrepancyCounter {
+        self.stable_account_counter_discrepancy_counter_memory.get()
     }
 
     pub fn create_additional_account(
