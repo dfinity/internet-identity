@@ -1,6 +1,5 @@
 use crate::internet_identity::types::{
-    AccountNumber, AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey,
-    Purpose, Timestamp,
+    AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey, Purpose, Timestamp,
 };
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_cdk::api::management_canister::main::{CanisterStatusType, QueryStats};
@@ -50,11 +49,11 @@ pub enum Operation {
 
     // Accounts creating and updating
     #[serde(rename = "create_account")]
-    CreateAccount { anchor_number: AnchorNumber },
+    CreateAccount,
     #[serde(rename = "rename_account")]
-    RenameAccount { anchor_number: AnchorNumber },
+    RenameAccount,
     #[serde(rename = "delete_account")]
-    DeleteAccount { anchor_number: AnchorNumber },
+    DeleteAccount,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

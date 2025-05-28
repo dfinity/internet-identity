@@ -60,11 +60,7 @@ pub fn create_account_for_origin(
             })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))?;
 
-        archive_operation(
-            anchor_number,
-            caller(),
-            Operation::CreateAccount { anchor_number },
-        );
+        archive_operation(anchor_number, caller(), Operation::CreateAccount);
 
         Ok(created_account)
     })
@@ -102,18 +98,10 @@ pub fn update_account_for_origin(
 
             // if we updated a default account, we need to archive an account creation as well!
             if account_number.is_none() {
-                archive_operation(
-                    anchor_number,
-                    caller(),
-                    Operation::CreateAccount { anchor_number },
-                );
+                archive_operation(anchor_number, caller(), Operation::CreateAccount);
             }
 
-            archive_operation(
-                anchor_number,
-                caller(),
-                Operation::RenameAccount { anchor_number },
-            );
+            archive_operation(anchor_number, caller(), Operation::RenameAccount);
 
             Ok(updated_account)
         }),

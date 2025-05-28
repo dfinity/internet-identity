@@ -93,11 +93,11 @@ pub mod compat {
         #[serde(rename = "remove_name")]
         RemoveName,
         #[serde(rename = "create_account")]
-        CreateAccount { anchor_number: AnchorNumber },
+        CreateAccount,
         #[serde(rename = "rename_account")]
-        RenameAccount { anchor_number: AnchorNumber },
+        RenameAccount,
         #[serde(rename = "delete_account")]
-        DeleteAccount { anchor_number: AnchorNumber },
+        DeleteAccount,
     }
 
     impl From<Operation> for CompatOperation {
@@ -131,15 +131,9 @@ pub mod compat {
                 Operation::IdentityMetadataReplace { .. } => {
                     panic!("not available in compat type")
                 }
-                Operation::CreateAccount { anchor_number } => {
-                    CompatOperation::CreateAccount { anchor_number }
-                }
-                Operation::RenameAccount { anchor_number } => {
-                    CompatOperation::RenameAccount { anchor_number }
-                }
-                Operation::DeleteAccount { anchor_number } => {
-                    CompatOperation::DeleteAccount { anchor_number }
-                }
+                Operation::CreateAccount => CompatOperation::CreateAccount,
+                Operation::RenameAccount => CompatOperation::RenameAccount,
+                Operation::DeleteAccount => CompatOperation::DeleteAccount,
             }
         }
     }
