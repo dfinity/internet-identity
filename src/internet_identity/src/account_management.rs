@@ -1,5 +1,6 @@
+#[cfg(not(test))]
+use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
-    anchor_management::post_operation_bookkeeping,
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
         der_encode_canister_sig_key,
@@ -60,7 +61,7 @@ pub fn create_account_for_origin(
             })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))?;
 
-        post_operation_bookkeeping(anchor_number, Operation::CreateAccount);
+        post_account_operation_bookkeeping(anchor_number, Operation::CreateAccount);
 
         Ok(created_account)
     })
@@ -98,10 +99,10 @@ pub fn update_account_for_origin(
 
             // if we updated a default account, we need to archive an account creation as well!
             if account_number.is_none() {
-                post_operation_bookkeeping(anchor_number, Operation::CreateAccount);
+                post_account_operation_bookkeeping(anchor_number, Operation::CreateAccount);
             }
 
-            post_operation_bookkeeping(anchor_number, Operation::RenameAccount);
+            post_account_operation_bookkeeping(anchor_number, Operation::RenameAccount);
 
             Ok(updated_account)
         }),
@@ -220,6 +221,16 @@ fn check_or_rebuild_max_anchor_accounts(
     }
     Ok(())
 }
+
+#[cfg(not(test))]
+#[allow(dead_code)]
+fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operation) {
+    post_operation_bookkeeping(anchor_number, operation)
+}
+
+// Bookkeeping fails outside of canisters, so we work around it for the unit tests.
+#[cfg(test)]
+fn post_account_operation_bookkeeping(_anchor_number: AnchorNumber, _operation: Operation) {}
 
 #[test]
 fn should_create_account_for_origin() {
