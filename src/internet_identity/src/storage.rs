@@ -910,18 +910,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// Increments the discrepancy counter (this is so we can ascertain correctness of our counters - ideally, this is never actually called)
     fn increment_discrepancy_counter(
         &mut self,
-        discrepancy: &DiscrepancyType,
+        discrepancy_type: &DiscrepancyType,
     ) -> Result<StorableDiscrepancyCounter, ValueError> {
         let counters = self.stable_discrepancy_counter_memory.get();
 
-        match discrepancy {
-            DiscrepancyType::AccountRebuild => {
-                self.stable_discrepancy_counter_memory
-                    .set(StorableDiscrepancyCounter {
-                        account_counter_rebuilds: counters.account_counter_rebuilds + 1,
-                    })
-            }
-        }
+        self.stable_discrepancy_counter_memory
+            .set(counters.increment(discrepancy_type))
     }
 
     /// Retrieves the discrepancy counter
