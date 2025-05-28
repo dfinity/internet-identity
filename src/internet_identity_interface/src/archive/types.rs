@@ -1,5 +1,6 @@
 use crate::internet_identity::types::{
-    AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey, Purpose, Timestamp,
+    AccountNumber, AnchorNumber, CredentialId, DeviceKey, DeviceProtection, KeyType, PublicKey,
+    Purpose, Timestamp,
 };
 use candid::{CandidType, Deserialize, Nat, Principal};
 use ic_cdk::api::management_canister::main::{CanisterStatusType, QueryStats};
@@ -39,13 +40,21 @@ pub enum Operation {
     #[serde(rename = "register_anchor_with_openid_credential")]
     RegisterAnchorWithOpenIdCredential { iss: String },
 
-    // Account name, set for new users in new discoverable passkeys flow
+    // Identity name, set for new users in new discoverable passkeys flow
     #[serde(rename = "add_name")]
     AddName,
     #[serde(rename = "update_name")]
     UpdateName,
     #[serde(rename = "remove_name")]
     RemoveName,
+
+    // Accounts creating and updating
+    #[serde(rename = "create_account")]
+    CreateAccount { anchor_number: AnchorNumber },
+    #[serde(rename = "rename_account")]
+    RenameAccount { anchor_number: AnchorNumber },
+    #[serde(rename = "delete_account")]
+    DeleteAccount { anchor_number: AnchorNumber },
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]

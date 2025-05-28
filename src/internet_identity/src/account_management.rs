@@ -1,4 +1,5 @@
 use crate::{
+    archive::archive_operation,
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
         der_encode_canister_sig_key,
@@ -19,9 +20,12 @@ use ic_canister_sig_creation::{
 };
 use ic_cdk::{api::time, caller};
 use ic_stable_structures::DefaultMemoryImpl;
-use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
-    Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+use internet_identity_interface::{
+    archive::types::Operation,
+    internet_identity::types::{
+        AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
+        Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    },
 };
 use serde_bytes::ByteBuf;
 
@@ -48,13 +52,21 @@ pub fn create_account_for_origin(
         )
         .map_err(Into::<CreateAccountError>::into)?;
 
-        storage
+        let created_account = storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
                 name,
                 origin,
             })
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
+            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))?;
+
+        archive_operation(
+            anchor_number,
+            caller(),
+            Operation::CreateAccount { anchor_number },
+        );
+
+        Ok(created_account)
     })
 }
 
@@ -79,14 +91,31 @@ pub fn update_account_for_origin(
                 .map_err(Into::<UpdateAccountError>::into)?
             }
 
-            storage
+            let updated_account = storage
                 .update_account(UpdateAccountParams {
                     account_number,
                     anchor_number,
                     name,
                     origin: origin.clone(),
                 })
-                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))?;
+
+            // if we updated a default account, we need to archive an account creation as well!
+            if account_number.is_none() {
+                archive_operation(
+                    anchor_number,
+                    caller(),
+                    Operation::CreateAccount { anchor_number },
+                );
+            }
+
+            archive_operation(
+                anchor_number,
+                caller(),
+                Operation::RenameAccount { anchor_number },
+            );
+
+            Ok(updated_account)
         }),
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
