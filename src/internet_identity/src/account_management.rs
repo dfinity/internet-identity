@@ -1,5 +1,5 @@
 use crate::{
-    archive::archive_operation,
+    anchor_management::post_operation_bookkeeping,
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
         der_encode_canister_sig_key,
@@ -60,7 +60,7 @@ pub fn create_account_for_origin(
             })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))?;
 
-        archive_operation(anchor_number, caller(), Operation::CreateAccount);
+        post_operation_bookkeeping(anchor_number, Operation::CreateAccount);
 
         Ok(created_account)
     })
@@ -98,10 +98,10 @@ pub fn update_account_for_origin(
 
             // if we updated a default account, we need to archive an account creation as well!
             if account_number.is_none() {
-                archive_operation(anchor_number, caller(), Operation::CreateAccount);
+                post_operation_bookkeeping(anchor_number, Operation::CreateAccount);
             }
 
-            archive_operation(anchor_number, caller(), Operation::RenameAccount);
+            post_operation_bookkeeping(anchor_number, Operation::RenameAccount);
 
             Ok(updated_account)
         }),
