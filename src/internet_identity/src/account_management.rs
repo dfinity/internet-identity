@@ -79,64 +79,29 @@ pub fn update_account_for_origin(
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
-        Some(new_name) => {
-            let (updated_account, old_account_name) =
-                // Type annotation was necessary for the compiler to infer the correct type
-                storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {
-                    // If the account to be updated is a default account
-                    // Check if we have reached account limit
-                    // Because editing a default account turns it into a stored account
-                    if account_number.is_none() {
-                        check_or_rebuild_max_anchor_accounts(
-                            storage,
-                            anchor_number,
-                            MAX_ANCHOR_ACCOUNTS as u64,
-                            true,
-                        )
-                        .map_err(Into::<UpdateAccountError>::into)?
-                    }
-
-                    let old_account = storage
-                        .read_account(ReadAccountParams {
-                            account_number,
-                            anchor_number,
-                            origin: &origin,
-                        })
-                        .expect("Updating an unreadable account should be impossible!");
-
-                    let updated_account = storage
-                        .update_account(UpdateAccountParams {
-                            account_number,
-                            anchor_number,
-                            name: new_name.clone(),
-                            origin: origin.clone(),
-                        })
-                        .map_err(|err| {
-                            UpdateAccountError::InternalCanisterError(format!("{}", err))
-                        })?;
-
-                    Ok((updated_account, old_account.name))
-                })?;
-
-            // No account number meant that the account was a default account and was created before being updated.
+        Some(name) => storage_borrow_mut(|storage| {
+            // If the account to be updated is a default account
+            // Check if whe have reached account limit
+            // Because editing a default account turns it into a stored account
             if account_number.is_none() {
-                post_account_operation_bookkeeping(
+                check_or_rebuild_max_anchor_accounts(
+                    storage,
                     anchor_number,
-                    Operation::CreateAccount {
-                        name: Private::Redacted,
-                    },
-                );
+                    MAX_ANCHOR_ACCOUNTS as u64,
+                    true,
+                )
+                .map_err(Into::<UpdateAccountError>::into)?
             }
 
-            let name = if updated_account.name == old_account_name {
-                None
-            } else {
-                Some(Private::Redacted)
-            };
-            post_account_operation_bookkeeping(anchor_number, Operation::UpdateAccount { name });
-
-            Ok(updated_account)
-        }
+            storage
+                .update_account(UpdateAccountParams {
+                    account_number,
+                    anchor_number,
+                    name,
+                    origin: origin.clone(),
+                })
+                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+        }),
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
         )),
