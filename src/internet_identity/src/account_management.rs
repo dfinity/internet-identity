@@ -70,14 +70,13 @@ pub fn update_account_for_origin(
             // Check if whe have reached account limit
             // Because editing a default account turns it into a stored account
             if account_number.is_none() {
-                if let Err(err) = check_or_rebuild_max_anchor_accounts(
+                check_or_rebuild_max_anchor_accounts(
                     storage,
                     anchor_number,
                     MAX_ANCHOR_ACCOUNTS as u64,
                     true,
-                ) {
-                    return Err(err.into());
-                }
+                )
+                .map_err(Into::<UpdateAccountError>::into)?
             }
 
             storage
