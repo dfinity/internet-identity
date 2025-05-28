@@ -49,9 +49,9 @@ pub enum Operation {
 
     // Accounts creating and updating
     #[serde(rename = "create_account")]
-    CreateAccount,
+    CreateAccount { hashed_name: Hash },
     #[serde(rename = "rename_account")]
-    RenameAccount,
+    UpdateAccount { update: ArchiveAccountUpdate },
     #[serde(rename = "delete_account")]
     DeleteAccount,
 }
@@ -218,3 +218,12 @@ pub struct CallErrorInfo {
     pub rejection_code: i32,
     pub message: String,
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ArchiveAccountUpdate {
+    pub hashed_old_name: Option<Hash>,
+    pub hashed_new_name: Option<Hash>,
+}
+
+/// Sha256 Digest: 32 bytes
+pub type Hash = [u8; 32];
