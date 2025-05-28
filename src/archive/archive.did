@@ -58,6 +58,9 @@ type Operation = variant {
     add_name;
     update_name;
     remove_name;
+    create_account;
+    rename_account;
+    delete_account;
 };
 
 type Entry = record {
