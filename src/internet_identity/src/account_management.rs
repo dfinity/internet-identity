@@ -40,8 +40,13 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
-        check_or_rebuild_max_anchor_accounts(storage, anchor_number, true)
-            .map_err(Into::<CreateAccountError>::into)?;
+        check_or_rebuild_max_anchor_accounts(
+            storage,
+            anchor_number,
+            MAX_ANCHOR_ACCOUNTS as u64,
+            true,
+        )
+        .map_err(Into::<CreateAccountError>::into)?;
 
         storage
             .create_additional_account(CreateAccountParams {
@@ -65,8 +70,12 @@ pub fn update_account_for_origin(
             // Check if whe have reached account limit
             // Because editing a default account turns it into a stored account
             if account_number.is_none() {
-                if let Err(err) = check_or_rebuild_max_anchor_accounts(storage, anchor_number, true)
-                {
+                if let Err(err) = check_or_rebuild_max_anchor_accounts(
+                    storage,
+                    anchor_number,
+                    MAX_ANCHOR_ACCOUNTS as u64,
+                    true,
+                ) {
                     return Err(err.into());
                 }
             }
@@ -171,6 +180,7 @@ pub fn get_account_delegation(
 fn check_or_rebuild_max_anchor_accounts(
     storage: &mut Storage<DefaultMemoryImpl>,
     anchor_number: AnchorNumber,
+    max_anchor_accounts: u64,
     first_time: bool, // required for safe recursion
 ) -> Result<(), CheckMaxAccountError> {
     let AccountsCounter {
@@ -178,11 +188,16 @@ fn check_or_rebuild_max_anchor_accounts(
         stored_account_references: _,
     } = storage.get_account_counter(anchor_number);
 
-    if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
+    if stored_accounts >= max_anchor_accounts {
         // check whether we actually have reached the number
         if first_time {
             storage.rebuild_identity_account_counters(anchor_number);
-            return check_or_rebuild_max_anchor_accounts(storage, anchor_number, false);
+            return check_or_rebuild_max_anchor_accounts(
+                storage,
+                anchor_number,
+                max_anchor_accounts,
+                false,
+            );
         } else {
             return Err(CheckMaxAccountError::AccountLimitReached);
         }
@@ -540,7 +555,12 @@ fn should_fail_check_or_rebuild_when_not_first_time() {
             MAX_ANCHOR_ACCOUNTS as u64,
             MAX_ANCHOR_ACCOUNTS as u64,
         );
-        let res = check_or_rebuild_max_anchor_accounts(storage, anchor.anchor_number(), false);
+        let res = check_or_rebuild_max_anchor_accounts(
+            storage,
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            false,
+        );
         assert!(res.is_err())
     });
 }
