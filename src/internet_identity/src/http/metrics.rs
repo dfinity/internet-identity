@@ -61,6 +61,11 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "Number of total account references registered in this canister.",
         )?;
         w.encode_gauge(
+            "internet_identity_account_counter_discrepancy_count",
+            storage.get_discrepancy_counter().account_counter_rebuilds as f64,
+            "Number of times the account counter was found to be inconsistent with the actual number of accounts.",
+        )?;
+        w.encode_gauge(
             "internet_identity_total_application_count",
             storage.get_total_application_count() as f64,
             "Number of total applications registered in this canister.",
