@@ -907,7 +907,7 @@ impl<M: Memory + Clone> Storage<M> {
         );
     }
 
-    /// Increments the discrepancy counter (this is so we can ascertain correctness)
+    /// Increments the discrepancy counter (this is so we can ascertain correctness of our counters - ideally, this is never actually called)
     fn increment_discrepancy_counter(
         &mut self,
         discrepancy: &DiscrepancyType,
