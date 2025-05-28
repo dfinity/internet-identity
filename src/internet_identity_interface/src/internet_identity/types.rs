@@ -341,11 +341,27 @@ pub enum CreateAccountError {
     Unauthorized(Principal),
 }
 
+impl From<CheckMaxAccountError> for CreateAccountError {
+    fn from(err: CheckMaxAccountError) -> Self {
+        match err {
+            CheckMaxAccountError::AccountLimitReached => Self::AccountLimitReached,
+        }
+    }
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
     InternalCanisterError(String),
     AccountLimitReached,
     Unauthorized(Principal),
+}
+
+impl From<CheckMaxAccountError> for UpdateAccountError {
+    fn from(err: CheckMaxAccountError) -> Self {
+        match err {
+            CheckMaxAccountError::AccountLimitReached => Self::AccountLimitReached,
+        }
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -365,4 +381,9 @@ pub enum AccountDelegationError {
     Unauthorized(Principal),
     InternalCanisterError(String),
     NoSuchDelegation,
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum CheckMaxAccountError {
+    AccountLimitReached,
 }

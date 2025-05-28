@@ -5,9 +5,12 @@ use crate::{
     },
     ii_domain::IIDomain,
     state::{self, storage_borrow, storage_borrow_mut},
-    storage::account::{
-        Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
-        PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+    storage::{
+        account::{
+            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
+            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+        },
+        Storage,
     },
     update_root_hash,
 };
@@ -15,9 +18,10 @@ use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
 use ic_cdk::{api::time, caller};
+use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CreateAccountError, Delegation, FrontendHostname,
-    SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
+    Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
 };
 use serde_bytes::ByteBuf;
 
@@ -36,14 +40,13 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     storage_borrow_mut(|storage| {
-        let AccountsCounter {
-            stored_accounts,
-            stored_account_references: _,
-        } = storage.get_account_counter(anchor_number);
-
-        if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-            return Err(CreateAccountError::AccountLimitReached);
-        }
+        check_or_rebuild_max_anchor_accounts(
+            storage,
+            anchor_number,
+            MAX_ANCHOR_ACCOUNTS as u64,
+            true,
+        )
+        .map_err(Into::<CreateAccountError>::into)?;
 
         storage
             .create_additional_account(CreateAccountParams {
@@ -67,14 +70,13 @@ pub fn update_account_for_origin(
             // Check if whe have reached account limit
             // Because editing a default account turns it into a stored account
             if account_number.is_none() {
-                let AccountsCounter {
-                    stored_accounts,
-                    stored_account_references: _,
-                } = storage.get_account_counter(anchor_number);
-
-                // TODO: also check the actual number and reset if inaccurate
-                if stored_accounts >= MAX_ANCHOR_ACCOUNTS as u64 {
-                    return Err(UpdateAccountError::AccountLimitReached);
+                if let Err(err) = check_or_rebuild_max_anchor_accounts(
+                    storage,
+                    anchor_number,
+                    MAX_ANCHOR_ACCOUNTS as u64,
+                    true,
+                ) {
+                    return Err(err.into());
                 }
             }
 
@@ -173,6 +175,36 @@ pub fn get_account_delegation(
     })
 }
 
+/// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
+/// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
+fn check_or_rebuild_max_anchor_accounts(
+    storage: &mut Storage<DefaultMemoryImpl>,
+    anchor_number: AnchorNumber,
+    max_anchor_accounts: u64,
+    first_time: bool, // required for safe recursion
+) -> Result<(), CheckMaxAccountError> {
+    let AccountsCounter {
+        stored_accounts,
+        stored_account_references: _,
+    } = storage.get_account_counter(anchor_number);
+
+    if stored_accounts >= max_anchor_accounts {
+        // check whether we actually have reached the number
+        if first_time {
+            storage.rebuild_identity_account_counters(anchor_number);
+            return check_or_rebuild_max_anchor_accounts(
+                storage,
+                anchor_number,
+                max_anchor_accounts,
+                false,
+            );
+        } else {
+            return Err(CheckMaxAccountError::AccountLimitReached);
+        }
+    }
+    Ok(())
+}
+
 #[test]
 fn should_create_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
@@ -212,6 +244,8 @@ fn should_fail_to_create_accounts_above_max() {
             create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {
             assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
+        } else {
+            assert!(result.is_ok())
         }
     }
 }
@@ -227,7 +261,10 @@ fn should_fail_to_update_default_accounts_above_max() {
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{}.com", i);
-        let _ = create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        let create_result =
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+
+        assert!(create_result.is_ok())
     }
     let result = update_account_for_origin(
         anchor.anchor_number(),
@@ -498,4 +535,92 @@ fn should_update_default_account_for_origin() {
             ),
         ]
     );
+}
+
+#[test]
+// This test is to make sure that the check_or_rebuild_max_anchor_accounts function correctly errors
+// It should error when the counters are at or above max and argument 'first_time' is false
+fn should_fail_check_or_rebuild_when_not_first_time() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        );
+        let res = check_or_rebuild_max_anchor_accounts(
+            storage,
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            false,
+        );
+        assert!(res.is_err())
+    });
+}
+
+#[test]
+fn should_properly_recalculate_faulty_account_counter() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let name = "Alice".to_string();
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        )
+    });
+
+    for i in 0..=MAX_ANCHOR_ACCOUNTS {
+        let origin = format!("https://example-{}.com", i);
+        let result =
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
+        if i == MAX_ANCHOR_ACCOUNTS {
+            assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
+        } else {
+            assert!(result.is_ok())
+        }
+    }
+}
+
+#[test]
+fn should_properly_recalculate_faulty_account_counter_when_updating() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        )
+    });
+
+    let result = update_account_for_origin(
+        anchor.anchor_number(),
+        None,
+        "https://example-1.com".to_string(),
+        AccountUpdate {
+            name: Some("Gabriel".to_string()),
+        },
+    );
+    assert!(result.is_ok())
 }

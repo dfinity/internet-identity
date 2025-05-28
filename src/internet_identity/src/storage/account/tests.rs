@@ -175,7 +175,7 @@ fn should_list_all_identity_accounts() {
     storage.create(anchor).unwrap();
 
     // 3. List accounts returns default account
-    let listed_accounts = storage.list_identity_accounts(anchor_number);
+    let listed_accounts = storage.list_identity_account_references(anchor_number);
     assert_eq!(listed_accounts.len(), 0);
 
     // 4. Create additional account
@@ -189,7 +189,7 @@ fn should_list_all_identity_accounts() {
         .unwrap();
 
     // 5. List accounts returns default account
-    let listed_accounts = storage.list_identity_accounts(anchor_number);
+    let listed_accounts = storage.list_identity_account_references(anchor_number);
     // Default account + additional account for the origin application.
     assert_eq!(listed_accounts.len(), 2);
 
@@ -204,7 +204,7 @@ fn should_list_all_identity_accounts() {
         .unwrap();
 
     // 7. List accounts returns default account
-    let listed_accounts = storage.list_identity_accounts(anchor_number);
+    let listed_accounts = storage.list_identity_account_references(anchor_number);
     // Default account + additional account for the origin_2 application.
     assert_eq!(listed_accounts.len(), 4);
 

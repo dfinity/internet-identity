@@ -761,7 +761,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Updates the anchor account, application and account counters.
-    /// It doesn't update the account conter for Account type.
+    /// It doesn't update the account counter for Account type.
     /// Because that one is updated when a new account number is allocated with `allocate_account_number`.
     fn update_counters(
         &mut self,
@@ -800,6 +800,24 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// This is for testing purposes only, DO NOT use anywhere else!
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub fn set_counters_for_testing(
+        &mut self,
+        anchor_number: AnchorNumber,
+        stored_accounts: u64,
+        stored_account_references: u64,
+    ) {
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            StorableAccountsCounter {
+                stored_accounts,
+                stored_account_references,
+            },
+        );
+    }
+
     /// Returns the account counter for a given anchor number.
     pub fn get_account_counter(&self, anchor_number: AnchorNumber) -> AccountsCounter {
         self.stable_anchor_account_counter_memory
@@ -823,8 +841,8 @@ impl<M: Memory + Clone> Storage<M> {
 
     // Increments the `stable_account_counter_memory` account counter by one and returns the new number.
     fn allocate_account_number(&mut self) -> Result<AccountNumber, StorageError> {
-        let account_conter = self.stable_account_counter_memory.get();
-        let updated_accounts_counter = account_conter.increment(&AccountType::Account);
+        let account_counter = self.stable_account_counter_memory.get();
+        let updated_accounts_counter = account_counter.increment(&AccountType::Account);
         let next_account_number = updated_accounts_counter.stored_accounts;
         self.stable_account_counter_memory
             .set(updated_accounts_counter)
@@ -832,9 +850,11 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(next_account_number)
     }
 
-    #[allow(dead_code)]
     /// Returns all account references associated with a single anchor number, across all applications.
-    pub fn list_identity_accounts(&self, anchor_number: AnchorNumber) -> Vec<AccountReference> {
+    pub fn list_identity_account_references(
+        &self,
+        anchor_number: AnchorNumber,
+    ) -> Vec<AccountReference> {
         let range_start = (anchor_number, ApplicationNumber::MIN);
         let range_end = (anchor_number, ApplicationNumber::MAX);
 
@@ -843,6 +863,32 @@ impl<M: Memory + Clone> Storage<M> {
             .flat_map(|(_, storable_account_ref_list_val)| storable_account_ref_list_val.into_vec())
             .map(AccountReference::from)
             .collect()
+    }
+
+    /// Rebuilds the account and account reference counters for a given identity
+    pub fn rebuild_identity_account_counters(&mut self, anchor_number: AnchorNumber) {
+        // get actual list of stored references and accounts
+        let acc_ref_list = self.list_identity_account_references(anchor_number);
+
+        let mut stored_accounts = 0;
+        let mut stored_account_references = 0;
+
+        acc_ref_list.iter().for_each(|acc_ref| {
+            // for every reference, we increment the account references counter
+            stored_account_references += 1;
+            // if the account reference has an account number and is thus stored, also increment the stored accounts counter
+            if acc_ref.account_number.is_some() {
+                stored_accounts += 1;
+            }
+        });
+
+        self.stable_anchor_account_counter_memory.insert(
+            anchor_number,
+            StorableAccountsCounter {
+                stored_accounts,
+                stored_account_references,
+            },
+        );
     }
 
     pub fn create_additional_account(
