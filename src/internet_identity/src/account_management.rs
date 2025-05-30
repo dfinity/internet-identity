@@ -142,7 +142,7 @@ pub fn update_account_for_origin(
             );
 
             Ok(updated_account)
-        },
+        }
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
         )),
