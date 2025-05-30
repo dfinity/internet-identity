@@ -81,43 +81,52 @@ pub fn update_account_for_origin(
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
-        Some(name) => storage_borrow_mut(|storage| {
-            // If the account to be updated is a default account
-            // Check if whe have reached account limit
-            // Because editing a default account turns it into a stored account
-            if account_number.is_none() {
-                check_or_rebuild_max_anchor_accounts(
-                    storage,
-                    anchor_number,
-                    MAX_ANCHOR_ACCOUNTS as u64,
-                    true,
-                )
-                .map_err(Into::<UpdateAccountError>::into)?
-            }
+        Some(new_name) => {
+            let (updated_account, old_account_name) =
+                // Type annotation was necessary for the compiler to infer the correct type
+                storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {
+                    // If the account to be updated is a default account
+                    // Check if we have reached account limit
+                    // Because editing a default account turns it into a stored account
+                    if account_number.is_none() {
+                        check_or_rebuild_max_anchor_accounts(
+                            storage,
+                            anchor_number,
+                            MAX_ANCHOR_ACCOUNTS as u64,
+                            true,
+                        )
+                        .map_err(Into::<UpdateAccountError>::into)?
+                    }
 
-            let old_account = storage
-                .read_account(ReadAccountParams {
-                    account_number,
-                    anchor_number,
-                    origin: &origin,
-                })
-                .expect("Updating an unreadable account should be impossible!");
+                    let old_account = storage
+                        .read_account(ReadAccountParams {
+                            account_number,
+                            anchor_number,
+                            origin: &origin,
+                        })
+                        .expect("Updating an unreadable account should be impossible!");
+                    let old_name_for_bookkeeping = old_account.name.clone();
 
-            let updated_account = storage
-                .update_account(UpdateAccountParams {
-                    account_number,
-                    anchor_number,
-                    name: name.clone(),
-                    origin: origin.clone(),
-                })
-                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))?;
+                    let updated_account_internal = storage
+                        .update_account(UpdateAccountParams {
+                            account_number,
+                            anchor_number,
+                            name: new_name.clone(),
+                            origin: origin.clone(),
+                        })
+                        .map_err(|err| {
+                            UpdateAccountError::InternalCanisterError(format!("{}", err))
+                        })?;
 
-            // if we updated a default account, we need to archive an account creation as well!
+                    Ok((updated_account_internal, old_name_for_bookkeeping))
+                })?;
+
+            // No account number meant that the account was a default account and was created before being updated.
             if account_number.is_none() {
                 post_account_operation_bookkeeping(
                     anchor_number,
                     Operation::CreateAccount {
-                        hashed_name: hash_name(name.clone()),
+                        hashed_name: hash_name(new_name.clone()),
                     },
                 );
             }
@@ -126,14 +135,14 @@ pub fn update_account_for_origin(
                 anchor_number,
                 Operation::UpdateAccount {
                     update: ArchiveAccountUpdate {
-                        hashed_old_name: old_account.name.map(hash_name),
-                        hashed_new_name: Some(hash_name(name)),
+                        hashed_old_name: old_account_name.map(hash_name),
+                        hashed_new_name: Some(hash_name(new_name)),
                     },
                 },
             );
 
             Ok(updated_account)
-        }),
+        },
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
         )),
