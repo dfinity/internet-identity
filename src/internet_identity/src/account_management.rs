@@ -1,3 +1,5 @@
+#[cfg(not(test))]
+use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
@@ -18,12 +20,17 @@ use ic_canister_sig_creation::{
     delegation_signature_msg, signature_map::CanisterSigInputs, DELEGATION_SIG_DOMAIN,
 };
 use ic_cdk::{api::time, caller};
+use ic_certification::Hash;
 use ic_stable_structures::DefaultMemoryImpl;
-use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
-    Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+use internet_identity_interface::{
+    archive::types::{ArchiveAccountUpdate, Operation},
+    internet_identity::types::{
+        AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
+        Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    },
 };
 use serde_bytes::ByteBuf;
+use sha2::{Digest, Sha256};
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
 
@@ -48,13 +55,22 @@ pub fn create_account_for_origin(
         )
         .map_err(Into::<CreateAccountError>::into)?;
 
-        storage
+        let created_account = storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
-                name,
+                name: name.clone(),
                 origin,
             })
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
+            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))?;
+
+        post_account_operation_bookkeeping(
+            anchor_number,
+            Operation::CreateAccount {
+                hashed_name: hash_name(name),
+            },
+        );
+
+        Ok(created_account)
     })
 }
 
@@ -79,14 +95,44 @@ pub fn update_account_for_origin(
                 .map_err(Into::<UpdateAccountError>::into)?
             }
 
-            storage
+            let old_account = storage
+                .read_account(ReadAccountParams {
+                    account_number,
+                    anchor_number,
+                    origin: &origin,
+                })
+                .expect("Updating an unreadable account should be impossible!");
+
+            let updated_account = storage
                 .update_account(UpdateAccountParams {
                     account_number,
                     anchor_number,
-                    name,
+                    name: name.clone(),
                     origin: origin.clone(),
                 })
-                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))?;
+
+            // if we updated a default account, we need to archive an account creation as well!
+            if account_number.is_none() {
+                post_account_operation_bookkeeping(
+                    anchor_number,
+                    Operation::CreateAccount {
+                        hashed_name: hash_name(name.clone()),
+                    },
+                );
+            }
+
+            post_account_operation_bookkeeping(
+                anchor_number,
+                Operation::UpdateAccount {
+                    update: ArchiveAccountUpdate {
+                        hashed_old_name: old_account.name.map(hash_name),
+                        hashed_new_name: Some(hash_name(name)),
+                    },
+                },
+            );
+
+            Ok(updated_account)
         }),
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
@@ -202,6 +248,22 @@ fn check_or_rebuild_max_anchor_accounts(
         }
     }
     Ok(())
+}
+
+#[cfg(not(test))]
+#[allow(dead_code)]
+fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operation) {
+    post_operation_bookkeeping(anchor_number, operation)
+}
+
+// Bookkeeping fails outside of canisters, so we work around it for the unit tests.
+#[cfg(test)]
+fn post_account_operation_bookkeeping(_anchor_number: AnchorNumber, _operation: Operation) {}
+
+fn hash_name(name: String) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(name);
+    hasher.finalize().into()
 }
 
 #[test]
