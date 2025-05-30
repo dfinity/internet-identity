@@ -46,7 +46,7 @@ pub fn create_account_for_origin(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
-    storage_borrow_mut(|storage| {
+    let created_account = storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(
             storage,
             anchor_number,
@@ -55,23 +55,23 @@ pub fn create_account_for_origin(
         )
         .map_err(Into::<CreateAccountError>::into)?;
 
-        let created_account = storage
+        storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
                 name: name.clone(),
                 origin,
             })
-            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))?;
+            .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
+    })?;
 
-        post_account_operation_bookkeeping(
-            anchor_number,
-            Operation::CreateAccount {
-                hashed_name: hash_name(name),
-            },
-        );
+    post_account_operation_bookkeeping(
+        anchor_number,
+        Operation::CreateAccount {
+            hashed_name: hash_name(name),
+        },
+    );
 
-        Ok(created_account)
-    })
+    Ok(created_account)
 }
 
 pub fn update_account_for_origin(
