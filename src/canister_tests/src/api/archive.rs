@@ -131,9 +131,7 @@ pub mod compat {
                 Operation::IdentityMetadataReplace { .. } => {
                     panic!("not available in compat type")
                 }
-                Operation::CreateAccount { name } => {
-                    CompatOperation::CreateAccount { name }
-                }
+                Operation::CreateAccount { name } => CompatOperation::CreateAccount { name },
                 Operation::UpdateAccount { name } => CompatOperation::UpdateAccount { name },
                 Operation::DeleteAccount => CompatOperation::DeleteAccount,
             }

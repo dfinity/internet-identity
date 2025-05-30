@@ -133,10 +133,7 @@ pub fn update_account_for_origin(
             } else {
                 Some(Private::Redacted)
             };
-            post_account_operation_bookkeeping(
-                anchor_number,
-                Operation::UpdateAccount { name },
-            );
+            post_account_operation_bookkeeping(anchor_number, Operation::UpdateAccount { name });
 
             Ok(updated_account)
         }
