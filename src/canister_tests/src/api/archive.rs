@@ -56,7 +56,7 @@ pub fn status(env: &PocketIc, canister_id: CanisterId) -> Result<ArchiveStatus, 
 pub mod compat {
     use candid::{CandidType, Deserialize, Principal};
     use internet_identity_interface::archive::types::{
-        DeviceDataUpdate, DeviceDataWithoutAlias, Entry, Operation,
+        ArchiveAccountUpdate, DeviceDataUpdate, DeviceDataWithoutAlias, Entry, Hash, Operation,
     };
     use internet_identity_interface::internet_identity::types::{
         AnchorNumber, PublicKey, Timestamp,
@@ -92,6 +92,12 @@ pub mod compat {
         UpdateName,
         #[serde(rename = "remove_name")]
         RemoveName,
+        #[serde(rename = "create_account")]
+        CreateAccount { hashed_name: Hash },
+        #[serde(rename = "rename_account")]
+        UpdateAccount { update: ArchiveAccountUpdate },
+        #[serde(rename = "delete_account")]
+        DeleteAccount,
     }
 
     impl From<Operation> for CompatOperation {
@@ -125,6 +131,11 @@ pub mod compat {
                 Operation::IdentityMetadataReplace { .. } => {
                     panic!("not available in compat type")
                 }
+                Operation::CreateAccount { hashed_name } => {
+                    CompatOperation::CreateAccount { hashed_name }
+                }
+                Operation::UpdateAccount { update } => CompatOperation::UpdateAccount { update },
+                Operation::DeleteAccount => CompatOperation::DeleteAccount,
             }
         }
     }
