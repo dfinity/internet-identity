@@ -59,13 +59,10 @@ type Operation = variant {
     update_name;
     remove_name;
     create_account : record {
-        hashed_name : blob;  // This is the Hash type (32 bytes)
+        name : Private;
     };
-    rename_account : record {
-        update : record {
-            hashed_old_name : opt blob;  // Optional Hash
-            hashed_new_name : opt blob;  // Optional Hash
-        };
+    update_account : record {
+        name : opt Private;
     };
     delete_account;
 };
