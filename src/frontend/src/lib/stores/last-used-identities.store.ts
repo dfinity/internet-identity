@@ -11,7 +11,9 @@ export type LastUsedAccount = {
   lastUsedTimestampMillis: number;
 };
 export type LastUsedAccounts = {
-  [origin: string]: LastUsedAccount;
+  [origin: string]: {
+    [accountNumber: string]: LastUsedAccount;
+  };
 };
 export type LastUsedIdentity = {
   identityNumber: bigint;
@@ -35,11 +37,13 @@ type LastUsedIdentitiesStore = Readable<LastUsedIdentities> & {
   reset: () => void;
 };
 
+export const PRIMARY_ACCOUNT_KEY = "primary";
+
 export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const { subscribe, set, update } = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
-    version: 2,
+    version: 3,
   });
 
   return {
@@ -64,7 +68,14 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         if (isNullish(identity.accounts)) {
           identity.accounts = {};
         }
-        identity.accounts[params.origin] = {
+        if (isNullish(identity.accounts[params.origin])) {
+          identity.accounts[params.origin] = {};
+        }
+        identity.accounts[params.origin][
+          isNullish(params.accountNumber)
+            ? PRIMARY_ACCOUNT_KEY
+            : params.accountNumber.toString()
+        ] = {
           ...params,
           lastUsedTimestampMillis: Date.now(),
         };

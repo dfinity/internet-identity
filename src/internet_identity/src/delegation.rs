@@ -2,60 +2,32 @@ use crate::ii_domain::IIDomain;
 use crate::stats::event_stats::{
     update_event_based_stats, Event, EventData, PrepareDelegationEvent,
 };
-use crate::{state, update_root_hash, DAY_NS, MINUTE_NS};
+use crate::{state, DAY_NS, MINUTE_NS};
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
 use ic_canister_sig_creation::{
     delegation_signature_msg, CanisterSigPublicKey, DELEGATION_SIG_DOMAIN,
 };
-use ic_cdk::api::time;
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::*;
-use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::net::IpAddr;
 
 // The expiration used for delegations if none is specified
 // (calculated as now() + this)
-const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
+pub const DEFAULT_EXPIRATION_PERIOD_NS: u64 = 30 * MINUTE_NS;
 
 // The maximum expiration time for delegation
 // (calculated as now() + this)
-const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
+pub const MAX_EXPIRATION_PERIOD_NS: u64 = 30 * DAY_NS;
 
-pub async fn prepare_delegation(
-    anchor_number: AnchorNumber,
-    frontend: FrontendHostname,
-    session_key: SessionKey,
-    max_time_to_live: Option<u64>,
-    ii_domain: &Option<IIDomain>,
-) -> (UserKey, Timestamp) {
-    state::ensure_salt_set().await;
-    check_frontend_length(&frontend);
-
-    let session_duration_ns = u64::min(
-        max_time_to_live.unwrap_or(DEFAULT_EXPIRATION_PERIOD_NS),
-        MAX_EXPIRATION_PERIOD_NS,
-    );
-    let expiration = time().saturating_add(session_duration_ns);
-    let seed = calculate_seed(anchor_number, &frontend);
-
-    state::signature_map_mut(|sigs| {
-        add_delegation_signature(sigs, session_key, seed.as_ref(), expiration);
-    });
-    update_root_hash();
-
-    delegation_bookkeeping(frontend, ii_domain.clone(), session_duration_ns);
-
-    (
-        ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
-        expiration,
-    )
-}
+// The prefix used in all account seed calculations to avoid collisions
+// with the primary acount seed calculations based on anchor number.
+const ACCOUNT_SEED_PREFIX: &str = "<account>";
 
 /// Update metrics and the list of latest front-end origins.
-fn delegation_bookkeeping(
+pub fn delegation_bookkeeping(
     frontend: FrontendHostname,
     ii_domain: Option<IIDomain>,
     session_duration_ns: u64,
@@ -96,43 +68,15 @@ fn is_dev_frontend(frontend: &FrontendHostname) -> bool {
     false
 }
 
-pub fn get_delegation(
-    anchor_number: AnchorNumber,
-    frontend: FrontendHostname,
-    session_key: SessionKey,
-    expiration: Timestamp,
-) -> GetDelegationResponse {
-    check_frontend_length(&frontend);
-
-    state::assets_and_signatures(|certified_assets, sigs| {
-        let inputs = CanisterSigInputs {
-            domain: DELEGATION_SIG_DOMAIN,
-            seed: &calculate_seed(anchor_number, &frontend),
-            message: &delegation_signature_msg(&session_key, expiration, None),
-        };
-        match sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash())) {
-            Ok(signature) => GetDelegationResponse::SignedDelegation(SignedDelegation {
-                delegation: Delegation {
-                    pubkey: session_key,
-                    expiration,
-                    targets: None,
-                },
-                signature: ByteBuf::from(signature),
-            }),
-            Err(_) => GetDelegationResponse::NoSuchDelegation,
-        }
-    })
-}
-
 pub fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
     check_frontend_length(&frontend);
 
-    let seed = calculate_seed(anchor_number, &frontend);
+    let seed = calculate_anchor_seed(anchor_number, &frontend);
     let public_key = der_encode_canister_sig_key(seed.to_vec());
     Principal::self_authenticating(public_key)
 }
 
-fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
+pub fn calculate_anchor_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> Hash {
     let salt = state::salt();
 
     let mut blob: Vec<u8> = vec![];
@@ -143,6 +87,30 @@ fn calculate_seed(anchor_number: AnchorNumber, frontend: &FrontendHostname) -> H
     let anchor_number_blob = anchor_number_str.bytes();
     blob.push(anchor_number_blob.len() as u8);
     blob.extend(anchor_number_blob);
+
+    blob.push(frontend.len() as u8);
+    blob.extend(frontend.bytes());
+
+    hash_bytes(blob)
+}
+
+/// Calculate a seed only from an `AccountNumber` and `FrontendHostname`.
+/// This is only called when we're not dealing with a default account.
+/// The anchor number is not included because accounts are not tied to specific anchors.
+pub fn calculate_account_seed(account_number: AccountNumber, frontend: &FrontendHostname) -> Hash {
+    let salt = state::salt();
+
+    let mut blob: Vec<u8> = vec![];
+    blob.push(salt.len() as u8);
+    blob.extend_from_slice(&salt);
+
+    blob.push(ACCOUNT_SEED_PREFIX.len() as u8);
+    blob.extend(ACCOUNT_SEED_PREFIX.bytes());
+
+    let account_number_str = account_number.to_string();
+    let account_number_blob = account_number_str.bytes();
+    blob.push(account_number_blob.len() as u8);
+    blob.extend(account_number_blob);
 
     blob.push(frontend.len() as u8);
     blob.extend(frontend.bytes());

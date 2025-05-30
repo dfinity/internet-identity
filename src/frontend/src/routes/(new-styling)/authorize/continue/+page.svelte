@@ -1,13 +1,13 @@
 <script lang="ts">
-  import Dialog from "$lib/components/UI/Dialog.svelte";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
   import { goto } from "$app/navigation";
   import {
     authenticateWithJWT,
     authenticateWithPasskey,
   } from "$lib/utils/authentication";
-  import { isNullish } from "@dfinity/utils";
   import {
     lastUsedIdentitiesStore,
+    type LastUsedAccount,
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { canisterConfig, canisterId } from "$lib/globals";
@@ -21,26 +21,48 @@
     authorizationStore,
     authorizationContextStore,
   } from "$lib/stores/authorization.store";
+  import Button from "$lib/components/ui/Button.svelte";
+  import {
+    ChevronDownIcon,
+    UserIcon,
+    PlusIcon,
+    ArrowRightLeftIcon,
+  } from "@lucide/svelte";
+  import RadioCard from "$lib/components/ui/RadioCard.svelte";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
+  import { untrack } from "svelte";
+  import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
 
-  let continueButtonRef = $state<HTMLButtonElement>();
+  let continueButtonRef = $state<HTMLElement>();
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore).sort(
-      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
-    ),
+    Object.values($lastUsedIdentitiesStore)
+      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
+      .slice(0, 3),
   );
-  let selectedIdentity = $state.raw(lastUsedIdentities[0]);
-  const lastUsedAccount = $derived(
-    selectedIdentity.accounts?.[
-      $authorizationContextStore.authRequest.derivationOrigin ??
-        $authorizationContextStore.requestOrigin
-    ],
+  let selectedIdentity = $state.raw(untrack(() => lastUsedIdentities[0]));
+  const lastUsedAccount = $derived<LastUsedAccount | undefined>(
+    Object.values(
+      selectedIdentity.accounts?.[$authorizationContextStore.effectiveOrigin] ??
+        {},
+    ).sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)[0],
   );
   let continueWith = $state<"lastUsedAccount" | "anotherAccount">(
     "lastUsedAccount",
   );
   let identitySwitcherVisible = $state(false);
+  let loading = $state(false);
+  let systemOverlay = $state(false);
 
-  const handleContinue = async () => {
+  const authenticateLastUsed = async () => {
     if ("passkey" in selectedIdentity.authMethod) {
       const { identity, identityNumber, credentialId } =
         await authenticateWithPasskey({
@@ -60,6 +82,7 @@
       "openid" in selectedIdentity.authMethod &&
       selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
     ) {
+      systemOverlay = true;
       const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
       const requestConfig = createGoogleRequestConfig(clientId);
       const jwt = await requestJWT(requestConfig, {
@@ -67,6 +90,7 @@
         mediation: "required",
         loginHint: selectedIdentity.authMethod.openid.sub,
       });
+      systemOverlay = false;
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: $sessionStore,
@@ -83,20 +107,57 @@
     } else {
       throw new Error("Unrecognized authentication method");
     }
+  };
 
-    switch (continueWith) {
-      case "lastUsedAccount":
-        if (isNullish(lastUsedAccount)) {
-          // Unreachable, user shouldn't have been redirected to this page
-          return;
-        }
-        lastUsedIdentitiesStore.addLastUsedAccount(lastUsedAccount);
-        return authorizationStore.authorize(lastUsedAccount.accountNumber);
-      case "anotherAccount":
-        return goto("/authorize/account");
-      default:
-        void (continueWith satisfies never);
+  const handleContinue = async () => {
+    try {
+      loading = true;
+      await authenticateLastUsed();
+
+      switch (continueWith) {
+        case "lastUsedAccount":
+          if ("passkey" in selectedIdentity.authMethod) {
+            authenticationV2Funnel.trigger(
+              AuthenticationV2Events.ContinueAsPasskey,
+            );
+          } else if ("openid" in selectedIdentity.authMethod) {
+            authenticationV2Funnel.trigger(
+              AuthenticationV2Events.ContinueAsGoogle,
+            );
+          }
+          lastUsedIdentitiesStore.addLastUsedAccount(
+            lastUsedAccount ?? {
+              identityNumber: selectedIdentity.identityNumber,
+              accountNumber: undefined,
+              origin: $authorizationContextStore.effectiveOrigin,
+            },
+          );
+          return authorizationStore.authorize(lastUsedAccount?.accountNumber);
+        case "anotherAccount":
+          authenticationV2Funnel.trigger(AuthenticationV2Events.UseAnother);
+          return goto("/authorize/account");
+        default:
+          void (continueWith satisfies never);
+      }
+    } catch (error) {
+      loading = false;
+      systemOverlay = false;
+      handleError(error);
     }
+  };
+
+  const selectOption = (option: typeof continueWith) => {
+    if (loading) {
+      return;
+    }
+    continueWith = option;
+  };
+
+  const showIdentitySwitcher = (show: boolean) => {
+    if (loading) {
+      return;
+    }
+    identitySwitcherVisible = show;
   };
 
   const switchIdentity = (identity: LastUsedIdentity) => {
@@ -106,85 +167,106 @@
   };
 
   $effect(() => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
     continueButtonRef?.focus();
   });
 </script>
 
-<div class="flex flex-col items-start">
-  <button
-    onclick={() => (identitySwitcherVisible = !identitySwitcherVisible)}
-    class="btn mb-3 self-start px-0 py-1 font-medium"
+<div class="flex flex-1 flex-col">
+  <AuthorizeHeader
+    origin={$authorizationContextStore.requestOrigin}
+    class="mb-6"
+  />
+  <Button
+    onclick={() => showIdentitySwitcher(true)}
+    variant="tertiary"
+    size="sm"
+    class="mb-3 -ml-2 max-w-full self-start !px-2 not-disabled:hover:bg-transparent dark:not-disabled:hover:bg-transparent"
   >
-    <span
-      >{selectedIdentity.name ?? selectedIdentity.identityNumber}'s Internet
-      Identity</span
-    >
-    <span class="-mt-2.5">⌄</span>
-  </button>
+    <Ellipsis
+      text={`${selectedIdentity.name ?? String(selectedIdentity.identityNumber)}'s Identity`}
+      position="middle"
+    />
+    <ChevronDownIcon size="1rem" class="shrink-0" />
+  </Button>
   <div
-    class="mb-6 flex flex-col items-stretch gap-3 self-stretch"
+    class="mb-6 flex flex-col items-stretch gap-1.5 self-stretch"
     role="radiogroup"
   >
-    <button
-      onclick={() => (continueWith = "lastUsedAccount")}
-      class={[
-        "btn box-border h-15 justify-start rounded-lg p-4 px-4 text-left transition-none",
-        continueWith === "lastUsedAccount"
-          ? "bg-surface-200-800 border-surface-0 border-2 font-semibold"
-          : "preset-outlined-surface-300-700",
-      ]}
-      role="radio"
-      aria-checked={continueWith === "lastUsedAccount"}
+    <RadioCard
+      onclick={() => selectOption("lastUsedAccount")}
+      checked={continueWith === "lastUsedAccount"}
+      disabled={loading}
     >
-      {lastUsedAccount?.name ?? "Primary account"}
-    </button>
-    <button
-      onclick={() => (continueWith = "anotherAccount")}
-      class={[
-        "btn box-border h-15 justify-start rounded-lg p-4 px-4 text-left transition-none",
-        continueWith === "anotherAccount"
-          ? "bg-surface-200-800 border-surface-0 border-2 font-semibold"
-          : "preset-outlined-surface-300-700",
-      ]}
-      role="radio"
-      aria-checked={continueWith === "lastUsedAccount"}
+      <Avatar size="sm">
+        {lastUsedAccount?.name?.slice(0, 1).toUpperCase() ?? "A"}
+      </Avatar>
+      <span class="overflow-hidden overflow-ellipsis whitespace-nowrap">
+        {lastUsedAccount?.name ?? "Primary Account"}
+      </span>
+    </RadioCard>
+    <RadioCard
+      onclick={() => selectOption("anotherAccount")}
+      checked={continueWith === "anotherAccount"}
+      disabled={loading}
     >
-      Use another account
-    </button>
+      <FeaturedIcon size="sm">
+        <ArrowRightLeftIcon size="1.25rem" />
+      </FeaturedIcon>
+      <span>Use another account</span>
+    </RadioCard>
   </div>
-  <button
-    bind:this={continueButtonRef}
+  <Button
+    bind:element={continueButtonRef}
     onclick={handleContinue}
-    class="btn preset-filled self-stretch py-2">Continue</button
+    size="xl"
+    disabled={loading}
   >
-</div>
-{#if identitySwitcherVisible}
-  <Dialog
-    title={"Switch Internet Identity"}
-    onClose={() => (identitySwitcherVisible = false)}
-  >
-    <div class="h-4"></div>
-    {#each lastUsedIdentities as lastUsedIdentity}
-      <button
-        onclick={() => switchIdentity(lastUsedIdentity)}
-        class="border-t-surface-100-900 text-surface-contrast-50-950/80 flex items-center border-t p-2 text-start"
+    {#if loading}
+      <ProgressRing />
+      <span
+        >{continueWith === "lastUsedAccount"
+          ? "Signing in..."
+          : "Authenticating..."}</span
       >
-        <span class="flex-1"
-          >{lastUsedIdentity.name ?? lastUsedIdentity.identityNumber}'s Internet
-          Identity</span
+    {:else}
+      <span>Continue</span>
+    {/if}
+  </Button>
+</div>
+{#if systemOverlay}
+  <SystemOverlayBackdrop />
+{/if}
+{#if identitySwitcherVisible}
+  <Dialog onClose={() => showIdentitySwitcher(false)}>
+    <h1 class="text-text-primary mb-8 text-2xl font-medium">Switch Identity</h1>
+    <div class="flex flex-col gap-1.5">
+      {#each lastUsedIdentities as lastUsedIdentity}
+        <RadioCard
+          onclick={() => switchIdentity(lastUsedIdentity)}
+          checked={lastUsedIdentity === selectedIdentity}
+          checkIcon
         >
-        {#if lastUsedIdentity === selectedIdentity}
+          <Avatar size="sm">
+            <UserIcon size="1.25rem" />
+          </Avatar>
           <span
-            class="preset-filled size-5 rounded-full text-center text-xs leading-5 font-bold"
-            >✓</span
+            class="flex-1 overflow-hidden text-start text-ellipsis whitespace-nowrap"
           >
-        {/if}
-      </button>
-    {/each}
-    <a
-      href="/authorize"
-      class="border-y-surface-100-900 text-surface-contrast-50-950/80 border-y p-2 text-start"
-      >Use another Internet Identity</a
-    >
+            {lastUsedIdentity.name ?? lastUsedIdentity.identityNumber}
+          </span>
+        </RadioCard>
+      {/each}
+      <RadioCard href="/authorize">
+        <FeaturedIcon size="sm">
+          <PlusIcon size="1.25rem" />
+        </FeaturedIcon>
+        <span
+          class="flex-1 overflow-hidden text-start text-ellipsis whitespace-nowrap"
+        >
+          Use another Internet Identity
+        </span>
+      </RadioCard>
+    </div>
   </Dialog>
 {/if}

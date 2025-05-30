@@ -10,6 +10,7 @@ import {
 import { Principal } from "@dfinity/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
 
 export interface Authenticated {
   identityNumber: bigint;
@@ -22,7 +23,7 @@ type AuthenticationStore = Readable<Authenticated | undefined> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
-  }) => Promise<void>;
+  }) => void;
   set: (value: Omit<Authenticated, "agent" | "actor">) => void;
   reset: () => void;
 };
@@ -33,8 +34,8 @@ const internalStore = writable<{
 }>();
 
 export const authenticationStore: AuthenticationStore = {
-  init: async ({ canisterId, agentOptions }) => {
-    const agent = await HttpAgent.create(agentOptions);
+  init: ({ canisterId, agentOptions }) => {
+    const agent = LazyHttpAgent.createLazy(agentOptions);
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,

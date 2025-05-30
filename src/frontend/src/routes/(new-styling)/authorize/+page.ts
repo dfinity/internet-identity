@@ -2,22 +2,26 @@ import type { PageLoad } from "./$types";
 import { get } from "svelte/store";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { redirect } from "@sveltejs/kit";
-import { nonNullish } from "@dfinity/utils";
+import {
+  AuthenticationV2Events,
+  authenticationV2Funnel,
+} from "$lib/utils/analytics/authenticationV2Funnel";
 
-let redirected = false;
+let firstVisit = true;
 
 export const load: PageLoad = () => {
-  if (!redirected) {
-    // Only redirect on first visit
-    const lastUsedIdentity = Object.values(get(lastUsedIdentitiesStore)).sort(
-      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
-    )[0];
-    if (
-      nonNullish(lastUsedIdentity?.accounts) &&
-      Object.values(lastUsedIdentity.accounts).length > 0
-    ) {
-      // Make sure that last used identity also has a last used account
-      redirected = true;
+  const lastUsedIdentityAvailable =
+    Object.values(get(lastUsedIdentitiesStore)).length > 0;
+
+  if (firstVisit) {
+    firstVisit = false;
+
+    authenticationV2Funnel.trigger(
+      lastUsedIdentityAvailable
+        ? AuthenticationV2Events.LastUsedPresent
+        : AuthenticationV2Events.LastUsedNotPresent,
+    );
+    if (lastUsedIdentityAvailable) {
       throw redirect(302, "/authorize/continue");
     }
   }

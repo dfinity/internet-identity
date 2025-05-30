@@ -2,7 +2,14 @@ import type { ClientInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { sessionStore } from "$lib/stores/session.store";
-import { initGlobals, canisterId, agentOptions } from "$lib/globals";
+import {
+  initGlobals,
+  canisterId,
+  agentOptions,
+  canisterConfig,
+} from "$lib/globals";
+import { isNullish } from "@dfinity/utils";
+import { isSameOrigin } from "$lib/utils/urlUtils";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -40,11 +47,37 @@ const overrideFeatureFlags = () => {
   window.history.replaceState(undefined, "", url);
 };
 
+// Set the discoverable passkey flag based on the new flow origins config.
+// This will be used for id.ai and Utopia to enable the new authentication flow.
+// Once the feature is enabled for all users, this can be removed.
+const maybeSetDiscoverablePasskeyFlowFlag = () => {
+  const newFlowOrigins = canisterConfig.new_flow_origins[0];
+  if (isNullish(newFlowOrigins)) {
+    return;
+  }
+  const origin = window.location.origin;
+  if (newFlowOrigins.filter((o) => isSameOrigin(o, origin)).length === 0) {
+    return;
+  }
+  featureFlags.DISCOVERABLE_PASSKEY_FLOW.set(true);
+};
+
+const redirectIfNecessary = (): void => {
+  if (window.location.pathname === "/" && window.location.hash === "") {
+    // We use location.replace to prevent the user from using the back button to navigate back.
+    if (window.location.hostname === "id.ai") {
+      window.location.replace("https://identity.internetcomputer.org");
+    } else if (window.location.hostname === "beta.id.ai") {
+      window.location.replace("https://beta.identity.internetcomputer.org");
+    }
+  }
+};
+
 export const init: ClientInit = async () => {
+  redirectIfNecessary();
   overrideFeatureFlags();
-  await initGlobals();
-  await Promise.all([
-    sessionStore.init({ canisterId, agentOptions }),
-    authenticationStore.init({ canisterId, agentOptions }),
-  ]);
+  initGlobals();
+  maybeSetDiscoverablePasskeyFlowFlag();
+  await sessionStore.init({ canisterId, agentOptions });
+  authenticationStore.init({ canisterId, agentOptions });
 };

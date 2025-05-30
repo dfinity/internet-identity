@@ -1,99 +1,142 @@
 <script lang="ts">
   import type { PageProps } from "./$types";
-  import { nonNullish } from "@dfinity/utils";
-  import { formatLastUsage } from "$lib/utils/time";
   import { throwCanisterError } from "$lib/utils/utils";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { authorizationContextStore } from "$lib/stores/authorization.store";
+  import {
+    authorizationStore,
+    authorizationContextStore,
+  } from "$lib/stores/authorization.store";
+  import RadioCard from "$lib/components/ui/RadioCard.svelte";
+  import { PlusIcon } from "@lucide/svelte";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
+  import { getDapps } from "$lib/flows/dappsExplorer/dapps";
+  import { nonNullish } from "@dfinity/utils";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import CreateAccount from "$lib/components/views/CreateAccount.svelte";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
+  import { GlobeIcon } from "@lucide/svelte";
+  import { page } from "$app/state";
+  import { untrack } from "svelte";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection.js";
 
   const { data }: PageProps = $props();
-  const { accounts } = data;
+  let accounts = $derived(data.accounts);
 
-  const origin =
-    $authorizationContextStore.authRequest.derivationOrigin ??
-    $authorizationContextStore.requestOrigin;
-  let selectedAccountNumber = $state(accounts[0].account_number[0]);
-  let creatingAccount = $state(false);
-  let newAccountName = $state("");
+  const origin = $derived($authorizationContextStore.requestOrigin);
+  const hostname = $derived(new URL(origin).hostname);
+  const dapps = getDapps();
+  const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
+  const preselectedAccount = untrack(() =>
+    "preselectAccount" in page.state && page.state.preselectAccount === true
+      ? accounts[0].account_number[0]
+      : null,
+  );
 
-  const handleCreateAccountFocus = () => {
-    creatingAccount = true;
+  let selectedAccountNumber = $state<bigint | undefined | null>(
+    preselectedAccount,
+  );
+  const selectedAccount = $derived(
+    accounts.find(
+      (account) => account.account_number[0] === selectedAccountNumber,
+    )!,
+  );
+  let dialog = $state(false);
+
+  const createAccount = async (name: string) => {
+    try {
+      const account = await $authenticatedStore.actor
+        .create_account(
+          $authenticatedStore.identityNumber,
+          $authorizationContextStore.effectiveOrigin,
+          name.trim(),
+        )
+        .then(throwCanisterError);
+      accounts = [...accounts, account];
+      selectedAccountNumber = account.account_number[0];
+      dialog = false;
+    } catch (error) {
+      handleError(error);
+      dialog = false;
+    }
   };
-  const handleSelectAccount = (accountNumber: bigint | undefined) => {
-    selectedAccountNumber = accountNumber;
-    newAccountName = "";
-    creatingAccount = false;
-  };
+
   const handleContinue = async () => {
-    const account = creatingAccount
-      ? await $authenticatedStore.actor
-          .create_account(
-            $authenticatedStore.identityNumber,
-            origin,
-            newAccountName,
-          )
-          .then(throwCanisterError)
-      : accounts.find(
-          ({ account_number }) => account_number[0] === selectedAccountNumber,
-        )!;
-    lastUsedIdentitiesStore.addLastUsedAccount({
-      origin,
-      identityNumber: $authenticatedStore.identityNumber,
-      accountNumber: account.account_number[0],
-      name: account.name[0],
-    });
-    await authorizationContextStore.authorize(account.account_number[0]);
+    try {
+      lastUsedIdentitiesStore.addLastUsedAccount({
+        origin: $authorizationContextStore.effectiveOrigin,
+        identityNumber: $authenticatedStore.identityNumber,
+        accountNumber: selectedAccount.account_number[0],
+        name: selectedAccount.name[0],
+      });
+      await authorizationStore.authorize(selectedAccount.account_number[0]);
+    } catch (error) {
+      handleError(error);
+    }
   };
 </script>
 
-<form class="flex flex-col items-start" onsubmit={(e) => e.preventDefault()}>
+<div class="flex flex-1 flex-col justify-end">
+  <div class="mb-6 flex flex-col gap-2">
+    <h1 class="text-text-primary text-2xl font-medium">Select an account</h1>
+    <p class="text-text-secondary text-sm">you'd like to sign in with</p>
+  </div>
+  <div class="mb-3 flex h-8 items-center gap-2">
+    {#if nonNullish(dapp?.logoSrc)}
+      <img
+        src={dapp.logoSrc}
+        alt=""
+        aria-hidden="true"
+        class="h-6 rounded-xl"
+      />
+    {:else}
+      <GlobeIcon size="1.25rem" class="text-fg-primary" />
+    {/if}
+    <Ellipsis
+      text={hostname}
+      position="middle"
+      class="text-text-primary w-0 max-w-[75%] flex-1 text-sm font-semibold"
+    />
+  </div>
   <div
-    class="mb-6 flex flex-col items-stretch gap-3 self-stretch"
+    class="mb-6 flex flex-col items-stretch gap-1.5 self-stretch"
     role="radiogroup"
   >
     {#each accounts as account}
-      {@const selected = account.account_number[0] === selectedAccountNumber}
-      <button
-        onclick={() => handleSelectAccount(account.account_number[0])}
-        class={[
-          "btn box-border flex h-18 flex-col items-start justify-center gap-0 rounded-lg p-4 px-4 text-left transition-none",
-          selected && !creatingAccount && newAccountName.length === 0
-            ? "bg-surface-200-800 border-surface-contrast-50-950 border-2 font-semibold"
-            : "preset-outlined-surface-300-700",
-        ]}
-        type="button"
-        role="radio"
-        aria-checked={selected}
+      <RadioCard
+        onclick={() => (selectedAccountNumber = account.account_number[0])}
+        checked={account === selectedAccount}
       >
-        <span class="-mt-0.5">{account.name[0] ?? "Primary account"}</span>
-        <span class="text-sm opacity-80"
-          >Last used: {nonNullish(account.last_used[0])
-            ? formatLastUsage(
-                new Date(Number(account.last_used[0] / BigInt(1000000))),
-              )
-            : "never"}</span
-        >
-      </button>
+        <Avatar size="sm">
+          {account.name[0]?.slice(0, 1).toUpperCase() ?? "A"}
+        </Avatar>
+        <span class="overflow-hidden overflow-ellipsis whitespace-nowrap">
+          {account.name[0] ?? "Primary account"}
+        </span>
+      </RadioCard>
     {/each}
-    <input
-      bind:value={newAccountName}
-      placeholder={creatingAccount
-        ? "Enter account name"
-        : "Create additional account"}
-      onfocus={handleCreateAccountFocus}
-      minlength="1"
-      class={[
-        "input ring-surface-300-700 placeholder:text-surface-contrast-50-950 box-border h-15 justify-start rounded-lg py-4 ps-4 pe-16 text-left font-semibold transition-none not-focus:cursor-pointer placeholder:font-normal",
-        creatingAccount &&
-          "!ring-surface-contrast-50-950 !bg-surface-200-800 placeholder:!text-surface-700-300 ring-2",
-      ]}
-    />
+    <RadioCard onclick={() => (dialog = true)}>
+      <FeaturedIcon size="sm">
+        <PlusIcon size="1.25rem" />
+      </FeaturedIcon>
+      <span>Create additional account</span>
+    </RadioCard>
   </div>
-  <button
+  <Button
     onclick={handleContinue}
+    variant="primary"
+    size="xl"
     type="submit"
-    disabled={newAccountName.length === 0 && creatingAccount}
-    class="btn preset-filled self-stretch py-2">Continue</button
+    disabled={selectedAccountNumber === null}
   >
-</form>
+    Continue
+  </Button>
+</div>
+{#if dialog}
+  <Dialog onClose={() => (dialog = false)}>
+    <CreateAccount create={createAccount} />
+  </Dialog>
+{/if}

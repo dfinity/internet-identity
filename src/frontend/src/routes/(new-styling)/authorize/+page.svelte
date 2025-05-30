@@ -1,6 +1,5 @@
 <script lang="ts">
   import { nonNullish } from "@dfinity/utils";
-  import { creationOptions } from "$lib/utils/iiConnection";
   import type {
     CheckCaptchaError,
     IdRegFinishError,
@@ -12,17 +11,13 @@
   import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
   import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
   import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-  import { type State } from "./state";
-  import ConnectOrCreatePasskey from "./components/ConnectOrCreatePasskey.svelte";
-  import CreatePasskey from "./components/CreatePasskey.svelte";
-  import SolveCaptcha from "./components/SolveCaptcha.svelte";
-  import Dialog from "$lib/components/UI/Dialog.svelte";
-  import { handleError } from "./error";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import { handleError } from "$lib/components/utils/error";
   import {
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import PickAuthenticationMethod from "./components/PickAuthenticationMethod.svelte";
+  import PickAuthenticationMethod from "$lib/components/views/PickAuthenticationMethod.svelte";
   import {
     authenticateWithJWT,
     authenticateWithPasskey,
@@ -40,23 +35,27 @@
     authorizationStore,
     authorizationContextStore,
   } from "$lib/stores/authorization.store";
+  import { toaster } from "$lib/components/utils/toaster";
+  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
+  import SolveCaptcha from "$lib/components/views/SolveCaptcha.svelte";
+  import SetupOrUseExistingPasskey from "$lib/components/views/SetupOrUseExistingPasskey.svelte";
+  import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
+  import { onMount } from "svelte";
+  import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
 
-  let currentState = $state<State>({ state: "pickAuthenticationMethod" });
+  let dialog = $state<"setupOrUseExistingPasskey" | "setupNewPasskey">();
+  let captcha = $state<{
+    image: string;
+    attempt: number;
+    solve: (solution: string) => void;
+  }>();
+  let systemOverlay = $state(false);
 
-  const pickAuthenticationMethod = () => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
-    currentState = { state: "pickAuthenticationMethod" };
-  };
-
-  const connectOrCreatePasskey = async () => {
+  const setupOrUseExistingPasskey = async () => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.ContinueWithPasskeyScreen,
     );
-    currentState = {
-      state: "connectOrCreatePasskey",
-      connect: continueWithExistingPasskey,
-      create: createPasskey,
-    };
+    dialog = "setupOrUseExistingPasskey";
   };
 
   const continueWithExistingPasskey = async () => {
@@ -75,41 +74,30 @@
         name: info.name[0],
         authMethod: { passkey: { credentialId } },
       });
-      await goto("/authorize/account");
+      await goto("/authorize/account", { state: { preselectAccount: true } });
     } catch (error) {
       handleError(error);
-      pickAuthenticationMethod();
+      dialog = undefined;
     }
   };
 
-  const createPasskey = () => {
+  const setupNewPasskey = () => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
-    currentState = {
-      state: "createPasskey",
-      create: async (name: string) => {
-        authenticationV2Funnel.trigger(
-          AuthenticationV2Events.StartWebauthnCreation,
-        );
-        try {
-          const passkeyIdentity = await DiscoverablePasskeyIdentity.create({
-            publicKey: {
-              ...creationOptions([], undefined, undefined),
-              user: {
-                id: window.crypto.getRandomValues(new Uint8Array(16)),
-                name,
-                displayName: name,
-              },
-            },
-          });
-          await startRegistration();
-          await registerWithPasskey(passkeyIdentity);
-        } catch (error) {
-          handleError(error);
-          pickAuthenticationMethod();
-        }
-      },
-      cancel: connectOrCreatePasskey,
-    };
+    dialog = "setupNewPasskey";
+  };
+
+  const createPasskey = async (name: string) => {
+    authenticationV2Funnel.trigger(
+      AuthenticationV2Events.StartWebauthnCreation,
+    );
+    try {
+      const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
+      await startRegistration();
+      await registerWithPasskey(passkeyIdentity);
+    } catch (error) {
+      handleError(error);
+      dialog = undefined;
+    }
   };
 
   const registerWithPasskey = async (
@@ -153,13 +141,17 @@
         authMethod: { passkey: { credentialId } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
-        origin:
-          $authorizationContextStore.authRequest.derivationOrigin ??
-          $authorizationContextStore.requestOrigin,
+        origin: $authorizationContextStore.effectiveOrigin,
         identityNumber,
         accountNumber: undefined,
       });
-      await authorizationStore.authorize(undefined);
+      captcha = undefined;
+      toaster.success({
+        title: "You're all set. Your account has been created.",
+        duration: 4000,
+        closable: false,
+      });
+      await authorizationStore.authorize(undefined, 4000);
     } catch (error) {
       if (isCanisterError<IdRegFinishError>(error)) {
         switch (error.type) {
@@ -184,7 +176,7 @@
         }
       }
       handleError(error);
-      pickAuthenticationMethod();
+      dialog = undefined;
     }
   };
 
@@ -194,10 +186,12 @@
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
       const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
       const requestConfig = createGoogleRequestConfig(clientId);
+      systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
         nonce: $sessionStore.nonce,
         mediation: "required",
       });
+      systemOverlay = false;
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: $sessionStore,
@@ -216,8 +210,9 @@
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      await goto("/authorize/account");
+      await goto("/authorize/account", { state: { preselectAccount: true } });
     } catch (error) {
+      systemOverlay = false;
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor" &&
@@ -230,7 +225,7 @@
         return registerWithGoogle(jwt);
       }
       handleError(error);
-      pickAuthenticationMethod();
+      dialog = undefined;
     }
   };
 
@@ -253,15 +248,14 @@
         return;
       }
       handleError(error);
-      pickAuthenticationMethod();
+      dialog = undefined;
     }
   };
 
-  const solveCaptcha = async (captcha: string, attempt = 0): Promise<void> =>
+  const solveCaptcha = async (image: string, attempt = 0): Promise<void> =>
     new Promise((resolve) => {
-      currentState = {
-        state: "solveCaptcha",
-        image: captcha,
+      captcha = {
+        image,
         attempt,
         solve: async (solution) => {
           try {
@@ -274,16 +268,15 @@
               isCanisterError<CheckCaptchaError>(error) &&
               error.type === "WrongSolution"
             ) {
-              const nextCaptcha = `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
-              await solveCaptcha(nextCaptcha, attempt + 1);
+              const nextImage = `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
+              await solveCaptcha(nextImage, attempt + 1);
               resolve();
               return;
             }
             handleError(error);
-            pickAuthenticationMethod();
+            dialog = undefined;
           }
         },
-        cancel: pickAuthenticationMethod,
       };
     });
 
@@ -304,18 +297,25 @@
         AuthenticationV2Events.SuccessfulGoogleRegistration,
       );
       authenticationStore.set({ identity, identityNumber });
+      const info =
+        await $authenticatedStore.actor.get_anchor_info(identityNumber);
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
+        name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
-        origin:
-          $authorizationContextStore.authRequest.derivationOrigin ??
-          $authorizationContextStore.requestOrigin,
+        origin: $authorizationContextStore.effectiveOrigin,
         identityNumber,
         accountNumber: undefined,
       });
-      await authorizationStore.authorize(undefined);
+      captcha = undefined;
+      toaster.success({
+        title: "You're all set. Your account has been created.",
+        duration: 4000,
+        closable: false,
+      });
+      await authorizationStore.authorize(undefined, 4000);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&
@@ -330,33 +330,36 @@
         }
       }
       handleError(error);
-      pickAuthenticationMethod();
+      dialog = undefined;
     }
   };
+
+  onMount(() => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
+  });
 </script>
 
-{#if currentState.state === "solveCaptcha"}
-  <Dialog
-    title={currentState.state === "solveCaptcha"
-      ? "Prove you're not a robot"
-      : "Continue with Passkey"}
-    class="min-h-96 w-100"
-  >
-    <SolveCaptcha {...currentState} />
-  </Dialog>
+{#if nonNullish(captcha)}
+  <SolveCaptcha {...captcha} />
 {:else}
-  <PickAuthenticationMethod {connectOrCreatePasskey} {continueWithGoogle} />
-  {#if currentState.state !== "pickAuthenticationMethod"}
-    <Dialog
-      title={"Continue with Passkey"}
-      onClose={pickAuthenticationMethod}
-      class="min-h-100 w-100"
-    >
-      {#if currentState.state === "connectOrCreatePasskey"}
-        <ConnectOrCreatePasskey {...currentState} />
-      {:else if currentState.state === "createPasskey"}
-        <CreatePasskey {...currentState} />
+  <AuthorizeHeader
+    origin={$authorizationContextStore.requestOrigin}
+    class="mb-6"
+  />
+  <PickAuthenticationMethod {setupOrUseExistingPasskey} {continueWithGoogle} />
+  {#if nonNullish(dialog)}
+    <Dialog onClose={() => (dialog = undefined)}>
+      {#if dialog === "setupOrUseExistingPasskey"}
+        <SetupOrUseExistingPasskey
+          setupNew={setupNewPasskey}
+          useExisting={continueWithExistingPasskey}
+        />
+      {:else if dialog === "setupNewPasskey"}
+        <CreatePasskey create={createPasskey} />
       {/if}
     </Dialog>
   {/if}
+{/if}
+{#if systemOverlay}
+  <SystemOverlayBackdrop />
 {/if}

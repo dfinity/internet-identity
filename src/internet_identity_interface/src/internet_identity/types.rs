@@ -209,6 +209,7 @@ pub struct InternetIdentityInit {
     pub register_rate_limit: Option<RateLimitConfig>,
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
+    pub new_flow_origins: Option<Vec<String>>,
     pub openid_google: Option<Option<OpenIdConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub fetch_root_key: Option<bool>,
@@ -336,15 +337,53 @@ pub struct AccountUpdate {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum CreateAccountError {
     InternalCanisterError(String),
+    AccountLimitReached,
+    Unauthorized(Principal),
+}
+
+impl From<CheckMaxAccountError> for CreateAccountError {
+    fn from(err: CheckMaxAccountError) -> Self {
+        match err {
+            CheckMaxAccountError::AccountLimitReached => Self::AccountLimitReached,
+        }
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
     InternalCanisterError(String),
+    AccountLimitReached,
+    Unauthorized(Principal),
+}
+
+impl From<CheckMaxAccountError> for UpdateAccountError {
+    fn from(err: CheckMaxAccountError) -> Self {
+        match err {
+            CheckMaxAccountError::AccountLimitReached => Self::AccountLimitReached,
+        }
+    }
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum GetAccountsError {
     InternalCanisterError(String),
     Unauthorized(Principal),
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct PrepareAccountDelegation {
+    pub user_key: UserKey,
+    pub expiration: Timestamp,
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum AccountDelegationError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+    NoSuchDelegation,
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum CheckMaxAccountError {
+    AccountLimitReached,
 }

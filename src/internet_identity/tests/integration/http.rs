@@ -5,6 +5,7 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_methods,
     sample_pubkey_authn_method, test_authn_method,
 };
+use canister_tests::api::internet_identity::api_v2;
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
 use canister_tests::framework::*;
@@ -89,6 +90,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins.clone()),
+        new_flow_origins: None,
         openid_google: None,
         analytics_config: None,
         fetch_root_key: None,
@@ -155,6 +157,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins.clone()),
+        new_flow_origins: None,
         openid_google: None,
         analytics_config: None,
         fetch_root_key: None,
@@ -197,6 +200,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins_2.clone()),
+        new_flow_origins: None,
         openid_google: None,
         analytics_config: None,
         fetch_root_key: None,
@@ -599,6 +603,7 @@ fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
         register_rate_limit: None,
         captcha_config: None,
         related_origins: Some(related_origins.clone()),
+        new_flow_origins: None,
         openid_google: None,
         analytics_config: None,
         fetch_root_key: None,
@@ -1323,6 +1328,56 @@ fn should_report_registration_rates() -> Result<(), CallError> {
         0.48,
         0.1,
     );
+    Ok(())
+}
+
+#[test]
+fn should_report_total_account_metrics() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://some-dapp.com".to_string();
+    let name = "Callisto".to_string();
+
+    let initial_metrics = get_metrics(&env, canister_id);
+    assert_metric(
+        &initial_metrics,
+        "internet_identity_total_accounts_count",
+        0f64,
+    );
+    assert_metric(
+        &initial_metrics,
+        "internet_identity_total_account_references_count",
+        0f64,
+    );
+    assert_metric(
+        &initial_metrics,
+        "internet_identity_total_application_count",
+        0f64,
+    );
+    assert_metric(
+        &initial_metrics,
+        "internet_identity_account_counter_discrepancy_count",
+        0f64,
+    );
+
+    let _ = api_v2::create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        name.clone(),
+    )?;
+    let metrics = get_metrics(&env, canister_id);
+    assert_metric(&metrics, "internet_identity_total_accounts_count", 1f64);
+    assert_metric(
+        &metrics,
+        "internet_identity_total_account_references_count",
+        // One for default account, one for created account
+        2f64,
+    );
+    assert_metric(&metrics, "internet_identity_total_application_count", 1f64);
     Ok(())
 }
 

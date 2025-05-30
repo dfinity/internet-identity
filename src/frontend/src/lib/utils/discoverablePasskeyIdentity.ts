@@ -19,14 +19,18 @@ import { extractAAGUID } from "$lib/utils/webAuthn";
  * @param authData The authData field of the attestation response.
  * @returns The COSE key of the authData.
  */
-export function authDataToCose(authData: ArrayBuffer): ArrayBuffer {
-  const dataView = new DataView(new ArrayBuffer(2));
-  const idLenBytes = authData.slice(53, 55);
-  [...new Uint8Array(idLenBytes)].forEach((v, i) => dataView.setUint8(i, v));
-  const credentialIdLength = dataView.getUint16(0);
-
-  // Get the public key object.
-  return authData.slice(55 + credentialIdLength);
+export function authDataToCose(authData: Uint8Array): Uint8Array {
+  const view = new DataView(authData.buffer);
+  const coseKey = authData.slice(55 + view.getUint16(53, false));
+  const decoded = borc.decodeFirst(coseKey);
+  const cleaned = new Map();
+  for (const [key, value] of decoded.entries()) {
+    if (typeof key === "number") {
+      // Only keep numeric keys, removing WebAuthn extension keys as a result
+      cleaned.set(key, value);
+    }
+  }
+  return borc.encode(cleaned);
 }
 
 function coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
@@ -69,13 +73,9 @@ export class CosePublicKey implements PublicKey {
  * @param credential The credential created previously
  */
 function parseCredential(
-  credential: Credential | null,
-): PublicKeyCredentialWithAttachment | null {
-  const creds = credential as PublicKeyCredentialWithAttachment | null;
-
-  if (creds === null) {
-    return null;
-  }
+  credential: Credential,
+): PublicKeyCredentialWithAttachment {
+  const creds = credential as PublicKeyCredentialWithAttachment;
 
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore This type error is probably also in agent-js
@@ -128,13 +128,19 @@ const publicKeyFromResult = (
   const attObject = borc.decodeFirst(
     new Uint8Array(result.response.attestationObject),
   );
-  return Promise.resolve(new CosePublicKey(authDataToCose(attObject.authData)));
+  return Promise.resolve(
+    new CosePublicKey(
+      authDataToCose(new Uint8Array(attObject.authData)).buffer,
+    ),
+  );
 };
 
 // See https://www.iana.org/assignments/cose/cose.xhtml#algorithms for a complete
 // list of these algorithms. We only list the ones we support here.
 enum PubKeyCoseAlgo {
   ECDSA_WITH_SHA256 = -7,
+  ED25519 = -8,
+  RSA_WITH_SHA256 = -257,
 }
 
 export class DiscoverablePasskeyIdentity extends SignIdentity {
@@ -166,16 +172,29 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     this.#credentialRequestOptions = credentialRequestOptions;
   }
 
-  static async create(
-    credentialCreationOptions?: CredentialCreationOptionsWithoutChallenge,
-  ): Promise<DiscoverablePasskeyIdentity> {
+  static async createNew(name: string): Promise<DiscoverablePasskeyIdentity> {
     const identity = new DiscoverablePasskeyIdentity({
-      credentialCreationOptions,
+      credentialCreationOptions: creationOptions(name),
     });
     await identity.sign(
       Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)).buffer,
     );
     return identity;
+  }
+
+  static useExisting({
+    credentialId,
+    getPublicKey,
+  }: {
+    credentialId?: Uint8Array;
+    getPublicKey: (
+      result: PublicKeyCredentialWithAttachment,
+    ) => Promise<CosePublicKey>;
+  }): DiscoverablePasskeyIdentity {
+    return new DiscoverablePasskeyIdentity({
+      getPublicKey,
+      credentialRequestOptions: requestOptions(credentialId),
+    });
   }
 
   getPublicKey(): CosePublicKey {
@@ -202,24 +221,15 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   }
 
   async sign(blob: ArrayBuffer): Promise<Signature> {
-    const credential = await (this.#credentialCreationOptions &&
-    !this.#credentialId
+    const credential = await (nonNullish(this.#credentialCreationOptions)
       ? navigator.credentials.create({
           ...this.#credentialCreationOptions,
           publicKey: {
             ...this.#credentialCreationOptions.publicKey,
             challenge: blob,
-            pubKeyCredParams: [
-              { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
-            ],
-            extensions: {
-              ...this.#credentialCreationOptions.publicKey.extensions,
-              // return credential properties / passkey info
-              credProps: true,
-            },
           },
         })
-      : this.#credentialRequestOptions
+      : nonNullish(this.#credentialRequestOptions)
         ? navigator.credentials.get({
             ...this.#credentialRequestOptions,
             publicKey: {
@@ -227,20 +237,13 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
               challenge: blob,
             },
           })
-        : navigator.credentials.get({
-            mediation: "optional",
-            publicKey: {
-              rpId: window.location.hostname, // TODO: This probably must be set to same value as set during credential creation
-              challenge: blob,
-              userVerification: "preferred",
-            },
-          }));
+        : Promise.reject(new Error("Missing credential options")));
+
+    if (credential === null) {
+      throw Error("WebAuthn credential is missing");
+    }
 
     const result = parseCredential(credential);
-
-    if (result === null) {
-      throw Error("Woops");
-    }
 
     if (result.authenticatorAttachment !== null) {
       this.#authenticatorAttachment = result.authenticatorAttachment;
@@ -252,14 +255,14 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     const cbor = borc.encode(
       new borc.Tagged(55799, {
         authenticator_data: new Uint8Array(result.response.authenticatorData),
-        client_data_json: new TextDecoder()
-          .decode(result.response.clientDataJSON)
-          .replace("webauthn.create", "webauthn.get"),
+        client_data_json: new TextDecoder().decode(
+          result.response.clientDataJSON,
+        ),
         signature: new Uint8Array(result.response.signature),
       }),
     );
     if (isNullish(cbor)) {
-      throw new Error("failed to encode cbor");
+      throw new Error("Failed to encode cbor");
     }
     if (nonNullish(result.response.attestationObject)) {
       // Parse the attestationObject as CBOR.
@@ -271,3 +274,55 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     return cbor.buffer as Signature;
   }
 }
+
+export const creationOptions = (
+  name: string,
+): CredentialCreationOptionsWithoutChallenge => ({
+  publicKey: {
+    // Identify the AAGUID of the passkey provider
+    attestation: "direct",
+    authenticatorSelection: {
+      // For maximum compatibility with various passkey provider,
+      // should not be set to either platform or cross-platform.
+      authenticatorAttachment: undefined,
+      // Require passkeys to verify the user e.g. TouchID
+      userVerification: "required",
+      // Require passkeys to be discoverable
+      residentKey: "required",
+      requireResidentKey: true,
+    },
+    // extensions: {
+    //   credProps: true,
+    // },
+    // Algorithms supported by the Internet Computer
+    pubKeyCredParams: [
+      { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
+      { type: "public-key", alg: PubKeyCoseAlgo.ED25519 },
+      { type: "public-key", alg: PubKeyCoseAlgo.RSA_WITH_SHA256 },
+    ],
+    // How II will identify itself
+    rp: {
+      name: "Internet Identity Service",
+    },
+    // User id is set to a random value since it's not used by II,
+    // the passkey is created before the actual user is created.
+    user: {
+      id: window.crypto.getRandomValues(new Uint8Array(16)),
+      displayName: name,
+      name,
+    },
+  },
+});
+
+export const requestOptions = (
+  credentialId?: Uint8Array,
+): CredentialRequestOptionsWithoutChallenge => ({
+  publicKey: {
+    // Either use the specified credential id or let the user pick a passkey
+    allowCredentials: nonNullish(credentialId)
+      ? [{ id: credentialId, type: "public-key" }]
+      : undefined,
+    // Require passkeys to verify the user e.g. TouchID
+    userVerification: "required",
+  },
+});
