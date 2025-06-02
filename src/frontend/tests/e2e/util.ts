@@ -560,10 +560,13 @@ export const createActor = async (
 /**
  * Workaround for Discoverable Passkeys in E2E tests,
  * current VirtualWebAuth implementation seems to throw
- * an error when a discoverable passkey is created.
+ * when a discoverable passkey is requested or created.
  *
  * So as a workaround, we remove the resident key
  * parameters from the webauthn request for now.
+ *
+ * Also, we add the `allowCredentials` parameter
+ * with the credentials from `getWebAuthnCredentials`.
  */
 export const mockDiscoverablePasskeys = async (
   browser: WebdriverIO.Browser,
