@@ -15,7 +15,7 @@ use std::collections::HashMap;
 #[test]
 fn should_lookup() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
     api::add(
@@ -59,7 +59,7 @@ fn should_lookup() -> Result<(), CallError> {
 #[test]
 fn should_add_additional_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -91,7 +91,7 @@ fn should_add_additional_device() -> Result<(), CallError> {
 #[test]
 fn should_not_add_existing_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let result = api::add(
@@ -114,7 +114,7 @@ fn should_not_add_existing_device() -> Result<(), CallError> {
 #[test]
 fn should_not_add_second_recovery_phrase() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -144,7 +144,7 @@ fn should_not_add_second_recovery_phrase() -> Result<(), CallError> {
 #[test]
 fn should_not_add_device_for_different_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
         flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -168,7 +168,11 @@ fn should_not_add_device_for_different_user() {
 #[test]
 fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_ii_with_archive(
+        &env,
+        Some(II_WASM_PREVIOUS.clone()),
+        Some(ARCHIVE_WASM_PREVIOUS.clone()),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -193,7 +197,7 @@ fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
 #[test]
 fn should_respect_total_size_limit() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     for i in 0..3u8 {
@@ -225,7 +229,7 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
 #[test]
 fn should_update_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let principal = principal_1();
     let mut device = device_data_1();
 
@@ -255,7 +259,7 @@ fn should_update_device() -> Result<(), CallError> {
 #[test]
 fn should_update_protected_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let principal = principal_1();
     let mut device = DeviceData {
         protection: DeviceProtection::Protected,
@@ -290,7 +294,7 @@ fn should_update_protected_device() -> Result<(), CallError> {
 #[test]
 fn should_not_modify_pubkey() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let principal = principal_1();
     let mut device = device_data_1();
 
@@ -321,7 +325,7 @@ fn should_not_modify_pubkey() {
 #[test]
 fn should_not_update_device_of_different_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
         flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -346,7 +350,7 @@ fn should_not_update_device_of_different_user() {
 #[test]
 fn should_not_update_protected_with_different_device() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let device1 = DeviceData {
         protection: DeviceProtection::Protected,
         key_type: KeyType::SeedPhrase,
@@ -385,7 +389,7 @@ fn should_not_update_protected_with_different_device() {
 #[test]
 fn should_not_update_non_recovery_device_to_be_protected() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let mut device1 = device_data_1();
@@ -410,7 +414,7 @@ fn should_not_update_non_recovery_device_to_be_protected() {
 #[test]
 fn should_get_credentials() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let recovery_webauthn_device = DeviceData {
@@ -477,7 +481,7 @@ fn should_get_credentials() -> Result<(), CallError> {
 #[test]
 fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let response = api::get_anchor_credentials(&env, canister_id, 1234564)?;
 
@@ -489,7 +493,7 @@ fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), Call
 #[test]
 fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
@@ -511,7 +515,7 @@ fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallErr
 #[test]
 fn should_remove_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -549,7 +553,7 @@ fn should_remove_device() -> Result<(), CallError> {
 #[test]
 fn should_remove_protected_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let mut device2 = device_data_2();
@@ -591,7 +595,7 @@ fn should_remove_protected_device() -> Result<(), CallError> {
 #[test]
 fn should_remove_last_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::remove(
@@ -611,7 +615,7 @@ fn should_remove_last_device() -> Result<(), CallError> {
 #[test]
 fn should_not_remove_device_of_different_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
         flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
@@ -635,7 +639,7 @@ fn should_not_remove_device_of_different_user() {
 #[test]
 fn should_not_remove_protected_with_different_device() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let device1 = DeviceData {
         protection: DeviceProtection::Protected,
         key_type: KeyType::SeedPhrase,
@@ -673,7 +677,11 @@ fn should_not_remove_protected_with_different_device() {
 #[test]
 fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_ii_with_archive(
+        &env,
+        Some(II_WASM_PREVIOUS.clone()),
+        Some(ARCHIVE_WASM_PREVIOUS.clone()),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -708,7 +716,7 @@ fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
 #[test]
 fn should_not_allow_get_anchor_info_for_different_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let result = api::get_anchor_info(&env, canister_id, principal_2(), user_number);
@@ -724,7 +732,7 @@ fn should_not_allow_get_anchor_info_for_different_user() {
 #[test]
 fn should_replace_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let anchor_info = api::get_anchor_info(&env, canister_id, principal_1(), user_number)?;
@@ -748,7 +756,7 @@ fn should_replace_device() -> Result<(), CallError> {
 #[test]
 fn should_keep_metadata() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let device = DeviceData {
         metadata: Some(HashMap::from([(
             "key".to_string(),
@@ -783,7 +791,7 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
     ];
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     for reserved_key in RESERVED_KEYS {
@@ -814,7 +822,7 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
 #[test]
 fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let device = DeviceData {
@@ -837,7 +845,7 @@ fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError
 #[test]
 fn should_lookup_device_key_with_credential_id() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let credential_id = ByteBuf::from(vec![1, 2, 3]);
     let device = DeviceData {

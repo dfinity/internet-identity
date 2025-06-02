@@ -219,6 +219,35 @@ pub fn arg_with_dynamic_captcha() -> Option<InternetIdentityInit> {
     })
 }
 
+pub fn install_ii_with_archive(
+    env: &PocketIc,
+    ii_wasm_opt: Option<Vec<u8>>,
+    archive_wasm_opt: Option<Vec<u8>>,
+) -> CanisterId {
+    let archive_wasm = archive_wasm_opt.unwrap_or_else(|| ARCHIVE_WASM.clone());
+    let ii_wasm = ii_wasm_opt.unwrap_or_else(|| II_WASM.clone());
+
+    let ii_arg = arg_with_wasm_hash(archive_wasm.clone());
+    let ii_canister_id = install_ii_canister_with_arg(env, ii_wasm, ii_arg);
+
+    // Deploy the archive using the II canister
+    match api::internet_identity::deploy_archive(env, ii_canister_id, &archive_wasm) {
+        Ok(DeployArchiveResult::Success(_archive_principal)) => {
+            // Successfully deployed.
+        }
+        Ok(unexpected_result) => {
+            panic!(
+                "archive deployment returned unexpected Ok result: {:?}",
+                unexpected_result
+            );
+        }
+        Err(err) => {
+            panic!("archive deployment failed: {:?}", err);
+        }
+    }
+    ii_canister_id
+}
+
 pub fn archive_wasm_hash(wasm: &Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(wasm);

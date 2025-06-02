@@ -3,9 +3,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, II_WASM,
-};
+use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntryV2};
 use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
@@ -15,7 +13,7 @@ use serde_bytes::ByteBuf;
 #[test]
 fn should_add_authn_method() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);
     let principal = authn_method_1.principal();
     let authn_method_2 = sample_pubkey_authn_method(2);
@@ -44,7 +42,7 @@ fn should_add_authn_method() -> Result<(), CallError> {
 #[test]
 fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = sample_pubkey_authn_method(1);
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -67,7 +65,7 @@ fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> 
 #[test]
 fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);
     let principal = authn_method_1.principal();
     let mut authn_method_2 = sample_pubkey_authn_method(2);
