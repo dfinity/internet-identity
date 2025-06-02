@@ -56,6 +56,10 @@ export const authenticateWithPasskey = async ({
           return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
         },
       });
+  if (features.DUMMY_AUTH) {
+    identityNumber = (await actor.lookup_device_key(new Uint8Array(32)))[0]!
+      .anchor_number;
+  }
   const delegation = await DelegationChain.create(
     passkeyIdentity,
     session.identity.getPublicKey(),

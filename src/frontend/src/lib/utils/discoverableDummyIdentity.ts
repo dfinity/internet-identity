@@ -1,4 +1,4 @@
-import { type Signature } from "@dfinity/agent";
+import { PublicKey, type Signature } from "@dfinity/agent";
 import { Ed25519KeyIdentity } from "@dfinity/identity";
 import {
   CosePublicKey,
@@ -12,8 +12,8 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
     super();
   }
 
-  getPublicKey(): CosePublicKey {
-    return CosePublicKey.fromDer(dummyIdentity.getPublicKey().toDer());
+  getPublicKey(): PublicKey {
+    return dummyIdentity.getPublicKey();
   }
 
   getCredentialId(): ArrayBuffer | undefined {
