@@ -21,7 +21,7 @@ use std::time::Duration;
 #[test]
 fn can_enter_device_registration_mode() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let result =
@@ -38,7 +38,7 @@ fn can_enter_device_registration_mode() -> Result<(), CallError> {
 #[test]
 fn can_not_enter_device_registration_mode_for_other_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let result = api::enter_device_registration_mode(&env, canister_id, principal_2(), user_number);
@@ -54,7 +54,7 @@ fn can_not_enter_device_registration_mode_for_other_user() {
 #[test]
 fn can_register_remote_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -84,7 +84,7 @@ fn can_register_remote_device() -> Result<(), CallError> {
 #[test]
 fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -127,7 +127,7 @@ fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
 #[test]
 fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -149,7 +149,7 @@ fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
 #[test]
 fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -168,7 +168,7 @@ fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError
 fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallError> {
     const REGISTRATION_MODE_EXPIRATION: Duration = Duration::from_secs(900);
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -187,7 +187,7 @@ fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallE
 #[test]
 fn reject_verification_without_tentative_device() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;
@@ -206,7 +206,7 @@ fn reject_verification_without_tentative_device() -> Result<(), CallError> {
 fn reject_verification_with_wrong_code() -> Result<(), CallError> {
     const MAX_RETRIES: u8 = 3;
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::enter_device_registration_mode(&env, canister_id, principal_1(), user_number)?;

@@ -7,7 +7,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{env, install_ii_canister, time, II_WASM};
+use canister_tests::framework::{env, install_ii_with_archive, time};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, DeviceData, DeviceWithUsage, IdentityInfoError, MetadataEntry,
 };
@@ -19,7 +19,7 @@ use std::time::Duration;
 #[test]
 fn should_get_identity_info() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_methods = sample_authn_methods();
     let identity_number = create_identity_with_authn_methods(&env, canister_id, &authn_methods);
 
@@ -47,7 +47,7 @@ fn should_get_identity_info() -> Result<(), CallError> {
 #[test]
 fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_methods = sample_authn_methods();
     let identity_number = create_identity_with_authn_methods(&env, canister_id, &authn_methods);
 
@@ -60,7 +60,7 @@ fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
 fn should_provide_authn_registration() -> Result<(), CallError> {
     const AUTHN_METHOD_REGISTRATION_TIMEOUT: u64 = Duration::from_secs(900).as_nanos() as u64; // 15 minutes
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method1 = sample_authn_methods().remove(0);
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method1);
     let device2 = DeviceData {

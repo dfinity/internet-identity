@@ -2,14 +2,14 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_methods, sample_authn_methods,
 };
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{env, install_ii_canister, II_WASM};
+use canister_tests::framework::{env, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::AuthnMethodPurpose;
 use pocket_ic::CallError;
 
 #[test]
 fn should_get_identity_authn_info() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_methods = sample_authn_methods();
     let identity_number = create_identity_with_authn_methods(&env, canister_id, &authn_methods);
 

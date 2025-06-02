@@ -42,6 +42,8 @@
   import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
   import { onMount } from "svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
+  import { features } from "$lib/legacy/features.js";
+  import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity.js";
 
   let dialog = $state<"setupOrUseExistingPasskey" | "setupNewPasskey">();
   let captcha = $state<{
@@ -91,7 +93,9 @@
       AuthenticationV2Events.StartWebauthnCreation,
     );
     try {
-      const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
+      const passkeyIdentity = features.DUMMY_AUTH
+        ? new DiscoverableDummyIdentity()
+        : await DiscoverablePasskeyIdentity.createNew(name);
       await startRegistration();
       await registerWithPasskey(passkeyIdentity);
     } catch (error) {

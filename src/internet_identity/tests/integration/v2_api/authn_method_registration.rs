@@ -4,7 +4,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, time, II_WASM,
+    env, expect_user_error_with_message, install_ii_with_archive, time,
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
@@ -18,7 +18,7 @@ use std::time::Duration;
 #[test]
 fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -40,7 +40,7 @@ fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
 #[test]
 fn should_require_authentication_to_enter_authn_method_registration_mode() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -61,7 +61,7 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
 #[test]
 fn should_register_authn_method() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -96,7 +96,7 @@ fn should_register_authn_method() -> Result<(), CallError> {
 #[test]
 fn should_verify_authn_method_after_failed_attempt() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -144,7 +144,7 @@ fn should_verify_authn_method_after_failed_attempt() -> Result<(), CallError> {
 #[test]
 fn identity_info_should_return_authn_method() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -177,7 +177,7 @@ fn identity_info_should_return_authn_method() -> Result<(), CallError> {
 #[test]
 fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -226,7 +226,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallEr
 fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), CallError> {
     const REGISTRATION_MODE_EXPIRATION: Duration = Duration::from_secs(900);
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -257,7 +257,7 @@ fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), Ca
 #[test]
 fn should_reject_confirmation_without_authn_method() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -288,7 +288,7 @@ fn should_reject_confirmation_without_authn_method() -> Result<(), CallError> {
 fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
     const MAX_RETRIES: u8 = 3;
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 

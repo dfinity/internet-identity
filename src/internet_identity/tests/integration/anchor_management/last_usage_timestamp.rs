@@ -12,7 +12,7 @@ use std::time::Duration;
 #[test]
 fn should_set_last_usage_on_get_anchor_info() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     env.advance_time(Duration::from_secs(1));
@@ -26,7 +26,7 @@ fn should_set_last_usage_on_get_anchor_info() -> Result<(), CallError> {
 #[test]
 fn should_set_last_usage_on_add() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -66,7 +66,7 @@ fn should_set_last_usage_on_add() -> Result<(), CallError> {
 #[test]
 fn should_set_last_usage_on_remove() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -109,7 +109,7 @@ fn should_set_last_usage_on_remove() -> Result<(), CallError> {
 #[test]
 fn should_set_last_usage_on_update() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -172,7 +172,7 @@ fn should_set_last_usage_on_update() -> Result<(), CallError> {
 #[test]
 fn should_set_last_usage_on_replace() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -220,7 +220,7 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
 #[test]
 fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     // initialize the salt otherwise prepare_delegation will take two execution rounds
     // throwing off the expected timestamp
     api::init_salt(&env, canister_id)?;
@@ -261,7 +261,7 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
 #[test]
 fn should_update_last_usage_on_tentative_device_registration() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(
@@ -314,7 +314,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
 #[test]
 fn should_update_last_usage_on_exit_device_registration_mode() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(

@@ -15,7 +15,7 @@ use std::time::Duration;
 #[test]
 fn should_get_valid_delegation() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -62,7 +62,7 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
 #[test]
 fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -109,7 +109,7 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
 #[test]
 fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -158,7 +158,7 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
 fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
     let env = env();
     let root_key = env.root_key().unwrap();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname_1 = "https://dapp1.com";
     let frontend_hostname_2 = "https://dapp2.com";
@@ -237,7 +237,11 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
 #[test]
 fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let canister_id = install_ii_with_archive(
+        &env,
+        Some(II_WASM_PREVIOUS.clone()),
+        Some(ARCHIVE_WASM_PREVIOUS.clone()),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -286,7 +290,7 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
 #[test]
 fn should_issue_different_principals() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let pub_session_key = ByteBuf::from("session public key");
     let frontend_hostname_1 = "https://dapp1.com";
@@ -319,7 +323,7 @@ fn should_issue_different_principals() -> Result<(), CallError> {
 #[test]
 fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -356,7 +360,7 @@ fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError
 #[test]
 fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -403,7 +407,7 @@ fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
 #[test]
 fn can_not_prepare_delegation_for_different_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
     let result = api::prepare_delegation(
@@ -427,7 +431,7 @@ fn can_not_prepare_delegation_for_different_user() {
 #[test]
 fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -463,7 +467,7 @@ fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
 #[test]
 fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");
@@ -493,7 +497,7 @@ fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
 #[test]
 fn should_return_different_principals_for_different_frontends() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname_1 = "https://dapp1.com";
@@ -523,7 +527,7 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Ca
 #[test]
 fn should_return_different_principals_for_different_users() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
     let user_number_1 =
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
@@ -555,7 +559,7 @@ fn should_return_different_principals_for_different_users() -> Result<(), CallEr
 #[test]
 fn should_not_allow_get_principal_for_other_user() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
         flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
