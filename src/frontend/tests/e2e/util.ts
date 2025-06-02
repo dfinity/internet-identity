@@ -457,8 +457,8 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
     {
-      timeout: 20_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
-      timeoutMsg: "expected only one window to exist after 20s",
+      timeout: 30_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
+      timeoutMsg: "expected only one window to exist after 30s",
     },
   );
   const handles = await browser.getWindowHandles();
