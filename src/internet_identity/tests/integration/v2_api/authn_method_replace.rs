@@ -4,9 +4,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_with_archive, 
-};
+use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodReplaceError, MetadataEntryV2,
 };

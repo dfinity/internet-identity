@@ -8,8 +8,7 @@ use candid::Principal;
 use canister_tests::api::internet_identity::{api_v2, get_anchor_info};
 use canister_tests::framework::{
     arg_with_anchor_range, arg_with_rate_limit, assert_metric, env, get_metrics,
-    install_ii_canister_with_arg, install_ii_with_archive, test_principal, time, 
-    II_WASM,
+    install_ii_canister_with_arg, install_ii_with_archive, test_principal, time, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
