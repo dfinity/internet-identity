@@ -7,7 +7,9 @@ use candid::Principal;
 use canister_tests::{api::internet_identity as api, framework::*};
 use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig, OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn
+    ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
+    OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{CallError, PocketIc};

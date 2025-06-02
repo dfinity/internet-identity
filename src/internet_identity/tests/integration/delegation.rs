@@ -237,7 +237,11 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
 #[test]
 fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, Some(II_WASM_PREVIOUS.clone()), Some(ARCHIVE_WASM_PREVIOUS.clone()));
+    let canister_id = install_ii_with_archive(
+        &env,
+        Some(II_WASM_PREVIOUS.clone()),
+        Some(ARCHIVE_WASM_PREVIOUS.clone()),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com";
     let pub_session_key = ByteBuf::from("session public key");

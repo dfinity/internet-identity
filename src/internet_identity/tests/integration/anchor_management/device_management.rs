@@ -168,7 +168,11 @@ fn should_not_add_device_for_different_user() {
 #[test]
 fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, Some(II_WASM_PREVIOUS.clone()), Some(ARCHIVE_WASM_PREVIOUS.clone()));
+    let canister_id = install_ii_with_archive(
+        &env,
+        Some(II_WASM_PREVIOUS.clone()),
+        Some(ARCHIVE_WASM_PREVIOUS.clone()),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -673,7 +677,11 @@ fn should_not_remove_protected_with_different_device() {
 #[test]
 fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, Some(II_WASM_PREVIOUS.clone()), Some(ARCHIVE_WASM_PREVIOUS.clone()));
+    let canister_id = install_ii_with_archive(
+        &env,
+        Some(II_WASM_PREVIOUS.clone()),
+        Some(ARCHIVE_WASM_PREVIOUS.clone()),
+    );
     let user_number = flows::register_anchor(&env, canister_id);
 
     api::add(

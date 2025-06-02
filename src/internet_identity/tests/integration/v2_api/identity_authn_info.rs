@@ -2,7 +2,7 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_methods, sample_authn_methods,
 };
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{env, install_ii_with_archive, II_WASM, ARCHIVE_WASM};
+use canister_tests::framework::{env, install_ii_with_archive, ARCHIVE_WASM, II_WASM};
 use internet_identity_interface::internet_identity::types::AuthnMethodPurpose;
 use pocket_ic::CallError;
 

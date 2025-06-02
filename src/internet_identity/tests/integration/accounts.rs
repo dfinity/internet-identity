@@ -10,7 +10,8 @@ use canister_tests::{
     },
     flows,
     framework::{
-        device_data_2, env, install_ii_with_archive, principal_1, principal_2, time, verify_delegation
+        device_data_2, env, install_ii_with_archive, principal_1, principal_2, time,
+        verify_delegation,
     },
 };
 use internet_identity_interface::internet_identity::types::{
