@@ -30,7 +30,7 @@ test("Authorize with an existing passkey", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Create new passkey and then wipe the last used identities from storage
     const { credential, principal } = await createPasskeyIdentity({ browser });
-    await browser.url(II_URL);
+    await browser.url(II_URL + "#do-not-redirect");
     await wipeStorage(browser);
     // Authorize with the above passkey
     const { principal: expectedPrincipal } = await authorize(
@@ -54,7 +54,7 @@ test("Authorize with a different passkey", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Create new passkey and then wipe the last used identities from storage
     const { credential, principal } = await createPasskeyIdentity({ browser });
-    await browser.url(II_URL);
+    await browser.url(II_URL + "#do-not-redirect");
     await wipeStorage(browser);
     // Create second passkey identity
     const { principal: otherPrincipal } = await createPasskeyIdentity({
