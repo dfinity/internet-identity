@@ -571,13 +571,55 @@ export const createActor = async (
 export const mockDiscoverablePasskeys = async (
   browser: WebdriverIO.Browser,
   authenticatorId: string,
-): Promise<void> => {
+): Promise<{
+  credentials: WebAuthnCredential[];
+  cleanup: () => void;
+}> => {
+  const result = {
+    credentials: [] as WebAuthnCredential[],
+    cleanup: () => clearInterval(pollInterval),
+  };
   const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+  // Poll for created credentials
+  const pollInterval = setInterval(async () => {
+    const currentValue = await browser.execute(() => {
+      // @ts-expect-error Since ts-ignore is banned
+      return window.__mockPasskeysSynced;
+    });
+    console.log("currentValue", currentValue);
+    if (currentValue !== false) {
+      return;
+    }
+    console.log("currentValue", currentValue);
+    // if (
+    //   (await browser.execute(() => {
+    //     // @ts-expect-error Since ts-ignore is banned
+    //     return window.__mockPasskeysSynced;
+    //   })) === null
+    // ) {
+    console.log("let's go!");
+    result.credentials =
+      (await getWebAuthnCredentials(browser, authenticatorId)) ?? [];
+    console.log("let's sync!");
+    await browser.execute(() => {
+      // @ts-expect-error Since ts-ignore is banned
+      window.__mockPasskeysSynced = true;
+      // @ts-expect-error Since ts-ignore is banned
+      window.__mockPasskeysSyncedFn?.();
+      // // @ts-expect-error Since ts-ignore is banned
+      // window.__mockPasskeysSynced = true;
+    });
+    console.log("synced!!");
+    // }
+  }, 500);
+
   await browser.execute((credentials) => {
     const create = navigator.credentials.create;
     const get = navigator.credentials.get;
-    navigator.credentials.create = (options) =>
-      create.call(navigator.credentials, {
+    navigator.credentials.create = async (options) => {
+      // @ts-expect-error Since ts-ignore is banned
+      window.__mockPasskeysSynced = false;
+      const result = await create.call(navigator.credentials, {
         publicKey: {
           ...options!.publicKey,
           authenticatorSelection: {
@@ -588,6 +630,13 @@ export const mockDiscoverablePasskeys = async (
           },
         },
       } as CredentialCreationOptions);
+
+      await new Promise<void>((resolve) => {
+        // @ts-expect-error Since ts-ignore is banned
+        window.__mockPasskeysSyncedFn = () => resolve();
+      });
+      return result;
+    };
     navigator.credentials.get = (options) =>
       get.call(navigator.credentials, {
         publicKey: {
@@ -611,4 +660,6 @@ export const mockDiscoverablePasskeys = async (
         },
       } as CredentialRequestOptions);
   }, credentials);
+
+  return result;
 };
