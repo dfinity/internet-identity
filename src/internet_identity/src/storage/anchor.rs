@@ -676,7 +676,7 @@ fn check_device_invariants(device: &Device) -> Result<(), AnchorError> {
 }
 
 fn check_device_limits(device: &Device) -> Result<(), AnchorError> {
-    const ORIGIN_LEN_LIMIT: usize = 50;
+    const ORIGIN_LEN_LIMIT: usize = 60;
     const ALIAS_LEN_LIMIT: usize = 64;
     const PK_LEN_LIMIT: usize = 300;
     const CREDENTIAL_ID_LEN_LIMIT: usize = 350;
