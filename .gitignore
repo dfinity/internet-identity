@@ -2,6 +2,7 @@
 .vscode/
 .idea/
 **/*~
+.windsurf/
 
 # Mac OSX temporary files
 .DS_Store
