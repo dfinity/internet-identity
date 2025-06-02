@@ -4,7 +4,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, II_WASM,
+    env, expect_user_error_with_message, install_ii_with_archive, II_WASM, ARCHIVE_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, AuthnMethodSecuritySettings,
@@ -19,7 +19,7 @@ use std::collections::HashMap;
 #[test]
 fn should_replace_authn_method_security_settings() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = recovery_phrase_authn_method();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
@@ -63,7 +63,7 @@ fn should_replace_authn_method_security_settings() -> Result<(), CallError> {
 #[test]
 fn should_require_authentication_to_replace_security_settings() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = recovery_phrase_authn_method();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
@@ -102,7 +102,7 @@ fn should_require_authentication_to_replace_security_settings() -> Result<(), Ca
 #[test]
 fn should_check_authn_method_exists() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = recovery_phrase_authn_method();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);

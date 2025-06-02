@@ -230,8 +230,7 @@ pub fn install_ii_with_archive(
     let ii_arg = arg_with_wasm_hash(archive_wasm.clone());
     let ii_canister_id = install_ii_canister_with_arg(env, ii_wasm, ii_arg);
 
-    // 3. Deploy the archive using the II canister
-    // api::internet_identity::deploy_archive takes &Vec<u8> for wasm
+    // Deploy the archive using the II canister
     match api::internet_identity::deploy_archive(env, ii_canister_id, &archive_wasm) {
         Ok(DeployArchiveResult::Success(_archive_principal)) => {
             // Successfully deployed.

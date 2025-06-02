@@ -18,7 +18,7 @@ use std::time::Duration;
 #[test]
 fn should_register_new_anchor() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
     let user_number = flows::register_anchor(&env, canister_id);
 
@@ -45,7 +45,7 @@ fn should_register_new_anchor() -> Result<(), CallError> {
 #[test]
 fn should_allow_multiple_registrations() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number_1 =
         flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
     let user_number_2 =
@@ -88,7 +88,7 @@ fn should_assign_correct_user_numbers() -> Result<(), CallError> {
 #[test]
 fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let challenge = api::create_challenge(&env, canister_id)?;
     let result = api::register(
         &env,
@@ -114,7 +114,7 @@ fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
 #[test]
 fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let mut device1 = device_data_1();
     device1.protection = DeviceProtection::Protected;
 
@@ -143,7 +143,7 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallErro
 #[test]
 fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let challenge = api::create_challenge(&env, canister_id)?;
     let result = api::register(
@@ -166,7 +166,7 @@ fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
 #[test]
 fn should_not_allow_expired_captcha() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let challenge = api::create_challenge(&env, canister_id)?;
     env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity
