@@ -39,13 +39,21 @@ pub enum Operation {
     #[serde(rename = "register_anchor_with_openid_credential")]
     RegisterAnchorWithOpenIdCredential { iss: String },
 
-    // Account name, set for new users in new discoverable passkeys flow
+    // Identity name, set for new users in new discoverable passkeys flow
     #[serde(rename = "add_name")]
     AddName,
     #[serde(rename = "update_name")]
     UpdateName,
     #[serde(rename = "remove_name")]
     RemoveName,
+
+    // Accounts creating and updating
+    #[serde(rename = "create_account")]
+    CreateAccount { name: Private },
+    #[serde(rename = "update_account")]
+    UpdateAccount { name: Option<Private> },
+    #[serde(rename = "delete_account")]
+    DeleteAccount,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
@@ -210,3 +218,6 @@ pub struct CallErrorInfo {
     pub rejection_code: i32,
     pub message: String,
 }
+
+/// Sha256 Digest: 32 bytes
+pub type Hash = [u8; 32];

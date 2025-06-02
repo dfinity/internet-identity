@@ -1,3 +1,5 @@
+#[cfg(not(test))]
+use crate::anchor_management::post_operation_bookkeeping;
 use crate::{
     delegation::{
         add_delegation_signature, check_frontend_length, delegation_bookkeeping,
@@ -19,9 +21,12 @@ use ic_canister_sig_creation::{
 };
 use ic_cdk::{api::time, caller};
 use ic_stable_structures::DefaultMemoryImpl;
-use internet_identity_interface::internet_identity::types::{
-    AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
-    Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+use internet_identity_interface::{
+    archive::types::{Operation, Private},
+    internet_identity::types::{
+        AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
+        Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+    },
 };
 use serde_bytes::ByteBuf;
 
@@ -39,7 +44,7 @@ pub fn create_account_for_origin(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
-    storage_borrow_mut(|storage| {
+    let created_account = storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(
             storage,
             anchor_number,
@@ -51,11 +56,20 @@ pub fn create_account_for_origin(
         storage
             .create_additional_account(CreateAccountParams {
                 anchor_number,
-                name,
+                name: name.clone(),
                 origin,
             })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
-    })
+    })?;
+
+    post_account_operation_bookkeeping(
+        anchor_number,
+        Operation::CreateAccount {
+            name: Private::Redacted,
+        },
+    );
+
+    Ok(created_account)
 }
 
 pub fn update_account_for_origin(
@@ -65,30 +79,64 @@ pub fn update_account_for_origin(
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
-        Some(name) => storage_borrow_mut(|storage| {
-            // If the account to be updated is a default account
-            // Check if whe have reached account limit
-            // Because editing a default account turns it into a stored account
+        Some(new_name) => {
+            let (updated_account, old_account_name) =
+                // Type annotation was necessary for the compiler to infer the correct type
+                storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {
+                    // If the account to be updated is a default account
+                    // Check if we have reached account limit
+                    // Because editing a default account turns it into a stored account
+                    if account_number.is_none() {
+                        check_or_rebuild_max_anchor_accounts(
+                            storage,
+                            anchor_number,
+                            MAX_ANCHOR_ACCOUNTS as u64,
+                            true,
+                        )
+                        .map_err(Into::<UpdateAccountError>::into)?
+                    }
+
+                    let old_account = storage
+                        .read_account(ReadAccountParams {
+                            account_number,
+                            anchor_number,
+                            origin: &origin,
+                        })
+                        .expect("Updating an unreadable account should be impossible!");
+
+                    let updated_account = storage
+                        .update_account(UpdateAccountParams {
+                            account_number,
+                            anchor_number,
+                            name: new_name.clone(),
+                            origin: origin.clone(),
+                        })
+                        .map_err(|err| {
+                            UpdateAccountError::InternalCanisterError(format!("{}", err))
+                        })?;
+
+                    Ok((updated_account, old_account.name))
+                })?;
+
+            // No account number meant that the account was a default account and was created before being updated.
             if account_number.is_none() {
-                if let Err(err) = check_or_rebuild_max_anchor_accounts(
-                    storage,
+                post_account_operation_bookkeeping(
                     anchor_number,
-                    MAX_ANCHOR_ACCOUNTS as u64,
-                    true,
-                ) {
-                    return Err(err.into());
-                }
+                    Operation::CreateAccount {
+                        name: Private::Redacted,
+                    },
+                );
             }
 
-            storage
-                .update_account(UpdateAccountParams {
-                    account_number,
-                    anchor_number,
-                    name,
-                    origin: origin.clone(),
-                })
-                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
-        }),
+            let name = if updated_account.name == old_account_name {
+                None
+            } else {
+                Some(Private::Redacted)
+            };
+            post_account_operation_bookkeeping(anchor_number, Operation::UpdateAccount { name });
+
+            Ok(updated_account)
+        }
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
         )),
@@ -204,6 +252,16 @@ fn check_or_rebuild_max_anchor_accounts(
     }
     Ok(())
 }
+
+#[cfg(not(test))]
+#[allow(dead_code)]
+fn post_account_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operation) {
+    post_operation_bookkeeping(anchor_number, operation)
+}
+
+// Bookkeeping fails outside of canisters, so we work around it for the unit tests.
+#[cfg(test)]
+fn post_account_operation_bookkeeping(_anchor_number: AnchorNumber, _operation: Operation) {}
 
 #[test]
 fn should_create_account_for_origin() {
@@ -623,4 +681,43 @@ fn should_properly_recalculate_faulty_account_counter_when_updating() {
         },
     );
     assert!(result.is_ok())
+}
+
+#[test]
+fn should_increment_discrepancy_counter() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+
+    // create faulty counter entries
+    storage_borrow_mut(|storage| {
+        storage.set_counters_for_testing(
+            anchor.anchor_number(),
+            MAX_ANCHOR_ACCOUNTS as u64,
+            MAX_ANCHOR_ACCOUNTS as u64,
+        )
+    });
+
+    storage_borrow(|storage| {
+        let discrepancy_counter_before = storage.get_discrepancy_counter();
+        assert_eq!(discrepancy_counter_before.account_counter_rebuilds, 0);
+    });
+
+    let result = update_account_for_origin(
+        anchor.anchor_number(),
+        None,
+        "https://example-1.com".to_string(),
+        AccountUpdate {
+            name: Some("Gabriel".to_string()),
+        },
+    );
+    assert!(result.is_ok());
+
+    storage_borrow(|storage| {
+        let discrepancy_counter_after = storage.get_discrepancy_counter();
+        assert_eq!(discrepancy_counter_after.account_counter_rebuilds, 1);
+    });
 }
