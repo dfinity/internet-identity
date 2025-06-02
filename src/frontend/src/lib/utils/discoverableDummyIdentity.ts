@@ -1,15 +1,15 @@
 import { PublicKey, type Signature } from "@dfinity/agent";
 import { Ed25519KeyIdentity } from "@dfinity/identity";
-import {
-  CosePublicKey,
-  DiscoverablePasskeyIdentity,
-} from "./discoverablePasskeyIdentity";
+import { DiscoverablePasskeyIdentity } from "./discoverablePasskeyIdentity";
 
 const dummyIdentity = Ed25519KeyIdentity.generate(new Uint8Array(32));
 
 export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
-  constructor() {
+  #name?: string;
+
+  constructor(name?: string) {
     super();
+    this.#name = name;
   }
 
   getPublicKey(): PublicKey {
@@ -25,7 +25,7 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
   }
 
   getName(): string | undefined {
-    return;
+    return this.#name;
   }
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined {

@@ -94,7 +94,7 @@
     );
     try {
       const passkeyIdentity = features.DUMMY_AUTH
-        ? new DiscoverableDummyIdentity()
+        ? new DiscoverableDummyIdentity(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
       await startRegistration();
       await registerWithPasskey(passkeyIdentity);
