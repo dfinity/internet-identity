@@ -106,7 +106,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "137.0.7151.55", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
@@ -555,4 +555,57 @@ export const createActor = async (
     agent,
     canisterId,
   });
+};
+
+/**
+ * Workaround for Discoverable Passkeys in E2E tests,
+ * current VirtualWebAuth implementation seems to throw
+ * an error when a discoverable passkey is created.
+ *
+ * So as a workaround, we remove the resident key
+ * parameters from the webauthn request for now.
+ */
+export const mockDiscoverablePasskeys = async (
+  browser: WebdriverIO.Browser,
+  authenticatorId: string,
+): Promise<void> => {
+  const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+  await browser.execute((credentials) => {
+    const create = navigator.credentials.create;
+    const get = navigator.credentials.get;
+    navigator.credentials.create = (options) =>
+      create.call(navigator.credentials, {
+        publicKey: {
+          ...options!.publicKey,
+          authenticatorSelection: {
+            ...options!.publicKey?.authenticatorSelection,
+            userVerification: "preferred",
+            residentKey: undefined,
+            requireResidentKey: undefined,
+          },
+        },
+      } as CredentialCreationOptions);
+    navigator.credentials.get = (options) =>
+      get.call(navigator.credentials, {
+        publicKey: {
+          ...options!.publicKey,
+          allowCredentials: credentials.map((credential) => ({
+            id: Uint8Array.from(
+              atob(
+                credential.credentialId
+                  .replace(/-/g, "+")
+                  .replace(/_/g, "/")
+                  .padEnd(
+                    Math.ceil(credential.credentialId.length / 4) * 4,
+                    "=",
+                  ),
+              ),
+              (m) => m.charCodeAt(0),
+            ).buffer,
+            type: "public-key",
+          })),
+          userVerification: "preferred",
+        },
+      } as CredentialRequestOptions);
+  }, credentials);
 };

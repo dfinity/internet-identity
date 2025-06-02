@@ -25,8 +25,6 @@
 
 <ButtonOrAnchor
   bind:element
-  role="radio"
-  aria-checked={checked}
   {...props}
   class={[
     "bg-bg-primary ring-border-secondary text-text-primary not-disabled:hover:bg-bg-primary_hover relative flex items-center justify-start gap-3 rounded-md p-3 text-sm font-semibold ring-1 outline-none ring-inset not-dark:shadow-xs",

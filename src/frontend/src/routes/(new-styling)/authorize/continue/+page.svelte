@@ -41,6 +41,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
+  import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
 
   let continueButtonRef = $state<HTMLElement>();
   const lastUsedIdentities = $derived(
@@ -182,6 +183,7 @@
     variant="tertiary"
     size="sm"
     class="mb-3 -ml-2 max-w-full self-start !px-2 not-disabled:hover:bg-transparent dark:not-disabled:hover:bg-transparent"
+    aria-label="Switch identity"
   >
     <Ellipsis
       text={`${selectedIdentity.name ?? String(selectedIdentity.identityNumber)}'s Identity`}
@@ -196,6 +198,8 @@
     <RadioCard
       onclick={() => selectOption("lastUsedAccount")}
       checked={continueWith === "lastUsedAccount"}
+      role="radio"
+      aria-checked={continueWith === "lastUsedAccount"}
       disabled={loading}
     >
       <Avatar size="sm">
@@ -208,6 +212,8 @@
     <RadioCard
       onclick={() => selectOption("anotherAccount")}
       checked={continueWith === "anotherAccount"}
+      role="radio"
+      aria-checked={continueWith === "anotherAccount"}
       disabled={loading}
     >
       <FeaturedIcon size="sm">
@@ -245,6 +251,8 @@
         <RadioCard
           onclick={() => switchIdentity(lastUsedIdentity)}
           checked={lastUsedIdentity === selectedIdentity}
+          role="radio"
+          aria-checked={lastUsedIdentity === selectedIdentity}
           checkIcon
         >
           <Avatar size="sm">
