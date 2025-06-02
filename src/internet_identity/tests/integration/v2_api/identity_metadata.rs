@@ -3,7 +3,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{env, install_ii_with_archive, ARCHIVE_WASM, II_WASM};
+use canister_tests::framework::{env, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{
     IdentityMetadataReplaceError, MetadataEntryV2,
 };
