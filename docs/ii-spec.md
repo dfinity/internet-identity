@@ -7,21 +7,21 @@ import IICandidInterface from "!!raw-loader!./internet_identity.did";
 
 This document describes and specifies Internet Identity from various angles and at various levels of abstraction, namely:
 
--   High level goals, requirements and use cases.
+- High level goals, requirements and use cases.
 
--   Overview of the security and identity machinery, including the interplay of identities, keys, and delegations.
+- Overview of the security and identity machinery, including the interplay of identities, keys, and delegations.
 
--   Interface as used by client applications frontends, i.e., our [client authentication protocol](#client-authentication-protocol).
+- Interface as used by client applications frontends, i.e., our [client authentication protocol](#client-authentication-protocol).
 
--   The interface of the Internet Identity Service *backend*, i.e., describing its contract at the Candid layer, as used by its frontend.
+- The interface of the Internet Identity Service _backend_, i.e., describing its contract at the Candid layer, as used by its frontend.
 
--   Important implementation notes about the Internet Identity Service backend.
+- Important implementation notes about the Internet Identity Service backend.
 
 The Internet Identity service consists of:
 
--   Its backend, a canister on ICP. More precisely, a canister on a dedicated subnet with a *well-known* canister id, and
+- Its backend, a canister on ICP. More precisely, a canister on a dedicated subnet with a _well-known_ canister id, and
 
--   its frontend, a web application served by the backend canister.
+- its frontend, a web application served by the backend canister.
 
 Similarly, the client applications consist of a frontend (served by a canister) and (typically) one or more backend canisters. Only the frontend interacts with the Internet Identity Service directly (via the [client authentication protocol](#client-authentication-protocol) described below).
 
@@ -29,73 +29,74 @@ Similarly, the client applications consist of a frontend (served by a canister) 
 
 The Internet Identity service allows users to
 
--   maintain identities on the Internet Computer
+- maintain identities on the Internet Computer
 
--   log in with these identities using one out of a set of security devices
+- log in with these identities using one out of a set of security devices
 
--   manage their set of security devices
+- manage their set of security devices
 
 Some functional requirements are
 
--   users have separate identities (or "pseudonyms") per client application (more precisely, per client application frontend "hostname", though see [Alternative Frontend Origins](#alternative-frontend-origins) for caveat about `.raw` domains)
+- users have separate identities (or "pseudonyms") per client application (more precisely, per client application frontend "hostname", though see [Alternative Frontend Origins](#alternative-frontend-origins) for caveat about `.raw` domains)
 
--   these identities are stable, i.e., do not depend on a user's security devices
+- these identities are stable, i.e., do not depend on a user's security devices
 
--   the client frontends interact with any canister on the Internet Computer under the user's identity with that frontend
+- the client frontends interact with any canister on the Internet Computer under the user's identity with that frontend
 
--   users do not need ever to remember secret information (but possibly per-user non-secret information)
+- users do not need ever to remember secret information (but possibly per-user non-secret information)
 
--   a security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity
+- a security device does not need to be manually touched upon every interaction with a client application; a login is valid for a certain amount of time per identity
 
 Some security requirements are
 
--   The separate identities of a single user cannot be related merely based on their public key or principal ids, to impede user tracking.
+- The separate identities of a single user cannot be related merely based on their public key or principal ids, to impede user tracking.
 
--   The security of the identities does not depend on the privacy of data stored on canisters, or transmitted to and from canisters. In particular, the delegations handed out by the backend canister must not be sensitive information.
+- The security of the identities does not depend on the privacy of data stored on canisters, or transmitted to and from canisters. In particular, the delegations handed out by the backend canister must not be sensitive information.
 
--   (many more, of course; apply common sense)
+- (many more, of course; apply common sense)
 
 Some noteworthy security assumptions are:
 
--   The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
+- The delivery of frontend applications is secure. In particular, a user accessing the Internet Identity Service Frontend through a TLS-secured HTTP connection cannot be tricked into running another web application.
 
 :::note
 Just for background: At launch this meant we relied on the trustworthiness of the boundary nodes as well as the replica the boundary nodes happens to fetch the assets from. After launch, certification of our HTTP Gateway protocol and trustworthy client-side code (browser extensions, proxies, etc.) have improved this situation.
 :::
 
--   The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
+- The security devices only allow the use of their keys from the same web application that created the key (in our case, the Internet Identity Service Frontend).
 
--   The user's browser is trustworthy, `postMessage` communication between different origins is authentic.
+- The user's browser is trustworthy, `postMessage` communication between different origins is authentic.
 
--   For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties).
+- For user privacy, we also assume the Internet Identity Service backend can keep a secret (but since data is replicated, we do not rely on this assumption for other security properties).
 
 ## Identity design and data model
-
 
 The Internet Computer serves this frontend under hostnames `https://identity.internetcomputer.org` (official) and `https://identity.ic0.app` (legacy).
 
 The canister maintains a salt (in the following the `salt`), a 32 byte long blob that is obtained via the Internet Computer's source of secure randomness.
 
-
 :::note
 Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities.
 :::
 
-A user account is identified by a unique *Identity Anchor*, a natural number chosen by the canister.
+A user Identity is identified by a unique _Identity Anchor_, a natural number chosen by the canister.
 
 A client application frontend is identified by its origin (e.g., `https://abcde-efg.ic0.app`, `https://nice-name.com`). Frontend applications can be served by canisters or by websites that are not hosted on the Internet Computer.
 
-A user has a separate *user identity* for each client application frontend (i.e., per origin). This identity is a [*self-authenticating id*](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) of the [DER encoded canister signature public key](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures) which has the form
+A user has a separate _user identity_ for each client application frontend (i.e., per origin). This identity is a [_self-authenticating id_](https://internetcomputer.org/docs/current/references/ic-interface-spec#id-classes) of the [DER encoded canister signature public key](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures) which has the form
+
 ```
 user_id = SHA-224(DER encoded public key) · 0x02` (29 bytes)
 ```
 
 and the `BIT STRING` field of the DER encoded public key has the form
+
 ```
 bit_string = |ii_canister_id| · ii_canister_id · seed
 ```
 
 where the `seed` is derived as follows
+
 ```
 seed = H(|salt| · salt · |user_number| · user_number · |frontend_origin| · frontend_origin)
 ```
@@ -106,11 +107,11 @@ where `H` is SHA-256, `·` is concatenation, `|…|` is a single byte representi
 A `frontend_origin` of the form `https://<canister id>.icp0.io` will be rewritten to `https://<canister id>.ic0.app` before being used in the seed. This ensures transparent pseudonym transfer between apps hosted on `ic0.app` and `icp0.io` domains.
 :::
 
-When a client application frontend wants to authenticate as a user, it uses a *session key* (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a [*delegation chain*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) that allows the session key to sign for the user's main identity.
+When a client application frontend wants to authenticate as a user, it uses a _session key_ (e.g., Ed25519 or ECDSA), and by way of the authentication flow (details below) obtains a [_delegation chain_](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) that allows the session key to sign for the user's main identity.
 
-The delegation chain consists of one delegation, called the *client delegation*. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a [canister signature](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures). This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 30 days, with a default of 30 minutes.
+The delegation chain consists of one delegation, called the _client delegation_. It delegates from the user identity (for the given client application frontend) to the session key. This delegation is created by the Internet Identity Service Canister, and signed using a [canister signature](https://internetcomputer.org/docs/current/references/ic-interface-spec/#canister-signatures). This delegation is unscoped (valid for all canisters) and has a maximum lifetime of 30 days, with a default of 30 minutes.
 
-The Internet Identity service frontend also manages an *identity frontend delegation*, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
+The Internet Identity service frontend also manages an _identity frontend delegation_, delegating from the security device's public key to a session key managed by this frontend, so that it can interact with the backend without having to invoke the security device for each signature.
 
 ## Client authentication protocol
 
@@ -139,23 +140,27 @@ sequenceDiagram
 3.  It loads the url `https://identity.internetcomputer.org/#authorize` in a separate tab. Let `identityWindow` be the `Window` object returned from this.
 
 4.  In the `identityWindow`, the user logs in, and the `identityWindow` invokes
+
     ```ts
-    window.opener.postMessage(msg, "*")
+    window.opener.postMessage(msg, "*");
     ```
 
     where `msg` is
+
     ```ts
     interface InternetIdentityReady {
-      kind: "authorize-ready"
+      kind: "authorize-ready";
     }
     ```
 
 5.  The client application, after receiving the `InternetIdentityReady`, invokes
+
     ```ts
-    identityWindow.postMessage(msg, "https://identity.internetcomputer.org")
+    identityWindow.postMessage(msg, "https://identity.internetcomputer.org");
     ```
 
     where `msg` is a value of type
+
     ```ts
     interface InternetIdentityAuthRequest {
       kind: "authorize-client";
@@ -163,47 +168,50 @@ sequenceDiagram
       maxTimeToLive?: bigint;
       allowPinAuthentication?: boolean;
       derivationOrigin?: string;
-      autoSelectionPrincipal?: string
+      autoSelectionPrincipal?: string;
     }
     ```
 
     where
 
-    -   the `sessionPublicKey` contains the public key of the session key pair.
+    - the `sessionPublicKey` contains the public key of the session key pair.
 
-    -   the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a one larger.
+    - the `maxTimeToLive`, if present, indicates the desired time span (in nanoseconds) until the requested delegation should expire. The Identity Provider frontend is free to set an earlier expiry time, but should not create a one larger.
 
-    -   the `allowPinAuthentication` (EXPERIMENTAL), if present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
+    - the `allowPinAuthentication` (EXPERIMENTAL), if present, indicates whether or not the Identity Provider should allow the user to authenticate and/or register using a temporary key/PIN identity. Authenticating dapps may want to prevent users from using Temporary keys/PIN identities because Temporary keys/PIN identities are less secure than Passkeys (webauthn credentials) and because Temporary keys/PIN identities generally only live in a browser database (which may get cleared by the browser/OS).
 
-    -   the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Internet Identity will validate the `derivationOrigin` by checking that it lists the client application origin in the `/.well-known/ii-alternative-origins` file (see [Alternative Frontend Origins](#alternative-frontend-origins)).
+    - the `derivationOrigin`, if present, indicates an origin that should be used for principal derivation instead of the client origin. Internet Identity will validate the `derivationOrigin` by checking that it lists the client application origin in the `/.well-known/ii-alternative-origins` file (see [Alternative Frontend Origins](#alternative-frontend-origins)).
 
-    -   the `autoSelectionPrincipal`, if present, indicates the textual representation of this dapp's principal for which the delegation is requested. If it is known to Internet Identity and the corresponding identity has been the most recently used for the client application origin, it will skip the identity selection and immediately prompt for authentication. This feature can be used to streamline re-authentication after a session expiry.
-
+    - the `autoSelectionPrincipal`, if present, indicates the textual representation of this dapp's principal for which the delegation is requested. If it is known to Internet Identity and the corresponding identity has been the most recently used for the client application origin, it will skip the identity selection and immediately prompt for authentication. This feature can be used to streamline re-authentication after a session expiry.
 
 6.  Now the client application window expects a message back, with data `event`.
 
 7.  If `event.origin` is not either `"https://identity.ic0.app"` or `"https://identity.internetcomputer.org"` (depending on which endpoint you are using), ignore this message.
 
 8.  The `event.data` value is a JS object with the following type:
+
     ```ts
     interface InternetIdentityAuthResponse {
       kind: "authorize-client-success";
-      delegations: [{
-        delegation: {
-          pubkey: Uint8Array;
-          expiration: bigint;
-          targets?: Principal[];
-        };
-        signature: Uint8Array;
-      }];
+      delegations: [
+        {
+          delegation: {
+            pubkey: Uint8Array;
+            expiration: bigint;
+            targets?: Principal[];
+          };
+          signature: Uint8Array;
+        },
+      ];
       userPublicKey: Uint8Array;
       authnMethod: "passkey";
     }
     ```
 
-    where the `userPublicKey` is the user's Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for [*authentication on the IC*](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) and `authnMethod` is the method used by the user to authenticate (`passkey` for webauthn, `pin` for temporary key/PIN identity, and `recovery` for recovery phrase or recovery device).
+    where the `userPublicKey` is the user's Identity on the given frontend and `delegations` corresponds to the CBOR-encoded delegation chain as used for [_authentication on the IC_](https://internetcomputer.org/docs/current/references/ic-interface-spec#authentication) and `authnMethod` is the method used by the user to authenticate (`passkey` for webauthn, `pin` for temporary key/PIN identity, and `recovery` for recovery phrase or recovery device).
 
 9.  It could also receive a failure message of the following type
+
     ```ts
     interface InternetIdentityAuthResponse {
       kind: "authorize-client-failure";
@@ -220,11 +228,11 @@ The client application frontend should support delegation chains of length more 
 :::note
 The Internet Identity frontend will use `event.origin` as the "Frontend URL" to base the user identity on. This includes protocol, full hostname and port. This means
 
--   Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
-    - However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see [Alternative Frontend Origins](#alternative-frontend-origins).
-    - Frontend URLs on `icp0.io` are mapped to `ic0.app` automatically, see [Identity design and data model](#identity-design-and-data-model).
--   The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that origin. Be careful when implementing a JavaScript playground on the Internet Computer.
-:::
+- Changing protocol, hostname (including subdomains) or port will invalidate all user identities.
+  - However, multiple different frontend URLs can be mapped back to the canonical frontend URL, see [Alternative Frontend Origins](#alternative-frontend-origins).
+  - Frontend URLs on `icp0.io` are mapped to `ic0.app` automatically, see [Identity design and data model](#identity-design-and-data-model).
+- The frontend application must never allow any untrusted JavaScript code to be executed, on any page on that origin. Be careful when implementing a JavaScript playground on the Internet Computer.
+  :::
 
 ## Alternative frontend origins
 
@@ -241,11 +249,9 @@ This feature is intended to allow more flexibility with respect to the origins o
 
 In order for Internet Identity to accept the `derivationOrigin` the origin of the client application must be listed in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the file must be hosted by an ICP canister that must implement the `http_request` query call as specified [here](https://internetcomputer.org/docs/current/references/http-gateway-protocol-spec)).
 
-
 ### JSON Schema {#alternative-frontend-origins-schema}
 
-
-``` json
+```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "II Alternative Origins Principal Derivation Origins",
@@ -263,14 +269,13 @@ In order for Internet Identity to accept the `derivationOrigin` the origin of th
       "uniqueItems": true
     }
   },
-  "required": [ "alternativeOrigins" ]
+  "required": ["alternativeOrigins"]
 }
 ```
 
-
-
 ### Example
-``` json
+
+```json
 {
   "alternativeOrigins": [
     "https://alternative-1.com",
@@ -296,30 +301,32 @@ In order to allow Internet Identity to read the path `/.well-known/ii-alternativ
 This section describes the interface that the backend canister provides.
 
 Note that the interface is split into 4 categories:
-* Identity management API, i.e. APIs for end-users to manage their identity.
-  * Legacy API.
-  * API v2 (experimental, incomplete).
-    * The aim of the API v2 is to introduce changes that cannot be made without breaking existing clients of the legacy API. While the API v2 has feature parity with the legacy API, the desired changes are not fully implemented yet:
-      * Methods should return proper results with meaningful errors.
-      * Adding explicit WebAuthn signatures to security critical operations.
-* HTTP gateway protocol, required to serve `https://identity.internetcomputer.org`.
-* Auth protocol, for creating signed delegations.
-* Verifiable credentials protocol, for creating id alias credentials.
-* Internal methods, not intended to be called by external clients.
-    * These are methods related to initialization of II itself and integration with its archive.
+
+- Identity management API, i.e. APIs for end-users to manage their identity.
+  - Legacy API.
+  - API v2 (experimental, incomplete).
+    - The aim of the API v2 is to introduce changes that cannot be made without breaking existing clients of the legacy API. While the API v2 has feature parity with the legacy API, the desired changes are not fully implemented yet:
+      - Methods should return proper results with meaningful errors.
+      - Adding explicit WebAuthn signatures to security critical operations.
+- HTTP gateway protocol, required to serve `https://identity.internetcomputer.org`.
+- Auth protocol, for creating signed delegations.
+- Verifiable credentials protocol, for creating id alias credentials.
+- Internal methods, not intended to be called by external clients.
+  - These are methods related to initialization of II itself and integration with its archive.
 
 The summary is given by the Candid interface:
 
 <CodeBlock language="candid">{IICandidInterface}</CodeBlock>
 
 ### Identity management (legacy API)
-#### The `create_challenge` and `register`  methods
+
+#### The `create_challenge` and `register` methods
 
 **Authorization**: This `register` request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
-The `register` method is used to create a new user. The Internet Identity Service backend creates a *fresh* Identity Anchor, creates the account record, and adds the given device as the first device.
+The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ Identity Anchor, creates the Identity record, and adds the given device as the first device.
 
-In order to protect the Internet Computer from too many "free" update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes *and* if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
+In order to protect the Internet Computer from too many "free" update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes _and_ if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
 
 #### The `add` method
 
@@ -333,7 +340,7 @@ The `add` method appends a new device to the given user's record.
 
 The Internet Identity Service backend rejects the call if the user already has a device on record with the given public key.
 
-This may also fail (with a *reject*) if the user is registering too many devices.
+This may also fail (with a _reject_) if the user is registering too many devices.
 
 #### The `remove` method
 
@@ -438,6 +445,7 @@ API V2: `identity_info`
 Fetches all data associated with an anchor including registration mode and tentatively registered devices.
 
 #### The `get_principal` query method
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Fetches the principal for a given user and front end.
@@ -449,7 +457,8 @@ Fetches the principal for a given user and front end.
 **Authorization**: Any non-anonymous identity can call this
 
 Initiates the registration of a new identity. Identity registration is a multistep process:
-1. Start the registration (this call). 
+
+1. Start the registration (this call).
 2. Solve the captcha, if any. Whether this step is required is indicated by the result of the first (this) call.
 3. Provide an authentication method to authenticate with in the future.
 
@@ -468,22 +477,126 @@ This call is used to supply a solution to the captcha challenge returned from `i
 Supply an authentication method to complete the process of creating a new identity. If successful, the identity number of the newly created identity is returned.
 
 #### The `authn_method_metadata_replace` method
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Replaces the `metadata` map of the given authn_method.
 
 #### The `authn_method_security_settings_replace` method
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Replaces the `authn_method_security_settings_replace` map of the given authn_method. This method is split from `authn_method_metadata_replace` in order to be able to introduce different security requirements for security relevant changes to authn_methods while not impeding non-critical changes (such as e.g. changing the authn_method alias).
 
 #### The `identity_metadata_replace` method
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 Replaces the `metadata` map associated with the given identity.
 
+### Account Management
+
+Internet Identity supports Accounts. Accounts are subordinate entities to an Identity and allow a user to appear to any given dApp as a completely different user/principal while using the same Identity and authentication methods. Accounts are separated per origin - in practice this means that you will have one set of accounts for each dapp. They also each have a unique account number assigned to them.
+
+There are two flavors of Accounts:
+
+- Primary Accounts are not named and always available. They show up as the same principal to any given dApp as your Identity did prior to the introduction of Accounts.
+- Secondary Accounts have custom names and are currently limited to 500 total, across origins. They show up as a new and unique principal to a dApp.
+
+Accounts can be renamed. Renaming a Primary Account turns them into a Secondary Account. Accounts can not currently be deleted.
+
+The following endpoints relate to Accounts:
+
+#### The `create_account` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `create_account` method causes the Internet Identity Service backend to create a new Secondary account for the user for a specific origin. This is counted against the total accounts limit.
+
+It takes an anchor number, origin and name as an input.
+
+- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
+
+- The origin is the frontend hostname for which the account will be created.
+
+- The name is what the account will be called.
+
+It returns a Result containing either an object with the created account's account number, origin, optional last used timestamp (which should always be null at time of creation) and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
+
+#### The `update_account` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `update_account` method causes the Internet Identity Service backend to update an existing account for the user. Currently, only account names can be updated. Updating the name of a Primary account turns it into a Secondary account and is counted against the total accounts limit. It has no influence on the principal of the account.
+
+It takes an anchor_number, origin, account number and update parameter.
+
+- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
+
+- The origin is the frontend hostname for which the account will be updated.
+
+- The account number is an Option parameter. If a Secondary account is to be updated, the Option should be `Some(account_number)`. If a Primary account is to be updated, the parameter should be `None`. When updating a Primary account, a new account number is assigned to the account.
+
+- The update parameter takes an `AccountUpdate` struct, which currently only has an optional `name` field, which represents the name that the account will be changed to.
+
+It returns a Result containing either an object with the updated account's account number, origin, optional last used timestamp and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
+
+#### The `get_accounts` query method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `get_accounts` method causes the Internet Identity Service backend to return a list of all accounts for a given origin.
+
+It takes an anchor number and origin as an input.
+
+It returns a Result containing either a vector of objects with the account's account number, origin, optional last used timestamp and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
+
+#### The `prepare_account_delegation` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `prepare_account_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key.
+
+It takes an anchor number, origin, account number, session key and max time to live as an input.
+
+- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
+
+- The origin is the frontend hostname for which the account will be retrieved.
+
+- The account number is an Option parameter. If a Secondary account is to be used, the Option should be `Some(account_number)`. If a Primary account is to be used, the parameter should be `None`. When using a Primary account, this endpoint is functionally equivalent to `prepare_delegation`.
+
+- The session key is the public key that the delegation is delegating to.
+
+- The max time to live is an Option parameter. If present, it represents the maximum time in nanoseconds that the delegation will be valid for. If not present, the default value is used.
+
+It returns a Result containing either an object with the user key and expiration timestamp in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
+
+This method needs to be called before the delegation can be fetched using `get_account_delegation`.
+
+#### The `get_account_delegation` query method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `get_account_delegation` method causes the Internet Identity Service backend to return a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key, if it has been prepared using `prepare_account_delegation`.
+
+It takes an anchor number, origin, account number, session key and expiration timestamp as an input.
+
+- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
+
+- The origin is the frontend hostname for which the account will be retrieved.
+
+- The account number is an Option parameter. If a Secondary account is to be used, the Option should be `Some(account_number)`. If a Primary account is to be used, the parameter should be `None`. When using a Primary account, this endpoint is functionally equivalent to `prepare_delegation`.
+
+- The session key is the public key that the delegation is delegating to.
+
+- The expiration timestamp is the timestamp at which the delegation will expire.
+
+It returns a Result containing a signed delegation in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
+
 ### Authentication protocol
+
 #### The `prepare_delegation` method
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 The `prepare_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given Identity Anchor and Client Application Frontend Hostname to the given session key.
@@ -497,6 +610,7 @@ The method returns the expiration timestamp of the delegation. This is returned 
 The actual delegation can be fetched using `get_delegation` immediately afterwards.
 
 #### The `get_delegation` query method
+
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
@@ -514,21 +628,25 @@ The methods `http_request` and `http_request_update` serve the front-end assets 
 ### Internal APIs
 
 #### The `init_salt` method
+
 **Authorization**: Can only be called by anyone.
 
 The `init_salt` method initialises the [salt](#salt). Traps if the salt is already initialised.
 
 #### The `stats` method
+
 **Authorization**: Can only be called by anyone.
 
 Reports statistics and configuration values of Internet Identity.
 
 #### The `deploy_archive` method
+
 **Authorization**: Can only be called by anyone.
 
 The `deploy_archive` method deploys the supplied wasm to the archive canister, given it matches the configured archive wasm hash.
 
 #### The `fetch_entries` and `acknowledge_entries` methods
+
 **Authorization**: Can only be called by the archive canister.
 
 API for the archive canister to fetch archive entries from the Internet Identity canister and to trigger pruning of archived entries within Internet Identity.
@@ -543,13 +661,13 @@ The `salt` used to blind the hashes that form the `seed` of the Canister Signatu
 
 Since this cannot be done during `canister_init` (no calls from canister init), the randomness is fetched by someone triggering the `init_salt()` method explicitly, or just any other update call. More concretely:
 
--   Anyone can invoke `init_salt()`
+- Anyone can invoke `init_salt()`
 
--   `init_salt()` traps if `salt != EMPTY_SALT`
+- `init_salt()` traps if `salt != EMPTY_SALT`
 
--   Else, `init_salt()` calls `aaaaa-aa.raw_rand()`. When that comes back successfully, and *still* `salt == EMPTY_SALT`, it sets the salt. Else, it traps (so that even if it is run multiple times concurrently, only the first to write the salt has an effect).
+- Else, `init_salt()` calls `aaaaa-aa.raw_rand()`. When that comes back successfully, and _still_ `salt == EMPTY_SALT`, it sets the salt. Else, it traps (so that even if it is run multiple times concurrently, only the first to write the salt has an effect).
 
--   *all* other update methods, at the beginning, if `salt == EMPTY_SALT`, they await `self.init_salt()`, ignoring the result (even if it is an error). Then they check if we still have `salt == EMPTY_SALT` and trap if that is the case.
+- _all_ other update methods, at the beginning, if `salt == EMPTY_SALT`, they await `self.init_salt()`, ignoring the result (even if it is an error). Then they check if we still have `salt == EMPTY_SALT` and trap if that is the case.
 
 ### Why we do not use `canister_inspect_message`
 
@@ -559,9 +677,9 @@ It seems that this implies that we should use `canister_inspect_message` to reje
 
 But upon closer inspection (heh), this is not actually useful.
 
--   One justification for this mechanism would be if we expect a high number of accidentally invalid calls. But we have no reason to expect them at the moment.
+- One justification for this mechanism would be if we expect a high number of accidentally invalid calls. But we have no reason to expect them at the moment.
 
--   Another is to protect against a malicious actor. But that is only useful if the malicious actor doesn't have an equally effective attack vector anyways, and in our case they do: If they want to flood the NNS with calls, they can use calls that do authenticate (e.g. keeping removing and adding devices, or preparing delegations); these calls would pass message inspection.
+- Another is to protect against a malicious actor. But that is only useful if the malicious actor doesn't have an equally effective attack vector anyways, and in our case they do: If they want to flood the NNS with calls, they can use calls that do authenticate (e.g. keeping removing and adding devices, or preparing delegations); these calls would pass message inspection.
 
 On the flip side, implementing `canister_inspect_message` adds code, and thus a risk for bugs. In particular, it increases the risk that some engineer might wrongly assume that the authentication check in `canister_inspect_message` is sufficient and will not do it again in the actual method, which could lead to a serious bug.
 
