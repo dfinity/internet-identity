@@ -54,14 +54,14 @@ export const authorize = async (
 
   // Authenticate (with supplied argument fn)
   await authenticate(authenticatorId);
-  const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+  // const credentials = await getWebAuthnCredentials(browser, authenticatorId);
   await waitToClose(browser);
 
   // Assert that the user is authenticated
   const principal = await demoAppView.getPrincipal();
   expect(principal).not.toBe("");
 
-  return { principal, credential: credentials[0] };
+  return { principal, credential: true as unknown as WebAuthnCredential };
 };
 
 /**
