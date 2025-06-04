@@ -505,7 +505,7 @@ There are two flavors of Accounts:
 
 Accounts can be renamed. Renaming a Primary Account turns them into a Secondary Account. Accounts can not currently be deleted.
 
-The following endpoints relate to Accounts:
+The following endpoints relate to Account Management:
 
 #### The `create_account` method
 
@@ -550,6 +550,10 @@ The `get_accounts` method causes the Internet Identity Service backend to return
 It takes an anchor number and origin as an input.
 
 It returns a Result containing either a vector of objects with the account's account number, origin, optional last used timestamp and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
+
+### Account Delegations
+
+Account Delegations function like regular delegations, but the resultant principal is based on the account number and frontend hostname.
 
 #### The `prepare_account_delegation` method
 
