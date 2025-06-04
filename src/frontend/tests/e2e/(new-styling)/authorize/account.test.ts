@@ -6,7 +6,7 @@ import { authorize, createPasskeyIdentity } from "./utils";
 
 test("Create and authorize with additional account", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { credential, principal } = await createPasskeyIdentity({ browser });
+    const { principal, credential } = await createPasskeyIdentity({ browser });
     const { principal: otherPrincipal } = await authorize(
       async () => {
         const page = WebDriverPageObjectElement.create(browser);
@@ -27,7 +27,7 @@ test("Create and authorize with additional account", async () => {
 
 test("Create additional account but authorize with default account", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { credential, principal } = await createPasskeyIdentity({ browser });
+    const { principal, credential } = await createPasskeyIdentity({ browser });
     const { principal: expectedPrincipal } = await authorize(
       async () => {
         const page = WebDriverPageObjectElement.create(browser);
@@ -49,7 +49,7 @@ test("Create additional account but authorize with default account", async () =>
 
 test("Create and authorize with additional account, then switch back to primary account", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const { credential, principal } = await createPasskeyIdentity({ browser });
+    const { principal, credential } = await createPasskeyIdentity({ browser });
     const { principal: otherPrincipal } = await authorize(
       async () => {
         const page = WebDriverPageObjectElement.create(browser);

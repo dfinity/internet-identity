@@ -251,8 +251,6 @@
         <RadioCard
           onclick={() => switchIdentity(lastUsedIdentity)}
           checked={lastUsedIdentity === selectedIdentity}
-          role="radio"
-          aria-checked={lastUsedIdentity === selectedIdentity}
           checkIcon
         >
           <Avatar size="sm">

@@ -86,6 +86,10 @@ export class WebDriverPageObjectElement implements PageObjectElement {
     );
   }
 
+  async waitFor(): Promise<void> {
+    await this.#getElement();
+  }
+
   async isPresent(): Promise<boolean> {
     const element = await this.#selectElement();
     return element?.isExisting() ?? false;

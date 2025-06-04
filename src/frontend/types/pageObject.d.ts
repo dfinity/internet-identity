@@ -28,6 +28,8 @@ export interface PageObjectElement {
    */
   getByText(text: string): PageObjectElement;
 
+  waitFor(): Promise<void>;
+
   isPresent(): Promise<boolean>;
 
   isDisabled(): Promise<boolean>;

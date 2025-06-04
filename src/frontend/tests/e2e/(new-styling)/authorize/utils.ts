@@ -50,22 +50,18 @@ export const authorize = async (
       originToRelyingPartyId(II_URL),
     );
   }
-  const createdCredentials = await mockDiscoverablePasskeys(
-    browser,
-    authenticatorId,
-  );
+  await mockDiscoverablePasskeys(browser);
 
   // Authenticate (with supplied argument fn)
   await authenticate(authenticatorId);
-  createdCredentials.cleanup();
-  // const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+  const credentials = await getWebAuthnCredentials(browser, authenticatorId);
   await waitToClose(browser);
 
   // Assert that the user is authenticated
   const principal = await demoAppView.getPrincipal();
   expect(principal).not.toBe("");
 
-  return { principal, credential: createdCredentials.credentials[0] };
+  return { principal, credential: credentials[0] };
 };
 
 /**
@@ -74,15 +70,27 @@ export const authorize = async (
  */
 export const createPasskeyIdentity = ({
   browser,
+  name = "Jane Doe",
 }: {
   browser: WebdriverIO.Browser;
+  name?: string;
 }): Promise<{ credential: WebAuthnCredential; principal: string }> =>
   authorize(
     async () => {
       const page = WebDriverPageObjectElement.create(browser);
+      await page.getByRole("heading", { name: "Sign in" }).waitFor();
+      const switchIdentity = page.getByRole("button", {
+        name: "Switch identity",
+      });
+      if (await switchIdentity.isPresent()) {
+        await switchIdentity.click();
+        await page
+          .getByRole("link", { name: "Use another Internet Identity" })
+          .click();
+      }
       await page.getByRole("button", { name: "Continue with Passkey" }).click();
       await page.getByRole("button", { name: "Set up a new Passkey" }).click();
-      await page.getByLabel("Identity name").input("Jane Doe");
+      await page.getByLabel("Identity name").input(name);
       await page.getByRole("button", { name: "Create Passkey" }).click();
     },
     { browser },
