@@ -3,9 +3,7 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_canister, II_WASM,
-};
+use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodMetadataReplaceError, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, MetadataEntryV2,
@@ -21,7 +19,7 @@ fn should_write_authn_method_metadata() -> Result<(), CallError> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -67,7 +65,7 @@ fn should_replace_authn_method_metadata() -> Result<(), CallError> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = AuthnMethodData {
         metadata: HashMap::from([
             (
@@ -133,7 +131,7 @@ fn should_require_authentication_to_replace_identity_metadata() {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -165,7 +163,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
     const VARIABLE_FIELDS_LIMIT: usize = 2500;
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -214,7 +212,7 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
     ];
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -250,7 +248,7 @@ fn should_enforce_string_type_for_legacy_keys() -> Result<(), CallError> {
     const RESERVED_KEYS: &[&str] = &["alias", "usage", "authenticator_attachment", "origin"];
 
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 

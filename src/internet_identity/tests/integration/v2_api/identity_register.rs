@@ -8,7 +8,7 @@ use candid::Principal;
 use canister_tests::api::internet_identity::{api_v2, get_anchor_info};
 use canister_tests::framework::{
     arg_with_anchor_range, arg_with_rate_limit, assert_metric, env, get_metrics,
-    install_ii_canister, install_ii_canister_with_arg, test_principal, time, II_WASM,
+    install_ii_canister_with_arg, install_ii_with_archive, test_principal, time, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::IdentityInfoError::Unauthorized;
 use internet_identity_interface::internet_identity::types::{
@@ -34,7 +34,7 @@ fn should_register_new_identity() {
 #[test]
 fn should_register_multiple_identities() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number_1 = create_identity_with_authn_method(&env, canister_id, &authn_method);
     let identity_number_2 = create_identity_with_authn_method(&env, canister_id, &authn_method);
@@ -45,7 +45,7 @@ fn should_register_multiple_identities() {
 #[test]
 fn should_transition_flow_principal_to_temp_key() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let flow_principal = test_principal(time(&env));
 
@@ -117,7 +117,7 @@ fn should_not_exceed_configured_identity_range() {
 #[test]
 fn should_not_allow_wrong_captcha() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let flow_principal = test_principal(0);
     api_v2::identity_registration_start(&env, canister_id, flow_principal)
@@ -141,7 +141,7 @@ fn should_not_allow_wrong_captcha() {
 #[test]
 fn should_not_allow_anonymous_principal_to_start_registration() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let result = api_v2::identity_registration_start(&env, canister_id, Principal::anonymous())
         .expect("API call failed");
@@ -152,7 +152,7 @@ fn should_not_allow_anonymous_principal_to_start_registration() {
 #[test]
 fn should_not_allow_different_principal() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let flow_principal1 = test_principal(1);
     let flow_principal2 = test_principal(2);
@@ -169,7 +169,7 @@ fn should_not_allow_different_principal() {
 #[test]
 fn should_allow_captcha_retries() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let flow_principal = test_principal(0);
     api_v2::identity_registration_start(&env, canister_id, flow_principal)
@@ -198,7 +198,7 @@ fn should_allow_captcha_retries() {
 #[test]
 fn should_not_allow_to_continue_expired_flow() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
 
     let flow_principal = test_principal(0);
     api_v2::identity_registration_start(&env, canister_id, flow_principal)
@@ -217,7 +217,7 @@ fn should_not_allow_to_continue_expired_flow() {
 #[test]
 fn should_fail_on_invalid_metadata() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let mut authn_method = test_authn_method();
     authn_method.metadata.insert(
         "usage".to_string(),
