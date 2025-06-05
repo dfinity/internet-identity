@@ -513,89 +513,17 @@ The following endpoints relate to Account Management:
 
 The `create_account` method causes the Internet Identity Service backend to create a new Secondary account for the user for a specific origin. This is counted against the total accounts limit.
 
-It takes an anchor number, origin and name as an input.
-
-- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
-
-- The origin is the frontend hostname for which the account will be created.
-
-- The name is what the account will be called.
-
-It returns a Result containing either an object with the created account's account number, origin, optional last used timestamp (which should always be null at time of creation) and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
-
 #### The `update_account` method
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 The `update_account` method causes the Internet Identity Service backend to update an existing account for the user. Currently, only account names can be updated. Updating the name of a Primary account turns it into a Secondary account and is counted against the total accounts limit. It has no influence on the principal of the account.
 
-It takes an anchor_number, origin, account number and update parameter.
-
-- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
-
-- The origin is the frontend hostname for which the account will be updated.
-
-- The account number is an Option parameter. If a Secondary account is to be updated, the Option should be `Some(account_number)`. If a Primary account is to be updated, the parameter should be `None`. When updating a Primary account, a new account number is assigned to the account.
-
-- The update parameter takes an `AccountUpdate` struct, which currently only has an optional `name` field, which represents the name that the account will be changed to.
-
-It returns a Result containing either an object with the updated account's account number, origin, optional last used timestamp and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
-
 #### The `get_accounts` query method
 
 **Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
 
 The `get_accounts` method causes the Internet Identity Service backend to return a list of all accounts for a given origin.
-
-It takes an anchor number and origin as an input.
-
-It returns a Result containing either a vector of objects with the account's account number, origin, optional last used timestamp and name in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
-
-### Account Delegations
-
-Account Delegations function like regular delegations, but the resultant principal is based on the account number and frontend hostname.
-
-#### The `prepare_account_delegation` method
-
-**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
-
-The `prepare_account_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key.
-
-It takes an anchor number, origin, account number, session key and max time to live as an input.
-
-- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
-
-- The origin is the frontend hostname for which the account will be retrieved.
-
-- The account number is an Option parameter. If a Secondary account is to be used, the Option should be `Some(account_number)`. If a Primary account is to be used, the parameter should be `None`. When using a Primary account, this endpoint is functionally equivalent to `prepare_delegation`.
-
-- The session key is the public key that the delegation is delegating to.
-
-- The max time to live is an Option parameter. If present, it represents the maximum time in nanoseconds that the delegation will be valid for. If not present, the default value is used.
-
-It returns a Result containing either an object with the user key and expiration timestamp in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
-
-This method needs to be called before the delegation can be fetched using `get_account_delegation`.
-
-#### The `get_account_delegation` query method
-
-**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
-
-The `get_account_delegation` method causes the Internet Identity Service backend to return a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key, if it has been prepared using `prepare_account_delegation`.
-
-It takes an anchor number, origin, account number, session key and expiration timestamp as an input.
-
-- The anchor number represents the identity to which the account will be added and the authorization of which will be checked.
-
-- The origin is the frontend hostname for which the account will be retrieved.
-
-- The account number is an Option parameter. If a Secondary account is to be used, the Option should be `Some(account_number)`. If a Primary account is to be used, the parameter should be `None`. When using a Primary account, this endpoint is functionally equivalent to `prepare_delegation`.
-
-- The session key is the public key that the delegation is delegating to.
-
-- The expiration timestamp is the timestamp at which the delegation will expire.
-
-It returns a Result containing a signed delegation in its Ok variant. In case of an Error, it returns an Err variant with appropriate information about the error.
 
 ### Authentication protocol
 
@@ -620,6 +548,32 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
 
 Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client application as per the [client authentication protocol](#client-authentication-protocol).
+
+### Account Delegations
+
+Account Delegations function like regular delegations, but the resultant principal is based on the account number and frontend hostname.
+
+#### The `prepare_account_delegation` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `prepare_account_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key. The account number is an Option parameter. If a Secondary account is to be used, the Option should be `Some(account_number)`. If a Primary account is to be used, the parameter should be `None`. When using a Primary account, this endpoint is functionally equivalent to `prepare_delegation`.
+
+This method returns the user's identity that's associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_account_delegation` query, we prevent attacks that trick the user into using a wrong identity. It also returns the expiration timestamp of the delegation. This is returned purely so that the client can feed it back to the backend in `get_account_delegation`.
+
+This method needs to be called before the delegation can be fetched using `get_account_delegation`.
+
+#### The `get_account_delegation` query method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `get_account_delegation` method causes the Internet Identity Service backend to return a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key, if it has been prepared using `prepare_account_delegation`. The account number is an Option parameter. If a Secondary account is to be used, the Option should be `Some(account_number)`. If a Primary account is to be used, the parameter should be `None`. When using a Primary account, this endpoint is functionally equivalent to `get_delegation`.
+
+For a certain amount of time after a call to `prepare_account_delegation`, a query call to `get_account_delegation` with the same arguments, plus the timestamp returned from `prepare_account_delegation`, actually fetches the delegation.
+
+Together with the `UserKey` returned by `prepare_account_delegation`, the result of this method is used by the Frontend to pass to the client application as per the [client authentication protocol](#client-authentication-protocol).
+
+This method needs to be called after the delegation has been prepared using `prepare_account_delegation`.
 
 ### Verifiable Credentials Protocol
 
