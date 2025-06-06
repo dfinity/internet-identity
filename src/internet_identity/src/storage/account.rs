@@ -198,3 +198,14 @@ pub struct PrepareAccountDelegation {
     pub user_key: UserKey,
     pub expiration: Timestamp,
 }
+
+pub(crate) fn check_name_length(name: &str) {
+    const ACCOUNT_NAME_LIMIT: usize = 255;
+
+    let n = name.len();
+    if name.len() > ACCOUNT_NAME_LIMIT {
+        trap(&format!(
+            "account name {n} exceeds the limit of {ACCOUNT_NAME_LIMIT} bytes",
+        ));
+    }
+}

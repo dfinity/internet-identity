@@ -9,8 +9,8 @@ use crate::{
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
-            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+            check_name_length, Account, AccountDelegationError, AccountsCounter,
+            CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
         },
         Storage,
     },
@@ -36,6 +36,7 @@ pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
+    check_frontend_length(origin);
     storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
 }
 
@@ -44,6 +45,8 @@ pub fn create_account_for_origin(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
+    check_frontend_length(&origin);
+    check_name_length(&name);
     let created_account = storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(
             storage,
@@ -79,29 +82,33 @@ pub fn update_account_for_origin(
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
-        Some(name) => storage_borrow_mut(|storage| {
-            // If the account to be updated is a default account
-            // Check if whe have reached account limit
-            // Because editing a default account turns it into a stored account
-            if account_number.is_none() {
-                check_or_rebuild_max_anchor_accounts(
-                    storage,
-                    anchor_number,
-                    MAX_ANCHOR_ACCOUNTS as u64,
-                    true,
-                )
-                .map_err(Into::<UpdateAccountError>::into)?
-            }
+        Some(name) => {
+            check_frontend_length(&origin);
+            check_name_length(&name);
+            storage_borrow_mut(|storage| {
+                // If the account to be updated is a default account
+                // Check if whe have reached account limit
+                // Because editing a default account turns it into a stored account
+                if account_number.is_none() {
+                    check_or_rebuild_max_anchor_accounts(
+                        storage,
+                        anchor_number,
+                        MAX_ANCHOR_ACCOUNTS as u64,
+                        true,
+                    )
+                    .map_err(Into::<UpdateAccountError>::into)?
+                }
 
-            storage
-                .update_account(UpdateAccountParams {
-                    account_number,
-                    anchor_number,
-                    name,
-                    origin: origin.clone(),
-                })
-                .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
-        }),
+                storage
+                    .update_account(UpdateAccountParams {
+                        account_number,
+                        anchor_number,
+                        name,
+                        origin: origin.clone(),
+                    })
+                    .map_err(|err| UpdateAccountError::InternalCanisterError(format!("{}", err)))
+            })
+        }
         None => Err(UpdateAccountError::InternalCanisterError(
             "No name was provided.".to_string(),
         )),
