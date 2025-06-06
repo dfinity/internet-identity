@@ -116,7 +116,7 @@ use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::account_reference::StorableAccountReference;
 use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCounter};
-use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::application_number::{self, StorableApplicationNumber};
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -1031,11 +1031,9 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the `Account` exists, returns it as `Account`.
     /// Optionally an application number can be passed if it is already known, so we don't look it up more than necessary.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
-        let application_number = if params.known_app_num.is_none() {
-            self.lookup_application_number_with_origin(params.origin)
-        } else {
-            params.known_app_num
-        };
+        let application_number = params
+            .known_app_num
+            .or_else(|| self.lookup_application_number_with_origin(params.origin));
 
         match params.account_number {
             // If a default account is requested
