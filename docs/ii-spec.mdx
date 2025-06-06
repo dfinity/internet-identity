@@ -570,6 +570,46 @@ Together with the `UserKey` returned by `prepare_account_delegation`, the result
 
 This method needs to be called after the delegation has been prepared using `prepare_account_delegation`.
 
+### OpenID Connect Protocol
+
+Internet Identity supports authentication using OpenID Connect credentials. This allows users to authenticate using credentials from supported OpenID Connect providers.
+
+#### The `openid_identity_registration_finish` method
+
+**Authorization**: Any non-anonymous identity can call this
+
+Completes the registration of a new identity using OpenID Connect credentials. This is part of the identity registration flow that starts with `identity_registration_start`. The salt needs to match the salt that was used to anonymize the principal when fetching the JWT from the frontend (in this case an anonymous principal).
+
+#### The `openid_credential_add` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+Adds a new OpenID Connect credential to an existing identity. The credential is identified by a JWT token and a salt value. The salt needs to match the salt that was used to anonymize the principal when fetching the JWT from the frontend.
+
+#### The `openid_credential_remove` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+Removes an OpenID Connect credential from an identity.
+
+#### The `openid_prepare_delegation` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+Prepares a delegation for authentication using OpenID Connect credentials. Similar to the regular `prepare_delegation` method, but uses OpenID Connect credentials for authentication.
+
+This delegation is only used to authenticate to Internet Identity. When authenticating to a third-party dApp, the OpenID-based delegation is then used to prepare and get a regular delegation.
+
+Must be called before `openid_get_delegation`.
+
+#### The `openid_get_delegation` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+Retrieves a prepared delegation for OpenID Connect authentication. This is used in conjunction with `openid_prepare_delegation` to complete the authentication flow.
+
+Must be called immediately after `openid_prepare_delegation`.
+
 ### Verifiable Credentials Protocol
 
 See [here](vc-spec.md) for the specification of the verifiable credentials protocol.
