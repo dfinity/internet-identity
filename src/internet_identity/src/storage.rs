@@ -1032,7 +1032,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the `Account` number exists but the `Account` doesn't exist, returns None.
     /// If the `Account` exists, returns it as `Account`.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
-        check_frontend_length(&params.origin);
+        check_frontend_length(params.origin);
         let application_number = self.lookup_application_number_with_origin(params.origin);
 
         match params.account_number {
