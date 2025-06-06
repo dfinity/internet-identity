@@ -116,7 +116,7 @@ use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::account_reference::StorableAccountReference;
 use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCounter};
-use crate::storage::storable::application_number::{self, StorableApplicationNumber};
+use crate::storage::storable::application_number::StorableApplicationNumber;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
