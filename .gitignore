@@ -39,3 +39,9 @@ release*.json
 arg.bin
 args.txt
 proposal.md
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

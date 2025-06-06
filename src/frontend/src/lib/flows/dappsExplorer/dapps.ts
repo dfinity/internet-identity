@@ -3,7 +3,7 @@ import { features } from "$lib/legacy/features";
 // * Only dapps using II are used
 // * All relevant logos are copied to II's assets
 // * Some logos are converted to webp
-import dappsJson from "./dapps.json";
+import dappsJson from "./dapps.json" with { type: "json" };
 
 // This path should point to internet-identity/src/frontend/src/assets/icons/*
 const iconFiles = import.meta.glob("$lib/icons/*", {
