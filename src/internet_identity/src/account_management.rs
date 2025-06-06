@@ -79,7 +79,6 @@ pub fn update_account_for_origin(
     origin: FrontendHostname,
     update: AccountUpdate,
 ) -> Result<Account, UpdateAccountError> {
-    check_frontend_length(&origin);
     match update.name {
         Some(new_name) => {
             validate_account_name(&new_name).map_err(Into::<UpdateAccountError>::into)?;

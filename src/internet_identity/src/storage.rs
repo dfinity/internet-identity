@@ -930,6 +930,7 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         params: CreateAccountParams,
     ) -> Result<Account, StorageError> {
+        check_frontend_length(&params.origin);
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
@@ -1031,6 +1032,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the `Account` number exists but the `Account` doesn't exist, returns None.
     /// If the `Account` exists, returns it as `Account`.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
+        check_frontend_length(&params.origin);
         let application_number = self.lookup_application_number_with_origin(params.origin);
 
         match params.account_number {
@@ -1126,6 +1128,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
     pub fn update_account(&mut self, params: UpdateAccountParams) -> Result<Account, StorageError> {
+        check_frontend_length(&params.origin);
         match params.account_number {
             Some(account_number) => self.update_existing_account(UpdateExistingAccountParams {
                 account_number,
