@@ -339,6 +339,7 @@ pub enum CreateAccountError {
     InternalCanisterError(String),
     AccountLimitReached,
     Unauthorized(Principal),
+    NameTooLong,
 }
 
 impl From<CheckMaxAccountError> for CreateAccountError {
@@ -349,17 +350,34 @@ impl From<CheckMaxAccountError> for CreateAccountError {
     }
 }
 
+impl From<CheckAccountNameLengthError> for CreateAccountError {
+    fn from(err: CheckAccountNameLengthError) -> Self {
+        match err {
+            CheckAccountNameLengthError::NameTooLong => Self::NameTooLong,
+        }
+    }
+}
+
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum UpdateAccountError {
     InternalCanisterError(String),
     AccountLimitReached,
     Unauthorized(Principal),
+    NameTooLong,
 }
 
 impl From<CheckMaxAccountError> for UpdateAccountError {
     fn from(err: CheckMaxAccountError) -> Self {
         match err {
             CheckMaxAccountError::AccountLimitReached => Self::AccountLimitReached,
+        }
+    }
+}
+
+impl From<CheckAccountNameLengthError> for UpdateAccountError {
+    fn from(err: CheckAccountNameLengthError) -> Self {
+        match err {
+            CheckAccountNameLengthError::NameTooLong => Self::NameTooLong,
         }
     }
 }
@@ -386,4 +404,9 @@ pub enum AccountDelegationError {
 #[derive(CandidType, Debug, Deserialize)]
 pub enum CheckMaxAccountError {
     AccountLimitReached,
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum CheckAccountNameLengthError {
+    NameTooLong,
 }

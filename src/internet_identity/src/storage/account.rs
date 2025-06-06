@@ -7,7 +7,8 @@ use crate::{
 use ic_cdk::trap;
 use ic_certification::Hash;
 use internet_identity_interface::internet_identity::types::{
-    AccountInfo, AccountNumber, AnchorNumber, FrontendHostname, Timestamp, UserKey,
+    AccountInfo, AccountNumber, AnchorNumber, CheckAccountNameLengthError, FrontendHostname,
+    Timestamp, UserKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -199,13 +200,13 @@ pub struct PrepareAccountDelegation {
     pub expiration: Timestamp,
 }
 
-pub(crate) fn check_name_length(name: &str) {
+pub(crate) fn check_name_length(name: &str) -> Result<(), CheckAccountNameLengthError> {
     const ACCOUNT_NAME_LIMIT: usize = 255;
 
     let n = name.len();
     if name.len() > ACCOUNT_NAME_LIMIT {
-        trap(&format!(
-            "account name {n} exceeds the limit of {ACCOUNT_NAME_LIMIT} bytes",
-        ));
+        return Err(CheckAccountNameLengthError::NameTooLong);
     }
+
+    Ok(())
 }

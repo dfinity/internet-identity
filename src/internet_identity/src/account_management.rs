@@ -46,7 +46,7 @@ pub fn create_account_for_origin(
     name: String,
 ) -> Result<Account, CreateAccountError> {
     check_frontend_length(&origin);
-    check_name_length(&name);
+    check_name_length(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(
             storage,
@@ -84,7 +84,7 @@ pub fn update_account_for_origin(
     match update.name {
         Some(name) => {
             check_frontend_length(&origin);
-            check_name_length(&name);
+            check_name_length(&name).map_err(Into::<UpdateAccountError>::into)?;
             storage_borrow_mut(|storage| {
                 // If the account to be updated is a default account
                 // Check if whe have reached account limit
