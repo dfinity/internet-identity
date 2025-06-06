@@ -203,7 +203,6 @@ pub struct PrepareAccountDelegation {
 pub(crate) fn check_name_length(name: &str) -> Result<(), CheckAccountNameLengthError> {
     const ACCOUNT_NAME_LIMIT: usize = 255;
 
-    let n = name.len();
     if name.len() > ACCOUNT_NAME_LIMIT {
         return Err(CheckAccountNameLengthError::NameTooLong);
     }
