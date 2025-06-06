@@ -1017,6 +1017,7 @@ impl<M: Memory + Clone> Storage<M> {
                             account_number: acc_ref.account_number,
                             anchor_number,
                             origin,
+                            known_app_num: Some(app_num),
                         })
                     })
                     .collect(),
@@ -1031,9 +1032,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the `Account` number doesn't esist, returns a default `Account`.
     /// If the `Account` number exists but the `Account` doesn't exist, returns None.
     /// If the `Account` exists, returns it as `Account`.
+    /// Optionally an application number can be passed if it is already known, so we don't look it up more than necessary.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
         check_frontend_length(params.origin);
-        let application_number = self.lookup_application_number_with_origin(params.origin);
+        let application_number = params
+            .known_app_num
+            .or_else(|| self.lookup_application_number_with_origin(params.origin));
 
         match params.account_number {
             // If a default account is requested
