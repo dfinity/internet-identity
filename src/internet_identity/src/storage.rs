@@ -104,6 +104,7 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
+use crate::delegation::check_frontend_length;
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -1003,6 +1004,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<Account> {
+        check_frontend_length(origin);
         match self.lookup_application_number_with_origin(origin) {
             None => vec![Account::new(anchor_number, origin.clone(), None, None)],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {

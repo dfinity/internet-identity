@@ -9,7 +9,7 @@ use crate::{
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            check_name_length, Account, AccountDelegationError, AccountsCounter,
+            validate_account_name, Account, AccountDelegationError, AccountsCounter,
             CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
         },
         Storage,
@@ -36,7 +36,6 @@ pub fn get_accounts_for_origin(
     anchor_number: AnchorNumber,
     origin: &FrontendHostname,
 ) -> Vec<Account> {
-    check_frontend_length(origin);
     storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
 }
 
@@ -45,8 +44,7 @@ pub fn create_account_for_origin(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
-    check_frontend_length(&origin);
-    check_name_length(&name).map_err(Into::<CreateAccountError>::into)?;
+    validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(
             storage,
@@ -84,7 +82,7 @@ pub fn update_account_for_origin(
     check_frontend_length(&origin);
     match update.name {
         Some(new_name) => {
-            check_name_length(&new_name).map_err(Into::<UpdateAccountError>::into)?;
+            validate_account_name(&new_name).map_err(Into::<UpdateAccountError>::into)?;
             let (updated_account, old_account_name) =
                 // Type annotation was necessary for the compiler to infer the correct type
                 storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {

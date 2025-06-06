@@ -350,10 +350,10 @@ impl From<CheckMaxAccountError> for CreateAccountError {
     }
 }
 
-impl From<CheckAccountNameLengthError> for CreateAccountError {
-    fn from(err: CheckAccountNameLengthError) -> Self {
+impl From<AccountNameValidationError> for CreateAccountError {
+    fn from(err: AccountNameValidationError) -> Self {
         match err {
-            CheckAccountNameLengthError::NameTooLong => Self::NameTooLong,
+            AccountNameValidationError::NameTooLong => Self::NameTooLong,
         }
     }
 }
@@ -374,10 +374,10 @@ impl From<CheckMaxAccountError> for UpdateAccountError {
     }
 }
 
-impl From<CheckAccountNameLengthError> for UpdateAccountError {
-    fn from(err: CheckAccountNameLengthError) -> Self {
+impl From<AccountNameValidationError> for UpdateAccountError {
+    fn from(err: AccountNameValidationError) -> Self {
         match err {
-            CheckAccountNameLengthError::NameTooLong => Self::NameTooLong,
+            AccountNameValidationError::NameTooLong => Self::NameTooLong,
         }
     }
 }
@@ -407,6 +407,6 @@ pub enum CheckMaxAccountError {
 }
 
 #[derive(CandidType, Debug, Deserialize)]
-pub enum CheckAccountNameLengthError {
+pub enum AccountNameValidationError {
     NameTooLong,
 }
