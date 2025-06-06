@@ -573,13 +573,13 @@ type UpdateAccountError = variant {
     InternalCanisterError : text;
     AccountLimitReached;
     Unauthorized : principal;
+    NameTooLong;
 };
 
 type AccountDelegationError = variant {
     InternalCanisterError : text;
     Unauthorized : principal;
     NoSuchDelegation;
-    NameTooLong;
 };
 
 type PrepareAccountDelegation = record {
