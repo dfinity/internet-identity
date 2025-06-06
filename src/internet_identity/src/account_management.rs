@@ -101,6 +101,7 @@ pub fn update_account_for_origin(
                             account_number,
                             anchor_number,
                             origin: &origin,
+                            known_app_num: None
                         })
                         .expect("Updating an unreadable account should be impossible!");
 
@@ -160,6 +161,7 @@ pub async fn prepare_account_delegation(
                 account_number,
                 anchor_number,
                 origin: &origin,
+                known_app_num: None,
             })
             .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
@@ -199,6 +201,7 @@ pub fn get_account_delegation(
                 account_number,
                 anchor_number,
                 origin,
+                known_app_num: None,
             })
             .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 
