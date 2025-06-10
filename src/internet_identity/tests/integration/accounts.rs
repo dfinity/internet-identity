@@ -336,7 +336,8 @@ fn should_update_account() -> Result<(), CallError> {
 /// When a default / numberless account gets updated, it becomes stored and numbered.
 /// It should not be possible to update
 #[test]
-fn should_not_update_numberless_account_twice() -> Result<(), CallError> {
+#[should_panic]
+fn should_not_update_numberless_account_twice() {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -358,7 +359,7 @@ fn should_not_update_numberless_account_twice() -> Result<(), CallError> {
 
     assert!(updated_account.is_ok());
 
-    let new_updated_account = update_account(
+    let _ = update_account(
         &env,
         canister_id,
         principal_1(),
@@ -367,12 +368,7 @@ fn should_not_update_numberless_account_twice() -> Result<(), CallError> {
         None,
         update,
     )
-    .expect("This call should succeed, but contain an Error!");
-
-    println!("{:?}", new_updated_account);
-
-    assert!(new_updated_account.is_err());
-    Ok(())
+    .expect("The call itself should succeed, but should panic inside");
 }
 
 /// Verifies that a default account can be updated
