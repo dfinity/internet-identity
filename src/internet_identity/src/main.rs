@@ -1,3 +1,4 @@
+use crate::account_management::migrate_application_lookup;
 use crate::anchor_management::tentative_device_registration;
 use crate::anchor_management::tentative_device_registration::{
     TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
@@ -514,6 +515,9 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::load_persistent_state();
 
     initialize(maybe_arg);
+
+    // XXX: This is to migrate the application lookup to the 32 byte origin hash lookup. Remove it after that has been deployed.
+    migrate_application_lookup();
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {

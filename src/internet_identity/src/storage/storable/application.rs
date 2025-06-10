@@ -4,6 +4,8 @@ use minicbor::{Decode, Encode};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 
+use crate::state::storage_borrow_mut;
+
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
 pub struct StorableApplication {

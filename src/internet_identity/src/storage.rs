@@ -163,7 +163,9 @@ const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
 const STABLE_APPLICATION_MEMORY_INDEX: u8 = 11u8;
-const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 12u8;
+// This memory index has been abandoned, do not use it
+// const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 12u8;
+const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX: u8 = 13u8;
 const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 14u8;
 const STABLE_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 15u8;
@@ -747,6 +749,19 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<StorableApplication> {
         self.lookup_application_number_with_origin(origin)
             .and_then(|application_number| self.stable_application_memory.get(&application_number))
+    }
+
+    /// Used for migrating from 8-byte to 32-byte origin hash
+    pub fn rebuild_lookup_application_with_origin_memory(&mut self) {
+        // Check that the memory is empty, otherwise panic
+        assert_eq!(self.lookup_application_with_origin_memory.len(), 0);
+
+        self.stable_application_memory
+            .iter()
+            .for_each(|(app_num, app)| {
+                self.lookup_application_with_origin_memory
+                    .insert(StorableOriginHash::from_origin(&app.origin), app_num);
+            })
     }
 
     fn lookup_account_references(

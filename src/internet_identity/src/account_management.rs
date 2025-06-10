@@ -228,6 +228,11 @@ pub fn get_account_delegation(
     })
 }
 
+/// This is needed to migrate the
+pub fn migrate_application_lookup() {
+    storage_borrow_mut(|storage| storage.rebuild_lookup_application_with_origin_memory());
+}
+
 /// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
 /// If it does, it rebuilds the counter. If it still exceeds, it will return an error.
 fn check_or_rebuild_max_anchor_accounts(
