@@ -753,9 +753,6 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Used for migrating from 8-byte to 32-byte origin hash
     pub fn rebuild_lookup_application_with_origin_memory(&mut self) {
-        // Check that the memory is empty, otherwise panic
-        assert_eq!(self.lookup_application_with_origin_memory.len(), 0);
-
         self.stable_application_memory
             .iter()
             .for_each(|(app_num, app)| {
