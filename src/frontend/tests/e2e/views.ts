@@ -413,6 +413,11 @@ export class MainView extends View {
     const dropdownId = await dropdownTrigger.getAttribute("aria-controls");
     await dropdownTrigger.click();
 
+    // Wait for dropdown to exist before we click it
+    await this.browser
+      .$(`#${dropdownId}`)
+      .waitForDisplayed({ timeout: 10_000 });
+
     // The menu element has an animation, so we wait until all animations are finished so
     // that we can reliably click on its elements
     await this.browser.waitUntil(
