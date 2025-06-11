@@ -1061,9 +1061,9 @@ a:hover,
 .c-landingPage__logo {
   position: absolute;
   left: var(--rs-split-page-left-pane-bezzel);
-  /* temporary change while we show marquee banner */
+  /* temporary change while we show marquee */
   /* top: var(--rs-split-page-left-pane-bezzel); */
-  top: 100px;
+  top: 80px;
 
   color: var(--rc-background--highlight-text);
 }
@@ -1189,6 +1189,8 @@ a:hover,
     color: var(--rc-background--highlight-text);
 
     padding: var(--rs-split-page-stack) 0;
+
+    /* Temporary addition for displaying marquee banner */
     padding-top: 80px;
   }
 

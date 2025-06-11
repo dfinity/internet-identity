@@ -64,6 +64,7 @@
     padding-top: 1rem;
     padding-bottom: 1rem;
     background-color: var(--rc-warning);
+    pointer-events: none;
   }
 
   .marquee-scroll {
