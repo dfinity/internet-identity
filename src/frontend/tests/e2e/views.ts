@@ -342,8 +342,8 @@ export class MainView extends View {
       deviceName,
       action: "remove",
     });
-    await removeButton.waitForDisplayed();
     await removeButton.scrollIntoView();
+    await removeButton.waitForDisplayed();
     await removeButton.click();
 
     const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
