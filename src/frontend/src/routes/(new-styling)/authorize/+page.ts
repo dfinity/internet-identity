@@ -22,7 +22,7 @@ export const load: PageLoad = () => {
         : AuthenticationV2Events.LastUsedNotPresent,
     );
     if (lastUsedIdentityAvailable) {
-      throw redirect(302, "/authorize/continue");
+      throw redirect(307, "/authorize/continue");
     }
   }
 };

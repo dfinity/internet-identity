@@ -7,12 +7,19 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
 
+  type Size = "sm" | "md" | "lg" | "xl";
+
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
+    buttonSize?: Size;
   }
 
-  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithGoogle,
+    buttonSize = "xl",
+  }: Props = $props();
 
   let googleLoading = $state(false);
 
@@ -41,7 +48,7 @@
     <Button
       onclick={setupOrUseExistingPasskey}
       disabled={!supportsPasskeys || googleLoading}
-      size="xl"
+      size={buttonSize}
     >
       <PasskeyIcon />
       Continue with Passkey
@@ -50,7 +57,7 @@
       <Button
         onclick={handleContinueWithGoogle}
         variant="secondary"
-        size="xl"
+        size={buttonSize}
         disabled={googleLoading}
       >
         {#if googleLoading}

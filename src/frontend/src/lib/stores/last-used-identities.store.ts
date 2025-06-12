@@ -1,7 +1,8 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { derived, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
+import { AccountInfo } from "$lib/generated/internet_identity_types";
 
 export type LastUsedAccount = {
   identityNumber: bigint;
@@ -34,6 +35,11 @@ type LastUsedIdentitiesStore = Readable<LastUsedIdentities> & {
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
   ) => void;
+  syncLastUsedAccounts: (
+    identityNumber: bigint,
+    origin: string,
+    accounts: AccountInfo[],
+  ) => AccountInfo[];
   reset: () => void;
 };
 
@@ -43,7 +49,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
   const { subscribe, set, update } = writableStored<LastUsedIdentities>({
     key: storeLocalStorageKey.LastUsedIdentities,
     defaultValue: {},
-    version: 3,
+    version: 4,
   });
 
   return {
@@ -81,6 +87,46 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         };
         return lastUsedIdentities;
       });
+    },
+    // TODO: Update this method once we store usage timestamps in the canister
+    syncLastUsedAccounts: (identityNumber, origin, accounts) => {
+      let sortedAccounts: AccountInfo[] = [];
+      update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[identityNumber.toString()];
+        if (isNullish(identity)) {
+          return lastUsedIdentities;
+        }
+        if (isNullish(identity.accounts)) {
+          identity.accounts = {};
+        }
+        if (isNullish(identity.accounts[origin])) {
+          identity.accounts[origin] = {};
+        }
+        const originAccounts = identity.accounts[origin];
+        accounts.forEach((account) => {
+          const key = isNullish(account.account_number[0])
+            ? PRIMARY_ACCOUNT_KEY
+            : account.account_number[0].toString();
+          originAccounts[key] = {
+            identityNumber,
+            accountNumber: account.account_number[0],
+            origin: account.origin,
+            name: account.name[0],
+            lastUsedTimestampMillis:
+              originAccounts[key]?.lastUsedTimestampMillis ?? 0,
+          };
+        });
+        sortedAccounts = Object.values(originAccounts).map((account) => ({
+          name: nonNullish(account.name) ? [account.name] : [],
+          origin,
+          account_number: nonNullish(account.accountNumber)
+            ? [account.accountNumber]
+            : [],
+          last_used: [BigInt(account.lastUsedTimestampMillis)],
+        }));
+        return lastUsedIdentities;
+      });
+      return sortedAccounts;
     },
     reset: () => {
       set({});
