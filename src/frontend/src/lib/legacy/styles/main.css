@@ -1062,11 +1062,13 @@ a:hover,
 .c-landingPage__logo {
   position: absolute;
   left: var(--rs-split-page-left-pane-bezzel);
-  /* temporary change while we show marquee */
-  /* top: var(--rs-split-page-left-pane-bezzel); */
-  top: 80px;
+  top: var(--rs-split-page-left-pane-bezzel);
 
   color: var(--rc-background--highlight-text);
+}
+
+.c-landingPage__logo__marqueespaced {
+  top: 80px !important;
 }
 
 .c-landingPage__logo .c-logo {
@@ -1190,9 +1192,10 @@ a:hover,
     color: var(--rc-background--highlight-text);
 
     padding: var(--rs-split-page-stack) 0;
+  }
 
-    /* Temporary addition for displaying marquee banner */
-    padding-top: 80px;
+  .c-landingPage__logo__marqueespaced {
+    padding-top: 80px !important;
   }
 
   .c-landingPage__left {
@@ -3096,8 +3099,10 @@ a.c-action-list__item {
     max-width: none;
     /* centers the container and adds a bit of space to make sure the footer does not stick to it */
     margin: 0 0 var(--rs-footer-height);
+  }
 
-    padding-top: 50px;
+  .l-container__marqueespaced {
+    padding-top: 50px !important;
   }
 }
 

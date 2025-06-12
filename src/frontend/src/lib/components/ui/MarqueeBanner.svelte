@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
+
   let {
     content,
     speed = 50,
     pauseOnHover = true,
     href,
-    fixed, // adding this because using components in the old flow is headache
+    fixed,
     class: classes,
   }: {
     content: string;
@@ -19,9 +21,56 @@
   let containerWidth = $state<number>(1);
   let isHovered = $state(false);
   let copies = $derived(Math.ceil(containerWidth / contentWidth) * 2);
+  let observer: MutationObserver | null = null;
 
-  // TODO show/hide temporarily show only between monday and thursday 10am
+  function applyClasses() {
+    let logo = document.querySelector(".c-landingPage__logo");
+    if (logo) {
+      logo.classList.add("c-landingPage__logo__marqueespaced");
+    }
+
+    let lContainer = document.querySelector(".l-container");
+    if (lContainer) {
+      lContainer.classList.add("l-container__marqueespaced");
+    }
+  }
+
+  onMount(() => {
+    applyClasses();
+
+    // This observer is necessary because the lContainer does not exist when the page loads
+    observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === "childList") {
+          applyClasses();
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  });
+
+  onDestroy(() => {
+    if (observer) {
+      observer.disconnect();
+    }
+
+    let logo = document.querySelector(".c-landingPage__logo");
+    if (logo) {
+      logo.classList.remove("c-landingPage__logo__marqueespaced");
+    }
+
+    let lContainer = document.querySelector(".l-container");
+    if (lContainer) {
+      lContainer.classList.remove("l-container__marqueespaced");
+    }
+  });
 </script>
+
+<!-- Rest of the component remains the same -->
 
 <div
   class={["marquee", classes, fixed && "fixed"]}
