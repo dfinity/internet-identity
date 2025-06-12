@@ -1,5 +1,4 @@
 @import "tailwindcss" source("../");
-@import "@toolwind/anchors";
 
 @plugin "@tailwindcss/forms";
 
