@@ -48,7 +48,7 @@
       <Button
         onclick={() => (identityPopover = !identityPopover)}
         variant="tertiary"
-        class="anchor/switch-identity ml-auto gap-2.5 pr-3 md:-mr-3"
+        class="identity-switcher-button ml-auto gap-2.5 pr-3 md:-mr-3"
       >
         <span>{currentIdentity.name ?? currentIdentity.identityNumber}</span>
         <ChevronDownIcon size="1rem" />
@@ -57,7 +57,7 @@
       {#if identityPopover}
         <Popover
           onClose={() => (identityPopover = false)}
-          class="anchored/switch-identity anchored-bottom-span-left mt-3 origin-top-right"
+          class="identity-switcher-popover mt-3 origin-top-right"
         >
           <IdentitySwitcher
             currentIdentityNumber={currentIdentity.identityNumber}
@@ -94,3 +94,16 @@
     {/if}
   </div>
 </header>
+
+<style>
+  :global {
+    .identity-switcher-button {
+      anchor-name: --anchor-identity-switcher;
+    }
+
+    .identity-switcher-popover {
+      position-anchor: --anchor-identity-switcher;
+      position-area: bottom span-left;
+    }
+  }
+</style>
