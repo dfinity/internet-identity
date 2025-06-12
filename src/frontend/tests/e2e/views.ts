@@ -342,7 +342,7 @@ export class MainView extends View {
       deviceName,
       action: "remove",
     });
-    await removeButton.scrollIntoView();
+    await removeButton.scrollIntoView({ block: "center", inline: "center" });
     await removeButton.waitForDisplayed();
     await removeButton.click();
 
