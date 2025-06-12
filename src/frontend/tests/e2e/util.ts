@@ -106,7 +106,7 @@ export async function runInBrowser(
   const browser = await remoteRetry({
     capabilities: {
       browserName: "chrome",
-      browserVersion: "134.0.6998.165", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
+      browserVersion: "137.0.7151.55", // More information about available versions can be found here: https://github.com/GoogleChromeLabs/chrome-for-testing
       "goog:chromeOptions": chromeOptions,
     },
   });
@@ -457,8 +457,8 @@ export async function waitToClose(browser: WebdriverIO.Browser): Promise<void> {
   await browser.waitUntil(
     async () => (await browser.getWindowHandles()).length == 1,
     {
-      timeout: 20_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
-      timeoutMsg: "expected only one window to exist after 20s",
+      timeout: 30_000, // this is relatively long, but we observed flakiness when just waiting for 10 seconds
+      timeoutMsg: "expected only one window to exist after 30s",
     },
   );
   const handles = await browser.getWindowHandles();
@@ -555,4 +555,157 @@ export const createActor = async (
     agent,
     canisterId,
   });
+};
+
+// TODO: To be replaced by `mockCreateDiscoverablePasskeysSynced`
+export const mockCreateDiscoverablePasskeys = async (
+  browser: WebdriverIO.Browser,
+): Promise<void> => {
+  await browser.execute(() => {
+    const create = navigator.credentials.create;
+    navigator.credentials.create = (options) =>
+      create.call(navigator.credentials, {
+        publicKey: {
+          ...options!.publicKey,
+          authenticatorSelection: {
+            ...options!.publicKey?.authenticatorSelection,
+            userVerification: "preferred",
+            residentKey: undefined,
+            requireResidentKey: undefined,
+          },
+        },
+      } as CredentialCreationOptions);
+  });
+};
+
+// TODO: WIP
+export const mockCreateDiscoverablePasskeysSynced = async (
+  browser: WebdriverIO.Browser,
+  authenticatorId: string,
+): Promise<{ credentials: WebAuthnCredential[]; cleanup: () => void }> => {
+  //
+  const result = {
+    credentials: [] as WebAuthnCredential[],
+    cleanup: () => clearInterval(pollInterval),
+  };
+
+  const pollInterval = setInterval(async () => {
+    const currentValue = await browser.execute(() => {
+      // @ts-expect-error Since ts-ignore is banned
+      return globalThis.__mockPasskeysSynced;
+    });
+    if (currentValue !== false) {
+      return;
+    }
+    result.credentials =
+      (await getWebAuthnCredentials(browser, authenticatorId)) ?? [];
+    await browser.execute(() => {
+      // @ts-expect-error Since ts-ignore is banned
+      globalThis.__mockPasskeysSynced = true;
+      // @ts-expect-error Since ts-ignore is banned
+      globalThis.__mockPasskeysSyncedFn?.();
+      // // @ts-expect-error Since ts-ignore is banned
+      // window.__mockPasskeysSynced = true;
+    });
+    console.log("synced!!");
+    // }
+  }, 500);
+
+  await browser.execute(() => {
+    const create = navigator.credentials.create;
+    navigator.credentials.create = async (options) => {
+      // @ts-expect-error Since ts-ignore is banned
+      globalThis.__mockPasskeysSynced = false;
+      const result = await create.call(navigator.credentials, {
+        publicKey: {
+          ...options!.publicKey,
+          authenticatorSelection: {
+            ...options!.publicKey?.authenticatorSelection,
+            userVerification: "preferred",
+            residentKey: undefined,
+            requireResidentKey: undefined,
+          },
+        },
+      } as CredentialCreationOptions);
+
+      await new Promise<void>((resolve) => {
+        // @ts-expect-error Since ts-ignore is banned
+        globalThis.__mockPasskeysSyncedFn = () => resolve();
+      });
+      return result;
+    };
+  });
+
+  return result;
+};
+
+// TODO: To be replaced by `mockGetDiscoverablePasskeysSynced`
+export const mockGetDiscoverablePasskeys = async (
+  browser: WebdriverIO.Browser,
+): Promise<void> => {
+  await browser.execute(() => {
+    const get = navigator.credentials.get;
+    navigator.credentials.get = (options) =>
+      get.call(navigator.credentials, {
+        publicKey: {
+          ...options!.publicKey,
+          userVerification: "preferred",
+        },
+      } as CredentialRequestOptions);
+  });
+};
+
+// TODO: WIP
+export const mockGetDiscoverablePasskeysSynced = async (
+  browser: WebdriverIO.Browser,
+  authenticatorId: string,
+): Promise<void> => {
+  const credentials = await getWebAuthnCredentials(browser, authenticatorId);
+  await browser.execute((credentials) => {
+    const get = navigator.credentials.get;
+    navigator.credentials.get = (options) =>
+      get.call(navigator.credentials, {
+        publicKey: {
+          ...options!.publicKey,
+          allowCredentials:
+            options!.publicKey?.allowCredentials ??
+            credentials.map((credential) => ({
+              id: Uint8Array.from(
+                atob(
+                  credential.credentialId
+                    .replace(/-/g, "+")
+                    .replace(/_/g, "/")
+                    .padEnd(
+                      Math.ceil(credential.credentialId.length / 4) * 4,
+                      "=",
+                    ),
+                ),
+                (m) => m.charCodeAt(0),
+              ).buffer,
+              type: "public-key",
+            })),
+          userVerification: "preferred",
+        },
+      } as CredentialRequestOptions);
+  }, credentials);
+};
+
+// TODO: To be replaced by `mockDiscoverablePasskeysSynced`
+export const mockDiscoverablePasskeys = async (
+  browser: WebdriverIO.Browser,
+): Promise<void> => {
+  await mockGetDiscoverablePasskeys(browser);
+  await mockCreateDiscoverablePasskeys(browser);
+};
+
+// TODO: WIP
+export const mockDiscoverablePasskeysSynced = async (
+  browser: WebdriverIO.Browser,
+  authenticatorId: string,
+): Promise<{
+  credentials: WebAuthnCredential[];
+  cleanup: () => void;
+}> => {
+  await mockGetDiscoverablePasskeysSynced(browser, authenticatorId);
+  return mockCreateDiscoverablePasskeysSynced(browser, authenticatorId);
 };

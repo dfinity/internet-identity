@@ -109,6 +109,8 @@
       <RadioCard
         onclick={() => (selectedAccountNumber = account.account_number[0])}
         checked={account === selectedAccount}
+        role="radio"
+        aria-checked={account === selectedAccount}
       >
         <Avatar size="sm">
           {account.name[0]?.slice(0, 1).toUpperCase() ?? "A"}
