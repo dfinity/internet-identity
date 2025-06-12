@@ -338,7 +338,14 @@ export class MainView extends View {
 
   async remove(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
-    await this.deviceAction({ deviceName, action: "remove" }).click();
+    const removeButton = await this.deviceAction({
+      deviceName,
+      action: "remove",
+    });
+    await removeButton.waitForDisplayed();
+    await removeButton.scrollIntoView();
+    await removeButton.click();
+
     const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
     await confirmRemoveDeviceView.waitForDisplay();
     await confirmRemoveDeviceView.enterAlias(deviceName);
