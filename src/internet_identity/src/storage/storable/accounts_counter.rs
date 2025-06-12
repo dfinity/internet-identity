@@ -23,11 +23,17 @@ impl StorableAccountsCounter {
     pub fn increment(&self, account_type: &AccountType) -> Self {
         match account_type {
             AccountType::AccountReference => Self {
-                stored_account_references: self.stored_account_references + 1,
+                stored_account_references: self
+                    .stored_account_references
+                    .checked_add(1)
+                    .expect("overflow in stored_account_references"),
                 stored_accounts: self.stored_accounts,
             },
             AccountType::Account => Self {
-                stored_accounts: self.stored_accounts + 1,
+                stored_accounts: self
+                    .stored_accounts
+                    .checked_add(1)
+                    .expect("overflow in stored_accounts"),
                 stored_account_references: self.stored_account_references,
             },
         }

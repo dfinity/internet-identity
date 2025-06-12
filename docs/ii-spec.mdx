@@ -79,7 +79,7 @@ The canister maintains a salt (in the following the `salt`), a 32 byte long blob
 Due to replication of data in canisters, the salt should not be considered secret against a determined attacker. However, the canister will not reveal the salt directly and to the extent it is unknown to an attacker it helps maintain privacy of user identities.
 :::
 
-A user account is identified by a unique _Identity Anchor_, a natural number chosen by the canister.
+A user Identity is identified by a unique _Identity Anchor_, a natural number chosen by the canister.
 
 A client application frontend is identified by its origin (e.g., `https://abcde-efg.ic0.app`, `https://nice-name.com`). Frontend applications can be served by canisters or by websites that are not hosted on the Internet Computer.
 
@@ -324,7 +324,7 @@ The summary is given by the Candid interface:
 
 **Authorization**: This `register` request must be sent to the canister with `caller` that is the self-authenticating id derived from the given `DeviceKey`.
 
-The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ Identity Anchor, creates the account record, and adds the given device as the first device.
+The `register` method is used to create a new user. The Internet Identity Service backend creates a _fresh_ Identity Anchor, creates the Identity record, and adds the given device as the first device.
 
 In order to protect the Internet Computer from too many "free" update calls, and to protect the Internet Identity Service from too many user registrations, this call is protected using a CAPTCHA challenge. The `register` call can only succeed if the `ChallengeResult` contains a `key` for a challenge that was created with `create_challenge` (see below) in the last 5 minutes _and_ if the `chars` match the characters that the Internet Identity Service has stored internally for that `key`.
 
@@ -494,6 +494,32 @@ Replaces the `authn_method_security_settings_replace` map of the given authn_met
 
 Replaces the `metadata` map associated with the given identity.
 
+### Account Management
+
+Internet Identity supports Accounts. Accounts are subordinate entities to an Identity and allow a user to appear to any given dApp as a completely different user/principal while using the same Identity and authentication methods. Accounts are separated per origin - in practice this means that you will have one set of accounts for each dapp.
+
+Accounts can be renamed. They can currently not be deleted. There is a limit to how many accounts can be created per Identity. Unnamed ('Primary') accounts do not count towards the account limit, making sure a user can always log in to any dApp.
+
+The following endpoints relate to Account Management:
+
+#### The `create_account` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `create_account` method causes the Internet Identity Service backend to create a new account for the user for a specific origin. This is counted against the accounts limit.
+
+#### The `update_account` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call. Only Account numbers associated with the caller Identity may be used.
+
+The `update_account` method causes the Internet Identity Service backend to update an existing account for the user. Currently, only account names can be updated. Updating the name of a previously unnamed ('Primary') account means it is now counted against the accounts limit. Updating has no influence on the principal of the account.
+
+#### The `get_accounts` query method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call.
+
+The `get_accounts` method causes the Internet Identity Service backend to return a list of all accounts for a given origin.
+
 ### Authentication protocol
 
 #### The `prepare_delegation` method
@@ -517,6 +543,32 @@ The actual delegation can be fetched using `get_delegation` immediately afterwar
 For a certain amount of time after a call to `prepare_delegation`, a query call to `get_delegation` with the same arguments, plus the timestamp returned from `prepare_delegation`, actually fetches the delegation.
 
 Together with the `UserKey` returned by `prepare_delegation`, the result of this method is used by the Frontend to pass to the client application as per the [client authentication protocol](#client-authentication-protocol).
+
+#### Account Delegations
+
+Account Delegations function like regular delegations, but the resultant principal is based on the account number and frontend hostname.
+
+#### The `prepare_account_delegation` method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call. Only Account numbers associated with the caller Identity may be used.
+
+The `prepare_account_delegation` method causes the Internet Identity Service backend to prepare a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key. The account number is an Option parameter. If a named account is to be used, the Option should be `Some(account_number)`. If an unnamed ('Primary') account is to be used, the parameter should be `None`. When passing `None`, this endpoint is functionally equivalent to `prepare_delegation`.
+
+This method returns the user's identity that's associated with the given Client Application Frontend Hostname. By returning this here, and not in the less secure `get_account_delegation` query, we prevent attacks that trick the user into using a wrong identity. It also returns the expiration timestamp of the delegation. This is returned purely so that the client can feed it back to the backend in `get_account_delegation`.
+
+This method needs to be called before the delegation can be fetched using `get_account_delegation`.
+
+#### The `get_account_delegation` query method
+
+**Authorization**: This request must be sent to the canister with `caller` that is the self-authenticating id derived from any of the public keys of devices associated with the user before this call. Only Account numbers associated with the caller Identity may be used.
+
+The `get_account_delegation` method causes the Internet Identity Service backend to return a delegation from the user identity associated with the given Identity Anchor, Account Number and Client Application Frontend Hostname to the given session key, if it has been prepared using `prepare_account_delegation`. The account number is an Option parameter. The account number is an Option parameter. If a named account is to be used, the Option should be `Some(account_number)`. If an unnamed ('Primary') account is to be used, the parameter should be `None`. When passing `None`, this endpoint is functionally equivalent to `get_delegation`
+
+For a certain amount of time after a call to `prepare_account_delegation`, a query call to `get_account_delegation` with the same arguments, plus the timestamp returned from `prepare_account_delegation`, actually fetches the delegation.
+
+Together with the `UserKey` returned by `prepare_account_delegation`, the result of this method is used by the Frontend to pass to the client application as per the [client authentication protocol](#client-authentication-protocol).
+
+This method needs to be called after the delegation has been prepared using `prepare_account_delegation`.
 
 ### OpenID Connect Protocol
 
