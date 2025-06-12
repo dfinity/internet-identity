@@ -70,8 +70,6 @@
   });
 </script>
 
-<!-- Rest of the component remains the same -->
-
 <div
   class={["marquee", classes, fixed && "fixed"]}
   bind:clientWidth={containerWidth}
