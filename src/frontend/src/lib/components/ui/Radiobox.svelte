@@ -1,29 +1,25 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from "svelte/elements";
-  import { CheckIcon, DotIcon } from "@lucide/svelte";
+  import { DotIcon } from "@lucide/svelte";
 
   type Size = "sm" | "md";
 
   type Props = Omit<HTMLInputAttributes, "type" | "size"> & {
-    element?: HTMLInputElement;
     size?: Size;
-    checkIcon?: boolean;
   };
 
   let {
     class: className,
     value,
-    element = $bindable(),
     group = $bindable(),
     size = "md",
-    checkIcon,
     ...props
   }: Props = $props();
 </script>
 
 <label
   class={[
-    "relative flex items-center justify-center rounded-full border",
+    "relative flex items-center justify-center rounded-sm border",
     "border-border-primary text-fg-primary-inversed bg-bg-primary",
     "hover:bg-bg-primary_hover",
     "has-checked:bg-bg-brand-solid has-checked:hover:bg-bg-brand-solid_hover has-checked:border-none",
@@ -36,27 +32,12 @@
     className,
   ]}
 >
-  <input
-    {...props}
-    {value}
-    bind:this={element}
-    bind:group
-    type="radio"
-    class={"sr-only"}
-  />
+  <input {...props} {value} bind:group type="radio" class={"sr-only"} />
   {#if value === group}
-    {#if checkIcon}
-      <CheckIcon
-        size={{ sm: "0.75rem", md: "1rem" }[size]}
-        strokeWidth="0.2rem"
-        class="absolute top-1/2 left-1/2 -translate-1/2"
-      />
-    {:else}
-      <DotIcon
-        size={{ sm: "0.75rem", md: "1rem" }[size]}
-        strokeWidth="0.5rem"
-        class="absolute top-1/2 left-1/2 -translate-1/2"
-      />
-    {/if}
+    <DotIcon
+      size={{ sm: "0.75rem", md: "1rem" }[size]}
+      strokeWidth="0.5rem"
+      class="absolute top-1/2 left-1/2 -translate-1/2"
+    />
   {/if}
 </label>
