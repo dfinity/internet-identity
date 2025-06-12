@@ -393,7 +393,9 @@ export class MainView extends View {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "reset" }).click();
     await this.browser.$('[data-page="reset-phrase-info"]').waitForExist();
-    (await this.browser.$('[data-action="next"]')).scrollIntoView({
+    await (
+      await this.browser.$('[data-action="next"]')
+    ).scrollIntoView({
       block: "center",
     });
     await this.browser.$('[data-action="next"]').click();
