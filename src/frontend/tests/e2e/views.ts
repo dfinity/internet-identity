@@ -424,11 +424,6 @@ export class MainView extends View {
         ),
       { timeoutMsg: "Animation didn't end" },
     );
-
-    // Wait for the dropdown menu to be fully displayed
-    await this.browser
-      .$(`#${dropdownId}`)
-      .waitForDisplayed({ timeout: 10_000 });
   }
 
   // Get a device action element from the device settings menu (menu must be opened
