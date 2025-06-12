@@ -338,7 +338,14 @@ export class MainView extends View {
 
   async remove(deviceName: string): Promise<void> {
     await this.openDeviceActions({ deviceName });
-    await this.deviceAction({ deviceName, action: "remove" }).click();
+    const removeButton = await this.deviceAction({
+      deviceName,
+      action: "remove",
+    });
+    await removeButton.scrollIntoView({ block: "center", inline: "center" });
+    await removeButton.waitForDisplayed();
+    await removeButton.click();
+
     const confirmRemoveDeviceView = new ConfirmRemoveDeviceView(this.browser);
     await confirmRemoveDeviceView.waitForDisplay();
     await confirmRemoveDeviceView.enterAlias(deviceName);
@@ -386,6 +393,11 @@ export class MainView extends View {
     await this.openDeviceActions({ deviceName });
     await this.deviceAction({ deviceName, action: "reset" }).click();
     await this.browser.$('[data-page="reset-phrase-info"]').waitForExist();
+    await (
+      await this.browser.$('[data-action="next"]')
+    ).scrollIntoView({
+      block: "center",
+    });
     await this.browser.$('[data-action="next"]').click();
   }
 
