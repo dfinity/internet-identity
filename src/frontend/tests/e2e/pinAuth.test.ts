@@ -94,25 +94,26 @@ test("Register and log in with PIN identity, retry on wrong PIN", async () => {
   }, APPLE_USER_AGENT);
 }, 300_000);
 
-test("Should not prompt for PIN after deleting temp key", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    const pin = "123456";
-    await addVirtualAuthenticator(browser);
+// THIS IS TEMPORARILY DISABLED WHILE WE SHOW A BANNER ON THE LEGACY II
+// test("Should not prompt for PIN after deleting temp key", async () => {
+//   await runInBrowser(async (browser: WebdriverIO.Browser) => {
+//     const pin = "123456";
+//     await addVirtualAuthenticator(browser);
 
-    await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
-    const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
-    const mainView = new MainView(browser);
-    await mainView.waitForDisplay(); // we should be logged in
-    await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
-    await FLOWS.addFidoDevice(browser);
+//     await browser.url(`${II_URL}?${ENABLE_PIN_QUERY_PARAM_KEY}`);
+//     const userNumber = await FLOWS.registerPinWelcomeView(browser, pin);
+//     const mainView = new MainView(browser);
+//     await mainView.waitForDisplay(); // we should be logged in
+//     await mainView.waitForTempKeyDisplay(DEFAULT_PIN_DEVICE_NAME);
+//     await FLOWS.addFidoDevice(browser);
 
-    await mainView.waitForDisplay();
-    await mainView.remove(DEFAULT_PIN_DEVICE_NAME);
+//     await mainView.waitForDisplay();
+//     await mainView.remove(DEFAULT_PIN_DEVICE_NAME);
 
-    // login now happens using the WebAuthn flow
-    await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
-  }, APPLE_USER_AGENT);
-}, 300_000);
+//     // login now happens using the WebAuthn flow
+//     await FLOWS.loginAuthenticateView(userNumber, DEVICE_NAME1, browser);
+//   }, APPLE_USER_AGENT);
+// }, 300_000);
 
 test("Register with PIN then log into client application", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {

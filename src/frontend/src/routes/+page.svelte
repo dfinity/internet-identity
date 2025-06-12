@@ -13,8 +13,8 @@
 </script>
 
 <TimedDisplay
-  appearTime={new Date(Date.UTC(2025, 5, 12, 14, 52))}
-  disappearTime={new Date(Date.UTC(2025, 5, 12, 15, 3))}
+  appearTime={new Date(Date.UTC(2025, 5, 26, 8))}
+  disappearTime={new Date(Date.UTC(2025, 5, 26, 8, 10))}
 >
   <MarqueeBanner
     content="The subnet hosting Internet Identity will undergo scheduled maintenance on Thursday, June 26, starting at 8:00 AM UTC, with an expected duration of 5-10 minutes. During this time, new logins may be temporarily unavailable. Existing sessions will remain active. Click here to learn more!"
