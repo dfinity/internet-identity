@@ -8,6 +8,8 @@ import { AuthenticateView, MainView } from "./views";
 
 // Read canister ids from the corresponding dfx files.
 // This assumes that they have been successfully dfx-deployed
+// TEMPORARILY IGNORE FOR BANNER
+// @ts-ignore
 import { DEVICE_NAME1, DEVICE_NAME2, II_URL } from "./constants";
 
 test("Removing current device logs user out", async () => {

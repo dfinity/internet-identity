@@ -19,6 +19,8 @@
   let containerWidth = $state<number>(1);
   let isHovered = $state(false);
   let copies = $derived(Math.ceil(containerWidth / contentWidth) * 2);
+
+  // TODO show/hide temporarily show only between monday and thursday 10am
 </script>
 
 <div
