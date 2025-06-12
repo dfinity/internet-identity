@@ -65,7 +65,7 @@
     white-space: nowrap;
     padding-top: 1rem;
     padding-bottom: 1rem;
-    background-color: var(--rc-warning);
+    background-color: var(--rc-warning-orange);
     pointer-events: none;
   }
 
@@ -79,6 +79,7 @@
     display: inline-block;
     animation: scroll linear infinite;
     user-select: none;
+    pointer-events: all;
     cursor: pointer;
     text-decoration-thickness: 2px;
     text-underline-offset: 4px;

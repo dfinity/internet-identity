@@ -254,6 +254,7 @@
   --rc-onError: var(--vc-snow);
 
   --rc-warning: var(--vc-brand-yellow);
+  --rc-warning-orange: var(--vc-brand-orange);
   --rc-onWarning: var(--rc-snow);
 
   --rc-info: var(--vc-brand-purple);
