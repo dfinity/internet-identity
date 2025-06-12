@@ -38,6 +38,7 @@ function coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
 }
 
 function coseFromDerEncodedBlob(derEncoded: DerEncodedPublicKey): ArrayBuffer {
+  console.log("derEncoded", derEncoded);
   return unwrapDER(derEncoded, DER_COSE_OID).buffer as ArrayBuffer;
 }
 
@@ -197,7 +198,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     });
   }
 
-  getPublicKey(): CosePublicKey {
+  getPublicKey(): PublicKey {
     if (!this.#publicKey) {
       throw Error("Sign first to retrieve public key");
     }
