@@ -333,6 +333,44 @@ fn should_update_account() -> Result<(), CallError> {
     Ok(())
 }
 
+/// When a default / numberless account gets updated, it becomes stored and numbered.
+/// It should not be possible to update
+#[test]
+#[should_panic]
+fn should_not_update_numberless_account_twice() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://some-dapp.com".to_string();
+    let name = Some("Icarus".to_string());
+
+    let update = AccountUpdate { name };
+
+    let updated_account = update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        None,
+        update.clone(),
+    )
+    .expect("This call should succeed!");
+
+    assert!(updated_account.is_ok());
+
+    let _ = update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin,
+        None,
+        update,
+    )
+    .expect("The call itself should succeed, but should panic inside");
+}
+
 /// Verifies that a default account can be updated
 #[test]
 fn should_update_default_account() -> Result<(), CallError> {
