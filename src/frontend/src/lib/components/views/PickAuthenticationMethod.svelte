@@ -41,6 +41,7 @@
     <Button
       onclick={setupOrUseExistingPasskey}
       disabled={!supportsPasskeys || googleLoading}
+      size="xl"
     >
       <PasskeyIcon />
       Continue with Passkey
@@ -50,6 +51,7 @@
         onclick={handleContinueWithGoogle}
         variant="secondary"
         disabled={googleLoading}
+        size="xl"
       >
         {#if googleLoading}
           <ProgressRing />

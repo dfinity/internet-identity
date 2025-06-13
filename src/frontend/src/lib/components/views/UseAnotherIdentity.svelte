@@ -1,6 +1,5 @@
 <script lang="ts">
   import PickAuthenticationMethod from "$lib/components/views/PickAuthenticationMethod.svelte";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
   import { nonNullish } from "@dfinity/utils";
   import SolveCaptcha from "$lib/components/views/SolveCaptcha.svelte";
   import SetupOrUseExistingPasskey from "$lib/components/views/SetupOrUseExistingPasskey.svelte";
@@ -20,7 +19,6 @@
     authenticationStore,
   } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { currentIdentityNumberStore } from "$lib/stores/current-identity.store";
   import { handleError } from "$lib/components/utils/error";
   import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
   import { inferPasskeyAlias, loadUAParser } from "$lib/flows/register";
@@ -40,7 +38,7 @@
 
   interface Props {
     onCancel: () => void;
-    onSuccess: () => void;
+    onSuccess: (identityNumber: bigint) => void;
   }
 
   const { onCancel, onSuccess }: Props = $props();
@@ -78,8 +76,7 @@
         name: info.name[0],
         authMethod: { passkey: { credentialId } },
       });
-      currentIdentityNumberStore.set(identityNumber);
-      onSuccess();
+      onSuccess(identityNumber);
     } catch (error) {
       handleError(error);
       onCancel();
@@ -145,13 +142,12 @@
         name: passkeyIdentity.getName(),
         authMethod: { passkey: { credentialId } },
       });
-      currentIdentityNumberStore.set(identityNumber);
       toaster.success({
         title: "You're all set. Your identity has been created.",
         duration: 4000,
         closable: false,
       });
-      onSuccess();
+      onSuccess(identityNumber);
     } catch (error) {
       if (isCanisterError<IdRegFinishError>(error)) {
         switch (error.type) {
@@ -210,8 +206,7 @@
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      currentIdentityNumberStore.set(identityNumber);
-      onSuccess();
+      onSuccess(identityNumber);
     } catch (error) {
       systemOverlay = false;
       if (
@@ -305,13 +300,12 @@
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      currentIdentityNumberStore.set(identityNumber);
       toaster.success({
         title: "You're all set. Your identity has been created.",
         duration: 4000,
         closable: false,
       });
-      onSuccess();
+      onSuccess(identityNumber);
     } catch (error) {
       if (
         isCanisterError<IdRegFinishError>(error) &&

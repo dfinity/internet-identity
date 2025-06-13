@@ -22,7 +22,6 @@
   import { handleError } from "$lib/components/utils/error";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
-  import { untrack } from "svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import {
     AuthenticationV2Events,
@@ -30,7 +29,6 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/flows/dappsExplorer/dapps";
-  import { currentIdentityNumberStore } from "$lib/stores/current-identity.store";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -38,21 +36,19 @@
       dapp.hasOrigin($authorizationContextStore.requestOrigin),
     ),
   );
-  const currentIdentity = $derived(
-    $lastUsedIdentitiesStore[`${$currentIdentityNumberStore!}`],
-  );
+  const selectedIdentity = $derived($lastUsedIdentitiesStore.selected!);
   const lastUsedAccounts = $derived.by<LastUsedAccount[]>(() => {
     const accounts = Object.values(
-      currentIdentity.accounts?.[$authorizationContextStore.effectiveOrigin] ??
+      selectedIdentity.accounts?.[$authorizationContextStore.effectiveOrigin] ??
         {},
     ).sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis);
     if (accounts.length === 0) {
       return [
         {
-          identityNumber: currentIdentity.identityNumber,
+          identityNumber: selectedIdentity.identityNumber,
           origin: $authorizationContextStore.effectiveOrigin,
           accountNumber: undefined,
-          lastUsedTimestampMillis: currentIdentity.lastUsedTimestampMillis,
+          lastUsedTimestampMillis: selectedIdentity.lastUsedTimestampMillis,
         },
       ];
     }
@@ -62,17 +58,17 @@
   let systemOverlay = $state(false);
 
   const authenticateCurrentIdentity = async () => {
-    if ("passkey" in currentIdentity.authMethod) {
+    if ("passkey" in selectedIdentity.authMethod) {
       const { identity, identityNumber } = await authenticateWithPasskey({
         canisterId,
         session: $sessionStore,
-        credentialId: currentIdentity.authMethod.passkey.credentialId,
+        credentialId: selectedIdentity.authMethod.passkey.credentialId,
       });
       authenticationStore.set({ identity, identityNumber });
-      lastUsedIdentitiesStore.addLastUsedIdentity(currentIdentity);
+      lastUsedIdentitiesStore.addLastUsedIdentity(selectedIdentity);
     } else if (
-      "openid" in currentIdentity.authMethod &&
-      currentIdentity.authMethod.openid.iss === "https://accounts.google.com"
+      "openid" in selectedIdentity.authMethod &&
+      selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
     ) {
       systemOverlay = true;
       const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
@@ -80,7 +76,7 @@
       const jwt = await requestJWT(requestConfig, {
         nonce: $sessionStore.nonce,
         mediation: "required",
-        loginHint: currentIdentity.authMethod.openid.sub,
+        loginHint: selectedIdentity.authMethod.openid.sub,
       });
       systemOverlay = false;
       const { identity, identityNumber } = await authenticateWithJWT({
@@ -89,7 +85,7 @@
         jwt,
       });
       authenticationStore.set({ identity, identityNumber });
-      lastUsedIdentitiesStore.addLastUsedIdentity(currentIdentity);
+      lastUsedIdentitiesStore.addLastUsedIdentity(selectedIdentity);
     } else {
       throw new Error("Unrecognized authentication method");
     }
@@ -99,11 +95,11 @@
     try {
       loading = true;
       await authenticateCurrentIdentity();
-      if ("passkey" in currentIdentity.authMethod) {
+      if ("passkey" in selectedIdentity.authMethod) {
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.ContinueAsPasskey,
         );
-      } else if ("openid" in currentIdentity.authMethod) {
+      } else if ("openid" in selectedIdentity.authMethod) {
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsGoogle);
       }
       lastUsedIdentitiesStore.addLastUsedAccount(account);

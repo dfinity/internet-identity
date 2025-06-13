@@ -2,7 +2,6 @@
   import type { HTMLAttributes } from "svelte/elements";
   import Logo from "$lib/components/ui/Logo.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { currentIdentityNumberStore } from "$lib/stores/current-identity.store";
   import { nonNullish } from "@dfinity/utils";
   import { ChevronDownIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -18,20 +17,15 @@
   const { children, class: className, ...props }: Props = $props();
 
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore)
+    Object.values($lastUsedIdentitiesStore.identities)
       .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
       .slice(0, 5),
   );
-  const currentIdentity = $derived(
-    nonNullish($currentIdentityNumberStore)
-      ? lastUsedIdentities.find(
-          (identity) => identity.identityNumber === $currentIdentityNumberStore,
-        )
-      : undefined,
-  );
+  const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
-  let identityPopover = $state(false);
-  let signInDialog = $state(false);
+  let identityButtonRef = $state<HTMLElement>();
+  let isIdentityPopoverOpen = $state(false);
+  let isSignInDialogOpen = $state(false);
 </script>
 
 <header
@@ -44,44 +38,46 @@
     <h1 class="text-md text-text-primary hidden font-semibold sm:block">
       Internet Identity
     </h1>
-    {#if nonNullish(currentIdentity)}
+    {#if nonNullish(selectedIdentity)}
       <Button
-        onclick={() => (identityPopover = !identityPopover)}
+        bind:element={identityButtonRef}
+        onclick={() => (isIdentityPopoverOpen = true)}
         variant="tertiary"
-        class="identity-switcher-button ml-auto gap-2.5 pr-3 md:-mr-3"
+        class="ml-auto gap-2.5 pr-3 md:-mr-3"
       >
-        <span>{currentIdentity.name ?? currentIdentity.identityNumber}</span>
+        <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
         <ChevronDownIcon size="1rem" />
       </Button>
 
-      {#if identityPopover}
+      {#if isIdentityPopoverOpen}
         <Popover
-          onClose={() => (identityPopover = false)}
-          class="identity-switcher-popover mt-3 origin-top-right"
+          anchor={identityButtonRef}
+          onClose={() => (isIdentityPopoverOpen = false)}
+          direction="down"
+          align="end"
+          distance="0.75rem"
         >
           <IdentitySwitcher
-            currentIdentityNumber={currentIdentity.identityNumber}
+            selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
             switchIdentity={(identityNumber) => {
               authenticationStore.reset();
-              currentIdentityNumberStore.set(identityNumber);
-              identityPopover = false;
+              lastUsedIdentitiesStore.selectIdentity(identityNumber);
+              isIdentityPopoverOpen = false;
             }}
-            useAnotherIdentity={() => {
-              signInDialog = true;
-              identityPopover = false;
-            }}
-            onClose={() => (identityPopover = false)}
+            useAnotherIdentity={() => (isSignInDialogOpen = true)}
+            onClose={() => (isIdentityPopoverOpen = false)}
           />
         </Popover>
       {/if}
 
-      {#if signInDialog}
-        <Dialog onClose={() => (signInDialog = false)}>
+      {#if isSignInDialogOpen}
+        <Dialog onClose={() => (isSignInDialogOpen = false)}>
           <UseAnotherIdentity
-            onCancel={() => (signInDialog = false)}
-            onSuccess={() => {
-              signInDialog = false;
+            onCancel={() => (isSignInDialogOpen = false)}
+            onSuccess={(identityNumber) => {
+              isSignInDialogOpen = false;
+              lastUsedIdentitiesStore.selectIdentity(identityNumber);
               goto("/authorize/account", {
                 replaceState: true,
                 invalidateAll: true,
@@ -94,16 +90,3 @@
     {/if}
   </div>
 </header>
-
-<style>
-  :global {
-    .identity-switcher-button {
-      anchor-name: --anchor-identity-switcher;
-    }
-
-    .identity-switcher-popover {
-      position-anchor: --anchor-identity-switcher;
-      position-area: bottom span-left;
-    }
-  }
-</style>

@@ -23,7 +23,7 @@
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
 
   type Props = HTMLAttributes<HTMLElement> & {
-    currentIdentityNumber: bigint;
+    selected: bigint;
     identities: LastUsedIdentity[];
     switchIdentity: (identityNumber: bigint) => void;
     useAnotherIdentity: () => void;
@@ -31,7 +31,7 @@
   };
 
   const {
-    currentIdentityNumber,
+    selected,
     identities,
     switchIdentity,
     useAnotherIdentity,
@@ -39,9 +39,7 @@
   }: Props = $props();
 
   const currentIdentity = $derived(
-    identities.find(
-      (identity) => identity.identityNumber === currentIdentityNumber,
-    )!,
+    identities.find((identity) => identity.identityNumber === selected)!,
   );
   let view = $state<"currentIdentity" | "switchIdentity">("currentIdentity");
   const links = [
@@ -150,7 +148,7 @@
           <ButtonCard
             onclick={() => switchIdentity(identity.identityNumber)}
             class={[
-              currentIdentityNumber === identity.identityNumber &&
+              selected === identity.identityNumber &&
                 "!ring-border-brand !ring-2",
             ]}
           >
@@ -158,7 +156,7 @@
               <UserIcon size="1.25rem" />
             </Avatar>
             <span>{identity.name ?? identity.identityNumber}</span>
-            {#if currentIdentityNumber === identity.identityNumber}
+            {#if selected === identity.identityNumber}
               <Checkbox
                 checked
                 size="md"

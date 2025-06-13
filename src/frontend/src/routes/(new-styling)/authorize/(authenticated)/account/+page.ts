@@ -13,6 +13,7 @@ export const load: PageLoad = async () => {
     .then(throwCanisterError);
   // TODO: currently makes sure that local last used sorting is applied
   //       to queried accounts since the latter has no timestamps yet.
+  //       This can be removed once the canister stores the timestamps.
   accounts = lastUsedIdentitiesStore.syncLastUsedAccounts(
     identityNumber,
     effectiveOrigin,

@@ -43,7 +43,6 @@
   import { onMount } from "svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { getDapps } from "$lib/flows/dappsExplorer/dapps";
-  import { currentIdentityNumberStore } from "$lib/stores/current-identity.store";
 
   let dialog = $state<"setupOrUseExistingPasskey" | "setupNewPasskey">();
   let captcha = $state<{
@@ -82,7 +81,7 @@
         name: info.name[0],
         authMethod: { passkey: { credentialId } },
       });
-      currentIdentityNumberStore.set(identityNumber);
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
       await goto("/authorize/account");
     } catch (error) {
       handleError(error);
@@ -154,7 +153,7 @@
         identityNumber,
         accountNumber: undefined,
       });
-      currentIdentityNumberStore.set(identityNumber);
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
       captcha = undefined;
       toaster.success({
         title: "You're all set. Your identity has been created.",
@@ -220,7 +219,7 @@
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      currentIdentityNumberStore.set(identityNumber);
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
       await goto("/authorize/account");
     } catch (error) {
       systemOverlay = false;
@@ -320,7 +319,7 @@
         identityNumber,
         accountNumber: undefined,
       });
-      currentIdentityNumberStore.set(identityNumber);
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
       captcha = undefined;
       toaster.success({
         title: "You're all set. Your identity has been created.",

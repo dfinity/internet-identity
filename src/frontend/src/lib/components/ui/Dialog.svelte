@@ -11,20 +11,19 @@
     closeOnOutsideClick?: boolean;
     showCloseButton?: boolean;
     backdrop?: boolean;
-    element?: HTMLDialogElement;
   };
 
-  let {
+  const {
     children,
     onClose,
     class: className,
     closeOnOutsideClick = true,
     showCloseButton = true,
     backdrop = true,
-    element = $bindable(),
     ...props
   }: Props = $props();
 
+  let dialogRef: HTMLDialogElement;
   let onCancel = (e: Event): void => {
     e.preventDefault();
     onClose?.();
@@ -37,12 +36,12 @@
   );
 
   const fadeOutBackDrop = () => {
-    element?.removeAttribute("data-visible");
+    dialogRef.removeAttribute("data-visible");
   };
 
   onMount(() => {
-    element?.showModal();
-    element?.setAttribute("data-visible", "true");
+    dialogRef.showModal();
+    dialogRef.setAttribute("data-visible", "true");
 
     // Use the virtualKeyboard API to intentionally render the software keyboard
     // on top of the page, we manually adjust the dialog positioning for it.
@@ -52,7 +51,7 @@
     const updateKeyboardInset = () => {
       clearTimeout(visualViewportResizeTimeout);
       visualViewportResizeTimeout = setTimeout(() => {
-        element?.style.setProperty(
+        dialogRef.style.setProperty(
           "--keyboard-inset-height",
           `${Math.max(window.innerHeight - window.visualViewport!.height, 0)}px`,
         );
@@ -86,7 +85,7 @@
 </script>
 
 <dialog
-  bind:this={element}
+  bind:this={dialogRef}
   oncancel={onCancel}
   closedby={closeOnOutsideClick ? "any" : "none"}
   class={[
