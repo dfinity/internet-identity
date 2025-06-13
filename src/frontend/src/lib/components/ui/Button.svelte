@@ -31,7 +31,7 @@
   bind:element
   {...props}
   class={[
-    "box-border flex items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100",
+    "box-border flex cursor-pointer items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100",
     {
       primary: [
         "bg-bg-brand-solid text-text-primary-inversed",

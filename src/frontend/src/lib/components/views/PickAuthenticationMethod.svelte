@@ -50,8 +50,8 @@
       <Button
         onclick={handleContinueWithGoogle}
         variant="secondary"
-        size="xl"
         disabled={googleLoading}
+        size="xl"
       >
         {#if googleLoading}
           <ProgressRing />
