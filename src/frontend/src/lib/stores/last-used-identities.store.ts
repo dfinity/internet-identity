@@ -1,5 +1,5 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
-import { derived, get, Readable, Writable, writable } from "svelte/store";
+import { derived, get, Readable, writable } from "svelte/store";
 import { writableStored } from "./writable.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { AccountInfo } from "$lib/generated/internet_identity_types";
