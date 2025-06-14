@@ -4,7 +4,7 @@
   import CenterLayout from "$lib/components/layout/CenterLayout.svelte";
   import {
     authorizationStore,
-    authorizationStatusStore,,
+    authorizationStatusStore,
   } from "$lib/stores/authorization.store";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
