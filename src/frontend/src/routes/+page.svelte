@@ -13,11 +13,11 @@
 </script>
 
 <TimedDisplay
-  appearTime={new Date(Date.UTC(2025, 5, 26, 8))}
-  disappearTime={new Date(Date.UTC(2025, 5, 26, 8, 10))}
+  appearTime={new Date(Date.UTC(2025, 5, 23, 0))}
+  disappearTime={new Date(Date.UTC(2025, 5, 26, 8, 5))}
 >
   <MarqueeBanner
-    content="The subnet hosting Internet Identity will undergo scheduled maintenance on Thursday, June 26, starting at 8:00 AM UTC, with an expected duration of 5-10 minutes. During this time, new logins may be temporarily unavailable. Existing sessions will remain active. Click here to learn more!"
+    content="The subnet hosting Internet Identity will undergo scheduled maintenance on Thursday, June 26, starting at 8:00 AM UTC, with an expected duration of 5-10 minutes. During this time, log in will be temporarily unavailable. Existing sessions will remain active. Click here to learn more"
     speed={20}
     pauseOnHover={true}
     href="https://forum.dfinity.org/t/vetkeys-production-key-and-ii-subnet-downtime/50370"
