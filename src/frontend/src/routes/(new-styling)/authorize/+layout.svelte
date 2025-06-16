@@ -27,7 +27,7 @@
       class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100"
     >
       {#if nonNullish($lastUsedIdentitiesStore.selected)}
-        {#key $lastUsedIdentitiesStore.selected}
+        {#key $lastUsedIdentitiesStore.selected.identityNumber}
           <div
             class="col-start-1 row-start-1 flex flex-col"
             in:fly={{ duration: 300, y: 60, delay: 200 }}
