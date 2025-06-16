@@ -4,7 +4,7 @@
     CheckCaptchaError,
     IdRegFinishError,
     IdRegStartError,
-    OpenIdDelegationError
+    OpenIdDelegationError,
   } from "$lib/generated/internet_identity_types";
   import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
   import { inferPasskeyAlias, loadUAParser } from "$lib/flows/register";
@@ -15,25 +15,25 @@
   import { handleError } from "$lib/components/utils/error";
   import {
     AuthenticationV2Events,
-    authenticationV2Funnel
+    authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import PickAuthenticationMethod from "$lib/components/views/PickAuthenticationMethod.svelte";
   import {
     authenticateWithJWT,
     authenticateWithPasskey,
-    authenticateWithSession
+    authenticateWithSession,
   } from "$lib/utils/authentication";
   import { canisterConfig, canisterId } from "$lib/globals";
   import { sessionStore } from "$lib/stores/session.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import {
     authenticatedStore,
-    authenticationStore
+    authenticationStore,
   } from "$lib/stores/authentication.store";
   import { goto } from "$app/navigation";
   import {
     authorizationStore,
-    authorizationContextStore
+    authorizationContextStore,
   } from "$lib/stores/authorization.store";
   import { toaster } from "$lib/components/utils/toaster";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
@@ -54,13 +54,13 @@
   const dapps = getDapps();
   const dapp = $derived(
     dapps.find((dapp) =>
-      dapp.hasOrigin($authorizationContextStore.requestOrigin)
-    )
+      dapp.hasOrigin($authorizationContextStore.requestOrigin),
+    ),
   );
 
   const setupOrUseExistingPasskey = async () => {
     authenticationV2Funnel.trigger(
-      AuthenticationV2Events.ContinueWithPasskeyScreen
+      AuthenticationV2Events.ContinueWithPasskeyScreen,
     );
     dialog = "setupOrUseExistingPasskey";
   };
@@ -71,7 +71,7 @@
       const { identity, identityNumber, credentialId } =
         await authenticateWithPasskey({
           canisterId,
-          session: $sessionStore
+          session: $sessionStore,
         });
       authenticationStore.set({ identity, identityNumber });
       const info =
@@ -79,7 +79,7 @@
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { passkey: { credentialId } }
+        authMethod: { passkey: { credentialId } },
       });
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
       await goto("/authorize/account");
@@ -96,7 +96,7 @@
 
   const createPasskey = async (name: string) => {
     authenticationV2Funnel.trigger(
-      AuthenticationV2Events.StartWebauthnCreation
+      AuthenticationV2Events.StartWebauthnCreation,
     );
     try {
       const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
@@ -110,7 +110,7 @@
 
   const registerWithPasskey = async (
     passkeyIdentity: DiscoverablePasskeyIdentity,
-    attempts = 0
+    attempts = 0,
   ) => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     const uaParser = loadUAParser();
@@ -118,47 +118,47 @@
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkeyIdentity.getAaguid()
+      aaguid: passkeyIdentity.getAaguid(),
     });
     const authnMethod = passkeyAuthnMethodData({
       alias,
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId: passkeyIdentity.getCredentialId()!,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
-      origin: window.location.origin
+      origin: window.location.origin,
     });
     const name = passkeyIdentity.getName();
     try {
       const { identity_number: identityNumber } = await $sessionStore.actor
         .identity_registration_finish({
           name: nonNullish(name) ? [name] : [],
-          authn_method: authnMethod
+          authn_method: authnMethod,
         })
         .then(throwCanisterError);
       authenticationV2Funnel.trigger(
-        AuthenticationV2Events.SuccessfulPasskeyRegistration
+        AuthenticationV2Events.SuccessfulPasskeyRegistration,
       );
       const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
       const identity = await authenticateWithSession({
-        session: $sessionStore
+        session: $sessionStore,
       });
       authenticationStore.set({ identity, identityNumber });
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: passkeyIdentity.getName(),
-        authMethod: { passkey: { credentialId } }
+        authMethod: { passkey: { credentialId } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
         origin: $authorizationContextStore.effectiveOrigin,
         identityNumber,
-        accountNumber: undefined
+        accountNumber: undefined,
       });
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
       captcha = undefined;
       toaster.success({
         title: "You're all set. Your identity has been created.",
         duration: 4000,
-        closable: false
+        closable: false,
       });
       await authorizationStore.authorize(undefined, 4000);
     } catch (error) {
@@ -169,7 +169,7 @@
             if ("CheckCaptcha" in nextStep) {
               if (attempts < 3) {
                 await solveCaptcha(
-                  `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`
+                  `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
                 );
                 return registerWithPasskey(passkeyIdentity, attempts + 1);
               }
@@ -198,13 +198,13 @@
       systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
         nonce: $sessionStore.nonce,
-        mediation: "required"
+        mediation: "required",
       });
       systemOverlay = false;
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: $sessionStore,
-        jwt
+        jwt,
       });
       // If the previous call succeeds, it means the Google user already exists in II.
       // Therefore, they are logging in.
@@ -217,7 +217,7 @@
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub } }
+        authMethod: { openid: { iss, sub } },
       });
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
       await goto("/authorize/account");
@@ -229,7 +229,7 @@
         nonNullish(jwt)
       ) {
         authenticationV2Funnel.trigger(
-          AuthenticationV2Events.RegisterWithGoogle
+          AuthenticationV2Events.RegisterWithGoogle,
         );
         await startRegistration();
         return registerWithGoogle(jwt);
@@ -246,7 +246,7 @@
         .then(throwCanisterError);
       if ("CheckCaptcha" in next_step) {
         await solveCaptcha(
-          `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`
+          `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`,
         );
       }
     } catch (error) {
@@ -286,7 +286,7 @@
             handleError(error);
             dialog = undefined;
           }
-        }
+        },
       };
     });
 
@@ -295,16 +295,16 @@
       await $sessionStore.actor
         .openid_identity_registration_finish({
           jwt,
-          salt: $sessionStore.salt
+          salt: $sessionStore.salt,
         })
         .then(throwCanisterError);
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: $sessionStore,
-        jwt
+        jwt,
       });
       authenticationV2Funnel.trigger(
-        AuthenticationV2Events.SuccessfulGoogleRegistration
+        AuthenticationV2Events.SuccessfulGoogleRegistration,
       );
       authenticationStore.set({ identity, identityNumber });
       const info =
@@ -312,19 +312,19 @@
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub } }
+        authMethod: { openid: { iss, sub } },
       });
       lastUsedIdentitiesStore.addLastUsedAccount({
         origin: $authorizationContextStore.effectiveOrigin,
         identityNumber,
-        accountNumber: undefined
+        accountNumber: undefined,
       });
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
       captcha = undefined;
       toaster.success({
         title: "You're all set. Your identity has been created.",
         duration: 4000,
-        closable: false
+        closable: false,
       });
       await authorizationStore.authorize(undefined, 4000);
     } catch (error) {
@@ -335,7 +335,7 @@
         const nextStep = error.value(error.type).next_step;
         if ("CheckCaptcha" in nextStep) {
           await solveCaptcha(
-            `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`
+            `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
           return registerWithGoogle(jwt);
         }
