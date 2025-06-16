@@ -119,6 +119,7 @@ pub struct PersistentState {
     pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
+    pub dummy_auth: Option<DummyAuthConfig>,
 }
 
 impl Default for PersistentState {
@@ -140,6 +141,7 @@ impl Default for PersistentState {
             fetch_root_key: None,
             enable_dapps_explorer: None,
             is_production: None,
+            dummy_auth: None,
         }
     }
 }

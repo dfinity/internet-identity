@@ -101,9 +101,10 @@
       AuthenticationV2Events.StartWebauthnCreation,
     );
     try {
-      const passkeyIdentity = features.DUMMY_AUTH
-        ? new DiscoverableDummyIdentity(name)
-        : await DiscoverablePasskeyIdentity.createNew(name);
+      const passkeyIdentity =
+        features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+          ? await DiscoverableDummyIdentity.createNew(name)
+          : await DiscoverablePasskeyIdentity.createNew(name);
       await startRegistration();
       await registerWithPasskey(passkeyIdentity);
     } catch (error) {
