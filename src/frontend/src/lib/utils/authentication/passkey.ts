@@ -9,6 +9,8 @@ import {
 import { isNullish } from "@dfinity/utils";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { Session } from "$lib/stores/session.store";
+import { features } from "$lib/legacy/features";
+import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 
 export class IdentityNotMigratedError extends Error {
   constructor() {
@@ -39,19 +41,25 @@ export const authenticateWithPasskey = async ({
     canisterId,
   });
   let identityNumber: bigint;
-  const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
-    credentialId,
-    getPublicKey: async (result) => {
-      const lookupResult = (
-        await actor.lookup_device_key(new Uint8Array(result.rawId))
-      )[0];
-      if (isNullish(lookupResult)) {
-        throw new IdentityNotMigratedError();
-      }
-      identityNumber = lookupResult.anchor_number;
-      return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
-    },
-  });
+  const passkeyIdentity = features.DUMMY_AUTH
+    ? new DiscoverableDummyIdentity()
+    : DiscoverablePasskeyIdentity.useExisting({
+        credentialId,
+        getPublicKey: async (result) => {
+          const lookupResult = (
+            await actor.lookup_device_key(new Uint8Array(result.rawId))
+          )[0];
+          if (isNullish(lookupResult)) {
+            throw new IdentityNotMigratedError();
+          }
+          identityNumber = lookupResult.anchor_number;
+          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+        },
+      });
+  if (features.DUMMY_AUTH) {
+    identityNumber = (await actor.lookup_device_key(new Uint8Array(32)))[0]!
+      .anchor_number;
+  }
   const delegation = await DelegationChain.create(
     passkeyIdentity,
     session.identity.getPublicKey(),

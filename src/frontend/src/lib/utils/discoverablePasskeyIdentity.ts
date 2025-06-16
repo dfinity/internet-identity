@@ -197,7 +197,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     });
   }
 
-  getPublicKey(): CosePublicKey {
+  getPublicKey(): PublicKey {
     if (!this.#publicKey) {
       throw Error("Sign first to retrieve public key");
     }
