@@ -6,12 +6,14 @@ import {
   AuthenticationV2Events,
   authenticationV2Funnel,
 } from "$lib/utils/analytics/authenticationV2Funnel";
+import { nonNullish } from "@dfinity/utils";
 
 let firstVisit = true;
 
 export const load: PageLoad = () => {
-  const lastUsedIdentityAvailable =
-    Object.values(get(lastUsedIdentitiesStore)).length > 0;
+  const lastUsedIdentityAvailable = nonNullish(
+    get(lastUsedIdentitiesStore).selected,
+  );
 
   if (firstVisit) {
     firstVisit = false;
@@ -22,7 +24,7 @@ export const load: PageLoad = () => {
         : AuthenticationV2Events.LastUsedNotPresent,
     );
     if (lastUsedIdentityAvailable) {
-      throw redirect(302, "/authorize/continue");
+      throw redirect(307, "/authorize/continue");
     }
   }
 };

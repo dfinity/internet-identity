@@ -12,6 +12,7 @@ import {
   transformSignedDelegation,
   retryFor,
 } from "$lib/utils/utils";
+import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest; // Additional details e.g. derivation origin
@@ -69,8 +70,18 @@ export const authorizationStore: AuthorizationStore = {
               ...value,
               status: "authorizing",
             }));
-            const artificialDelayPromise = waitFor(artificialDelay);
             const { identityNumber, actor } = get(authenticatedStore);
+            const syncLastUsedAccountsPromise = actor
+              .get_accounts(identityNumber, effectiveOrigin)
+              .then(throwCanisterError)
+              .then((accounts) =>
+                lastUsedIdentitiesStore.syncLastUsedAccounts(
+                  identityNumber,
+                  effectiveOrigin,
+                  accounts,
+                ),
+              );
+            const artificialDelayPromise = waitFor(artificialDelay);
             try {
               const { user_key, expiration } = await actor
                 .prepare_account_delegation(
@@ -95,6 +106,7 @@ export const authorizationStore: AuthorizationStore = {
                   .then(throwCanisterError)
                   .then(transformSignedDelegation),
               );
+              await syncLastUsedAccountsPromise;
               await artificialDelayPromise;
               resolve({
                 kind: "success",
