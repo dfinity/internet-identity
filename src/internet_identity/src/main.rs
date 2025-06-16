@@ -478,6 +478,7 @@ fn config() -> InternetIdentityInit {
         fetch_root_key: persistent_state.fetch_root_key,
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
+        dummy_auth: Some(persistent_state.dummy_auth.clone()),
     })
 }
 
@@ -589,6 +590,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(is_production) = arg.is_production {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.is_production = Some(is_production);
+            })
+        }
+        if let Some(dummy_auth) = arg.dummy_auth {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.dummy_auth = dummy_auth;
             })
         }
     }
