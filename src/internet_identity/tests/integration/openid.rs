@@ -7,9 +7,9 @@ use candid::Principal;
 use canister_tests::{api::internet_identity as api, framework::*};
 use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, InternetIdentityInit, OpenIdConfig, OpenIdCredentialKey,
-    OpenIdDelegationError, PublicKeyAuthn,
+    ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
+    OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{CallError, PocketIc};
@@ -378,6 +378,13 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
         openid_google: Some(Some(OpenIdConfig {
             client_id: CLIENT_ID.to_string(),
         })),
+        archive_config: Some(ArchiveConfig {
+            module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+            entries_buffer_limit: 10_000,
+            polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
+            entries_fetch_limit: 10,
+        }),
+        canister_creation_cycles_cost: Some(0),
         ..Default::default()
     };
     // Cycles are needed before installation because of the async HTTP outcalls
@@ -387,6 +394,21 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
         Some(args),
         10_000_000_000_000,
     );
+
+    match api::deploy_archive(env, canister_id, &ARCHIVE_WASM) {
+        Ok(DeployArchiveResult::Success(_archive_principal)) => {
+            // Successfully deployed.
+        }
+        Ok(unexpected_result) => {
+            panic!(
+                "archive deployment returned unexpected Ok result: {:?}",
+                unexpected_result
+            );
+        }
+        Err(err) => {
+            panic!("archive deployment failed: {:?}", err);
+        }
+    }
 
     // Mock google certs response
     mock_google_certs_response(env);

@@ -30,6 +30,7 @@ export const idlFactory = ({ IDL }) => {
       }),
     }),
   });
+  const DummyAuthConfig = IDL.Record({ 'prompt_for_index' : IDL.Bool });
   const RateLimitConfig = IDL.Record({
     'max_tokens' : IDL.Nat64,
     'time_per_token_ns' : IDL.Nat64,
@@ -46,6 +47,7 @@ export const idlFactory = ({ IDL }) => {
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   const UserNumber = IDL.Nat64;
@@ -189,6 +191,7 @@ export const idlFactory = ({ IDL }) => {
     'AccountLimitReached' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+    'NameTooLong' : IDL.Null,
   });
   const ChallengeKey = IDL.Text;
   const Challenge = IDL.Record({
@@ -439,6 +442,7 @@ export const idlFactory = ({ IDL }) => {
     'AccountLimitReached' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+    'NameTooLong' : IDL.Null,
   });
   const VerifyTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
@@ -743,6 +747,7 @@ export const init = ({ IDL }) => {
       }),
     }),
   });
+  const DummyAuthConfig = IDL.Record({ 'prompt_for_index' : IDL.Bool });
   const RateLimitConfig = IDL.Record({
     'max_tokens' : IDL.Nat64,
     'time_per_token_ns' : IDL.Nat64,
@@ -759,6 +764,7 @@ export const init = ({ IDL }) => {
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'captcha_config' : IDL.Opt(CaptchaConfig),
+    'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
   });
   return [IDL.Opt(InternetIdentityInit)];

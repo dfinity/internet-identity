@@ -10,8 +10,8 @@ use canister_tests::{
     },
     flows,
     framework::{
-        device_data_2, env, install_ii_canister, principal_1, principal_2, time, verify_delegation,
-        II_WASM,
+        device_data_2, env, install_ii_with_archive, principal_1, principal_2, time,
+        verify_delegation,
     },
 };
 use internet_identity_interface::internet_identity::types::{
@@ -25,7 +25,7 @@ use serde_bytes::ByteBuf;
 #[test]
 fn should_create_account() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -57,7 +57,7 @@ fn should_create_account() -> Result<(), CallError> {
 #[test]
 fn should_list_accounts() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Ganymede".to_string();
@@ -144,7 +144,7 @@ fn should_list_accounts() -> Result<(), CallError> {
 #[test]
 fn should_list_default_account() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
 
@@ -175,7 +175,7 @@ fn should_list_default_account() -> Result<(), CallError> {
 #[test]
 fn should_list_only_own_accounts() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let another_identity_number =
         flows::register_anchor_with_device(&env, canister_id, &device_data_2());
@@ -287,7 +287,7 @@ fn should_list_only_own_accounts() -> Result<(), CallError> {
 #[test]
 fn should_update_account() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -333,11 +333,49 @@ fn should_update_account() -> Result<(), CallError> {
     Ok(())
 }
 
+/// When a default / numberless account gets updated, it becomes stored and numbered.
+/// It should not be possible to update
+#[test]
+#[should_panic]
+fn should_not_update_numberless_account_twice() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://some-dapp.com".to_string();
+    let name = Some("Icarus".to_string());
+
+    let update = AccountUpdate { name };
+
+    let updated_account = update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        None,
+        update.clone(),
+    )
+    .expect("This call should succeed!");
+
+    assert!(updated_account.is_ok());
+
+    let _ = update_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin,
+        None,
+        update,
+    )
+    .expect("The call itself should succeed, but should panic inside");
+}
+
 /// Verifies that a default account can be updated
 #[test]
 fn should_update_default_account() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let origin = "https://some-dapp.com".to_string();
     let name = "Callisto".to_string();
@@ -418,7 +456,7 @@ fn should_update_default_account() -> Result<(), CallError> {
 #[should_panic]
 fn should_only_update_owned_account() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let another_identity_number =
         flows::register_anchor_with_device(&env, canister_id, &device_data_2());
@@ -473,7 +511,7 @@ fn should_only_update_owned_account() {
 #[test]
 fn should_get_valid_account_delegation() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -513,7 +551,7 @@ fn should_get_valid_account_delegation() -> Result<(), CallError> {
 #[test]
 fn should_get_matching_principals() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -596,7 +634,7 @@ fn should_get_matching_principals() -> Result<(), CallError> {
 #[test]
 fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -638,7 +676,7 @@ fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), Ca
 #[test]
 fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -685,7 +723,7 @@ fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), 
 fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
     let env = env();
     let root_key = env.root_key().unwrap();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname_1 = "https://dapp1.com".to_string();
     let frontend_hostname_2 = "https://dapp2.com".to_string();
@@ -768,7 +806,7 @@ fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
 #[test]
 fn should_issue_different_principals_for_account_delegations() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let pub_session_key = ByteBuf::from("session public key");
     let frontend_hostname_1 = "https://dapp1.com".to_string();
@@ -816,7 +854,7 @@ fn should_issue_different_principals_for_account_delegations() -> Result<(), Cal
 #[test]
 fn can_not_prepare_account_delegation_for_different_user() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -844,7 +882,7 @@ fn can_not_prepare_account_delegation_for_different_user() -> Result<(), CallErr
 #[test]
 fn can_not_get_account_delegation_for_different_user() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -885,7 +923,7 @@ fn can_not_get_account_delegation_for_different_user() -> Result<(), CallError> 
 #[test]
 fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");
@@ -922,7 +960,7 @@ fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError>
 #[test]
 fn should_issue_different_principals_for_different_accounts() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
     let frontend_hostname = "https://some-dapp.com".to_string();
     let pub_session_key = ByteBuf::from("session public key");

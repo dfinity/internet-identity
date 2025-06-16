@@ -31,7 +31,7 @@ fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
 #[test]
 fn should_get_valid_id_alias() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
@@ -114,7 +114,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
 #[test]
 fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number_1 = flows::register_anchor(&env, canister_id);
     let identity_number_2 = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
@@ -237,7 +237,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
 #[test]
 fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party_1 = FrontendHostname::from("https://some-dapp-1.com");
     let relying_party_2 = FrontendHostname::from("https://some-dapp-2.com");
@@ -364,7 +364,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
 #[test]
 fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer_1 = FrontendHostname::from("https://some-issuer-1.com");
@@ -491,7 +491,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
 #[test]
 fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer-1.com");
@@ -608,7 +608,7 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
 #[test]
 fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
@@ -630,7 +630,7 @@ fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
 #[test]
 fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
@@ -667,7 +667,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
 #[test]
 fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
@@ -698,7 +698,7 @@ fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
 #[test]
 fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");
@@ -738,7 +738,7 @@ fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> 
 #[should_panic(expected = "id_alias signature invalid")]
 fn should_not_validate_id_alias_with_wrong_canister_key() {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
     let relying_party = FrontendHostname::from("https://some-dapp.com");
     let issuer = FrontendHostname::from("https://some-issuer.com");

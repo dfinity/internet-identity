@@ -9,8 +9,8 @@ use crate::{
     state::{self, storage_borrow, storage_borrow_mut},
     storage::{
         account::{
-            Account, AccountDelegationError, AccountsCounter, CreateAccountParams,
-            PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
+            validate_account_name, Account, AccountDelegationError, AccountsCounter,
+            CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
         },
         Storage,
     },
@@ -44,6 +44,7 @@ pub fn create_account_for_origin(
     origin: FrontendHostname,
     name: String,
 ) -> Result<Account, CreateAccountError> {
+    validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
         check_or_rebuild_max_anchor_accounts(
             storage,
@@ -80,6 +81,7 @@ pub fn update_account_for_origin(
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(new_name) => {
+            validate_account_name(&new_name).map_err(Into::<UpdateAccountError>::into)?;
             let (updated_account, old_account_name) =
                 // Type annotation was necessary for the compiler to infer the correct type
                 storage_borrow_mut(|storage| -> Result<(Account, Option<String>), UpdateAccountError> {
@@ -101,6 +103,7 @@ pub fn update_account_for_origin(
                             account_number,
                             anchor_number,
                             origin: &origin,
+                            known_app_num: None
                         })
                         .expect("Updating an unreadable account should be impossible!");
 
@@ -160,6 +163,7 @@ pub async fn prepare_account_delegation(
                 account_number,
                 anchor_number,
                 origin: &origin,
+                known_app_num: None,
             })
             .ok_or(AccountDelegationError::Unauthorized(caller()))
     })?;
@@ -199,6 +203,7 @@ pub fn get_account_delegation(
                 account_number,
                 anchor_number,
                 origin,
+                known_app_num: None,
             })
             .ok_or(AccountDelegationError::Unauthorized(caller()))?;
 

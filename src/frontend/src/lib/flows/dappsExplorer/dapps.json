@@ -784,5 +784,11 @@
     "oneLiner": "Decentralized alternative to WhatsApp",
     "website": "https://oc.app/",
     "logo": "openchat_logo.webp"
+  },
+  {
+    "name": "Demo App",
+    "oneLiner": "Experience next-gen decentralized authentication.",
+    "website": "https://try.id.ai",
+    "logo": "try-id-ai.svg"
   }
 ]

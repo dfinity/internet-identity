@@ -43,7 +43,7 @@ describe("lastUsedIdentitiesStore", () => {
   });
 
   it("should initialize with an empty object", () => {
-    expect(get(lastUsedIdentitiesStore)).toEqual({});
+    expect(get(lastUsedIdentitiesStore).identities).toEqual({});
   });
 
   it("should add the first identity correctly", () => {
@@ -61,7 +61,7 @@ describe("lastUsedIdentitiesStore", () => {
         lastUsedTimestampMillis: mockTimestamp1,
       },
     };
-    expect(get(lastUsedIdentitiesStore)).toEqual(expected);
+    expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
   });
 
   it("should add multiple identities with correct timestamps", () => {
@@ -94,7 +94,7 @@ describe("lastUsedIdentitiesStore", () => {
         lastUsedTimestampMillis: mockTimestamp2,
       },
     };
-    expect(get(lastUsedIdentitiesStore)).toEqual(expected);
+    expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
   });
 
   it("should update the timestamp when adding an existing identity", () => {
@@ -105,7 +105,7 @@ describe("lastUsedIdentitiesStore", () => {
       authMethod: { passkey: { credentialId: credId1 } },
     });
     expect(
-      get(lastUsedIdentitiesStore)[identity1.toString()]
+      get(lastUsedIdentitiesStore).identities[identity1.toString()]
         .lastUsedTimestampMillis,
     ).toBe(mockTimestamp1);
 
@@ -125,9 +125,9 @@ describe("lastUsedIdentitiesStore", () => {
         lastUsedTimestampMillis: mockTimestamp3,
       },
     };
-    expect(get(lastUsedIdentitiesStore)).toEqual(expected);
+    expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
     expect(
-      get(lastUsedIdentitiesStore)[identity1.toString()]
+      get(lastUsedIdentitiesStore).identities[identity1.toString()]
         .lastUsedTimestampMillis,
     ).toBe(mockTimestamp3);
   });
@@ -138,10 +138,10 @@ describe("lastUsedIdentitiesStore", () => {
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
     });
-    expect(get(lastUsedIdentitiesStore)).not.toEqual({}); // Ensure it's not empty
+    expect(get(lastUsedIdentitiesStore).identities).not.toEqual({}); // Ensure it's not empty
 
     lastUsedIdentitiesStore.reset();
-    expect(get(lastUsedIdentitiesStore)).toEqual({});
+    expect(get(lastUsedIdentitiesStore).identities).toEqual({});
   });
 });
 

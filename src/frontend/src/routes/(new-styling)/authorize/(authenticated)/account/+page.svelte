@@ -1,50 +1,41 @@
 <script lang="ts">
   import type { PageProps } from "./$types";
   import { throwCanisterError } from "$lib/utils/utils";
-  import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import {
+    authenticatedStore,
+    isAuthenticatedStore,
+  } from "$lib/stores/authentication.store";
   import {
     authorizationStore,
     authorizationContextStore,
   } from "$lib/stores/authorization.store";
-  import RadioCard from "$lib/components/ui/RadioCard.svelte";
   import { PlusIcon } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { handleError } from "$lib/components/utils/error";
-  import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import { getDapps } from "$lib/flows/dappsExplorer/dapps";
   import { nonNullish } from "@dfinity/utils";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import CreateAccount from "$lib/components/views/CreateAccount.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { GlobeIcon } from "@lucide/svelte";
-  import { page } from "$app/state";
-  import { untrack } from "svelte";
-  import { remapToLegacyDomain } from "$lib/utils/iiConnection.js";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
+  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
+  import { goto } from "$app/navigation";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import type { AccountInfo } from "$lib/generated/internet_identity_types";
 
   const { data }: PageProps = $props();
-  let accounts = $derived(data.accounts);
+  let accounts = $derived(
+    data.accounts.sort((a, b) =>
+      Number((b.last_used[0] ?? BigInt(0)) - (a.last_used[0] ?? BigInt(0))),
+    ),
+  );
 
   const origin = $derived($authorizationContextStore.requestOrigin);
-  const hostname = $derived(new URL(origin).hostname);
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
-  const preselectedAccount = untrack(() =>
-    "preselectAccount" in page.state && page.state.preselectAccount === true
-      ? accounts[0].account_number[0]
-      : null,
-  );
 
-  let selectedAccountNumber = $state<bigint | undefined | null>(
-    preselectedAccount,
-  );
-  const selectedAccount = $derived(
-    accounts.find(
-      (account) => account.account_number[0] === selectedAccountNumber,
-    )!,
-  );
-  let dialog = $state(false);
+  let createAccountDialog = $state(false);
+  let loading = $state(false);
 
   const createAccount = async (name: string) => {
     try {
@@ -56,89 +47,72 @@
         )
         .then(throwCanisterError);
       accounts = [...accounts, account];
-      selectedAccountNumber = account.account_number[0];
-      dialog = false;
     } catch (error) {
       handleError(error);
-      dialog = false;
+    } finally {
+      createAccountDialog = false;
     }
   };
 
-  const handleContinue = async () => {
-    try {
-      lastUsedIdentitiesStore.addLastUsedAccount({
-        origin: $authorizationContextStore.effectiveOrigin,
-        identityNumber: $authenticatedStore.identityNumber,
-        accountNumber: selectedAccount.account_number[0],
-        name: selectedAccount.name[0],
-      });
-      await authorizationStore.authorize(selectedAccount.account_number[0]);
-    } catch (error) {
-      handleError(error);
-    }
+  const continueAs = async (account: AccountInfo) => {
+    loading = true;
+    lastUsedIdentitiesStore.addLastUsedAccount({
+      origin: $authorizationContextStore.effectiveOrigin,
+      identityNumber: $authenticatedStore.identityNumber,
+      accountNumber: account.account_number[0],
+      name: account.name[0],
+    });
+    await authorizationStore.authorize(account.account_number[0]);
   };
+
+  $effect(() => {
+    if (!$isAuthenticatedStore) {
+      goto("/authorize/continue", {
+        replaceState: true,
+        state: { disableNavigationAnimation: true },
+      });
+    }
+  });
 </script>
 
 <div class="flex flex-1 flex-col justify-end">
+  <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <div class="mb-6 flex flex-col gap-2">
-    <h1 class="text-text-primary text-2xl font-medium">Select an account</h1>
-    <p class="text-text-secondary text-sm">you'd like to sign in with</p>
+    <h1 class="text-text-primary text-2xl font-medium">Choose account</h1>
+    <p class="text-text-secondary self-start text-sm">
+      <span>or create another for</span>
+      {#if nonNullish(dapp?.name)}
+        <b>{dapp.name}</b>
+      {:else}
+        <span>this app</span>
+      {/if}
+    </p>
   </div>
-  <div class="mb-3 flex h-8 items-center gap-2">
-    {#if nonNullish(dapp?.logoSrc)}
-      <img
-        src={dapp.logoSrc}
-        alt=""
-        aria-hidden="true"
-        class="h-6 rounded-xl"
-      />
-    {:else}
-      <GlobeIcon size="1.25rem" class="text-fg-primary" />
-    {/if}
-    <Ellipsis
-      text={hostname}
-      position="middle"
-      class="text-text-primary w-0 max-w-[75%] flex-1 text-sm font-semibold"
-    />
-  </div>
-  <div
-    class="mb-6 flex flex-col items-stretch gap-1.5 self-stretch"
-    role="radiogroup"
-  >
-    {#each accounts as account}
-      <RadioCard
-        onclick={() => (selectedAccountNumber = account.account_number[0])}
-        checked={account === selectedAccount}
-        role="radio"
-        aria-checked={account === selectedAccount}
-      >
-        <Avatar size="sm">
-          {account.name[0]?.slice(0, 1).toUpperCase() ?? "A"}
-        </Avatar>
-        <span class="overflow-hidden overflow-ellipsis whitespace-nowrap">
-          {account.name[0] ?? "Primary account"}
-        </span>
-      </RadioCard>
-    {/each}
-    <RadioCard onclick={() => (dialog = true)}>
+  <div class="flex flex-col items-stretch gap-1.5 self-stretch">
+    <ul class="contents">
+      {#each accounts as account}
+        <li class="contents">
+          <ButtonCard onclick={() => continueAs(account)} disabled={loading}>
+            <Avatar size="sm">
+              {(account.name[0] ?? "Primary account").slice(0, 1).toUpperCase()}
+            </Avatar>
+            <span class="overflow-hidden overflow-ellipsis whitespace-nowrap">
+              {account.name[0] ?? "Primary account"}
+            </span>
+          </ButtonCard>
+        </li>
+      {/each}
+    </ul>
+    <ButtonCard onclick={() => (createAccountDialog = true)} disabled={loading}>
       <FeaturedIcon size="sm">
         <PlusIcon size="1.25rem" />
       </FeaturedIcon>
       <span>Create additional account</span>
-    </RadioCard>
+    </ButtonCard>
   </div>
-  <Button
-    onclick={handleContinue}
-    variant="primary"
-    size="xl"
-    type="submit"
-    disabled={selectedAccountNumber === null}
-  >
-    Continue
-  </Button>
 </div>
-{#if dialog}
-  <Dialog onClose={() => (dialog = false)}>
+{#if createAccountDialog}
+  <Dialog onClose={() => (createAccountDialog = false)}>
     <CreateAccount create={createAccount} />
   </Dialog>
 {/if}

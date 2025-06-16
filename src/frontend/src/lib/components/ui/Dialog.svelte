@@ -8,7 +8,6 @@
 
   type Props = HTMLAttributes<HTMLDialogElement> & {
     onClose?: () => void;
-    title?: string;
     closeOnOutsideClick?: boolean;
     showCloseButton?: boolean;
     backdrop?: boolean;
@@ -17,7 +16,6 @@
   const {
     children,
     onClose,
-    title,
     class: className,
     closeOnOutsideClick = true,
     showCloseButton = true,
@@ -100,7 +98,7 @@
     backdrop && "[&[data-visible]]:backdrop:opacity-80",
   ]}
   style="--keyboard-inset-height: env(keyboard-inset-height);"
-  transition:transitionFn
+  transition:transitionFn|global
   onoutrostart={fadeOutBackDrop}
   {...props}
 >

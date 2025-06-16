@@ -19,6 +19,7 @@ describe("isRegistrationAllowed", () => {
       openid_google: [],
       is_production: [],
       new_flow_origins: [],
+      dummy_auth: [],
     };
   };
 
