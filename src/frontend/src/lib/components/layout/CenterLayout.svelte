@@ -8,7 +8,7 @@
   const { children, class: className, ...rest }: Props = $props();
 </script>
 
-<div class={["flex min-h-[100dvh] w-screen flex-col", className]} {...rest}>
+<div class={["flex min-h-[100dvh] flex-col", className]} {...rest}>
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">

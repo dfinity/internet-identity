@@ -335,9 +335,7 @@
   <h1 class="text-text-primary mb-2 text-2xl font-medium">
     Use another identity
   </h1>
-  <p class="text-text-secondary mb-6 self-start text-sm">
-    Choose authentication method
-  </p>
+  <p class="text-text-secondary mb-6 self-start text-sm">Choose method</p>
   <PickAuthenticationMethod {setupOrUseExistingPasskey} {continueWithGoogle} />
 {:else if view === "setupOrUseExistingPasskey"}
   <SetupOrUseExistingPasskey
