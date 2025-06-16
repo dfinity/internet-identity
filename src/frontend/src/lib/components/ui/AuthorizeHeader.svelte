@@ -18,13 +18,11 @@
 </script>
 
 <div {...props} class={["flex flex-1 flex-col", className]}>
-  <div
-    class="flex flex-1 flex-col items-center justify-center pb-3 [@media(min-height:648px)]:py-8"
-  >
+  <div class="flex flex-1 flex-col items-center justify-center pt-5 pb-6">
     <div
       aria-hidden="true"
       class={[
-        "mb-4 flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
+        "mb-6 flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
         isNullish(dapp?.logoSrc) &&
           "border-border-tertiary text-fg-primary bg-bg-primary border",
       ]}
@@ -41,13 +39,4 @@
       <Ellipsis text={hostname} position="middle" />
     </Badge>
   </div>
-  <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-    Sign in
-  </h1>
-  <p class="text-text-secondary self-start text-sm">
-    {#if nonNullish(dapp?.name)}
-      <span>to <b>{dapp.name}</b></span>
-    {/if}
-    <span>with Internet Identity</span>
-  </p>
 </div>

@@ -14,9 +14,23 @@
     className,
   ]}
 >
-  <div class="text-text-tertiary text-sm font-medium">© Internet Identity</div>
-  <nav class="text-text-primary flex gap-4 text-sm font-semibold">
-    <a href={SUPPORT_URL} target="_blank" rel="noopener">Support</a>
-    <a href={SOURCE_CODE_URL} target="_blank" rel="noopener">Source code</a>
+  <div class="text-text-tertiary text-xs font-medium">© Internet Identity</div>
+  <nav class="text-text-primary flex gap-4 text-xs font-semibold">
+    <a
+      href={SUPPORT_URL}
+      target="_blank"
+      rel="noopener"
+      class="outline-0 focus-visible:underline"
+    >
+      Support
+    </a>
+    <a
+      href={SOURCE_CODE_URL}
+      target="_blank"
+      rel="noopener"
+      class="outline-0 focus-visible:underline"
+    >
+      Source code
+    </a>
   </nav>
 </footer>

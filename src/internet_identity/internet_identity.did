@@ -566,12 +566,14 @@ type CreateAccountError = variant {
     InternalCanisterError : text;
     AccountLimitReached;
     Unauthorized : principal;
+    NameTooLong;
 };
 
 type UpdateAccountError = variant {
     InternalCanisterError : text;
     AccountLimitReached;
     Unauthorized : principal;
+    NameTooLong;
 };
 
 type AccountDelegationError = variant {

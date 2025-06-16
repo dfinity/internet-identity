@@ -34,6 +34,7 @@ fn should_create_additional_account() {
         account_number: Some(1), // First account created
         anchor_number,
         origin: &origin,
+        known_app_num: None,
     };
     let additional_account_1 = storage.read_account(read_params.clone());
     assert!(
@@ -295,6 +296,7 @@ fn should_update_additional_account() {
         account_number: Some(account_number), // First account created is 1
         anchor_number,
         origin: &origin,
+        known_app_num: None,
     };
     let additional_account_1 = storage.read_account(read_params.clone());
     assert!(
@@ -518,6 +520,7 @@ fn should_read_default_account_with_empty_reference_list() {
         account_number: None,
         anchor_number,
         origin: &origin,
+        known_app_num: Some(app_num),
     };
     let default_account = storage.read_account(read_params).unwrap();
 
@@ -551,6 +554,7 @@ fn should_not_read_account_from_wrong_anchor() {
         account_number: Some(1),        // First account created
         anchor_number: anchor_number_2, // Different anchor
         origin: &origin,
+        known_app_num: None,
     };
     let account = storage.read_account(read_params);
 

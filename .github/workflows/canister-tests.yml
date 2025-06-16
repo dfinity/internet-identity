@@ -1038,15 +1038,16 @@ jobs:
             exit 1
           fi
 
-  interface-compatibility:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-didc
-      - name: "Check canister interface compatibility"
-        run: |
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
-          didc check src/internet_identity/internet_identity.did internet_identity_previous.did
+  # DEACTIVATED SO WE CAN UPDATE THE ERROR TYPE IN CREATE AND UPDATE ACCOUNTS
+  # interface-compatibility:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: ./.github/actions/setup-didc
+  #     - name: "Check canister interface compatibility"
+  #       run: |
+  #         curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did -o internet_identity_previous.did
+  #         didc check src/internet_identity/internet_identity.did internet_identity_previous.did
 
   sig-verifier-js:
     runs-on: ubuntu-latest

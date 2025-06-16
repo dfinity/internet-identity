@@ -104,6 +104,7 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::BufferedEntry;
 
+use crate::delegation::check_frontend_length;
 use crate::openid::OpenIdCredentialKey;
 use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
@@ -929,6 +930,7 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         params: CreateAccountParams,
     ) -> Result<Account, StorageError> {
+        check_frontend_length(&params.origin);
         let anchor_number = params.anchor_number;
         let origin = &params.origin;
 
@@ -1003,6 +1005,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_number: AnchorNumber,
         origin: &FrontendHostname,
     ) -> Vec<Account> {
+        check_frontend_length(origin);
         match self.lookup_application_number_with_origin(origin) {
             None => vec![Account::new(anchor_number, origin.clone(), None, None)],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
@@ -1014,6 +1017,7 @@ impl<M: Memory + Clone> Storage<M> {
                             account_number: acc_ref.account_number,
                             anchor_number,
                             origin,
+                            known_app_num: Some(app_num),
                         })
                     })
                     .collect(),
@@ -1028,8 +1032,12 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the `Account` number doesn't esist, returns a default `Account`.
     /// If the `Account` number exists but the `Account` doesn't exist, returns None.
     /// If the `Account` exists, returns it as `Account`.
+    /// Optionally an application number can be passed if it is already known, so we don't look it up more than necessary.
     pub fn read_account(&self, params: ReadAccountParams) -> Option<Account> {
-        let application_number = self.lookup_application_number_with_origin(params.origin);
+        check_frontend_length(params.origin);
+        let application_number = params
+            .known_app_num
+            .or_else(|| self.lookup_application_number_with_origin(params.origin));
 
         match params.account_number {
             // If a default account is requested
@@ -1124,6 +1132,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
     pub fn update_account(&mut self, params: UpdateAccountParams) -> Result<Account, StorageError> {
+        check_frontend_length(&params.origin);
         match params.account_number {
             Some(account_number) => self.update_existing_account(UpdateExistingAccountParams {
                 account_number,
