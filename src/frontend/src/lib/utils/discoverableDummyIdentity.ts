@@ -4,19 +4,19 @@ import { DiscoverablePasskeyIdentity } from "./discoverablePasskeyIdentity";
 import { canisterConfig } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
 
-const getSeedIndex = (): number => {
+const getSeedIndex = (): bigint => {
   if (canisterConfig.dummy_auth[0]?.[0]?.prompt_for_index === true) {
-    const value = prompt("Enter seed index (0 - 255)", "0")?.trim();
+    const value = prompt("Enter seed index", "0")?.trim();
     if (isNullish(value)) {
       throw new Error("Operation cancelled");
     }
-    const index = parseInt(value);
-    if (isNaN(index) || index < 0 || index > 255) {
+    const index = BigInt(value);
+    if (index < BigInt(0)) {
       throw new Error("Invalid index");
     }
     return index;
   }
-  return 0;
+  return BigInt(0);
 };
 
 export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
@@ -29,8 +29,10 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
     this.#name = name;
 
     const index = getSeedIndex();
-    const seed = new Uint8Array(32);
-    seed.set([index], seed.length - 1);
+    const buffer = new ArrayBuffer(32);
+    const view = new DataView(buffer);
+    view.setBigUint64(0, index);
+    const seed = new Uint8Array(buffer);
     this.#identity = Ed25519KeyIdentity.generate(seed);
     this.#credentialId = seed;
   }
