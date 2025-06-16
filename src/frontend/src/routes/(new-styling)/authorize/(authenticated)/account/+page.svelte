@@ -78,9 +78,9 @@
 <div class="flex flex-1 flex-col justify-end">
   <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <div class="mb-6 flex flex-col gap-2">
-    <h1 class="text-text-primary text-2xl font-medium">Choose an account</h1>
+    <h1 class="text-text-primary text-2xl font-medium">Choose account</h1>
     <p class="text-text-secondary self-start text-sm">
-      <span>Or create another for</span>
+      <span>or create another for</span>
       {#if nonNullish(dapp?.name)}
         <b>{dapp.name}</b>
       {:else}
@@ -94,7 +94,7 @@
         <li class="contents">
           <ButtonCard onclick={() => continueAs(account)} disabled={loading}>
             <Avatar size="sm">
-              {account.name[0]?.slice(0, 1).toUpperCase() ?? "A"}
+              {(account.name[0] ?? "Primary account").slice(0, 1).toUpperCase()}
             </Avatar>
             <span class="overflow-hidden overflow-ellipsis whitespace-nowrap">
               {account.name[0] ?? "Primary account"}

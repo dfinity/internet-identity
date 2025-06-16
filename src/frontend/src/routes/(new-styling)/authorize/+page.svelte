@@ -355,14 +355,14 @@
 {:else}
   <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
-    Sign in
+    Choose method
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
-    <span>To continue</span>
+    <span>to continue with</span>
     {#if nonNullish(dapp?.name)}
-      <span>to <b>{dapp.name}</b></span>
+      <span><b>{dapp.name}</b></span>
     {:else}
-      <span>to this app</span>
+      <span>this app</span>
     {/if}
   </p>
   <PickAuthenticationMethod {setupOrUseExistingPasskey} {continueWithGoogle} />

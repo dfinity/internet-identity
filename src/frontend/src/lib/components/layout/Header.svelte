@@ -19,7 +19,7 @@
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
       .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 5),
+      .slice(0, 3),
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 

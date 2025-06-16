@@ -7,7 +7,6 @@
     LifeBuoyIcon,
     CodeSquareIcon,
     XIcon,
-    ArrowLeftIcon,
   } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import type { HTMLAttributes } from "svelte/elements";
@@ -38,10 +37,6 @@
     onClose,
   }: Props = $props();
 
-  const currentIdentity = $derived(
-    identities.find((identity) => identity.identityNumber === selected)!,
-  );
-  let view = $state<"currentIdentity" | "switchIdentity">("currentIdentity");
   const links = [
     {
       href: INTERNET_COMPUTER_URL,
@@ -61,125 +56,71 @@
   ];
 </script>
 
-{#snippet currentIdentityView()}
-  <div class="mb-4 flex items-center">
-    <h2 class="text-text-primary text-md font-medium">Internet Identity</h2>
-    {#if nonNullish(onClose)}
-      <Button
-        onclick={onClose}
-        variant="tertiary"
-        size="sm"
-        iconOnly
-        class="ml-auto !rounded-full"
-      >
-        <XIcon size="1.25rem" />
-      </Button>
-    {/if}
-  </div>
-  <div class="mb-10 flex flex-col gap-2">
-    <div
-      class="bg-bg-brand-primary_alt border-border-secondary flex items-center gap-3 rounded-xl border p-3"
-    >
-      <Avatar size="sm">
-        <UserIcon size="1.25rem" />
-      </Avatar>
-      <div class="flex flex-1 flex-col text-sm">
-        <div class="text-text-primary font-semibold">
-          {currentIdentity.name ?? currentIdentity.identityNumber}
-        </div>
-        <div class="text-text-tertiary">
-          {"passkey" in currentIdentity.authMethod ? "Passkey" : "Google"}
-        </div>
-      </div>
-      <Button variant="tertiary" size="sm" class="hidden">Manage</Button>
-    </div>
-    {#if identities.length > 1}
-      <Button onclick={() => (view = "switchIdentity")} variant="secondary">
-        <span>Switch identity</span>
-      </Button>
-    {:else}
-      <Button onclick={useAnotherIdentity} variant="secondary">
-        <span>Use another identity</span>
-      </Button>
-    {/if}
-  </div>
-  <hr class="border-t-border-tertiary mb-4" />
-  <div class="flex gap-4">
-    {#each links as { href, label }}
-      <a
-        {href}
-        target="_blank"
-        class="text-text-secondary text-sm font-medium outline-0 focus-visible:underline"
-      >
-        {label}
-      </a>
-    {/each}
-  </div>
-{/snippet}
-
-{#snippet switchIdentityView()}
-  <div class="mb-4 flex items-center gap-2">
+<div class="mb-4 flex items-center">
+  <h2 class="text-text-primary text-md font-medium">Switch identity</h2>
+  {#if nonNullish(onClose)}
     <Button
-      onclick={() => (view = "currentIdentity")}
+      onclick={onClose}
       variant="tertiary"
       size="sm"
       iconOnly
-      class="!rounded-full"
+      class="ml-auto !rounded-full"
     >
-      <ArrowLeftIcon size="1.25rem" />
+      <XIcon size="1.25rem" />
     </Button>
-    <h2 class="text-text-primary text-md font-medium">Switch identity</h2>
-    {#if nonNullish(onClose)}
-      <Button
-        onclick={onClose}
-        variant="tertiary"
-        size="sm"
-        iconOnly
-        class="ml-auto !rounded-full"
-      >
-        <XIcon size="1.25rem" />
-      </Button>
-    {/if}
-  </div>
-  <div class="flex flex-col gap-1.5">
-    <ul class="contents">
-      {#each identities as identity}
-        <li class="contents">
-          <ButtonCard
-            onclick={() => switchIdentity(identity.identityNumber)}
-            class={[
-              selected === identity.identityNumber &&
-                "!ring-border-brand !ring-2",
-            ]}
-          >
-            <Avatar size="sm">
-              <UserIcon size="1.25rem" />
-            </Avatar>
-            <span>{identity.name ?? identity.identityNumber}</span>
-            {#if selected === identity.identityNumber}
-              <Checkbox
-                checked
-                size="md"
-                class="pointer-events-none mr-1 ml-auto !rounded-full"
-                tabindex={-1}
-                aria-hidden
-              />
-            {/if}
-          </ButtonCard>
-        </li>
-      {/each}
-    </ul>
-    <ButtonCard onclick={useAnotherIdentity}>
-      <FeaturedIcon size="sm">
-        <PlusIcon size="1.25rem" />
-      </FeaturedIcon>
-      <span>Use another identity</span>
-    </ButtonCard>
-  </div>
-{/snippet}
-
-{#if view === "currentIdentity"}
-  {@render currentIdentityView()}
-{:else if view === "switchIdentity"}
-  {@render switchIdentityView()}
-{/if}
+  {/if}
+</div>
+<div class="mb-5 flex flex-col gap-1.5">
+  <ul class="contents">
+    {#each identities as identity}
+      <li class="contents">
+        <ButtonCard
+          onclick={() => switchIdentity(identity.identityNumber)}
+          class={[
+            selected === identity.identityNumber &&
+              "!ring-border-brand !ring-2",
+          ]}
+        >
+          <Avatar size="sm">
+            <UserIcon size="1.25rem" />
+          </Avatar>
+          <div class="flex flex-col text-left text-sm">
+            <div class="text-text-primary font-semibold">
+              {identity.name ?? identity.identityNumber}
+            </div>
+            <div class="text-text-tertiary">
+              {"passkey" in identity.authMethod ? "Passkey" : "Google"}
+            </div>
+          </div>
+          {#if selected === identity.identityNumber}
+            <Checkbox
+              checked
+              size="md"
+              class="pointer-events-none mr-1 ml-auto !rounded-full"
+              tabindex={-1}
+              aria-hidden
+            />
+          {/if}
+        </ButtonCard>
+      </li>
+    {/each}
+  </ul>
+  <ButtonCard onclick={useAnotherIdentity}>
+    <FeaturedIcon size="sm">
+      <PlusIcon size="1.25rem" />
+    </FeaturedIcon>
+    <span>Use another identity</span>
+  </ButtonCard>
+</div>
+<hr class="border-t-border-tertiary mb-4" />
+<div class="flex gap-4">
+  {#each links as { href, label }}
+    <a
+      {href}
+      target="_blank"
+      class="text-text-secondary text-sm font-medium outline-0 focus-visible:underline"
+    >
+      {label}
+    </a>
+  {/each}
+</div>
