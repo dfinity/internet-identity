@@ -65,6 +65,7 @@
       size="sm"
       iconOnly
       class="ml-auto !rounded-full"
+      aria-label="Close"
     >
       <XIcon size="1.25rem" />
     </Button>
@@ -88,7 +89,7 @@
             <div class="text-text-primary font-semibold">
               {identity.name ?? identity.identityNumber}
             </div>
-            <div class="text-text-tertiary">
+            <div class="text-text-tertiary" aria-hidden="true">
               {"passkey" in identity.authMethod ? "Passkey" : "Google"}
             </div>
           </div>

@@ -44,6 +44,7 @@
         onclick={() => (isIdentityPopoverOpen = true)}
         variant="tertiary"
         class="ml-auto gap-2.5 pr-3 md:-mr-3"
+        aria-label="Switch identity"
       >
         <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
         <ChevronDownIcon size="1rem" />
@@ -65,7 +66,10 @@
               lastUsedIdentitiesStore.selectIdentity(identityNumber);
               isIdentityPopoverOpen = false;
             }}
-            useAnotherIdentity={() => (isSignInDialogOpen = true)}
+            useAnotherIdentity={() => {
+              isIdentityPopoverOpen = false;
+              isSignInDialogOpen = true;
+            }}
             onClose={() => (isIdentityPopoverOpen = false)}
           />
         </Popover>
@@ -76,13 +80,13 @@
           <UseAnotherIdentity
             onCancel={() => (isSignInDialogOpen = false)}
             onSuccess={(identityNumber) => {
-              isSignInDialogOpen = false;
               lastUsedIdentitiesStore.selectIdentity(identityNumber);
               goto("/authorize/account", {
                 replaceState: true,
                 invalidateAll: true,
                 state: { disableNavigationAnimation: true },
               });
+              isSignInDialogOpen = false;
             }}
           />
         </Dialog>

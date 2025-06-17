@@ -51,6 +51,7 @@
       spellcheck="false"
       disabled={loading}
       error={name.length > 64 ? "Maximum length is 64 characters." : undefined}
+      aria-label="Identity name"
     />
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">

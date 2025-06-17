@@ -6,6 +6,8 @@
   type Props = HTMLAttributes<HTMLDivElement>;
 
   const { children, class: className, ...props }: Props = $props();
+
+  let divRef = $state<HTMLElement>();
 </script>
 
 <div
@@ -20,9 +22,15 @@
   {#if !("disableNavigationAnimation" in page.state)}
     {#key page.route.id}
       <div
+        bind:this={divRef}
         class="col-start-1 row-start-1 flex flex-col max-sm:flex-1"
-        in:fly={{ x: 200 * (navigating.delta ?? 1), duration: 200, delay: 80 }}
+        in:fly={{
+          x: 200 * (navigating.delta ?? 1),
+          duration: 200,
+          delay: 80,
+        }}
         out:fly={{ x: -160 * (navigating.delta ?? 1), duration: 160 }}
+        onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
       >
         {@render children?.()}
       </div>
