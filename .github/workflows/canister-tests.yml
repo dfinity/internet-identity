@@ -600,6 +600,9 @@ jobs:
       - name: Kickstart npm ci
         run: '{ npm ci --no-audit --no-fund; echo "$?" > ~/npm-ci-status; } &'
 
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
       # Helps with debugging
