@@ -26,7 +26,7 @@
     "preview:showcase": "astro preview --root ./src/showcase",
     "screenshots": "npm run opts -- ./src/frontend/screenshots.ts",
     "test": "vitest --config ./vitest.config.ts",
-    "test:e2e": "VITEST_MAX_THREADS=1 vitest --mode e2e --config ./vitest.config.ts authorize",
+    "test:e2e": "VITEST_MAX_THREADS=1 vitest --mode e2e --config ./vitest.config.ts",
     "test:e2e-desktop": "SCREEN=desktop npm run test:e2e",
     "test:e2e-mobile": "SCREEN=mobile npm run test:e2e",
     "lint": "npm run lint:eslint && npm run lint:lit",

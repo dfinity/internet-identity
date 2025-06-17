@@ -595,10 +595,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
 
-      # npm ci is a slow operation that mostly involves downloading packages, so we run
-      # it in the background while we set up the replica
       - name: Kickstart npm ci
-        run: '{ npm ci --no-audit --no-fund; echo "$?" > ~/npm-ci-status; } &'
+        run: npm ci --no-audit --no-fund
 
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
