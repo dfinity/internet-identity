@@ -285,6 +285,8 @@ type InternetIdentityInit = record {
     // Configuration to set the canister as production mode.
     // For now, this is used only to show or hide the banner.
     is_production : opt bool;
+    // Configuration for dummy authentication used in e2e tests.
+    dummy_auth : opt opt DummyAuthConfig;
 };
 
 type ChallengeKey = text;
@@ -728,6 +730,11 @@ type AccountUpdate = record {
     name : opt text;
 };
 
+type DummyAuthConfig = record {
+    // Prompts user for a index value (0 - 255) when set to true,
+    // this is used in e2e to have multiple dummy auth identities.
+    prompt_for_index : bool;
+};
 
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API

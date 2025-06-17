@@ -20,6 +20,9 @@ export const ERROR_SUPPORT_URL = `${SUPPORT_URL}/hc/en-us/articles/3230136272718
 // Default source code URL
 export const SOURCE_CODE_URL = "https://github.com/dfinity/internet-identity";
 
+// Internet Computer URL
+export const INTERNET_COMPUTER_URL = "https://internetcomputer.org";
+
 // Pin is disallowed by default unless this query parameter is set.
 // This is used for testing purposes because we still support logging in with PIN but not registering with it.
 export const ENABLE_PIN_QUERY_PARAM_KEY = "enablePin";

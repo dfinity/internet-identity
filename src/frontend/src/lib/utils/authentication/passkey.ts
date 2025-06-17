@@ -6,9 +6,12 @@ import {
   CosePublicKey,
   DiscoverablePasskeyIdentity,
 } from "$lib/utils/discoverablePasskeyIdentity";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { Session } from "$lib/stores/session.store";
+import { features } from "$lib/legacy/features";
+import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
+import { canisterConfig } from "$lib/globals";
 
 export class IdentityNotMigratedError extends Error {
   constructor() {
@@ -38,20 +41,31 @@ export const authenticateWithPasskey = async ({
     agent: session.agent,
     canisterId,
   });
+  const dummyAuth =
+    features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0]);
   let identityNumber: bigint;
-  const passkeyIdentity = DiscoverablePasskeyIdentity.useExisting({
-    credentialId,
-    getPublicKey: async (result) => {
-      const lookupResult = (
-        await actor.lookup_device_key(new Uint8Array(result.rawId))
-      )[0];
-      if (isNullish(lookupResult)) {
-        throw new IdentityNotMigratedError();
-      }
-      identityNumber = lookupResult.anchor_number;
-      return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
-    },
-  });
+  const passkeyIdentity = dummyAuth
+    ? DiscoverableDummyIdentity.useExisting()
+    : DiscoverablePasskeyIdentity.useExisting({
+        credentialId,
+        getPublicKey: async (result) => {
+          const lookupResult = (
+            await actor.lookup_device_key(new Uint8Array(result.rawId))
+          )[0];
+          if (isNullish(lookupResult)) {
+            throw new IdentityNotMigratedError();
+          }
+          identityNumber = lookupResult.anchor_number;
+          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+        },
+      });
+  if (dummyAuth) {
+    identityNumber = (
+      await actor.lookup_device_key(
+        new Uint8Array(passkeyIdentity.getCredentialId()!),
+      )
+    )[0]!.anchor_number;
+  }
   const delegation = await DelegationChain.create(
     passkeyIdentity,
     session.identity.getPublicKey(),

@@ -26,6 +26,9 @@ const config = {
       },
     },
     version: { name: packagejson.version },
+    output: {
+      bundleStrategy: "single",
+    },
   },
 };
 

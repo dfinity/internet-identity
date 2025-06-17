@@ -9,7 +9,8 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, FrontendHostname, OpenIdConfig, RateLimitConfig, Timestamp,
+    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OpenIdConfig,
+    RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -39,6 +40,7 @@ pub struct StorablePersistentState {
     fetch_root_key: Option<bool>,
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
+    dummy_auth: Option<DummyAuthConfig>,
 }
 
 impl Storable for StorablePersistentState {
@@ -83,6 +85,7 @@ impl From<PersistentState> for StorablePersistentState {
             fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
+            dummy_auth: s.dummy_auth,
         }
     }
 }
@@ -105,6 +108,7 @@ impl From<StorablePersistentState> for PersistentState {
             fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
+            dummy_auth: s.dummy_auth,
         }
     }
 }
@@ -155,6 +159,7 @@ mod tests {
             fetch_root_key: None,
             enable_dapps_explorer: None,
             is_production: None,
+            dummy_auth: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -181,6 +186,7 @@ mod tests {
             fetch_root_key: None,
             enable_dapps_explorer: None,
             is_production: None,
+            dummy_auth: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }
