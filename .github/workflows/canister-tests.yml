@@ -595,11 +595,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
 
-      - name: Kickstart npm ci
+      - name: Install npm deps
         run: npm ci --no-audit --no-fund
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install chromium
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
@@ -634,14 +634,6 @@ jobs:
           # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
-
-      # Check the return code of npm ci
-      - name: Check on npm ci
-        # make sure we don't wait too long if for some unlikely reason the npm status file doesn't get created
-        timeout-minutes: 5
-        run: |
-          until [ -f ~/npm-ci-status ]; do sleep 1; done
-          exit $(cat ~/npm-ci-status)
 
       - name: Run dev server
         id: dev-server-start
