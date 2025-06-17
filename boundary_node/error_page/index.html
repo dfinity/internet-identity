@@ -55,8 +55,6 @@
         color: var(--text-primary);
         font-weight: 600;
         font-size: 1.1rem;
-        margin-block-start: 0;
-        margin-block-end: 0;
       }
 
       .notice-box {
@@ -76,6 +74,15 @@
         display: flex;
         align-items: center;
         justify-content: center;
+      }
+
+      .link {
+        color: var(--text-secondary);
+        text-decoration: none;
+      }
+
+      .link:hover {
+        text-decoration: underline;
       }
 
       :root {
@@ -367,8 +374,25 @@
       <!-- Error Notice -->
       <div class="page-container">
         <div class="notice-box">
-          <h1>{status_code} - {reason}</h1>
-          <p>{details}</p>
+          <h1>Internet Identity is temporarily unavailable</h1>
+          <p>
+            The subnet that hosts Internet Identity (II) is undergoing scheduled
+            maintenance to back up the vetKeys production key.
+          </p>
+          <p><b>Estimated downtime:</b> 5–10 minutes</p>
+          <p>Please try again shortly.</p>
+          <p>
+            Note: Existing sessions remain active and dapps that rely on II will
+            continue to function as normal.
+          </p>
+          <p>
+            <a
+              href="https://forum.dfinity.org/t/vetkeys-production-key-and-ii-subnet-downtime/50370"
+              target="_blank"
+              class="link"
+              >More information ➔</a
+            >
+          </p>
         </div>
       </div>
     </main>
