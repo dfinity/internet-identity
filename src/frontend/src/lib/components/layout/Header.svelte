@@ -66,7 +66,10 @@
               lastUsedIdentitiesStore.selectIdentity(identityNumber);
               isIdentityPopoverOpen = false;
             }}
-            useAnotherIdentity={() => (isSignInDialogOpen = true)}
+            useAnotherIdentity={() => {
+              isIdentityPopoverOpen = false;
+              isSignInDialogOpen = true;
+            }}
             onClose={() => (isIdentityPopoverOpen = false)}
           />
         </Popover>
@@ -77,13 +80,13 @@
           <UseAnotherIdentity
             onCancel={() => (isSignInDialogOpen = false)}
             onSuccess={(identityNumber) => {
-              isSignInDialogOpen = false;
               lastUsedIdentitiesStore.selectIdentity(identityNumber);
               goto("/authorize/account", {
                 replaceState: true,
                 invalidateAll: true,
                 state: { disableNavigationAnimation: true },
               });
+              isSignInDialogOpen = false;
             }}
           />
         </Dialog>
