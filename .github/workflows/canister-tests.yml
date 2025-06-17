@@ -661,12 +661,12 @@ jobs:
           path: dev-server-logs.txt
           if-no-files-found: ignore
 
-      - name: Archive test failures
-        if: ${{ always() }}
+      - name: Archive playwright reports
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-test-failures-${{ env.artifact_suffix }}
-          path: test-failures/*
+          name: playwright-report-${{ env.artifact_suffix }}
+          path: playwright-report/
           if-no-files-found: ignore
 
   # Aggregate all e2e matrix jobs, used in branch protection
