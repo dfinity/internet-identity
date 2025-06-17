@@ -2,6 +2,7 @@ import { Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
 
 const II_URL = "https://id.ai";
+const TEST_APP_URL = "https://nice-name.com";
 
 export type DummyAuthFn = (page: Page) => void;
 
@@ -33,7 +34,7 @@ export const authorize = async (
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
-  await page.goto("https://nice-name.com");
+  await page.goto(TEST_APP_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
@@ -68,9 +69,10 @@ export const createIdentity = (
 ): Promise<string> =>
   authorize(page, async (authPage) => {
     // Wait for page to load
-    await authPage
-      .getByRole("heading", { name: "Internet Identity" })
-      .waitFor();
+    await Promise.any([
+      authPage.getByRole("button", { name: "Continue with Passkey" }).waitFor(),
+      authPage.getByRole("button", { name: "Switch identity" }).waitFor(),
+    ]);
 
     // Check if we're on the continue screen or not
     const onContinueScreen = await authPage
