@@ -583,7 +583,7 @@ jobs:
     strategy:
       matrix:
         device: [ "desktop", "mobile" ]
-        shard: [ "1_6", "2_6", "3_6", "4_6", "5_6", "6_6" ]
+        shard: [ "1_1", "1_2", "1_3" ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -643,7 +643,7 @@ jobs:
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
 
       - run: |
-          npx playwright test --project ${{ matrix.device }} --workers 3 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
 
       - name: Stop dfx
         if: ${{ always() }}
