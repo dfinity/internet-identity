@@ -44,6 +44,7 @@
         onclick={() => (isIdentityPopoverOpen = true)}
         variant="tertiary"
         class="ml-auto gap-2.5 pr-3 md:-mr-3"
+        aria-label="Switch identity"
       >
         <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
         <ChevronDownIcon size="1rem" />
