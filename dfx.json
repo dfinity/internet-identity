@@ -21,6 +21,10 @@
       "build": "demos/vc_issuer/build.sh",
       "post_install": "bash -c 'demos/vc_issuer/provision'",
       "dependencies": ["internet_identity"]
+    },
+    "try_ii": {
+      "source": ["src/try-ii/src/try-ii-frontend/dist"],
+      "type": "assets"
     }
   },
   "defaults": {
