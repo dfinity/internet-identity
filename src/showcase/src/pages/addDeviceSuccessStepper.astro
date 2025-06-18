@@ -7,8 +7,8 @@ import Screen from "../layouts/Screen.astro";
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
     import { chromeDevice, userNumber } from "../constants";
-    import { addDeviceSuccessPage } from "$lib/flows/addDevice/addDeviceSuccess";
-    import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
+    import { addDeviceSuccessPage } from "$lib/legacy/flows/addDevice/addDeviceSuccess";
+    import { tentativeDeviceStepper } from "$lib/legacy/flows/addDevice/stepper";
 
     addDeviceSuccessPage({
       i18n,

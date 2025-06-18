@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { pollForTentativeDevicePage } from "$lib/flows/addDevice/manage/pollForTentativeDevice";
+    import { pollForTentativeDevicePage } from "$lib/legacy/flows/addDevice/manage/pollForTentativeDevice";
 
     pollForTentativeDevicePage({
       cancel: () => toast.info("canceled"),
