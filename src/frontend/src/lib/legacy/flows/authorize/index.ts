@@ -19,7 +19,7 @@ import { Principal } from "@dfinity/principal";
 import { nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
-import { validateDerivationOrigin } from "../../../utils/validateDerivationOrigin";
+import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { fetchDelegation } from "./fetchDelegation";
 import copyJson from "./index.json";
 import { AuthContext, authenticationProtocol } from "./postMessageInterface";

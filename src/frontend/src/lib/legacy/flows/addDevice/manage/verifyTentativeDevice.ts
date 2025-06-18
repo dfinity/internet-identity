@@ -29,11 +29,23 @@ const verifyTentativeDeviceTemplate = <T>({
   verify,
   doContinue,
   cancel,
-}: {ng) => {
+}: {
+  userNumber: bigint;
+  alias: string;
+  remaining: AsyncIterable<string>;
+  cancel: () => void;
+  verify: (
+    value: string,
+  ) => Promise<{ retry: false; value: T } | { retry: true }>;
+  doContinue: (result: T) => void;
+}) => {
+  const pinInput_ = pinInput({
+    verify: async (pin: string) => {
       const result = await verify(pin);
       if (result.retry) {
         return {
-          ok: fals    value: string,r: "The entered verification code was invalid. Please try again.",
+          ok: false,
+          error: "The entered verification code was invalid. Please try again.",
         };
       }
 
@@ -44,9 +56,13 @@ const verifyTentativeDeviceTemplate = <T>({
 
   const pageContentSlot = html`<article>
     ${tentativeDeviceStepper({ step: "verify" })}
-    <hgroup>          error: "The entered verification code was invalid. Please try again.",/h2>
+    <hgroup>
+      <div class="c-card__label">
+        <h2>Internet Identity ${userNumber}</h2>
       </div>
-      <h1 class="t-title t-title--main">Activate Passkey</    onSubmit: doContinue,utput
+      <h1 class="t-title t-title--main">Activate Passkey</h1>
+    </hgroup>
+    <output
       class="c-input c-input--fullwidth c-input--stack c-input--readonly t-vip t-vip--small"
       >${alias}</output
     >
@@ -57,7 +73,7 @@ const verifyTentativeDeviceTemplate = <T>({
     </p>
     <label
       class="l-stack"
-      data-      >${alias}</outputde"
+      data-role="verification-code"
       aria-label="Verification Code"
     >
       <div class="c-input--stack">${pinInput_.template}</div>
@@ -93,13 +109,16 @@ export function verifyTentativeDevicePage<T>(
   props: TemplateProps<T>,
   container?: HTMLElement,
 ): void {
-  return renderPage<(props: TemplateProps<T>) => TemplateRes    slot: pageContentSlot,DeviceTemplate,
+  return renderPage<(props: TemplateProps<T>) => TemplateResult>(
+    verifyTentativeDeviceTemplate,
   )(props, container);
 }
 
 /**
- * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.  container?: HTMLElement,henticated II connection
- * @param alias of the tentative device to be verifi    verifyTentativeDeviceTemplate,mp when the registration mode expires
+ * Page to verify the tentative device: the device verification code can be entered and is the checked on the canister.
+ * @param connection authenticated II connection
+ * @param alias of the tentative device to be verified
+ * @param endTimestamp timestamp when the registration mode expires
  */
 export const verifyTentativeDevice = async ({
   connection,
@@ -113,10 +132,13 @@ export const verifyTentativeDevice = async ({
   const countdown: AsyncCountdown<VerifyResult | "canceled"> =
     AsyncCountdown.fromNanos(endTimestamp);
 
-  verifyTenta  connection,
-  alias,
-  endTimestamp,
-}: {
+  verifyTentativeDevicePage<VerifyResult>({
+    userNumber: connection.userNumber,
+    alias,
+    cancel: async () => {
+      await withLoader(() => connection.exitDeviceRegistrationMode());
+      countdown.stop("canceled");
+    },
 
     // To verify the code, we query the canister, and return _except_ if the code is wrong
     // _and_ there are some attemps left, in which case we update the UI and prompt the user
@@ -138,7 +160,9 @@ export const verifyTentativeDevice = async ({
     },
     doContinue: (res) => countdown.stop(res),
     remaining: countdown.remainingFormattedAsync(),
-  });        connection.verifyTentativeDevice(value),rol
+  });
+
+  // We handle the result and yield back control
   return handleVerifyResult(await countdown.wait());
 };
 
@@ -148,13 +172,14 @@ const handleVerifyResult = async (
   // If the verification worked or the user canceled, then we don't show anything special
   if (result === "canceled") {
     return "failed";
-  } else     remaining: countdown.remainingFormattedAsync(),sult) {
+  } else if (typeof result === "object" && "verified" in result) {
     result satisfies VerifyResult;
     return "verified";
   }
 
   // otherwise it's an error, and we tell the user what happened
-  const showE  result: VerifyResult | "canceled" | typeof AsyncCountdown.timeout,    displayError({ title, message, primaryButton: "Ok" });
+  const showError = ({ title, message }: { title: string; message: string }) =>
+    displayError({ title, message, primaryButton: "Ok" });
 
   if (result === AsyncCountdown.timeout) {
     await showError({
@@ -171,7 +196,10 @@ const handleVerifyResult = async (
     });
     return "failed";
   } else if ("device_registration_mode_off" in result) {
-    await sh        'The timeout has been reached. For security reasons the "add device" process has been aborted.',le because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
+    await showError({
+      title: "Device Registration Not Enabled",
+      message:
+        "Verification not possible because device registration is no longer enabled. Either the timeout has been reached or device registration was disabled using another device.",
     });
     return "failed";
   } else if ("timeout" in result) {
