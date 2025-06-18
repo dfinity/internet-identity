@@ -90,7 +90,7 @@
   closedby={closeOnOutsideClick ? "any" : "none"}
   class={[
     // Layout base/dialog/bottomsheet
-    "fixed flex max-w-full flex-col overflow-hidden bg-transparent",
+    "fixed flex max-w-full flex-col overflow-hidden bg-transparent outline-none",
     "sm:m-auto sm:min-h-[100dvh] sm:w-100",
     "w-full max-sm:top-auto max-sm:bottom-0",
     // Backdrop base/visible
