@@ -12,9 +12,9 @@
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
 
-  type Props = HTMLAttributes<HTMLHeadElement>;
+  type Props = HTMLAttributes<HTMLHeadElement> & { customText?: string };
 
-  const { children, class: className, ...props }: Props = $props();
+  const { children, class: className, customText, ...props }: Props = $props();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -36,7 +36,7 @@
   <div class="flex h-16 flex-1 items-center gap-4">
     <Logo class="text-fg-primary h-5.5" />
     <h1 class="text-md text-text-primary hidden font-semibold sm:block">
-      Internet Identity
+      {nonNullish(customText) ? `${customText}` : "Internet Identity"}
     </h1>
     {#if nonNullish(selectedIdentity)}
       <Button

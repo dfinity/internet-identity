@@ -6,6 +6,7 @@ import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 
 export const reroute: Reroute = ({ url }) => {
+  console.log(url.pathname === "/hub");
   if (nonNullish(getAddDeviceAnchor(url))) {
     return "/register/device";
   }
@@ -14,6 +15,9 @@ export const reroute: Reroute = ({ url }) => {
   }
   if (url.pathname.startsWith("/vc-flow")) {
     return "/vc-flow/index";
+  }
+  if (url.pathname === "/hub") {
+    return "/hub/home";
   }
   if (url.hash === "#authorize") {
     return get(DISCOVERABLE_PASSKEY_FLOW) ? "/authorize" : "/legacy/authorize";
