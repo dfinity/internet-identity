@@ -3,7 +3,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   authenticationProtocol,
   AuthRequest,
-} from "$lib/flows/authorize/postMessageInterface";
+} from "$lib/legacy/flows/authorize/postMessageInterface";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {

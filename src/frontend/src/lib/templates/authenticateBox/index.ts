@@ -13,15 +13,15 @@ import {
 } from "$lib/legacy/crypto/pinIdentity";
 import { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
-import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
-import { idbRetrievePinIdentityMaterial } from "$lib/flows/pin/idb";
-import { usePin } from "$lib/flows/pin/usePin";
-import { useRecovery } from "$lib/flows/recovery/useRecovery";
+import { registerTentativeDevice } from "$lib/legacy/flows/addDevice/welcomeView/registerTentativeDevice";
+import { idbRetrievePinIdentityMaterial } from "$lib/legacy/flows/pin/idb";
+import { usePin } from "$lib/legacy/flows/pin/usePin";
+import { useRecovery } from "$lib/legacy/flows/recovery/useRecovery";
 import {
   RegisterFlowOpts,
   getRegisterFlowOpts,
   registerFlow,
-} from "$lib/flows/register";
+} from "$lib/legacy/flows/register";
 import { I18n } from "$lib/legacy/i18n";
 import { getAnchors, setAnchorUsed } from "$lib/legacy/storage";
 import {

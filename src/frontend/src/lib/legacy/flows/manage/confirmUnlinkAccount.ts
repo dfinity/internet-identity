@@ -1,7 +1,7 @@
 import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
 import { warningLabelIcon } from "$lib/templates/infoScreen";
 import { mainWindow } from "$lib/templates/mainWindow";
-import { accountItem } from "$lib/flows/manage/linkedAccountsSection";
+import { accountItem } from "$lib/legacy/flows/manage/linkedAccountsSection";
 import { I18n } from "$lib/legacy/i18n";
 import { renderPage } from "$lib/utils/lit-html";
 import { nonNullish } from "@dfinity/utils";

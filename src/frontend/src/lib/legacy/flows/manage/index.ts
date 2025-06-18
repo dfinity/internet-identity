@@ -23,20 +23,29 @@ import {
   OPENID_AUTHENTICATION,
 } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
-import { addDevice } from "$lib/flows/addDevice/manage/addDevice";
-import { dappsExplorer } from "$lib/flows/dappsExplorer";
-import { KnownDapp, getDapps } from "$lib/flows/dappsExplorer/dapps";
-import { dappsHeader, dappsTeaser } from "$lib/flows/dappsExplorer/teaser";
-import { confirmUnlinkAccount } from "$lib/flows/manage/confirmUnlinkAccount";
-import { linkedAccountsSection } from "$lib/flows/manage/linkedAccountsSection";
-import copyJson from "$lib/flows/manage/linkedAccountsSection.json";
+import { addDevice } from "$lib/legacy/flows/addDevice/manage/addDevice";
+import { dappsExplorer } from "$lib/legacy/flows/dappsExplorer";
+import { KnownDapp, getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+import {
+  dappsHeader,
+  dappsTeaser,
+} from "$lib/legacy/flows/dappsExplorer/teaser";
+import { confirmUnlinkAccount } from "$lib/legacy/flows/manage/confirmUnlinkAccount";
+import { linkedAccountsSection } from "$lib/legacy/flows/manage/linkedAccountsSection";
+import copyJson from "$lib/legacy/flows/manage/linkedAccountsSection.json";
 import {
   TempKeyWarningAction,
   tempKeyWarningBox,
   tempKeysSection,
-} from "$lib/flows/manage/tempKeys";
-import { addPhrase, recoveryWizard } from "$lib/flows/recovery/recoveryWizard";
-import { setupKey, setupPhrase } from "$lib/flows/recovery/setupRecovery";
+} from "$lib/legacy/flows/manage/tempKeys";
+import {
+  addPhrase,
+  recoveryWizard,
+} from "$lib/legacy/flows/recovery/recoveryWizard";
+import {
+  setupKey,
+  setupPhrase,
+} from "$lib/legacy/flows/recovery/setupRecovery";
 import { I18n } from "$lib/legacy/i18n";
 import { getCredentialsOrigin } from "$lib/utils/credential-devices";
 import {

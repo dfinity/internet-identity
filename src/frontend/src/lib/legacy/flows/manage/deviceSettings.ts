@@ -3,8 +3,8 @@ import { promptDeviceAlias } from "$lib/templates/alias";
 import { displayError } from "$lib/templates/displayError";
 import { infoScreenTemplate } from "$lib/templates/infoScreen";
 import { withLoader } from "$lib/templates/loader";
-import { recoverWithPhrase } from "$lib/flows/recovery/recoverWith/phrase";
-import { phraseWizard } from "$lib/flows/recovery/setupRecovery";
+import { recoverWithPhrase } from "$lib/legacy/flows/recovery/recoverWith/phrase";
+import { phraseWizard } from "$lib/legacy/flows/recovery/setupRecovery";
 import { I18n } from "$lib/legacy/i18n";
 import {
   AuthenticatedConnection,

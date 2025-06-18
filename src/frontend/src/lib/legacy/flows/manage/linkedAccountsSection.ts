@@ -1,6 +1,6 @@
 import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
 import { googleIcon, pulsatingCircleIcon } from "$lib/templates/icons";
-import copyJson from "$lib/flows/manage/linkedAccountsSection.json";
+import copyJson from "$lib/legacy/flows/manage/linkedAccountsSection.json";
 import { I18n } from "$lib/legacy/i18n";
 import { getMetadataString } from "$lib/utils/openID";
 import { formatLastUsage } from "$lib/utils/time";

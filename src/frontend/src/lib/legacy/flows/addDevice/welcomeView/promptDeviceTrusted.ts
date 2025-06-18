@@ -1,6 +1,6 @@
 import { mainWindow } from "$lib/templates/mainWindow";
-import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
-import copyJson from "$lib/flows/addDevice/welcomeView/promptDeviceTrusted.json";
+import { tentativeDeviceStepper } from "$lib/legacy/flows/addDevice/stepper";
+import copyJson from "$lib/legacy/flows/addDevice/welcomeView/promptDeviceTrusted.json";
 import { I18n } from "$lib/legacy/i18n";
 import { renderPage } from "$lib/utils/lit-html";
 import { html } from "lit-html";

@@ -2,11 +2,11 @@ import { handleLoginFlowResult } from "$lib/templates/authenticateBox";
 import {
   WEBAUTHN_IFRAME_PATH,
   webAuthnInIframeFlow,
-} from "$lib/flows/iframeWebAuthn";
+} from "$lib/legacy/flows/iframeWebAuthn";
 import { nonNullish } from "@dfinity/utils";
-import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
-import { authFlowAuthorize } from "$lib/flows/authorize";
-import { authFlowManage, renderManageWarmup } from "$lib/flows/manage";
+import { registerTentativeDevice } from "$lib/legacy/flows/addDevice/welcomeView/registerTentativeDevice";
+import { authFlowAuthorize } from "$lib/legacy/flows/authorize";
+import { authFlowManage, renderManageWarmup } from "$lib/legacy/flows/manage";
 import { createSpa } from "./spa";
 import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";

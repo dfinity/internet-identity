@@ -1,6 +1,6 @@
 import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
-import { domainWarning } from "$lib/flows/manage";
+import { domainWarning } from "$lib/legacy/flows/manage/index";
 
 const recoveryPhrase: DeviceData = {
   alias: "Recovery Phrase",

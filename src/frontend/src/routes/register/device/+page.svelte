@@ -3,11 +3,11 @@
   import { AuthenticatedConnection, Connection } from "$lib/utils/iiConnection";
   import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
   import { analytics } from "$lib/utils/analytics/analytics";
-  import { registerTentativeDevice } from "$lib/flows/addDevice/welcomeView/registerTentativeDevice";
+  import { registerTentativeDevice } from "$lib/legacy/flows/addDevice/welcomeView/registerTentativeDevice";
   import { goto } from "$app/navigation";
   import { handleLoginFlowResult } from "$lib/templates/authenticateBox";
   import { nonNullish } from "@dfinity/utils";
-  import { renderManage } from "$lib/flows/manage";
+  import { renderManage } from "$lib/legacy/flows/manage";
   import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png?url";
   import { PreLoadImage } from "$lib/utils/preLoadImage";
   import { canisterConfig, canisterId } from "$lib/globals";

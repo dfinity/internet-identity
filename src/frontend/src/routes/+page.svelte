@@ -1,7 +1,7 @@
 <script lang="ts">
   import Flow from "$lib/components/utils/Flow.svelte";
   import { Connection } from "$lib/utils/iiConnection";
-  import { authFlowManage } from "$lib/flows/manage";
+  import { authFlowManage } from "$lib/legacy/flows/manage";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { canisterConfig, canisterId } from "$lib/globals";
   import MarqueeBanner from "$lib/components/ui/MarqueeBanner.svelte";

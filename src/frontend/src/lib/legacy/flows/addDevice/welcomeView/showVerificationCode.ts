@@ -5,7 +5,7 @@ import type {
 import { displayError } from "$lib/templates/displayError";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
-import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
+import { tentativeDeviceStepper } from "$lib/legacy/flows/addDevice/stepper";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import { AsyncCountdown } from "$lib/utils/countdown";
 import { Connection } from "$lib/utils/iiConnection";

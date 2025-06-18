@@ -12,7 +12,7 @@
   import { PlusIcon } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { handleError } from "$lib/components/utils/error";
-  import { getDapps } from "$lib/flows/dappsExplorer/dapps";
+  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { nonNullish } from "@dfinity/utils";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import CreateAccount from "$lib/components/views/CreateAccount.svelte";

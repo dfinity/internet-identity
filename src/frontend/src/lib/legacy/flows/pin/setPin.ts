@@ -5,8 +5,8 @@ import { mount, renderPage } from "$lib/utils/lit-html";
 import { isNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 
-import { confirmPin } from "$lib/flows/pin/confirmPin";
-import { promptPinInfo } from "$lib/flows/pin/pinInfo";
+import { confirmPin } from "$lib/legacy/flows/pin/confirmPin";
+import { promptPinInfo } from "$lib/legacy/flows/pin/pinInfo";
 import copyJson from "./setPin.json";
 
 /* Prompt the user to create a new PIN */

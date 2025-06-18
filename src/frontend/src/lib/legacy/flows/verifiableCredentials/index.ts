@@ -5,7 +5,7 @@ import { withLoader } from "$lib/templates/loader";
 import { showMessage } from "$lib/templates/message";
 import { showSpinner } from "$lib/templates/spinner";
 import { toast } from "$lib/templates/toast";
-import { fetchDelegation } from "$lib/flows/authorize/fetchDelegation";
+import { fetchDelegation } from "$lib/legacy/flows/authorize/fetchDelegation";
 import { I18n } from "$lib/legacy/i18n";
 import { getAnchorByPrincipal } from "$lib/legacy/storage";
 import { AuthenticatedConnection, Connection } from "$lib/utils/iiConnection";
