@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { addPhrasePage } from "$lib/flows/recovery/recoveryWizard";
+    import { addPhrasePage } from "$lib/legacy/flows/recovery/recoveryWizard";
 
     addPhrasePage({
       ok: () => toast.info("ok"),

@@ -4,7 +4,7 @@ import {
   pulsatingCircleIcon,
   warningIcon,
 } from "$lib/templates/icons";
-import sectionCopyJson from "$lib/flows/manage/authenticatorsSection.json";
+import sectionCopyJson from "$lib/legacy/flows/manage/authenticatorsSection.json";
 import { I18n } from "$lib/legacy/i18n";
 import { formatLastUsage } from "$lib/utils/time";
 import { isNullish, nonNullish } from "@dfinity/utils";

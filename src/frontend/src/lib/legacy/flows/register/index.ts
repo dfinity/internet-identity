@@ -7,8 +7,8 @@ import {
 import { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { anyFeatures } from "$lib/legacy/features";
-import { idbStorePinIdentityMaterial } from "$lib/flows/pin/idb";
-import { registerDisabled } from "$lib/flows/registerDisabled";
+import { idbStorePinIdentityMaterial } from "$lib/legacy/flows/pin/idb";
+import { registerDisabled } from "$lib/legacy/flows/registerDisabled";
 import { I18n } from "$lib/legacy/i18n";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import {

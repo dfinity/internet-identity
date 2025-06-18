@@ -2,8 +2,8 @@ import { cypherIcon } from "$lib/templates/icons";
 import {
   authenticatorItem,
   dedupLabels,
-} from "$lib/flows/manage/authenticatorsSection";
-import { Authenticator } from "$lib/flows/manage/types";
+} from "$lib/legacy/flows/manage/authenticatorsSection";
+import { Authenticator } from "$lib/legacy/flows/manage/types";
 import { I18n } from "$lib/legacy/i18n";
 import { unreachable } from "$lib/utils/utils";
 import { TemplateResult, html } from "lit-html";

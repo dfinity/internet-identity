@@ -1,4 +1,4 @@
-import { callbackFlow } from "$lib/flows/redirect";
+import { callbackFlow } from "$lib/legacy/flows/redirect";
 import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
 import { createSpa } from "./spa";
 

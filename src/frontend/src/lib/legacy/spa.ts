@@ -2,7 +2,7 @@ import loaderUrl from "$lib/templates/loader.png?url";
 import { showWarningIfNecessary } from "./banner";
 import { displayError } from "$lib/templates/displayError";
 import { anyFeatures, features } from "./features";
-import { compatibilityNotice } from "$lib/flows/compatibilityNotice";
+import { compatibilityNotice } from "$lib/legacy/flows/compatibilityNotice";
 import "./styles/main.css";
 import { supportsWebAuthn } from "$lib/utils/featureDetection";
 import { Connection } from "$lib/utils/iiConnection";

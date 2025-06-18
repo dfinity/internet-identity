@@ -7,7 +7,7 @@
  *   then we know which one the user is actually using
  * - It doesn't support creating credentials; use `WebAuthnIdentity` for that
  */
-import { webAuthnInIframe } from "$lib/flows/iframeWebAuthn";
+import { webAuthnInIframe } from "$lib/legacy/flows/iframeWebAuthn";
 import { PublicKey, Signature, SignIdentity } from "@dfinity/agent";
 import { DER_COSE_OID, unwrapDER } from "@dfinity/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";

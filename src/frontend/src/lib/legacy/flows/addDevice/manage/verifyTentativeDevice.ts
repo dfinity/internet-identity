@@ -3,7 +3,7 @@ import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { pinInput } from "$lib/templates/pinInput";
-import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
+import { tentativeDeviceStepper } from "$lib/legacy/flows/addDevice/stepper";
 import { AsyncCountdown } from "$lib/utils/countdown";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { renderPage } from "$lib/utils/lit-html";

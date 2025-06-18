@@ -5,10 +5,10 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
-import { addDeviceSuccess } from "$lib/flows/addDevice/addDeviceSuccess";
-import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
-import { promptDeviceTrusted } from "$lib/flows/addDevice/welcomeView/promptDeviceTrusted";
-import { inferPasskeyAlias, loadUAParser } from "$lib/flows/register";
+import { addDeviceSuccess } from "$lib/legacy/flows/addDevice/addDeviceSuccess";
+import { tentativeDeviceStepper } from "$lib/legacy/flows/addDevice/stepper";
+import { promptDeviceTrusted } from "$lib/legacy/flows/addDevice/welcomeView/promptDeviceTrusted";
+import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { setAnchorUsed } from "$lib/legacy/storage";
 import { authenticatorAttachmentToKeyType } from "$lib/utils/authenticatorAttachment";
 import { Connection, creationOptions } from "$lib/utils/iiConnection";

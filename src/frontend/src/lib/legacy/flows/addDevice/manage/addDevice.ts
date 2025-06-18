@@ -4,7 +4,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { displayError } from "$lib/templates/displayError";
 import { withLoader } from "$lib/templates/loader";
-import { tentativeDeviceStepper } from "$lib/flows/addDevice/stepper";
+import { tentativeDeviceStepper } from "$lib/legacy/flows/addDevice/stepper";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { isNullish } from "@dfinity/utils";
 import { addDeviceSuccess } from "../addDeviceSuccess";

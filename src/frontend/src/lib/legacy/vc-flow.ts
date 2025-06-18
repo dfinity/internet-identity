@@ -1,4 +1,4 @@
-import { vcFlow } from "$lib/flows/verifiableCredentials";
+import { vcFlow } from "$lib/legacy/flows/verifiableCredentials";
 import { createSpa } from "./spa";
 import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
 
