@@ -26,13 +26,14 @@ globalThis.Buffer = Buffer;
 export const readCanisterId = (): string => {
   // The backend uses a known element ID so that we can pick up the value from here
   const setupJs = document.querySelector(
-    "[data-canister-id]",,
+    "[data-canister-id]",
   ) as HTMLElement | null;
   if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
     void displayError({
       title: "Canister ID not set",
       message:
-        "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",      primaryButton: "Reload",",
+        "There was a problem contacting the IC. The host serving this page did not give us a canister ID. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
     }).then(() => {
       window.location.reload();
     });
@@ -44,13 +45,15 @@ export const readCanisterId = (): string => {
 
 export const readCanisterConfig = (): InternetIdentityInit => {
   // The backend uses a known element ID so that we can pick up the value from here
-  const setupJs = document.querySelector    "[data-canister-config]",]",
+  const setupJs = document.querySelector(
+    "[data-canister-config]",
   ) as HTMLElement | null;
   if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
     void displayError({
       title: "Canister config not set",
       message:
-        "There was a problem contacting the IC. The host serving this page did not give us the canister config. Try reloading the page and contact support if the problem persists.      primaryButton: "Reload",ad",
+        "There was a problem contacting the IC. The host serving this page did not give us the canister config. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
     }).then(() => {
       window.location.reload();
     });
@@ -59,14 +62,16 @@ export const readCanisterConfig = (): InternetIdentityInit => {
 
   try {
     const [jsonValue] = IDL.decode(
-      [init({ IDL })[0]._typ      fromBase64(setupJs.dataset.canisterConfig),fig),
+      [init({ IDL })[0]._type],
+      fromBase64(setupJs.dataset.canisterConfig),
     );
     return jsonValue as unknown as InternetIdentityInit;
   } catch {
     void displayError({
       title: "Canister config not valid",
       message:
-        "There was a problem contacting the IC. The host serving this page did not give us a valid canister config. Try reloading the page and contact support if the problem persist      primaryButton: "Reload",load",
+        "There was a problem contacting the IC. The host serving this page did not give us a valid canister config. Try reloading the page and contact support if the problem persists.",
+      primaryButton: "Reload",
     }).then(() => {
       window.location.reload();
     });
@@ -77,9 +82,11 @@ export const readCanisterConfig = (): InternetIdentityInit => {
 // Show version information for the curious programmer
 export const printDevMessage = () => {
   console.log("Welcome to Internet Identity!");
-  console    "The code can be found here: https://github.com/dfinity/internet-identity",ntity",
+  console.log(
+    "The code can be found here: https://github.com/dfinity/internet-identity",
   );
-  consol    `https://github.com/dfinity/internet-identity/commit/${version.commit}`,ommit}`,
+  console.log(
+    `https://github.com/dfinity/internet-identity/commit/${version.commit}`,
   );
   if (nonNullish(version.release)) {
     console.log(`This is version ${version.release}`);
@@ -91,7 +98,8 @@ export const printDevMessage = () => {
   if (anyFeatures()) {
     const message = `
 Some features are enabled:
-${Object.entries(fe  .map(([k, v]) => ` - ${k}: ${v}`)
+${Object.entries(features)
+  .map(([k, v]) => ` - ${k}: ${v}`)
   .join("\n")}
 see more at https://github.com/dfinity/internet-identity#features
       `;
