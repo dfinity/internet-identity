@@ -63,6 +63,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
               ? [
                   {
                     hosts: [
+                      "id.ai",
                       "identity.ic0.app",
                       "identity.internetcomputer.org",
                     ],
@@ -93,6 +94,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
             allowedHosts: ["icp-api.io"],
             cors: {
               origin: [
+                "https://id.ai",
                 "https://identity.internetcomputer.org",
                 "https://identity.ic0.app",
                 "https://nice-name.com",

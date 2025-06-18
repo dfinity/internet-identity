@@ -13,6 +13,7 @@ export default defineConfig(
       environment: "jsdom",
       exclude: [
         ...configDefaults.exclude,
+        "src/frontend/tests/e2e-playwright/**",
         ...(mode === "test" ? ["src/frontend/tests/e2e/**"] : []),
       ],
       include: [
