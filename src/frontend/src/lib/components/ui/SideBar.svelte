@@ -6,8 +6,10 @@
     $props();
 </script>
 
-<nav class={["bg-bg-primary border-border-secondary border-r px-3", classes]}>
-  <div class="flex h-16 flex-1 items-center gap-4">
+<nav
+  class={["bg-bg-primary border-border-secondary border-r px-4 py-5", classes]}
+>
+  <div class="mb-6 flex flex-1 items-center gap-4 px-3">
     <Logo class="text-fg-primary h-5.5" />
     <h1 class="text-md text-text-primary hidden font-semibold sm:block">
       Internet Identity Hub

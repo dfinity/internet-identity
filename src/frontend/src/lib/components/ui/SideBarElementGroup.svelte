@@ -1,10 +1,33 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
+  import { page } from "$app/state";
+  import { onMount } from "svelte";
 
   let { children } = $props();
   let groupRef = $state<HTMLDivElement>();
   let hoveredAnchor = $state<HTMLAnchorElement>();
+  let activeAnchor = $derived.by(getActiveAnchor);
   let highlightStyle = $state("");
+
+  onMount(() => {
+    setTimeout(() => {
+      // Tick doesn't work here
+      activeAnchor = getActiveAnchor();
+      updateHighlight();
+    }, 0);
+  });
+
+  $effect(() => {
+    console.log(activeAnchor);
+  });
+
+  function getActiveAnchor() {
+    if (!groupRef) return;
+    const anchors = Array.from(groupRef.querySelectorAll("a"));
+    const currentPath = page.url.pathname;
+    console.log(anchors.find((a) => a.getAttribute("href") === currentPath));
+    return anchors.find((a) => a.getAttribute("href") === currentPath);
+  }
 
   const handlePointerOver = (e: PointerEvent) => {
     if (!groupRef) return;
@@ -23,13 +46,15 @@
     const related = (e.relatedTarget as HTMLElement)?.closest("a");
     if (!related || related.parentElement !== groupRef) {
       hoveredAnchor = undefined;
+      updateHighlight();
     }
   };
 
   function updateHighlight() {
-    if (hoveredAnchor && groupRef) {
-      const anchorRect = hoveredAnchor.getBoundingClientRect();
-      const groupRect = groupRef.getBoundingClientRect();
+    const anchor = hoveredAnchor ?? activeAnchor;
+    if (anchor && groupRef) {
+      const anchorRect = anchor.getBoundingClientRect();
+      console.log(anchorRect.top);
       highlightStyle = `
         position: absolute;
         top: ${anchorRect.top}px;
@@ -49,12 +74,12 @@
   onpointerout={handlePointerOut}
   class="z-2"
 >
-  {#if hoveredAnchor}
+  {@render children?.()}
+  {#if hoveredAnchor || activeAnchor}
     <div
       class="bg-bg-active border-border-secondary pointer-events-none rounded-sm border"
       style={highlightStyle}
-      transition:fade={{ duration: 50 }}
+      transition:fade={{ duration: 150 }}
     ></div>
   {/if}
-  {@render children?.()}
 </div>
