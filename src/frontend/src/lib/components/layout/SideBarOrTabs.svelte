@@ -62,4 +62,19 @@
     min-height: 100dvh;
     min-width: 100dvw;
   }
+
+  @media (max-width: 1024px) {
+    .sidebar-layout {
+      display: grid;
+      grid-template-columns:
+        296px
+        1fr
+        minmax(0, max-content)
+        1fr;
+
+      grid-template-rows: min-content 1fr max-content 1fr min-content;
+      min-height: 100dvh;
+      min-width: 100dvw;
+    }
+  }
 </style>
