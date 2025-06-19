@@ -1,7 +1,16 @@
 <script lang="ts">
+  import Button from "$lib/components/ui/Button.svelte";
   import Card from "$lib/components/ui/Card.svelte";
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
   import { Plus, Unlink } from "@lucide/svelte";
+
+  const handleUnlinkCredential = () => {
+    console.log("unlink credential"); //TODO
+  };
+
+  const handleAddCredential = () => {
+    console.log("add credential"); //TODO
+  };
 </script>
 
 <div class="text-text-primary">
@@ -17,9 +26,10 @@
       </div>
 
       <div>
-        <ButtonOrAnchor
-          class="bg-bg-brand-solid text-text-primary-inversed top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
-          >Add <Plus size="1.25rem" /></ButtonOrAnchor
+        <Button
+          onclick={handleAddCredential}
+          class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
+          >Add <Plus size="1.25rem" /></Button
         >
       </div>
     </div>
@@ -30,7 +40,7 @@
             <h5 class="font-semibold">Label</h5>
           </td>
           <td class="p-4">
-            <h5>"asdf"</h5>
+            <h5>Goo goo gaga</h5>
           </td>
           <td class="flex justify-end p-4">
             <ButtonOrAnchor></ButtonOrAnchor>
@@ -41,12 +51,12 @@
             <h5 class="font-semibold">Account Name</h5>
           </td>
           <td class="p-4">
-            <h5>"asdf"</h5>
+            <h5>My gmail acc</h5>
           </td>
           <td class="flex justify-end p-4"
-            ><ButtonOrAnchor href="/hub/security">
+            ><Button variant="tertiary" onclick={handleUnlinkCredential}>
               <Unlink class="stroke-fg-error-secondary" />
-            </ButtonOrAnchor></td
+            </Button></td
           ></tr
         >
       </tbody>

@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { fade } from "svelte/transition";
 
-  const { children } = $props();
+  let { children, bindableGroupRef = $bindable() } = $props();
   let groupRef = $state<HTMLDivElement>();
   let activeAnchor = $derived.by(getActiveAnchor);
   let highlightStyle = $state("");
@@ -55,6 +55,7 @@
 <div
   class="border-border-secondary z-2 flex flex-row gap-4 border-b pb-2"
   bind:this={groupRef}
+  bind:this={bindableGroupRef}
 >
   {@render children?.()}
   {#if activeAnchor && loaded}

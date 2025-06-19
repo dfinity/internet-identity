@@ -1,10 +1,14 @@
 <script lang="ts">
+  import Button from "$lib/components/ui/Button.svelte";
   import Card from "$lib/components/ui/Card.svelte";
-  import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
   import { ChevronRight, InfoIcon } from "@lucide/svelte";
 
   let identityName = "Laniakea";
   let lastUsedAccessMethod = "iCloud Keychain";
+
+  const handleClickIdentityInfo = () => {
+    console.log("Clicked Identity Info");
+  };
 </script>
 
 <div class="text-text-primary">
@@ -30,9 +34,9 @@
             <h5 class="font-semibold">{identityName}</h5>
           </td>
           <td class="flex justify-end p-4">
-            <ButtonOrAnchor>
+            <Button onclick={handleClickIdentityInfo} variant="tertiary">
               <InfoIcon />
-            </ButtonOrAnchor>
+            </Button>
           </td>
         </tr>
         <tr>
@@ -43,9 +47,9 @@
             <h5 class="font-semibold">{lastUsedAccessMethod}</h5>
           </td>
           <td class="flex justify-end p-4"
-            ><ButtonOrAnchor href="/hub/security">
+            ><Button variant="tertiary" href="/hub/security">
               <ChevronRight />
-            </ButtonOrAnchor></td
+            </Button></td
           ></tr
         >
       </tbody>

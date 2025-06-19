@@ -3,7 +3,7 @@
   import { page } from "$app/state";
   import { onMount } from "svelte";
 
-  const { children } = $props();
+  let { children, bindableGroupRef = $bindable<HTMLDivElement>() } = $props();
   let groupRef = $state<HTMLDivElement>();
   let hoveredAnchor = $state<HTMLAnchorElement>();
   let activeAnchor = $derived.by(getActiveAnchor);
@@ -66,6 +66,7 @@
 
 <div
   bind:this={groupRef}
+  bind:this={bindableGroupRef}
   onpointerover={handlePointerOver}
   onpointerout={handlePointerOut}
   class="z-2"
