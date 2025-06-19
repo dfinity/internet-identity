@@ -6,7 +6,7 @@
   import { LucideHome, Shield, UserIcon } from "@lucide/svelte";
   import SideBarElementGroup from "$lib/components/ui/SideBarElementGroup.svelte";
   import { fly } from "svelte/transition";
-  import { navigating, page } from "$app/state";
+  import { page } from "$app/state";
   import TabElement from "$lib/components/ui/TabElement.svelte";
   import TabElementGroup from "$lib/components/ui/TabElementGroup.svelte";
   import { beforeNavigate } from "$app/navigation";
