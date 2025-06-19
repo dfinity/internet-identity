@@ -18,4 +18,7 @@ export const reroute: Reroute = ({ url }) => {
   if (url.hash === "#authorize") {
     return get(DISCOVERABLE_PASSKEY_FLOW) ? "/authorize" : "/legacy/authorize";
   }
+  if (url.pathname === "/") {
+    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/" : "/legacy";
+  }
 };

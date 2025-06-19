@@ -37,7 +37,6 @@
       });
       await authorizationStore.authorize(undefined, 4000);
     },
-    onError: handleError,
   });
 
   const dapps = getDapps();
