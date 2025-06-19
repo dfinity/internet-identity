@@ -10,7 +10,7 @@
     Settings and recommendations to keep your identity secure
   </h2>
   <Card>
-    <div class="flex flex-col gap-5 p-4 md:flex-row">
+    <div class="flex flex-col justify-between gap-5 p-4 md:flex-row">
       <div>
         <h3 class="mb-2 text-lg font-semibold">Access methods</h3>
         <h4>Manage your passkeys, security keys and linked accounts.</h4>
