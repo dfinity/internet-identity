@@ -1,20 +1,25 @@
 <script lang="ts">
-  import SideBarElement from "$lib/components/layout/SideBarElement.svelte";
+  import SideBarElement from "$lib/components/ui/SideBarElement.svelte";
   import SideBarOrTabs from "$lib/components/layout/SideBarOrTabs.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
-  import { UserIcon } from "@lucide/svelte";
+  import { LucideHome, Shield, UserIcon } from "@lucide/svelte";
+  import SideBarElementGroup from "$lib/components/ui/SideBarElementGroup.svelte";
   const { children } = $props();
 </script>
 
 <SideBarOrTabs>
   {#snippet sidebarElements()}
-    <SideBarElement class="text-text-primary" href="/hub">
-      <h1>Home</h1>
-    </SideBarElement>
-    <SideBarElement class="text-text-primary" href="/hub/security">
-      <h1>Security</h1>
-    </SideBarElement>
+    <SideBarElementGroup>
+      <SideBarElement href="/hub">
+        <LucideHome size="1rem" class="stroke-fg-quaternary" />
+        <h1>Home</h1>
+      </SideBarElement>
+      <SideBarElement class="text-text-primary" href="/hub/security">
+        <Shield size="1rem" class="stroke-fg-quaternary" />
+        <h1>Security</h1>
+      </SideBarElement>
+    </SideBarElementGroup>
   {/snippet}
 
   {#snippet tabElements()}
