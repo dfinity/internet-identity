@@ -5,7 +5,12 @@
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
   import { LucideHome, Shield, UserIcon } from "@lucide/svelte";
   import SideBarElementGroup from "$lib/components/ui/SideBarElementGroup.svelte";
+  import { fly, scale } from "svelte/transition";
+  import { navigating, page } from "$app/state";
   const { children } = $props();
+
+  let divRef = $state<HTMLDivElement>();
+  const animationDuration = 200;
 </script>
 
 <SideBarOrTabs>
@@ -32,7 +37,21 @@
   {/snippet}
 
   {#snippet content()}
-    {@render children?.()}
+    {#key page.url.pathname}
+      <div
+        bind:this={divRef}
+        in:fly={{
+          x: 200 * (navigating.delta ?? 1),
+          duration: 200,
+          delay: 200,
+        }}
+        out:fly={{ x: -160 * (navigating.delta ?? 1), duration: 160 }}
+        onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
+        class="nth-2:hidden"
+      >
+        {@render children?.()}
+      </div>
+    {/key}
   {/snippet}
 
   {#snippet header()}

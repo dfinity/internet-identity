@@ -17,15 +17,10 @@
     }, 0);
   });
 
-  $effect(() => {
-    console.log(activeAnchor);
-  });
-
   function getActiveAnchor() {
     if (!groupRef) return;
     const anchors = Array.from(groupRef.querySelectorAll("a"));
     const currentPath = page.url.pathname;
-    console.log(anchors.find((a) => a.getAttribute("href") === currentPath));
     return anchors.find((a) => a.getAttribute("href") === currentPath);
   }
 
@@ -54,7 +49,6 @@
     const anchor = hoveredAnchor ?? activeAnchor;
     if (anchor && groupRef) {
       const anchorRect = anchor.getBoundingClientRect();
-      console.log(anchorRect.top);
       highlightStyle = `
         position: absolute;
         top: ${anchorRect.top}px;
