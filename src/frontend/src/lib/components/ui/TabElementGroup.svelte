@@ -7,12 +7,14 @@
   let groupRef = $state<HTMLDivElement>();
   let activeAnchor = $derived.by(getActiveAnchor);
   let highlightStyle = $state("");
+  let loaded = $state(false);
 
   onMount(() => {
     setTimeout(() => {
       // Tick doesn't work here
       activeAnchor = getActiveAnchor();
       updateHighlight();
+      loaded = true;
     }, 0);
   });
 
@@ -55,7 +57,7 @@
   bind:this={groupRef}
 >
   {@render children?.()}
-  {#if activeAnchor}
+  {#if activeAnchor && loaded}
     <div
       class="border-fg-primary pointer-events-none border-b-2"
       style={highlightStyle}

@@ -8,12 +8,14 @@
   let hoveredAnchor = $state<HTMLAnchorElement>();
   let activeAnchor = $derived.by(getActiveAnchor);
   let highlightStyle = $state("");
+  let loaded = $state(false);
 
   onMount(() => {
     setTimeout(() => {
       // Tick doesn't work here
       activeAnchor = getActiveAnchor();
       updateHighlight();
+      loaded = true;
     }, 0);
   });
 
@@ -69,7 +71,7 @@
   class="z-2"
 >
   {@render children?.()}
-  {#if hoveredAnchor || activeAnchor}
+  {#if (hoveredAnchor || activeAnchor) && loaded}
     <div
       class="bg-bg-active border-border-secondary pointer-events-none rounded-sm border"
       style={highlightStyle}
