@@ -27,7 +27,7 @@
       <tbody>
         <tr class="border-border-tertiary border-t border-b">
           <td class="p-4">
-            <h5 class="font-semibold">Identity Name</h5>
+            <h5 class="font-semibold">Label</h5>
           </td>
           <td class="p-4">
             <h5>"asdf"</h5>
@@ -38,14 +38,14 @@
         </tr>
         <tr>
           <td class="p-4">
-            <h5 class="font-semibold">Access Methods</h5>
+            <h5 class="font-semibold">Account Name</h5>
           </td>
           <td class="p-4">
             <h5>"asdf"</h5>
           </td>
           <td class="flex justify-end p-4"
             ><ButtonOrAnchor href="/hub/security">
-              <Unlink />
+              <Unlink class="stroke-fg-error-secondary" />
             </ButtonOrAnchor></td
           ></tr
         >
