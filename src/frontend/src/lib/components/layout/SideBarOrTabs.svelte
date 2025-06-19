@@ -36,11 +36,16 @@
     </footer>
   </div>
 {:else}
-  <Tabs>
-    {@render tabElements?.()}
-  </Tabs>
-  <div class="px-4">
-    {@render content?.()}
+  <div class="flex min-h-screen flex-col">
+    <Tabs>
+      {@render tabElements?.()}
+    </Tabs>
+    <div class="flex-1 px-4">
+      {@render content?.()}
+    </div>
+    <footer>
+      {@render footer?.()}
+    </footer>
   </div>
 {/if}
 
