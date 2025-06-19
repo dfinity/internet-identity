@@ -39,7 +39,7 @@
   <Tabs>
     {@render tabElements?.()}
   </Tabs>
-  <div>
+  <div class="px-4">
     {@render content?.()}
   </div>
 {/if}

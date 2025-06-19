@@ -3,7 +3,7 @@
   import { page } from "$app/state";
   import { onMount } from "svelte";
 
-  let { children } = $props();
+  const { children } = $props();
   let groupRef = $state<HTMLDivElement>();
   let hoveredAnchor = $state<HTMLAnchorElement>();
   let activeAnchor = $derived.by(getActiveAnchor);

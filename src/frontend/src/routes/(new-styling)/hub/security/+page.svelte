@@ -10,7 +10,7 @@
     Settings and recommendations to keep your identity secure
   </h2>
   <Card>
-    <div class="flex gap-5 p-4">
+    <div class="flex flex-col gap-5 p-4 md:flex-row">
       <div>
         <h3 class="mb-2 text-lg font-semibold">Access methods</h3>
         <h4>Manage your passkeys, security keys and linked accounts.</h4>
@@ -18,7 +18,7 @@
 
       <div>
         <ButtonOrAnchor
-          class="bg-bg-brand-solid text-text-primary-inversed top-0 flex items-center gap-1 rounded-sm px-3.5 py-2 font-semibold"
+          class="bg-bg-brand-solid text-text-primary-inversed top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
           >Add <Plus size="1.25rem" /></ButtonOrAnchor
         >
       </div>

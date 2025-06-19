@@ -7,6 +7,8 @@
   import SideBarElementGroup from "$lib/components/ui/SideBarElementGroup.svelte";
   import { fly, scale } from "svelte/transition";
   import { navigating, page } from "$app/state";
+  import TabElement from "$lib/components/ui/TabElement.svelte";
+  import TabElementGroup from "$lib/components/ui/TabElementGroup.svelte";
   const { children } = $props();
 
   let divRef = $state<HTMLDivElement>();
@@ -28,12 +30,14 @@
   {/snippet}
 
   {#snippet tabElements()}
-    <SideBarElement class="text-text-primary" href="/hub">
-      <h1>Home</h1>
-    </SideBarElement>
-    <SideBarElement class="text-text-primary" href="/hub/security">
-      <h1>Security</h1>
-    </SideBarElement>
+    <TabElementGroup>
+      <TabElement class="text-text-primary" href="/hub">
+        <h1>Home</h1>
+      </TabElement>
+      <TabElement class="text-text-primary" href="/hub/security">
+        <h1>Security</h1>
+      </TabElement>
+    </TabElementGroup>
   {/snippet}
 
   {#snippet content()}
