@@ -10,6 +10,14 @@
   let activeAnchor = $derived.by(getActiveAnchor);
   let hoveredStyle = $state("");
   let activeStyle = $state("");
+  let pullOpts = {
+    stiffness: 0.1,
+    damping: 0.25,
+  };
+  let releaseOpts = {
+    stiffness: 0.1,
+    damping: 0.25,
+  };
   let hoveredCoords = new Spring({ x: 0, y: 0 });
   let activeCoords = new Spring({ x: 0, y: 0 });
   let loaded = $state(false);
