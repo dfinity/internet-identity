@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import { onDestroy, onMount } from "svelte";
   import { Spring } from "svelte/motion";
+  import { afterNavigate } from "$app/navigation";
 
   let { children, bindableGroupRef = $bindable<HTMLDivElement>() } = $props();
   let groupRef = $state<HTMLDivElement>();
@@ -10,16 +11,21 @@
   let activeAnchor = $derived.by(getActiveAnchor);
   let hoveredStyle = $state("");
   let activeStyle = $state("");
-  let pullOpts = {
-    stiffness: 0.1,
-    damping: 0.25,
-  };
-  let releaseOpts = {
-    stiffness: 0.1,
-    damping: 0.25,
-  };
-  let hoveredCoords = new Spring({ x: 0, y: 0 });
-  let activeCoords = new Spring({ x: 0, y: 0 });
+
+  let hoveredCoords = new Spring(
+    { x: 0, y: 0 },
+    {
+      stiffness: 0.5,
+      damping: 0.5,
+    },
+  );
+  let activeCoords = new Spring(
+    { x: 0, y: 0 },
+    {
+      stiffness: 0.4,
+      damping: 0.4,
+    },
+  );
   let loaded = $state(false);
 
   onMount(() => {
@@ -31,7 +37,7 @@
         node.addEventListener("click", handleClick);
       });
       activeAnchor = getActiveAnchor();
-      updateHighlight();
+      updateHighlight(true);
       loaded = true;
     }, 0);
   });
@@ -40,6 +46,10 @@
     groupRef?.childNodes.forEach((node) => {
       node.removeEventListener("click", handleClick);
     });
+  });
+
+  afterNavigate(() => {
+    updateHighlight();
   });
 
   function getActiveAnchor() {
@@ -81,30 +91,31 @@
     }
   };
 
-  function updateHighlight() {
+  function updateHighlight(instant?: boolean) {
     const anchor = hoveredAnchor ?? activeAnchor;
     if (anchor && groupRef) {
-      const anchorRect = anchor.getBoundingClientRect();
+      const { x, y, height, width } = anchor.getBoundingClientRect();
+      if (instant) {
+        hoveredCoords.set({ x, y }, { instant });
+      } else {
+        hoveredCoords.target = { x, y };
+      }
       hoveredStyle = `
-        position: absolute;
-        top: ${anchorRect.top}px;
-        left: ${anchorRect.left}px;
-        width: ${anchorRect.width}px;
-        height: ${anchorRect.height}px;
-        z-index: -1;
-        transition: all 0.15s cubic-bezier(.4,1,.4,1);
+        width: ${width}px;
+        height: ${height}px;
       `;
     }
     if (activeAnchor) {
-      const anchorRect = activeAnchor.getBoundingClientRect();
+      const { x, y, height, width } = activeAnchor.getBoundingClientRect();
+
+      if (instant) {
+        activeCoords.set({ x, y }, { instant });
+      } else {
+        activeCoords.target = { x, y };
+      }
       activeStyle = `
-        position: absolute;
-        top: ${anchorRect.top}px;
-        left: ${anchorRect.left}px;
-        width: ${anchorRect.width}px;
-        height: ${anchorRect.height}px;
-        z-index: -1;
-        transition: all 0.15s cubic-bezier(.4,1,.4,1);
+        width: ${width}px;
+        height: ${height}px;
       `;
     }
   }
@@ -120,15 +131,15 @@
   {@render children?.()}
   {#if activeAnchor && loaded}
     <div
-      class="bg-bg-active pointer-events-none rounded-sm"
-      style={activeStyle}
+      class="bg-bg-active pointer-events-none absolute -z-[1] rounded-sm"
+      style={`top: ${activeCoords.current.y}px; left: ${activeCoords.current.x}px; ${activeStyle}`}
       transition:fade={{ duration: 150 }}
     ></div>
   {/if}
   {#if (hoveredAnchor || activeAnchor) && loaded}
     <div
-      class=" border-border-secondary pointer-events-none rounded-sm border"
-      style={hoveredStyle}
+      class="border-border-secondary pointer-events-none absolute -z-[1] rounded-sm border"
+      style={`top: ${hoveredCoords.current.y}px; left: ${hoveredCoords.current.x}px; ${hoveredStyle}`}
       transition:fade={{ duration: 150 }}
     ></div>
   {/if}
