@@ -29,6 +29,7 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -54,47 +55,13 @@
     }
     return accounts;
   });
+  const authLastUsedFlow = new AuthLastUsedFlow();
   let loading = $state(false);
-  let systemOverlay = $state(false);
 
-  const authenticateCurrentIdentity = async () => {
-    if ("passkey" in selectedIdentity.authMethod) {
-      const { identity, identityNumber } = await authenticateWithPasskey({
-        canisterId,
-        session: $sessionStore,
-        credentialId: selectedIdentity.authMethod.passkey.credentialId,
-      });
-      authenticationStore.set({ identity, identityNumber });
-      lastUsedIdentitiesStore.addLastUsedIdentity(selectedIdentity);
-    } else if (
-      "openid" in selectedIdentity.authMethod &&
-      selectedIdentity.authMethod.openid.iss === "https://accounts.google.com"
-    ) {
-      systemOverlay = true;
-      const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id!;
-      const requestConfig = createGoogleRequestConfig(clientId);
-      const jwt = await requestJWT(requestConfig, {
-        nonce: $sessionStore.nonce,
-        mediation: "required",
-        loginHint: selectedIdentity.authMethod.openid.sub,
-      });
-      systemOverlay = false;
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: $sessionStore,
-        jwt,
-      });
-      authenticationStore.set({ identity, identityNumber });
-      lastUsedIdentitiesStore.addLastUsedIdentity(selectedIdentity);
-    } else {
-      throw new Error("Unrecognized authentication method");
-    }
-  };
-
-  const continueAs = async (account: LastUsedAccount) => {
+  const handleContinueAs = async (account: LastUsedAccount) => {
     try {
       loading = true;
-      await authenticateCurrentIdentity();
+      await authLastUsedFlow.authenticate(selectedIdentity);
       if ("passkey" in selectedIdentity.authMethod) {
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.ContinueAsPasskey,
@@ -105,20 +72,18 @@
       lastUsedIdentitiesStore.addLastUsedAccount(account);
       await authorizationStore.authorize(account.accountNumber);
     } catch (error) {
-      systemOverlay = false;
       loading = false;
       handleError(error);
     }
   };
 
-  const useAnother = async () => {
+  const handleUseAnother = async () => {
     try {
       loading = true;
-      await authenticateCurrentIdentity();
+      await authLastUsedFlow.authenticate(selectedIdentity);
       authenticationV2Funnel.trigger(AuthenticationV2Events.UseAnother);
       await goto("/authorize/account");
     } catch (error) {
-      systemOverlay = false;
       loading = false;
       handleError(error);
     }
@@ -146,7 +111,10 @@
     <ul class="contents">
       {#each lastUsedAccounts as account}
         <li class="contents">
-          <ButtonCard onclick={() => continueAs(account)} disabled={loading}>
+          <ButtonCard
+            onclick={() => handleContinueAs(account)}
+            disabled={loading}
+          >
             <Avatar size="sm" aria-hidden>
               {(account.name ?? "Primary account").slice(0, 1).toUpperCase()}
             </Avatar>
@@ -157,7 +125,7 @@
         </li>
       {/each}
     </ul>
-    <ButtonCard onclick={useAnother} disabled={loading}>
+    <ButtonCard onclick={handleUseAnother} disabled={loading}>
       <FeaturedIcon size="sm">
         <PlusIcon size="1.25rem" />
       </FeaturedIcon>
@@ -165,6 +133,6 @@
     </ButtonCard>
   </div>
 </div>
-{#if systemOverlay}
+{#if authLastUsedFlow.systemOverlay}
   <SystemOverlayBackdrop />
 {/if}

@@ -1,8 +1,8 @@
 import { Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
 
-const II_URL = "https://id.ai";
-const TEST_APP_URL = "https://nice-name.com";
+export const II_URL = "https://id.ai";
+export const TEST_APP_URL = "https://nice-name.com";
 
 export type DummyAuthFn = (page: Page) => void;
 
