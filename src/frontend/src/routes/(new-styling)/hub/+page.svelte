@@ -12,7 +12,9 @@
 </script>
 
 <div class="text-text-primary">
-  <h1 class="mb-4 text-4xl">Welcome, {identityName}!</h1>
+  <h1 class="text-text-tertiary mb-4 text-4xl font-semibold">
+    Welcome, {identityName}!
+  </h1>
   <h2 class="mb-12 text-lg">
     Manage your identity, passkeys and connected apps below.
   </h2>

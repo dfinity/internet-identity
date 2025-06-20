@@ -1,22 +1,37 @@
 <script lang="ts">
   import { fade } from "svelte/transition";
   import { page } from "$app/state";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
+  import { Spring } from "svelte/motion";
 
   let { children, bindableGroupRef = $bindable<HTMLDivElement>() } = $props();
   let groupRef = $state<HTMLDivElement>();
   let hoveredAnchor = $state<HTMLAnchorElement>();
   let activeAnchor = $derived.by(getActiveAnchor);
-  let highlightStyle = $state("");
+  let hoveredStyle = $state("");
+  let activeStyle = $state("");
+  let hoveredCoords = new Spring({ x: 0, y: 0 });
+  let activeCoords = new Spring({ x: 0, y: 0 });
   let loaded = $state(false);
 
   onMount(() => {
     setTimeout(() => {
       // Tick doesn't work here
+      groupRef?.childNodes.forEach((node) => {
+        // Click listener on div is not great for aria
+        // So we just add to kids
+        node.addEventListener("click", handleClick);
+      });
       activeAnchor = getActiveAnchor();
       updateHighlight();
       loaded = true;
     }, 0);
+  });
+
+  onDestroy(() => {
+    groupRef?.childNodes.forEach((node) => {
+      node.removeEventListener("click", handleClick);
+    });
   });
 
   function getActiveAnchor() {
@@ -47,11 +62,34 @@
     }
   };
 
+  const handleClick = (e: Event) => {
+    if (!groupRef) return;
+
+    const anchor = (e.target as HTMLElement).closest("a");
+
+    if (anchor && anchor.parentElement === groupRef) {
+      activeAnchor = anchor;
+      updateHighlight();
+    }
+  };
+
   function updateHighlight() {
     const anchor = hoveredAnchor ?? activeAnchor;
     if (anchor && groupRef) {
       const anchorRect = anchor.getBoundingClientRect();
-      highlightStyle = `
+      hoveredStyle = `
+        position: absolute;
+        top: ${anchorRect.top}px;
+        left: ${anchorRect.left}px;
+        width: ${anchorRect.width}px;
+        height: ${anchorRect.height}px;
+        z-index: -1;
+        transition: all 0.15s cubic-bezier(.4,1,.4,1);
+      `;
+    }
+    if (activeAnchor) {
+      const anchorRect = activeAnchor.getBoundingClientRect();
+      activeStyle = `
         position: absolute;
         top: ${anchorRect.top}px;
         left: ${anchorRect.left}px;
@@ -69,13 +107,20 @@
   bind:this={bindableGroupRef}
   onpointerover={handlePointerOver}
   onpointerout={handlePointerOut}
-  class="z-2"
+  class="z-2 flex flex-col gap-1"
 >
   {@render children?.()}
+  {#if activeAnchor && loaded}
+    <div
+      class="bg-bg-active pointer-events-none rounded-sm"
+      style={activeStyle}
+      transition:fade={{ duration: 150 }}
+    ></div>
+  {/if}
   {#if (hoveredAnchor || activeAnchor) && loaded}
     <div
-      class="bg-bg-active border-border-secondary pointer-events-none rounded-sm border"
-      style={highlightStyle}
+      class=" border-border-secondary pointer-events-none rounded-sm border"
+      style={hoveredStyle}
       transition:fade={{ duration: 150 }}
     ></div>
   {/if}
