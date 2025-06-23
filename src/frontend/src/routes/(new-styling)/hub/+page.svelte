@@ -6,8 +6,8 @@
   let identityName = "Laniakea";
   let lastUsedAccessMethod = "iCloud Keychain";
 
-  const handleClickIdentityInfo = () => {
-    console.log("Clicked Identity Info");
+  const handleHoverIdentityInfo = () => {
+    console.log("hovering Identity Info");
   };
 </script>
 
@@ -36,24 +36,28 @@
             <h5 class="font-semibold">{identityName}</h5>
           </td>
           <td class="flex justify-end p-4">
-            <Button onclick={handleClickIdentityInfo} variant="tertiary">
+            <button onmouseenter={handleHoverIdentityInfo}>
               <InfoIcon />
-            </Button>
+            </button>
           </td>
         </tr>
         <tr>
-          <td class="p-4">
-            <h5>Access Methods</h5>
+          <td colspan="3">
+            <Button
+              class="!h-14 w-full rounded-t-none rounded-b-2xl p-4 !text-[16px] !font-normal"
+              variant="tertiary"
+              href="/hub/security"
+            >
+              <h5 class="flex-1">Access Methods</h5>
+
+              <h5 class="flex-1 font-semibold">{lastUsedAccessMethod}</h5>
+
+              <span class="flex justify-end">
+                <ChevronRight />
+              </span>
+            </Button>
           </td>
-          <td class="p-4">
-            <h5 class="font-semibold">{lastUsedAccessMethod}</h5>
-          </td>
-          <td class="flex justify-end p-4"
-            ><Button variant="tertiary" href="/hub/security">
-              <ChevronRight />
-            </Button></td
-          ></tr
-        >
+        </tr>
       </tbody>
     </table>
   </Card>
