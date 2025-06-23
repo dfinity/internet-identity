@@ -1,25 +1,39 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
 
+  type Size = "sm" | "md" | "lg" | "xl";
+  type Variant = "info" | "success" | "warning" | "error";
+
   type Props = HTMLAttributes<HTMLDivElement> & {
-    size?: keyof typeof sizes;
+    size?: Size;
+    variant?: Variant;
   };
 
-  const { children, class: className, size = "md", ...props }: Props = $props();
-
-  const sizes = {
-    sm: "size-8",
-    md: "size-10",
-    lg: "size-12",
-    xl: "size-14",
-  };
+  const {
+    children,
+    class: className,
+    size = "md",
+    variant = "info",
+    ...props
+  }: Props = $props();
 </script>
 
 <div
   {...props}
   class={[
-    "bg-bg-primary text-fg-secondary border-border-secondary flex shrink-0 items-center justify-center rounded-lg border",
-    sizes[size],
+    "flex shrink-0 items-center justify-center",
+    {
+      info: "bg-bg-primary text-fg-secondary ring-border-secondary rounded-lg ring",
+      success: "bg-bg-success-primary text-fg-success-primary rounded-full",
+      warning: "bg-bg-warning-primary text-fg-warning-primary rounded-full",
+      error: "bg-bg-error-primary text-fg-error-primary rounded-full",
+    }[variant],
+    {
+      sm: "size-8",
+      md: "size-10",
+      lg: "size-12",
+      xl: "size-14",
+    }[size],
     className,
   ]}
 >

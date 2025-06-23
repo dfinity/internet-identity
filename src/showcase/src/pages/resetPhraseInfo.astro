@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { resetPhraseInfoPage } from "$lib/flows/manage/deviceSettings";
+    import { resetPhraseInfoPage } from "$lib/legacy/flows/manage/deviceSettings";
 
     resetPhraseInfoPage({
       next: () => toast.info("next"),

@@ -28,7 +28,7 @@
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { nonNullish } from "@dfinity/utils";
-  import { getDapps } from "$lib/flows/dappsExplorer/dapps";
+  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 
   const dapps = getDapps();
   const dapp = $derived(

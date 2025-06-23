@@ -5,7 +5,7 @@ import type {
 import { authenticateBoxFlow } from "$lib/templates/authenticateBox";
 import { withLoader } from "$lib/templates/loader";
 import { toast } from "$lib/templates/toast";
-import { registerFlow, RegisterFlowOpts } from "$lib/flows/register";
+import { registerFlow, RegisterFlowOpts } from "$lib/legacy/flows/register";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
 import { ActorSubclass } from "@dfinity/agent";

@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { chromeDevice, userNumber } from "../constants";
-    import { showVerificationCodePage } from "$lib/flows/addDevice/welcomeView/showVerificationCode";
+    import { showVerificationCodePage } from "$lib/legacy/flows/addDevice/welcomeView/showVerificationCode";
 
     showVerificationCodePage({
       userNumber,

@@ -11,6 +11,10 @@
   import { fly, scale } from "svelte/transition";
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
+  import { RotateCcwIcon, CircleAlertIcon } from "@lucide/svelte";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
 
   const { children }: LayoutProps = $props();
 
@@ -56,8 +60,31 @@
       <p class="text-text-secondary text-lg">Redirecting to the app</p>
     </div>
   {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure"}
-    <div>Error</div>
-  {:else if status === "success"}
-    <div>Success</div>
+    {@const title = {
+      orphan: "Missing request",
+      closed: "Connection closed",
+      invalid: "Invalid request",
+      failure: "Something went wrong",
+    }[status]}
+    {@const description = {
+      orphan:
+        "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer.",
+      closed:
+        "It seems like the connection with the service could not be established.",
+      invalid: "It seems like an invalid authentication request was received.",
+      failure:
+        "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
+    }[status]}
+    <Dialog>
+      <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
+        <CircleAlertIcon size="1.5rem" />
+      </FeaturedIcon>
+      <h1 class="text-text-primary mb-3 text-2xl font-medium">{title}</h1>
+      <p class="text-md text-text-tertiary mb-6 font-medium">{description}</p>
+      <Button onclick={() => window.close()} variant="secondary">
+        <RotateCcwIcon size="1rem" />
+        Return to app
+      </Button>
+    </Dialog>
   {/if}
 </CenterLayout>
