@@ -6,20 +6,27 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
-    create: (name: string) => void;
+    create: (name: string) => Promise<void>;
+    onError?: (error: unknown) => void;
   }
 
-  const { create }: Props = $props();
+  const { create, onError = handleError }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
   let loading = $state(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     loading = true;
-    create(name.trim());
+    try {
+      await create(name.trim());
+    } catch (error) {
+      loading = false;
+      onError(error);
+    }
   };
 
   onMount(() => {
@@ -51,6 +58,7 @@
       spellcheck="false"
       disabled={loading}
       error={name.length > 64 ? "Maximum length is 64 characters." : undefined}
+      aria-label="Identity name"
     />
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">

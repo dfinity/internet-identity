@@ -3,19 +3,27 @@
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
     setupNew: () => void;
-    useExisting: () => void;
+    useExisting: () => Promise<void>;
+    onError?: (error: unknown) => void;
   }
 
-  const { setupNew, useExisting }: Props = $props();
+  const { setupNew, useExisting, onError = handleError }: Props = $props();
 
   let loading = $state(false);
 
-  const handleUseExisting = () => {
+  const handleUseExisting = async () => {
     loading = true;
-    useExisting();
+    try {
+      await useExisting();
+    } catch (error) {
+      onError(error);
+    } finally {
+      loading = false;
+    }
   };
 </script>
 

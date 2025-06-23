@@ -5,7 +5,7 @@ import type {
 import { authenticateBoxFlow } from "$lib/templates/authenticateBox";
 import { withLoader } from "$lib/templates/loader";
 import { toast } from "$lib/templates/toast";
-import { registerFlow, RegisterFlowOpts } from "$lib/flows/register";
+import { registerFlow, RegisterFlowOpts } from "$lib/legacy/flows/register";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
 import { ActorSubclass } from "@dfinity/agent";
@@ -28,6 +28,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   enable_dapps_explorer: [],
   is_production: [],
   new_flow_origins: [],
+  dummy_auth: [],
 };
 
 const registerSuccessToastTemplate = (result: unknown) => html`

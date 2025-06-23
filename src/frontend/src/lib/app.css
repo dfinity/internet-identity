@@ -247,12 +247,12 @@ a:not(:disabled) {
     --fg-brand-secondary: var(--color-brand-500);
     --fg-brand-secondary_alt: var(--color-surface-light-600);
     --fg-brand-secondary_hover: var(--color-surface-light-500);
-    --fg-error-primary: var(--color-error-500);
-    --fg-error-secondary: var(--color-error-400);
-    --fg-warning-primary: var(--color-warning-500);
-    --fg-warning-secondary: var(--color-warning-400);
-    --fg-success-primary: var(--color-success-500);
-    --fg-success-secondary: var(--color-success-400);
+    --fg-error-primary: var(--color-error-400);
+    --fg-error-secondary: var(--color-error-500);
+    --fg-warning-primary: var(--color-warning-400);
+    --fg-warning-secondary: var(--color-warning-500);
+    --fg-success-primary: var(--color-success-400);
+    --fg-success-secondary: var(--color-success-500);
 
     /* Background colors */
     --bg-primary: var(--color-surface-dark-950);

@@ -6,7 +6,9 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { registerCurrentDeviceCurrentOriginPage } from "$lib/flows/addDevice/registerCurrentDeviceCurrentOrigin";
+    import {
+      registerCurrentDeviceCurrentOriginPage
+    } from "$lib/legacy/flows/addDevice/registerCurrentDeviceCurrentOrigin";
 
     registerCurrentDeviceCurrentOriginPage({
       add: () => toast.info("Register current device"),

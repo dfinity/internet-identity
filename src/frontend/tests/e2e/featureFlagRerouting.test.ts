@@ -17,7 +17,7 @@ const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
   });
 };
 
-test.skip("Should redirect to new-styling authenticate with feature flag and load app.css", async () => {
+test("Should redirect to new-styling authenticate with feature flag and load app.css", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Visit the root with feature flag
     await browser.url(

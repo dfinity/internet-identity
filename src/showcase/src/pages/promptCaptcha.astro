@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { promptCaptchaPage } from "$lib/flows/register/captcha";
+    import { promptCaptchaPage } from "$lib/legacy/flows/register/captcha";
     import { dummyChallenge } from "../constants";
 
     promptCaptchaPage({

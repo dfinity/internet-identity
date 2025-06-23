@@ -3,7 +3,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   authenticationProtocol,
   AuthRequest,
-} from "$lib/flows/authorize/postMessageInterface";
+} from "$lib/legacy/flows/authorize/postMessageInterface";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
@@ -13,6 +13,8 @@ import {
   retryFor,
 } from "$lib/utils/utils";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import { features } from "$lib/legacy/features";
+import { canisterConfig } from "$lib/globals";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest; // Additional details e.g. derivation origin
@@ -81,7 +83,12 @@ export const authorizationStore: AuthorizationStore = {
                   accounts,
                 ),
               );
-            const artificialDelayPromise = waitFor(artificialDelay);
+            const artificialDelayPromise = waitFor(
+              features.DUMMY_AUTH ||
+                nonNullish(canisterConfig.dummy_auth[0]?.[0])
+                ? 0
+                : artificialDelay,
+            );
             try {
               const { user_key, expiration } = await actor
                 .prepare_account_delegation(

@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { addDeviceWarningPage } from "$lib/flows/recovery/recoveryWizard";
+    import { addDeviceWarningPage } from "$lib/legacy/flows/recovery/recoveryWizard";
 
     addDeviceWarningPage({
       ok: () => toast.info("ok"),

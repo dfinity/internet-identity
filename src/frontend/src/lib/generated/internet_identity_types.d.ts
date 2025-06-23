@@ -115,7 +115,8 @@ export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
-  { 'Unauthorized' : Principal };
+  { 'Unauthorized' : Principal } |
+  { 'NameTooLong' : null };
 export type CredentialId = Uint8Array | number[];
 export interface Delegation {
   'pubkey' : PublicKey,
@@ -157,6 +158,7 @@ export interface DeviceWithUsage {
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
+export interface DummyAuthConfig { 'prompt_for_index' : boolean }
 export type FrontendHostname = string;
 export type GetAccountsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -246,6 +248,7 @@ export interface InternetIdentityInit {
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
   'related_origins' : [] | [Array<string>],
   'captcha_config' : [] | [CaptchaConfig],
+  'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   'register_rate_limit' : [] | [RateLimitConfig],
 }
 export interface InternetIdentityStats {
@@ -360,7 +363,8 @@ export type Timestamp = bigint;
 export type Token = {};
 export type UpdateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
-  { 'Unauthorized' : Principal };
+  { 'Unauthorized' : Principal } |
+  { 'NameTooLong' : null };
 export type UserKey = PublicKey;
 export type UserNumber = bigint;
 export type VerifyTentativeDeviceResponse = {

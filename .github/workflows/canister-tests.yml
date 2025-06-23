@@ -223,7 +223,7 @@ jobs:
 
   vc-issuer-test:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, vc_demo_issuer-build]
+    needs: [ docker-build-ii, vc_demo_issuer-build ]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -269,7 +269,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ ubuntu-latest, macos-latest ]
     steps:
       - uses: actions/checkout@v4
 
@@ -335,11 +335,11 @@ jobs:
 
   canister-tests-run:
     runs-on: ${{ matrix.os }}
-    needs: [canister-tests-build, cached-build, docker-build-archive]
+    needs: [ canister-tests-build, cached-build, docker-build-archive ]
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        partition: ["1/3", "2/3", "3/3"]
+        os: [ ubuntu-latest, macos-latest ]
+        partition: [ "1/3", "2/3", "3/3" ]
     steps:
       - uses: actions/checkout@v4
 
@@ -391,7 +391,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [cached-build, docker-build-archive]
+    needs: [ cached-build, docker-build-archive ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -444,10 +444,10 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [cached-build, test-app-build, vc_demo_issuer-build]
+    needs: [ cached-build, test-app-build, vc_demo_issuer-build ]
     strategy:
       matrix:
-        device: ["desktop", "mobile"]
+        device: [ "desktop", "mobile" ]
         # We run the integration tests on both the official and legacy domains, to make sure
         # the webapp (routes, csp, etc) works on both. Captchas are statically enabled on one
         # domain and disabled on the other.
@@ -466,7 +466,7 @@ jobs:
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
+        shard: [ "1_6", "2_6", "3_6", "4_6", "5_6", "6_6" ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -576,11 +576,103 @@ jobs:
           name: e2e-test-failures-${{ env.artifact_suffix }}
           path: test-failures/*
           if-no-files-found: ignore
+  
+  e2e-playwright:
+    runs-on: ubuntu-latest
+    needs: [ cached-build, test-app-build ]
+    strategy:
+      matrix:
+        device: [ "desktop", "mobile" ]
+        shard: [ "1_3", "2_3", "3_3" ]
+      # Make sure that one failing test does not cancel all other matrix jobs
+      fail-fast: false
+
+    env:
+      # Suffix used for tagging artifacts
+      artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+
+      - name: Install npm deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium
+
+      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
+
+      # Helps with debugging
+      - name: Show versions
+        run: |
+          echo dfx --version
+          dfx --version
+          echo node --version
+          node --version
+
+      - name: "Run dfx"
+        run: dfx start --background --artificial-delay 0
+
+      - name: "Download II wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: internet_identity_test_cached.wasm.gz
+          path: .
+
+      - name: "Download test app wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: test_app.wasm
+          path: demos/test-app
+
+      - name: Create Canisters
+        run: dfx canister create --all
+
+      - name: Deploy canisters
+        run: |
+          # NOTE: dfx install will run the postinstall scripts from dfx.json
+          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
+          dfx canister install test_app --wasm demos/test-app/test_app.wasm
+
+      - name: Run dev server
+        id: dev-server-start
+        run: |
+          TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
+          dev_server_pid=$!
+          echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
+
+      - run: |
+          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+
+      - name: Stop dfx
+        if: ${{ always() }}
+        run: dfx stop
+
+      - name: Stop dev server
+        if: ${{ always() }}
+        run: kill ${{ steps.dev-server-start.outputs.dev_server_pid }}
+
+      - name: Archive dev server logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-server-logs-${{ env.artifact_suffix }}
+          path: dev-server-logs.txt
+          if-no-files-found: ignore
+
+      - name: Archive playwright reports
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ env.artifact_suffix }}
+          path: playwright-report/
+          if-no-files-found: ignore
 
   # Aggregate all e2e matrix jobs, used in branch protection
   e2e-all:
     runs-on: ubuntu-latest
-    needs: e2e
+    needs: [ e2e, e2e-playwright ]
     steps:
       - run: echo e2e ok
 
@@ -731,7 +823,7 @@ jobs:
   # On release tags, a new release is created and the assets are uploaded.
   release:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, docker-build-archive, vc_demo_issuer-build]
+    needs: [ docker-build-ii, docker-build-archive, vc_demo_issuer-build ]
 
     steps:
       - uses: actions/checkout@v4
@@ -952,7 +1044,7 @@ jobs:
   # Make sure that the asset we're testing is the same as that produced by the (slower) docker builds
   cached-build-check:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, cached-build]
+    needs: [ docker-build-ii, cached-build ]
     steps:
       - uses: actions/checkout@v4
       - name: "Download docker build"
@@ -1002,7 +1094,7 @@ jobs:
           path: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
 
   verify-clean-build-hash:
-    needs: ["clean-build", "docker-build-ii"]
+    needs: [ "clean-build", "docker-build-ii" ]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

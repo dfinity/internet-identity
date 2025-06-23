@@ -2,7 +2,7 @@ import type {
   Challenge,
   DeviceData,
 } from "$lib/generated/internet_identity_types";
-import { getDapps } from "$lib/flows/dappsExplorer/dapps";
+import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 
 export const dapps = getDapps();
 

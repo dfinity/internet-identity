@@ -1,4 +1,4 @@
-import { KnownDapp } from "$lib/flows/dappsExplorer/dapps";
+import { KnownDapp } from "$lib/legacy/flows/dappsExplorer/dapps";
 import {
   readCanisterId,
   getReplicaHost,

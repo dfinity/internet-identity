@@ -1,0 +1,400 @@
+<html>
+  <head>
+    <meta charset="utf8" />
+    <title>Internet Computer - Error: {reason}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <style>
+      html,
+      body {
+        min-height: 100dvh;
+      }
+
+      html {
+        background-color: var(--bg-primary);
+        -webkit-font-smoothing: antialiased;
+        font-family: var(
+          --default-font-family,
+          ui-sans-serif,
+          system-ui,
+          sans-serif,
+          "Apple Color Emoji",
+          "Segoe UI Emoji",
+          "Segoe UI Symbol",
+          "Noto Color Emoji"
+        );
+      }
+
+      button:not(:disabled),
+      a:not(:disabled) {
+        cursor: pointer;
+      }
+
+      .logo-container {
+        display: flex;
+        align-items: center;
+        justify-content: left;
+        height: 1.375rem;
+        fill: var(--text-primary);
+        gap: 1rem;
+      }
+
+      .logo-svg {
+        height: 100%;
+        width: auto;
+      }
+
+      header {
+        align-items: center;
+        justify-content: center;
+        padding-top: 0.5rem;
+        padding-left: 0.5rem;
+      }
+
+      .ii-title {
+        color: var(--text-primary);
+        font-weight: 600;
+        font-size: 1.1rem;
+      }
+
+      .notice-box {
+        display: flex;
+        border-radius: 0.75rem;
+        border: 1px solid var(--border-secondary);
+        padding: 1rem;
+        flex-direction: column;
+        align-items: flex-start;
+        color: var(--text-primary);
+        background-color: var(--bg-secondary);
+      }
+
+      .page-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .link {
+        color: var(--text-secondary);
+        text-decoration: none;
+      }
+
+      .link:hover {
+        text-decoration: underline;
+      }
+
+      :root {
+        --not-assigned: #ff51d6;
+      }
+
+      :root {
+        --color-surface-light-25: #fcfcfc;
+        --color-surface-light-50: #f6f6f6;
+        --color-surface-light-100: #f1f1f1;
+        --color-surface-light-200: #e8e8e8;
+        --color-surface-light-300: #dddddd;
+        --color-surface-light-400: #909091;
+        --color-surface-light-500: #777778;
+        --color-surface-light-600: #5c5c5d;
+        --color-surface-light-700: #414143;
+        --color-surface-light-800: #232325;
+        --color-surface-light-900: #1d1d1f;
+        --color-surface-light-950: #161618;
+
+        --color-surface-dark-25: #fafafa;
+        --color-surface-dark-50: #b3b3b7;
+        --color-surface-dark-100: #a1a1a5;
+        --color-surface-dark-200: #8f8f93;
+        --color-surface-dark-300: #7c7c80;
+        --color-surface-dark-400: #69696c;
+        --color-surface-dark-500: #565658;
+        --color-surface-dark-600: #434344;
+        --color-surface-dark-700: #313131;
+        --color-surface-dark-800: #232323;
+        --color-surface-dark-900: #1a1a1a;
+        --color-surface-dark-950: #161616;
+
+        --color-brand-25: var(--color-surface-light-25);
+        --color-brand-50: var(--color-surface-light-50);
+        --color-brand-100: var(--color-surface-light-100);
+        --color-brand-200: var(--color-surface-light-200);
+        --color-brand-300: var(--color-surface-light-300);
+        --color-brand-400: var(--color-surface-light-400);
+        --color-brand-500: var(--color-surface-light-500);
+        --color-brand-600: var(--color-surface-light-600);
+        --color-brand-700: var(--color-surface-light-700);
+        --color-brand-800: var(--color-surface-light-800);
+        --color-brand-900: var(--color-surface-light-900);
+        --color-brand-950: var(--color-surface-light-950);
+
+        --color-success-25: #f6fef9;
+        --color-success-50: #ecfdf3;
+        --color-success-100: #dcfae6;
+        --color-success-200: #abefc6;
+        --color-success-300: #75e0a7;
+        --color-success-400: #47cd89;
+        --color-success-500: #17b26a;
+        --color-success-600: #079455;
+        --color-success-700: #067647;
+        --color-success-800: #085d3a;
+        --color-success-900: #074d31;
+        --color-success-950: #053321;
+
+        --color-warning-25: #fffcf5;
+        --color-warning-50: #fffaeb;
+        --color-warning-100: #fef0c7;
+        --color-warning-200: #fedf89;
+        --color-warning-300: #fec84b;
+        --color-warning-400: #fdb022;
+        --color-warning-500: #f79009;
+        --color-warning-600: #dc6803;
+        --color-warning-700: #b54708;
+        --color-warning-800: #93370d;
+        --color-warning-900: #7a2e0e;
+        --color-warning-950: #4e1d09;
+
+        --color-error-25: #fffbfa;
+        --color-error-50: #fef3f2;
+        --color-error-100: #fee4e2;
+        --color-error-200: #fecdca;
+        --color-error-300: #fda29b;
+        --color-error-400: #f97066;
+        --color-error-500: #f04438;
+        --color-error-600: #d92d20;
+        --color-error-700: #b42318;
+        --color-error-800: #912018;
+        --color-error-900: #7a271a;
+        --color-error-950: #55160c;
+
+        --breakpoint-sm: 30rem;
+        --breakpoint-md: 48rem;
+        --breakpoint-lg: 90rem;
+      }
+
+      :root {
+        /* Text colors */
+        --text-primary: var(--color-surface-light-900);
+        --text-primary-inversed: var(--color-surface-light-50);
+        --text-primary_on-brand: var(--color-white);
+        --text-secondary: var(--color-surface-light-700);
+        --text-secondary_hover: var(--color-surface-light-800);
+        --text-secondary_on-brand: var(--not-assigned);
+        --text-tertiary: var(--color-surface-light-600);
+        --text-tertiary_hover: var(--color-surface-light-700);
+        --text-tertiary_on-brand: var(--not-assigned);
+        --text-disabled: var(--color-surface-light-400);
+        --text-placeholder: var(--color-surface-light-400);
+        --text-placeholder_subtle: var(--color-surface-light-300);
+        --text-brand-primary: var(--color-surface-light-900);
+        --text-brand-secondary: var(--color-surface-light-700);
+        --text-brand-secondary_hover: var(--color-surface-light-800);
+        --text-brand-tertiary: var(--color-surface-light-600);
+        --text-brand-tertiary_alt: var(--color-surface-light-600);
+        --text-error-primary: var(--color-error-600);
+        --text-error-primary_hover: var(--color-error-700);
+        --text-warning-primary: var(--color-warning-600);
+        --text-success-primary: var(--color-success-600);
+
+        /* Border colors */
+        --border-primary: var(--color-surface-light-400);
+        --border-secondary: var(--color-surface-light-300);
+        --border-tertiary: var(--color-surface-light-200);
+        --border-disabled: var(--color-surface-light-200);
+        --border-disabled_subtle: var(--color-surface-light-100);
+        --border-brand: var(--color-brand-950);
+        --border-brand_alt: var(--color-brand-900);
+        --border-error: var(--color-error-500);
+        --border-error_subtle: var(--color-error-300);
+
+        /* Foreground colors */
+        --fg-primary: var(--color-surface-light-900);
+        --fg-primary-inversed: var(--color-white);
+        --fg-secondary: var(--color-surface-light-700);
+        --fg-secondary_hover: var(--color-surface-light-800);
+        --fg-tertiary: var(--color-surface-light-600);
+        --fg-tertiary_hover: var(--color-surface-light-700);
+        --fg-quaternary: var(--color-surface-light-400);
+        --fg-quaternary_hover: var(--color-surface-light-500);
+        --fg-disabled: var(--color-surface-light-400);
+        --fg-disabled_subtle: var(--color-surface-light-300);
+        --fg-brand-primary: var(--color-brand-600);
+        --fg-brand-primary_alt: var(--color-fg-brand-primary);
+        --fg-brand-secondary: var(--color-brand-500);
+        --fg-brand-secondary_alt: var(--color-fg-brand-secondary);
+        --fg-brand-secondary_hover: var(--color-brand-600);
+        --fg-error-primary: var(--color-error-600);
+        --fg-error-secondary: var(--color-error-500);
+        --fg-warning-primary: var(--color-warning-600);
+        --fg-warning-secondary: var(--color-warning-500);
+        --fg-success-primary: var(--color-success-600);
+        --fg-success-secondary: var(--color-success-500);
+
+        /* Background colors */
+        --bg-primary: var(--color-white);
+        --bg-primary_alt: var(--color-surface-light-25);
+        --bg-primary_hover: var(--color-surface-light-100);
+        --bg-primary-solid: var(--color-surface-light-950);
+        --bg-secondary: var(--color-surface-light-50);
+        --bg-secondary_alt: var(--color-surface-light-100);
+        --bg-secondary_hover: var(--color-surface-light-100);
+        --bg-tertiary: var(--color-surface-light-200);
+        --bg-active: var(--color-surface-light-50);
+        --bg-disabled: var(--color-surface-light-200);
+        --bg-disabled_subtle: var(--color-surface-light-50);
+        --bg-overlay: var(--color-black);
+        --bg-brand-primary: var(--color-brand-25);
+        --bg-brand-primary_alt: var(--color-brand-50);
+        --bg-brand-solid: var(--color-brand-900);
+        --bg-brand-solid_hover: var(--color-brand-800);
+        --bg-error-primary: var(--color-error-50);
+        --bg-error-secondary: var(--color-error-100);
+        --bg-error-solid: var(--color-error-600);
+        --bg-warning-primary: var(--color-warning-50);
+        --bg-warning-secondary: var(--color-warning-100);
+        --bg-warning-solid: var(--color-warning-600);
+        --bg-success-primary: var(--color-success-50);
+        --bg-success-secondary: var(--color-success-100);
+        --bg-success-solid: var(--color-success-600);
+
+        /* Focus ring colors */
+        --focus-ring: var(--color-surface-light-300);
+        --focus-ring-error: var(--color-error-500);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          /* Text colors */
+          --text-primary: var(--color-surface-dark-25);
+          --text-primary-inversed: var(--color-surface-dark-900);
+          --text-primary_on-brand: var(--color-surface-dark-50);
+          --text-secondary: var(--color-surface-dark-50);
+          --text-secondary_hover: var(--color-surface-dark-100);
+          --text-secondary_on-brand: var(--not-assigned);
+          --text-tertiary: var(--color-surface-dark-100);
+          --text-tertiary_hover: var(--color-surface-dark-200);
+          --text-tertiary_on-brand: var(--not-assigned);
+          --text-disabled: var(--color-surface-dark-100);
+          --text-placeholder: var(--color-surface-dark-100);
+          --text-placeholder_subtle: var(--color-surface-dark-700);
+          --text-brand-primary: var(--color-surface-dark-50);
+          --text-brand-secondary: var(--color-surface-dark-300);
+          --text-brand-secondary_hover: var(--color-surface-dark-200);
+          --text-brand-tertiary: var(--color-surface-dark-400);
+          --text-brand-tertiary_alt: var(--color-surface-dark-50);
+          --text-error-primary: var(--color-error-400);
+          --text-error-primary_hover: var(--color-error-300);
+          --text-warning-primary: var(--color-warning-400);
+          --text-success-primary: var(--color-success-400);
+
+          /* Border colors */
+          --border-primary: var(--color-surface-dark-600);
+          --border-secondary: var(--color-surface-light-700);
+          --border-tertiary: var(--color-surface-dark-800);
+          --border-disabled: var(--color-surface-dark-800);
+          --border-disabled_subtle: var(--color-surface-dark-900);
+          --border-brand: var(--color-surface-dark-25);
+          --border-brand_alt: var(--color-brand-50);
+          --border-error: var(--color-error-400);
+          --border-error_subtle: var(--color-error-500);
+
+          /* Foreground colors */
+          --fg-primary: var(--color-white);
+          --fg-primary-inversed: var(--color-surface-dark-950);
+          --fg-secondary: var(--color-surface-light-300);
+          --fg-secondary_hover: var(--color-surface-light-200);
+          --fg-tertiary: var(--color-surface-light-400);
+          --fg-tertiary_hover: var(--color-surface-light-300);
+          --fg-quaternary: var(--color-surface-light-600);
+          --fg-quaternary_hover: var(--color-surface-light-500);
+          --fg-disabled: var(--color-surface-light-500);
+          --fg-disabled_subtle: var(--color-surface-light-600);
+          --fg-brand-primary: var(--color-brand-500);
+          --fg-brand-primary_alt: var(--color-surface-light-300);
+          --fg-brand-secondary: var(--color-brand-500);
+          --fg-brand-secondary_alt: var(--color-surface-light-600);
+          --fg-brand-secondary_hover: var(--color-surface-light-500);
+          --fg-error-primary: var(--color-error-500);
+          --fg-error-secondary: var(--color-error-400);
+          --fg-warning-primary: var(--color-warning-500);
+          --fg-warning-secondary: var(--color-warning-400);
+          --fg-success-primary: var(--color-success-500);
+          --fg-success-secondary: var(--color-success-400);
+
+          /* Background colors */
+          --bg-primary: var(--color-surface-dark-950);
+          --bg-primary_alt: var(--color-surface-dark-900);
+          --bg-primary_hover: var(--color-surface-dark-800);
+          --bg-primary-solid: var(--color-surface-dark-950);
+          --bg-secondary: var(--color-surface-dark-900);
+          --bg-secondary_alt: var(--color-surface-dark-800);
+          --bg-secondary_hover: var(--color-surface-dark-800);
+          --bg-tertiary: var(--color-surface-dark-800);
+          --bg-active: var(--color-surface-dark-800);
+          --bg-disabled: var(--color-surface-dark-700);
+          --bg-disabled_subtle: var(--color-surface-dark-900);
+          --bg-overlay: var(--color-black);
+          --bg-brand-primary: var(--color-brand-950);
+          --bg-brand-primary_alt: var(--color-brand-900);
+          --bg-brand-solid: var(--color-brand-25);
+          --bg-brand-solid_hover: var(--color-brand-200);
+          --bg-error-primary: var(--color-error-950);
+          --bg-error-secondary: var(--color-error-600);
+          --bg-error-solid: var(--color-error-600);
+          --bg-warning-primary: var(--color-warning-950);
+          --bg-warning-secondary: var(--color-warning-600);
+          --bg-warning-solid: var(--color-warning-600);
+          --bg-success-primary: var(--color-success-950);
+          --bg-success-secondary: var(--color-success-600);
+          --bg-success-solid: var(--color-success-600);
+
+          /* Focus ring colors */
+          --focus-ring: var(--color-surface-dark-600);
+          --focus-ring-error: var(--color-error-500);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <!-- Logo -->
+      <header>
+        <div class="logo-container">
+          <svg viewBox="0 0 46 22" class="logo-svg">
+            <path
+              d="M45.9992 11C45.9992 4.93463 40.9792 0 34.8188 0C32.2505 0 29.4539 1.33375 26.4911 3.96324C25.0903 5.2064 23.8757 6.5361 22.9637 7.60537C19.7613 3.99235 15.4664 0 11.1804 0C5.99986 0 1.4822 3.63324 0.306661 8.44735C0.308259 8.44331 0.309856 8.43765 0.311453 8.43199C0.309856 8.43765 0.308259 8.4425 0.306661 8.44735C0.106213 9.2675 0 10.1224 0 11C0 17.0654 4.94012 22 11.1005 22C13.6688 22 16.5453 20.6663 19.5081 18.0368C20.9089 16.7936 22.1235 15.4639 23.0355 14.3946C26.2379 18.0076 30.5336 22 34.8196 22C40.0001 22 44.5178 18.3668 45.6933 13.5535C45.8938 12.7333 46 11.8784 46 11.0008L45.9992 11ZM23.823 7.59404C24.8699 6.39779 25.9081 5.34147 26.9127 4.45015C29.7557 1.92662 32.4159 0.647059 34.8188 0.647059C40.6318 0.647059 45.3603 5.29132 45.3603 11C45.3603 11.8007 45.2653 12.6007 45.0768 13.3788C45.0465 13.4685 44.6592 14.5426 43.5555 15.5868C42.122 16.9432 40.179 17.6315 37.78 17.6324C40.3603 16.4968 42.1651 13.9457 42.1651 11C42.1651 6.99551 38.8693 3.73838 34.8188 3.73838C33.24 3.73838 31.3074 4.74375 29.0721 6.72779C28.0667 7.62074 27.0485 8.67059 25.9736 9.92507L25.5519 10.4152L23.3917 8.07529L23.823 7.59485V7.59404ZM20.0017 11.1084C19.1488 12.134 17.9189 13.5316 16.5054 14.7861C13.8716 17.1244 12.1594 17.6146 11.1804 17.6146C7.48605 17.6146 4.47294 14.647 4.47294 11C4.47294 7.35301 7.48286 4.40809 11.1804 4.38544C11.3145 4.38544 11.4766 4.39919 11.6731 4.43478C13.5785 5.17485 15.2804 6.35574 16.3082 7.30853C17.1347 8.07529 18.6321 9.64441 20.0009 11.1076L20.0017 11.1084ZM22.1762 14.406C21.1285 15.6022 20.0911 16.6585 19.0865 17.5499C16.2834 20.0378 13.5218 21.3529 11.1005 21.3529C8.29343 21.3529 5.66126 20.2732 3.68712 18.3126C1.72098 16.3601 0.638878 13.7629 0.638878 11C0.638878 10.1993 0.73471 9.39853 0.92238 8.62125C0.954324 8.52824 1.34164 7.45574 2.44371 6.41316C3.87719 5.05677 5.82018 4.36846 8.21916 4.36765C5.6389 5.50324 3.83407 8.05427 3.83407 11C3.83407 15.0045 7.12988 18.2616 11.1804 18.2616C12.7592 18.2616 14.6918 17.2563 16.9271 15.2722C17.9325 14.3793 18.9507 13.3294 20.0256 12.0749L20.4465 11.584C20.4465 11.584 22.5747 13.8891 22.5979 13.915L22.1754 14.406H22.1762ZM25.9975 10.8916C26.8504 9.86603 28.0803 8.46838 29.4938 7.2139C32.1276 4.87559 33.8398 4.38544 34.8188 4.38544C38.5131 4.38544 41.5263 7.35301 41.5263 11C41.5263 14.647 38.5163 17.5919 34.8188 17.6146C34.6847 17.6146 34.5226 17.6008 34.3253 17.5652C34.3269 17.5652 34.3277 17.566 34.3293 17.5668C32.4222 16.8268 30.7188 15.6451 29.6902 14.6915C28.8637 13.9247 27.3663 12.3556 25.9967 10.8924L25.9975 10.8916ZM45.6885 13.5648C45.6901 13.5607 45.6909 13.5559 45.6925 13.5526C45.6917 13.5559 45.6901 13.5607 45.6885 13.5648Z"
+            />
+          </svg>
+          <h1 class="ii-title">Internet Identity</h1>
+        </div>
+      </header>
+
+      <!-- Error Notice -->
+      <div class="page-container">
+        <div class="notice-box">
+          <h1>Internet Identity is temporarily unavailable</h1>
+          <p>
+            The subnet that hosts Internet Identity (II) is undergoing scheduled
+            maintenance to back up the vetKeys production key.
+          </p>
+          <p><b>Estimated downtime:</b> 5–10 minutes</p>
+          <p>Please try again shortly.</p>
+          <p>
+            Note: Existing sessions remain active and dapps that rely on II will
+            continue to function as normal.
+          </p>
+          <p>
+            <a
+              href="https://forum.dfinity.org/t/vetkeys-production-key-and-ii-subnet-downtime/50370"
+              target="_blank"
+              class="link"
+              >More information ➔</a
+            >
+          </p>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

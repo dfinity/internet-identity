@@ -2,7 +2,7 @@
   import { isNullish, nonNullish } from "@dfinity/utils";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
-  import { getDapps } from "$lib/flows/dappsExplorer/dapps.js";
+  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps.js";
   import type { HTMLAttributes } from "svelte/elements";
   import { GlobeIcon } from "@lucide/svelte";
 

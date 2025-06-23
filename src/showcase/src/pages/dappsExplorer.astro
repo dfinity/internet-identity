@@ -6,7 +6,7 @@ import Screen from "../layouts/Screen.astro";
   <script>
     import { toast } from "$lib/templates/toast";
     import { i18n } from "../i18n";
-    import { dappsExplorerPage } from "$lib/flows/dappsExplorer";
+    import { dappsExplorerPage } from "$lib/legacy/flows/dappsExplorer";
     import { dapps } from "../constants";
 
     dappsExplorerPage({ dapps, i18n, back: () => toast.info("back") });
