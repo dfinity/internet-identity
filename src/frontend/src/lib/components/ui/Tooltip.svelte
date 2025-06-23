@@ -41,34 +41,34 @@
     const track = () => {
       if (nonNullish(anchorRef) && nonNullish(tooltipRef)) {
         const anchorRect = anchorRef.getBoundingClientRect();
-        const popoverRect = tooltipRef.getBoundingClientRect();
+        const tooltipRect = tooltipRef.getBoundingClientRect();
         tooltipRef.style.top = {
-          up: `calc(${anchorRect.top - popoverRect.height}px - ${distance})`,
+          up: `calc(${anchorRect.top - tooltipRect.height}px - ${distance})`,
           right: {
             start: `calc(${anchorRect.top}px - ${padding})`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - popoverRect.height}px + ${padding})`,
+            center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
+            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${padding})`,
           }[align],
           down: `calc(${anchorRect.bottom}px + ${distance})`,
           left: {
             start: `calc(${anchorRect.top}px - ${padding})`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - popoverRect.height}px + ${padding})`,
+            center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
+            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${padding})`,
           }[align],
         }[direction];
         tooltipRef.style.left = {
           up: {
             start: `calc(${anchorRect.left}px - ${padding})`,
-            center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - popoverRect.width}px + ${padding})`,
+            center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
+            end: `calc(${anchorRect.right - tooltipRect.width}px + ${padding})`,
           }[align],
           right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
             start: `calc(${anchorRect.left}px - ${padding})`,
-            center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - popoverRect.width}px + ${padding})`,
+            center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
+            end: `calc(${anchorRect.right - tooltipRect.width}px + ${padding})`,
           }[align],
-          left: `calc(${anchorRect.left - popoverRect.width}px - ${distance})`,
+          left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`,
         }[direction];
       }
       if (tracking) {
