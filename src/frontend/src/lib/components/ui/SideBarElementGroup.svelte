@@ -15,15 +15,15 @@
   let hoveredCoords = new Spring(
     { x: 0, y: 0 },
     {
-      stiffness: 0.5,
-      damping: 0.5,
+      stiffness: 0.4,
+      damping: 0.7,
     },
   );
   let activeCoords = new Spring(
     { x: 0, y: 0 },
     {
-      stiffness: 0.4,
-      damping: 0.4,
+      stiffness: 0.3,
+      damping: 0.6,
     },
   );
   let loaded = $state(false);

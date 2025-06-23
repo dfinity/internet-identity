@@ -5,11 +5,11 @@
     $props();
 </script>
 
-<div
+<section
   class={[
-    "bg-bg-primary border-border-secondary rounded-2xl border shadow-sm",
+    "bg-bg-primary border-border-secondary rounded-2xl border not-dark:shadow-sm",
     classes,
   ]}
 >
   {@render children?.()}
-</div>
+</section>

@@ -1,11 +1,18 @@
 <script lang="ts">
-  import Alert from "$lib/components/ui/Alert.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import Card from "$lib/components/ui/Card.svelte";
+  import Panel from "$lib/components/ui/Panel.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
-  import { Plus, TriangleAlertIcon, Unlink } from "@lucide/svelte";
+  import {
+    Apple,
+    AppleIcon,
+    Plus,
+    TriangleAlertIcon,
+    Unlink,
+  } from "@lucide/svelte";
+  import ThreeColListItem from "$lib/components/ui/ThreeColListItem.svelte";
+  import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
 
   let displayUnlinkGoogleDialog = $state(false);
 
@@ -19,7 +26,7 @@
   <h2 class="mb-12 text-lg">
     Settings and recommendations to keep your identity secure
   </h2>
-  <Card>
+  <Panel>
     <div class="flex flex-col justify-between gap-5 p-4 md:flex-row">
       <div>
         <h3 class="mb-2 text-lg font-semibold">Access methods</h3>
@@ -34,38 +41,44 @@
         >
       </div>
     </div>
-    <table class="w-full">
-      <tbody>
-        <tr class="border-border-tertiary border-t border-b">
-          <td class="p-4">
-            <h5 class="font-semibold">Label</h5>
-          </td>
-          <td class="p-4">
-            <h5>Goo goo gaga</h5>
-          </td>
-          <td class="flex justify-end p-4">
-            <ButtonOrAnchor></ButtonOrAnchor>
-          </td>
-        </tr>
-        <tr>
-          <td class="p-4">
-            <h5 class="font-semibold">Account Name</h5>
-          </td>
-          <td class="p-4">
-            <h5>My gmail acc</h5>
-          </td>
-          <td class="flex justify-end p-4"
-            ><Button
-              variant="tertiary"
-              onclick={() => (displayUnlinkGoogleDialog = true)}
-            >
-              <Unlink class="stroke-fg-error-secondary" />
-            </Button></td
-          ></tr
-        >
-      </tbody>
-    </table>
-  </Card>
+    <ul>
+      <ThreeColListItem gridCols="1fr 1fr 52px">
+        {#snippet colOne()}
+          <div class="flex items-center gap-3">
+            <AppleIcon />
+            <h5 class="text-text-primary text-sm font-semibold">Label</h5>
+          </div>
+        {/snippet}
+        {#snippet colTwo()}
+          <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
+        {/snippet}
+        {#snippet colThree()}
+          <div></div>
+        {/snippet}
+      </ThreeColListItem>
+      <ThreeColListItem gridCols="1fr 1fr min-content">
+        {#snippet colOne()}
+          <div class="flex items-center gap-3">
+            <GoogleIcon />
+            <h5 class="text-text-primary text-sm font-semibold">
+              Account Name
+            </h5>
+          </div>
+        {/snippet}
+        {#snippet colTwo()}
+          <h5 class="text-text-tertiary text-sm">My gmail acc</h5>
+        {/snippet}
+        {#snippet colThree()}
+          <Button
+            variant="tertiary"
+            onclick={() => (displayUnlinkGoogleDialog = true)}
+          >
+            <Unlink class="stroke-fg-error-secondary" />
+          </Button>
+        {/snippet}
+      </ThreeColListItem>
+    </ul>
+  </Panel>
 </div>
 
 {#if displayUnlinkGoogleDialog}
