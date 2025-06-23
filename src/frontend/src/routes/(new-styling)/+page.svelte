@@ -66,7 +66,6 @@
         <SolveCaptcha {...authFlow.captcha} />
       {:else}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          Manage your identity
           {lastUsedIdentities.length > 0 ? "Choose identity" : "Sign in"}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
