@@ -11,17 +11,17 @@
   };
 </script>
 
-<div class="text-text-primary">
-  <h1 class="text-text-tertiary mb-4 text-4xl font-semibold">
+<div>
+  <h1 class="text-text-primary mb-4 text-3xl font-semibold">
     Welcome, {identityName}!
   </h1>
-  <h2 class="mb-12 text-lg">
-    Manage your identity, passkeys and connected apps below.
+  <h2 class="text-text-tertiary mb-12">
+    Manage your identity and passkeys below.
   </h2>
   <Card>
     <div class="p-4">
-      <h3 class="mb-2 text-lg font-semibold">My Identity</h3>
-      <h4>
+      <h3 class="text-text-primary mb-2 text-lg font-semibold">My Identity</h3>
+      <h4 class="text-text-tertiary text-sm">
         Internet Identity is used to sign in securely and connect to apps with
         passkeys.
       </h4>
@@ -30,29 +30,31 @@
       <tbody>
         <tr class="border-border-tertiary border-t border-b">
           <td class="p-4">
-            <h5>Identity Name</h5>
+            <h5 class="text-text-tertiary text-sm">Identity Name</h5>
           </td>
           <td class="p-4">
-            <h5 class="font-semibold">{identityName}</h5>
+            <h5 class="text-text-primary text-sm font-semibold">
+              {identityName}
+            </h5>
           </td>
-          <td class="flex justify-end p-4">
-            <button onmouseenter={handleHoverIdentityInfo}>
-              <InfoIcon />
-            </button>
+          <td class="text-text-primary flex justify-end p-4">
+            <InfoIcon />
           </td>
         </tr>
         <tr>
           <td colspan="3">
             <Button
-              class="!h-14 w-full rounded-t-none rounded-b-2xl p-4 !text-[16px] !font-normal"
+              class="!h-14 w-full !gap-0 rounded-t-none rounded-b-2xl p-4 !text-[16px] !font-normal"
               variant="tertiary"
               href="/hub/security"
             >
-              <h5 class="flex-1">Access Methods</h5>
+              <h5 class="text-text-tertiary flex-1 text-sm">Access Methods</h5>
 
-              <h5 class="flex-1 font-semibold">{lastUsedAccessMethod}</h5>
+              <h5 class="text-text-primary flex-1 text-sm font-semibold">
+                {lastUsedAccessMethod}
+              </h5>
 
-              <span class="flex justify-end">
+              <span class="text-text-primary flex justify-end">
                 <ChevronRight />
               </span>
             </Button>

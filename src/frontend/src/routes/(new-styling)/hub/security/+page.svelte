@@ -75,13 +75,13 @@
     >
     <h1 class="text-text-primary mb-3 text-2xl font-medium">Are you sure?</h1>
     <p class="text-text-tertiary mb-8 font-medium">
-      You're about to disconnect your Google Account. If you proceed, you will
-      no longer be able to sign-in to your identity or dapp using your Google
+      You're about to unlink your Google Account. If you proceed, you will no
+      longer be able to sign-in to your identity or dapps using your Google
       Account.
     </p>
     <div class="flex w-full flex-col gap-3">
-      <Button variant="primary" danger>Disconnect</Button>
-      <Button variant="tertiary">Keep connected</Button>
+      <Button variant="primary" danger>Unlink Google Account</Button>
+      <Button variant="tertiary">Keep linked</Button>
     </div>
   </Dialog>
 {/if}
