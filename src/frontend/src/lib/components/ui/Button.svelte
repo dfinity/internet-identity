@@ -14,6 +14,7 @@
       variant?: Variant;
       size?: Size;
       iconOnly?: boolean;
+      danger?: boolean;
     };
 
   let {
@@ -23,6 +24,7 @@
     variant = "primary",
     size = "md",
     iconOnly,
+    danger,
     ...props
   }: Props = $props();
 </script>
@@ -34,22 +36,36 @@
     "box-border flex cursor-pointer items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100",
     {
       primary: [
-        "bg-bg-brand-solid text-text-primary-inversed",
-        "not-disabled:hover:bg-bg-brand-solid_hover",
+        danger
+          ? "bg-bg-error-solid text-white"
+          : "bg-bg-brand-solid text-text-primary-inversed",
+        danger
+          ? "not-disabled:hover:bg-bg-error-solid_hover"
+          : "not-disabled:hover:bg-bg-brand-solid_hover",
         "disabled:bg-bg-disabled disabled:text-fg-disabled",
       ],
       secondary: [
-        "bg-bg-primary border-border-secondary text-fg-primary border",
-        "not-disabled:hover:bg-bg-primary_hover",
+        "bg-bg-primary border",
+        danger
+          ? "border-border-error_subtle text-text-error-primary"
+          : "border-border-secondary text-fg-primary",
+        danger
+          ? "not-disabled:hover:bg-bg-error-primary text-text-error-primary_hover"
+          : "not-disabled:hover:bg-bg-primary_hover",
         "disabled:border-border-disabled disabled:text-fg-disabled",
       ],
       tertiary: [
-        "text-fg-primary",
-        "not-disabled:hover:bg-bg-primary_hover",
+        danger ? "text-text-error-primary" : "text-fg-primary",
+        danger
+          ? "not-disabled:hover:bg-bg-error-primary text-text-error-primary_hover"
+          : "not-disabled:hover:bg-bg-primary_hover",
         "disabled:text-fg-disabled",
       ],
     }[variant],
-    "focus-visible:ring-focus-ring focus-visible:ring-offset-bg-primary outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+    "focus-visible:ring-offset-bg-primary outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+    danger
+      ? "focus-visible:ring-focus-ring-error"
+      : "focus-visible:ring-focus-ring",
     {
       sm: iconOnly ? "size-9" : "h-9 gap-1.5 px-3 text-sm",
       md: iconOnly ? "size-10" : "h-10 gap-1.5 px-3.5 text-sm",

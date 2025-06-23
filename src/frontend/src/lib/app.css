@@ -183,6 +183,7 @@ a:not(:disabled) {
   --bg-error-primary: var(--color-error-50);
   --bg-error-secondary: var(--color-error-100);
   --bg-error-solid: var(--color-error-600);
+  --bg-error-solid_hover: var(--color-error-700);
   --bg-warning-primary: var(--color-warning-50);
   --bg-warning-secondary: var(--color-warning-100);
   --bg-warning-solid: var(--color-warning-600);
@@ -274,6 +275,7 @@ a:not(:disabled) {
     --bg-error-primary: var(--color-error-950);
     --bg-error-secondary: var(--color-error-600);
     --bg-error-solid: var(--color-error-600);
+    --bg-error-solid_hover: var(--color-error-500);
     --bg-warning-primary: var(--color-warning-950);
     --bg-warning-secondary: var(--color-warning-600);
     --bg-warning-solid: var(--color-warning-600);
@@ -366,6 +368,7 @@ a:not(:disabled) {
   --color-bg-error-primary: var(--bg-error-primary);
   --color-bg-error-secondary: var(--bg-error-secondary);
   --color-bg-error-solid: var(--bg-error-solid);
+  --color-bg-error-solid_hover: var(--bg-error-solid_hover);
   --color-bg-warning-primary: var(--bg-warning-primary);
   --color-bg-warning-secondary: var(--bg-warning-secondary);
   --color-bg-warning-solid: var(--bg-warning-solid);

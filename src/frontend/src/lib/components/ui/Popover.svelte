@@ -11,8 +11,8 @@
     anchor?: HTMLElement;
     onClose?: () => void;
     closeOnOutsideClick?: boolean;
-    direction: Direction;
-    align: Align;
+    direction?: Direction;
+    align?: Align;
     distance?: string;
   };
 
@@ -40,7 +40,7 @@
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
         popoverRef.style.top = {
-          up: `calc(${anchorRef.offsetTop - popoverRef.clientWidth}px - ${distance})`,
+          up: `calc(${anchorRect.top - popoverRect.height}px - ${distance})`,
           right: {
             start: `${anchorRect.top}px`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
