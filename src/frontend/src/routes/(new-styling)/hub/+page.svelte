@@ -37,9 +37,7 @@
               {identityName}
             </h5>
           </td>
-          <td class="text-text-primary flex justify-end p-4">
-            <InfoIcon />
-          </td>
+          <td class="text-text-primary flex justify-end p-4"> </td>
         </tr>
         <tr>
           <td colspan="3">
