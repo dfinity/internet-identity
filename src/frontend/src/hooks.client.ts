@@ -62,19 +62,7 @@ const maybeSetDiscoverablePasskeyFlowFlag = () => {
   featureFlags.DISCOVERABLE_PASSKEY_FLOW.set(true);
 };
 
-const redirectIfNecessary = (): void => {
-  if (window.location.pathname === "/" && window.location.hash === "") {
-    // We use location.replace to prevent the user from using the back button to navigate back.
-    if (window.location.hostname === "id.ai") {
-      window.location.replace("https://identity.internetcomputer.org");
-    } else if (window.location.hostname === "beta.id.ai") {
-      window.location.replace("https://beta.identity.internetcomputer.org");
-    }
-  }
-};
-
 export const init: ClientInit = async () => {
-  redirectIfNecessary();
   overrideFeatureFlags();
   initGlobals();
   maybeSetDiscoverablePasskeyFlowFlag();

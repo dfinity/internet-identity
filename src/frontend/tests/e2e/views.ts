@@ -262,6 +262,12 @@ export class MainView extends View {
     await this.browser
       .$('[data-role="identity-management"]')
       .waitForDisplayed({ timeout: 10_000 });
+    // TODO, remove once we remove the marquee banner
+    await this.browser.execute(() => {
+      const style = document.createElement("style");
+      style.innerHTML = ".marquee { display: none !important; }";
+      document.body.appendChild(style);
+    });
   }
 
   async waitForDeviceCount(deviceName: string, count: number): Promise<void> {

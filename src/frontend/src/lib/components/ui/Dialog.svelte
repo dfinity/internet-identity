@@ -91,7 +91,7 @@
   class={[
     // Layout base/dialog/bottomsheet
     "fixed flex max-w-full flex-col overflow-hidden bg-transparent outline-none",
-    "sm:m-auto sm:min-h-[100dvh] sm:w-100",
+    "sm:m-auto sm:w-100",
     "w-full max-sm:top-auto max-sm:bottom-0",
     // Backdrop base/visible
     "backdrop:bg-bg-overlay backdrop:opacity-0 backdrop:transition-opacity backdrop:duration-200",

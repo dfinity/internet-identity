@@ -4,6 +4,7 @@ import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { nonNullish } from "@dfinity/utils";
 import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
+import { building } from "$app/environment";
 
 export const reroute: Reroute = ({ url }) => {
   if (nonNullish(getAddDeviceAnchor(url))) {
@@ -17,5 +18,8 @@ export const reroute: Reroute = ({ url }) => {
   }
   if (url.hash === "#authorize") {
     return get(DISCOVERABLE_PASSKEY_FLOW) ? "/authorize" : "/legacy/authorize";
+  }
+  if (url.pathname === "/") {
+    return get(DISCOVERABLE_PASSKEY_FLOW) || building ? "/" : "/legacy";
   }
 };

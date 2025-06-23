@@ -30,10 +30,9 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 
-interface AuthFlowOptions {
+export interface AuthFlowOptions {
   onSignIn: (identityNumber: bigint) => void;
   onSignUp: (identityNumber: bigint) => void;
-  onError: (error: unknown) => void;
 }
 
 export class AuthFlow {
@@ -61,25 +60,21 @@ export class AuthFlow {
   };
 
   continueWithExistingPasskey = async (): Promise<void> => {
-    try {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
-      const { identity, identityNumber, credentialId } =
-        await authenticateWithPasskey({
-          canisterId,
-          session: get(sessionStore),
-        });
-      authenticationStore.set({ identity, identityNumber });
-      const info =
-        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: { passkey: { credentialId } },
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+    const { identity, identityNumber, credentialId } =
+      await authenticateWithPasskey({
+        canisterId,
+        session: get(sessionStore),
       });
-      this.#options.onSignIn(identityNumber);
-    } catch (error) {
-      this.#options.onError(error);
-    }
+    authenticationStore.set({ identity, identityNumber });
+    const info =
+      await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+    lastUsedIdentitiesStore.addLastUsedIdentity({
+      identityNumber,
+      name: info.name[0],
+      authMethod: { passkey: { credentialId } },
+    });
+    this.#options.onSignIn(identityNumber);
   };
 
   setupNewPasskey = (): void => {
@@ -99,7 +94,8 @@ export class AuthFlow {
       await this.#startRegistration();
       this.#options.onSignUp(await this.#registerWithPasskey(passkeyIdentity));
     } catch (error) {
-      this.#options.onError(error);
+      this.view = "chooseMethod";
+      throw error;
     }
   };
 
@@ -107,8 +103,7 @@ export class AuthFlow {
     let jwt: string | undefined = undefined;
     const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
     if (isNullish(clientId)) {
-      this.#options.onError(new Error("Google is not configured"));
-      return;
+      throw new Error("Google is not configured");
     }
     try {
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
@@ -150,8 +145,10 @@ export class AuthFlow {
         );
         await this.#startRegistration();
         this.#options.onSignUp(await this.#registerWithGoogle(jwt));
+        return;
       }
-      this.#options.onError(error);
+      this.view = "chooseMethod";
+      throw error;
     }
   };
 

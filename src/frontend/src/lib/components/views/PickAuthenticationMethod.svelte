@@ -6,13 +6,19 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
+  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
+    onError?: (error: unknown) => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithGoogle,
+    onError = handleError,
+  }: Props = $props();
 
   let googleLoading = $state(false);
 
@@ -20,6 +26,8 @@
     googleLoading = true;
     try {
       await continueWithGoogle();
+    } catch (error) {
+      onError(error);
     } finally {
       googleLoading = false;
     }
