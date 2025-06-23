@@ -121,7 +121,7 @@
 >
   <div
     class={[
-      "bg-fg-primary relative flex max-w-80 flex-col items-start rounded-lg p-3 shadow-lg",
+      "bg-fg-primary relative flex max-w-80 flex-col items-start rounded-lg p-3 drop-shadow-lg",
       {
         up: {
           start: "origin-[1.6rem_100%]",
