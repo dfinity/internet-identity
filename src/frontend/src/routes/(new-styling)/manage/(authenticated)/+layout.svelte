@@ -64,11 +64,11 @@
 <SideBarOrTabs>
   {#snippet sidebarElements()}
     <SideBarElementGroup bind:bindableGroupRef={sideBarGroupRef}>
-      <SideBarElement href="/hub">
+      <SideBarElement href="/manage">
         <LucideHome size="1rem" class="stroke-fg-quaternary" />
         <h1>Home</h1>
       </SideBarElement>
-      <SideBarElement class="text-text-primary" href="/hub/security">
+      <SideBarElement class="text-text-primary" href="/manage/security">
         <Shield size="1rem" class="stroke-fg-quaternary" />
         <h1>Security</h1>
       </SideBarElement>
@@ -77,10 +77,10 @@
 
   {#snippet tabElements()}
     <TabElementGroup bind:bindableGroupRef={tabsGroupRef}>
-      <TabElement class="text-text-primary" href="/hub">
+      <TabElement class="text-text-primary" href="/manage">
         <h1>Home</h1>
       </TabElement>
-      <TabElement class="text-text-primary" href="/hub/security">
+      <TabElement class="text-text-primary" href="/manage/security">
         <h1>Security</h1>
       </TabElement>
     </TabElementGroup>
