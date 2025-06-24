@@ -10,12 +10,14 @@
   import { goto } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 
-  let identityNumber = $state(undefined);
+  let identityNumber: number | undefined = $state(undefined);
   const migrationFlow = new MigrationFlow();
 
   const handleSubmit = async () => {
     if (nonNullish(identityNumber)) {
-      await migrationFlow.authenticateWithIdentityNumber(identityNumber);
+      await migrationFlow.authenticateWithIdentityNumber(
+        BigInt(identityNumber),
+      );
     }
   };
 
