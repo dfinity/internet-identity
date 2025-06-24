@@ -9,15 +9,21 @@
   import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
   import { goto } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { handleError } from "$lib/components/utils/error";
 
   let identityNumber: number | undefined = $state(undefined);
   const migrationFlow = new MigrationFlow();
 
+  let authenticating = $state(false);
+
   const handleSubmit = async () => {
     if (nonNullish(identityNumber)) {
-      await migrationFlow.authenticateWithIdentityNumber(
-        BigInt(identityNumber),
-      );
+      authenticating = true;
+      await migrationFlow
+        .authenticateWithIdentityNumber(BigInt(identityNumber))
+        .catch(handleError);
+      authenticating = false;
     }
   };
 
@@ -77,9 +83,14 @@
         variant="primary"
         size="lg"
         type="submit"
-        disabled={isNullish(identityNumber)}
+        disabled={isNullish(identityNumber) || authenticating}
       >
-        <span>Migrate Identity</span>
+        {#if authenticating}
+          <ProgressRing />
+          <span>Authenticating...</span>
+        {:else}
+          <span>Migrate Identity</span>
+        {/if}
       </Button>
     </div>
   </form>

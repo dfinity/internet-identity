@@ -62,6 +62,7 @@ export class MigrationFlow {
     // TODO: Create the passkey in id.ai
     // TODO: Update identity name with call to canister. PENDING endpoint.
     const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
+    const origin = window.location.origin;
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
     const sanitizedOrigin =
