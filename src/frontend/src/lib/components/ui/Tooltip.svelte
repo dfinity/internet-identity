@@ -11,6 +11,8 @@
     direction?: Direction;
     align?: Align;
     distance?: string;
+    hidden?: boolean;
+    anchor?: HTMLElement;
   };
 
   const id = $props.id();
@@ -20,6 +22,8 @@
     direction = "up",
     align = "center",
     distance = "0.5rem",
+    hidden = false,
+    anchor,
     children,
     class: className,
     ...restProps
@@ -28,8 +32,9 @@
   let wrapperRef = $state<HTMLElement>();
   let tooltipRef = $state<HTMLElement>();
   let isTooltipVisible = $state(false);
-  let anchorRef = $derived(
-    (wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined,
+  const anchorRef = $derived(
+    anchor ??
+      ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined),
   );
 
   $effect(() => {
@@ -82,20 +87,23 @@
   });
 
   $effect(() => {
+    if (hidden) {
+      return;
+    }
     const showListener = () => (isTooltipVisible = true);
     const hideListener = () => (isTooltipVisible = false);
     const toggleListener = () => (isTooltipVisible = false);
-    anchorRef?.addEventListener("mouseenter", showListener);
-    anchorRef?.addEventListener("mouseleave", hideListener);
-    anchorRef?.addEventListener("focusin", showListener);
-    anchorRef?.addEventListener("focusout", hideListener);
-    anchorRef?.addEventListener("touchend", toggleListener);
+    wrapperRef?.addEventListener("mouseenter", showListener);
+    wrapperRef?.addEventListener("mouseleave", hideListener);
+    wrapperRef?.addEventListener("focusin", showListener);
+    wrapperRef?.addEventListener("focusout", hideListener);
+    wrapperRef?.addEventListener("touchend", toggleListener);
     return () => {
-      anchorRef?.removeEventListener("mouseenter", showListener);
-      anchorRef?.removeEventListener("mouseleave", hideListener);
-      anchorRef?.removeEventListener("focusin", showListener);
-      anchorRef?.removeEventListener("focusout", hideListener);
-      anchorRef?.addEventListener("touchend", toggleListener);
+      wrapperRef?.removeEventListener("mouseenter", showListener);
+      wrapperRef?.removeEventListener("mouseleave", hideListener);
+      wrapperRef?.removeEventListener("focusin", showListener);
+      wrapperRef?.removeEventListener("focusout", hideListener);
+      wrapperRef?.addEventListener("touchend", toggleListener);
     };
   });
 

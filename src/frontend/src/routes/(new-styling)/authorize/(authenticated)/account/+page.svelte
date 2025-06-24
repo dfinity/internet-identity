@@ -22,6 +22,7 @@
   import { goto } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import type { AccountInfo } from "$lib/generated/internet_identity_types";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   const { data }: PageProps = $props();
   let accounts = $derived(
@@ -30,12 +31,14 @@
     ),
   );
 
+  const maxAccountsReached = $derived(accounts.length >= 0);
   const origin = $derived($authorizationContextStore.requestOrigin);
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
 
   let createAccountDialog = $state(false);
   let loading = $state(false);
+  let tooltipAnchorRef = $state<HTMLElement>();
 
   const createAccount = async (name: string) => {
     try {
@@ -103,12 +106,28 @@
         </li>
       {/each}
     </ul>
-    <ButtonCard onclick={() => (createAccountDialog = true)} disabled={loading}>
-      <FeaturedIcon size="sm">
-        <PlusIcon size="1.25rem" />
-      </FeaturedIcon>
-      <span>Create additional account</span>
-    </ButtonCard>
+    <Tooltip
+      label="Limit reached"
+      description="You’ve reached the maximum of 5 accounts."
+      direction="down"
+      align="start"
+      anchor={tooltipAnchorRef}
+      hidden={!maxAccountsReached}
+    >
+      <ButtonCard
+        onclick={() => (createAccountDialog = true)}
+        disabled={loading || maxAccountsReached}
+      >
+        <FeaturedIcon
+          bind:element={tooltipAnchorRef}
+          size="sm"
+          class={[maxAccountsReached ? "opacity-50" : ""]}
+        >
+          <PlusIcon size="1.25rem" />
+        </FeaturedIcon>
+        <span>Create additional account</span>
+      </ButtonCard>
+    </Tooltip>
   </div>
 </div>
 {#if createAccountDialog}
