@@ -31,7 +31,7 @@
     ),
   );
 
-  const maxAccountsReached = $derived(accounts.length >= 0);
+  const maxAccountsReached = $derived(accounts.length >= 5);
   const origin = $derived($authorizationContextStore.requestOrigin);
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
