@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
+  import Button from "../ui/Button.svelte";
+  import { goto } from "$app/navigation";
+  import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
 
   type Props = HTMLAttributes<HTMLElement>;
 
@@ -15,6 +18,9 @@
   ]}
 >
   <div class="text-text-tertiary text-xs font-medium">© Internet Identity</div>
+  {#if $ENABLE_MIGRATE_FLOW}
+    <Button variant="primary" onclick={() => goto("/migrate")}>Migrate</Button>
+  {/if}
   <nav class="text-text-primary flex gap-4 text-xs font-semibold">
     <a
       href={SUPPORT_URL}
