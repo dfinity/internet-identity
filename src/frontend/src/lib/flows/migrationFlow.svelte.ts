@@ -16,19 +16,20 @@ import { convertToValidCredentialData } from "$lib/utils/credential-devices";
 import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
+import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 
 export class MigrationFlow {
   view = $state<"enterNumber" | "enterName" | "success">("enterNumber");
-  #identityNumber: UserNumber | undefined;
+  identityNumber: UserNumber | undefined;
 
   constructor() {
-    this.#identityNumber = undefined;
+    this.identityNumber = undefined;
   }
 
   authenticateWithIdentityNumber = async (
     identityNumber: UserNumber,
   ): Promise<void> => {
-    this.#identityNumber = identityNumber;
+    this.identityNumber = identityNumber;
     const devices = await this.#lookupAuthenticators(identityNumber);
     const webAuthnAuthenticators = devices
       .filter(({ key_type }) => !("browser_storage_key" in key_type))
@@ -54,7 +55,7 @@ export class MigrationFlow {
   };
 
   createPasskey = async (name: string): Promise<void> => {
-    if (isNullish(this.#identityNumber)) {
+    if (isNullish(this.identityNumber)) {
       // Cannot call createPasskey before authenticateWithIdentityNumber.
       throw new Error("Identity number is null");
     }
@@ -107,7 +108,7 @@ export class MigrationFlow {
       ]);
     }
     const response = await get(authenticatedStore).actor.authn_method_add(
-      this.#identityNumber,
+      this.identityNumber,
       {
         security_settings: securitySettings,
         metadata,
@@ -122,6 +123,15 @@ export class MigrationFlow {
         },
       },
     );
+    lastUsedIdentitiesStore.addLastUsedIdentity({
+      identityNumber: this.identityNumber,
+      name,
+      authMethod: {
+        passkey: {
+          credentialId: new Uint8Array(credentialId),
+        },
+      },
+    });
     if ("Ok" in response) {
       this.view = "success";
     }

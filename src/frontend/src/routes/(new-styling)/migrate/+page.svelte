@@ -2,13 +2,13 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { UserIcon } from "@lucide/svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
   import { MigrationFlow } from "$lib/flows/migrationFlow.svelte";
   import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
+  import { goto } from "$app/navigation";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 
   let identityNumber = $state(undefined);
   const migrationFlow = new MigrationFlow();
@@ -20,7 +20,11 @@
   };
 
   const handleCreate = async (name: string) => {
+    if (isNullish(migrationFlow.identityNumber)) {
+      throw new Error("Identity number is null");
+    }
     await migrationFlow.createPasskey(name);
+    lastUsedIdentitiesStore.selectIdentity(migrationFlow.identityNumber);
   };
 </script>
 
@@ -35,7 +39,7 @@
         {:else if migrationFlow.view === "enterName"}
           <CreatePasskey create={handleCreate} />
         {:else}
-          <p>Migration completed</p>
+          {@render successfulMigration()}
         {/if}
       </AuthPanel>
     </div>
@@ -47,9 +51,6 @@
 {#snippet enterIndentitNumber()}
   <form class="flex flex-1 flex-col">
     <div class="mb-8 flex flex-col">
-      <FeaturedIcon size="lg" class="mb-4 self-start">
-        <UserIcon size="1.5rem" />
-      </FeaturedIcon>
       <h1 class="text-text-primary mb-3 text-2xl font-medium">
         Enter the identity number
       </h1>
@@ -80,4 +81,23 @@
       </Button>
     </div>
   </form>
+{/snippet}
+
+{#snippet successfulMigration()}
+  <div class="mb-8 flex flex-col">
+    <h1 class="text-text-primary mb-3 text-2xl font-medium">
+      Migration completed
+    </h1>
+    <p class="text-md text-text-tertiary mb-6 font-medium">
+      You can now authenticate with your identity in the new flow.
+    </p>
+    <Button
+      onclick={() => goto("/manage")}
+      variant="primary"
+      size="lg"
+      type="submit"
+    >
+      <span>Go to manage</span>
+    </Button>
+  </div>
 {/snippet}
