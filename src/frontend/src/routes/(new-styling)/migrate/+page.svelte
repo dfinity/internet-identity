@@ -15,15 +15,11 @@
   let identityNumber: number | undefined = $state(undefined);
   const migrationFlow = new MigrationFlow();
 
-  let authenticating = $state(false);
-
   const handleSubmit = async () => {
     if (nonNullish(identityNumber)) {
-      authenticating = true;
       await migrationFlow
         .authenticateWithIdentityNumber(BigInt(identityNumber))
         .catch(handleError);
-      authenticating = false;
     }
   };
 
@@ -83,9 +79,9 @@
         variant="primary"
         size="lg"
         type="submit"
-        disabled={isNullish(identityNumber) || authenticating}
+        disabled={isNullish(identityNumber) || migrationFlow.authenticating}
       >
-        {#if authenticating}
+        {#if migrationFlow.authenticating}
           <ProgressRing />
           <span>Authenticating...</span>
         {:else}

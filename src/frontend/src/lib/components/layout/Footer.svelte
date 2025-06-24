@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import Button from "../ui/Button.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
   import { goto } from "$app/navigation";
   import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
 

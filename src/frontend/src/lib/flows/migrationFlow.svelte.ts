@@ -17,10 +17,12 @@ import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import { throwCanisterError } from "$lib/utils/utils";
 
 export class MigrationFlow {
   view = $state<"enterNumber" | "enterName" | "success">("enterNumber");
   identityNumber: UserNumber | undefined;
+  authenticating = $state(false);
 
   constructor() {
     this.identityNumber = undefined;
@@ -29,6 +31,7 @@ export class MigrationFlow {
   authenticateWithIdentityNumber = async (
     identityNumber: UserNumber,
   ): Promise<void> => {
+    this.authenticating = true;
     this.identityNumber = identityNumber;
     const devices = await this.#lookupAuthenticators(identityNumber);
     const webAuthnAuthenticators = devices
@@ -51,6 +54,7 @@ export class MigrationFlow {
       delegation,
     );
     authenticationStore.set({ identity, identityNumber });
+    this.authenticating = false;
     this.view = "enterName";
   };
 
@@ -109,9 +113,8 @@ export class MigrationFlow {
         },
       ]);
     }
-    const response = await get(authenticatedStore).actor.authn_method_add(
-      this.identityNumber,
-      {
+    await get(authenticatedStore)
+      .actor.authn_method_add(this.identityNumber, {
         security_settings: securitySettings,
         metadata,
         last_authentication: [],
@@ -123,8 +126,8 @@ export class MigrationFlow {
             credential_id: Array.from(new Uint8Array(credentialId)),
           },
         },
-      },
-    );
+      })
+      .then(throwCanisterError);
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: this.identityNumber,
       name,
@@ -134,9 +137,7 @@ export class MigrationFlow {
         },
       },
     });
-    if ("Ok" in response) {
-      this.view = "success";
-    }
+    this.view = "success";
   };
 
   #lookupAuthenticators = async (
