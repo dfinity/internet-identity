@@ -32,6 +32,7 @@
   let wrapperRef = $state<HTMLElement>();
   let tooltipRef = $state<HTMLElement>();
   let isTooltipVisible = $state(false);
+
   const anchorRef = $derived(
     anchor ??
       ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined),
