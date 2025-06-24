@@ -31,13 +31,13 @@
     ),
   );
 
-  const maxAccountsReached = $derived(accounts.length >= 5);
+  const isAccountLimitReached = $derived(accounts.length >= 5);
   const origin = $derived($authorizationContextStore.requestOrigin);
   const dapps = getDapps();
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
 
-  let createAccountDialog = $state(false);
-  let loading = $state(false);
+  let isCreateAccountDialogVisible = $state(false);
+  let isAuthorizing = $state(false);
   let tooltipAnchorRef = $state<HTMLElement>();
 
   const createAccount = async (name: string) => {
@@ -53,12 +53,12 @@
     } catch (error) {
       handleError(error);
     } finally {
-      createAccountDialog = false;
+      isCreateAccountDialogVisible = false;
     }
   };
 
   const continueAs = async (account: AccountInfo) => {
-    loading = true;
+    isAuthorizing = true;
     lastUsedIdentitiesStore.addLastUsedAccount({
       origin: $authorizationContextStore.effectiveOrigin,
       identityNumber: $authenticatedStore.identityNumber,
@@ -95,7 +95,10 @@
     <ul class="contents">
       {#each accounts as account}
         <li class="contents">
-          <ButtonCard onclick={() => continueAs(account)} disabled={loading}>
+          <ButtonCard
+            onclick={() => continueAs(account)}
+            disabled={isAuthorizing}
+          >
             <Avatar size="sm">
               {(account.name[0] ?? "Primary account").slice(0, 1).toUpperCase()}
             </Avatar>
@@ -112,16 +115,16 @@
       direction="down"
       align="start"
       anchor={tooltipAnchorRef}
-      hidden={!maxAccountsReached}
+      hidden={!isAccountLimitReached}
     >
       <ButtonCard
-        onclick={() => (createAccountDialog = true)}
-        disabled={loading || maxAccountsReached}
+        onclick={() => (isCreateAccountDialogVisible = true)}
+        disabled={isAuthorizing || isAccountLimitReached}
       >
         <FeaturedIcon
           bind:element={tooltipAnchorRef}
           size="sm"
-          class={[maxAccountsReached ? "opacity-50" : ""]}
+          class={[isAccountLimitReached ? "opacity-50" : ""]}
         >
           <PlusIcon size="1.25rem" />
         </FeaturedIcon>
@@ -130,8 +133,8 @@
     </Tooltip>
   </div>
 </div>
-{#if createAccountDialog}
-  <Dialog onClose={() => (createAccountDialog = false)}>
+{#if isCreateAccountDialogVisible}
+  <Dialog onClose={() => (isCreateAccountDialogVisible = false)}>
     <CreateAccount create={createAccount} />
   </Dialog>
 {/if}
