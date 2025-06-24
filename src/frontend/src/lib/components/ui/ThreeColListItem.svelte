@@ -4,23 +4,25 @@
     colOne,
     colTwo,
     colThree,
-    gridCols = "1fr 1fr min-content",
+    gridCols = "0.5fr 1fr min-content",
     href,
+    hrefAriaLabel = "Link",
   }: {
     colOne: Snippet;
     colTwo: Snippet;
     colThree: Snippet;
     gridCols?: string;
     href?: string;
+    hrefAriaLabel?: string;
   } = $props();
 
   let tailwindGridCols = $derived(gridCols.replaceAll(" ", "_"));
 </script>
 
 {#if href}
-  <a {href} class="contents h-full w-full" aria-label="Go to Security">
+  <a {href} class="contents h-full w-full" aria-label={hrefAriaLabel}>
     <li
-      class="border-border-tertiary text-fg-primary not-disabled:hover:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring grid cursor-pointer grid-cols-[{tailwindGridCols}] items-center border-t p-4 text-sm outline-none not-last:border-b last:rounded-b-2xl focus-visible:ring-2 focus-visible:ring-offset-2"
+      class={`border-border-tertiary text-fg-primary not-disabled:hover:bg-bg-primary_hover disabled:border-border-disabled disabled:text-fg-disabled focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring grid cursor-pointer grid-cols-[${tailwindGridCols}] items-center border-t p-4 text-sm outline-none not-last:border-b last:rounded-b-2xl focus-visible:ring-2 focus-visible:ring-offset-2`}
     >
       <div class="col-start-1 col-end-2">
         {@render colOne?.()}
@@ -35,7 +37,7 @@
   </a>
 {:else}
   <li
-    class="border-border-tertiary col-span-full grid grid-cols-[{tailwindGridCols}] items-center border-t p-4 not-last:border-b"
+    class={`border-border-tertiary grid grid-cols-[${tailwindGridCols}] items-center border-t p-4 not-last:border-b`}
   >
     <div class="col-start-1 col-end-2">
       {@render colOne?.()}

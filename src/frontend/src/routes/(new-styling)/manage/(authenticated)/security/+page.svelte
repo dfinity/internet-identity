@@ -3,16 +3,11 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
-  import {
-    Apple,
-    AppleIcon,
-    Plus,
-    TriangleAlertIcon,
-    Unlink,
-  } from "@lucide/svelte";
+  import { AppleIcon, Plus, TriangleAlertIcon, Unlink } from "@lucide/svelte";
   import ThreeColListItem from "$lib/components/ui/ThreeColListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
+  import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
 
   let displayUnlinkGoogleDialog = $state(false);
 
@@ -30,7 +25,7 @@
     <div class="flex flex-col justify-between gap-5 p-4 md:flex-row">
       <div>
         <h3 class="mb-2 text-lg font-semibold">Access methods</h3>
-        <h4>Manage your passkeys, security keys and linked accounts.</h4>
+        <h4>Manage your passkeys, security keys, and linked accounts.</h4>
       </div>
 
       <div>
@@ -42,7 +37,25 @@
       </div>
     </div>
     <ul>
-      <ThreeColListItem gridCols="1fr 1fr 52px">
+      {#each identityInfo.devices as device}
+        <ThreeColListItem>
+          {#snippet colOne()}
+            <div class="flex items-center gap-3">
+              <AppleIcon />
+              <AccessMethod accessMethod={device} />
+            </div>
+          {/snippet}
+          {#snippet colTwo()}
+            <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
+            <AccessMethod accessMethod={device} />
+          {/snippet}
+          {#snippet colThree()}
+            <!-- for layout consistency -->
+            <div class="w-[52px]"></div>
+          {/snippet}
+        </ThreeColListItem>
+      {/each}
+      <ThreeColListItem>
         {#snippet colOne()}
           <div class="flex items-center gap-3">
             <AppleIcon />
@@ -53,10 +66,11 @@
           <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
         {/snippet}
         {#snippet colThree()}
-          <div></div>
+          <!-- for layout consistency -->
+          <div class="w-[52px]"></div>
         {/snippet}
       </ThreeColListItem>
-      <ThreeColListItem gridCols="1fr 1fr min-content">
+      <ThreeColListItem>
         {#snippet colOne()}
           <div class="flex items-center gap-3">
             <GoogleIcon />

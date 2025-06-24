@@ -11,6 +11,7 @@
   import TabElementGroup from "$lib/components/ui/TabElementGroup.svelte";
   import { beforeNavigate } from "$app/navigation";
   import { isDesktopViewport } from "$lib/utils/UI/deviceDetection";
+  import { expoIn, expoOut } from "svelte/easing";
 
   const { children } = $props();
 
@@ -103,8 +104,9 @@
               : animationDirection === "right"
                 ? 200
                 : undefined,
-          duration: 200,
-          delay: 200,
+          duration: 160,
+          delay: 160,
+          easing: expoOut,
         }}
         out:fly={{
           y:
@@ -120,6 +122,7 @@
                 ? -160
                 : undefined,
           duration: 160,
+          easing: expoIn,
         }}
         onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
         class="nth-2:hidden"

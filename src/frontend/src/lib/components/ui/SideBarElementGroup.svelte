@@ -15,15 +15,15 @@
   let hoveredCoords = new Spring(
     { x: 0, y: 0 },
     {
-      stiffness: 0.4,
-      damping: 0.7,
+      stiffness: 0.5,
+      damping: 0.6,
     },
   );
   let activeCoords = new Spring(
     { x: 0, y: 0 },
     {
-      stiffness: 0.3,
-      damping: 0.6,
+      stiffness: 0.6,
+      damping: 0.7,
     },
   );
   let loaded = $state(false);
@@ -131,7 +131,7 @@
   {@render children?.()}
   {#if activeAnchor && loaded}
     <div
-      class="bg-bg-active pointer-events-none absolute -z-[1] rounded-sm"
+      class="bg-bg-active top-[] pointer-events-none absolute -z-[1] rounded-sm"
       style={`top: ${activeCoords.current.y}px; left: ${activeCoords.current.x}px; ${activeStyle}`}
       transition:fade={{ duration: 150 }}
     ></div>

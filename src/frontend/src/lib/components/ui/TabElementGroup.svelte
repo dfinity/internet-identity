@@ -1,13 +1,22 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { onMount } from "svelte";
+  import { Spring } from "svelte/motion";
   import { fade } from "svelte/transition";
 
   let { children, bindableGroupRef = $bindable() } = $props();
   let groupRef = $state<HTMLDivElement>();
   let activeAnchor = $derived.by(getActiveAnchor);
-  let highlightStyle = $state("");
+  let activeStyle = $state("");
   let loaded = $state(false);
+
+  let activeCoords = new Spring(
+    { x: 0, y: 0 },
+    {
+      stiffness: 0.6,
+      damping: 0.7,
+    },
+  );
 
   onMount(() => {
     setTimeout(() => {
@@ -32,21 +41,19 @@
     return anchors.find((a) => a.getAttribute("href") === currentPath);
   }
 
-  function updateHighlight() {
+  function updateHighlight(instant?: boolean) {
     const anchor = activeAnchor;
     if (anchor && groupRef) {
-      const headingRect = anchor.querySelector("h1")?.getBoundingClientRect();
+      const { x, y, height, width } = anchor.getBoundingClientRect();
 
-      if (!headingRect) return;
-
-      highlightStyle = `
-        position: absolute;
-        top: ${headingRect.top + 8}px;
-        left: ${headingRect.left}px;
-        width: ${headingRect.width}px;
-        height: ${headingRect.height}px;
-        z-index: -1;
-        transition: all 0.15s cubic-bezier(.4,1,.4,1);
+      if (instant) {
+        activeCoords.set({ x, y }, { instant });
+      } else {
+        activeCoords.target = { x, y };
+      }
+      activeStyle = `
+        width: ${width}px;
+        height: ${height}px;
       `;
     }
   }
@@ -60,8 +67,8 @@
   {@render children?.()}
   {#if activeAnchor && loaded}
     <div
-      class="border-fg-primary pointer-events-none border-b-2"
-      style={highlightStyle}
+      class="border-fg-primary pointer-events-none absolute border-b-2"
+      style={`top: ${activeCoords.current.y + 8}px; left: ${activeCoords.current.x}px; ${activeStyle}`}
       transition:fade={{ duration: 150 }}
     ></div>
   {/if}

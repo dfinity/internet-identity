@@ -63,7 +63,7 @@
     min-width: 100dvw;
   }
 
-  @media (max-width: 1024px) {
+  @media (max-width: 1155px) {
     .sidebar-layout {
       display: grid;
       grid-template-columns:
