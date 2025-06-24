@@ -37,7 +37,7 @@
     <div class="col-start-1 row-start-1 flex flex-col">
       <AuthPanel>
         {#if migrationFlow.view === "enterNumber"}
-          {@render enterIndentitNumber()}
+          {@render enterIdentityNumber()}
         {:else if migrationFlow.view === "enterName"}
           <CreatePasskey create={handleCreate} />
         {:else}
@@ -50,7 +50,7 @@
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
 
-{#snippet enterIndentitNumber()}
+{#snippet enterIdentityNumber()}
   <form class="flex flex-1 flex-col">
     <div class="mb-8 flex flex-col">
       <h1 class="text-text-primary mb-3 text-2xl font-medium">
