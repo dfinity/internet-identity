@@ -88,27 +88,6 @@
   });
 
   $effect(() => {
-    if (hidden) {
-      return;
-    }
-    const showListener = () => (isTooltipVisible = true);
-    const hideListener = () => (isTooltipVisible = false);
-    const toggleListener = () => (isTooltipVisible = false);
-    wrapperRef?.addEventListener("mouseenter", showListener);
-    wrapperRef?.addEventListener("mouseleave", hideListener);
-    wrapperRef?.addEventListener("focusin", showListener);
-    wrapperRef?.addEventListener("focusout", hideListener);
-    wrapperRef?.addEventListener("touchend", toggleListener);
-    return () => {
-      wrapperRef?.removeEventListener("mouseenter", showListener);
-      wrapperRef?.removeEventListener("mouseleave", hideListener);
-      wrapperRef?.removeEventListener("focusin", showListener);
-      wrapperRef?.removeEventListener("focusout", hideListener);
-      wrapperRef?.addEventListener("touchend", toggleListener);
-    };
-  });
-
-  $effect(() => {
     if (isTooltipVisible) {
       tooltipRef?.showPopover();
     } else {
@@ -117,93 +96,113 @@
   });
 </script>
 
-<div bind:this={wrapperRef} class="contents" aria-describedby={id}>
+{#if hidden}
   {@render children?.()}
-</div>
-<div
-  {id}
-  {...restProps}
-  bind:this={tooltipRef}
-  popover={"manual"}
-  class="tooltip pointer-events-none fixed overflow-visible bg-transparent"
-  role="tooltip"
->
+{:else}
+  <!-- Wrapper used for event handlers and (optionally) anchoring -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class={[
-      "bg-fg-primary relative flex max-w-80 flex-col items-start rounded-lg p-3 drop-shadow-lg",
-      {
-        up: {
-          start: "origin-[1.6rem_100%]",
-          center: "origin-bottom",
-          end: "origin-[calc(100%-1.6rem)_100%]",
-        }[align],
-        right: {
-          start: "origin-[0_1.6rem]",
-          center: "origin-left",
-          end: "origin-[0_calc(100%-1.6rem)]",
-        }[align],
-        down: {
-          start: "origin-[1.6rem_0]",
-          center: "origin-top",
-          end: "origin-[calc(100%-1.6rem)_0]",
-        }[align],
-        left: {
-          start: "origin-[100%_1.6rem]",
-          center: "origin-right",
-          end: "origin-[100%_calc(100%-1.6rem)]",
-        }[align],
-      }[direction],
-      className,
-    ]}
+    bind:this={wrapperRef}
+    onmouseenter={() => (isTooltipVisible = true)}
+    onmouseleave={() => (isTooltipVisible = false)}
+    onfocusin={() => (isTooltipVisible = true)}
+    onfocusout={() => (isTooltipVisible = false)}
+    ontouchend={() => (isTooltipVisible = !isTooltipVisible)}
+    class="contents"
+    aria-describedby={id}
   >
-    <span class="text-bg-primary text-start text-xs font-semibold">{label}</span
-    >
-    {#if nonNullish(description)}
-      <span class="text-bg-tertiary mt-1 text-start text-xs font-medium">
-        {description}
-      </span>
-    {/if}
+    {@render children?.()}
+  </div>
+  <!-- Tooltip wrapper that doesn't animate so its dimensions don't change -->
+  <div
+    {id}
+    {...restProps}
+    bind:this={tooltipRef}
+    popover={"manual"}
+    class="tooltip pointer-events-none fixed overflow-visible bg-transparent"
+    role="tooltip"
+  >
+    <!-- Tooltip inner container that animates -->
     <div
       class={[
-        "absolute size-0",
+        "bg-fg-primary relative flex max-w-80 flex-col items-start rounded-lg p-3 drop-shadow-lg",
         {
           up: {
-            start: "bottom-0 left-7",
-            center: "bottom-0 left-[50%]",
-            end: "right-7 bottom-0",
+            start: "origin-[1.6rem_100%]",
+            center: "origin-bottom",
+            end: "origin-[calc(100%-1.6rem)_100%]",
           }[align],
           right: {
-            start: "top-7 left-0",
-            center: "top-[50%] left-0",
-            end: "bottom-7 left-0",
+            start: "origin-[0_1.6rem]",
+            center: "origin-left",
+            end: "origin-[0_calc(100%-1.6rem)]",
           }[align],
           down: {
-            start: "top-0 left-7",
-            center: "top-0 left-[50%]",
-            end: "top-0 right-7",
+            start: "origin-[1.6rem_0]",
+            center: "origin-top",
+            end: "origin-[calc(100%-1.6rem)_0]",
           }[align],
           left: {
-            start: "top-7 right-0",
-            center: "top-[50%] right-0",
-            end: "right-0 bottom-7",
+            start: "origin-[100%_1.6rem]",
+            center: "origin-right",
+            end: "origin-[100%_calc(100%-1.6rem)]",
           }[align],
         }[direction],
+        className,
       ]}
     >
+      <!-- Tooltip content -->
+      <span class="text-bg-primary text-start text-xs font-semibold"
+        >{label}</span
+      >
+      {#if nonNullish(description)}
+        <span class="text-bg-tertiary mt-1 text-start text-xs font-medium">
+          {description}
+        </span>
+      {/if}
+      <!-- Tooltip arrow -->
       <div
         class={[
-          "bg-fg-primary size-2 origin-center -translate-1 rotate-45",
+          "absolute size-0",
           {
-            up: "rounded-br-xs",
-            right: "rounded-bl-xs",
-            down: "rounded-tl-xs",
-            left: "rounded-tr-xs",
+            up: {
+              start: "bottom-0 left-7",
+              center: "bottom-0 left-[50%]",
+              end: "right-7 bottom-0",
+            }[align],
+            right: {
+              start: "top-7 left-0",
+              center: "top-[50%] left-0",
+              end: "bottom-7 left-0",
+            }[align],
+            down: {
+              start: "top-0 left-7",
+              center: "top-0 left-[50%]",
+              end: "top-0 right-7",
+            }[align],
+            left: {
+              start: "top-7 right-0",
+              center: "top-[50%] right-0",
+              end: "right-0 bottom-7",
+            }[align],
           }[direction],
         ]}
-      ></div>
+      >
+        <div
+          class={[
+            "bg-fg-primary size-2 origin-center -translate-1 rotate-45",
+            {
+              up: "rounded-br-xs",
+              right: "rounded-bl-xs",
+              down: "rounded-tl-xs",
+              left: "rounded-tr-xs",
+            }[direction],
+          ]}
+        ></div>
+      </div>
     </div>
   </div>
-</div>
+{/if}
 
 <style>
   .tooltip {
