@@ -46,11 +46,11 @@ class IdentityInfo {
   };
 
   reset = () => {
-    this.loaded = false;
     this.name = "";
     this.devices = [];
     this.openIdCredentials = [];
     this.deviceRegistration = undefined;
+    this.loaded = false;
   };
 
   constructor() {}

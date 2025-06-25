@@ -46,19 +46,19 @@
 
   const gotoManage = () => goto("/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
     identityInfo.reset();
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
     identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
   const onSignUp = async (identityNumber: bigint) => {
+    identityInfo.reset();
     toaster.success({
       title: "You're all set. Your identity has been created.",
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    identityInfo.reset();
     identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
@@ -71,8 +71,8 @@
     await authLastUsedFlow.authenticate(chosenIdentity).catch((e) => {
       throw new Error("Could not authenticate");
     });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
     identityInfo.reset();
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
     identityInfo.fetch();
     await gotoManage();
     isIdentityPopoverOpen = false;

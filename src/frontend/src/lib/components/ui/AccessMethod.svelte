@@ -32,7 +32,7 @@
   {#if "credential_id" in accessMethod}
     <h5
       class="text-text-primary text-sm font-semibold nth-[2]:hidden"
-      transition:fade={{ delay: 30 }}
+      transition:fade={{ delay: 30, duration: 30 }}
     >
       <div class="mr-3 inline-block">
         {accessMethod.alias}
@@ -48,7 +48,7 @@
   {:else}
     <h5
       class="text-text-primary text-sm font-semibold nth-[2]:hidden"
-      transition:fade={{ delay: 30 }}
+      transition:fade={{ delay: 30, duration: 30 }}
     >
       <div class="mr-3 inline-block">
         {formatOpenIdCredentialName(accessMethod)}
