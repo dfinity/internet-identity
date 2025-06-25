@@ -55,7 +55,7 @@
       </div>
 
       {#if nonNullish(accessMethod.last_usage_timestamp[0])}
-        <div class="text-text-tertiary ml-3 font-normal">
+        <div class="text-text-tertiary font-normal">
           Last used {formatLastUsage(
             new Date(
               Number(accessMethod.last_usage_timestamp[0] / BigInt(1000000)),

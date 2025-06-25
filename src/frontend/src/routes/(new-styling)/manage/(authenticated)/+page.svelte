@@ -5,7 +5,10 @@
   import ListItem from "$lib/components/ui/ListItem.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import { type DeviceWithUsage } from "$lib/generated/internet_identity_types";
+  import {
+    type OpenIdCredential,
+    type DeviceWithUsage,
+  } from "$lib/generated/internet_identity_types";
   import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
   import { fade } from "svelte/transition";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
@@ -13,11 +16,19 @@
 
   const getLastUsedAccessMethod = (
     devices: DeviceWithUsage[],
-  ): DeviceWithUsage | null => {
-    if (devices.length === 0) {
+    openIdCredentials: OpenIdCredential[],
+  ): DeviceWithUsage | OpenIdCredential | null => {
+    if (devices.length === 0 && openIdCredentials.length === 0) {
       return null;
     }
-    return devices.sort((devA, devB) => {
+    const allMethods = [
+      ...devices,
+      ...openIdCredentials.map((cred) => {
+        return { ...cred, last_usage: cred.last_usage_timestamp };
+      }),
+    ];
+
+    return allMethods.sort((devA, devB) => {
       if (nonNullish(devA.last_usage[0]) && nonNullish(devB.last_usage[0])) {
         return Number(devA.last_usage[0]) - Number(devB.last_usage[0]);
       } else if (
@@ -37,7 +48,10 @@
   };
 
   const lastUsedAccessMethod = $derived(
-    getLastUsedAccessMethod(identityInfo.devices),
+    getLastUsedAccessMethod(
+      identityInfo.devices,
+      identityInfo.openIdCredentials,
+    ),
   );
 </script>
 

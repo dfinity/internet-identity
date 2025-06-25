@@ -1,17 +1,32 @@
 <script lang="ts">
   import SideBarElement from "$lib/components/ui/SideBarElement.svelte";
   import SideBarOrTabs from "$lib/components/layout/SideBarOrTabs.svelte";
-  import Avatar from "$lib/components/ui/Avatar.svelte";
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
-  import { LucideHome, Shield, UserIcon } from "@lucide/svelte";
+  import {
+    ChevronDownIcon,
+    LucideHome,
+    Shield,
+    UserIcon,
+  } from "@lucide/svelte";
   import SideBarElementGroup from "$lib/components/ui/SideBarElementGroup.svelte";
   import { fly } from "svelte/transition";
   import { page } from "$app/state";
   import TabElement from "$lib/components/ui/TabElement.svelte";
   import TabElementGroup from "$lib/components/ui/TabElementGroup.svelte";
-  import { beforeNavigate } from "$app/navigation";
+  import { beforeNavigate, goto } from "$app/navigation";
   import { isDesktopViewport } from "$lib/utils/UI/deviceDetection";
   import { expoIn, expoOut } from "svelte/easing";
+  import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import {
+    authenticatedStore,
+    authenticationStore,
+  } from "$lib/stores/authentication.store";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import Button from "$lib/components/ui/Button.svelte";
+  import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import Popover from "$lib/components/ui/Popover.svelte";
+  import AuthDialog from "$lib/components/views/AuthDialog.svelte";
+  import { toaster } from "$lib/components/utils/toaster";
 
   const { children } = $props();
 
@@ -19,7 +34,33 @@
 
   let sideBarGroupRef = $state<HTMLDivElement>();
   let tabsGroupRef = $state<HTMLDivElement>();
+  let identityButtonRef = $state<HTMLElement>();
   let animationDirection: "up" | "down" | "left" | "right" = $state("up");
+
+  let isIdentityPopoverOpen = $state(false);
+  let isAuthDialogOpen = $state(false);
+
+  const lastUsedIdentities = $derived(
+    Object.values($lastUsedIdentitiesStore.identities)
+      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
+      .slice(0, 3),
+  );
+
+  const gotoManage = () => goto("/manage", { replaceState: true });
+  const onSignIn = async (identityNumber: bigint) => {
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    await gotoManage();
+    isAuthDialogOpen = false;
+  };
+  const onSignUp = async (identityNumber: bigint) => {
+    toaster.success({
+      title: "You're all set. Your identity has been created.",
+      duration: 2000,
+    });
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    await gotoManage();
+    isAuthDialogOpen = false;
+  };
 
   beforeNavigate((nav) => {
     const fromPathName = nav.from?.url.pathname;
@@ -135,11 +176,58 @@
   {#snippet header()}
     <div class="flex px-8 py-4">
       <div class="flex-1"></div>
-      <ButtonOrAnchor class="transition-all hover:invert-100">
-        <Avatar size="sm">
-          <UserIcon size="1.25rem" />
-        </Avatar>
-      </ButtonOrAnchor>
+      <!-- <IdentitySwitcher
+        selected={$authenticatedStore.identityNumber}
+        identities={lastUsedIdentities}
+        switchIdentity={(identityNumber) => {
+          authenticationStore.reset();
+          lastUsedIdentitiesStore.selectIdentity(identityNumber);
+        }}
+      /> -->
+
+      <Button
+        bind:element={identityButtonRef}
+        onclick={() => (isIdentityPopoverOpen = true)}
+        variant="tertiary"
+        class="ml-auto gap-2.5 pr-3 md:-mr-3"
+        aria-label="Switch identity"
+      >
+        <span>{identityInfo.name ?? $authenticatedStore.identityNumber}</span>
+        <ChevronDownIcon size="1rem" />
+      </Button>
+      {#if isIdentityPopoverOpen}
+        <Popover
+          anchor={identityButtonRef}
+          onClose={() => (isIdentityPopoverOpen = false)}
+          direction="down"
+          align="end"
+          distance="0.75rem"
+        >
+          <IdentitySwitcher
+            selected={$authenticatedStore.identityNumber}
+            identities={lastUsedIdentities}
+            switchIdentity={(identityNumber) => {
+              authenticationStore.reset();
+              lastUsedIdentitiesStore.selectIdentity(identityNumber);
+              isIdentityPopoverOpen = false;
+            }}
+            useAnotherIdentity={() => {
+              isIdentityPopoverOpen = false;
+              isAuthDialogOpen = true;
+            }}
+            onClose={() => (isIdentityPopoverOpen = false)}
+          />
+        </Popover>
+      {/if}
+      {#if isAuthDialogOpen}
+        <AuthDialog
+          title="Use another identity"
+          subtitle="Choose method"
+          {onSignIn}
+          {onSignUp}
+          onClose={() => (isAuthDialogOpen = false)}
+        />
+      {/if}
     </div>
   {/snippet}
   {#snippet footer()}
