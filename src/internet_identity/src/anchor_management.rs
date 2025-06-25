@@ -9,7 +9,9 @@ use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor, DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace, MetadataEntry
+    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
+    DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace,
+    MetadataEntry,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
