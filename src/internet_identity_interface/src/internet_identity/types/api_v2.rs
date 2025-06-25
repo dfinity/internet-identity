@@ -80,6 +80,7 @@ pub struct IdentityInfo {
     pub authn_method_registration: Option<AuthnMethodRegistration>,
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub metadata: HashMap<String, MetadataEntryV2>,
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -148,6 +149,24 @@ pub enum IdentityMetadataReplaceError {
     StorageSpaceExceeded {
         space_available: u64,
         space_required: u64,
+    },
+    InternalCanisterError(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct IdentityPropertiesReplace {
+    pub name: Option<String>,
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum IdentityPropertiesReplaceError {
+    Unauthorized(Principal),
+    StorageSpaceExceeded {
+        space_available: u64,
+        space_required: u64,
+    },
+    NameTooLong {
+        limit: usize,
     },
     InternalCanisterError(String),
 }

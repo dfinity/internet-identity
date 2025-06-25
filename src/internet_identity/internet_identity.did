@@ -522,6 +522,7 @@ type IdentityInfo = record {
     openid_credentials : opt vec OpenIdCredential;
     // Authentication method independent metadata
     metadata : MetadataMapV2;
+    name : opt text;
 };
 
 type IdentityInfoError = variant {
@@ -736,6 +737,22 @@ type DummyAuthConfig = record {
     prompt_for_index : bool;
 };
 
+type IdentityPropertiesReplace = record {
+    name : opt text;
+};
+
+type IdentityPropertiesReplaceError = variant {
+    Unauthorized : principal;
+    StorageSpaceExceeded : record {
+        space_available : nat64;
+        space_required : nat64;
+    };
+    NameTooLong : record {
+        limit : nat64;
+    };
+    InternalCanisterError : text;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -786,6 +803,11 @@ service : (opt InternetIdentityInit) -> {
     // The existing metadata map will be overwritten.
     // Requires authentication.
     identity_metadata_replace : (IdentityNumber, MetadataMapV2) -> (variant { Ok; Err : IdentityMetadataReplaceError });
+
+    // Replaces the identity properties.
+    // The existing properties will be overwritten.
+    // Requires authentication.
+    identity_properties_replace : (IdentityNumber, IdentityPropertiesReplace) -> (variant { Ok; Err : IdentityPropertiesReplaceError });
 
     // Adds a new authentication method to the identity.
     // Requires authentication.

@@ -9,8 +9,7 @@ use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
-    DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, MetadataEntry,
+    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor, DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace, MetadataEntry
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -194,6 +193,15 @@ pub fn identity_metadata_replace(
     let metadata_keys = metadata.keys().cloned().collect();
     anchor.replace_identity_metadata(metadata)?;
     Ok(Operation::IdentityMetadataReplace { metadata_keys })
+}
+
+/// Replaces the identity properties and returns the operation to be archived.
+/// Currently only supports setting the name property.
+pub fn identity_properties_replace(
+    anchor: &mut Anchor,
+    properties: IdentityPropertiesReplace,
+) -> Result<Operation, AnchorError> {
+    set_name(anchor, properties.name)
 }
 
 /// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.

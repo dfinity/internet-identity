@@ -349,6 +349,16 @@ export const idlFactory = ({ IDL }) => {
       'space_available' : IDL.Nat64,
     }),
   });
+  const IdentityPropertiesReplace = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
+  const IdentityPropertiesReplaceError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'NameTooLong' : IDL.Record({ 'limit' : IDL.Nat64 }),
+    'StorageSpaceExceeded' : IDL.Record({
+      'space_required' : IDL.Nat64,
+      'space_available' : IDL.Nat64,
+    }),
+  });
   const IdRegFinishArg = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
     'authn_method' : AuthnMethodData,
@@ -614,6 +624,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : IDL.Null,
             'Err' : IdentityMetadataReplaceError,
+          }),
+        ],
+        [],
+      ),
+    'identity_properties_replace' : IDL.Func(
+        [IdentityNumber, IdentityPropertiesReplace],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : IdentityPropertiesReplaceError,
           }),
         ],
         [],
