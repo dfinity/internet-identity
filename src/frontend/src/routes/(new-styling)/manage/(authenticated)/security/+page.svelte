@@ -4,7 +4,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { AppleIcon, Plus, TriangleAlertIcon, Unlink } from "@lucide/svelte";
-  import ThreeColListItem from "$lib/components/ui/ThreeColListItem.svelte";
+  import ListItem from "$lib/components/ui/ListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
@@ -38,59 +38,43 @@
     </div>
     <ul>
       {#each identityInfo.devices as device}
-        <ThreeColListItem>
-          {#snippet colOne()}
-            <div class="flex items-center gap-3">
-              <AppleIcon />
-              <AccessMethod accessMethod={device} />
-            </div>
-          {/snippet}
-          {#snippet colTwo()}
-            <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
-            <AccessMethod accessMethod={device} />
-          {/snippet}
-          {#snippet colThree()}
-            <!-- for layout consistency -->
-            <div class="w-[52px]"></div>
-          {/snippet}
-        </ThreeColListItem>
-      {/each}
-      <ThreeColListItem>
-        {#snippet colOne()}
-          <div class="flex items-center gap-3">
+        <ListItem>
+          <div class="min-w-16">
             <AppleIcon />
-            <h5 class="text-text-primary text-sm font-semibold">Label</h5>
           </div>
-        {/snippet}
-        {#snippet colTwo()}
-          <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
-        {/snippet}
-        {#snippet colThree()}
+          <div class="flex-1">
+            <AccessMethod accessMethod={device} />
+          </div>
           <!-- for layout consistency -->
+          <!-- TODO: this is where we would add interactions like removal -->
           <div class="w-[52px]"></div>
-        {/snippet}
-      </ThreeColListItem>
-      <ThreeColListItem>
-        {#snippet colOne()}
+        </ListItem>
+      {/each}
+      {#each identityInfo.openIdCredentials as credential}
+        <ListItem>
           <div class="flex items-center gap-3">
             <GoogleIcon />
             <h5 class="text-text-primary text-sm font-semibold">
               Account Name
             </h5>
           </div>
-        {/snippet}
-        {#snippet colTwo()}
-          <h5 class="text-text-tertiary text-sm">My gmail acc</h5>
-        {/snippet}
-        {#snippet colThree()}
+          <h5 class="text-text-tertiary text-sm">{credential.metadata}</h5>
           <Button
             variant="tertiary"
             onclick={() => (displayUnlinkGoogleDialog = true)}
           >
             <Unlink class="stroke-fg-error-secondary" />
           </Button>
-        {/snippet}
-      </ThreeColListItem>
+        </ListItem>
+      {/each}
+      <ListItem>
+        <div class="flex items-center gap-3">
+          <h5 class="text-text-primary text-sm font-semibold">Label</h5>
+        </div>
+        <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
+        <!-- for layout consistency -->
+        <div class="w-[52px]"></div>
+      </ListItem>
     </ul>
   </Panel>
 </div>

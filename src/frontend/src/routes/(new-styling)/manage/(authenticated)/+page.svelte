@@ -2,7 +2,7 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { ChevronRight, InfoIcon } from "@lucide/svelte";
-  import ThreeColListItem from "$lib/components/ui/ThreeColListItem.svelte";
+  import ListItem from "$lib/components/ui/ListItem.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
   import { type DeviceWithUsage } from "$lib/generated/internet_identity_types";
@@ -67,64 +67,56 @@
       </h4>
     </div>
     <ul>
-      <ThreeColListItem>
-        {#snippet colOne()}
-          <h5 class="text-text-tertiary text-sm">Identity Name</h5>
-        {/snippet}
-        {#snippet colTwo()}
-          <div>
-            {#if identityInfo.name}
-              <h5
-                class="text-text-primary text-sm font-semibold nth-[2]:hidden"
-                transition:fade={{ delay: 30 }}
-              >
-                {identityInfo.name}
-              </h5>
-            {:else}
-              <PlaceHolder class="mr-8 h-4 !rounded-sm" />
-            {/if}
-          </div>
-        {/snippet}
-        {#snippet colThree()}
-          <Tooltip
-            label="Your Identity name is currently not editable. It is only ever visible to you."
-            ><InfoIcon class="text-text-primary" /></Tooltip
-          >
-        {/snippet}
-      </ThreeColListItem>
-      <ThreeColListItem href="manage/security">
-        {#snippet colOne()}
-          <h5 class="text-text-tertiary text-sm nth-[2]:hidden">
-            Access Methods
-          </h5>
-        {/snippet}
-        {#snippet colTwo()}
+      <ListItem>
+        <h5 class="text-text-tertiary min-w-30 text-sm">Identity Name</h5>
+        <div class="flex-1">
+          {#if identityInfo.name}
+            <h5
+              class="text-text-primary text-sm font-semibold nth-[2]:hidden"
+              transition:fade={{ delay: 30 }}
+            >
+              {identityInfo.name}
+            </h5>
+          {:else}
+            <PlaceHolder class="mr-8 h-4 !rounded-sm" />
+          {/if}
+        </div>
+        <Tooltip
+          label="Your Identity name is currently not editable. It is only ever visible to you."
+          ><InfoIcon class="text-text-primary" /></Tooltip
+        >
+      </ListItem>
+      <ListItem href="manage/security">
+        <h5 class="text-text-tertiary min-w-30 text-sm nth-[2]:hidden">
+          Access Methods
+        </h5>
+        <div class="flex-1">
           {#if lastUsedAccessMethod}
             <h5
               class="text-text-primary text-sm font-semibold nth-[2]:hidden"
               transition:fade={{ delay: 30 }}
             >
-              {lastUsedAccessMethod.alias}
+              <div class="mr-3 inline-block">
+                {lastUsedAccessMethod.alias}
+              </div>
               {#if nonNullish(lastUsedAccessMethod.last_usage[0])}
-                <span class="text-text-tertiary ml-3 font-normal"
-                  >Last used {formatLastUsage(
+                <div class="text-text-tertiary inline-block font-normal">
+                  Last used {formatLastUsage(
                     new Date(
                       Number(
                         lastUsedAccessMethod.last_usage[0] / BigInt(1000000),
                       ),
                     ),
-                  )}</span
-                >
+                  )}
+                </div>
               {/if}
             </h5>
           {:else}
             <PlaceHolder class="mr-8 h-4 !rounded-sm" />
           {/if}
-        {/snippet}
-        {#snippet colThree()}
-          <ChevronRight class="text-text-primary" />
-        {/snippet}
-      </ThreeColListItem>
+        </div>
+        <ChevronRight class="text-text-primary" />
+      </ListItem>
     </ul>
   </Panel>
 </div>
