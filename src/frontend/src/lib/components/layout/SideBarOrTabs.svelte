@@ -28,7 +28,7 @@
     <div class="col-start-3 col-end-4 row-start-3 row-end-4 p-4">
       {@render content?.()}
     </div>
-    <header class="col-start-2 col-end-5 row-start-1 row-end-2">
+    <header class="col-start-2 col-end-5 row-start-1 row-end-2 pt-2 pr-6">
       {@render header?.()}
     </header>
     <footer class="col-start-2 col-end-5 row-start-5 row-end-6">
@@ -37,6 +37,9 @@
   </div>
 {:else}
   <div class="flex min-h-screen flex-col">
+    <header class="absolute top-0 right-0 mt-1">
+      {@render header?.()}
+    </header>
     <Tabs>
       {@render tabElements?.()}
     </Tabs>

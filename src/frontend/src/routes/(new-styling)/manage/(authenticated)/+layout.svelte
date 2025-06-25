@@ -27,6 +27,7 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import AuthDialog from "$lib/components/views/AuthDialog.svelte";
   import { toaster } from "$lib/components/utils/toaster";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
 
   const { children } = $props();
 
@@ -60,6 +61,20 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     await gotoManage();
     isAuthDialogOpen = false;
+  };
+
+  const handleSwitchIdentity = async (identityNumber: bigint) => {
+    // authenticationStore.reset();
+    const authLastUsedFlow = new AuthLastUsedFlow();
+    const chosenIdentity =
+      $lastUsedIdentitiesStore.identities[Number(identityNumber)];
+    await authLastUsedFlow.authenticate(chosenIdentity).catch((e) => {
+      throw new Error("Could not authenticate");
+    });
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    identityInfo.fetch();
+    await gotoManage();
+    isIdentityPopoverOpen = false;
   };
 
   beforeNavigate((nav) => {
@@ -174,17 +189,8 @@
   {/snippet}
 
   {#snippet header()}
-    <div class="flex px-8 py-4">
+    <div class="flex">
       <div class="flex-1"></div>
-      <!-- <IdentitySwitcher
-        selected={$authenticatedStore.identityNumber}
-        identities={lastUsedIdentities}
-        switchIdentity={(identityNumber) => {
-          authenticationStore.reset();
-          lastUsedIdentitiesStore.selectIdentity(identityNumber);
-        }}
-      /> -->
-
       <Button
         bind:element={identityButtonRef}
         onclick={() => (isIdentityPopoverOpen = true)}
@@ -206,11 +212,7 @@
           <IdentitySwitcher
             selected={$authenticatedStore.identityNumber}
             identities={lastUsedIdentities}
-            switchIdentity={(identityNumber) => {
-              authenticationStore.reset();
-              lastUsedIdentitiesStore.selectIdentity(identityNumber);
-              isIdentityPopoverOpen = false;
-            }}
+            switchIdentity={handleSwitchIdentity}
             useAnotherIdentity={() => {
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;

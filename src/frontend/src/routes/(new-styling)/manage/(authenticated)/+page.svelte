@@ -12,7 +12,6 @@
   import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
   import { fade } from "svelte/transition";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
-  import { formatLastUsage } from "$lib/utils/time";
 
   const getLastUsedAccessMethod = (
     devices: DeviceWithUsage[],

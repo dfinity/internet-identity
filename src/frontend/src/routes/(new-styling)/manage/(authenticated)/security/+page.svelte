@@ -138,7 +138,7 @@
         </ListItem>
       {/each}
       {#each identityInfo.openIdCredentials as credential}
-        <ListItem>
+        <ListItem class="!py-2">
           <div class="min-w-8">
             <GoogleIcon />
           </div>
@@ -148,6 +148,7 @@
 
           <Button
             variant="tertiary"
+            iconOnly={true}
             onclick={() => (removableOpenIdCredential = credential)}
           >
             <Unlink class="stroke-fg-error-secondary" />
