@@ -25,9 +25,14 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { isNullish } from "@dfinity/utils";
   import { type OpenIdCredential } from "$lib/generated/internet_identity_types";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   let removableOpenIdCredential = $state<OpenIdCredential | null>(null);
   let displayAddCredentialDialog = $state(false);
+
+  const totalAccessMethods = $derived<number>(
+    identityInfo.devices.length + identityInfo.openIdCredentials.length,
+  );
 
   const handleAddGoogle = async () => {
     const googleClientId = canisterConfig.openid_google[0]?.[0]?.client_id;
@@ -138,21 +143,23 @@
         </ListItem>
       {/each}
       {#each identityInfo.openIdCredentials as credential}
-        <ListItem class="!py-2">
-          <div class="min-w-8">
+        <ListItem class="!py-0">
+          <div class="min-w-8 py-4">
             <GoogleIcon />
           </div>
-          <div class="flex-1">
+          <div class="flex-1 py-4">
             <AccessMethod accessMethod={credential} />
           </div>
 
-          <Button
-            variant="tertiary"
-            iconOnly={true}
-            onclick={() => (removableOpenIdCredential = credential)}
-          >
-            <Unlink class="stroke-fg-error-secondary" />
-          </Button>
+          {#if totalAccessMethods > 1}
+            <Button
+              variant="tertiary"
+              iconOnly={true}
+              onclick={() => (removableOpenIdCredential = credential)}
+            >
+              <Unlink class="stroke-fg-error-secondary" />
+            </Button>
+          {/if}
         </ListItem>
       {/each}
     </ul>

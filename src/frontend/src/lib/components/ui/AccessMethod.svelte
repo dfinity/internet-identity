@@ -30,11 +30,12 @@
 
 {#if accessMethod}
   {#if "credential_id" in accessMethod}
+    <!-- Passkey -->
     <h5
       class="text-text-primary text-sm font-semibold nth-[2]:hidden"
       transition:fade={{ delay: 30, duration: 30 }}
     >
-      <div class="mr-3 inline-block">
+      <div class="mr-3 inline-block min-w-32">
         {accessMethod.alias}
       </div>
       {#if nonNullish(accessMethod.last_usage[0])}
@@ -46,16 +47,17 @@
       {/if}
     </h5>
   {:else}
+    <!-- OpenID -->
     <h5
       class="text-text-primary text-sm font-semibold nth-[2]:hidden"
       transition:fade={{ delay: 30, duration: 30 }}
     >
-      <div class="mr-3 inline-block">
+      <div class="mr-3 inline-block min-w-32">
         {formatOpenIdCredentialName(accessMethod)}
       </div>
 
       {#if nonNullish(accessMethod.last_usage_timestamp[0])}
-        <div class="text-text-tertiary font-normal">
+        <div class="text-text-tertiary inline-block font-normal">
           Last used {formatLastUsage(
             new Date(
               Number(accessMethod.last_usage_timestamp[0] / BigInt(1000000)),

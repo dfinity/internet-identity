@@ -29,7 +29,7 @@
 
     return allMethods.sort((devA, devB) => {
       if (nonNullish(devA.last_usage[0]) && nonNullish(devB.last_usage[0])) {
-        return Number(devA.last_usage[0]) - Number(devB.last_usage[0]);
+        return Number(devB.last_usage[0]) - Number(devA.last_usage[0]);
       } else if (
         isNullish(devA.last_usage[0]) &&
         nonNullish(devB.last_usage[0])
