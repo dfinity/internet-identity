@@ -92,7 +92,7 @@ impl From<AnchorError> for IdentityPropertiesReplaceError {
     fn from(value: AnchorError) -> Self {
         match value {
             AnchorError::NameTooLong { limit } => {
-                IdentityPropertiesReplaceError::NameTooLong { limit }
+                IdentityPropertiesReplaceError::NameTooLong { limit: limit.try_into().unwrap() }
             }
             err => IdentityPropertiesReplaceError::InternalCanisterError(err.to_string()),
         }
