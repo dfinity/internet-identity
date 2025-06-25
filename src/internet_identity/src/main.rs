@@ -739,6 +739,7 @@ mod v2_api {
                 .map(AuthnMethodRegistration::from),
             openid_credentials: anchor_info.openid_credentials,
             metadata,
+            name: anchor_info.name,
         };
         Ok(identity_info)
     }
@@ -836,6 +837,20 @@ mod v2_api {
                 (),
                 anchor_management::identity_metadata_replace(anchor, metadata)
                     .map_err(IdentityMetadataReplaceError::from)?,
+            ))
+        })
+    }
+
+    #[update]
+    fn identity_properties_replace(
+        identity_number: IdentityNumber,
+        properties: IdentityPropertiesReplace,
+    ) -> Result<(), IdentityPropertiesReplaceError> {
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            Ok::<_, IdentityPropertiesReplaceError>((
+                (),
+                anchor_management::identity_properties_replace(anchor, properties)
+                    .map_err(IdentityPropertiesReplaceError::from)?,
             ))
         })
     }

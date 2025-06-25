@@ -119,6 +119,24 @@ pub fn identity_metadata_replace(
     .map(|(x,)| x)
 }
 
+pub fn identity_properties_replace(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+    properties: &IdentityPropertiesReplace,
+) -> Result<Result<(), IdentityPropertiesReplaceError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "identity_properties_replace",
+        (identity_number, properties),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn authn_method_add(
     env: &PocketIc,
     canister_id: CanisterId,
