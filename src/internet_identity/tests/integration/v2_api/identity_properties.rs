@@ -133,7 +133,7 @@ fn should_not_set_too_long_name() -> Result<(), CallError> {
     )?;
     assert!(matches!(
         result,
-        Err(IdentityPropertiesReplaceError::StorageSpaceExceeded { .. })
+        Err(IdentityPropertiesReplaceError::NameTooLong { limit: 128 })
     ));
     Ok(())
 }

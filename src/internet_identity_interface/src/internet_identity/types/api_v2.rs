@@ -166,7 +166,7 @@ pub enum IdentityPropertiesReplaceError {
         space_required: u64,
     },
     NameTooLong {
-        limit: usize,
+        limit: u64,
     },
     InternalCanisterError(String),
 }
