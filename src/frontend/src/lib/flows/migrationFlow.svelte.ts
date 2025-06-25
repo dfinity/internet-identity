@@ -64,7 +64,6 @@ export class MigrationFlow {
       throw new Error("Identity number is null");
     }
     // TODO: Create the passkey in id.ai
-    // TODO: Update identity name with call to canister. PENDING endpoint.
     const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
     const origin = window.location.origin;
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
@@ -113,21 +112,28 @@ export class MigrationFlow {
         },
       ]);
     }
-    await get(authenticatedStore)
-      .actor.authn_method_add(this.identityNumber, {
-        security_settings: securitySettings,
-        metadata,
-        last_authentication: [],
-        authn_method: {
-          WebAuthn: {
-            pubkey: Array.from(
-              new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
-            ),
-            credential_id: Array.from(new Uint8Array(credentialId)),
+    await Promise.all([
+      get(authenticatedStore)
+        .actor.authn_method_add(this.identityNumber, {
+          security_settings: securitySettings,
+          metadata,
+          last_authentication: [],
+          authn_method: {
+            WebAuthn: {
+              pubkey: Array.from(
+                new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
+              ),
+              credential_id: Array.from(new Uint8Array(credentialId)),
+            },
           },
-        },
-      })
-      .then(throwCanisterError);
+        })
+        .then(throwCanisterError),
+      get(authenticatedStore)
+        .actor.identity_properties_replace(this.identityNumber, {
+          name: [name],
+        })
+        .then(throwCanisterError),
+    ]);
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: this.identityNumber,
       name,
