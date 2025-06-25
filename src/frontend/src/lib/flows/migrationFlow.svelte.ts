@@ -80,11 +80,6 @@ export class MigrationFlow {
       uaParser,
       aaguid: passkeyIdentity.getAaguid(),
     });
-
-    const info = await get(authenticatedStore).actor.identity_info(
-      this.identityNumber,
-    );
-    console.log("in da create before setting name", info);
     const credentialId = passkeyIdentity.getCredentialId();
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is null");
@@ -148,10 +143,6 @@ export class MigrationFlow {
         },
       },
     });
-    const info2 = await get(authenticatedStore).actor.identity_info(
-      this.identityNumber,
-    );
-    console.log("in da create after setting name", info2);
     this.view = "success";
   };
 
