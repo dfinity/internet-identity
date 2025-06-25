@@ -64,7 +64,6 @@ export class MigrationFlow {
       throw new Error("Identity number is null");
     }
     // TODO: Create the passkey in id.ai
-    // TODO: Update identity name with call to canister. PENDING endpoint.
     const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
     const origin = window.location.origin;
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
@@ -81,6 +80,11 @@ export class MigrationFlow {
       uaParser,
       aaguid: passkeyIdentity.getAaguid(),
     });
+
+    const info = await get(authenticatedStore).actor.identity_info(
+      this.identityNumber,
+    );
+    console.log("in da create before setting name", info);
     const credentialId = passkeyIdentity.getCredentialId();
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is null");
@@ -113,21 +117,28 @@ export class MigrationFlow {
         },
       ]);
     }
-    await get(authenticatedStore)
-      .actor.authn_method_add(this.identityNumber, {
-        security_settings: securitySettings,
-        metadata,
-        last_authentication: [],
-        authn_method: {
-          WebAuthn: {
-            pubkey: Array.from(
-              new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
-            ),
-            credential_id: Array.from(new Uint8Array(credentialId)),
+    await Promise.all([
+      get(authenticatedStore)
+        .actor.authn_method_add(this.identityNumber, {
+          security_settings: securitySettings,
+          metadata,
+          last_authentication: [],
+          authn_method: {
+            WebAuthn: {
+              pubkey: Array.from(
+                new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
+              ),
+              credential_id: Array.from(new Uint8Array(credentialId)),
+            },
           },
-        },
-      })
-      .then(throwCanisterError);
+        })
+        .then(throwCanisterError),
+      get(authenticatedStore)
+        .actor.identity_properties_replace(this.identityNumber, {
+          name: [name],
+        })
+        .then(throwCanisterError),
+    ]);
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: this.identityNumber,
       name,
@@ -137,6 +148,10 @@ export class MigrationFlow {
         },
       },
     });
+    const info2 = await get(authenticatedStore).actor.identity_info(
+      this.identityNumber,
+    );
+    console.log("in da create after setting name", info2);
     this.view = "success";
   };
 

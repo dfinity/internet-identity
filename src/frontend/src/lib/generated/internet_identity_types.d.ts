@@ -220,6 +220,7 @@ export interface IdentityAuthnInfo {
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   'metadata' : MetadataMapV2,
+  'name' : [] | [string],
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
   'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
