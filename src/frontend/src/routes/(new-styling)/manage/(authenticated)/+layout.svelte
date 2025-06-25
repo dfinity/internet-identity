@@ -17,10 +17,7 @@
   import { isDesktopViewport } from "$lib/utils/UI/deviceDetection";
   import { expoIn, expoOut } from "svelte/easing";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
-  import {
-    authenticatedStore,
-    authenticationStore,
-  } from "$lib/stores/authentication.store";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Button from "$lib/components/ui/Button.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
@@ -50,6 +47,8 @@
   const gotoManage = () => goto("/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    identityInfo.reset();
+    identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
@@ -59,12 +58,13 @@
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    identityInfo.reset();
+    identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
 
   const handleSwitchIdentity = async (identityNumber: bigint) => {
-    // authenticationStore.reset();
     const authLastUsedFlow = new AuthLastUsedFlow();
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[Number(identityNumber)];
@@ -72,6 +72,7 @@
       throw new Error("Could not authenticate");
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    identityInfo.reset();
     identityInfo.fetch();
     await gotoManage();
     isIdentityPopoverOpen = false;
