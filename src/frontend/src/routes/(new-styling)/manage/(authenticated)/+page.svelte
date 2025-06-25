@@ -91,29 +91,7 @@
           Access Methods
         </h5>
         <div class="flex-1">
-          {#if lastUsedAccessMethod}
-            <h5
-              class="text-text-primary text-sm font-semibold nth-[2]:hidden"
-              transition:fade={{ delay: 30 }}
-            >
-              <div class="mr-3 inline-block">
-                {lastUsedAccessMethod.alias}
-              </div>
-              {#if nonNullish(lastUsedAccessMethod.last_usage[0])}
-                <div class="text-text-tertiary inline-block font-normal">
-                  Last used {formatLastUsage(
-                    new Date(
-                      Number(
-                        lastUsedAccessMethod.last_usage[0] / BigInt(1000000),
-                      ),
-                    ),
-                  )}
-                </div>
-              {/if}
-            </h5>
-          {:else}
-            <PlaceHolder class="mr-8 h-4 !rounded-sm" />
-          {/if}
+          <AccessMethod accessMethod={lastUsedAccessMethod} />
         </div>
         <ChevronRight class="text-text-primary" />
       </ListItem>

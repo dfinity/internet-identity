@@ -18,24 +18,86 @@
   import {
     createAnonymousNonce,
     createGoogleRequestConfig,
+    decodeJWT,
+    decodeJWTWithNameAndEmail,
     requestJWT,
   } from "$lib/utils/openID";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { isNullish } from "@dfinity/utils";
+  import { type OpenIdCredential } from "$lib/generated/internet_identity_types";
 
-  let displayUnlinkOpenIdDialog = $state(false);
+  let removableOpenIdCredential = $state<OpenIdCredential | null>(null);
   let displayAddCredentialDialog = $state(false);
 
   const handleAddGoogle = async () => {
     const googleClientId = canisterConfig.openid_google[0]?.[0]?.client_id;
     if (isNullish(googleClientId)) throw new Error("Missing Google client ID");
-    const { nonce } = await createAnonymousNonce(
+    const { nonce, salt } = await createAnonymousNonce(
       $authenticatedStore.identity.getPrincipal(),
     );
     const jwt = await requestJWT(createGoogleRequestConfig(googleClientId), {
       mediation: "required",
       nonce,
     });
+
+    const { iss, sub, aud, name, email } = decodeJWTWithNameAndEmail(jwt);
+
+    if (
+      identityInfo.openIdCredentials.find((c) => c.iss === iss && c.sub === sub)
+    ) {
+      throw new Error("Account already linked");
+    }
+
+    const googleAddPromise = $authenticatedStore.actor.openid_credential_add(
+      $authenticatedStore.identityNumber,
+      jwt,
+      salt,
+    );
+    // Optimistically show as added
+    identityInfo.openIdCredentials.push({
+      aud,
+      iss,
+      sub,
+      metadata: [
+        ["name", { String: name }],
+        ["email", { String: email }],
+      ],
+      last_usage_timestamp: [],
+    });
+    displayAddCredentialDialog = false;
+
+    const googleAddResult = await googleAddPromise;
+
+    if ("Ok" in googleAddResult) {
+      identityInfo.fetch();
+    } else {
+      identityInfo.openIdCredentials = identityInfo.openIdCredentials.filter(
+        (cred) => !(cred.iss === iss && cred.sub === sub),
+      );
+      throw new Error(Object.keys(await googleAddResult.Err)[0]);
+    }
+  };
+
+  const handleRemoveGoogle = async (credential: OpenIdCredential) => {
+    const googleRemovePromise =
+      $authenticatedStore.actor.openid_credential_remove(
+        $authenticatedStore.identityNumber,
+        [credential.iss, credential.sub],
+      );
+    // Optimistically show as removed
+    identityInfo.openIdCredentials = identityInfo.openIdCredentials.filter(
+      (cred) => !(cred.iss === credential.iss && cred.sub === credential.sub),
+    );
+    removableOpenIdCredential = null;
+
+    const googleRemoveResult = await googleRemovePromise;
+
+    if ("Ok" in googleRemoveResult) {
+      identityInfo.fetch();
+    } else {
+      identityInfo.openIdCredentials.push(credential);
+      throw new Error(Object.keys(googleRemoveResult.Err)[0]);
+    }
   };
 </script>
 
@@ -64,7 +126,7 @@
     <ul>
       {#each identityInfo.devices as device}
         <ListItem>
-          <div class="min-w-16">
+          <div class="min-w-8">
             <AppleIcon />
           </div>
           <div class="flex-1">
@@ -77,35 +139,27 @@
       {/each}
       {#each identityInfo.openIdCredentials as credential}
         <ListItem>
-          <div class="flex items-center gap-3">
+          <div class="min-w-8">
             <GoogleIcon />
-            <h5 class="text-text-primary text-sm font-semibold">
-              Account Name
-            </h5>
           </div>
-          <h5 class="text-text-tertiary text-sm">{credential.metadata}</h5>
+          <div class="flex-1">
+            <AccessMethod accessMethod={credential} />
+          </div>
+
           <Button
             variant="tertiary"
-            onclick={() => (displayUnlinkOpenIdDialog = true)}
+            onclick={() => (removableOpenIdCredential = credential)}
           >
             <Unlink class="stroke-fg-error-secondary" />
           </Button>
         </ListItem>
       {/each}
-      <ListItem>
-        <div class="flex items-center gap-3">
-          <h5 class="text-text-primary text-sm font-semibold">Label</h5>
-        </div>
-        <h5 class="text-text-tertiary text-sm">Goo goo gaga</h5>
-        <!-- for layout consistency -->
-        <div class="w-[52px]"></div>
-      </ListItem>
     </ul>
   </Panel>
 </div>
 
-{#if displayUnlinkOpenIdDialog}
-  <Dialog onClose={() => (displayUnlinkOpenIdDialog = false)}>
+{#if removableOpenIdCredential}
+  <Dialog onClose={() => (removableOpenIdCredential = null)}>
     <FeaturedIcon class="mb-3" variant="warning"
       ><TriangleAlertIcon /></FeaturedIcon
     >
@@ -116,7 +170,11 @@
       Account.
     </p>
     <div class="flex w-full flex-col gap-3">
-      <Button variant="primary" danger>Unlink Google Account</Button>
+      <Button
+        onclick={() => handleRemoveGoogle(removableOpenIdCredential!)}
+        variant="primary"
+        danger>Unlink Google Account</Button
+      >
       <Button variant="tertiary">Keep linked</Button>
     </div>
   </Dialog>

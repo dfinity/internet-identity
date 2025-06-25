@@ -183,63 +183,20 @@ export const decodeJWT = (
   return { iss, sub, aud };
 };
 
+/**
+ * Decode a JWT token so it can be compared with others and the name can be displayed
+ * @param token to decode
+ * @returns common claims
+ */
+export const decodeJWTWithNameAndEmail = (
+  token: string,
+): { iss: string; sub: string; aud: string; name: string; email: string } => {
+  const [_header, body, _signature] = token.split(".");
+  const { iss, sub, aud, name, email } = JSON.parse(atob(body));
+  return { iss, sub, aud, name, email };
+};
+
 export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
   const value = metadata.find((entry) => entry[0] === key)?.[1];
   return value && "String" in value ? value.String : undefined;
 };
-
-// export const linkAccount = async () => {
-
-//   if (isNullish(googleClientId)) {
-//     toast.error(copy.linking_google_accounts_is_unavailable);
-//     return;
-//   }
-//   try {
-//     const jwt = await withLoader(() =>
-//       requestJWT(createGoogleRequestConfig(googleClientId), {
-//         mediation: "required",
-//         nonce,
-//       }),
-//     );
-//     const { iss, sub } = decodeJWT(jwt);
-//     if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
-//       toast.error(copy.account_already_linked);
-//       return;
-//     }
-//     await connection.addOpenIdCredential(jwt, salt);
-//     resolve();
-//   } catch (error) {
-//     if (isOpenIdCancelError(error)) {
-//       toast.error(copy.third_party_sign_in_permission_required);
-//       return;
-//     }
-//     if (isCanisterError<OpenIdCredentialAddError>(error)) {
-//       switch (error.type) {
-//         case "Unauthorized":
-//           toast.error(copy.authentication_failed);
-//           console.error(
-//             `Authentication unexpectedly failed: ${error
-//               .value(error.type)
-//               .toText()}`,
-//           );
-//           break;
-//         case "JwtVerificationFailed":
-//           toast.error(copy.jwt_signature_invalid);
-//           break;
-//         case "OpenIdCredentialAlreadyRegistered":
-//           toast.error(copy.account_already_linked);
-//           break;
-//         case "InternalCanisterError":
-//           toast.error(`Unexpected error: ${error.value(error.type)}`);
-//           break;
-//         default: {
-//           // Make sure all error cases are covered,
-//           // else this will throw a TS error here.
-//           const _ = error.type satisfies never;
-//         }
-//       }
-//       return;
-//     }
-//     throw error;
-//   }
-// };
