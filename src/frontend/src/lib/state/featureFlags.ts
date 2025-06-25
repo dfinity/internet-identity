@@ -79,6 +79,11 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
+export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
+  "ENABLE_MIGRATE_FLOW",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,

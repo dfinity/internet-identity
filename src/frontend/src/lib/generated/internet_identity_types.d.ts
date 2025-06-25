@@ -220,6 +220,7 @@ export interface IdentityAuthnInfo {
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,
   'metadata' : MetadataMapV2,
+  'name' : [] | [string],
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
   'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
@@ -236,6 +237,18 @@ export type IdentityMetadataReplaceError = {
     }
   };
 export type IdentityNumber = bigint;
+export interface IdentityPropertiesReplace { 'name' : [] | [string] }
+export type IdentityPropertiesReplaceError = {
+    'InternalCanisterError' : string
+  } |
+  { 'Unauthorized' : Principal } |
+  { 'NameTooLong' : { 'limit' : bigint } } |
+  {
+    'StorageSpaceExceeded' : {
+      'space_required' : bigint,
+      'space_available' : bigint,
+    }
+  };
 export interface InternetIdentityInit {
   'fetch_root_key' : [] | [boolean],
   'openid_google' : [] | [[] | [OpenIdConfig]],
@@ -487,6 +500,11 @@ export interface _SERVICE {
     [IdentityNumber, MetadataMapV2],
     { 'Ok' : null } |
       { 'Err' : IdentityMetadataReplaceError }
+  >,
+  'identity_properties_replace' : ActorMethod<
+    [IdentityNumber, IdentityPropertiesReplace],
+    { 'Ok' : null } |
+      { 'Err' : IdentityPropertiesReplaceError }
   >,
   'identity_registration_finish' : ActorMethod<
     [IdRegFinishArg],

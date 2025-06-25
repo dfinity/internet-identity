@@ -334,6 +334,7 @@ export const idlFactory = ({ IDL }) => {
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
+    'name' : IDL.Opt(IDL.Text),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });
@@ -344,6 +345,16 @@ export const idlFactory = ({ IDL }) => {
   const IdentityMetadataReplaceError = IDL.Variant({
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
+    'StorageSpaceExceeded' : IDL.Record({
+      'space_required' : IDL.Nat64,
+      'space_available' : IDL.Nat64,
+    }),
+  });
+  const IdentityPropertiesReplace = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
+  const IdentityPropertiesReplaceError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'NameTooLong' : IDL.Record({ 'limit' : IDL.Nat64 }),
     'StorageSpaceExceeded' : IDL.Record({
       'space_required' : IDL.Nat64,
       'space_available' : IDL.Nat64,
@@ -614,6 +625,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : IDL.Null,
             'Err' : IdentityMetadataReplaceError,
+          }),
+        ],
+        [],
+      ),
+    'identity_properties_replace' : IDL.Func(
+        [IdentityNumber, IdentityPropertiesReplace],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : IdentityPropertiesReplaceError,
           }),
         ],
         [],

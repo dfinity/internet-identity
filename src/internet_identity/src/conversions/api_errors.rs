@@ -5,7 +5,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, PrepareIdAliasError,
 };
 use internet_identity_interface::internet_identity::types::{
-    IdentityInfoError, IdentityMetadataReplaceError,
+    IdentityInfoError, IdentityMetadataReplaceError, IdentityPropertiesReplaceError,
 };
 
 impl From<IdentityUpdateError> for IdentityMetadataReplaceError {
@@ -62,6 +62,39 @@ impl From<IdentityUpdateError> for IdentityInfoError {
                 IdentityInfoError::Unauthorized(principal)
             }
             err => IdentityInfoError::InternalCanisterError(err.to_string()),
+        }
+    }
+}
+
+impl From<IdentityUpdateError> for IdentityPropertiesReplaceError {
+    fn from(value: IdentityUpdateError) -> Self {
+        let storage_err = match value {
+            IdentityUpdateError::Unauthorized(principal) => {
+                return IdentityPropertiesReplaceError::Unauthorized(principal)
+            }
+            IdentityUpdateError::StorageError(_, storage_err) => storage_err,
+        };
+
+        match storage_err {
+            StorageError::EntrySizeLimitExceeded {
+                space_available,
+                space_required,
+            } => IdentityPropertiesReplaceError::StorageSpaceExceeded {
+                space_available,
+                space_required,
+            },
+            err => IdentityPropertiesReplaceError::InternalCanisterError(err.to_string()),
+        }
+    }
+}
+
+impl From<AnchorError> for IdentityPropertiesReplaceError {
+    fn from(value: AnchorError) -> Self {
+        match value {
+            AnchorError::NameTooLong { limit } => IdentityPropertiesReplaceError::NameTooLong {
+                limit: limit.try_into().unwrap(),
+            },
+            err => IdentityPropertiesReplaceError::InternalCanisterError(err.to_string()),
         }
     }
 }
