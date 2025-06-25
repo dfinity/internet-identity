@@ -3,16 +3,39 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { AppleIcon, Plus, TriangleAlertIcon, Unlink } from "@lucide/svelte";
+  import {
+    AppleIcon,
+    InfoIcon,
+    Plus,
+    TriangleAlertIcon,
+    Unlink,
+  } from "@lucide/svelte";
   import ListItem from "$lib/components/ui/ListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
+  import { canisterConfig } from "$lib/globals";
+  import {
+    createAnonymousNonce,
+    createGoogleRequestConfig,
+    requestJWT,
+  } from "$lib/utils/openID";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { isNullish } from "@dfinity/utils";
 
-  let displayUnlinkGoogleDialog = $state(false);
+  let displayUnlinkOpenIdDialog = $state(false);
+  let displayAddCredentialDialog = $state(false);
 
-  const handleAddCredential = () => {
-    console.log("add credential"); //TODO
+  const handleAddGoogle = async () => {
+    const googleClientId = canisterConfig.openid_google[0]?.[0]?.client_id;
+    if (isNullish(googleClientId)) throw new Error("Missing Google client ID");
+    const { nonce } = await createAnonymousNonce(
+      $authenticatedStore.identity.getPrincipal(),
+    );
+    const jwt = await requestJWT(createGoogleRequestConfig(googleClientId), {
+      mediation: "required",
+      nonce,
+    });
   };
 </script>
 
@@ -30,7 +53,9 @@
 
       <div>
         <Button
-          onclick={handleAddCredential}
+          onclick={() => {
+            displayAddCredentialDialog = true;
+          }}
           class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
           >Add <Plus size="1.25rem" /></Button
         >
@@ -61,7 +86,7 @@
           <h5 class="text-text-tertiary text-sm">{credential.metadata}</h5>
           <Button
             variant="tertiary"
-            onclick={() => (displayUnlinkGoogleDialog = true)}
+            onclick={() => (displayUnlinkOpenIdDialog = true)}
           >
             <Unlink class="stroke-fg-error-secondary" />
           </Button>
@@ -79,8 +104,8 @@
   </Panel>
 </div>
 
-{#if displayUnlinkGoogleDialog}
-  <Dialog onClose={() => (displayUnlinkGoogleDialog = false)}>
+{#if displayUnlinkOpenIdDialog}
+  <Dialog onClose={() => (displayUnlinkOpenIdDialog = false)}>
     <FeaturedIcon class="mb-3" variant="warning"
       ><TriangleAlertIcon /></FeaturedIcon
     >
@@ -93,6 +118,23 @@
     <div class="flex w-full flex-col gap-3">
       <Button variant="primary" danger>Unlink Google Account</Button>
       <Button variant="tertiary">Keep linked</Button>
+    </div>
+  </Dialog>
+{/if}
+
+{#if displayAddCredentialDialog}
+  <Dialog onClose={() => (displayAddCredentialDialog = false)}>
+    <FeaturedIcon class="mb-3" variant="info"><InfoIcon /></FeaturedIcon>
+    <h1 class="text-text-primary mb-3 text-2xl font-medium">Add credential</h1>
+    <p class="text-text-tertiary mb-8 font-medium">
+      Please choose the type of credential you would like to add.
+    </p>
+    <div class="flex w-full flex-col gap-3">
+      <!-- TODO: if/when we add more credentials and OpenID providers, we'll need to add more buttons here -->
+      <Button variant="primary" onclick={handleAddGoogle}
+        ><GoogleIcon /> Link Google Account</Button
+      >
+      <Button variant="tertiary">Cancel</Button>
     </div>
   </Dialog>
 {/if}
