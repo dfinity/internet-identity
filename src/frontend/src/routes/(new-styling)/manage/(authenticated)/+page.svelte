@@ -4,53 +4,10 @@
   import { ChevronRight, InfoIcon } from "@lucide/svelte";
   import ListItem from "$lib/components/ui/ListItem.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
-  import { isNullish, nonNullish } from "@dfinity/utils";
-  import {
-    type OpenIdCredential,
-    type AuthnMethodData,
-  } from "$lib/generated/internet_identity_types";
   import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
   import { fade } from "svelte/transition";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
-
-  const getLastUsedAccessMethod = (
-    authnMethods: AuthnMethodData[],
-    openIdCredentials: OpenIdCredential[],
-  ): AuthnMethodData | OpenIdCredential | null => {
-    if (authnMethods.length === 0 && openIdCredentials.length === 0) {
-      return null;
-    }
-    const allMethods = [
-      ...authnMethods,
-      ...openIdCredentials.map((cred) => {
-        return { ...cred, last_authentication: cred.last_usage_timestamp };
-      }),
-    ];
-
-    return allMethods.sort((devA, devB) => {
-      if (
-        nonNullish(devA.last_authentication[0]) &&
-        nonNullish(devB.last_authentication[0])
-      ) {
-        return (
-          Number(devB.last_authentication[0]) -
-          Number(devA.last_authentication[0])
-        );
-      } else if (
-        isNullish(devA.last_authentication[0]) &&
-        nonNullish(devB.last_authentication[0])
-      ) {
-        return 1;
-      } else if (
-        nonNullish(devA.last_authentication[0]) &&
-        isNullish(devB.last_authentication[0])
-      ) {
-        return -1;
-      } else {
-        return 0;
-      }
-    })[0];
-  };
+  import { getLastUsedAccessMethod } from "$lib/utils/accessMethods";
 
   const lastUsedAccessMethod = $derived(
     getLastUsedAccessMethod(

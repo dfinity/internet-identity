@@ -36,6 +36,10 @@ class IdentityInfo {
   openIdCredentials = $state<OpenIdCredential[]>([]);
   removableOpenIdCredential = $state<OpenIdCredential | null>(null);
 
+  totalAccessMethods = $derived<number>(
+    this.authnMethods.length + this.openIdCredentials.length,
+  );
+
   fetch = async () => {
     try {
       const {

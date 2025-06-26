@@ -11,10 +11,6 @@
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
 
   let displayAddCredentialDialog = $state(false);
-
-  const totalAccessMethods = $derived<number>(
-    identityInfo.authnMethods.length + identityInfo.openIdCredentials.length,
-  );
 </script>
 
 <div class="text-text-primary">
@@ -64,7 +60,7 @@
             <AccessMethod accessMethod={credential} />
           </div>
 
-          {#if totalAccessMethods > 1}
+          {#if identityInfo.totalAccessMethods > 1}
             <Button
               variant="tertiary"
               iconOnly={true}
