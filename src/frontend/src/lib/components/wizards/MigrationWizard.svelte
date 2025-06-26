@@ -49,23 +49,11 @@
   });
 </script>
 
-<div class="flex min-h-[100dvh] flex-col" data-page="migration-view">
-  <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header />
-  <div class="flex flex-1 flex-col items-center justify-center">
-    <div class="col-start-1 row-start-1 flex flex-col">
-      <AuthPanel>
-        {#if migrationFlow.view === "enterNumber"}
-          {@render enterIdentityNumber()}
-        {:else if migrationFlow.view === "enterName"}
-          <CreatePasskey create={handleCreate} />
-        {/if}
-      </AuthPanel>
-    </div>
-  </div>
-  <Footer />
-  <div class="h-[env(safe-area-inset-bottom)]"></div>
-</div>
+{#if migrationFlow.view === "enterNumber"}
+  {@render enterIdentityNumber()}
+{:else if migrationFlow.view === "enterName"}
+  <CreatePasskey create={handleCreate} />
+{/if}
 
 {#snippet enterIdentityNumber()}
   <form class="flex flex-1 flex-col">
