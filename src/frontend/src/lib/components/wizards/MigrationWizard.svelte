@@ -1,0 +1,108 @@
+<script lang="ts">
+  import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
+  import Header from "$lib/components/layout/Header.svelte";
+  import Footer from "$lib/components/layout/Footer.svelte";
+  import Input from "$lib/components/ui/Input.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
+  import { isNullish, nonNullish } from "@dfinity/utils";
+  import { MigrationFlow } from "$lib/flows/migrationFlow.svelte";
+  import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
+  import { goto } from "$app/navigation";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { handleError } from "$lib/components/utils/error";
+
+  const { onSuccess }: { onSuccess: () => void } = $props();
+
+  let identityNumber: number | undefined = $state(undefined);
+  const migrationFlow = new MigrationFlow();
+
+  const handleSubmit = async () => {
+    if (nonNullish(identityNumber)) {
+      try {
+        await migrationFlow
+          .authenticateWithIdentityNumber(BigInt(identityNumber))
+          .catch(handleError);
+      } catch (e) {
+        migrationFlow.view = "enterNumber";
+        console.error(e);
+      }
+    }
+  };
+
+  const handleCreate = async (name: string) => {
+    try {
+      if (isNullish(migrationFlow.identityNumber)) {
+        throw new Error("Identity number is null");
+      }
+      await migrationFlow.createPasskey(name);
+      lastUsedIdentitiesStore.selectIdentity(migrationFlow.identityNumber);
+      onSuccess();
+    } catch (e) {
+      migrationFlow.view = "enterNumber";
+      console.error(e);
+    }
+  };
+
+  $effect(() => {
+    console.log("migrationFlow.view", migrationFlow.view);
+  });
+</script>
+
+<div class="flex min-h-[100dvh] flex-col" data-page="migration-view">
+  <div class="h-[env(safe-area-inset-top)]"></div>
+  <Header />
+  <div class="flex flex-1 flex-col items-center justify-center">
+    <div class="col-start-1 row-start-1 flex flex-col">
+      <AuthPanel>
+        {#if migrationFlow.view === "enterNumber"}
+          {@render enterIdentityNumber()}
+        {:else if migrationFlow.view === "enterName"}
+          <CreatePasskey create={handleCreate} />
+        {/if}
+      </AuthPanel>
+    </div>
+  </div>
+  <Footer />
+  <div class="h-[env(safe-area-inset-bottom)]"></div>
+</div>
+
+{#snippet enterIdentityNumber()}
+  <form class="flex flex-1 flex-col">
+    <div class="mb-8 flex flex-col">
+      <h1 class="text-text-primary mb-3 text-2xl font-medium">
+        Enter the identity number
+      </h1>
+      <p class="text-md text-text-tertiary mb-6 font-medium">
+        This process will allow you to use the new authentication flow.
+      </p>
+      <Input
+        bind:value={identityNumber}
+        inputmode="numeric"
+        placeholder="Identity number"
+        type="number"
+        size="md"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        aria-label="Identity number"
+      />
+    </div>
+    <div class="mt-auto flex flex-col items-stretch gap-3">
+      <Button
+        onclick={handleSubmit}
+        variant="primary"
+        size="lg"
+        type="submit"
+        disabled={isNullish(identityNumber) || migrationFlow.authenticating}
+      >
+        {#if migrationFlow.authenticating}
+          <ProgressRing />
+          <span>Authenticating...</span>
+        {:else}
+          <span>Migrate Identity</span>
+        {/if}
+      </Button>
+    </div>
+  </form>
+{/snippet}

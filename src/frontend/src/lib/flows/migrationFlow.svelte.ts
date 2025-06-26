@@ -18,9 +18,10 @@ import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdent
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { throwCanisterError } from "$lib/utils/utils";
+import { toaster } from "$lib/components/utils/toaster";
 
 export class MigrationFlow {
-  view = $state<"enterNumber" | "enterName" | "success">("enterNumber");
+  view = $state<"enterNumber" | "enterName">("enterNumber");
   identityNumber: UserNumber | undefined;
   authenticating = $state(false);
 
@@ -143,7 +144,10 @@ export class MigrationFlow {
         },
       },
     });
-    this.view = "success";
+    toaster.success({
+      title: "Migration completed successfully",
+      duration: 4000,
+    });
   };
 
   #lookupAuthenticators = async (
