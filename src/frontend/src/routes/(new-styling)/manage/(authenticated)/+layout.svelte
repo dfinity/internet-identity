@@ -33,7 +33,8 @@
   let sideBarGroupRef = $state<HTMLDivElement>();
   let tabsGroupRef = $state<HTMLDivElement>();
   let identityButtonRef = $state<HTMLElement>();
-  let animationDirection: "up" | "down" | "left" | "right" = $state("up");
+
+  let animationDirection = $state<"up" | "down" | "left" | "right">("up");
 
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
@@ -68,15 +69,45 @@
     const authLastUsedFlow = new AuthLastUsedFlow();
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[Number(identityNumber)];
-    await authLastUsedFlow.authenticate(chosenIdentity).catch((e) => {
-      throw new Error("Could not authenticate");
-    });
+    await authLastUsedFlow.authenticate(chosenIdentity);
     identityInfo.reset();
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     identityInfo.fetch();
     await gotoManage();
     isIdentityPopoverOpen = false;
   };
+
+  const flyInX = $derived(
+    animationDirection === "left"
+      ? -200
+      : animationDirection === "right"
+        ? 200
+        : undefined,
+  );
+
+  const flyInY = $derived(
+    animationDirection === "up"
+      ? -200
+      : animationDirection === "down"
+        ? 200
+        : undefined,
+  );
+
+  const flyOutX = $derived(
+    animationDirection === "left"
+      ? 160
+      : animationDirection === "right"
+        ? -160
+        : undefined,
+  );
+
+  const flyOutY = $derived(
+    animationDirection === "up"
+      ? 160
+      : animationDirection === "down"
+        ? -160
+        : undefined,
+  );
 
   beforeNavigate((nav) => {
     const fromPathName = nav.from?.url.pathname;
@@ -149,35 +180,15 @@
       <div
         bind:this={divRef}
         in:fly={{
-          y:
-            animationDirection === "up"
-              ? -200
-              : animationDirection === "down"
-                ? 200
-                : undefined,
-          x:
-            animationDirection === "left"
-              ? -200
-              : animationDirection === "right"
-                ? 200
-                : undefined,
+          y: flyInY,
+          x: flyInX,
           duration: 160,
           delay: 160,
           easing: expoOut,
         }}
         out:fly={{
-          y:
-            animationDirection === "up"
-              ? 160
-              : animationDirection === "down"
-                ? -160
-                : undefined,
-          x:
-            animationDirection === "left"
-              ? 160
-              : animationDirection === "right"
-                ? -160
-                : undefined,
+          y: flyOutY,
+          x: flyOutX,
           duration: 160,
           easing: expoIn,
         }}

@@ -5,7 +5,14 @@ import {
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
-import { nonNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
+import { canisterConfig } from "$lib/globals";
+import {
+  createAnonymousNonce,
+  createGoogleRequestConfig,
+  decodeJWTWithNameAndEmail,
+  requestJWT,
+} from "$lib/utils/openID";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -24,8 +31,10 @@ class IdentityInfo {
   loaded = $state(false);
   name = $state("");
   authnMethods = $state<AuthnMethodData[]>([]);
-  openIdCredentials = $state<OpenIdCredential[]>([]);
   authnMethodRegistration = $state<AuthnMethodRegistrationInfo>();
+
+  openIdCredentials = $state<OpenIdCredential[]>([]);
+  removableOpenIdCredential = $state<OpenIdCredential | null>(null);
 
   fetch = async () => {
     try {
@@ -51,6 +60,85 @@ class IdentityInfo {
     } catch (e) {
       this.reset();
       throw e;
+    }
+  };
+
+  addGoogle = async () => {
+    const googleClientId = canisterConfig.openid_google[0]?.[0]?.client_id;
+    if (isNullish(googleClientId)) throw new Error("Missing Google client ID");
+    const { nonce, salt } = await createAnonymousNonce(
+      get(authenticatedStore).identity.getPrincipal(),
+    );
+    const jwt = await requestJWT(createGoogleRequestConfig(googleClientId), {
+      mediation: "required",
+      nonce,
+    });
+
+    const { iss, sub, aud, name, email } = decodeJWTWithNameAndEmail(jwt);
+
+    if (this.openIdCredentials.find((c) => c.iss === iss && c.sub === sub)) {
+      throw new Error("Account already linked");
+    }
+
+    const googleAddPromise = get(
+      authenticatedStore,
+    ).actor.openid_credential_add(
+      get(authenticatedStore).identityNumber,
+      jwt,
+      salt,
+    );
+    // Optimistically show as added
+    this.openIdCredentials.push({
+      aud,
+      iss,
+      sub,
+      metadata: [
+        ["name", { String: name }],
+        ["email", { String: email }],
+      ],
+      last_usage_timestamp: [],
+    });
+
+    const googleAddResult = await googleAddPromise;
+
+    if ("Ok" in googleAddResult) {
+      this.fetch();
+    } else {
+      this.openIdCredentials = this.openIdCredentials.filter(
+        (cred) => !(cred.iss === iss && cred.sub === sub),
+      );
+      throw new Error(Object.keys(await googleAddResult.Err)[0]);
+    }
+  };
+
+  removeGoogle = async () => {
+    if (!this.removableOpenIdCredential)
+      throw Error("Must first select a credential to be removed!");
+
+    const googleRemovePromise = get(
+      authenticatedStore,
+    ).actor.openid_credential_remove(get(authenticatedStore).identityNumber, [
+      this.removableOpenIdCredential.iss,
+      this.removableOpenIdCredential.sub,
+    ]);
+    // Optimistically show as removed
+    this.openIdCredentials = this.openIdCredentials.filter(
+      (cred) =>
+        !(
+          cred.iss === this.removableOpenIdCredential!.iss &&
+          cred.sub === this.removableOpenIdCredential!.sub
+        ),
+    );
+    const temporaryCredential = this.removableOpenIdCredential;
+    this.removableOpenIdCredential = null;
+
+    const googleRemoveResult = await googleRemovePromise;
+
+    if ("Ok" in googleRemoveResult) {
+      this.fetch();
+    } else {
+      this.openIdCredentials.push(temporaryCredential);
+      throw new Error(Object.keys(googleRemoveResult.Err)[0]);
     }
   };
 
