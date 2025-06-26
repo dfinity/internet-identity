@@ -43,10 +43,6 @@
       console.error(e);
     }
   };
-
-  $effect(() => {
-    console.log("migrationFlow.view", migrationFlow.view);
-  });
 </script>
 
 {#if migrationFlow.view === "enterNumber"}
