@@ -1,7 +1,7 @@
 <script lang="ts">
   import {
     type OpenIdCredential,
-    type DeviceWithUsage,
+    type AuthnMethodData,
   } from "$lib/generated/internet_identity_types";
   import { formatLastUsage } from "$lib/utils/time";
   import { nonNullish } from "@dfinity/utils";
@@ -10,9 +10,18 @@
 
   let {
     accessMethod,
-  }: { accessMethod: DeviceWithUsage | OpenIdCredential | null } = $props();
+  }: { accessMethod: AuthnMethodData | OpenIdCredential | null } = $props();
 
-  const formatOpenIdCredentialName = (credential: OpenIdCredential) => {
+  const getAuthnMethodAlias = (authnMethod: AuthnMethodData) => {
+    const metadataAlias = authnMethod.metadata.find(
+      ([key, _val]) => key === "alias",
+    )?.[1]!;
+    if (metadataAlias && "String" in metadataAlias) {
+      return metadataAlias.String;
+    }
+  };
+
+  const getOpenIdCredentialName = (credential: OpenIdCredential) => {
     const metadataName = credential.metadata.find(
       ([key, _val]) => key === "name",
     )?.[1]!;
@@ -29,19 +38,21 @@
 </script>
 
 {#if accessMethod}
-  {#if "credential_id" in accessMethod}
+  {#if "authn_method" in accessMethod}
     <!-- Passkey -->
     <h5
       class="text-text-primary text-sm font-semibold nth-[2]:hidden"
       transition:fade={{ delay: 30, duration: 30 }}
     >
       <div class="mr-3 inline-block min-w-32">
-        {accessMethod.alias}
+        {getAuthnMethodAlias(accessMethod)}
       </div>
-      {#if nonNullish(accessMethod.last_usage[0])}
+      {#if nonNullish(accessMethod.last_authentication[0])}
         <div class="text-text-tertiary inline-block font-normal">
           Last used {formatLastUsage(
-            new Date(Number(accessMethod.last_usage[0] / BigInt(1000000))),
+            new Date(
+              Number(accessMethod.last_authentication[0] / BigInt(1000000)),
+            ),
           )}
         </div>
       {/if}
@@ -53,7 +64,7 @@
       transition:fade={{ delay: 30, duration: 30 }}
     >
       <div class="mr-3 inline-block min-w-32">
-        {formatOpenIdCredentialName(accessMethod)}
+        {getOpenIdCredentialName(accessMethod)}
       </div>
 
       {#if nonNullish(accessMethod.last_usage_timestamp[0])}

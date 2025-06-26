@@ -1,7 +1,7 @@
 import { get } from "svelte/store";
 import {
-  DeviceRegistrationInfo,
-  DeviceWithUsage,
+  AuthnMethodData,
+  AuthnMethodRegistrationInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
@@ -10,33 +10,44 @@ import { nonNullish } from "@dfinity/utils";
 const fetchIdentityInfo = async () => {
   let authenticated = get(authenticatedStore);
 
-  return await authenticated.actor.get_anchor_info(
+  let identityInfoResponse = await authenticated.actor.identity_info(
     authenticated.identityNumber,
   );
+
+  console.log(identityInfoResponse);
+
+  if ("Err" in identityInfoResponse)
+    throw Error("Failed to fetch identity info");
+
+  return identityInfoResponse.Ok;
 };
 
 class IdentityInfo {
   loaded = $state(false);
   name = $state("");
-  devices = $state<DeviceWithUsage[]>([]);
+  authnMethods = $state<AuthnMethodData[]>([]);
   openIdCredentials = $state<OpenIdCredential[]>([]);
-  deviceRegistration = $state<DeviceRegistrationInfo>();
+  authnMethodRegistration = $state<AuthnMethodRegistrationInfo>();
 
   fetch = async () => {
     try {
-      let { name, devices, openid_credentials, device_registration } =
-        await fetchIdentityInfo();
+      let {
+        name,
+        openid_credentials,
+        authn_methods,
+        authn_method_registration,
+      } = await fetchIdentityInfo();
       if (nonNullish(name[0])) {
         this.name = name[0];
       }
-      if (nonNullish(devices)) {
-        this.devices = devices;
+      if (nonNullish(authn_methods)) {
+        this.authnMethods = authn_methods;
       }
       if (nonNullish(openid_credentials[0])) {
         this.openIdCredentials = openid_credentials[0];
       }
-      if (nonNullish(device_registration[0])) {
-        this.deviceRegistration = device_registration[0];
+      if (nonNullish(authn_method_registration[0])) {
+        this.authnMethodRegistration = authn_method_registration[0];
       }
       this.loaded = true;
     } catch (e) {
@@ -47,9 +58,9 @@ class IdentityInfo {
 
   reset = () => {
     this.name = "";
-    this.devices = [];
+    this.authnMethods = [];
     this.openIdCredentials = [];
-    this.deviceRegistration = undefined;
+    this.authnMethodRegistration = undefined;
     this.loaded = false;
   };
 

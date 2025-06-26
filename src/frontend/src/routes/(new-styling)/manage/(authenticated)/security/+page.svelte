@@ -3,13 +3,7 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import {
-    AppleIcon,
-    InfoIcon,
-    Plus,
-    TriangleAlertIcon,
-    Unlink,
-  } from "@lucide/svelte";
+  import { InfoIcon, Plus, TriangleAlertIcon, Unlink } from "@lucide/svelte";
   import ListItem from "$lib/components/ui/ListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
@@ -18,20 +12,19 @@
   import {
     createAnonymousNonce,
     createGoogleRequestConfig,
-    decodeJWT,
     decodeJWTWithNameAndEmail,
     requestJWT,
   } from "$lib/utils/openID";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { isNullish } from "@dfinity/utils";
   import { type OpenIdCredential } from "$lib/generated/internet_identity_types";
-  import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
 
   let removableOpenIdCredential = $state<OpenIdCredential | null>(null);
   let displayAddCredentialDialog = $state(false);
 
   const totalAccessMethods = $derived<number>(
-    identityInfo.devices.length + identityInfo.openIdCredentials.length,
+    identityInfo.authnMethods.length + identityInfo.openIdCredentials.length,
   );
 
   const handleAddGoogle = async () => {
@@ -129,13 +122,13 @@
       </div>
     </div>
     <ul>
-      {#each identityInfo.devices as device}
+      {#each identityInfo.authnMethods as authnMethod}
         <ListItem>
           <div class="min-w-8">
-            <AppleIcon />
+            <PasskeyIcon />
           </div>
           <div class="flex-1">
-            <AccessMethod accessMethod={device} />
+            <AccessMethod accessMethod={authnMethod} />
           </div>
           <!-- for layout consistency -->
           <!-- TODO: this is where we would add interactions like removal -->
