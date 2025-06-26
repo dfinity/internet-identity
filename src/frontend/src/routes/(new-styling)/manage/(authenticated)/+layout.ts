@@ -6,7 +6,7 @@ import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store"
 import { isNullish } from "@dfinity/utils";
 import identityInfoState from "$lib/stores/identity-info.state.svelte";
 
-export const load: LayoutLoad = async () => {
+export const load: LayoutLoad = () => {
   // Go back to / if not authenticated with currently selected identity
   const authentication = get(authenticationStore);
   const selectedIdentity = get(lastUsedIdentitiesStore).selected;
@@ -18,5 +18,5 @@ export const load: LayoutLoad = async () => {
     throw redirect(307, "/");
   }
 
-  identityInfoState.fetch();
+  void identityInfoState.fetch();
 };

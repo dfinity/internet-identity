@@ -8,13 +8,11 @@ import { authenticatedStore } from "./authentication.store";
 import { nonNullish } from "@dfinity/utils";
 
 const fetchIdentityInfo = async () => {
-  let authenticated = get(authenticatedStore);
+  const authenticated = get(authenticatedStore);
 
-  let identityInfoResponse = await authenticated.actor.identity_info(
+  const identityInfoResponse = await authenticated.actor.identity_info(
     authenticated.identityNumber,
   );
-
-  console.log(identityInfoResponse);
 
   if ("Err" in identityInfoResponse)
     throw Error("Failed to fetch identity info");
@@ -31,7 +29,7 @@ class IdentityInfo {
 
   fetch = async () => {
     try {
-      let {
+      const {
         name,
         openid_credentials,
         authn_methods,

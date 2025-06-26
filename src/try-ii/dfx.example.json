@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "try-ii-frontend": {
+      "source": ["src/try-ii-frontend/dist"],
+      "type": "assets",
+      "workspace": "try-ii-frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
