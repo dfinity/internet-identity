@@ -37,7 +37,7 @@
             displayAddCredentialDialog = true;
           }}
           class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
-          >Link Google Account <Plus size="1.25rem" /></Button
+          >Add <Plus size="1.25rem" /></Button
         >
       </div>
     </div>
