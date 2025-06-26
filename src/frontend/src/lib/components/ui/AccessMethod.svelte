@@ -22,17 +22,17 @@
   };
 
   const getOpenIdCredentialName = (credential: OpenIdCredential) => {
-    const metadataName = credential.metadata.find(
-      ([key, _val]) => key === "name",
-    )?.[1]!;
-    if (metadataName && "String" in metadataName) {
-      return metadataName.String;
-    }
     const metadataEmail = credential.metadata.find(
       ([key, _val]) => key === "email",
     )?.[1]!;
     if (metadataEmail && "String" in metadataEmail) {
       return metadataEmail.String;
+    }
+    const metadataName = credential.metadata.find(
+      ([key, _val]) => key === "name",
+    )?.[1]!;
+    if (metadataName && "String" in metadataName) {
+      return metadataName.String;
     }
   };
 </script>

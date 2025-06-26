@@ -14,7 +14,7 @@
     { x: 0, y: 0 },
     {
       stiffness: 0.6,
-      damping: 0.7,
+      damping: 0.6,
     },
   );
 

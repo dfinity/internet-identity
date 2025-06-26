@@ -102,7 +102,10 @@
         </div>
         <Tooltip
           label="Your Identity name is currently not editable. It is only ever visible to you."
-          ><InfoIcon class="text-text-primary" /></Tooltip
+          ><InfoIcon
+            size="20"
+            class="text-text-primary stroke-fg-tertiary"
+          /></Tooltip
         >
       </ListItem>
       <ListItem href="manage/security">

@@ -1,9 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
-  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { InfoIcon, Plus, TriangleAlertIcon, Unlink } from "@lucide/svelte";
+  import { Link2Off, Plus } from "@lucide/svelte";
   import ListItem from "$lib/components/ui/ListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
@@ -20,15 +18,17 @@
 </script>
 
 <div class="text-text-primary">
-  <h1 class="mb-4 text-4xl">Security</h1>
-  <h2 class="mb-12 text-lg">
+  <h1 class="mb-4 text-3xl font-semibold">Security</h1>
+  <h2 class="text-text-tertiary mb-12 text-lg">
     Settings and recommendations to keep your identity secure
   </h2>
   <Panel>
-    <div class="flex flex-col justify-between gap-5 p-4 md:flex-row">
+    <div class="flex flex-col justify-between gap-5 p-4 pb-5 md:flex-row">
       <div>
         <h3 class="mb-2 text-lg font-semibold">Access methods</h3>
-        <h4>Manage your passkeys, security keys, and linked accounts.</h4>
+        <h4 class="text-text-tertiary text-sm">
+          Manage your passkeys, security keys, and linked accounts.
+        </h4>
       </div>
 
       <div>
@@ -71,7 +71,7 @@
               onclick={() =>
                 (identityInfo.removableOpenIdCredential = credential)}
             >
-              <Unlink class="stroke-fg-error-secondary" />
+              <Link2Off class="stroke-fg-error-secondary" />
             </Button>
           {/if}
         </ListItem>

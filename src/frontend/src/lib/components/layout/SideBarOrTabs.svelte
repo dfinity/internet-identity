@@ -36,17 +36,17 @@
     </footer>
   </div>
 {:else}
-  <div class="flex min-h-screen flex-col">
-    <header class="absolute top-0 right-0 mt-1">
+  <div class="bg-bg-primary_alt flex min-h-screen flex-col">
+    <header class="bg-bg-primary_alt absolute top-0 right-0 mt-1">
       {@render header?.()}
     </header>
     <Tabs>
       {@render tabElements?.()}
     </Tabs>
-    <div class="flex-1 px-4">
+    <div class="bg-bg-primary_alt flex-1 px-4">
       {@render content?.()}
     </div>
-    <footer>
+    <footer class="bg-bg-primary_alt">
       {@render footer?.()}
     </footer>
   </div>
