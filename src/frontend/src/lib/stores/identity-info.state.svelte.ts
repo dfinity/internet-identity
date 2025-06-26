@@ -102,7 +102,7 @@ class IdentityInfo {
     const googleAddResult = await googleAddPromise;
 
     if ("Ok" in googleAddResult) {
-      this.fetch();
+      void this.fetch();
     } else {
       this.openIdCredentials = this.openIdCredentials.filter(
         (cred) => !(cred.iss === iss && cred.sub === sub),
@@ -135,7 +135,7 @@ class IdentityInfo {
     const googleRemoveResult = await googleRemovePromise;
 
     if ("Ok" in googleRemoveResult) {
-      this.fetch();
+      void this.fetch();
     } else {
       this.openIdCredentials.push(temporaryCredential);
       throw new Error(Object.keys(googleRemoveResult.Err)[0]);
