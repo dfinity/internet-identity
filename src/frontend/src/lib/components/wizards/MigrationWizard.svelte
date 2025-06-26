@@ -18,30 +18,17 @@
   const migrationFlow = new MigrationFlow();
 
   const handleSubmit = async () => {
+    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
     if (nonNullish(identityNumber)) {
-      try {
-        await migrationFlow
-          .authenticateWithIdentityNumber(BigInt(identityNumber))
-          .catch(handleError);
-      } catch (e) {
-        migrationFlow.view = "enterNumber";
-        console.error(e);
-      }
+      await migrationFlow
+        .authenticateWithIdentityNumber(BigInt(identityNumber))
+        .catch(handleError);
     }
   };
 
   const handleCreate = async (name: string) => {
-    try {
-      if (isNullish(migrationFlow.identityNumber)) {
-        throw new Error("Identity number is null");
-      }
-      await migrationFlow.createPasskey(name);
-      lastUsedIdentitiesStore.selectIdentity(migrationFlow.identityNumber);
-      onSuccess();
-    } catch (e) {
-      migrationFlow.view = "enterNumber";
-      console.error(e);
-    }
+    await migrationFlow.createPasskey(name);
+    onSuccess();
   };
 </script>
 

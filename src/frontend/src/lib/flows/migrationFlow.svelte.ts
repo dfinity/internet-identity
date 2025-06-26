@@ -144,6 +144,7 @@ export class MigrationFlow {
         },
       },
     });
+    lastUsedIdentitiesStore.selectIdentity(this.identityNumber);
     toaster.success({
       title: "Migration completed successfully",
       duration: 4000,
