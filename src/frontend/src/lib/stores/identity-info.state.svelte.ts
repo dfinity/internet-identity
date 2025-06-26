@@ -61,8 +61,6 @@ class IdentityInfo {
     this.authnMethodRegistration = undefined;
     this.loaded = false;
   };
-
-  constructor() {}
 }
 
 export default new IdentityInfo();
