@@ -4,7 +4,10 @@ import {
   AuthnMethodRegistrationInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import { authenticatedStore } from "./authentication.store";
+import {
+  authenticatedStore,
+  authenticationStore,
+} from "./authentication.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { canisterConfig } from "$lib/globals";
 import {
@@ -13,6 +16,9 @@ import {
   decodeJWTWithNameAndEmail,
   requestJWT,
 } from "$lib/utils/openID";
+import { lastUsedIdentityStore } from "./last-used-identities.store";
+import { authorizationStore } from "./authorization.store";
+import { goto } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -139,6 +145,17 @@ class IdentityInfo {
     const googleRemoveResult = await googleRemovePromise;
 
     if ("Ok" in googleRemoveResult) {
+      const lastUsed = get(lastUsedIdentityStore);
+
+      // If we unlinked the credential we logged in with, we log out.
+      if (
+        "openid" in lastUsed?.authMethod! &&
+        lastUsed?.authMethod.openid.sub === temporaryCredential.iss
+      ) {
+        await authenticationStore.reset();
+        goto("/");
+        return;
+      }
       void this.fetch();
     } else {
       this.openIdCredentials.push(temporaryCredential);
