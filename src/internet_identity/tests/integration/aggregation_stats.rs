@@ -108,7 +108,12 @@ fn should_report_at_most_100_entries() -> Result<(), CallError> {
     let identity_nr = create_identity(&env, canister_id, ii_origin);
 
     for i in 0..102 {
-        delegation_for_origin(&env, canister_id, identity_nr, &format!("https://some-dapp-{i}"))?;
+        delegation_for_origin(
+            &env,
+            canister_id,
+            identity_nr,
+            &format!("https://some-dapp-{i}"),
+        )?;
     }
 
     let aggregations = api::stats(&env, canister_id)?.event_aggregations;
@@ -130,7 +135,12 @@ fn should_remove_at_most_100_entries_24h() -> Result<(), CallError> {
     let identity_nr = create_identity(&env, canister_id, ii_origin);
 
     for i in 0..102 {
-        delegation_for_origin(&env, canister_id, identity_nr, &format!("https://some-dapp-{i}"))?;
+        delegation_for_origin(
+            &env,
+            canister_id,
+            identity_nr,
+            &format!("https://some-dapp-{i}"),
+        )?;
     }
 
     env.advance_time(Duration::from_secs(60 * 60 * 24));
@@ -167,7 +177,12 @@ fn should_prune_at_most_100_entries_30d() -> Result<(), CallError> {
     let identity_nr = create_identity(&env, canister_id, ii_origin);
 
     for i in 0..102 {
-        delegation_for_origin(&env, canister_id, identity_nr, &format!("https://some-dapp-{i}"))?;
+        delegation_for_origin(
+            &env,
+            canister_id,
+            identity_nr,
+            &format!("https://some-dapp-{i}"),
+        )?;
     }
 
     env.advance_time(Duration::from_secs(60 * 60 * 24 * 30));

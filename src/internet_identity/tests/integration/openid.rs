@@ -400,9 +400,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
             // Successfully deployed.
         }
         Ok(unexpected_result) => {
-            panic!(
-                "archive deployment returned unexpected Ok result: {unexpected_result:?}"
-            );
+            panic!("archive deployment returned unexpected Ok result: {unexpected_result:?}");
         }
         Err(err) => {
             panic!("archive deployment failed: {err:?}");
