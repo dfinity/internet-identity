@@ -90,9 +90,9 @@ pub fn register(
     };
     let anchor_number = anchor.anchor_number();
 
-    anchor.add_device(device.clone()).unwrap_or_else(|err| {
-        trap(&format!("failed to register anchor {anchor_number}: {err}"))
-    });
+    anchor
+        .add_device(device.clone())
+        .unwrap_or_else(|err| trap(&format!("failed to register anchor {anchor_number}: {err}")));
     activity_bookkeeping(
         &mut anchor,
         &AuthorizationKey::DeviceKey(device.pubkey.clone()),
@@ -101,7 +101,9 @@ pub fn register(
     // write anchor to stable memory
     state::storage_borrow_mut(|storage| {
         storage.create(anchor).unwrap_or_else(|err| {
-            trap(&format!("failed to write data of anchor {anchor_number}: {err}"))
+            trap(&format!(
+                "failed to write data of anchor {anchor_number}: {err}"
+            ))
         });
         storage.registration_rates.new_registration()
     });

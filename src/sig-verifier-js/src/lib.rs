@@ -68,8 +68,8 @@ pub fn validate_delegation_and_get_principal(
     // `signed_delegation_chain.publicKey` is a public key for canister signatures of `ii_canister_id`
     let cs_pk = CanisterSigPublicKey::try_from(signed_delegation_chain.publicKey.as_slice())
         .map_err(|e| format!("Invalid publicKey in delegation chain: {e}"))?;
-    let expected_ii_canister_id = Principal::from_text(ii_canister_id)
-        .map_err(|e| format!("Invalid ii_canister_id: {e}"))?;
+    let expected_ii_canister_id =
+        Principal::from_text(ii_canister_id).map_err(|e| format!("Invalid ii_canister_id: {e}"))?;
     if cs_pk.canister_id != expected_ii_canister_id {
         return Err(format!(
             "Delegation's signing canister {} does not match II canister id {}",
