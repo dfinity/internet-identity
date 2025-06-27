@@ -42,7 +42,7 @@ fn can_link_google_account() -> Result<(), CallError> {
         &jwt,
         &salt,
     )?
-    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -77,7 +77,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
         &jwt,
         &salt,
     )?
-    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -91,7 +91,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
         identity_number,
         &claims.key(),
     )?
-    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
 
     // Try to get delegation based on credential, should fail now
     // Create session key
@@ -143,7 +143,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         &jwt,
         &salt,
     )?
-    .map_err(|e| CallError::Reject(format!("{:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
 
     // Create session key
     let pub_session_key = ByteBuf::from("session public key");
@@ -158,7 +158,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         &pub_session_key,
     )? {
         Ok(response) => response,
-        Err(err) => panic!("Failing at openid_prepare_delegation: {:?}", err),
+        Err(err) => panic!("Failing at openid_prepare_delegation: {err:?}"),
     };
 
     assert_eq!(
@@ -178,7 +178,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
     )? {
         Ok(signed_delegation) => signed_delegation,
         Err(err) => {
-            panic!("Failing at openid_get_delegation: {:?}", err)
+            panic!("Failing at openid_get_delegation: {err:?}")
         }
     };
 
@@ -282,7 +282,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         &jwt,
         &salt,
     )?
-    .map_err(|e| CallError::Reject(format!("Error at first add: {:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("Error at first add: {e:?}")))?;
 
     // Create session key
     let pub_session_key = ByteBuf::from("session public key");
@@ -297,7 +297,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         &pub_session_key,
     )? {
         Ok(response) => response,
-        Err(err) => panic!("Failing at openid_prepare_delegation: {:?}", err),
+        Err(err) => panic!("Failing at openid_prepare_delegation: {err:?}"),
     };
 
     assert_eq!(
@@ -312,7 +312,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         identity_number,
         &claims.key(),
     )?
-    .map_err(|e| CallError::Reject(format!("Error at remove: {:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("Error at remove: {e:?}")))?;
 
     env.advance_time(second_time_to_advance);
 
@@ -327,7 +327,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         &second_jwt,
         &second_salt,
     )?
-    .map_err(|e| CallError::Reject(format!("Error at second add: {:?}", e)))?;
+    .map_err(|e| CallError::Reject(format!("Error at second add: {e:?}")))?;
 
     // Get the delegation
     match api::openid_get_delegation(
@@ -401,12 +401,11 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
         }
         Ok(unexpected_result) => {
             panic!(
-                "archive deployment returned unexpected Ok result: {:?}",
-                unexpected_result
+                "archive deployment returned unexpected Ok result: {unexpected_result:?}"
             );
         }
         Err(err) => {
-            panic!("archive deployment failed: {:?}", err);
+            panic!("archive deployment failed: {err:?}");
         }
     }
 
@@ -570,10 +569,10 @@ fn number_of_openid_credentials(
     identity_number: u64,
 ) -> Result<usize, CallError> {
     let openid_credentials = api::get_anchor_info(env, canister_id, sender, identity_number)
-        .map_err(|err| CallError::Reject(format!("{:?}", err)))?
+        .map_err(|err| CallError::Reject(format!("{err:?}")))?
         .openid_credentials
         .ok_or("Could not fetch credentials!")
-        .map_err(|err| CallError::Reject(format!("{:?}", err)))?;
+        .map_err(|err| CallError::Reject(format!("{err:?}")))?;
 
     Ok(openid_credentials.len())
 }

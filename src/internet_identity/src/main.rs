@@ -1114,10 +1114,7 @@ mod test {
             CandidSource::File(Path::new("internet_identity.did")),
         )
         .unwrap_or_else(|e| {
-            panic!(
-                "the canister code interface is not equal to the did file: {:?}",
-                e
-            )
+            panic!("the canister code interface is not equal to the did file: {e:?}")
         });
     }
 }
