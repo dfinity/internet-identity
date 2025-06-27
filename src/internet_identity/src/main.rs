@@ -292,7 +292,7 @@ async fn prepare_delegation(
              expiration,
          }| (user_key, expiration),
     )
-    .unwrap_or_else(|err| trap(&format!("{:?}", err)))
+    .unwrap_or_else(|err| trap(&format!("{err:?}")))
 }
 
 #[query]
