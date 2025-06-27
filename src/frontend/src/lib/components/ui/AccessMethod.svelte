@@ -68,7 +68,8 @@
         "text-text-primary foldable-subgrid text-sm font-semibold nth-[2]:hidden",
         classes,
       ]}
-      transition:fade={{ delay: 30, duration: 30 }}
+      in:fade={{ delay: 30, duration: 30 }}
+      out:fade={{ duration: 30 }}
     >
       <div class="flex min-w-32 items-center pr-3">
         {getAuthnMethodAlias(accessMethod)}
@@ -90,7 +91,8 @@
         "text-text-primary foldable-subgrid text-sm font-semibold nth-[2]:hidden",
         classes,
       ]}
-      transition:fade={{ delay: 30, duration: 30 }}
+      in:fade={{ delay: 30, duration: 30 }}
+      out:fade={{ duration: 30 }}
     >
       {#if openIdHasName && openIdHasEmail}
         <div class="flex min-w-32 flex-col justify-center pr-3">
@@ -123,7 +125,16 @@
     </div>
   {/if}
 {:else}
-  <PlaceHolder class="mr-8 h-4 !rounded-sm" />
+  <!-- <div
+    class="flex items-center"
+    in:fade={{ duration: 30 }}
+    out:fade={{ duration: 30, delay: 30 }}
+  > -->
+  <PlaceHolder
+    class="mt-1 mr-8 hidden h-4 !rounded-sm nth-last-[2]:inline-block"
+    hiddenIndex={7}
+  />
+  <!-- </div> -->
 {/if}
 
 <style>

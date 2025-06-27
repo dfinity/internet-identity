@@ -57,7 +57,7 @@
               {identityInfo.name}
             </h5>
           {:else}
-            <PlaceHolder class="mr-8 h-4 !rounded-sm" />
+            <PlaceHolder class="mr-8 h-4 w-full !rounded-sm" />
           {/if}
         </div>
         <div class="flex items-center justify-center">
