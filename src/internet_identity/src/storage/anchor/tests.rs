@@ -583,7 +583,7 @@ fn should_enforce_max_number_of_openid_credentials() {
     }
 
     let result = anchor.add_openid_credential(openid_credential(101));
-    println!("{:?}", result);
+    println!("{result:?}");
 
     assert!(matches!(
         result,

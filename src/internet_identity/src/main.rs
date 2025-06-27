@@ -292,7 +292,7 @@ async fn prepare_delegation(
              expiration,
          }| (user_key, expiration),
     )
-    .unwrap_or_else(|err| trap(&format!("{:?}", err)))
+    .unwrap_or_else(|err| trap(&format!("{err:?}")))
 }
 
 #[query]
@@ -1114,10 +1114,7 @@ mod test {
             CandidSource::File(Path::new("internet_identity.did")),
         )
         .unwrap_or_else(|e| {
-            panic!(
-                "the canister code interface is not equal to the did file: {:?}",
-                e
-            )
+            panic!("the canister code interface is not equal to the did file: {e:?}")
         });
     }
 }

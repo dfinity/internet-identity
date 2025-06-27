@@ -33,9 +33,7 @@ pub fn assert_eq_ignoring_last_authentication(
         .for_each(|(a, b)| {
             assert!(
                 eq_ignoring_last_authentication(a, b),
-                "authn methods are not equal: {:?} != {:?}",
-                a,
-                b
+                "authn methods are not equal: {a:?} != {b:?}"
             )
         });
 }

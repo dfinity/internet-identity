@@ -233,10 +233,9 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
         expect_user_error_with_message(
             result,
             CanisterCalledTrap,
-            Regex::new(&format!(
-                "Metadata key '{}' is reserved and cannot be used\\.",
-                reserved_key
-            ))
+            Regex::new(
+                format!(r"Metadata key '{reserved_key}' is reserved and cannot be used\.").as_str(),
+            )
             .unwrap(),
         );
     }

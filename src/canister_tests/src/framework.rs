@@ -236,13 +236,10 @@ pub fn install_ii_with_archive(
             // Successfully deployed.
         }
         Ok(unexpected_result) => {
-            panic!(
-                "archive deployment returned unexpected Ok result: {:?}",
-                unexpected_result
-            );
+            panic!("archive deployment returned unexpected Ok result: {unexpected_result:?}");
         }
         Err(err) => {
-            panic!("archive deployment failed: {:?}", err);
+            panic!("archive deployment failed: {err:?}");
         }
     }
     ii_canister_id
@@ -554,7 +551,7 @@ pub fn assert_labelled_metric(
     for label_value in label_values {
         assert_metric(
             metrics,
-            &(metric_name.to_string() + &format!("{{{}=\"{}\"}}", label_name, label_value)),
+            &format!("{metric_name}{{{label_name}=\"{label_value}\"}}"),
             expected_value,
         );
     }

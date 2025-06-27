@@ -54,7 +54,7 @@ impl Display for IdentityUpdateError {
 
 impl From<IdentityUpdateError> for String {
     fn from(err: IdentityUpdateError) -> Self {
-        format!("{}", err)
+        format!("{err}")
     }
 }
 

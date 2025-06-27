@@ -99,7 +99,7 @@ impl SupportedCredentialType {
                 ("institute".to_string(), institute.to_string())
             }
             SupportedCredentialType::VerifiedAdult(min_age) => {
-                ("minAge".to_string(), format!("{}", min_age).to_string())
+                ("minAge".to_string(), format!("{min_age}").to_string())
             }
         }
     }
@@ -129,7 +129,7 @@ pub fn get_vc_consent_message(
 ) -> Result<Icrc21ConsentInfo, Icrc21Error> {
     render_consent_message(credential_spec, language).map(|message| Icrc21ConsentInfo {
         consent_message: message,
-        language: format!("{}", language),
+        language: format!("{language}"),
     })
 }
 

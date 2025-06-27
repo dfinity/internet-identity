@@ -1519,8 +1519,8 @@ impl fmt::Display for StorageError {
                 range,
             } => write!(
                 f,
-                "Identity Anchor {} is out of range [{}, {})",
-                anchor_number, range.0, range.1
+                "Identity Anchor {anchor_number} is out of range [{}, {})",
+                range.0, range.1
             ),
             Self::BadAnchorNumber(n) => write!(f, "bad Identity Anchor {n}"),
             Self::DeserializationError(err) => {
@@ -1540,12 +1540,11 @@ impl fmt::Display for StorageError {
             Self::AnchorNotFound { anchor_number } => {
                 write!(
                     f,
-                    "StableAnchor not found for anchor number {}",
-                    anchor_number
+                    "StableAnchor not found for anchor number {anchor_number}",
                 )
             }
             Self::ApplicationNotFound { origin } => {
-                write!(f, "Application not found for origin {}", origin)
+                write!(f, "Application not found for origin {origin}")
             }
             Self::MissingAccountName => write!(f, "Account name is missing"),
             Self::MissingAccount {
@@ -1554,17 +1553,15 @@ impl fmt::Display for StorageError {
             } => {
                 write!(
                     f,
-                    "Account not found for anchor number {} and name {}",
-                    anchor_number, name
+                    "Account not found for anchor number {anchor_number} and name {name}",
                 )
             }
             Self::AccountNotFound { account_number } => {
-                write!(f, "Account not found for account number {}", account_number)
+                write!(f, "Account not found for account number {account_number}")
             }
             Self::OriginNotFoundForApplicationNumber { application_number } => write!(
                 f,
-                "Origin not found for application number {}",
-                application_number
+                "Origin not found for application number {application_number}",
             ),
             Self::ErrorUpdatingAccountCounter => write!(f, "Error updating account counter"),
         }

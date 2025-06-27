@@ -49,7 +49,7 @@ pub fn validate_delegation_and_get_principal(
     // Signed delegation chain contains exactly one delegation.
     let signed_delegation_chain: DelegationChain =
         serde_json::from_str(signed_delegation_chain_json)
-            .map_err(|e| format!("Error parsing delegation_chain: {}", e).to_string())?;
+            .map_err(|e| format!("Error parsing delegation_chain: {e}"))?;
     if signed_delegation_chain.delegations.len() != 1 {
         return Err("Expected exactly one signed delegation".to_string());
     }
@@ -67,9 +67,9 @@ pub fn validate_delegation_and_get_principal(
 
     // `signed_delegation_chain.publicKey` is a public key for canister signatures of `ii_canister_id`
     let cs_pk = CanisterSigPublicKey::try_from(signed_delegation_chain.publicKey.as_slice())
-        .map_err(|e| format!("Invalid publicKey in delegation chain: {}", e))?;
-    let expected_ii_canister_id = Principal::from_text(ii_canister_id)
-        .map_err(|e| format!("Invalid ii_canister_id: {}", e))?;
+        .map_err(|e| format!("Invalid publicKey in delegation chain: {e}"))?;
+    let expected_ii_canister_id =
+        Principal::from_text(ii_canister_id).map_err(|e| format!("Invalid ii_canister_id: {e}"))?;
     if cs_pk.canister_id != expected_ii_canister_id {
         return Err(format!(
             "Delegation's signing canister {} does not match II canister id {}",
@@ -107,7 +107,7 @@ pub fn validate_delegation_and_get_principal(
         &cs_pk.to_der(),
         ic_root_public_key_raw,
     )
-    .map_err(|e| format!("Invalid canister signature: {}", e))?;
+    .map_err(|e| format!("Invalid canister signature: {e}"))?;
 
     Ok(Principal::self_authenticating(signed_delegation_chain.publicKey.as_slice()).to_text())
 }

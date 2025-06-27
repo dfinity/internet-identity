@@ -732,10 +732,7 @@ mod test {
             CandidSource::File(Path::new("archive.did")),
         )
         .unwrap_or_else(|e| {
-            panic!(
-                "the canister code interface is not equal to the did file: {:?}",
-                e
-            )
+            panic!("the canister code interface is not equal to the did file: {e:?}")
         });
     }
 }

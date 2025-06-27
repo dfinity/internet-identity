@@ -803,7 +803,7 @@ impl fmt::Display for AnchorError {
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
             AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
             AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
-            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{}' is reserved and cannot be used.", key),
+            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{key}' is reserved and cannot be used."),
             AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
             AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
