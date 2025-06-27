@@ -183,6 +183,19 @@ export const decodeJWT = (
   return { iss, sub, aud };
 };
 
+/**
+ * Decode a JWT token so it can be compared with others and the name can be displayed
+ * @param token to decode
+ * @returns common claims
+ */
+export const decodeJWTWithNameAndEmail = (
+  token: string,
+): { iss: string; sub: string; aud: string; name: string; email: string } => {
+  const [_header, body, _signature] = token.split(".");
+  const { iss, sub, aud, name, email } = JSON.parse(atob(body));
+  return { iss, sub, aud, name, email };
+};
+
 export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
   const value = metadata.find((entry) => entry[0] === key)?.[1];
   return value && "String" in value ? value.String : undefined;
