@@ -141,6 +141,6 @@
   .foldable-subgrid {
     display: grid;
     /* We may need to update the minimum width for really long emails, but it seems fine for now.  */
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 </style>

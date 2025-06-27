@@ -45,7 +45,9 @@
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t px-4 py-4"
       >
-        <h5 class="text-text-tertiary flex min-w-30 items-center pr-4 text-sm">
+        <h5
+          class="text-text-tertiary flex min-w-30 items-center pr-2 text-sm md:pr-4"
+        >
           Identity Name
         </h5>
         <div class="flex items-center">
@@ -76,7 +78,7 @@
         aria-label="Go to Security"
       >
         <h5
-          class="text-text-tertiary flex min-w-30 items-center pr-4 text-sm nth-[2]:hidden"
+          class="text-text-tertiary flex min-w-30 items-center pr-2 text-sm nth-[2]:hidden md:pr-4"
         >
           Access Methods
         </h5>
