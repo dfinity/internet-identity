@@ -514,7 +514,7 @@ fn should_fail_prepare_credential_for_unauthorized_principal() {
         },
     )
     .expect("API call failed");
-    assert_matches!(response, Err(e) if format!("{:?}", e).contains("unauthorized principal"));
+    assert_matches!(response, Err(e) if format!("{e:?}").contains("unauthorized principal"));
 }
 
 #[test]
