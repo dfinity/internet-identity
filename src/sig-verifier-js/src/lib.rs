@@ -49,7 +49,7 @@ pub fn validate_delegation_and_get_principal(
     // Signed delegation chain contains exactly one delegation.
     let signed_delegation_chain: DelegationChain =
         serde_json::from_str(signed_delegation_chain_json)
-            .map_err(|e| format!("Error parsing delegation_chain: {e}").to_string())?;
+            .map_err(|e| format!("Error parsing delegation_chain: {e}"))?;
     if signed_delegation_chain.delegations.len() != 1 {
         return Err("Expected exactly one signed delegation".to_string());
     }
