@@ -89,4 +89,5 @@ export default {
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
+  ENABLE_MIGRATE_FLOW,
 } as Record<string, FeatureFlagStore>;
