@@ -21,7 +21,7 @@
     <h1 class="text-text-primary text-3xl font-semibold">
       Welcome,
       {#if !identityInfo.name}
-        <PlaceHolder class="mt-0.5 inline-block h-6 w-64" />
+        <PlaceHolder class="mt-0.5 inline-block h-6 w-40 md:w-64" />
       {:else}
         <span transition:fade={{ delay: 30 }}>
           {identityInfo.name}!
