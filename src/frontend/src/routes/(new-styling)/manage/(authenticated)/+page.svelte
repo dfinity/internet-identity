@@ -2,7 +2,6 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { ChevronRight, InfoIcon } from "@lucide/svelte";
-  import ListItem from "$lib/components/ui/ListItem.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
   import { fade } from "svelte/transition";
@@ -42,10 +41,14 @@
         passkeys.
       </h4>
     </div>
-    <ul>
-      <ListItem>
-        <h5 class="text-text-tertiary min-w-30 text-sm">Identity Name</h5>
-        <div class="flex-1">
+    <div class="grid grid-cols-[1fr_2fr_min-content] grid-rows-2">
+      <div
+        class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t px-4 py-4"
+      >
+        <h5 class="text-text-tertiary flex min-w-30 items-center pr-4 text-sm">
+          Identity Name
+        </h5>
+        <div class="flex items-center">
           {#if identityInfo.name}
             <h5
               class="text-text-primary text-sm font-semibold nth-[2]:hidden"
@@ -57,23 +60,33 @@
             <PlaceHolder class="mr-8 h-4 !rounded-sm" />
           {/if}
         </div>
-        <Tooltip
-          label="Your Identity name is currently not editable. It is only ever visible to you."
-          ><InfoIcon
-            size="20"
-            class="text-text-primary stroke-fg-tertiary"
-          /></Tooltip
+        <div class="flex items-center justify-center">
+          <Tooltip
+            label="Your Identity name is currently not editable. It is only ever visible to you."
+            ><InfoIcon
+              size="20"
+              class="text-text-primary stroke-fg-tertiary"
+            /></Tooltip
+          >
+        </div>
+      </div>
+      <a
+        class="border-border-tertiary not-disabled:hover:bg-bg-primary_hover col-span-3 grid grid-cols-subgrid rounded-b-2xl border-t px-4 py-4"
+        href="manage/security"
+        aria-label="Go to Security"
+      >
+        <h5
+          class="text-text-tertiary flex min-w-30 items-center pr-4 text-sm nth-[2]:hidden"
         >
-      </ListItem>
-      <ListItem href="manage/security">
-        <h5 class="text-text-tertiary min-w-30 text-sm nth-[2]:hidden">
           Access Methods
         </h5>
-        <div class="flex-1">
-          <AccessMethod accessMethod={lastUsedAccessMethod} />
+
+        <AccessMethod accessMethod={lastUsedAccessMethod} />
+
+        <div class="flex items-center justify-center">
+          <ChevronRight class="text-text-primary" />
         </div>
-        <ChevronRight class="text-text-primary" />
-      </ListItem>
-    </ul>
+      </a>
+    </div>
   </Panel>
 </div>

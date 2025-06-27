@@ -37,42 +37,47 @@
         >
       </div>
     </div>
-    <ul>
+    <div
+      class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
+    >
       {#each identityInfo.authnMethods as authnMethod}
-        <ListItem>
-          <div class="min-w-8">
+        <div
+          class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+        >
+          <div class="flex min-w-8 items-center justify-center px-4 pr-4">
             <PasskeyIcon />
           </div>
-          <div class="flex-1">
-            <AccessMethod accessMethod={authnMethod} />
-          </div>
+          <AccessMethod accessMethod={authnMethod} />
           <!-- for layout consistency -->
           <!-- TODO: this is where we would add interactions like removal -->
-          <div class="w-[52px]"></div>
-        </ListItem>
+          <div class="min-h-10 min-w-[52px]"></div>
+        </div>
       {/each}
       {#each identityInfo.openIdCredentials as credential}
-        <ListItem class="!py-0">
-          <div class="min-w-8 py-4">
+        <div
+          class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+        >
+          <div class="flex min-w-8 items-center justify-center px-4 pr-4">
             <GoogleIcon />
           </div>
-          <div class="flex-1 py-4">
-            <AccessMethod accessMethod={credential} />
-          </div>
 
-          {#if identityInfo.totalAccessMethods > 1}
-            <Button
-              variant="tertiary"
-              iconOnly={true}
-              onclick={() =>
-                (identityInfo.removableOpenIdCredential = credential)}
-            >
-              <Link2Off class="stroke-fg-error-secondary" />
-            </Button>
-          {/if}
-        </ListItem>
+          <AccessMethod accessMethod={credential} />
+
+          <div class="flex items-center justify-center pr-4">
+            {#if identityInfo.totalAccessMethods > 1}
+              <Button
+                variant="tertiary"
+                iconOnly={true}
+                onclick={() =>
+                  (identityInfo.removableOpenIdCredential = credential)}
+              >
+                <Link2Off class="stroke-fg-error-secondary" />
+              </Button>
+            {/if}
+          </div>
+        </div>
       {/each}
-    </ul>
+    </div>
   </Panel>
 </div>
 
