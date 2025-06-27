@@ -91,10 +91,7 @@ pub fn register(
     let anchor_number = anchor.anchor_number();
 
     anchor.add_device(device.clone()).unwrap_or_else(|err| {
-        trap(&format!(
-            "failed to register anchor {}: {err}",
-            anchor_number
-        ))
+        trap(&format!("failed to register anchor {anchor_number}: {err}"))
     });
     activity_bookkeeping(
         &mut anchor,
@@ -104,10 +101,7 @@ pub fn register(
     // write anchor to stable memory
     state::storage_borrow_mut(|storage| {
         storage.create(anchor).unwrap_or_else(|err| {
-            trap(&format!(
-                "failed to write data of anchor {}: {err}",
-                anchor_number
-            ))
+            trap(&format!("failed to write data of anchor {anchor_number}: {err}"))
         });
         storage.registration_rates.new_registration()
     });
@@ -136,19 +130,10 @@ fn verify_caller_is_device_or_temp_key(temp_key: &Option<Principal>, device_prin
     if &caller != device_principal {
         if let Some(temp_key) = temp_key {
             if &caller != temp_key {
-                trap(&format!(
-                    "caller {} could not be authenticated against device pubkey {} or temporary key {}",
-                    caller,
-                    device_principal,
-                    temp_key
-                ));
+                trap(&format!("caller {caller} could not be authenticated against device pubkey {device_principal} or temporary key {temp_key}"));
             }
         } else {
-            trap(&format!(
-                "caller {} could not be authenticated against device pubkey {} and no temporary key was sent",
-                caller,
-                device_principal,
-            ));
+            trap(&format!("caller {caller} could not be authenticated against device pubkey {device_principal} and no temporary key was sent"));
         }
     }
 }

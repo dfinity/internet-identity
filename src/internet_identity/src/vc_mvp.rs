@@ -119,7 +119,7 @@ pub fn get_id_alias(
         let rp_sig = sigs
             .get_signature_as_cbor(&rp_sig_inputs, Some(cert_assets.root_hash()))
             .map_err(|err| {
-                GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {}", err))
+                GetIdAliasError::NoSuchCredentials(format!("rp_sig not found: {err}"))
             })?;
         let rp_jws = vc_signing_input_to_jws(rp_id_alias_jwt.as_bytes(), &rp_sig)
             .expect("failed constructing rp JWS");
@@ -132,7 +132,7 @@ pub fn get_id_alias(
         let issuer_sig = sigs
             .get_signature_as_cbor(&issuer_sig_inputs, Some(cert_assets.root_hash()))
             .map_err(|err| {
-                GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {}", err))
+                GetIdAliasError::NoSuchCredentials(format!("issuer_sig not found: {err}"))
             })?;
         let issuer_jws = vc_signing_input_to_jws(issuer_id_alias_jwt.as_bytes(), &issuer_sig)
             .expect("failed constructing issuer JWS");
@@ -192,5 +192,5 @@ fn prepare_credential_id_new(alias_tuple: &AliasTuple) -> String {
     hasher.update(alias_tuple.id_alias.to_text());
     let hash: Hash = hasher.finalize().into();
     let alias_hash = format!("alias_hash:{}", hex::encode(hash));
-    format!("{}{},{}", II_CREDENTIAL_URL_PREFIX, timestamp, alias_hash)
+    format!("{II_CREDENTIAL_URL_PREFIX}{timestamp},{alias_hash}")
 }

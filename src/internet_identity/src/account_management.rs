@@ -114,9 +114,7 @@ pub fn update_account_for_origin(
                             name: new_name.clone(),
                             origin: origin.clone(),
                         })
-                        .map_err(|err| {
-                            UpdateAccountError::InternalCanisterError(format!("{}", err))
-                        })?;
+                        .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
 
                     Ok((updated_account, old_account.name))
                 })?;
