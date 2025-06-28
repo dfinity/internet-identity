@@ -33,7 +33,7 @@
   bind:element
   {...props}
   class={[
-    "box-border flex cursor-pointer items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100",
+    "box-border flex items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100 not-disabled:cursor-pointer",
     {
       primary: [
         danger

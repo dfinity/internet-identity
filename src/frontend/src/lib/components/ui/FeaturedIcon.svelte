@@ -5,21 +5,24 @@
   type Variant = "info" | "success" | "warning" | "error";
 
   type Props = HTMLAttributes<HTMLDivElement> & {
+    element?: HTMLElement;
     size?: Size;
     variant?: Variant;
   };
 
-  const {
+  let {
     children,
     class: className,
     size = "md",
     variant = "info",
+    element = $bindable(),
     ...props
   }: Props = $props();
 </script>
 
 <div
   {...props}
+  bind:this={element}
   class={[
     "flex shrink-0 items-center justify-center",
     {
