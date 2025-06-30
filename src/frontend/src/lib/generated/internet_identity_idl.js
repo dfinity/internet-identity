@@ -334,6 +334,7 @@ export const idlFactory = ({ IDL }) => {
   const IdentityInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethodData),
     'metadata' : MetadataMapV2,
+    'name' : IDL.Opt(IDL.Text),
     'authn_method_registration' : IDL.Opt(AuthnMethodRegistrationInfo),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
   });

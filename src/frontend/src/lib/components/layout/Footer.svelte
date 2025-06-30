@@ -4,10 +4,19 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { goto } from "$app/navigation";
   import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
+  import { page } from "$app/state";
 
   type Props = HTMLAttributes<HTMLElement>;
 
   const { children, class: className, ...props }: Props = $props();
+
+  // TODO: Remove once we have the proper UX for triggering the migration
+  const triggerMigration = () => {
+    const migrationPath = page.route.id?.includes("authorize")
+      ? "/authorize/migrate"
+      : "/migrate";
+    goto(migrationPath);
+  };
 </script>
 
 <footer
@@ -18,8 +27,9 @@
   ]}
 >
   <div class="text-text-tertiary text-xs font-medium">© Internet Identity</div>
+  <!-- TODO: Remove once we have the proper UX for triggering the migration -->
   {#if $ENABLE_MIGRATE_FLOW}
-    <Button variant="primary" onclick={() => goto("/migrate")}>Migrate</Button>
+    <Button variant="primary" onclick={triggerMigration}>Migrate</Button>
   {/if}
   <nav class="text-text-primary flex gap-4 text-xs font-semibold">
     <a
