@@ -1,8 +1,4 @@
-import type {
-  MetadataMapV2,
-  OpenIdCredentialAddError,
-  OpenIdCredentialRemoveError,
-} from "$lib/generated/internet_identity_types";
+import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
 import {
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
