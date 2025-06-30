@@ -4,8 +4,22 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { TriangleAlertIcon } from "@lucide/svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import { throwCanisterError } from "$lib/utils/utils";
+  import { handleError } from "../utils/error";
 
   const { onClose } = $props();
+
+  const handleRemoveCredential = async () => {
+    try {
+      let res = await identityInfo.removeGoogle();
+
+      if ("Err" in res) {
+        throwCanisterError(res);
+      }
+    } catch (error) {
+      handleError(error);
+    }
+  };
 </script>
 
 <Dialog {onClose}>
@@ -19,11 +33,7 @@
     Account.
   </p>
   <div class="flex w-full flex-col gap-3">
-    <Button
-      onclick={() => identityInfo.removeGoogle()}
-      variant="primary"
-      danger
-    >
+    <Button onclick={handleRemoveCredential} variant="primary" danger>
       Unlink Google Account
     </Button>
     <Button variant="tertiary" onclick={onClose}>Keep linked</Button>

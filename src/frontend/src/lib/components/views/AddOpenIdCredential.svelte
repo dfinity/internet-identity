@@ -3,8 +3,22 @@
   import Button from "$lib/components/ui/Button.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import { handleError } from "../utils/error";
+  import { throwCanisterError } from "$lib/utils/utils";
 
   const { onClose } = $props();
+
+  const handleAddCredential = async () => {
+    try {
+      let res = await identityInfo.addGoogle();
+
+      if ("Err" in res) {
+        throwCanisterError(res);
+      }
+    } catch (error) {
+      handleError(error);
+    }
+  };
 </script>
 
 <Dialog {onClose}>
@@ -18,7 +32,7 @@
       variant="primary"
       onclick={() => {
         onClose();
-        identityInfo.addGoogle();
+        handleAddCredential();
       }}
     >
       <GoogleIcon /> Link Google Account

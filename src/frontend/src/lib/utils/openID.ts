@@ -1,4 +1,8 @@
-import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
+import type {
+  MetadataMapV2,
+  OpenIdCredentialAddError,
+  OpenIdCredentialRemoveError,
+} from "$lib/generated/internet_identity_types";
 import {
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
@@ -81,6 +85,45 @@ export const isNotSupportedError = (error: unknown) =>
  */
 export const isOpenIdCancelError = (error: unknown) => {
   return error instanceof Error && error.name === "NetworkError";
+};
+
+/**
+ * Format an OpenID credential add error
+ * @param err to format
+ * @returns a formatted error message
+ */
+const formatOpenIdAddError = (err: OpenIdCredentialAddError) => {
+  if ("OpenIdCredentialAlreadyRegistered" in err) {
+    return "This credential is already linked to another identity";
+  }
+  if ("Unauthorized" in err) {
+    return "You are not authorized to add this credential";
+  }
+  if ("InternalCanisterError" in err) {
+    return "An internal error occurred: " + err.InternalCanisterError;
+  }
+  if ("JwtVerificationFailed" in err) {
+    return "The JWT is invalid";
+  }
+  return "An unknown error occurred";
+};
+
+/**
+ * Format an OpenID credential remove error
+ * @param err to format
+ * @returns a formatted error message
+ */
+const formatOpenIdRemoveError = (err: OpenIdCredentialRemoveError) => {
+  if ("OpenIdCredentialNotFound" in err) {
+    return "This credential is not linked to this identity";
+  }
+  if ("Unauthorized" in err) {
+    return "You are not authorized to remove this credential";
+  }
+  if ("InternalCanisterError" in err) {
+    return "An internal error occurred: " + err.InternalCanisterError;
+  }
+  return "An unknown error occurred";
 };
 
 /**
