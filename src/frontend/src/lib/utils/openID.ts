@@ -88,45 +88,6 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Format an OpenID credential add error
- * @param err to format
- * @returns a formatted error message
- */
-const formatOpenIdAddError = (err: OpenIdCredentialAddError) => {
-  if ("OpenIdCredentialAlreadyRegistered" in err) {
-    return "This credential is already linked to another identity";
-  }
-  if ("Unauthorized" in err) {
-    return "You are not authorized to add this credential";
-  }
-  if ("InternalCanisterError" in err) {
-    return "An internal error occurred: " + err.InternalCanisterError;
-  }
-  if ("JwtVerificationFailed" in err) {
-    return "The JWT is invalid";
-  }
-  return "An unknown error occurred";
-};
-
-/**
- * Format an OpenID credential remove error
- * @param err to format
- * @returns a formatted error message
- */
-const formatOpenIdRemoveError = (err: OpenIdCredentialRemoveError) => {
-  if ("OpenIdCredentialNotFound" in err) {
-    return "This credential is not linked to this identity";
-  }
-  if ("Unauthorized" in err) {
-    return "You are not authorized to remove this credential";
-  }
-  if ("InternalCanisterError" in err) {
-    return "An internal error occurred: " + err.InternalCanisterError;
-  }
-  return "An unknown error occurred";
-};
-
-/**
  * Request JWT through redirect flow in a popup
  * @param config of the OpenID provider
  * @param options for the JWT request
