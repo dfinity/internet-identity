@@ -216,11 +216,10 @@ impl Display for AuthnMethodConversionError {
             AuthnMethodConversionError::InvalidMetadataType {
                 key,
                 expected_type,
-                actual_value: actual_type,
+                actual_value,
             } => write!(
                 f,
-                "Invalid metadata type for key '{}': expected {}, got value {}",
-                key, expected_type, actual_type
+                "Invalid metadata type for key '{key}': expected {expected_type}, got value {actual_value}",
             ),
         }
     }
@@ -252,7 +251,7 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
                         Err(AuthnMethodConversionError::InvalidMetadataType {
                             key: key.to_string(),
                             expected_type: "string".to_string(),
-                            actual_value: format!("{:?}", value),
+                            actual_value: format!("{value:?}"),
                         })
                     }
                 })
