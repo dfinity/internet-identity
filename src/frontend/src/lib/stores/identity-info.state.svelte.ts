@@ -114,7 +114,7 @@ class IdentityInfo {
       );
     }
 
-    throwCanisterError(googleAddResult);
+    await throwCanisterError(googleAddResult);
   };
 
   removeGoogle = async () => {
@@ -146,7 +146,7 @@ class IdentityInfo {
       this.openIdCredentials.push(temporaryCredential);
     }
 
-    throwCanisterError(googleRemoveResult);
+    await throwCanisterError(googleRemoveResult);
   };
 
   reset = () => {
