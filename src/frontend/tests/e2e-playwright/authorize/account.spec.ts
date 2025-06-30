@@ -63,3 +63,26 @@ test("Create and authorize with additional account, then switch back to primary 
   expect(principal).toBe(expectedPrincipal);
   expect(principal).not.toBe(otherPrincipal);
 });
+
+test("Can't create more than 5 accounts", async ({ page }) => {
+  const auth = dummyAuth();
+  await createIdentity(page, "John Doe", auth);
+  await authorize(page, async (authPage) => {
+    auth(authPage);
+    await authPage
+      .getByRole("button", { name: "Create or use another account" })
+      .click();
+    for (let i = 1; i <= 4; i++) {
+      await authPage
+        .getByRole("button", { name: "Create additional account" })
+        .click();
+      await authPage.getByLabel("Account name").fill(`Additional account ${i}`);
+      await authPage.getByRole("button", { name: "Create account" }).click();
+    }
+    await expect(
+      authPage.getByRole("button", { name: "Create additional account" }),
+    ).toBeDisabled();
+    // Authentication needs to complete in `authorize()` to pass the test
+    await authPage.getByRole("button", { name: "Primary account" }).click();
+  });
+});
