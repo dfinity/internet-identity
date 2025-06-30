@@ -29,8 +29,9 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     credentialData: CredentialData[],
     rpId: string | undefined,
     iframe: boolean | undefined,
+    userVerification: "discouraged" | "required" | "preferred" = "discouraged",
   ): MultiWebAuthnIdentity {
-    return new this(credentialData, rpId, iframe);
+    return new this(credentialData, rpId, iframe, userVerification);
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
@@ -40,6 +41,10 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     readonly credentialData: CredentialData[],
     readonly rpId: string | undefined,
     readonly iframe: boolean | undefined,
+    readonly userVerification:
+      | "discouraged"
+      | "required"
+      | "preferred" = "discouraged",
   ) {
     super();
     this._actualIdentity = undefined;
@@ -78,7 +83,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
           id: cd.credentialId,
         })),
         challenge: blob,
-        userVerification: "discouraged",
+        userVerification: this.userVerification,
         rpId: this.rpId,
       },
     };

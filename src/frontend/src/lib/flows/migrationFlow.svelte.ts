@@ -74,6 +74,8 @@ export class MigrationFlow {
       webAuthnAuthenticators,
       currentFlow?.rpId,
       currentFlow?.useIframe ?? false,
+      // Set user verification to preferred to ensure the user is verified during migration.
+      "preferred",
     );
     try {
       const session = get(sessionStore);
