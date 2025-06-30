@@ -82,6 +82,7 @@ test("Can't create more than 5 accounts", async ({ page }) => {
     await expect(
       authPage.getByRole("button", { name: "Create additional account" }),
     ).toBeDisabled();
+    // Authentication needs to complete in `authorize()` to pass the test
     await authPage.getByRole("button", { name: "Primary account" }).click();
   });
 });
