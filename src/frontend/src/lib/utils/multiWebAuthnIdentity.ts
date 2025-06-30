@@ -36,7 +36,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
 
   /* Set after the first `sign`, see `sign()` for more info. */
   protected _actualIdentity?: WebAuthnIdentity;
-  private _userVerification: "discouraged" | "required" | "preferred";
 
   protected constructor(
     readonly credentialData: CredentialData[],
@@ -49,7 +48,6 @@ export class MultiWebAuthnIdentity extends SignIdentity {
   ) {
     super();
     this._actualIdentity = undefined;
-    this._userVerification = userVerification;
   }
 
   /* This whole class is a bit of a hack since we can only consider it a
@@ -85,7 +83,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
           id: cd.credentialId,
         })),
         challenge: blob,
-        userVerification: this._userVerification,
+        userVerification: this.userVerification,
         rpId: this.rpId,
       },
     };
