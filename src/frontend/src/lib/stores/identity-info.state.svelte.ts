@@ -3,8 +3,6 @@ import {
   AuthnMethodData,
   AuthnMethodRegistrationInfo,
   OpenIdCredential,
-  OpenIdCredentialAddError,
-  OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -15,7 +13,6 @@ import {
   decodeJWTWithNameAndEmail,
   requestJWT,
 } from "$lib/utils/openID";
-import { toaster } from "$lib/components/utils/toaster";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
