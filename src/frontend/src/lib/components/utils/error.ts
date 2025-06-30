@@ -3,6 +3,7 @@ import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
   CheckCaptchaError,
+  CreateAccountError,
   IdRegFinishError,
   IdRegStartError,
 } from "$lib/generated/internet_identity_types";
@@ -21,9 +22,12 @@ export const handleError = (error: unknown) => {
 
   // Handle canister errors
   if (
-    isCanisterError<IdRegStartError | IdRegFinishError | CheckCaptchaError>(
-      error,
-    )
+    isCanisterError<
+      | IdRegStartError
+      | IdRegFinishError
+      | CheckCaptchaError
+      | CreateAccountError
+    >(error)
   ) {
     switch (error.type) {
       case "RateLimitExceeded":
@@ -46,12 +50,33 @@ export const handleError = (error: unknown) => {
           description: error.value(error.type),
         });
         break;
+      case "AccountLimitReached":
+        toaster.warning({
+          title: "Limit reached",
+          description: "No more additional accounts can be created",
+        });
+        break;
       case "AlreadyInProgress":
       case "WrongSolution":
-        // Should be handled up the stack; reaching here means they weren’t.
+        // Should be handled up the stack; reaching here means they weren't.
         toaster.error({
           title: "Unhandled error",
           description: error.type,
+        });
+        break;
+      case "NameTooLong":
+      case "Unauthorized":
+        // Shouldn't have happened; reaching here means they weren't avoided.
+        toaster.error({
+          title: "Unexpected error",
+          description: error.type,
+        });
+        break;
+      case "InternalCanisterError":
+        // Should never happen; reaching here means there's a technical issue.
+        toaster.error({
+          title: "An internal error occurred",
+          description: error.value(error.type),
         });
         break;
       default: {
