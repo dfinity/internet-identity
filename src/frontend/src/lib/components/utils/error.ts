@@ -62,7 +62,7 @@ export const handleError = (error: unknown) => {
         break;
       case "OpenIdCredentialAlreadyRegistered":
         toaster.error({
-          title: "This credential is already linked to another identity",
+          title: "This account is already linked to another identity",
         });
         break;
       case "Unauthorized":
