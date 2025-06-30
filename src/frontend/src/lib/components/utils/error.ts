@@ -66,10 +66,6 @@ export const handleError = (error: unknown) => {
         });
         break;
       case "Unauthorized":
-        toaster.error({
-          title: "You are not authorized to add this credential",
-        });
-        break;
       case "InternalCanisterError":
         toaster.error({
           title: "An internal error occurred",

@@ -4,18 +4,13 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { TriangleAlertIcon } from "@lucide/svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
-  import { throwCanisterError } from "$lib/utils/utils";
   import { handleError } from "../utils/error";
 
   const { onClose } = $props();
 
   const handleRemoveCredential = async () => {
     try {
-      let res = await identityInfo.removeGoogle();
-
-      if ("Err" in res) {
-        throwCanisterError(res);
-      }
+      await identityInfo.removeGoogle();
     } catch (error) {
       handleError(error);
     }

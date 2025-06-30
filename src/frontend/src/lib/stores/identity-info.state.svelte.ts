@@ -13,6 +13,7 @@ import {
   decodeJWTWithNameAndEmail,
   requestJWT,
 } from "$lib/utils/openID";
+import { throwCanisterError } from "$lib/utils/utils";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -112,8 +113,8 @@ class IdentityInfo {
         (cred) => !(cred.iss === iss && cred.sub === sub),
       );
     }
-    // Return the result so we can handle potential errors elsewhere
-    return googleAddResult;
+
+    throwCanisterError(googleAddResult);
   };
 
   removeGoogle = async () => {
@@ -144,8 +145,8 @@ class IdentityInfo {
     } else {
       this.openIdCredentials.push(temporaryCredential);
     }
-    // Return the result so we can handle potential errors elsewhere
-    return googleRemoveResult;
+
+    throwCanisterError(googleRemoveResult);
   };
 
   reset = () => {

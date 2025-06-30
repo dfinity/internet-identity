@@ -4,17 +4,12 @@
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { handleError } from "../utils/error";
-  import { throwCanisterError } from "$lib/utils/utils";
 
   const { onClose } = $props();
 
   const handleAddCredential = async () => {
     try {
-      let res = await identityInfo.addGoogle();
-
-      if ("Err" in res) {
-        throwCanisterError(res);
-      }
+      await identityInfo.addGoogle();
     } catch (error) {
       handleError(error);
     }
