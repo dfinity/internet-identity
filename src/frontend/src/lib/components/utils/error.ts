@@ -74,7 +74,8 @@ export const handleError = (error: unknown) => {
         break;
       case "JwtVerificationFailed":
         toaster.error({
-          title: "The JWT is invalid",
+          title: "Authorization invalid",
+          description: "It may have expired — please try again",
         });
         break;
       case "OpenIdCredentialNotFound":
