@@ -29,20 +29,27 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     credentialData: CredentialData[],
     rpId: string | undefined,
     iframe: boolean | undefined,
+    userVerification: "discouraged" | "required" | "preferred" = "discouraged",
   ): MultiWebAuthnIdentity {
-    return new this(credentialData, rpId, iframe);
+    return new this(credentialData, rpId, iframe, userVerification);
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
   protected _actualIdentity?: WebAuthnIdentity;
+  private _userVerification: "discouraged" | "required" | "preferred";
 
   protected constructor(
     readonly credentialData: CredentialData[],
     readonly rpId: string | undefined,
     readonly iframe: boolean | undefined,
+    readonly userVerification:
+      | "discouraged"
+      | "required"
+      | "preferred" = "discouraged",
   ) {
     super();
     this._actualIdentity = undefined;
+    this._userVerification = userVerification;
   }
 
   /* This whole class is a bit of a hack since we can only consider it a
@@ -78,7 +85,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
           id: cd.credentialId,
         })),
         challenge: blob,
-        userVerification: "discouraged",
+        userVerification: this._userVerification,
         rpId: this.rpId,
       },
     };
