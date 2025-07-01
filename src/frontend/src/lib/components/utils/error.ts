@@ -66,6 +66,7 @@ export const handleError = (error: unknown) => {
         });
         break;
       case "Unauthorized":
+        break;
       case "InternalCanisterError":
         toaster.error({
           title: "An internal error occurred",
