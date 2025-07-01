@@ -189,8 +189,8 @@ class IdentityInfo {
   };
 
   logout = () => {
-    this.reset();
-    authorizationStore.init();
+    void this.reset();
+    void authorizationStore.init();
     goto("/");
   };
 
