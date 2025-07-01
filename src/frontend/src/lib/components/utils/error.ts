@@ -5,6 +5,8 @@ import type {
   CheckCaptchaError,
   IdRegFinishError,
   IdRegStartError,
+  OpenIdCredentialAddError,
+  OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import { isOpenIdCancelError } from "$lib/utils/openID";
 
@@ -21,9 +23,13 @@ export const handleError = (error: unknown) => {
 
   // Handle canister errors
   if (
-    isCanisterError<IdRegStartError | IdRegFinishError | CheckCaptchaError>(
-      error,
-    )
+    isCanisterError<
+      | IdRegStartError
+      | IdRegFinishError
+      | CheckCaptchaError
+      | OpenIdCredentialAddError
+      | OpenIdCredentialRemoveError
+    >(error)
   ) {
     switch (error.type) {
       case "RateLimitExceeded":
@@ -52,6 +58,30 @@ export const handleError = (error: unknown) => {
         toaster.error({
           title: "Unhandled error",
           description: error.type,
+        });
+        break;
+      case "OpenIdCredentialAlreadyRegistered":
+        toaster.error({
+          title: "This account is already linked to another identity",
+        });
+        break;
+      case "Unauthorized":
+        break;
+      case "InternalCanisterError":
+        toaster.error({
+          title: "An internal error occurred",
+          description: error.value(error.type),
+        });
+        break;
+      case "JwtVerificationFailed":
+        toaster.error({
+          title: "Authorization invalid",
+          description: "It may have expired — please try again",
+        });
+        break;
+      case "OpenIdCredentialNotFound":
+        toaster.error({
+          title: "This credential is not linked to this identity",
         });
         break;
       default: {

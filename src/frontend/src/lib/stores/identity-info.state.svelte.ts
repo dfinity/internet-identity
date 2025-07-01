@@ -3,8 +3,6 @@ import {
   AuthnMethodData,
   AuthnMethodRegistrationInfo,
   OpenIdCredential,
-  OpenIdCredentialAddError,
-  OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -15,6 +13,7 @@ import {
   decodeJWTWithNameAndEmail,
   requestJWT,
 } from "$lib/utils/openID";
+import { throwCanisterError } from "$lib/utils/utils";
 import { toaster } from "$lib/components/utils/toaster";
 import { authorizationStore } from "./authorization.store";
 import { goto } from "$app/navigation";
@@ -30,35 +29,6 @@ const fetchIdentityInfo = async () => {
     throw Error("Failed to fetch identity info");
 
   return identityInfoResponse.Ok;
-};
-
-const formatOpenIdAddError = (err: OpenIdCredentialAddError) => {
-  if ("OpenIdCredentialAlreadyRegistered" in err) {
-    return "This credential is already linked to another identity";
-  }
-  if ("Unauthorized" in err) {
-    return "You are not authorized to add this credential";
-  }
-  if ("InternalCanisterError" in err) {
-    return "An internal error occurred: " + err.InternalCanisterError;
-  }
-  if ("JwtVerificationFailed" in err) {
-    return "The JWT is invalid";
-  }
-  return "An unknown error occurred";
-};
-
-const formatOpenIdRemoveError = (err: OpenIdCredentialRemoveError) => {
-  if ("OpenIdCredentialNotFound" in err) {
-    return "This credential is not linked to this identity";
-  }
-  if ("Unauthorized" in err) {
-    return "You are not authorized to remove this credential";
-  }
-  if ("InternalCanisterError" in err) {
-    return "An internal error occurred: " + err.InternalCanisterError;
-  }
-  return "An unknown error occurred";
 };
 
 class IdentityInfo {
@@ -145,12 +115,9 @@ class IdentityInfo {
       this.openIdCredentials = this.openIdCredentials.filter(
         (cred) => !(cred.iss === iss && cred.sub === sub),
       );
-      toaster.error({
-        title: "Failed to add Google Account",
-        description: formatOpenIdAddError(googleAddResult.Err),
-      });
-      throw new Error(Object.keys(googleAddResult.Err)[0]);
     }
+
+    await throwCanisterError(googleAddResult);
   };
 
   removeGoogle = async () => {
@@ -180,12 +147,9 @@ class IdentityInfo {
       void this.fetch();
     } else {
       this.openIdCredentials.push(temporaryCredential);
-      toaster.error({
-        title: "Failed to remove Google Account",
-        description: formatOpenIdRemoveError(googleRemoveResult.Err),
-      });
-      throw new Error(Object.keys(googleRemoveResult.Err)[0]);
     }
+
+    await throwCanisterError(googleRemoveResult);
   };
 
   logout = () => {
