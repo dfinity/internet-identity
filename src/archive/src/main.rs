@@ -51,7 +51,10 @@ use ic_stable_structures::{
     cell::Cell as StableCell, log::Log, DefaultMemoryImpl, Memory as StableMemory,
     RestrictedMemory, StableBTreeMap, Storable, MAX_PAGES,
 };
-use internet_identity_interface::archive::types::{AnchorEntries, ArchiveInit, ArchiveStatus, BufferedEntry, CallErrorInfo, CallInfo, CanisterStatus, Cursor, DefiniteCanisterSettings, Entries, FetchInfo};
+use internet_identity_interface::archive::types::{
+    AnchorEntries, ArchiveInit, ArchiveStatus, BufferedEntry, CallErrorInfo, CallInfo,
+    CanisterStatus, Cursor, DefiniteCanisterSettings, Entries, FetchInfo,
+};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
