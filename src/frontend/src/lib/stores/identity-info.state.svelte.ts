@@ -176,9 +176,10 @@ class IdentityInfo {
 
     if ("Ok" in googleRemoveResult) {
       void this.fetch();
-      // lastUsedIdentitiesStore.removeIdentity(
-      //   get(authenticatedStore).identityNumber,
-      // );
+      lastUsedIdentitiesStore.removeIdentity(
+        get(authenticatedStore).identityNumber,
+      );
+      // TODO: if we are signed in via google, we should sign out here.
     } else {
       this.openIdCredentials.push(temporaryCredential);
       toaster.error({
