@@ -14,7 +14,6 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { throwCanisterError } from "$lib/utils/utils";
-import { toaster } from "$lib/components/utils/toaster";
 import { authorizationStore } from "./authorization.store";
 import { goto } from "$app/navigation";
 
@@ -153,9 +152,9 @@ class IdentityInfo {
   };
 
   logout = () => {
-    void this.reset();
+    this.reset();
     void authorizationStore.init();
-    goto("/");
+    void goto("/");
   };
 
   reset = () => {
