@@ -103,7 +103,6 @@
       popoverRef?.classList.add("shadow-xl");
     }}
     onoutrostart={() => {
-      popoverRef?.classList.remove("shadow-xl");
       popoverRef?.hidePopover();
     }}
     class="popover slow-shadow fixed rounded-xl bg-transparent"
