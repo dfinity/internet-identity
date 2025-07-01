@@ -100,16 +100,15 @@
     out:fade|global={{ delay: 160, duration: 1 }}
     onintrostart={() => {
       popoverRef?.showPopover();
-      popoverRef?.classList.add("shadow-xl");
     }}
     onoutrostart={() => {
       popoverRef?.hidePopover();
     }}
-    class="popover slow-shadow fixed rounded-xl bg-transparent"
+    class="popover fixed overflow-visible bg-transparent"
   >
     <div
       class={[
-        "bg-bg-primary_alt border-border-secondary flex w-90 flex-col rounded-xl border p-4",
+        "bg-bg-primary_alt border-border-secondary flex w-90 flex-col rounded-xl border p-4 shadow-xl",
         {
           up: {
             start: "origin-bottom-left",
@@ -149,11 +148,6 @@
     transition-property: overlay, display;
     transition-duration: 0.16s;
     transition-behavior: allow-discrete;
-  }
-
-  .slow-shadow {
-    transition-property: box-shadow;
-    transition-duration: 0.8s;
   }
 
   .popover > div {
