@@ -116,7 +116,8 @@
     <span>Use another identity</span>
   </ButtonCard>
   {#if onLogout}
-    <Button onclick={onLogout} variant="tertiary"><LogOutIcon />Sign Out</Button
+    <Button onclick={onLogout} variant="tertiary"
+      ><LogOutIcon size="1.25rem" />Sign Out</Button
     >
   {/if}
 </div>
