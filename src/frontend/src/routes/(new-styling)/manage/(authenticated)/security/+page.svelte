@@ -2,7 +2,6 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
   import { Link2Off, Plus } from "@lucide/svelte";
-  import ListItem from "$lib/components/ui/ListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
