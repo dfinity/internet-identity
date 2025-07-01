@@ -16,6 +16,7 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { toaster } from "$lib/components/utils/toaster";
+import { lastUsedIdentitiesStore } from "./last-used-identities.store";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -116,13 +117,11 @@ class IdentityInfo {
       throw new Error("Account already linked");
     }
 
+    const { identityNumber } = get(authenticatedStore);
+
     const googleAddPromise = get(
       authenticatedStore,
-    ).actor.openid_credential_add(
-      get(authenticatedStore).identityNumber,
-      jwt,
-      salt,
-    );
+    ).actor.openid_credential_add(identityNumber, jwt, salt);
     // Optimistically show as added
     this.openIdCredentials.push({
       aud,
@@ -139,6 +138,7 @@ class IdentityInfo {
 
     if ("Ok" in googleAddResult) {
       void this.fetch();
+      lastUsedIdentitiesStore.removeIdentity(identityNumber);
     } else {
       this.openIdCredentials = this.openIdCredentials.filter(
         (cred) => !(cred.iss === iss && cred.sub === sub),
@@ -176,6 +176,9 @@ class IdentityInfo {
 
     if ("Ok" in googleRemoveResult) {
       void this.fetch();
+      // lastUsedIdentitiesStore.removeIdentity(
+      //   get(authenticatedStore).identityNumber,
+      // );
     } else {
       this.openIdCredentials.push(temporaryCredential);
       toaster.error({
