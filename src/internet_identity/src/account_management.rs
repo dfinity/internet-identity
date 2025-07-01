@@ -114,9 +114,7 @@ pub fn update_account_for_origin(
                             name: new_name.clone(),
                             origin: origin.clone(),
                         })
-                        .map_err(|err| {
-                            UpdateAccountError::InternalCanisterError(format!("{}", err))
-                        })?;
+                        .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
 
                     Ok((updated_account, old_account.name))
                 })?;
@@ -302,7 +300,7 @@ fn should_fail_to_create_accounts_above_max() {
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
     let name = "Alice".to_string();
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
-        let origin = format!("https://example-{}.com", i);
+        let origin = format!("https://example-{i}.com");
         let result =
             create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {
@@ -323,7 +321,7 @@ fn should_fail_to_update_default_accounts_above_max() {
     let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
     let name = "Alice".to_string();
     for i in 0..MAX_ANCHOR_ACCOUNTS {
-        let origin = format!("https://example-{}.com", i);
+        let origin = format!("https://example-{i}.com");
         let create_result =
             create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
 
@@ -648,7 +646,7 @@ fn should_properly_recalculate_faulty_account_counter() {
     });
 
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
-        let origin = format!("https://example-{}.com", i);
+        let origin = format!("https://example-{i}.com");
         let result =
             create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {

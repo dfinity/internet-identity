@@ -80,7 +80,7 @@ fn should_retrieve_aggregations_for_multiple_frontend_origins_sorted_by_weight()
         let event = EventData {
             event: Event::PrepareDelegation(PrepareDelegationEvent {
                 ii_domain: Some(IIDomain::Ic0App),
-                frontend: format!("https://example{}.com", i),
+                frontend: format!("https://example{i}.com"),
                 session_duration_ns: Duration::from_secs(DUMMY_SESSION_LENGTH_SEC + i).as_nanos()
                     as u64,
             }),
@@ -89,13 +89,13 @@ fn should_retrieve_aggregations_for_multiple_frontend_origins_sorted_by_weight()
     }
 
     let per_origin_weight_one = (0..10)
-        .map(|i| (format!("https://example{}.com", i), 1))
+        .map(|i| (format!("https://example{i}.com"), 1))
         .collect::<Vec<_>>();
     let per_origin_sess_weight = (0..10)
         .rev() // aggregations are sorted by weight descending
         .map(|i| {
             (
-                format!("https://example{}.com", i),
+                format!("https://example{i}.com"),
                 DUMMY_SESSION_LENGTH_SEC + i,
             )
         })
