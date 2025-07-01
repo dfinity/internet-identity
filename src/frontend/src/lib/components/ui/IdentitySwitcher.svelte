@@ -27,6 +27,7 @@
     switchIdentity: (identityNumber: bigint) => void;
     useAnotherIdentity: () => void;
     onClose?: () => void;
+    onLogout?: () => void;
   };
 
   const {
@@ -35,6 +36,7 @@
     switchIdentity,
     useAnotherIdentity,
     onClose,
+    onLogout,
   }: Props = $props();
 
   const links = [
@@ -112,6 +114,9 @@
     </FeaturedIcon>
     <span>Use another identity</span>
   </ButtonCard>
+  <!-- {#if onLogout}
+    shpegoogle
+  {/if} -->
 </div>
 <hr class="border-t-border-tertiary mb-4" />
 <div class="flex gap-4">
