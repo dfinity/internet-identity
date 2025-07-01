@@ -16,6 +16,8 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { toaster } from "$lib/components/utils/toaster";
+import { authorizationStore } from "./authorization.store";
+import { goto } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -184,6 +186,12 @@ class IdentityInfo {
       });
       throw new Error(Object.keys(googleRemoveResult.Err)[0]);
     }
+  };
+
+  logout = () => {
+    this.reset();
+    authorizationStore.init();
+    goto("/");
   };
 
   reset = () => {

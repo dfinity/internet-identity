@@ -7,6 +7,7 @@
     LifeBuoyIcon,
     CodeSquareIcon,
     XIcon,
+    LogOutIcon,
   } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import type { HTMLAttributes } from "svelte/elements";
@@ -114,9 +115,10 @@
     </FeaturedIcon>
     <span>Use another identity</span>
   </ButtonCard>
-  <!-- {#if onLogout}
-    shpegoogle
-  {/if} -->
+  {#if onLogout}
+    <Button onclick={onLogout} variant="tertiary"><LogOutIcon />Sign Out</Button
+    >
+  {/if}
 </div>
 <hr class="border-t-border-tertiary mb-4" />
 <div class="flex gap-4">
