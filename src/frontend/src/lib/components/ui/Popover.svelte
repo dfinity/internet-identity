@@ -100,7 +100,7 @@
     out:fade|global={{ delay: 160, duration: 1 }}
     onintrostart={() => popoverRef?.showPopover()}
     onoutrostart={() => popoverRef?.hidePopover()}
-    class="popover fixed bg-transparent"
+    class="popover fixed overflow-visible bg-transparent"
   >
     <div
       class={[
