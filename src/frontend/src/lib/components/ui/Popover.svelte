@@ -100,11 +100,11 @@
     out:fade|global={{ delay: 160, duration: 1 }}
     onintrostart={() => popoverRef?.showPopover()}
     onoutrostart={() => popoverRef?.hidePopover()}
-    class="popover fixed bg-transparent"
+    class="popover fixed rounded-xl bg-transparent shadow-xl"
   >
     <div
       class={[
-        "bg-bg-primary_alt border-border-secondary flex w-90 flex-col rounded-xl border p-4 shadow-xl",
+        "bg-bg-primary_alt border-border-secondary flex w-90 flex-col rounded-xl border p-4",
         {
           up: {
             start: "origin-bottom-left",
