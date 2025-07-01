@@ -83,7 +83,6 @@
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
-    lastUsedCredential={$lastUsedIdentityStore?.authMethod}
     credentialToBeRemoved={identityInfo.removableOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
   />

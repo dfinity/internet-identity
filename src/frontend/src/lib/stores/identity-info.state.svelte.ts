@@ -146,12 +146,7 @@ class IdentityInfo {
 
     if ("Ok" in googleRemoveResult) {
       // If we just deleted the method we are logged in with, we log the user out.
-      const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod;
-      if (
-        lastUsedAuthMethod &&
-        "openid" in lastUsedAuthMethod &&
-        lastUsedAuthMethod.openid.sub === temporaryCredential.sub
-      ) {
+      if (this.isCurrentAccessMethod({ openid: temporaryCredential })) {
         this.logout();
         lastUsedIdentitiesStore.removeIdentity(
           get(authenticatedStore).identityNumber,
@@ -171,6 +166,32 @@ class IdentityInfo {
     this.reset();
     void authorizationStore.init();
     void goto("/");
+  };
+
+  isCurrentAccessMethod = (
+    accessMethod:
+      | { passkey: { credentialId: Uint8Array } }
+      | { openid: { iss: string; sub: string } },
+  ) => {
+    const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod;
+    if (
+      lastUsedAuthMethod &&
+      "openid" in lastUsedAuthMethod &&
+      "openid" in accessMethod &&
+      lastUsedAuthMethod.openid.sub === accessMethod.openid.sub
+    ) {
+      return true;
+    }
+    if (
+      lastUsedAuthMethod &&
+      "passkey" in lastUsedAuthMethod &&
+      "passkey" in accessMethod &&
+      lastUsedAuthMethod.passkey.credentialId ===
+        accessMethod.passkey.credentialId
+    ) {
+      return true;
+    }
+    return false;
   };
 
   reset = () => {
