@@ -146,8 +146,9 @@ class IdentityInfo {
 
     if ("Ok" in googleRemoveResult) {
       // If we just deleted the method we are logged in with, we log the user out.
-      const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod!;
+      const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod;
       if (
+        lastUsedAuthMethod &&
         "openid" in lastUsedAuthMethod &&
         lastUsedAuthMethod.openid.sub === temporaryCredential.sub
       ) {
