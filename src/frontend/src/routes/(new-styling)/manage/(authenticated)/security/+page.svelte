@@ -2,13 +2,13 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
   import { Link2Off, Plus } from "@lucide/svelte";
-  import ListItem from "$lib/components/ui/ListItem.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
+  import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
 
   let displayAddCredentialDialog = $state(false);
 </script>
@@ -83,6 +83,8 @@
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
+    lastUsedCredential={$lastUsedIdentityStore?.authMethod}
+    credentialToBeRemoved={identityInfo.removableOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
   />
 {/if}

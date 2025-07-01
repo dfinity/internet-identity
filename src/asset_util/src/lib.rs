@@ -386,8 +386,8 @@ lazy_static! {
     static ref KNOWN_FILES: HashMap<PathBuf, (ContentType, ContentEncoding)> = {
         let mut map = HashMap::new();
         map.insert(Path::new(".well-known/ic-domains").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
-        map.insert(Path::new(".well-known/ii-alternative-origins").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
         map.insert(Path::new(".well-known/webauthn").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
+        map.insert(Path::new(".well-known/ii-alternative-origins").to_owned(), (ContentType::JSON, ContentEncoding::Identity));
         map
     };
 }
@@ -479,7 +479,7 @@ fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding
     }
     let extension = asset_path
         .extension()
-        .unwrap_or_else(|| panic!("Unsupported file without extension: {:?}", asset_path))
+        .unwrap_or_else(|| panic!("Unsupported file without extension: {asset_path:?}"))
         .to_str()
         .unwrap();
     let (extension, encoding) = if extension == "gz" {

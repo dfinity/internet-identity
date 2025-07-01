@@ -4,8 +4,17 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { TriangleAlertIcon } from "@lucide/svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import { handleError } from "../utils/error";
 
-  const { onClose } = $props();
+  const { onClose, lastUsedCredential, credentialToBeRemoved } = $props();
+
+  const handleRemoveCredential = async () => {
+    try {
+      await identityInfo.removeGoogle();
+    } catch (error) {
+      handleError(error);
+    }
+  };
 </script>
 
 <Dialog {onClose}>
@@ -17,13 +26,14 @@
     You're about to unlink your Google Account. If you proceed, you will no
     longer be able to sign-in to your identity or dapps using your Google
     Account.
+    {#if "openid" in lastUsedCredential && lastUsedCredential.openid.sub === credentialToBeRemoved.sub}
+      <br /><br />As you are currently signed in with this Account, you will be
+      signed out.
+    {/if}
   </p>
+
   <div class="flex w-full flex-col gap-3">
-    <Button
-      onclick={() => identityInfo.removeGoogle()}
-      variant="primary"
-      danger
-    >
+    <Button onclick={handleRemoveCredential} variant="primary" danger>
       Unlink Google Account
     </Button>
     <Button variant="tertiary" onclick={onClose}>Keep linked</Button>

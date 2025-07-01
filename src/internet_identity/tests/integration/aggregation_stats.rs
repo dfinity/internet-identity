@@ -112,7 +112,7 @@ fn should_report_at_most_100_entries() -> Result<(), CallError> {
             &env,
             canister_id,
             identity_nr,
-            &format!("https://some-dapp-{}", i),
+            &format!("https://some-dapp-{i}"),
         )?;
     }
 
@@ -139,7 +139,7 @@ fn should_remove_at_most_100_entries_24h() -> Result<(), CallError> {
             &env,
             canister_id,
             identity_nr,
-            &format!("https://some-dapp-{}", i),
+            &format!("https://some-dapp-{i}"),
         )?;
     }
 
@@ -181,7 +181,7 @@ fn should_prune_at_most_100_entries_30d() -> Result<(), CallError> {
             &env,
             canister_id,
             identity_nr,
-            &format!("https://some-dapp-{}", i),
+            &format!("https://some-dapp-{i}"),
         )?;
     }
 
@@ -290,8 +290,7 @@ fn assert_expected_aggregation(
     assert_eq!(
         aggregations.get(key).unwrap(),
         &data,
-        "Aggregation key \"{}\" does not match",
-        key
+        "Aggregation key \"{key}\" does not match"
     );
 }
 
@@ -299,7 +298,7 @@ fn create_identity(env: &PocketIc, canister_id: CanisterId, ii_origin: &str) -> 
     let authn_method = AuthnMethodData {
         metadata: HashMap::from([(
             "origin".to_string(),
-            MetadataEntryV2::String(format!("https://identity.{}", ii_origin)),
+            MetadataEntryV2::String(format!("https://identity.{ii_origin}")),
         )]),
         ..test_authn_method()
     };
@@ -307,7 +306,7 @@ fn create_identity(env: &PocketIc, canister_id: CanisterId, ii_origin: &str) -> 
 }
 
 fn aggregation_key(aggregation: &str, window: &str, ii_domain: &str) -> String {
-    format!("{} {} {}", aggregation, window, ii_domain)
+    format!("{aggregation} {window} {ii_domain}")
 }
 
 fn delegation_for_origin(
