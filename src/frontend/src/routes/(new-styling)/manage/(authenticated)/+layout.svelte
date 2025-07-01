@@ -230,6 +230,7 @@
               isAuthDialogOpen = true;
             }}
             onClose={() => (isIdentityPopoverOpen = false)}
+            onLogout={identityInfo.logout}
           />
         </Popover>
       {/if}

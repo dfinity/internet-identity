@@ -4,7 +4,10 @@ import {
   AuthnMethodRegistrationInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import { authenticatedStore } from "./authentication.store";
+import {
+  authenticatedStore,
+  authenticationStore,
+} from "./authentication.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { canisterConfig } from "$lib/globals";
 import {
@@ -14,6 +17,7 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { throwCanisterError } from "$lib/utils/utils";
+import { goto } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -147,6 +151,12 @@ class IdentityInfo {
     }
 
     await throwCanisterError(googleRemoveResult);
+  };
+
+  logout = () => {
+    this.reset();
+    void authenticationStore.reset();
+    void goto("/");
   };
 
   reset = () => {
