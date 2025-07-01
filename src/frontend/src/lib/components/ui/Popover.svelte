@@ -98,9 +98,15 @@
     popover={closeOnOutsideClick ? "auto" : "manual"}
     in:fade|global={{ duration: 1 }}
     out:fade|global={{ delay: 160, duration: 1 }}
-    onintrostart={() => popoverRef?.showPopover()}
-    onoutrostart={() => popoverRef?.hidePopover()}
-    class="popover fixed rounded-xl bg-transparent shadow-xl"
+    onintrostart={() => {
+      popoverRef?.showPopover();
+      popoverRef?.classList.add("shadow-xl");
+    }}
+    onoutrostart={() => {
+      popoverRef?.classList.remove("shadow-xl");
+      popoverRef?.hidePopover();
+    }}
+    class="popover slow-shadow fixed rounded-xl bg-transparent"
   >
     <div
       class={[
@@ -144,6 +150,11 @@
     transition-property: overlay, display;
     transition-duration: 0.16s;
     transition-behavior: allow-discrete;
+  }
+
+  .slow-shadow {
+    transition-property: box-shadow;
+    transition-duration: 0.8s;
   }
 
   .popover > div {
