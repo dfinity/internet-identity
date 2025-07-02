@@ -183,7 +183,7 @@ const poll = (
 
       // Debounce a little; in practice won't be noticed by users but
       // will avoid hot looping in case the op becomes near instantaneous.
-      await waitFor(100);
+      await waitFor(5000);
     }
   });
 
