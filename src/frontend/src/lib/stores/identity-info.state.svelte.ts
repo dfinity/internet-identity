@@ -4,7 +4,10 @@ import {
   AuthnMethodRegistrationInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import { authenticatedStore } from "./authentication.store";
+import {
+  authenticatedStore,
+  authenticationStore,
+} from "./authentication.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { canisterConfig } from "$lib/globals";
 import {

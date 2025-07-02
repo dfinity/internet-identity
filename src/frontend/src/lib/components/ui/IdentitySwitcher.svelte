@@ -7,6 +7,7 @@
     LifeBuoyIcon,
     CodeSquareIcon,
     XIcon,
+    LogOutIcon,
   } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import type { HTMLAttributes } from "svelte/elements";
@@ -27,6 +28,7 @@
     switchIdentity: (identityNumber: bigint) => void;
     useAnotherIdentity: () => void;
     onClose?: () => void;
+    onLogout?: () => void;
   };
 
   const {
@@ -35,6 +37,7 @@
     switchIdentity,
     useAnotherIdentity,
     onClose,
+    onLogout,
   }: Props = $props();
 
   const links = [
@@ -112,6 +115,11 @@
     </FeaturedIcon>
     <span>Use another identity</span>
   </ButtonCard>
+  {#if onLogout}
+    <Button onclick={onLogout} variant="tertiary"
+      ><LogOutIcon size="1.25rem" />Sign Out</Button
+    >
+  {/if}
 </div>
 <hr class="border-t-border-tertiary mb-4" />
 <div class="flex gap-4">
