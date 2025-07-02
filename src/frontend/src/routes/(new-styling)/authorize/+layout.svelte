@@ -163,7 +163,7 @@
         orphan:
           "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer.",
         closed:
-          "It seems like the connection with the service could not be established.",
+          "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support.",
         invalid:
           "It seems like an invalid authentication request was received.",
         failure:
