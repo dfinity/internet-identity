@@ -8,6 +8,7 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
+  import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
 
   let displayAddCredentialDialog = $state(false);
 </script>
@@ -84,6 +85,7 @@
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
+    credentialToBeRemoved={identityInfo.removableOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
   />
 {/if}

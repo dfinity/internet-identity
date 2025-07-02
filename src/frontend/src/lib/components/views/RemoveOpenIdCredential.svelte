@@ -5,8 +5,13 @@
   import { TriangleAlertIcon } from "@lucide/svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { handleError } from "../utils/error";
+  import { type OpenIdCredential } from "$lib/generated/internet_identity_types";
 
-  const { onClose } = $props();
+  const {
+    onClose,
+    credentialToBeRemoved,
+  }: { onClose: () => void; credentialToBeRemoved: OpenIdCredential } =
+    $props();
 
   const handleRemoveCredential = async () => {
     try {
@@ -26,7 +31,12 @@
     You're about to unlink your Google Account. If you proceed, you will no
     longer be able to sign-in to your identity or dapps using your Google
     Account.
+    {#if identityInfo.isCurrentAccessMethod({ openid: credentialToBeRemoved })}
+      <br /><br />As you are currently signed in with this Account, you will be
+      signed out.
+    {/if}
   </p>
+
   <div class="flex w-full flex-col gap-3">
     <Button onclick={handleRemoveCredential} variant="primary" danger>
       Unlink Google Account
