@@ -10,14 +10,17 @@ export class AddPasskeyFlow {
 
   constructor(identityNumber: UserNumber) {
     this.#identityNumber = identityNumber;
+    const identity = get(sessionStore).identity;
     this.#tentativeDevice = {
       alias: "temporary-key",
       metadata: [],
       origin: [window.location.origin],
       protection: { unprotected: null },
-      pubkey: new Uint8Array(),
+      // TODO: Confirm it works when removing it
+      pubkey: Array.from(new Uint8Array(identity.getPublicKey().toDer())),
       purpose: { authentication: null },
       key_type: { unknown: null },
+      // TODO: Do we need to set it?
       credential_id: [],
     };
     this.verificationCode = undefined;
