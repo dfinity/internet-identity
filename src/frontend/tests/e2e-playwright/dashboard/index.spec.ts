@@ -17,14 +17,14 @@ test.describe("Dashboard Navigation", () => {
 
     // Verify we're at the dashboard
     await page.waitForURL(II_URL + "/manage");
-    await page
-      .getByRole("heading", {
+    await expect(
+      page.getByRole("heading", {
         name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
-      })
-      .isVisible();
-    await page
-      .getByRole("heading", { level: 5, name: TEST_USER_NAME })
-      .isVisible();
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: TEST_USER_NAME }),
+    ).toBeVisible();
 
     // Navigate to security page
     await page
@@ -33,7 +33,7 @@ test.describe("Dashboard Navigation", () => {
       .click();
 
     await page.waitForURL(II_URL + "/manage/security");
-    await page.getByRole("heading", { name: "Security" }).isVisible();
+    await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
 
     // Check that we have one passkey listed
     const passkey = await page.getByText("Chrome");

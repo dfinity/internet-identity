@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
 
 const DEFAULT_USER_NAME = "John Doe";
@@ -14,14 +14,14 @@ test.describe("First visit", () => {
     auth(page);
     await page.getByRole("button", { name: "Create Passkey" }).click();
     await page.waitForURL(II_URL + "/manage");
-    await page
-      .getByRole("heading", {
+    await expect(
+      page.getByRole("heading", {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      })
-      .isVisible();
-    await page
-      .getByRole("heading", { level: 5, name: DEFAULT_USER_NAME })
-      .isVisible();
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
+    ).toBeVisible();
   });
 
   test("Sign in with an existing passkey", async ({ page }) => {
@@ -33,14 +33,14 @@ test.describe("First visit", () => {
     auth(page);
     await page.getByRole("button", { name: "Use an existing Passkey" }).click();
     await page.waitForURL(II_URL + "/manage");
-    await page
-      .getByRole("heading", {
+    await expect(
+      page.getByRole("heading", {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      })
-      .isVisible();
-    await page
-      .getByRole("heading", { level: 5, name: DEFAULT_USER_NAME })
-      .isVisible();
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
+    ).toBeVisible();
   });
 });
 
@@ -52,14 +52,14 @@ test.describe("Last used identities listed", () => {
     auth(page);
     await page.getByRole("button", { name: DEFAULT_USER_NAME }).click();
     await page.waitForURL(II_URL + "/manage");
-    await page
-      .getByRole("heading", {
+    await expect(
+      page.getByRole("heading", {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      })
-      .isVisible();
-    await page
-      .getByRole("heading", { level: 5, name: DEFAULT_USER_NAME })
-      .isVisible();
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
+    ).toBeVisible();
   });
 
   test("Sign in with another identity", async ({ page }) => {
@@ -71,14 +71,14 @@ test.describe("Last used identities listed", () => {
     auth(page);
     await page.getByRole("button", { name: "Use an existing Passkey" }).click();
     await page.waitForURL(II_URL + "/manage");
-    await page
-      .getByRole("heading", {
+    await expect(
+      page.getByRole("heading", {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      })
-      .isVisible();
-    await page
-      .getByRole("heading", { level: 5, name: DEFAULT_USER_NAME })
-      .isVisible();
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
+    ).toBeVisible();
   });
 
   test("Sign up with a new passkey", async ({ page }) => {
@@ -92,13 +92,13 @@ test.describe("Last used identities listed", () => {
     auth(page);
     await page.getByRole("button", { name: "Create Passkey" }).click();
     await page.waitForURL(II_URL + "/manage");
-    await page
-      .getByRole("heading", {
+    await expect(
+      page.getByRole("heading", {
         name: new RegExp(`Welcome, ${SECONDARY_USER_NAME}!`),
-      })
-      .isVisible();
-    await page
-      .getByRole("heading", { level: 5, name: SECONDARY_USER_NAME })
-      .isVisible();
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: SECONDARY_USER_NAME }),
+    ).toBeVisible();
   });
 });
