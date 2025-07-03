@@ -1,19 +1,15 @@
 import { expect, test } from "@playwright/test";
 import { clearStorage, createIdentity, dummyAuth, II_URL } from "../utils";
 
-// Test user name
 const TEST_USER_NAME = "Test User";
 
 test.describe("Dashboard Navigation", () => {
   test("User can register, sign in, access the dashboard and navigate to security page", async ({
     page,
   }) => {
-    // Create a test identity
     const auth = dummyAuth();
     await createIdentity(page, TEST_USER_NAME, auth);
     await clearStorage(page);
-
-    // Sign in with the created identity
     await page.goto(II_URL);
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     auth(page);

@@ -1,7 +1,6 @@
 import { test } from "@playwright/test";
 import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
 
-// Test user names
 const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";
 
