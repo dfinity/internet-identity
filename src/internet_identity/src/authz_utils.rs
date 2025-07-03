@@ -3,7 +3,7 @@ use crate::ii_domain::IIDomain;
 use crate::storage::anchor::Anchor;
 use crate::storage::StorageError;
 use crate::{anchor_management, state};
-use candid::Principal;
+use candid::{CandidType, Principal};
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
@@ -17,7 +17,7 @@ pub enum IdentityUpdateError {
     StorageError(IdentityNumber, StorageError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, CandidType)]
 pub struct AuthorizationError {
     pub principal: Principal,
 }

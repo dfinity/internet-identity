@@ -511,6 +511,10 @@ type AuthnMethodConfirmationError = variant {
     NoAuthnMethodToConfirm;
 };
 
+type AuthorizationError = record {
+    principal;
+};
+
 type IdentityAuthnInfo = record {
     authn_methods : vec AuthnMethod;
     recovery_authn_methods : vec AuthnMethod;
@@ -852,6 +856,9 @@ service : (opt InternetIdentityInit) -> {
     // subsequently be used for authentication for that identity.
     // Requires authentication.
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
+
+
+    authn_method_poll_for_verified : (IdentityNumber) -> (variant {Ok : bool; Err: AuthorizationError});
 
     // Authentication protocol
     // =======================

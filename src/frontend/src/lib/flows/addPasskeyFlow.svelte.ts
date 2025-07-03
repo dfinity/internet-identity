@@ -7,6 +7,7 @@ export class AddPasskeyFlow {
   verificationCode: string | undefined;
   #identityNumber: UserNumber;
   #tentativeDevice: DeviceData;
+  #pollForVerified;
 
   constructor(identityNumber: UserNumber) {
     this.#identityNumber = identityNumber;
@@ -24,6 +25,16 @@ export class AddPasskeyFlow {
       credential_id: [],
     };
     this.verificationCode = undefined;
+    this.#pollForVerified = setInterval(async () => {
+      const verifiedResponse =
+        await get(sessionStore).actor.authn_method_poll_for_verified(
+          identityNumber,
+        );
+      if ("Ok" in verifiedResponse && verifiedResponse.Ok === true) {
+        this.view = "add-device";
+        clearInterval(this.#pollForVerified);
+      }
+    }, 2000);
   }
 
   addTemporaryKey = async () => {

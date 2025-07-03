@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { AddPasskeyFlow } from "$lib/flows/addPasskeyFlow.svelte";
   import { onMount } from "svelte";
 
-  const user = $page.url.searchParams.get("user");
-
+  const user = page.url.searchParams.get("user");
   const flow = new AddPasskeyFlow(BigInt(user!));
 
   onMount(() => {

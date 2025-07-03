@@ -85,6 +85,7 @@ export interface AuthnMethodSecuritySettings {
 export type AuthnMethodSecuritySettingsReplaceError = {
     'AuthnMethodNotFound' : null
   };
+export type AuthorizationError = [Principal];
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -415,6 +416,11 @@ export interface _SERVICE {
     [IdentityNumber, PublicKey, MetadataMapV2],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodMetadataReplaceError }
+  >,
+  'authn_method_poll_for_verified' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : boolean } |
+      { 'Err' : AuthorizationError }
   >,
   'authn_method_register' : ActorMethod<
     [IdentityNumber, AuthnMethodData],
