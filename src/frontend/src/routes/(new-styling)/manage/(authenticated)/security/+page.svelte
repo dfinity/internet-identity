@@ -26,7 +26,7 @@
         </h4>
       </div>
 
-      {#if identityInfo.openIdCredentials.length === 0}
+      {#if identityInfo.openIdCredentials.length === 0 || identityInfo.authnMethods.length <= 8}
         <div>
           <Button
             onclick={() => {

@@ -75,15 +75,17 @@
         Add Passkey
       </Button>
       <!-- TODO: if/when we add more credentials and OpenID providers, we'll need to add more buttons here -->
-      <Button
-        variant="primary"
-        onclick={() => {
-          onClose();
-          handleAddCredential();
-        }}
-      >
-        <GoogleIcon /> Link Google Account
-      </Button>
+      {#if identityInfo.openIdCredentials.length === 0}
+        <Button
+          variant="primary"
+          onclick={() => {
+            onClose();
+            handleAddCredential();
+          }}
+        >
+          <GoogleIcon /> Link Google Account
+        </Button>
+      {/if}
       <Button variant="tertiary" onclick={onClose}>Cancel</Button>
     </div>
   {/if}

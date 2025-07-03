@@ -6,13 +6,20 @@ import {
 import { canisterConfig } from "$lib/globals";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import featureFlags from "$lib/state/featureFlags";
-import { authenticationStore } from "$lib/stores/authentication.store";
+import {
+  authenticatedStore,
+  authenticationStore,
+} from "$lib/stores/authentication.store";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { sessionStore } from "$lib/stores/session.store";
+import {
+  authenticateWithPasskey,
+  authenticateWithSession,
+} from "$lib/utils/authentication";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { throwCanisterError } from "$lib/utils/utils";
-import { DelegationIdentity } from "@dfinity/identity";
+import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import { get } from "svelte/store";
 
@@ -72,9 +79,10 @@ export class AddPasskeyFlow {
       get(sessionStore).identity.getPublicKey().toDer(),
     );
 
-    const identityInfoResponse = await get(sessionStore).actor.identity_info(
-      this.#identityNumber,
-    );
+    const identityNumber = this.#identityNumber;
+
+    const identityInfoResponse =
+      await get(sessionStore).actor.identity_info(identityNumber);
 
     const { name } = await throwCanisterError(identityInfoResponse);
 
@@ -126,7 +134,7 @@ export class AddPasskeyFlow {
     }
 
     let replaceResult = await get(sessionStore).actor.authn_method_replace(
-      this.#identityNumber,
+      identityNumber,
       tempPubKey,
       {
         security_settings: {
@@ -146,18 +154,17 @@ export class AddPasskeyFlow {
 
     throwCanisterError(replaceResult);
 
+    const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
+    const identity = DelegationIdentity.fromDelegation(passkeyIdentity);
+
+    authenticationStore.set({ identity, identityNumber });
     lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber: this.#identityNumber,
-      name: name[0],
-      authMethod: {
-        passkey: {
-          credentialId: new Uint8Array(passkeyIdentity.getCredentialId()!),
-        },
-      },
+      identityNumber,
+      name: passkeyIdentity.getName(),
+      authMethod: { passkey: { credentialId } },
     });
 
-    // TODO: update authenticationStore so we can log in
-
+    console.log(await get(authenticatedStore));
     return replaceResult;
   };
 }

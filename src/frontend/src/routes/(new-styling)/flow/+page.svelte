@@ -4,15 +4,13 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
   import { AddPasskeyFlow } from "$lib/flows/addPasskeyFlow.svelte";
-  import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { sessionStore } from "$lib/stores/session.store";
   import { onMount } from "svelte";
 
   const user = page.url.searchParams.get("user");
   const flow = new AddPasskeyFlow(BigInt(user!));
 
-  const handleAddPasskey = () => {
-    const addPasskeyResult = flow.addPasskey();
+  const handleAddPasskey = async () => {
+    const addPasskeyResult = await flow.addPasskey();
 
     if ("Ok" in addPasskeyResult) {
       goto("/manage");
