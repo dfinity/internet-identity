@@ -36,6 +36,7 @@ dfx deploy internet_identity --no-wallet
 > [!NOTE]\
 > By default, the CAPTCHA is disabled used. If you want to use the real (random) CAPTCHA, set
 > `II_DUMMY_CAPTCHA` to `0` and configure II to use a CAPTCHA:
+>
 > ```
 > II_DUMMY_CAPTCHA=0 dfx deploy internet_identity --no-wallet \
 >     --argument '(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaEnabled}}}})'
@@ -100,18 +101,37 @@ We have a set of Selenium tests that run through the various flows. To set up a 
 
 1. Start a local replica with `dfx start`
 1. Deploy II and the other test canisters with `dfx deploy --no-wallet`
+
+- If you want to run the new playwright tests, you need to deploy II with a speicific argument:
+  ```bash
+  dfx canister install internet_identity --wasm internet_identity.wasm.gz --upgrade-unchanged --mode=upgrade --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }})"
+  ```
+
 1. Start the vite dev server with TLS enabled and hot reloading disabled: `TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev`
 
 To watch the tests run in the browser remove the `headless` option from `src/frontend/src/test-e2e/util.ts`.
 
-The tests can be executed by running:
+The legacy tests can be executed by running:
 
 ```bash
 npm run test:e2e
 ```
 
+The new playwright tests can be executed by running:
+
+```bash
+npm run test:e2e-playwright
+```
+
+Alternatively, you can run them with the Playwright UI:
+
+```bash
+npx playwright test --ui
+```
+
 > [!NOTE]\
 > By default, the e2e tests expect the CAPTCHA to be disabled. If you want to run the e2e tests against II with (dummy) CAPTCHA enabled, make sure that the II_DUMMY_CAPTCHA=1 was set when building II and then run:
+>
 > ```
 > II_CAPTCHA=enabled npm run test:e2e
 > ```
