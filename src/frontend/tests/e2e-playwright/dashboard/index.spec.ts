@@ -36,11 +36,11 @@ test.describe("Dashboard Navigation", () => {
       .getByRole("link", { name: "Security" })
       .click();
 
-    // Verify we're at the security page
     await page.waitForURL(II_URL + "/manage/security");
+    await page.getByRole("heading", { name: "Security" }).isVisible();
 
     // Check that we have one passkey listed
-    const passkey = await page.getByText("Passkey");
+    const passkey = await page.getByText("Chrome");
     await expect(passkey).toBeVisible();
     await expect(passkey).toHaveCount(1);
   });
