@@ -34,6 +34,8 @@ test.describe("Dashboard Navigation", () => {
 
     await page.waitForURL(II_URL + "/manage/security");
     await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
+    // Needed to make sure the navigation is done
+    await expect(page.getByLabel("Go to Security")).not.toBeVisible();
 
     // Check that we have one passkey listed
     const passkey = await page.getByText("Chrome");
