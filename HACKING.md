@@ -34,7 +34,7 @@ dfx deploy internet_identity --no-wallet
 ```
 
 > [!NOTE]\
-> By default, the CAPTCHA is disabled used. If you want to use the real (random) CAPTCHA, set
+> By default, the CAPTCHA is disabled. If you want to use the real (random) CAPTCHA, set
 > `II_DUMMY_CAPTCHA` to `0` and configure II to use a CAPTCHA:
 >
 > ```
