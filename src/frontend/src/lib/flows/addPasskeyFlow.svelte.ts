@@ -52,5 +52,11 @@ export class AddPasskeyFlow {
 
   addPasskey = async () => {
     // TODO: Use temporary key to add a new passkey
+    const tempPubKey = get(sessionStore).identity.getPublicKey();
+    get(sessionStore).actor.authn_method_replace(
+      this.#identityNumber,
+      tempPubKey,
+      {},
+    );
   };
 }
