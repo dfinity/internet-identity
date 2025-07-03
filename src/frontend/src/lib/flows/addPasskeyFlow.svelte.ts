@@ -6,9 +6,13 @@ import {
 import { canisterConfig } from "$lib/globals";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import featureFlags from "$lib/state/featureFlags";
+import { authenticationStore } from "$lib/stores/authentication.store";
+import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
+import { throwCanisterError } from "$lib/utils/utils";
+import { DelegationIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import { get } from "svelte/store";
 
@@ -44,6 +48,9 @@ export class AddPasskeyFlow {
         this.view = "add-device";
         clearInterval(this.#pollForVerified);
       }
+      if ("Err" in verifiedResponse) {
+        console.log(verifiedResponse.Err);
+      }
     }, 2000);
   }
 
@@ -61,15 +68,20 @@ export class AddPasskeyFlow {
   };
 
   addPasskey = async () => {
-    // TODO: Use temporary key to add a new passkey
     const tempPubKey = new Uint8Array(
       get(sessionStore).identity.getPublicKey().toDer(),
     );
 
+    const identityInfoResponse = await get(sessionStore).actor.identity_info(
+      this.#identityNumber,
+    );
+
+    const { name } = await throwCanisterError(identityInfoResponse);
+
     const passkeyIdentity =
       featureFlags.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
-        ? await DiscoverableDummyIdentity.createNew("my good name")
-        : await DiscoverablePasskeyIdentity.createNew("my good name");
+        ? await DiscoverableDummyIdentity.createNew(name[0] ?? "")
+        : await DiscoverablePasskeyIdentity.createNew(name[0] ?? "");
 
     const uaParser = loadUAParser();
     const authenticatorAttachment =
@@ -113,7 +125,7 @@ export class AddPasskeyFlow {
       ]);
     }
 
-    get(sessionStore).actor.authn_method_replace(
+    let replaceResult = await get(sessionStore).actor.authn_method_replace(
       this.#identityNumber,
       tempPubKey,
       {
@@ -131,5 +143,21 @@ export class AddPasskeyFlow {
         },
       },
     );
+
+    throwCanisterError(replaceResult);
+
+    lastUsedIdentitiesStore.addLastUsedIdentity({
+      identityNumber: this.#identityNumber,
+      name: name[0],
+      authMethod: {
+        passkey: {
+          credentialId: new Uint8Array(passkeyIdentity.getCredentialId()!),
+        },
+      },
+    });
+
+    // TODO: update authenticationStore so we can log in
+
+    return replaceResult;
   };
 }
