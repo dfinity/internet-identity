@@ -8,6 +8,7 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
+  import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
 
   let displayAddCredentialDialog = $state(false);
 </script>
@@ -26,15 +27,17 @@
         </h4>
       </div>
 
-      <div>
-        <Button
-          onclick={() => {
-            displayAddCredentialDialog = true;
-          }}
-          class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
-          >Add <Plus size="1.25rem" /></Button
-        >
-      </div>
+      {#if identityInfo.openIdCredentials.length === 0}
+        <div>
+          <Button
+            onclick={() => {
+              displayAddCredentialDialog = true;
+            }}
+            class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
+            >Add <Plus size="1.25rem" /></Button
+          >
+        </div>
+      {/if}
     </div>
     <div
       class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
@@ -82,6 +85,7 @@
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
+    credentialToBeRemoved={identityInfo.removableOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
   />
 {/if}

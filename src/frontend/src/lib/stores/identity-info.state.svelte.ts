@@ -4,10 +4,7 @@ import {
   AuthnMethodRegistrationInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import {
-  authenticatedStore,
-  authenticationStore,
-} from "./authentication.store";
+import { authenticatedStore } from "./authentication.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { canisterConfig } from "$lib/globals";
 import {
@@ -17,6 +14,11 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { throwCanisterError } from "$lib/utils/utils";
+import {
+  lastUsedIdentitiesStore,
+  lastUsedIdentityStore,
+} from "./last-used-identities.store";
+import { authorizationStore } from "./authorization.store";
 import { goto } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
@@ -89,13 +91,11 @@ class IdentityInfo {
       throw new Error("Account already linked");
     }
 
+    const { identityNumber } = get(authenticatedStore);
+
     const googleAddPromise = get(
       authenticatedStore,
-    ).actor.openid_credential_add(
-      get(authenticatedStore).identityNumber,
-      jwt,
-      salt,
-    );
+    ).actor.openid_credential_add(identityNumber, jwt, salt);
     // Optimistically show as added
     this.openIdCredentials.push({
       aud,
@@ -145,6 +145,15 @@ class IdentityInfo {
     const googleRemoveResult = await googleRemovePromise;
 
     if ("Ok" in googleRemoveResult) {
+      // If we just deleted the method we are logged in with, we log the user out.
+      if (this.isCurrentAccessMethod({ openid: temporaryCredential })) {
+        this.logout();
+        lastUsedIdentitiesStore.removeIdentity(
+          get(authenticatedStore).identityNumber,
+        );
+        return;
+      }
+
       void this.fetch();
     } else {
       this.openIdCredentials.push(temporaryCredential);
@@ -155,8 +164,34 @@ class IdentityInfo {
 
   logout = () => {
     this.reset();
-    void authenticationStore.reset();
+    void authorizationStore.init();
     void goto("/");
+  };
+
+  isCurrentAccessMethod = (
+    accessMethod:
+      | { passkey: { credentialId: Uint8Array } }
+      | { openid: { iss: string; sub: string } },
+  ) => {
+    const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod;
+    if (
+      lastUsedAuthMethod &&
+      "openid" in lastUsedAuthMethod &&
+      "openid" in accessMethod &&
+      lastUsedAuthMethod.openid.sub === accessMethod.openid.sub
+    ) {
+      return true;
+    }
+    if (
+      lastUsedAuthMethod &&
+      "passkey" in lastUsedAuthMethod &&
+      "passkey" in accessMethod &&
+      lastUsedAuthMethod.passkey.credentialId ===
+        accessMethod.passkey.credentialId
+    ) {
+      return true;
+    }
+    return false;
   };
 
   reset = () => {
