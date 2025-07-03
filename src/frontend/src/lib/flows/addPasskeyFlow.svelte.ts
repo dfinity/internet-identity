@@ -1,5 +1,15 @@
-import { DeviceData, UserNumber } from "$lib/generated/internet_identity_types";
+import {
+  DeviceData,
+  MetadataMapV2,
+  UserNumber,
+} from "$lib/generated/internet_identity_types";
+import { canisterConfig } from "$lib/globals";
+import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
+import featureFlags from "$lib/state/featureFlags";
 import { sessionStore } from "$lib/stores/session.store";
+import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
+import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
+import { nonNullish } from "@dfinity/utils";
 import { get } from "svelte/store";
 
 export class AddPasskeyFlow {
@@ -52,11 +62,74 @@ export class AddPasskeyFlow {
 
   addPasskey = async () => {
     // TODO: Use temporary key to add a new passkey
-    const tempPubKey = get(sessionStore).identity.getPublicKey();
+    const tempPubKey = new Uint8Array(
+      get(sessionStore).identity.getPublicKey().toDer(),
+    );
+
+    const passkeyIdentity =
+      featureFlags.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+        ? await DiscoverableDummyIdentity.createNew("my good name")
+        : await DiscoverablePasskeyIdentity.createNew("my good name");
+
+    const uaParser = loadUAParser();
+    const authenticatorAttachment =
+      passkeyIdentity.getAuthenticatorAttachment();
+
+    const deviceName = await inferPasskeyAlias({
+      authenticatorType: authenticatorAttachment,
+      userAgent: navigator.userAgent,
+      uaParser,
+      aaguid: passkeyIdentity.getAaguid(),
+    });
+
+    const origin = window.location.origin;
+    // The canister only allow for 50 characters, so for long domains we don't attach an origin
+    // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
+    const sanitizedOrigin =
+      nonNullish(origin) && origin.length <= 50 ? origin : undefined;
+
+    const metadata: MetadataMapV2 = [
+      [
+        "alias",
+        {
+          String: deviceName,
+        },
+      ],
+    ];
+    if (nonNullish(authenticatorAttachment)) {
+      metadata.push([
+        "authenticator_attachment",
+        {
+          String: authenticatorAttachment,
+        },
+      ]);
+    }
+    if (nonNullish(sanitizedOrigin)) {
+      metadata.push([
+        "origin",
+        {
+          String: sanitizedOrigin,
+        },
+      ]);
+    }
+
     get(sessionStore).actor.authn_method_replace(
       this.#identityNumber,
       tempPubKey,
-      {},
+      {
+        security_settings: {
+          protection: { Unprotected: null },
+          purpose: { Authentication: null },
+        },
+        metadata,
+        last_authentication: [],
+        authn_method: {
+          WebAuthn: {
+            pubkey: new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
+            credential_id: new Uint8Array(passkeyIdentity.getCredentialId()!),
+          },
+        },
+      },
     );
   };
 }

@@ -6,6 +6,10 @@
   const user = page.url.searchParams.get("user");
   const flow = new AddPasskeyFlow(BigInt(user!));
 
+  const handleAddPasskey = () => {
+    flow.addPasskey();
+  };
+
   onMount(() => {
     flow.addTemporaryKey();
   });
@@ -19,4 +23,5 @@
   <p class="text-text-primary">{flow.verificationCode}</p>
 {:else if flow.view === "add-device"}
   <p class="text-text-primary">Add device</p>
+  <button onclick={handleAddPasskey}>Add passkey</button>
 {/if}
