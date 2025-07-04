@@ -19,7 +19,6 @@ export class AddPasskeyFlow {
   verificationCode: string | undefined;
   #identityNumber: UserNumber;
   #tentativeDevice: DeviceData;
-  #pollForVerifiedTimeout;
 
   constructor(identityNumber: UserNumber) {
     this.#identityNumber = identityNumber;
@@ -37,10 +36,7 @@ export class AddPasskeyFlow {
       credential_id: [],
     };
     this.verificationCode = undefined;
-    this.#pollForVerifiedTimeout = setTimeout(
-      () => this.#pollForVerifiedFunction(identityNumber),
-      1000,
-    );
+    setTimeout(() => this.#pollForVerifiedFunction(identityNumber), 1000);
   }
 
   #pollForVerifiedFunction = async (identityNumber: bigint) => {
