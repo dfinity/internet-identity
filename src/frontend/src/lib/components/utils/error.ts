@@ -103,7 +103,7 @@ export const handleError = (error: unknown) => {
         console.error(error);
         break;
       default: {
-        // Should be avoided; reaching here means an error is not implemented.
+        // Should be avoided; reaching here means an error is missing above.
         void (error.type satisfies never);
         toaster.error({
           title: "Unknown error",
