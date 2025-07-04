@@ -7,16 +7,18 @@ import { get } from "svelte/store";
 export class StartAddPasskeyFlow {
   view = $state<"show-link" | "authorize" | "success">("show-link");
   #identityNumber: UserNumber;
-  #tentativeDevice: DeviceData | undefined;
 
   constructor(identityNumber: UserNumber) {
     this.#identityNumber = identityNumber;
-    this.#tentativeDevice = undefined;
   }
 
   startAddPasskeyFlow = async () => {
     await this.#enterRegistrationMode();
-    this.#tentativeDevice = await this.#pollForTentativeDevice();
+    try {
+      this.#pollForTentativeDevice();
+    } catch (e) {
+      throw new Error("Failed to poll for tentative device");
+    }
     this.view = "authorize";
   };
 
