@@ -7,10 +7,10 @@
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
-  import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
-  import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
+  import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
+  import { CROSS_DEVICE_PASSKEYS } from "$lib/state/featureFlags";
 
-  let displayAddCredentialDialog = $state(false);
+  let displayAddAccessMethod = $state(false);
 </script>
 
 <div class="text-text-primary">
@@ -27,11 +27,11 @@
         </h4>
       </div>
 
-      {#if identityInfo.openIdCredentials.length === 0}
+      {#if identityInfo.openIdCredentials.length === 0 || (identityInfo.authnMethods.length <= 10 && $CROSS_DEVICE_PASSKEYS)}
         <div>
           <Button
             onclick={() => {
-              displayAddCredentialDialog = true;
+              displayAddAccessMethod = true;
             }}
             class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
             >Add <Plus size="1.25rem" /></Button
@@ -90,6 +90,6 @@
   />
 {/if}
 
-{#if displayAddCredentialDialog}
-  <AddOpenIdCredential onClose={() => (displayAddCredentialDialog = false)} />
+{#if displayAddAccessMethod}
+  <AddAccessMethodDialog onClose={() => (displayAddAccessMethod = false)} />
 {/if}

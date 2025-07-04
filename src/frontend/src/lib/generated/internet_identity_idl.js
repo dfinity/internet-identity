@@ -150,6 +150,9 @@ export const idlFactory = ({ IDL }) => {
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
+  const AuthnMethodVerifiedPollError = IDL.Variant({
+    'Unauthorized' : IDL.Null,
+  });
   const AuthnMethodConfirmationCode = IDL.Record({
     'confirmation_code' : IDL.Text,
     'expiration' : Timestamp,
@@ -493,6 +496,16 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         [],
+      ),
+    'authn_method_poll_for_verified' : IDL.Func(
+        [IdentityNumber],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Bool,
+            'Err' : AuthnMethodVerifiedPollError,
+          }),
+        ],
+        ['query'],
       ),
     'authn_method_register' : IDL.Func(
         [IdentityNumber, AuthnMethodData],
