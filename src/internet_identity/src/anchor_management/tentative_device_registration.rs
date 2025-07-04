@@ -1,10 +1,10 @@
 use crate::anchor_management::add_device;
-use crate::authz_utils::IdentityUpdateError;
+use crate::authz_utils::{AuthorizationError, IdentityUpdateError};
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::Anchor;
 use crate::{secs_to_nanos, state};
-use candid::Principal;
+use candid::{CandidType, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use internet_identity_interface::archive::types::Operation;
@@ -177,6 +177,17 @@ fn get_verified_device(
             }
         }
     })
+}
+
+#[derive(CandidType)]
+pub enum AuthnMethodVerifiedPollError {
+    Unauthorized,
+}
+
+impl From<AuthorizationError> for AuthnMethodVerifiedPollError {
+    fn from(_err: AuthorizationError) -> Self {
+        AuthnMethodVerifiedPollError::Unauthorized
+    }
 }
 
 /// Checks whether a tentative device has been verified without mutating anything

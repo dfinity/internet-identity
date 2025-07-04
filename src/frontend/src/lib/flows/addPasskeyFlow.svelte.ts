@@ -19,7 +19,7 @@ export class AddPasskeyFlow {
   verificationCode: string | undefined;
   #identityNumber: UserNumber;
   #tentativeDevice: DeviceData;
-  #pollForVerified;
+  #pollForVerifiedTimeout;
 
   constructor(identityNumber: UserNumber) {
     this.#identityNumber = identityNumber;
@@ -37,28 +37,29 @@ export class AddPasskeyFlow {
       credential_id: [],
     };
     this.verificationCode = undefined;
-    this.#pollForVerified = setInterval(async () => {
-      const verifiedResponse =
-        await get(sessionStore).actor.authn_method_poll_for_verified(
-          identityNumber,
-        );
-      if ("Ok" in verifiedResponse && verifiedResponse.Ok === true) {
-        this.view = "add-device";
-        clearInterval(this.#pollForVerified);
-      }
-      if ("Err" in verifiedResponse) {
-        console.log(verifiedResponse.Err);
-      }
-    }, 2000);
+    this.#pollForVerifiedTimeout = setTimeout(
+      () => this.#pollForVerifiedFunction(identityNumber),
+      1000,
+    );
   }
 
+  #pollForVerifiedFunction = async (identityNumber: bigint) => {
+    const verifiedResponse =
+      await get(sessionStore).actor.authn_method_poll_for_verified(
+        identityNumber,
+      );
+    if ("Ok" in verifiedResponse && verifiedResponse.Ok === true) {
+      this.view = "add-device";
+    } else {
+      setTimeout(() => this.#pollForVerifiedFunction(identityNumber), 100);
+    }
+  };
+
   addTemporaryKey = async () => {
-    console.log("adding temporary key");
     const response = await get(sessionStore).actor.add_tentative_device(
       this.#identityNumber,
       this.#tentativeDevice,
     );
-    console.log(response);
     if ("added_tentatively" in response) {
       this.verificationCode = response.added_tentatively.verification_code;
       this.view = "show-code";
@@ -72,10 +73,9 @@ export class AddPasskeyFlow {
 
     const identityNumber = this.#identityNumber;
 
-    const identityInfoResponse =
-      await get(sessionStore).actor.identity_info(identityNumber);
-
-    const { name } = await throwCanisterError(identityInfoResponse);
+    const { name } = await get(sessionStore)
+      .actor.identity_info(identityNumber)
+      .then(throwCanisterError);
 
     const passkeyIdentity =
       get(featureFlags.DUMMY_AUTH) ||
@@ -125,10 +125,14 @@ export class AddPasskeyFlow {
       ]);
     }
 
-    const replaceResult = await get(sessionStore).actor.authn_method_replace(
-      identityNumber,
-      tempPubKey,
-      {
+    const credentialIdRaw = passkeyIdentity.getCredentialId();
+
+    if (!credentialIdRaw) throw Error("Missing credential id!");
+
+    const credentialId = new Uint8Array(credentialIdRaw);
+
+    const replaceResult = await get(sessionStore)
+      .actor.authn_method_replace(identityNumber, tempPubKey, {
         security_settings: {
           protection: { Unprotected: null },
           purpose: { Authentication: null },
@@ -138,15 +142,11 @@ export class AddPasskeyFlow {
         authn_method: {
           WebAuthn: {
             pubkey: new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
-            credential_id: new Uint8Array(passkeyIdentity.getCredentialId()!),
+            credential_id: credentialId,
           },
         },
-      },
-    );
-
-    void throwCanisterError(replaceResult);
-
-    const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
+      })
+      .then(throwCanisterError);
 
     // TODO: figure out some magic to authenticate without scanning again
 
@@ -156,6 +156,6 @@ export class AddPasskeyFlow {
       authMethod: { passkey: { credentialId } },
     });
 
-    return replaceResult;
+    return { Ok: replaceResult };
   };
 }

@@ -27,7 +27,7 @@
         </h4>
       </div>
 
-      {#if identityInfo.openIdCredentials.length === 0 || (identityInfo.authnMethods.length <= 8 && $CROSS_DEVICE_PASSKEYS)}
+      {#if identityInfo.openIdCredentials.length === 0 || (identityInfo.authnMethods.length <= 10 && $CROSS_DEVICE_PASSKEYS)}
         <div>
           <Button
             onclick={() => {

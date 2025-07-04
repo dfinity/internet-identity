@@ -4,9 +4,9 @@ use crate::anchor_management::tentative_device_registration::{
 };
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
-use crate::authz_utils::AuthorizationError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
+use crate::tentative_device_registration::AuthnMethodVerifiedPollError;
 use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -658,9 +658,8 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
-    use crate::{
-        anchor_management::tentative_device_registration::poll_for_device_verified,
-        authz_utils::AuthorizationError,
+    use crate::anchor_management::tentative_device_registration::{
+        poll_for_device_verified, AuthnMethodVerifiedPollError,
     };
 
     use super::*;
@@ -925,8 +924,8 @@ mod v2_api {
     #[query]
     fn authn_method_poll_for_verified(
         identity_number: IdentityNumber,
-    ) -> Result<bool, AuthorizationError> {
-        check_authorization(identity_number)?;
+    ) -> Result<bool, AuthnMethodVerifiedPollError> {
+        check_authorization(identity_number).map_err(AuthnMethodVerifiedPollError::from)?;
         Ok(poll_for_device_verified(identity_number))
     }
 }

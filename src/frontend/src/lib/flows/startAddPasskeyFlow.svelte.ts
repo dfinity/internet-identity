@@ -14,22 +14,17 @@ export class StartAddPasskeyFlow {
   }
 
   startAddPasskeyFlow = async () => {
-    console.log("starting add passkey flow");
     await this.#enterRegistrationMode();
-    console.log("registration mode entered");
     this.#tentativeDevice = await this.#pollForTentativeDevice();
-    console.log(this.#tentativeDevice);
     this.view = "authorize";
   };
 
   verifyDevice = async (code: string) => {
-    console.log("verifying device");
     const actor = await get(authenticatedStore).actor;
     const response = await actor.verify_tentative_device(
       this.#identityNumber,
       code,
     );
-    console.log(response);
     if ("verified" in response) {
       this.view = "success";
     }
@@ -45,7 +40,9 @@ export class StartAddPasskeyFlow {
     // eslint-disable-next-line no-async-promise-executor
     return new Promise<DeviceData | undefined>(async (resolve) => {
       // TODO: Add countdown or timeout
-      while (true) {
+      let counter = 0;
+      const maxCount = 1000;
+      while (counter < maxCount) {
         const anchorInfo = await actor.get_anchor_info(this.#identityNumber);
         const tentativeDevice =
           anchorInfo.device_registration[0]?.tentative_device[0];
@@ -56,6 +53,7 @@ export class StartAddPasskeyFlow {
         // Debounce a little; in practice won't be noticed by users but
         // will avoid hot looping in case the op becomes near instantaneous.
         await waitFor(100);
+        counter++;
       }
     });
   };

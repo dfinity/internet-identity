@@ -511,8 +511,8 @@ type AuthnMethodConfirmationError = variant {
     NoAuthnMethodToConfirm;
 };
 
-type AuthorizationError = record {
-    principal;
+type AuthnMethodVerifiedPollError = variant {
+    Unauthorized;
 };
 
 type IdentityAuthnInfo = record {
@@ -858,7 +858,7 @@ service : (opt InternetIdentityInit) -> {
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
 
 
-    authn_method_poll_for_verified : (IdentityNumber) -> (variant {Ok : bool; Err: AuthorizationError});
+    authn_method_poll_for_verified : (IdentityNumber) -> (variant {Ok : bool; Err : AuthnMethodVerifiedPollError }) query;
 
     // Authentication protocol
     // =======================
