@@ -15,8 +15,8 @@ export class StartAddPasskeyFlow {
   startAddPasskeyFlow = async () => {
     await this.#enterRegistrationMode();
     try {
-      this.#pollForTentativeDevice();
-    } catch (e) {
+      await this.#pollForTentativeDevice();
+    } catch (_e) {
       throw new Error("Failed to poll for tentative device");
     }
     this.view = "authorize";
