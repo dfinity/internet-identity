@@ -6,6 +6,10 @@
   import { handleError } from "../utils/error";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { StartAddPasskeyFlow } from "$lib/flows/startAddPasskeyFlow.svelte";
+  import QrCreator from "qr-creator";
+  import Input from "../ui/Input.svelte";
+  import { isDarkMode } from "$lib/state/UI/isDarkMode";
+  import { CROSS_DEVICE_PASSKEYS } from "$lib/state/featureFlags";
 
   const { onClose } = $props();
 
@@ -13,10 +17,31 @@
     $authenticatedStore.identityNumber,
   );
 
+  let inputRef = $state<HTMLInputElement>();
+  let qrCodeRef = $state<HTMLDivElement>();
+
   let startAddingPasskeyDialog = $state(false);
   let url = $derived(
     `${window.location.origin}/flow/?user=${$authenticatedStore.identityNumber}`,
   );
+
+  $effect(() => {
+    if (qrCodeRef) {
+      // Remove existing children when dark mode settings change
+      qrCodeRef.innerHTML = "";
+      QrCreator.render(
+        {
+          text: url,
+          radius: 0.5,
+          ecLevel: "H",
+          fill: $isDarkMode ? "#fafafa" : "#1d1d1f",
+          background: null,
+          size: 200,
+        },
+        qrCodeRef,
+      );
+    }
+  });
 
   const handleAddCredential = async () => {
     try {
@@ -34,7 +59,6 @@
   let authorizationCode = $state("");
 
   const handleAuthorize = async () => {
-    startAddingPasskeyDialog = false;
     await startAddPasskeyFlow.verifyDevice(authorizationCode);
   };
 </script>
@@ -49,16 +73,38 @@
         Scan the following QR code below on your new device or enter the URL
         manually
       </p>
-      <a class="text-text-primary" href={url}>{url}</a>
+      <div class="mb-8 flex items-center justify-center">
+        <div bind:this={qrCodeRef}></div>
+      </div>
+      <p class="text-text-primary text-center">{url}</p>
     {:else if startAddPasskeyFlow.view === "authorize"}
       <h1 class="text-text-primary mb-3 text-2xl font-medium">Authorize</h1>
-      <input type="text" bind:value={authorizationCode} />
+      <Input
+        bind:element={inputRef}
+        bind:value={authorizationCode}
+        inputmode="text"
+        placeholder="Authorization code"
+        hint="Enter the authorization code displayed on the new client."
+        type="text"
+        size="md"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        error={authorizationCode.length > 8
+          ? "Maximum length is 8 characters."
+          : undefined}
+        aria-label="Identity name"
+        class="mb-3"
+      />
       <Button variant="primary" onclick={handleAuthorize}>Authorize</Button>
     {:else if startAddPasskeyFlow.view === "success"}
-      <h1 class="text-text-primary mb-3 text-2xl font-medium">Device added</h1>
-      <p class="text-text-tertiary mb-8 font-medium">
-        Your device has been added successfully.
+      <h1 class="text-text-primary mb-3 text-2xl font-medium">
+        On this side, you're finished.
+      </h1>
+      <p class="text-text-tertiary font-medium">
+        Please continue on the new device. You can close this window.
       </p>
+      <Button onclick={onClose}>Close</Button>
     {/if}
   {:else}
     <h1 class="text-text-primary mb-3 text-2xl font-medium">Add credential</h1>
@@ -66,14 +112,16 @@
       Please choose the type of credential you would like to add.
     </p>
     <div class="flex w-full flex-col gap-3">
-      <Button
-        variant="primary"
-        onclick={() => {
-          chooseAddPasskey();
-        }}
-      >
-        Add Passkey
-      </Button>
+      {#if $CROSS_DEVICE_PASSKEYS}
+        <Button
+          variant="primary"
+          onclick={() => {
+            chooseAddPasskey();
+          }}
+        >
+          Add Passkey on other Device
+        </Button>
+      {/if}
       <!-- TODO: if/when we add more credentials and OpenID providers, we'll need to add more buttons here -->
       {#if identityInfo.openIdCredentials.length === 0}
         <Button

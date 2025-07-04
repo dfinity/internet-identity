@@ -23,7 +23,7 @@ export class StartAddPasskeyFlow {
   };
 
   verifyDevice = async (code: string) => {
-    console.log("in da verifying device");
+    console.log("verifying device");
     const actor = await get(authenticatedStore).actor;
     const response = await actor.verify_tentative_device(
       this.#identityNumber,

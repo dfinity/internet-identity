@@ -8,6 +8,7 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
+  import { CROSS_DEVICE_PASSKEYS } from "$lib/state/featureFlags";
 
   let displayAddAccessMethod = $state(false);
 </script>
@@ -26,7 +27,7 @@
         </h4>
       </div>
 
-      {#if identityInfo.openIdCredentials.length === 0 || identityInfo.authnMethods.length <= 8}
+      {#if identityInfo.openIdCredentials.length === 0 || (identityInfo.authnMethods.length <= 8 && $CROSS_DEVICE_PASSKEYS)}
         <div>
           <Button
             onclick={() => {

@@ -5,6 +5,7 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import { AddPasskeyFlow } from "$lib/flows/addPasskeyFlow.svelte";
   import { onMount } from "svelte";
+  import { fly } from "svelte/transition";
 
   const user = page.url.searchParams.get("user");
   const flow = new AddPasskeyFlow(BigInt(user!));
@@ -13,7 +14,7 @@
     const addPasskeyResult = await flow.addPasskey();
 
     if ("Ok" in addPasskeyResult) {
-      goto("/manage");
+      goto("/");
     }
   };
 
@@ -22,19 +23,29 @@
   });
 </script>
 
-<div class="flex h-screen w-screen items-center justify-center">
+<div class="bg-bg-secondary flex h-screen w-screen items-center justify-center">
   <Panel class="p-4">
     <h1 class="text-text-primary mb-3.5 text-2xl font-semibold">
-      Add Device Flow
+      Add a new passkey to your identity
     </h1>
-    {#if flow.view === "loading"}
-      <p class="text-text-secondary">Loading...</p>
-    {:else if flow.view === "show-code"}
-      <p class="text-text-secondary mb-2">Authorization code</p>
-      <p class="text-text-secondary">{flow.verificationCode}</p>
-    {:else if flow.view === "add-device"}
-      <p class="text-text-secondary mb-2">Add device</p>
-      <Button onclick={handleAddPasskey}>Add passkey</Button>
-    {/if}
+    <div>
+      {#if flow.view === "loading"}
+        <p class="text-text-secondary text-center">Loading...</p>
+      {:else if flow.view === "show-code"}
+        <p class="text-text-secondary mb-3.5">
+          Please enter the code displayed below on your original device.
+        </p>
+        <p class="text-text-primary text-center text-4xl">
+          {flow.verificationCode}
+        </p>
+      {:else if flow.view === "add-device"}
+        <p class="text-text-secondary mb-4 text-center nth-[2]:hidden">
+          Please add a new passkey to use on this device.
+        </p>
+        <div class="w-full">
+          <Button class="w-full" onclick={handleAddPasskey}>Add passkey</Button>
+        </div>
+      {/if}
+    </div>
   </Panel>
 </div>

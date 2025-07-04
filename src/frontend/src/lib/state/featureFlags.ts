@@ -84,10 +84,16 @@ export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
   false,
 );
 
+export const CROSS_DEVICE_PASSKEYS = createFeatureFlagStore(
+  "CROSS_DEVICE_PASSKEYS",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   ENABLE_MIGRATE_FLOW,
+  CROSS_DEVICE_PASSKEYS,
 } as Record<string, FeatureFlagStore>;

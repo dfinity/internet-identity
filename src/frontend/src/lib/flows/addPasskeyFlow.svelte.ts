@@ -155,16 +155,15 @@ export class AddPasskeyFlow {
     throwCanisterError(replaceResult);
 
     const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
-    const identity = DelegationIdentity.fromDelegation(passkeyIdentity);
 
-    authenticationStore.set({ identity, identityNumber });
+    // TODO: figure out some magic to authenticate without scanning again
+
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber,
       name: passkeyIdentity.getName(),
       authMethod: { passkey: { credentialId } },
     });
 
-    console.log(await get(authenticatedStore));
     return replaceResult;
   };
 }
