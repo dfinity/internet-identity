@@ -38,6 +38,7 @@ type LastUsedIdentitiesStore = Readable<{
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
   ) => void;
+  removeIdentity: (identityNumber: bigint) => void;
   syncLastUsedAccounts: (
     identityNumber: bigint,
     origin: string,
@@ -105,6 +106,12 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           ...params,
           lastUsedTimestampMillis: Date.now(),
         };
+        return lastUsedIdentities;
+      });
+    },
+    removeIdentity(identityNumber) {
+      lastUsedStore.update((lastUsedIdentities) => {
+        delete lastUsedIdentities[identityNumber.toString()];
         return lastUsedIdentities;
       });
     },

@@ -53,7 +53,7 @@ use ic_stable_structures::{
 };
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use internet_identity_interface::internet_identity::types::*;
+use internet_identity_interface::internet_identity::types::{AnchorNumber, Timestamp};
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -732,10 +732,7 @@ mod test {
             CandidSource::File(Path::new("archive.did")),
         )
         .unwrap_or_else(|e| {
-            panic!(
-                "the canister code interface is not equal to the did file: {:?}",
-                e
-            )
+            panic!("the canister code interface is not equal to the did file: {e:?}")
         });
     }
 }

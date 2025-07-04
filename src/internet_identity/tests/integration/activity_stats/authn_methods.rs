@@ -64,10 +64,7 @@ fn should_report_daily_active_authn_methods() -> Result<(), CallError> {
         let metrics = get_metrics(&env, canister_id);
         assert_metric(
             &metrics,
-            &format!(
-                "internet_identity_daily_active_authn_methods{{type=\"{}\"}}",
-                authn_type
-            ),
+            &format!("internet_identity_daily_active_authn_methods{{type=\"{authn_type}\"}}"),
             2f64,
         );
 
@@ -122,10 +119,7 @@ fn should_report_monthly_active_authn_methods() -> Result<(), CallError> {
         let metrics = get_metrics(&env, canister_id);
         assert_metric(
             &metrics,
-            &format!(
-                "internet_identity_monthly_active_authn_methods{{type=\"{}\"}}",
-                authn_type
-            ),
+            &format!("internet_identity_monthly_active_authn_methods{{type=\"{authn_type}\"}}"),
             2f64,
         );
 

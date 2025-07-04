@@ -319,7 +319,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
                 let start = url_start + 4; // "url(" is 4 chars
                 if let Some(url_end) = line[start..].find(")") {
                     let url = line[start..start + url_end].trim_matches(|c| c == '"' || c == '/');
-                    Some(format!("/{}", url))
+                    Some(format!("/{url}"))
                 } else {
                     None
                 }
@@ -506,7 +506,7 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
                     if let Some(url_end) = line[url_start..].find(&format!("{ICON_SUFFIX}\"")) {
                         let url = line[url_start..url_start + url_end + 5]
                             .trim_matches(|c| c == '"' || c == '/');
-                        Some(format!("/{}", url))
+                        Some(format!("/{url}"))
                     } else {
                         None
                     }

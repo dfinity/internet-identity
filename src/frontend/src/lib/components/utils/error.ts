@@ -6,6 +6,8 @@ import type {
   CreateAccountError,
   IdRegFinishError,
   IdRegStartError,
+  OpenIdCredentialAddError,
+  OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import { isOpenIdCancelError } from "$lib/utils/openID";
 
@@ -27,6 +29,8 @@ export const handleError = (error: unknown) => {
       | IdRegFinishError
       | CheckCaptchaError
       | CreateAccountError
+      | OpenIdCredentialAddError
+      | OpenIdCredentialRemoveError
     >(error)
   ) {
     switch (error.type) {
@@ -54,6 +58,22 @@ export const handleError = (error: unknown) => {
         toaster.warning({
           title: "Limit reached",
           description: "No more additional accounts can be created",
+        });
+        break;
+      case "OpenIdCredentialAlreadyRegistered":
+        toaster.error({
+          title: "This account is already linked to another identity",
+        });
+        break;
+      case "JwtVerificationFailed":
+        toaster.error({
+          title: "Authorization invalid",
+          description: "It may have expired — please try again",
+        });
+        break;
+      case "OpenIdCredentialNotFound":
+        toaster.error({
+          title: "This credential is not linked to this identity",
         });
         break;
       case "AlreadyInProgress":

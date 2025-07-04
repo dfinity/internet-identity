@@ -288,8 +288,7 @@ fn get_credential(req: GetCredentialRequest) -> Result<IssuedCredentialData, Iss
         Err(e) => {
             return Result::<IssuedCredentialData, IssueCredentialError>::Err(
                 IssueCredentialError::SignatureNotFound(format!(
-                    "signature not prepared or expired: {}",
-                    e
+                    "signature not prepared or expired: {e}"
                 )),
             );
         }
@@ -323,7 +322,7 @@ fn get_derivation_origin(hostname: &str) -> Result<DerivationOriginData, Derivat
         // We don't currently rely on the value provided, so if it doesn't match
         // we just print a warning
         if hostname != config.frontend_hostname {
-            println!("*** achtung! bad frontend hostname {}", hostname,);
+            println!("*** achtung! bad frontend hostname {hostname}");
         }
 
         Ok(DerivationOriginData {
@@ -354,7 +353,7 @@ fn verify_credential_spec(spec: &CredentialSpec) -> Result<SupportedCredentialTy
             verify_single_argument(spec, "minAge", ArgumentValue::Int(18))?;
             Ok(VerifiedAdult(18))
         }
-        other => Err(format!("Credential {} is not supported", other)),
+        other => Err(format!("Credential {other} is not supported")),
     }
 }
 
@@ -384,8 +383,7 @@ fn verify_single_argument(
 
     if value != &expected_value {
         return Err(format!(
-            "Unsupported value for argument '{}': expected '{}', got '{}'",
-            expected_argument, expected_value, value
+            "Unsupported value for argument '{expected_argument}': expected '{expected_value}', got '{value}'"
         ));
     }
 
@@ -405,19 +403,19 @@ fn verify_single_argument(
 #[update]
 fn add_employee(employee_id: Principal) -> String {
     EMPLOYEES.with_borrow_mut(|employees| employees.insert(employee_id));
-    format!("Added employee {}", employee_id)
+    format!("Added employee {employee_id}")
 }
 
 #[update]
 fn add_graduate(graduate_id: Principal) -> String {
     GRADUATES.with_borrow_mut(|graduates| graduates.insert(graduate_id));
-    format!("Added graduate {}", graduate_id)
+    format!("Added graduate {graduate_id}")
 }
 
 #[update]
 fn add_adult(adult_id: Principal) -> String {
     ADULTS.with_borrow_mut(|adults| adults.insert(adult_id));
-    format!("Added adult {}", adult_id)
+    format!("Added adult {adult_id}")
 }
 
 #[query]
@@ -443,7 +441,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
         None => HttpResponse {
             status_code: 404,
             headers,
-            body: ByteBuf::from(format!("Asset {} not found.", path)),
+            body: ByteBuf::from(format!("Asset {path} not found.")),
         },
     }
 }
@@ -646,9 +644,7 @@ mod test {
         )
         .unwrap_or_else(|e| {
             panic!(
-                "the canister interface is not equal to the did file: {:?} \n--- current interface:\n{}\n",
-                e,
-                canister_interface,
+                "the canister interface is not equal to the did file: {e:?} \n--- current interface:\n{canister_interface}\n"
             )
         });
     }
