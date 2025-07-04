@@ -5,9 +5,9 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import { AddPasskeyFlow } from "$lib/flows/addPasskeyFlow.svelte";
   import { onMount } from "svelte";
-  import { fly } from "svelte/transition";
 
   const user = page.url.searchParams.get("user");
+  if (!user) goto("/");
   const flow = new AddPasskeyFlow(BigInt(user!));
 
   const handleAddPasskey = async () => {
