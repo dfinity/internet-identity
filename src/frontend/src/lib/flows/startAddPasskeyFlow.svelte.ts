@@ -38,7 +38,7 @@ export class StartAddPasskeyFlow {
   #pollForTentativeDevice = async (): Promise<DeviceData | undefined> => {
     const actor = await get(authenticatedStore).actor;
     // eslint-disable-next-line no-async-promise-executor
-    return new Promise<DeviceData | undefined>(async (resolve) => {
+    return new Promise<DeviceData | undefined>(async (resolve, reject) => {
       // TODO: Add countdown or timeout
       let counter = 0;
       const maxCount = 1000;
@@ -54,6 +54,10 @@ export class StartAddPasskeyFlow {
         // will avoid hot looping in case the op becomes near instantaneous.
         await waitFor(100);
         counter++;
+        if (counter >= maxCount) {
+          reject(Error("Failed to find tentative device")); // or reject with an error
+          return;
+        }
       }
     });
   };
