@@ -89,7 +89,7 @@ export const handleError = (error: unknown) => {
       case "Unauthorized":
         // Shouldn't have happened; reaching here means they weren't avoided.
         toaster.error({
-          title: "Unexpected error",
+          title: "Unreachable error",
           description: error.type,
         });
         console.error(error);
@@ -103,7 +103,13 @@ export const handleError = (error: unknown) => {
         console.error(error);
         break;
       default: {
+        // Should be avoided; reaching here means an error is not implemented.
         void (error.type satisfies never);
+        toaster.error({
+          title: "Unexpected error",
+          description: error.type,
+        });
+        console.error(error);
       }
     }
     return;
