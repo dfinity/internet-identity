@@ -73,7 +73,7 @@ export const handleError = (error: unknown) => {
         break;
       case "OpenIdCredentialNotFound":
         toaster.error({
-          title: "This credential is not linked to this identity",
+          title: "This account has already been unlinked",
         });
         break;
       case "AlreadyInProgress":
@@ -83,6 +83,7 @@ export const handleError = (error: unknown) => {
           title: "Unhandled error",
           description: error.type,
         });
+        console.error(error);
         break;
       case "NameTooLong":
       case "Unauthorized":
@@ -91,6 +92,7 @@ export const handleError = (error: unknown) => {
           title: "Unexpected error",
           description: error.type,
         });
+        console.error(error);
         break;
       case "InternalCanisterError":
         // Should never happen; reaching here means there's a technical issue.
@@ -98,6 +100,7 @@ export const handleError = (error: unknown) => {
           title: "An internal error occurred",
           description: error.value(error.type),
         });
+        console.error(error);
         break;
       default: {
         void (error.type satisfies never);
