@@ -3,6 +3,7 @@ import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
   CheckCaptchaError,
+  CreateAccountError,
   IdRegFinishError,
   IdRegStartError,
   OpenIdCredentialAddError,
@@ -27,6 +28,7 @@ export const handleError = (error: unknown) => {
       | IdRegStartError
       | IdRegFinishError
       | CheckCaptchaError
+      | CreateAccountError
       | OpenIdCredentialAddError
       | OpenIdCredentialRemoveError
     >(error)
@@ -52,25 +54,15 @@ export const handleError = (error: unknown) => {
           description: error.value(error.type),
         });
         break;
-      case "AlreadyInProgress":
-      case "WrongSolution":
-        // Should be handled up the stack; reaching here means they weren’t.
-        toaster.error({
-          title: "Unhandled error",
-          description: error.type,
+      case "AccountLimitReached":
+        toaster.warning({
+          title: "Limit reached",
+          description: "No more additional accounts can be created",
         });
         break;
       case "OpenIdCredentialAlreadyRegistered":
         toaster.error({
           title: "This account is already linked to another identity",
-        });
-        break;
-      case "Unauthorized":
-        break;
-      case "InternalCanisterError":
-        toaster.error({
-          title: "An internal error occurred",
-          description: error.value(error.type),
         });
         break;
       case "JwtVerificationFailed":
@@ -81,11 +73,43 @@ export const handleError = (error: unknown) => {
         break;
       case "OpenIdCredentialNotFound":
         toaster.error({
-          title: "This credential is not linked to this identity",
+          title: "This account has already been unlinked",
         });
         break;
+      case "AlreadyInProgress":
+      case "WrongSolution":
+        // Should be handled up the stack; reaching here means they weren't.
+        toaster.error({
+          title: "Unhandled error",
+          description: error.type,
+        });
+        console.error(error);
+        break;
+      case "NameTooLong":
+      case "Unauthorized":
+        // Shouldn't have happened; reaching here means they weren't avoided.
+        toaster.error({
+          title: "Unexpected error",
+          description: error.type,
+        });
+        console.error(error);
+        break;
+      case "InternalCanisterError":
+        // Should never happen; reaching here means there's a technical issue.
+        toaster.error({
+          title: "An internal error occurred",
+          description: error.value(error.type),
+        });
+        console.error(error);
+        break;
       default: {
+        // Should be avoided; reaching here means an error is missing above.
         void (error.type satisfies never);
+        toaster.error({
+          title: "Unknown error",
+          description: error.type,
+        });
+        console.error(error);
       }
     }
     return;
