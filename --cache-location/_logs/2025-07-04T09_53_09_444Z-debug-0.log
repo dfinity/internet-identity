@@ -1,0 +1,20 @@
+0 verbose cli /Users/andri.schatz/.nvm/versions/node/v20.18.1/bin/node /Users/andri.schatz/.nvm/versions/node/v20.18.1/bin/npm
+1 info using npm@11.3.0
+2 info using node@v20.18.1
+3 silly config load:file:/Users/andri.schatz/.nvm/versions/node/v20.18.1/lib/node_modules/npm/npmrc
+4 warn "0" is being parsed as a normal command line argument.
+5 warn Unknown cli config "--max-warnings". This will stop working in the next major version of npm.
+6 silly config load:file:/Users/andri.schatz/dev/internet-identity/.npmrc
+7 silly config load:file:/Users/andri.schatz/.npmrc
+8 silly config load:file:/Users/andri.schatz/.nvm/versions/node/v20.18.1/etc/npmrc
+9 verbose title npm eslint 0 node_modules/.cache/eslint src/frontend/**/*.ts* src/showcase/**/*.ts
+10 verbose argv "eslint" "--max-warnings" "0" "--cache" "--cache-location" "node_modules/.cache/eslint" "src/frontend/**/*.ts*" "src/showcase/**/*.ts"
+11 verbose logfile logs-max:10 dir:/Users/andri.schatz/dev/internet-identity/--cache-location/_logs/2025-07-04T09_53_09_444Z-
+12 verbose logfile /Users/andri.schatz/dev/internet-identity/--cache-location/_logs/2025-07-04T09_53_09_444Z-debug-0.log
+13 silly logfile done cleaning log files
+14 verbose cwd /Users/andri.schatz/dev/internet-identity
+15 verbose os Darwin 24.5.0
+16 verbose node v20.18.1
+17 verbose npm  v11.3.0
+18 verbose exit 1
+19 verbose code 1

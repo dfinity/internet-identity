@@ -6,20 +6,11 @@ import {
 import { canisterConfig } from "$lib/globals";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import featureFlags from "$lib/state/featureFlags";
-import {
-  authenticatedStore,
-  authenticationStore,
-} from "$lib/stores/authentication.store";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { sessionStore } from "$lib/stores/session.store";
-import {
-  authenticateWithPasskey,
-  authenticateWithSession,
-} from "$lib/utils/authentication";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { throwCanisterError } from "$lib/utils/utils";
-import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
 import { nonNullish } from "@dfinity/utils";
 import { get } from "svelte/store";
 
@@ -87,7 +78,8 @@ export class AddPasskeyFlow {
     const { name } = await throwCanisterError(identityInfoResponse);
 
     const passkeyIdentity =
-      featureFlags.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+      get(featureFlags.DUMMY_AUTH) ||
+      nonNullish(canisterConfig.dummy_auth[0]?.[0])
         ? await DiscoverableDummyIdentity.createNew(name[0] ?? "")
         : await DiscoverablePasskeyIdentity.createNew(name[0] ?? "");
 
@@ -133,7 +125,7 @@ export class AddPasskeyFlow {
       ]);
     }
 
-    let replaceResult = await get(sessionStore).actor.authn_method_replace(
+    const replaceResult = await get(sessionStore).actor.authn_method_replace(
       identityNumber,
       tempPubKey,
       {
@@ -152,7 +144,7 @@ export class AddPasskeyFlow {
       },
     );
 
-    throwCanisterError(replaceResult);
+    void throwCanisterError(replaceResult);
 
     const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
 

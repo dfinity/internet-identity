@@ -4,11 +4,10 @@ function createDarkModeStore() {
   // Helper to check dark mode
   const getIsDarkMode = () =>
     typeof window !== "undefined" &&
-    window.matchMedia &&
     window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   return readable(getIsDarkMode(), (set) => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
+    if (typeof window === "undefined") return;
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 

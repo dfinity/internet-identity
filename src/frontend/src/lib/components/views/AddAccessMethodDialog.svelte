@@ -82,6 +82,9 @@
       <Input
         bind:element={inputRef}
         bind:value={authorizationCode}
+        onkeydown={(e) => {
+          if (e.key === "Enter") handleAuthorize();
+        }}
         inputmode="text"
         placeholder="Authorization code"
         hint="Enter the authorization code displayed on the new client."
@@ -101,7 +104,7 @@
       <h1 class="text-text-primary mb-3 text-2xl font-medium">
         On this side, you're finished.
       </h1>
-      <p class="text-text-tertiary font-medium">
+      <p class="text-text-tertiary mb-3 font-medium">
         Please continue on the new device. You can close this window.
       </p>
       <Button onclick={onClose}>Close</Button>
