@@ -11,6 +11,7 @@ export class StartAddPasskeyFlow {
 
   constructor(identityNumber: UserNumber) {
     this.#identityNumber = identityNumber;
+    this.#tentativeDevice = undefined;
   }
 
   startAddPasskeyFlow = async () => {
