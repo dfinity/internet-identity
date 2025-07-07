@@ -85,7 +85,6 @@ export interface AuthnMethodSecuritySettings {
 export type AuthnMethodSecuritySettingsReplaceError = {
     'AuthnMethodNotFound' : null
   };
-export type AuthnMethodVerifiedPollError = { 'Unauthorized' : null };
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -114,6 +113,7 @@ export interface CheckCaptchaArg { 'solution' : string }
 export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
+export type CheckTentativeDeviceVerifiedError = { 'Unauthorized' : null };
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -407,6 +407,11 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodAddError }
   >,
+  'authn_method_check_tentative_device_verified' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : boolean } |
+      { 'Err' : CheckTentativeDeviceVerifiedError }
+  >,
   'authn_method_confirm' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
@@ -416,11 +421,6 @@ export interface _SERVICE {
     [IdentityNumber, PublicKey, MetadataMapV2],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodMetadataReplaceError }
-  >,
-  'authn_method_poll_for_verified' : ActorMethod<
-    [IdentityNumber],
-    { 'Ok' : boolean } |
-      { 'Err' : AuthnMethodVerifiedPollError }
   >,
   'authn_method_register' : ActorMethod<
     [IdentityNumber, AuthnMethodData],

@@ -511,7 +511,7 @@ type AuthnMethodConfirmationError = variant {
     NoAuthnMethodToConfirm;
 };
 
-type AuthnMethodVerifiedPollError = variant {
+type CheckTentativeDeviceVerifiedError = variant {
     Unauthorized;
 };
 
@@ -858,7 +858,7 @@ service : (opt InternetIdentityInit) -> {
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
 
 
-    authn_method_poll_for_verified : (IdentityNumber) -> (variant {Ok : bool; Err : AuthnMethodVerifiedPollError }) query;
+    authn_method_check_tentative_device_verified : (IdentityNumber) -> (variant {Ok : bool; Err : CheckTentativeDeviceVerifiedError }) query;
 
     // Authentication protocol
     // =======================

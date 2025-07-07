@@ -180,20 +180,20 @@ fn get_verified_device(
 }
 
 #[derive(CandidType)]
-pub enum AuthnMethodVerifiedPollError {
+pub enum CheckTentativeDeviceVerifiedError {
     Unauthorized,
 }
 
-impl From<AuthorizationError> for AuthnMethodVerifiedPollError {
+impl From<AuthorizationError> for CheckTentativeDeviceVerifiedError {
     fn from(_err: AuthorizationError) -> Self {
-        AuthnMethodVerifiedPollError::Unauthorized
+        CheckTentativeDeviceVerifiedError::Unauthorized
     }
 }
 
 /// Checks whether a tentative device has been verified without mutating anything
 /// This is so that on the new client we can prompt for adding the final passkey as soon as
 /// on the old client we have verified the temporary key
-pub fn poll_for_device_verified(identity_number: IdentityNumber) -> bool {
+pub fn check_tentative_device_verified(identity_number: IdentityNumber) -> bool {
     state::tentative_device_registrations(|registrations| {
         registrations.get(&identity_number).is_none()
     })
