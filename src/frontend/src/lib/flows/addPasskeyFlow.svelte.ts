@@ -41,9 +41,9 @@ export class AddPasskeyFlow {
 
   #pollForVerifiedFunction = async (identityNumber: bigint) => {
     const verifiedResponse =
-      await get(sessionStore).actor.authn_method_poll_for_verified(
-        identityNumber,
-      );
+      await get(
+        sessionStore,
+      ).actor.authn_method_check_tentative_device_verified(identityNumber);
     if ("Ok" in verifiedResponse && verifiedResponse.Ok === true) {
       this.view = "add-device";
     } else {
