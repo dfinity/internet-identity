@@ -40,12 +40,14 @@ thread_local! {
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
 }
 
+#[derive(Clone)]
 pub struct TentativeDeviceRegistration {
     pub expiration: Timestamp,
     pub state: RegistrationState,
 }
 
 /// Registration state of new devices added using the two step device add flow
+#[derive(Clone)]
 pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
@@ -190,6 +192,11 @@ struct State {
     // tentative device registrations, not persisted across updates
     // if an anchor number is present in this map then registration mode is active until expiration
     tentative_device_registrations: RefCell<HashMap<AnchorNumber, TentativeDeviceRegistration>>,
+    // if an anchor number + id combo is present in this map then registration mode is active until expiration
+    tentative_device_registrations_v2:
+        RefCell<HashMap<RegistrationId, (IdentityNumber, TentativeDeviceRegistration)>>,
+    // lookup table so we can easily return a user's active registrations in identity_info
+    lookup_tentative_device_registration_v2: RefCell<HashMap<IdentityNumber, Vec<RegistrationId>>>,
     // additional usage metrics, NOT persisted across updates (but probably should be in the future)
     usage_metrics: RefCell<UsageMetrics>,
     // State that is temporarily persisted in stable memory during upgrades using
@@ -311,6 +318,55 @@ pub fn tentative_device_registrations_mut<R>(
     f: impl FnOnce(&mut HashMap<AnchorNumber, TentativeDeviceRegistration>) -> R,
 ) -> R {
     STATE.with(|s| f(&mut s.tentative_device_registrations.borrow_mut()))
+}
+
+#[allow(dead_code)] // For now this is not used
+pub fn tentative_device_registrations_v2<R>(
+    f: impl FnOnce(&HashMap<RegistrationId, (IdentityNumber, TentativeDeviceRegistration)>) -> R,
+) -> R {
+    STATE.with(|s| f(&s.tentative_device_registrations_v2.borrow()))
+}
+
+pub fn tentative_device_registrations_v2_mut<R>(
+    f: impl FnOnce(&mut HashMap<RegistrationId, (IdentityNumber, TentativeDeviceRegistration)>) -> R,
+) -> R {
+    STATE.with(|s| f(&mut s.tentative_device_registrations_v2.borrow_mut()))
+}
+
+#[allow(dead_code)] // For now this is not used
+pub fn lookup_tentative_device_registration_v2<R>(
+    f: impl FnOnce(&HashMap<IdentityNumber, Vec<RegistrationId>>) -> R,
+) -> R {
+    STATE.with(|s| f(&s.lookup_tentative_device_registration_v2.borrow()))
+}
+
+pub fn lookup_tentative_device_registration_v2_mut<R>(
+    f: impl FnOnce(&mut HashMap<IdentityNumber, Vec<RegistrationId>>) -> R,
+) -> R {
+    STATE.with(|s| f(&mut s.lookup_tentative_device_registration_v2.borrow_mut()))
+}
+
+pub fn get_tentative_device_registrations_by_identity_v2(
+    identity_number: IdentityNumber,
+) -> Vec<TentativeDeviceRegistration> {
+    lookup_tentative_device_registration_v2(|lookup| {
+        tentative_device_registrations_v2(|registrations| match lookup.get(&identity_number) {
+            Some(ids) => ids
+                .iter()
+                .map(|id| registrations.get(id).unwrap())
+                .map(|(_, reg)| reg.clone())
+                .collect(),
+            None => todo!(),
+        })
+    })
+}
+
+pub fn get_identity_number_by_registration_id(id: &RegistrationId) -> Option<IdentityNumber> {
+    tentative_device_registrations_v2(|registrations| {
+        registrations
+            .get(id)
+            .and_then(|&(identity_number, _)| Some(identity_number))
+    })
 }
 
 pub fn assets_mut<R>(f: impl FnOnce(&mut CertifiedAssets) -> R) -> R {
