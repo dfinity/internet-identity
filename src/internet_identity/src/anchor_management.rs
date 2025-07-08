@@ -38,42 +38,56 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let name = anchor.name();
     let now = time();
 
-    state::tentative_device_registrations(|tentative_device_registrations| {
-        match tentative_device_registrations.get(&anchor_number) {
-            Some(TentativeDeviceRegistration {
-                expiration,
-                state:
-                    DeviceTentativelyAdded {
-                        tentative_device, ..
-                    },
-            }) if *expiration > now => IdentityAnchorInfo {
+    let tentative_device_registration =
+        state::tentative_device_registrations(|tentative_device_registrations| {
+            tentative_device_registrations.get(&anchor_number)
+        });
+
+    let tentative_device_registration_v2 =
+        state::get_tentative_device_registrations_by_identity_v2(anchor_number);
+
+    //TODO: figure out this matrix
+    match tentative_device_registration {
+        Some(TentativeDeviceRegistration {
+            expiration,
+            state: DeviceTentativelyAdded {
+                tentative_device, ..
+            },
+        }) if *expiration > now => IdentityAnchorInfo {
+            devices,
+            device_registration: Some(DeviceRegistrationInfo {
+                expiration: *expiration,
+                tentative_device: Some(tentative_device.clone()),
+            }),
+            device_registrations_v2: tentative_device_registration_v2
+                .iter()
+                .map(|tent_dev_reg| DeviceRegistrationInfo {
+                    expiration: tent_dev_reg.expiration,
+                    tentative_device: None,
+                })
+                .collect(),
+            openid_credentials,
+            name,
+        },
+        Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
+            IdentityAnchorInfo {
                 devices,
                 device_registration: Some(DeviceRegistrationInfo {
                     expiration: *expiration,
-                    tentative_device: Some(tentative_device.clone()),
+                    tentative_device: None,
                 }),
+                device_registrations_v2,
                 openid_credentials,
                 name,
-            },
-            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
-                IdentityAnchorInfo {
-                    devices,
-                    device_registration: Some(DeviceRegistrationInfo {
-                        expiration: *expiration,
-                        tentative_device: None,
-                    }),
-                    openid_credentials,
-                    name,
-                }
             }
-            None | Some(_) => IdentityAnchorInfo {
-                devices,
-                device_registration: None,
-                openid_credentials,
-                name,
-            },
         }
-    })
+        None | Some(_) => IdentityAnchorInfo {
+            devices,
+            device_registration: None,
+            openid_credentials,
+            name,
+        },
+    }
 }
 
 /// Handles all the bookkeeping required on anchor activity:
