@@ -122,7 +122,6 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
     }
     try {
-      this.systemOverlay = false;
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
