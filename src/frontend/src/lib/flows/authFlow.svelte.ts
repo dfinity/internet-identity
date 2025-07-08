@@ -106,13 +106,14 @@ export class AuthFlow {
       throw new Error("Google is not configured");
     }
     try {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
       const requestConfig = createGoogleRequestConfig(clientId);
       this.systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
         nonce: get(sessionStore).nonce,
         mediation: "required",
       });
+      // Moved after `requestJWT` to avoid Safari from blocking the popup.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
       this.systemOverlay = false;
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
@@ -134,6 +135,9 @@ export class AuthFlow {
       });
       this.#options.onSignIn(identityNumber);
     } catch (error) {
+      // We also want to trigger it if `requestJWT` fails to have the drop-off in the analytics.
+      // Double-triggering is not a problem as it's considered by the same user in Plausible.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
       this.systemOverlay = false;
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
