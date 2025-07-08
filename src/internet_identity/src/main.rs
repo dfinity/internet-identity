@@ -863,8 +863,12 @@ mod v2_api {
     #[update]
     fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
+        id: RegistrationId,
     ) -> Result<RegistrationModeInfo, ()> {
-        let timeout = enter_device_registration_mode(identity_number);
+        check_authz_and_record_activity(identity_number)
+            .unwrap_or_else(|err| trap(&format!("{err}")));
+        let timeout =
+            tentative_device_registration::enter_device_registration_mode_v2(identity_number, id);
         Ok(RegistrationModeInfo {
             expiration: timeout,
         })
@@ -927,6 +931,11 @@ mod v2_api {
     ) -> Result<bool, CheckTentativeDeviceVerifiedError> {
         check_authorization(identity_number).map_err(CheckTentativeDeviceVerifiedError::from)?;
         Ok(check_tentative_device_verified(identity_number))
+    }
+
+    #[query]
+    fn lookup_by_registration_mode_id(id: RegistrationId) {
+        todo!() //TODO
     }
 }
 

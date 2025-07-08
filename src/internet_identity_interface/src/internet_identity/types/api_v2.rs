@@ -234,3 +234,5 @@ pub enum CreateIdentityData {
     PubkeyAuthn(IdRegFinishArg),
     OpenID(OpenIDRegFinishArg),
 }
+
+pub type RegistrationId = [u8; 5];

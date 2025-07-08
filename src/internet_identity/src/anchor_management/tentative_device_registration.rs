@@ -1,7 +1,10 @@
 use crate::anchor_management::add_device;
 use crate::authz_utils::{AuthorizationError, IdentityUpdateError};
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
-use crate::state::TentativeDeviceRegistration;
+use crate::state::{
+    get_identity_number_by_registration_id, get_tentative_device_registrations_by_identity_v2,
+    TentativeDeviceRegistration,
+};
 use crate::storage::anchor::Anchor;
 use crate::{secs_to_nanos, state};
 use candid::{CandidType, Principal};
@@ -42,6 +45,43 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
                 expiration
             }
         }
+    })
+}
+
+/// Enables device registration mode for the given anchor and returns the expiration timestamp (when it will be disabled again).
+/// If the device registration mode is already active it will just return the expiration timestamp again.
+pub fn enter_device_registration_mode_v2(
+    identity_number: IdentityNumber,
+    id: RegistrationId,
+) -> Timestamp {
+    state::tentative_device_registrations_v2_mut(|registrations| {
+        state::lookup_tentative_device_registration_v2_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
+                trap("too many anchors in device registration mode");
+            }
+
+            match registrations.get(&id) {
+                Some((_identity_number, TentativeDeviceRegistration { expiration, .. })) => {
+                    *expiration
+                } // already enabled, just return the existing expiration
+                None => {
+                    let expiration = time() + REGISTRATION_MODE_DURATION;
+                    registrations.insert(
+                        id,
+                        (
+                            identity_number,
+                            TentativeDeviceRegistration {
+                                expiration,
+                                state: DeviceRegistrationModeActive,
+                            },
+                        ),
+                    );
+                    lookup;
+                    expiration
+                }
+            }
+        })
     })
 }
 
@@ -223,4 +263,33 @@ fn prune_expired_tentative_device_registrations(
     let now = time();
 
     registrations.retain(|_, TentativeDeviceRegistration { expiration, .. }| *expiration > now)
+}
+
+/// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
+fn prune_expired_tentative_device_registrations_v2(
+    registrations: &mut HashMap<RegistrationId, (IdentityNumber, TentativeDeviceRegistration)>,
+    lookup: &mut HashMap<IdentityNumber, Vec<RegistrationId>>,
+) {
+    let now = time();
+
+    registrations.retain(
+        |reg_id, (identity_number, TentativeDeviceRegistration { expiration, .. })| {
+            if *expiration > now {
+                true
+            } else {
+                let mut len = 0;
+                lookup.entry(*identity_number).and_modify(|ids| {
+                    let temp_ids: Vec<[u8; 5]> =
+                        ids.iter().filter(|id| **id == *reg_id).cloned().collect();
+                    len = temp_ids.len();
+                    *ids = temp_ids;
+                });
+                // If we just removed the last id, clean up the entire entry
+                if len == 0 {
+                    lookup.remove(identity_number);
+                }
+                false
+            }
+        },
+    )
 }
