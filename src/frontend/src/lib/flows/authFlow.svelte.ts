@@ -142,7 +142,6 @@ export class AuthFlow {
       });
       this.#options.onSignIn(identityNumber);
     } catch (error) {
-      this.systemOverlay = false;
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor" &&
@@ -157,6 +156,8 @@ export class AuthFlow {
       }
       this.view = "chooseMethod";
       throw error;
+    } finally {
+      this.systemOverlay = false;
     }
   };
 
