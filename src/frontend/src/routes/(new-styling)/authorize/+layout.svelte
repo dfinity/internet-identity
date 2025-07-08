@@ -152,12 +152,13 @@
         <ProgressRing class="text-fg-primary size-14" />
         <p class="text-text-secondary text-lg">Redirecting to the app</p>
       </div>
-    {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure"}
+    {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure" || status === "unverified-origin"}
       {@const title = {
         orphan: "Missing request",
         closed: "Connection closed",
         invalid: "Invalid request",
         failure: "Something went wrong",
+        "unverified-origin": "Unverified origin",
       }[status]}
       {@const description = {
         orphan:
@@ -168,6 +169,8 @@
           "It seems like an invalid authentication request was received.",
         failure:
           "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
+        "unverified-origin":
+          "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page.",
       }[status]}
       <Dialog>
         <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">

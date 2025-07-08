@@ -103,10 +103,13 @@ export async function authenticationProtocol({
         authnMethod: "pin" | "passkey" | "recovery";
       }
     | { kind: "failure"; text: string }
+    | { kind: "unverified-origin"; text: string }
   >;
   /* Progress update messages to let the user know what's happening. */
   onProgress: (state: "waiting" | "validating") => void;
-}): Promise<"orphan" | "closed" | "invalid" | "success" | "failure"> {
+}): Promise<
+  "orphan" | "closed" | "invalid" | "success" | "failure" | "unverified-origin"
+> {
   authorizeClientFunnel.init();
 
   if (window.opener === null) {
@@ -168,7 +171,10 @@ export async function authenticationProtocol({
     };
   }
 
-  if (authenticateResult.kind === "failure") {
+  if (
+    authenticateResult.kind === "failure" ||
+    authenticateResult.kind === "unverified-origin"
+  ) {
     authorizeClientFunnel.trigger(AuthorizeClientEvents.AuthenticateError, {
       origin: requestOrigin,
       failureReason: authenticateResult.text,
@@ -177,7 +183,7 @@ export async function authenticationProtocol({
       kind: "authorize-client-failure",
       text: authenticateResult.text,
     } satisfies AuthResponse);
-    return "failure";
+    return authenticateResult.kind;
   }
   void (authenticateResult.kind satisfies "success");
   authorizeClientFunnel.trigger(AuthorizeClientEvents.AuthenticateSuccess);
