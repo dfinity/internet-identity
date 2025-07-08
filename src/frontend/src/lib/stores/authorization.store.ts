@@ -15,6 +15,7 @@ import {
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { features } from "$lib/legacy/features";
 import { canisterConfig } from "$lib/globals";
+import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest; // Additional details e.g. derivation origin
@@ -32,6 +33,7 @@ export type AuthorizationStatus =
   | "authenticating"
   | "authorizing"
   | "success"
+  | "unverified-origin"
   | "failure";
 
 type AuthorizationStore = Readable<{
@@ -58,7 +60,7 @@ let authorize: (
 export const authorizationStore: AuthorizationStore = {
   init: async () => {
     const status = await authenticationProtocol({
-      authenticate: (context) => {
+      authenticate: async (context) => {
         const effectiveOrigin = remapToLegacyDomain(
           context.authRequest.derivationOrigin ?? context.requestOrigin,
         );
@@ -66,6 +68,23 @@ export const authorizationStore: AuthorizationStore = {
           context: { ...context, effectiveOrigin },
           status: "authenticating",
         });
+
+        const validationResult = await validateDerivationOrigin({
+          requestOrigin: context.requestOrigin,
+          derivationOrigin: context.authRequest.derivationOrigin,
+        });
+
+        if (validationResult.result === "invalid") {
+          internalStore.update((value) => ({
+            ...value,
+            status: "unverified-origin",
+          }));
+          return {
+            kind: "unverified-origin",
+            text: `Invalid derivation origin: ${validationResult.message}`,
+          };
+        }
+
         return new Promise((resolve) => {
           authorize = async (accountNumber, artificialDelay = 0) => {
             internalStore.update((value) => ({
