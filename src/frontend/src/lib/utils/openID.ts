@@ -164,8 +164,6 @@ export const isFedCMSupported = (
   if (isSamsungBrowser) {
     return false;
   }
-
-  // Same check as in requestJWT
   return nonNullish(config.configURL) && "IdentityCredential" in window;
 };
 
