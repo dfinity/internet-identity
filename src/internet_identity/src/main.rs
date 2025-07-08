@@ -969,7 +969,7 @@ mod openid_api {
         anchor_operation_with_authz_check(identity_number, |anchor| {
             let openid_credential =
                 openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                    .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
+                    .map_err(|err| OpenIdCredentialAddError::JwtVerificationFailed(err.to_string()))?;
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
@@ -1006,7 +1006,7 @@ mod openid_api {
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         let openid_credential =
             openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+                .map_err(|err| OpenIdDelegationError::JwtVerificationFailed(err.to_string()))?;
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
@@ -1047,7 +1047,7 @@ mod openid_api {
     ) -> Result<SignedDelegation, OpenIdDelegationError> {
         let openid_credential =
             openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+                .map_err(|err| OpenIdDelegationError::JwtVerificationFailed(err.to_string()))?;
 
         match lookup_anchor_with_openid_credential(&openid_credential.key()) {
             Some(anchor_number) => {
