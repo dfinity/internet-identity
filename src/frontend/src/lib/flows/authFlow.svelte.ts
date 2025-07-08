@@ -105,15 +105,23 @@ export class AuthFlow {
     if (isNullish(clientId)) {
       throw new Error("Google is not configured");
     }
+    // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
       const requestConfig = createGoogleRequestConfig(clientId);
       this.systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
         nonce: get(sessionStore).nonce,
         mediation: "required",
       });
+    } catch (error) {
       this.systemOverlay = false;
+      this.view = "chooseMethod";
+      throw error;
+    } finally {
+      // Moved after `requestJWT` to avoid Safari from blocking the popup.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+    }
+    try {
       const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -134,7 +142,6 @@ export class AuthFlow {
       });
       this.#options.onSignIn(identityNumber);
     } catch (error) {
-      this.systemOverlay = false;
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor" &&
@@ -149,6 +156,8 @@ export class AuthFlow {
       }
       this.view = "chooseMethod";
       throw error;
+    } finally {
+      this.systemOverlay = false;
     }
   };
 
