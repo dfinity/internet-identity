@@ -33,6 +33,7 @@ export type AuthorizationStatus =
   | "authenticating"
   | "authorizing"
   | "success"
+  | "unverified-origin"
   | "failure";
 
 type AuthorizationStore = Readable<{
@@ -76,10 +77,10 @@ export const authorizationStore: AuthorizationStore = {
         if (validationResult.result === "invalid") {
           internalStore.update((value) => ({
             ...value,
-            status: "invalid",
+            status: "unverified-origin",
           }));
           return {
-            kind: "failure",
+            kind: "unverified-origin",
             text: `Invalid derivation origin: ${validationResult.message}`,
           };
         }
