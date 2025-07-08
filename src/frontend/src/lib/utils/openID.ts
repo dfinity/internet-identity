@@ -150,6 +150,26 @@ export const createAnonymousNonce = async (
 };
 
 /**
+ * Check if FedCM is supported based on user agent and config
+ * @param userAgent browser user agent string
+ * @param config of the OpenID provider
+ * @returns boolean indicating if FedCM is supported
+ */
+export const isFedCMSupported = (
+  userAgent: string,
+  config: RequestConfig,
+): boolean => {
+  // Samsung browser runs an older version of FedCM not compatible with our params.
+  const isSamsungBrowser = /SamsungBrowser/i.test(userAgent);
+  if (isSamsungBrowser) {
+    return false;
+  }
+
+  // Same check as in requestJWT
+  return nonNullish(config.configURL) && "IdentityCredential" in window;
+};
+
+/**
  * Request JWT token through FedCM with redirect in a popup as fallback
  * @param config of the OpenID provider
  * @param options for the JWT request
@@ -158,8 +178,7 @@ export const requestJWT = async (
   config: RequestConfig,
   options: RequestOptions,
 ): Promise<string> => {
-  const supportsFedCM =
-    nonNullish(config.configURL) && "IdentityCredential" in window;
+  const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
     : await requestWithRedirect(config, options);
