@@ -177,6 +177,7 @@ pub struct DeviceRegistrationInfo {
 pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
+    pub device_registrations_v2: Vec<DeviceRegistrationInfo>,
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub name: Option<String>,
 }

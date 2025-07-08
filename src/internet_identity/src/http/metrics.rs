@@ -154,6 +154,20 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
             "The number of users in registration mode",
         )
     })?;
+    state::lookup_tentative_device_registration_v2(|lookup_tentative_device_registration_v2| {
+        w.encode_gauge(
+            "internet_identity_users_in_registration_mode_v2",
+            lookup_tentative_device_registration_v2.len() as f64,
+            "The number of users in registration mode v2",
+        )
+    })?;
+    state::tentative_device_registrations_v2(|tentative_device_registrations_v2| {
+        w.encode_gauge(
+            "internet_identity_users_in_registration_mode_v2_lookup",
+            tentative_device_registrations_v2.len() as f64,
+            "The number of users in registration mode v2",
+        )
+    })?;
     state::usage_metrics(|usage_metrics| {
         w.encode_gauge(
             "internet_identity_delegation_counter",
