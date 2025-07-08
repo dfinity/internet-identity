@@ -10,6 +10,10 @@ import type {
   OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import { isOpenIdCancelError } from "$lib/utils/openID";
+import {
+  AuthenticationV2Events,
+  authenticationV2Funnel,
+} from "$lib/utils/analytics/authenticationV2Funnel";
 
 export const handleError = (error: unknown) => {
   // Handle browser errors
@@ -68,8 +72,14 @@ export const handleError = (error: unknown) => {
       case "JwtVerificationFailed":
         toaster.error({
           title: "Authorization invalid",
-          description: `It may have expired — please try again. ${error.value(error.type)}`,
+          description: `It may have expired — please try again.`,
         });
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.JwtVerificationFailed,
+          {
+            error: error.value(error.type),
+          },
+        );
         break;
       case "OpenIdCredentialNotFound":
         toaster.error({

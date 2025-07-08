@@ -20,8 +20,10 @@ import { Funnel } from "./Funnel";
  *        register-with-google
  *          successful-google-registration
  *            auth-success
+ *          jwt-verification-failed
  *        login-with-google
  *          auth-success
+ *          jwt-verification-failed
  *      continue-with-passkey-screen
  *        register-with-passkey
  *          enter-name-screen
@@ -50,6 +52,7 @@ export const AuthenticationV2Events = {
   SuccessfulPasskeyRegistration: "successful-passkey-registration",
   UseExistingPasskey: "use-existing-passkey",
   AuthSuccess: "auth-success",
+  JwtVerificationFailed: "jwt-verification-failed",
 } as const;
 
 export const authenticationV2Funnel = new Funnel<typeof AuthenticationV2Events>(
