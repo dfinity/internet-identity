@@ -117,7 +117,7 @@
     >
       <div class="bg-bg-primary_alt h-24 rounded-t-2xl"></div>
     </div>
-    <div class="relative z-1 flex flex-1 flex-col">
+    <div class="relative flex flex-1 flex-col">
       {@render children?.()}
       <!-- Element that pushes bottom sheet away from mobile keyboard or gesture navigation -->
       <div class="flex sm:hidden">

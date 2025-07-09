@@ -9,8 +9,8 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
-  import AddAccessMethod from "$lib/components/views/AddAccessMethod.svelte";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
+  import { invalidateAll } from "$app/navigation";
 
   const MAX_PASSKEYS = 8;
 
@@ -27,6 +27,11 @@
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
       : !isMaxOpenIdCredentialsReached,
   );
+
+  const handleAccessMethodsChanged = () => {
+    isAddAccessMethodDialogOpen = false;
+    invalidateAll();
+  };
 </script>
 
 <h1 class="text-text-primary mb-4 text-3xl font-semibold">Security</h1>
@@ -112,9 +117,10 @@
 
 {#if isAddAccessMethodDialogOpen}
   {#if $ADD_ACCESS_METHOD}
-    <Dialog onClose={() => (isAddAccessMethodDialogOpen = false)}>
-      <AddAccessMethod continueWithGoogle={() => Promise.resolve()} />
-    </Dialog>
+    <AddAccessMethodDialog
+      onChange={handleAccessMethodsChanged}
+      onClose={() => (isAddAccessMethodDialogOpen = false)}
+    />
   {:else}
     <AddOpenIdCredential
       onClose={() => (isAddAccessMethodDialogOpen = false)}
