@@ -81,9 +81,9 @@ export const handleError = (error: unknown) => {
         break;
       case "JwtExpired":
         toaster.error({
-          title: "Expired Certificates",
+          title: "Expired JWT",
           description:
-            "Certificates have expired — please try again in a few minutes.",
+            "The JWT has expired — please try again in a few minutes.",
         });
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.JwtVerificationExpired,
