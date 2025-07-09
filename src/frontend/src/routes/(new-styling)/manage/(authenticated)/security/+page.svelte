@@ -9,11 +9,15 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
+  import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
+  import { invalidateAll } from "$app/navigation";
+  import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
 
   const MAX_PASSKEYS = 8;
 
   let isAddAccessMethodDialogOpen = $state(false);
 
+  const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const isMaxOpenIdCredentialsReached = $derived(
     identityInfo.openIdCredentials.length >= 1,
   );
@@ -25,6 +29,11 @@
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
       : !isMaxOpenIdCredentialsReached,
   );
+
+  const handleGoogleLinked = (credential: OpenIdCredential) => {
+    openIdCredentials.push(credential);
+    invalidateAll();
+  };
 </script>
 
 <h1 class="text-text-primary mb-4 text-3xl font-semibold">Security</h1>
@@ -72,7 +81,7 @@
         <div class="min-h-10 min-w-[52px]"></div>
       </div>
     {/each}
-    {#each identityInfo.openIdCredentials as credential}
+    {#each openIdCredentials as credential}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
@@ -109,5 +118,14 @@
 {/if}
 
 {#if isAddAccessMethodDialogOpen}
-  <AddOpenIdCredential onClose={() => (isAddAccessMethodDialogOpen = false)} />
+  {#if $ADD_ACCESS_METHOD}
+    <AddAccessMethodDialog
+      onGoogleLinked={handleGoogleLinked}
+      onClose={() => (isAddAccessMethodDialogOpen = false)}
+    />
+  {:else}
+    <AddOpenIdCredential
+      onClose={() => (isAddAccessMethodDialogOpen = false)}
+    />
+  {/if}
 {/if}
