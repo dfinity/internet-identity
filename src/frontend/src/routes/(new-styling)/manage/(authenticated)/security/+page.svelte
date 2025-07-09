@@ -9,6 +9,8 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
+  import AddAccessMethod from "$lib/components/views/AddAccessMethod.svelte";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
 
   let isAddAccessMethodDialogOpen = $state(false);
 
@@ -103,5 +105,7 @@
 {/if}
 
 {#if isAddAccessMethodDialogOpen}
-  <AddOpenIdCredential onClose={() => (isAddAccessMethodDialogOpen = false)} />
+  <Dialog onClose={() => (isAddAccessMethodDialogOpen = false)}>
+    <AddAccessMethod continueWithGoogle={() => Promise.resolve()} />
+  </Dialog>
 {/if}
