@@ -1,10 +1,10 @@
 use crate::anchor_management::add_device;
-use crate::authz_utils::IdentityUpdateError;
+use crate::authz_utils::{AuthorizationError, IdentityUpdateError};
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::Anchor;
 use crate::{secs_to_nanos, state};
-use candid::Principal;
+use candid::{CandidType, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use internet_identity_interface::archive::types::Operation;
@@ -176,6 +176,26 @@ fn get_verified_device(
                 })
             }
         }
+    })
+}
+
+#[derive(CandidType)]
+pub enum CheckTentativeDeviceVerifiedError {
+    Unauthorized,
+}
+
+impl From<AuthorizationError> for CheckTentativeDeviceVerifiedError {
+    fn from(_err: AuthorizationError) -> Self {
+        CheckTentativeDeviceVerifiedError::Unauthorized
+    }
+}
+
+/// Checks whether a tentative device has been verified without mutating anything
+/// This is so that on the new client we can prompt for adding the final passkey as soon as
+/// on the old client we have verified the temporary key
+pub fn check_tentative_device_verified(identity_number: IdentityNumber) -> bool {
+    state::tentative_device_registrations(|registrations| {
+        registrations.get(&identity_number).is_none()
     })
 }
 

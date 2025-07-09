@@ -141,6 +141,9 @@ export const idlFactory = ({ IDL }) => {
     'authn_method' : AuthnMethod,
   });
   const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
+  const CheckTentativeDeviceVerifiedError = IDL.Variant({
+    'Unauthorized' : IDL.Null,
+  });
   const AuthnMethodConfirmationError = IDL.Variant({
     'RegistrationModeOff' : IDL.Null,
     'NoAuthnMethodToConfirm' : IDL.Null,
@@ -473,6 +476,16 @@ export const idlFactory = ({ IDL }) => {
         [IdentityNumber, AuthnMethodData],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
         [],
+      ),
+    'authn_method_check_tentative_device_verified' : IDL.Func(
+        [IdentityNumber],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Bool,
+            'Err' : CheckTentativeDeviceVerifiedError,
+          }),
+        ],
+        ['query'],
       ),
     'authn_method_confirm' : IDL.Func(
         [IdentityNumber, IDL.Text],

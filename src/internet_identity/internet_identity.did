@@ -511,6 +511,10 @@ type AuthnMethodConfirmationError = variant {
     NoAuthnMethodToConfirm;
 };
 
+type CheckTentativeDeviceVerifiedError = variant {
+    Unauthorized;
+};
+
 type IdentityAuthnInfo = record {
     authn_methods : vec AuthnMethod;
     recovery_authn_methods : vec AuthnMethod;
@@ -852,6 +856,9 @@ service : (opt InternetIdentityInit) -> {
     // subsequently be used for authentication for that identity.
     // Requires authentication.
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
+
+
+    authn_method_check_tentative_device_verified : (IdentityNumber) -> (variant {Ok : bool; Err : CheckTentativeDeviceVerifiedError }) query;
 
     // Authentication protocol
     // =======================

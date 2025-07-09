@@ -113,6 +113,7 @@ export interface CheckCaptchaArg { 'solution' : string }
 export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
+export type CheckTentativeDeviceVerifiedError = { 'Unauthorized' : null };
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -405,6 +406,11 @@ export interface _SERVICE {
     [IdentityNumber, AuthnMethodData],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodAddError }
+  >,
+  'authn_method_check_tentative_device_verified' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : boolean } |
+      { 'Err' : CheckTentativeDeviceVerifiedError }
   >,
   'authn_method_confirm' : ActorMethod<
     [IdentityNumber, string],
