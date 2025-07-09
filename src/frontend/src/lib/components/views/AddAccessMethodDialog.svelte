@@ -116,7 +116,7 @@
     {#if addAccessMethodFlow.isSystemOverlayVisible}
       <SystemOverlayBackdrop />
     {/if}
-  {:else}
+  {:else if addAccessMethodFlow.view === "addPasskey"}
     <div class="mt-4 mb-6 flex flex-col">
       <PasskeyIllustration class="text-text-primary mb-8 h-32" />
       <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
