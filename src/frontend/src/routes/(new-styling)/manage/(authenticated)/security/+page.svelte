@@ -10,7 +10,7 @@
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
 
-  let isAddAccessMethodDialogVisible = $state(false);
+  let isAddAccessMethodDialogOpen = $state(false);
 
   const isMaxOpenIdCredentialsReached = $derived(
     identityInfo.openIdCredentials.length >= 1,
@@ -39,7 +39,7 @@
     {#if isAddAccessMethodVisible}
       <div>
         <Button
-          onclick={() => (isAddAccessMethodDialogVisible = true)}
+          onclick={() => (isAddAccessMethodDialogOpen = true)}
           class="max-md:w-full"
         >
           <span>Add</span>
@@ -102,8 +102,6 @@
   />
 {/if}
 
-{#if isAddAccessMethodDialogVisible}
-  <AddOpenIdCredential
-    onClose={() => (isAddAccessMethodDialogVisible = false)}
-  />
+{#if isAddAccessMethodDialogOpen}
+  <AddOpenIdCredential onClose={() => (isAddAccessMethodDialogOpen = false)} />
 {/if}
