@@ -1,6 +1,7 @@
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
+use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
@@ -44,6 +45,30 @@ thread_local! {
 pub struct TentativeDeviceRegistration {
     pub expiration: Timestamp,
     pub state: RegistrationState,
+}
+
+impl TentativeDeviceRegistration {
+    pub fn to_maybe_info(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
+        match self {
+            TentativeDeviceRegistration {
+                expiration,
+                state:
+                    DeviceTentativelyAdded {
+                        tentative_device, ..
+                    },
+            } if *expiration > now => Some(DeviceRegistrationInfo {
+                expiration: *expiration,
+                tentative_device: Some(tentative_device.clone()),
+            }),
+            TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
+                Some(DeviceRegistrationInfo {
+                    expiration: *expiration,
+                    tentative_device: None,
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Registration state of new devices added using the two step device add flow
@@ -344,6 +369,12 @@ pub fn lookup_tentative_device_registration_v2_mut<R>(
     f: impl FnOnce(&mut HashMap<IdentityNumber, Vec<RegistrationId>>) -> R,
 ) -> R {
     STATE.with(|s| f(&mut s.lookup_tentative_device_registration_v2.borrow_mut()))
+}
+
+pub fn get_tentative_device_registration_by_identity(
+    identity_number: IdentityNumber,
+) -> Option<TentativeDeviceRegistration> {
+    tentative_device_registrations(|registrations| registrations.get(&identity_number).cloned())
 }
 
 pub fn get_tentative_device_registrations_by_identity_v2(

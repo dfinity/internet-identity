@@ -39,54 +39,20 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let now = time();
 
     let tentative_device_registration =
-        state::tentative_device_registrations(|tentative_device_registrations| {
-            tentative_device_registrations.get(&anchor_number)
-        });
+        state::get_tentative_device_registration_by_identity(anchor_number);
 
     let tentative_device_registration_v2 =
         state::get_tentative_device_registrations_by_identity_v2(anchor_number);
 
-    //TODO: figure out this matrix
-    match tentative_device_registration {
-        Some(TentativeDeviceRegistration {
-            expiration,
-            state: DeviceTentativelyAdded {
-                tentative_device, ..
-            },
-        }) if *expiration > now => IdentityAnchorInfo {
-            devices,
-            device_registration: Some(DeviceRegistrationInfo {
-                expiration: *expiration,
-                tentative_device: Some(tentative_device.clone()),
-            }),
-            device_registrations_v2: tentative_device_registration_v2
-                .iter()
-                .map(|tent_dev_reg| DeviceRegistrationInfo {
-                    expiration: tent_dev_reg.expiration,
-                    tentative_device: None,
-                })
-                .collect(),
-            openid_credentials,
-            name,
-        },
-        Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
-            IdentityAnchorInfo {
-                devices,
-                device_registration: Some(DeviceRegistrationInfo {
-                    expiration: *expiration,
-                    tentative_device: None,
-                }),
-                device_registrations_v2,
-                openid_credentials,
-                name,
-            }
-        }
-        None | Some(_) => IdentityAnchorInfo {
-            devices,
-            device_registration: None,
-            openid_credentials,
-            name,
-        },
+    IdentityAnchorInfo {
+        devices,
+        device_registration: tentative_device_registration.and_then(|reg| reg.to_maybe_info(now)),
+        device_registrations_v2: tentative_device_registration_v2
+            .iter()
+            .filter_map(|reg| reg.to_maybe_info(now))
+            .collect(),
+        openid_credentials,
+        name,
     }
 }
 
