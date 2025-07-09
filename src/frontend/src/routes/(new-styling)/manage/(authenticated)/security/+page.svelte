@@ -9,7 +9,6 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
-  import { get } from "svelte/store";
 
   const MAX_PASSKEYS = 8;
 
@@ -22,7 +21,7 @@
     identityInfo.authnMethods.length >= MAX_PASSKEYS,
   );
   const isAddAccessMethodVisible = $derived(
-    get(ADD_ACCESS_METHOD)
+    $ADD_ACCESS_METHOD
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
       : !isMaxOpenIdCredentialsReached,
   );
