@@ -11,19 +11,24 @@
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
   import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
   import { invalidateAll } from "$app/navigation";
-  import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
+  import type {
+    AuthnMethodData,
+    OpenIdCredential,
+  } from "$lib/generated/internet_identity_types";
 
   const MAX_PASSKEYS = 8;
 
   let isAddAccessMethodDialogOpen = $state(false);
 
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
+  const authnMethods = $derived(identityInfo.authnMethods);
   const isMaxOpenIdCredentialsReached = $derived(
     identityInfo.openIdCredentials.length >= 1,
   );
   const isMaxPasskeysReached = $derived(
     identityInfo.authnMethods.length >= MAX_PASSKEYS,
   );
+  const isUsingPasskeys = $derived(authnMethods.length > 0);
   const isAddAccessMethodVisible = $derived(
     $ADD_ACCESS_METHOD
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
@@ -32,6 +37,11 @@
 
   const handleGoogleLinked = (credential: OpenIdCredential) => {
     openIdCredentials.push(credential);
+    invalidateAll();
+  };
+
+  const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
+    authnMethods.push(authnMethod);
     invalidateAll();
   };
 </script>
@@ -66,7 +76,7 @@
   <div
     class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
   >
-    {#each identityInfo.authnMethods as authnMethod}
+    {#each authnMethods as authnMethod}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
@@ -121,7 +131,10 @@
   {#if $ADD_ACCESS_METHOD}
     <AddAccessMethodDialog
       onGoogleLinked={handleGoogleLinked}
+      onPasskeyRegistered={handlePasskeyRegistered}
       onClose={() => (isAddAccessMethodDialogOpen = false)}
+      {isMaxOpenIdCredentialsReached}
+      {isUsingPasskeys}
     />
   {:else}
     <AddOpenIdCredential

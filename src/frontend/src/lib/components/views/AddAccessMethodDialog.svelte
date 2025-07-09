@@ -10,30 +10,50 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { AddAccessMethodFlow } from "$lib/flows/addAccessMethodFlow.svelte";
-  import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
+  import type {
+    AuthnMethodData,
+    OpenIdCredential,
+  } from "$lib/generated/internet_identity_types";
+  import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
 
   interface Props {
     onGoogleLinked: (credential: OpenIdCredential) => void;
+    onPasskeyRegistered: (credential: AuthnMethodData) => void;
     onClose: () => void;
     onError?: (error: unknown) => void;
+    isMaxOpenIdCredentialsReached?: boolean;
+    isUsingPasskeys?: boolean;
   }
 
   const {
     onGoogleLinked,
+    onPasskeyRegistered,
     onClose,
     onError = (error) => {
       onClose();
       handleError(error);
     },
+    isMaxOpenIdCredentialsReached,
+    isUsingPasskeys,
   }: Props = $props();
 
-  const addAccessMethodFlow = new AddAccessMethodFlow();
+  const addAccessMethodFlow = new AddAccessMethodFlow({
+    isMaxOpenIdCredentialsReached,
+  });
 
   const isPasskeySupported = nonNullish(window.PublicKeyCredential);
 
   const handleContinueWithGoogle = async () => {
     try {
       onGoogleLinked(await addAccessMethodFlow.linkGoogleAccount());
+      onClose();
+    } catch (error) {
+      onError(error);
+    }
+  };
+  const handleCreatePasskey = async () => {
+    try {
+      onPasskeyRegistered(await addAccessMethodFlow.createPasskey());
       onClose();
     } catch (error) {
       onError(error);
@@ -68,6 +88,7 @@
       {/if}
       <div class="flex flex-col items-stretch gap-3">
         <Button
+          onclick={addAccessMethodFlow.continueWithPasskey}
           disabled={!isPasskeySupported ||
             addAccessMethodFlow.isGoogleAuthenticating}
           size="xl"
@@ -95,6 +116,44 @@
     {#if addAccessMethodFlow.isSystemOverlayVisible}
       <SystemOverlayBackdrop />
     {/if}
+  {:else if addAccessMethodFlow.view === "addPasskey"}
+    <div class="mt-4 mb-6 flex flex-col">
+      <PasskeyIllustration class="text-text-primary mb-8 h-32" />
+      <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
+        {#if isUsingPasskeys}
+          Add another passkey
+        {:else}
+          Add a passkey
+        {/if}
+      </h1>
+      <p
+        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+      >
+        With passkeys, you can now use your fingerprint, face, or screen lock to
+        quickly and securely confirm it’s really you.
+      </p>
+    </div>
+    <div class="flex flex-col gap-3">
+      <Button
+        onclick={handleCreatePasskey}
+        size="lg"
+        disabled={addAccessMethodFlow.isCreatingPasskey}
+      >
+        {#if addAccessMethodFlow.isCreatingPasskey}
+          <ProgressRing />
+          <span>Creating passkey...</span>
+        {:else}
+          <span>Create passkey</span>
+        {/if}
+      </Button>
+      <Button
+        variant="tertiary"
+        size="lg"
+        disabled={addAccessMethodFlow.isCreatingPasskey}
+      >
+        Continue on another device
+      </Button>
+    </div>
   {/if}
 </Dialog>
 
