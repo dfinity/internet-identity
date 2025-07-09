@@ -183,6 +183,22 @@
           Return to app
         </Button>
       </Dialog>
+    {:else if status === "late-success"}
+      <Dialog>
+        <FeaturedIcon size="lg" class="mb-4 self-start">
+          <CircleAlertIcon size="1.5rem" />
+        </FeaturedIcon>
+        <h1 class="text-text-primary mb-3 text-2xl font-medium">
+          Authentication successful
+        </h1>
+        <p class="text-md text-text-tertiary mb-6 font-medium">
+          You may close this page.
+        </p>
+        <Button onclick={() => window.close()} variant="secondary">
+          <RotateCcwIcon size="1rem" />
+          Return to app
+        </Button>
+      </Dialog>
     {/if}
   </div>
   <Footer />

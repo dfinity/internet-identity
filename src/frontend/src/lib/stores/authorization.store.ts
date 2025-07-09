@@ -24,14 +24,24 @@ export type AuthorizationContext = {
 };
 
 export type AuthorizationStatus =
+  // Not handled in `authorize/+layout.svelte`.
   | "init"
+  // Sent in postMessageInterface, kept for backwards compatibility.
+  // Not handled in `authorize/+layout.svelte`.
+  | "waiting"
+  // Sent in postMessageInterface, kept for backwards compatibility
+  // Not handled in `authorize/+layout.svelte`.
+  | "validating"
+  // Set on starting the authenticate flow.
+  | "authenticating"
+  // Set on starting the authorization flow.
+  | "authorizing"
+  // Set after "success" if the user is still here after 2 seconds.
+  | "late-success"
+  // All the following are returned by `authenticationProtocol`
+  | "invalid"
   | "orphan"
   | "closed"
-  | "waiting"
-  | "validating"
-  | "invalid"
-  | "authenticating"
-  | "authorizing"
   | "success"
   | "unverified-origin"
   | "failure";
@@ -155,6 +165,17 @@ export const authorizationStore: AuthorizationStore = {
         internalStore.update((value) => ({ ...value, status })),
     });
     internalStore.update((value) => ({ ...value, status }));
+    if (status === "success") {
+      const LATE_SUCCESS_MESSAGE_DELAY_MS = 2000;
+      // If the user is still here after 2 seconds, show a message
+      // "Authentication successful, close page"
+      setTimeout(() => {
+        internalStore.update((value) => ({
+          ...value,
+          status: "late-success",
+        }));
+      }, LATE_SUCCESS_MESSAGE_DELAY_MS);
+    }
   },
   subscribe: (...args) => internalStore.subscribe(...args),
   authorize: (accountNumber, artificialDelay) => {
