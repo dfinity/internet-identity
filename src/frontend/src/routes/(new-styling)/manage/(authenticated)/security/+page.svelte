@@ -8,16 +8,23 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
-  import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
+  import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
+  import { get } from "svelte/store";
+
+  const MAX_PASSKEYS = 8;
 
   let isAddAccessMethodDialogOpen = $state(false);
 
   const isMaxOpenIdCredentialsReached = $derived(
     identityInfo.openIdCredentials.length >= 1,
   );
-  const isMaxPasskeysReached = $derived(identityInfo.authnMethods.length >= 8);
+  const isMaxPasskeysReached = $derived(
+    identityInfo.authnMethods.length >= MAX_PASSKEYS,
+  );
   const isAddAccessMethodVisible = $derived(
-    !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached,
+    get(ADD_ACCESS_METHOD)
+      ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
+      : !isMaxOpenIdCredentialsReached,
   );
 </script>
 
