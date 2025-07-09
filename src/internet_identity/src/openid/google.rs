@@ -36,10 +36,11 @@ const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 
 const HTTP_STATUS_OK: u8 = 200;
 
-// Fetch the Google certs every hour, the responses are always
+// Fetch the Google certs every fifteen minutes, the responses are always
 // valid for at least 5 hours so that should be enough margin.
+// Update 2025-08-09: We found error when verifying JWTs quite often. Moved from 1h to 15 min.
 #[cfg(not(test))]
-const FETCH_CERTS_INTERVAL: u64 = 60 * 60; // 1 hour in seconds
+const FETCH_CERTS_INTERVAL: u64 = 60 * 15; // 15 minutes in seconds
 
 const NANOSECONDS_PER_SECOND: u64 = 1_000_000_000;
 
