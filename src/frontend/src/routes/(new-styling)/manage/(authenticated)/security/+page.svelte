@@ -9,7 +9,6 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
-  import { get } from "svelte/store";
   import AddAccessMethod from "$lib/components/views/AddAccessMethod.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
 
@@ -24,7 +23,7 @@
     identityInfo.authnMethods.length >= MAX_PASSKEYS,
   );
   const isAddAccessMethodVisible = $derived(
-    get(ADD_ACCESS_METHOD)
+    $ADD_ACCESS_METHOD
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
       : !isMaxOpenIdCredentialsReached,
   );
@@ -112,8 +111,13 @@
 {/if}
 
 {#if isAddAccessMethodDialogOpen}
-  <Dialog onClose={() => (isAddAccessMethodDialogOpen = false)}>
-    <AddAccessMethod continueWithGoogle={() => Promise.resolve()} />
-  </Dialog>
-  <AddOpenIdCredential onClose={() => (isAddAccessMethodDialogOpen = false)} />
+  {#if $ADD_ACCESS_METHOD}
+    <Dialog onClose={() => (isAddAccessMethodDialogOpen = false)}>
+      <AddAccessMethod continueWithGoogle={() => Promise.resolve()} />
+    </Dialog>
+  {:else}
+    <AddOpenIdCredential
+      onClose={() => (isAddAccessMethodDialogOpen = false)}
+    />
+  {/if}
 {/if}
