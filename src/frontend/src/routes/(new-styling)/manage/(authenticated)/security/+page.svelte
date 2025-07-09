@@ -10,78 +10,90 @@
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
 
-  let displayAddCredentialDialog = $state(false);
+  let isAddAccessMethodDialogVisible = $state(false);
+
+  const isMaxOpenIdCredentialsReached = $derived(
+    identityInfo.openIdCredentials.length >= 1,
+  );
+  const isMaxPasskeysReached = $derived(identityInfo.authnMethods.length >= 8);
+  const isAddAccessMethodVisible = $derived(
+    !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached,
+  );
 </script>
 
-<div class="text-text-primary">
-  <h1 class="mb-4 text-3xl font-semibold">Security</h1>
-  <h2 class="text-text-tertiary mb-12 text-lg">
-    Settings and recommendations to keep your identity secure
-  </h2>
-  <Panel>
-    <div class="flex flex-col justify-between gap-5 p-4 pb-5 md:flex-row">
+<h1 class="text-text-primary mb-4 text-3xl font-semibold">Security</h1>
+<p class="text-text-tertiary text-md mb-12">
+  Settings and recommendations to keep your identity secure
+</p>
+<Panel>
+  <div class="flex flex-col justify-between gap-5 p-4 pb-5 md:flex-row">
+    <div>
+      <h2 class="text-text-primary mb-2 text-lg font-semibold">
+        Access methods
+      </h2>
+      <p class="text-text-tertiary text-sm">
+        Manage your passkeys, security keys, and linked accounts.
+      </p>
+    </div>
+
+    {#if isAddAccessMethodVisible}
       <div>
-        <h3 class="mb-2 text-lg font-semibold">Access methods</h3>
-        <h4 class="text-text-tertiary text-sm">
-          Manage your passkeys, security keys, and linked accounts.
-        </h4>
+        <Button
+          onclick={() => (isAddAccessMethodDialogVisible = true)}
+          class="max-md:w-full"
+        >
+          <span>Add</span>
+          <Plus size="1.25rem" />
+        </Button>
       </div>
-
-      {#if identityInfo.openIdCredentials.length === 0}
-        <div>
-          <Button
-            onclick={() => {
-              displayAddCredentialDialog = true;
-            }}
-            class="bg-bg-brand-solid text-text-primary-inversed text-[] top-0 flex w-full items-center justify-center gap-1 rounded-sm px-3.5 py-2 font-semibold md:max-w-fit"
-            >Add <Plus size="1.25rem" /></Button
-          >
-        </div>
-      {/if}
-    </div>
-    <div
-      class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
-    >
-      {#each identityInfo.authnMethods as authnMethod}
+    {/if}
+  </div>
+  <div
+    class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
+  >
+    {#each identityInfo.authnMethods as authnMethod}
+      <div
+        class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+      >
         <div
-          class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+          class="text-text-primary flex min-w-8 items-center justify-center px-4 pr-4"
         >
-          <div class="flex min-w-8 items-center justify-center px-4 pr-4">
-            <PasskeyIcon />
-          </div>
-          <AccessMethod accessMethod={authnMethod} />
-          <!-- for layout consistency -->
-          <!-- TODO: this is where we would add interactions like removal -->
-          <div class="min-h-10 min-w-[52px]"></div>
+          <PasskeyIcon />
         </div>
-      {/each}
-      {#each identityInfo.openIdCredentials as credential}
+        <AccessMethod accessMethod={authnMethod} />
+        <!-- for layout consistency -->
+        <!-- TODO: this is where we would add interactions like removal -->
+        <div class="min-h-10 min-w-[52px]"></div>
+      </div>
+    {/each}
+    {#each identityInfo.openIdCredentials as credential}
+      <div
+        class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+      >
         <div
-          class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+          class="text-text-primary flex min-w-8 items-center justify-center px-4 pr-4"
         >
-          <div class="flex min-w-8 items-center justify-center px-4 pr-4">
-            <GoogleIcon />
-          </div>
-
-          <AccessMethod accessMethod={credential} />
-
-          <div class="flex items-center justify-center pr-4">
-            {#if identityInfo.totalAccessMethods > 1}
-              <Button
-                variant="tertiary"
-                iconOnly={true}
-                onclick={() =>
-                  (identityInfo.removableOpenIdCredential = credential)}
-              >
-                <Link2Off class="stroke-fg-error-secondary" />
-              </Button>
-            {/if}
-          </div>
+          <GoogleIcon />
         </div>
-      {/each}
-    </div>
-  </Panel>
-</div>
+
+        <AccessMethod accessMethod={credential} />
+
+        <div class="flex items-center justify-center pr-4">
+          {#if identityInfo.totalAccessMethods > 1}
+            <Button
+              variant="tertiary"
+              iconOnly={true}
+              onclick={() =>
+                (identityInfo.removableOpenIdCredential = credential)}
+            >
+              <Link2Off class="stroke-fg-error-secondary" />
+            </Button>
+          {/if}
+        </div>
+      </div>
+    {/each}
+  </div>
+</Panel>
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
@@ -90,6 +102,8 @@
   />
 {/if}
 
-{#if displayAddCredentialDialog}
-  <AddOpenIdCredential onClose={() => (displayAddCredentialDialog = false)} />
+{#if isAddAccessMethodDialogVisible}
+  <AddOpenIdCredential
+    onClose={() => (isAddAccessMethodDialogVisible = false)}
+  />
 {/if}
