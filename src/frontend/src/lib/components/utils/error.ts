@@ -75,6 +75,9 @@ export const handleError = (error: unknown) => {
           description:
             "There was an error verifying your account — please try again.",
         });
+        // This is triggered also with errors from the dashboard.
+        // Plausible Funnels filter by the user triggering specific events before.
+        // Triggering the error here, means we'll get the total of these errors.
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.JwtVerificationFailed,
         );
@@ -85,6 +88,9 @@ export const handleError = (error: unknown) => {
           description:
             "The JWT has expired — please try again in a few minutes.",
         });
+        // This is triggered also with errors from the dashboard.
+        // Plausible Funnels filter by the user triggering specific events before.
+        // Triggering the error here, means we'll get the total of these errors.
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.JwtVerificationExpired,
         );
