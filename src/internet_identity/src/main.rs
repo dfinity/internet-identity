@@ -952,12 +952,10 @@ mod openid_api {
     fn openid_identity_registration_finish(
         arg: OpenIDRegFinishArg,
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
-        match openid::with_provider(&arg.jwt, |provider| provider.verify(&arg.jwt, &arg.salt)) {
-            Ok(_) => registration::registration_flow_v2::identity_registration_finish(
-                CreateIdentityData::OpenID(arg),
-            ),
-            Err(err) => Err(IdRegFinishError::InvalidAuthnMethod(err)),
-        }
+        openid::with_provider(&arg.jwt, |provider| provider.verify(&arg.jwt, &arg.salt))?;
+        registration::registration_flow_v2::identity_registration_finish(
+            CreateIdentityData::OpenID(arg),
+        )
     }
 
     #[update]
@@ -968,8 +966,7 @@ mod openid_api {
     ) -> Result<(), OpenIdCredentialAddError> {
         anchor_operation_with_authz_check(identity_number, |anchor| {
             let openid_credential =
-                openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                    .map_err(|_| OpenIdCredentialAddError::JwtVerificationFailed)?;
+                openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))?;
             add_openid_credential(anchor, openid_credential)
                 .map(|operation| ((), operation))
                 .map_err(|err| match err {
