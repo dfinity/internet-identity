@@ -387,7 +387,7 @@ export const idlFactory = ({ IDL }) => {
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
-    'JwtVerificationFailed' : IDL.Text,
+    'JwtVerificationFailed' : IDL.Null,
   });
   const OpenIdCredentialKey = IDL.Tuple(Iss, Sub);
   const OpenIdCredentialRemoveError = IDL.Variant({
@@ -398,7 +398,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
-    'JwtVerificationFailed' : IDL.Text,
+    'JwtVerificationFailed' : IDL.Null,
   });
   const OpenIDRegFinishArg = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
   const UserKey = PublicKey;

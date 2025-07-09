@@ -72,13 +72,10 @@ export const handleError = (error: unknown) => {
       case "JwtVerificationFailed":
         toaster.error({
           title: "Authorization invalid",
-          description: `It may have expired — please try again.`,
+          description: "It may have expired — please try again.",
         });
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.JwtVerificationFailed,
-          {
-            error: error.value(error.type),
-          },
         );
         break;
       case "OpenIdCredentialNotFound":
