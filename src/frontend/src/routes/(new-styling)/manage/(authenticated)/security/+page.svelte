@@ -76,7 +76,7 @@
   <div
     class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
   >
-    {#each identityInfo.authnMethods as authnMethod}
+    {#each authnMethods as authnMethod}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
