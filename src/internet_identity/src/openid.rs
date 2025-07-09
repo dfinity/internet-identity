@@ -8,9 +8,12 @@ use ic_canister_sig_creation::{
 use ic_cdk::api::time;
 use ic_certification::Hash;
 use identity_jose::jws::Decoder;
-use internet_identity_interface::internet_identity::types::openid::{OpenIdCredentialAddError, OpenIdDelegationError};
+use internet_identity_interface::internet_identity::types::openid::{
+    OpenIdCredentialAddError, OpenIdDelegationError,
+};
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey
+    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, PublicKey,
+    SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -36,7 +39,9 @@ impl From<OpenIDJWTVerificationError> for OpenIdCredentialAddError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
             OpenIDJWTVerificationError::JWTExpired => OpenIdCredentialAddError::JwtExpired,
-            OpenIDJWTVerificationError::GenericError(_) => OpenIdCredentialAddError::JwtVerificationFailed,
+            OpenIDJWTVerificationError::GenericError(_) => {
+                OpenIdCredentialAddError::JwtVerificationFailed
+            }
         }
     }
 }
@@ -46,7 +51,9 @@ impl From<OpenIDJWTVerificationError> for OpenIdDelegationError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
             OpenIDJWTVerificationError::JWTExpired => OpenIdDelegationError::JwtExpired,
-            OpenIDJWTVerificationError::GenericError(_) => OpenIdDelegationError::JwtVerificationFailed,
+            OpenIDJWTVerificationError::GenericError(_) => {
+                OpenIdDelegationError::JwtVerificationFailed
+            }
         }
     }
 }
@@ -55,12 +62,15 @@ impl From<OpenIDJWTVerificationError> for OpenIdDelegationError {
 impl From<OpenIDJWTVerificationError> for IdRegFinishError {
     fn from(error: OpenIDJWTVerificationError) -> Self {
         match error {
-            OpenIDJWTVerificationError::JWTExpired => IdRegFinishError::InvalidAuthnMethod("JWT expired".to_string()),
-            OpenIDJWTVerificationError::GenericError(msg) => IdRegFinishError::InvalidAuthnMethod(format!("JWT verification failed: {}", msg)),
+            OpenIDJWTVerificationError::JWTExpired => {
+                IdRegFinishError::InvalidAuthnMethod("JWT expired".to_string())
+            }
+            OpenIDJWTVerificationError::GenericError(msg) => {
+                IdRegFinishError::InvalidAuthnMethod(format!("JWT verification failed: {}", msg))
+            }
         }
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq, CandidType, Deserialize, Clone)]
 pub struct OpenIdCredential {
@@ -140,7 +150,11 @@ pub trait OpenIdProvider {
     ///
     /// * `jwt`: The JWT returned by the OpenID authentication flow with the OpenID provider
     /// * `salt`: The random salt that was used to bind the nonce to the caller principal
-    fn verify(&self, jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, OpenIDJWTVerificationError>;
+    fn verify(
+        &self,
+        jwt: &str,
+        salt: &[u8; 32],
+    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError>;
 
     fn metadata_name(&self, metadata: HashMap<String, MetadataEntryV2>) -> Option<String>;
 }
@@ -165,16 +179,24 @@ where
 {
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
-        .map_err(|_| OpenIDJWTVerificationError::GenericError("Failed to decode JWT".to_string( )))?;
+        .map_err(|_| {
+            OpenIDJWTVerificationError::GenericError("Failed to decode JWT".to_string())
+        })?;
 
-    let claims: PartialClaims =
-        serde_json::from_slice(validation_item.claims()).map_err(|_| OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string()))?;
+    let claims: PartialClaims = serde_json::from_slice(validation_item.claims()).map_err(|_| {
+        OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string())
+    })?;
 
     PROVIDERS.with_borrow(|providers| {
         providers
             .iter()
             .find(|provider| provider.issuer() == claims.iss)
-            .ok_or_else(|| OpenIDJWTVerificationError::GenericError(format!("Unsupported issuer: {}", claims.iss)))
+            .ok_or_else(|| {
+                OpenIDJWTVerificationError::GenericError(format!(
+                    "Unsupported issuer: {}",
+                    claims.iss
+                ))
+            })
             .and_then(|provider| callback(provider.as_ref()))
     })
 }
@@ -234,7 +256,11 @@ impl OpenIdProvider for ExampleProvider {
         "https://example.com"
     }
 
-    fn verify(&self, _: &str, _: &[u8; 32]) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
+    fn verify(
+        &self,
+        _: &str,
+        _: &[u8; 32],
+    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
         Ok(self.credential())
     }
 
@@ -276,7 +302,9 @@ fn should_return_error_unsupported_issuer() {
 
     assert_eq!(
         with_provider(jwt, |provider| provider.verify(jwt, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError("Unsupported issuer: https://example.com".to_string()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Unsupported issuer: https://example.com".to_string()
+        ))
     );
 }
 
@@ -287,7 +315,9 @@ fn should_return_error_when_encoding_invalid() {
     assert_eq!(
         with_provider(invalid_jwt, |provider| provider
             .verify(invalid_jwt, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError("Failed to decode JWT".to_string()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Failed to decode JWT".to_string()
+        ))
     );
 }
 
@@ -298,6 +328,8 @@ fn should_return_error_when_claims_invalid() {
     assert_eq!(
         with_provider(jwt_without_issuer, |provider| provider
             .verify(jwt_without_issuer, &[0u8; 32])),
-        Err(OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Unable to decode claims".to_string()
+        ))
     );
 }

@@ -1,3 +1,4 @@
+use super::OpenIDJWTVerificationError;
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -24,7 +25,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::Into;
 use std::rc::Rc;
-use super::OpenIDJWTVerificationError;
 
 const ISSUER: &str = "https://accounts.google.com";
 
@@ -90,25 +90,42 @@ impl OpenIdProvider for Provider {
         ISSUER
     }
 
-    fn verify(&self, jwt: &str, salt: &[u8; 32]) -> Result<OpenIdCredential, OpenIDJWTVerificationError > {
+    fn verify(
+        &self,
+        jwt: &str,
+        salt: &[u8; 32],
+    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
         // Decode JWT and verify claims
         let validation_item = Decoder::new()
             .decode_compact_serialization(jwt.as_bytes(), None)
-            .map_err(|_| OpenIDJWTVerificationError::GenericError("Unable to decode JWT".to_string()))?;
-        let claims: Claims = serde_json::from_slice(validation_item.claims())
-            .map_err(|_| OpenIDJWTVerificationError::GenericError("Unable to decode claims or expected claims are missing".to_string()))?;
+            .map_err(|_| {
+                OpenIDJWTVerificationError::GenericError("Unable to decode JWT".to_string())
+            })?;
+        let claims: Claims = serde_json::from_slice(validation_item.claims()).map_err(|_| {
+            OpenIDJWTVerificationError::GenericError(
+                "Unable to decode claims or expected claims are missing".to_string(),
+            )
+        })?;
         verify_claims(&self.client_id, &claims, salt)?;
 
         // Verify JWT signature
-        let kid = validation_item.kid().ok_or(OpenIDJWTVerificationError::GenericError("JWT is missing kid".to_string()))?;
+        let kid = validation_item
+            .kid()
+            .ok_or(OpenIDJWTVerificationError::GenericError(
+                "JWT is missing kid".to_string(),
+            ))?;
         let certs = self.certs.borrow();
         let cert = certs
             .iter()
             .find(|cert| cert.kid().is_some_and(|v| v == kid))
-            .ok_or(OpenIDJWTVerificationError::GenericError(format!("Certificate not found for {kid}")))?;
+            .ok_or(OpenIDJWTVerificationError::GenericError(format!(
+                "Certificate not found for {kid}"
+            )))?;
         validation_item
             .verify(&JwsVerifierFn::from(verify_signature), cert)
-            .map_err(|_| OpenIDJWTVerificationError::GenericError("Invalid signature".to_string()))?;
+            .map_err(|_| {
+                OpenIDJWTVerificationError::GenericError("Invalid signature".to_string())
+            })?;
 
         // Return credential with Google specific metadata
         let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
@@ -299,7 +316,11 @@ fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), Signature
         .map_err(|_| SignatureVerificationErrorKind::InvalidSignature.into())
 }
 
-fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result<(), OpenIDJWTVerificationError> {
+fn verify_claims(
+    client_id: &String,
+    claims: &Claims,
+    salt: &[u8; 32],
+) -> Result<(), OpenIDJWTVerificationError> {
     let now = time();
     let mut hasher = Sha256::new();
     hasher.update(salt);
@@ -308,40 +329,57 @@ fn verify_claims(client_id: &String, claims: &Claims, salt: &[u8; 32]) -> Result
     let expected_nonce = BASE64_URL_SAFE_NO_PAD.encode(hash);
 
     if claims.iss != ISSUER {
-        return Err(OpenIDJWTVerificationError::GenericError(format!("Invalid issuer: {}", claims.iss)));
+        return Err(OpenIDJWTVerificationError::GenericError(format!(
+            "Invalid issuer: {}",
+            claims.iss
+        )));
     }
     if &claims.aud != client_id {
-        return Err(OpenIDJWTVerificationError::GenericError(format!("Invalid audience: {}", claims.aud)));
+        return Err(OpenIDJWTVerificationError::GenericError(format!(
+            "Invalid audience: {}",
+            claims.aud
+        )));
     }
     if claims.nonce != expected_nonce {
-        return Err(OpenIDJWTVerificationError::GenericError(format!("Invalid nonce: {}", claims.nonce)));
+        return Err(OpenIDJWTVerificationError::GenericError(format!(
+            "Invalid nonce: {}",
+            claims.nonce
+        )));
     }
     if now > claims.iat * NANOSECONDS_PER_SECOND + MAX_VALIDITY_WINDOW {
         return Err(OpenIDJWTVerificationError::JWTExpired);
     }
     if now < claims.iat * NANOSECONDS_PER_SECOND {
-        return Err(OpenIDJWTVerificationError::GenericError("JWT is not valid yet".into()));
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "JWT is not valid yet".into(),
+        ));
     }
     if claims
         .email
         .as_ref()
         .is_some_and(|val| val.len() > MAX_EMAIL_LENGTH)
     {
-        return Err(OpenIDJWTVerificationError::GenericError("Email too long".into()));
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "Email too long".into(),
+        ));
     }
     if claims
         .name
         .as_ref()
         .is_some_and(|val| val.len() > MAX_NAME_LENGTH)
     {
-        return Err(OpenIDJWTVerificationError::GenericError("Name too long".into()));
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "Name too long".into(),
+        ));
     }
     if claims
         .picture
         .as_ref()
         .is_some_and(|val| val.len() > MAX_PICTURE_URL_LENGTH)
     {
-        return Err(OpenIDJWTVerificationError::GenericError("Picture URL too long".into()));
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "Picture URL too long".into(),
+        ));
     }
 
     Ok(())
@@ -447,7 +485,9 @@ fn should_return_error_when_encoding_invalid() {
 
     assert_eq!(
         provider.verify(invalid_jwt, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Unable to decode JWT".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Unable to decode JWT".into()
+        ))
     );
 }
 
@@ -461,7 +501,9 @@ fn should_return_error_when_cert_missing() {
 
     assert_eq!(
         provider.verify(&jwt, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Certificate not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Certificate not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into()
+        ))
     );
 }
 
@@ -479,7 +521,9 @@ fn should_return_error_when_signature_invalid() {
 
     assert_eq!(
         provider.verify(&invalid_jwt, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Invalid signature".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Invalid signature".into()
+        ))
     );
 }
 
@@ -492,7 +536,10 @@ fn should_return_error_when_invalid_issuer() {
 
     assert_eq!(
         verify_claims(&client_id, &invalid_claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError(format!("Invalid issuer: {}", invalid_claims.iss)))
+        Err(OpenIDJWTVerificationError::GenericError(format!(
+            "Invalid issuer: {}",
+            invalid_claims.iss
+        )))
     );
 }
 
@@ -505,7 +552,10 @@ fn should_return_error_when_invalid_audience() {
 
     assert_eq!(
         verify_claims(&client_id, &invalid_claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError(format!("Invalid audience: {}", invalid_claims.aud)))
+        Err(OpenIDJWTVerificationError::GenericError(format!(
+            "Invalid audience: {}",
+            invalid_claims.aud
+        )))
     );
 }
 
@@ -520,7 +570,9 @@ fn should_return_error_when_invalid_salt() {
 
     assert_eq!(
         verify_claims(client_id, &claims, &invalid_salt),
-        Err(OpenIDJWTVerificationError::GenericError("Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into()
+        ))
     );
 }
 
@@ -535,7 +587,9 @@ fn should_return_error_when_invalid_caller() {
 
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Invalid nonce: etiDaLGcRdm5-rcqe0ZQUeMgpfp4v9TOOYUPbhRx7nI".into()
+        ))
     );
 }
 
@@ -559,7 +613,9 @@ fn should_return_error_when_not_valid_yet() {
 
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("JWT is not valid yet".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "JWT is not valid yet".into()
+        ))
     );
 }
 
@@ -571,7 +627,9 @@ fn should_return_error_when_email_too_long() {
 
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Email too long".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Email too long".into()
+        ))
     );
 }
 
@@ -583,7 +641,9 @@ fn should_return_error_when_name_too_long() {
 
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Name too long".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Name too long".into()
+        ))
     );
 }
 
@@ -595,6 +655,8 @@ fn should_return_error_when_picture_url_too_long() {
 
     assert_eq!(
         verify_claims(client_id, &claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError("Picture URL too long".into()))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Picture URL too long".into()
+        ))
     );
 }
