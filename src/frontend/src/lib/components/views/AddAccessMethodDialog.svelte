@@ -172,10 +172,10 @@
       </p>
     </div>
     <Button onclick={handleCopyLink} variant="secondary" size="lg">
-      <span
-        >{addAccessMethodFlow.newDeviceLink.host +
-          addAccessMethodFlow.newDeviceLink.pathname}</span
-      >
+      <span>
+        {addAccessMethodFlow.newDeviceLink.host +
+          addAccessMethodFlow.newDeviceLink.pathname}
+      </span>
       <CopyIcon size="1.25rem" />
     </Button>
   {/if}
