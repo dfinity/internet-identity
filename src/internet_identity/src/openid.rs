@@ -66,7 +66,7 @@ impl From<OpenIDJWTVerificationError> for IdRegFinishError {
                 IdRegFinishError::InvalidAuthnMethod("JWT expired".to_string())
             }
             OpenIDJWTVerificationError::GenericError(msg) => {
-                IdRegFinishError::InvalidAuthnMethod(format!("JWT verification failed: {}", msg))
+                IdRegFinishError::InvalidAuthnMethod(format!("JWT verification failed: {msg}"))
             }
         }
     }
