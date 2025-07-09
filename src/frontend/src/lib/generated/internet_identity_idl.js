@@ -386,6 +386,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdCredentialAddError = IDL.Variant({
     'OpenIdCredentialAlreadyRegistered' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
+    'JwtExpired' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'JwtVerificationFailed' : IDL.Null,
   });
@@ -398,6 +399,7 @@ export const idlFactory = ({ IDL }) => {
   const OpenIdDelegationError = IDL.Variant({
     'NoSuchDelegation' : IDL.Null,
     'NoSuchAnchor' : IDL.Null,
+    'JwtExpired' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
   });
   const OpenIDRegFinishArg = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
