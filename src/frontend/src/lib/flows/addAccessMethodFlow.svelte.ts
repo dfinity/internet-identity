@@ -25,15 +25,22 @@ export interface AddAccessMethodFlowOptions {
 }
 
 export class AddAccessMethodFlow {
-  view = $state<"chooseMethod" | "addPasskey">("chooseMethod");
+  view = $state<"chooseMethod" | "addPasskey" | "continueOnAnotherDevice">(
+    "chooseMethod",
+  );
   isGoogleAuthenticating = $state(false);
   isSystemOverlayVisible = $state(false);
   isCreatingPasskey = $state(false);
+  newDeviceLink: URL;
 
   constructor(options?: AddAccessMethodFlowOptions) {
     if (options?.isMaxOpenIdCredentialsReached === true) {
       this.view = "addPasskey";
     }
+    this.newDeviceLink = new URL(
+      `/add-device/${get(authenticatedStore).identityNumber.toString(16)}`,
+      window.location.origin,
+    );
   }
 
   linkGoogleAccount = async (): Promise<OpenIdCredential> => {
@@ -118,5 +125,9 @@ export class AddAccessMethodFlow {
 
   continueWithPasskey = () => {
     this.view = "addPasskey";
+  };
+
+  continueOnAnotherDevice = () => {
+    this.view = "continueOnAnotherDevice";
   };
 }

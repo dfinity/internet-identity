@@ -15,6 +15,8 @@
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
+  import { CopyIcon } from "@lucide/svelte";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
 
   interface Props {
     onGoogleLinked: (credential: OpenIdCredential) => void;
@@ -59,6 +61,8 @@
       onError(error);
     }
   };
+  const handleCopyLink = () =>
+    navigator.clipboard.writeText(addAccessMethodFlow.newDeviceLink.href);
 </script>
 
 <Dialog {onClose}>
@@ -147,6 +151,7 @@
         {/if}
       </Button>
       <Button
+        onclick={addAccessMethodFlow.continueOnAnotherDevice}
         variant="tertiary"
         size="lg"
         disabled={addAccessMethodFlow.isCreatingPasskey}
@@ -154,6 +159,25 @@
         Continue on another device
       </Button>
     </div>
+  {:else if addAccessMethodFlow.view === "continueOnAnotherDevice"}
+    <div class="mt-4 mb-6 flex flex-col">
+      <PasskeyIllustration class="text-text-primary mb-8 h-32" />
+      <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
+        Continue on another device
+      </h1>
+      <p
+        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+      >
+        Scan the above QR code with your <b>new device</b> or enter the URL manually.
+      </p>
+    </div>
+    <Button onclick={handleCopyLink} variant="secondary" size="lg">
+      <span
+        >{addAccessMethodFlow.newDeviceLink.host +
+          addAccessMethodFlow.newDeviceLink.pathname}</span
+      >
+      <CopyIcon size="1.25rem" />
+    </Button>
   {/if}
 </Dialog>
 
