@@ -83,6 +83,10 @@ export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
   "ENABLE_MIGRATE_FLOW",
   false,
 );
+export const ADD_ACCESS_METHOD = createFeatureFlagStore(
+  "ADD_ACCESS_METHOD",
+  false,
+);
 
 export default {
   DOMAIN_COMPATIBILITY,
@@ -90,4 +94,5 @@ export default {
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   ENABLE_MIGRATE_FLOW,
+  ADD_ACCESS_METHOD,
 } as Record<string, FeatureFlagStore>;
