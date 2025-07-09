@@ -169,12 +169,17 @@ export const authorizationStore: AuthorizationStore = {
       const LATE_SUCCESS_MESSAGE_DELAY_MS = 2000;
       // If the user is still here after 2 seconds, show a message
       // "Authentication successful, close page"
-      setTimeout(() => {
+      const lateSuccessTimeout = setTimeout(() => {
         internalStore.update((value) => ({
           ...value,
           status: "late-success",
         }));
       }, LATE_SUCCESS_MESSAGE_DELAY_MS);
+      internalStore.subscribe(({ status }) => {
+        if (status !== "success") {
+          clearTimeout(lateSuccessTimeout);
+        }
+      });
     }
   },
   subscribe: (...args) => internalStore.subscribe(...args),
