@@ -510,7 +510,7 @@ fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_check_tentative_device_verified() {
+fn should_require_authentication_to_check_tentative_device() {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -523,11 +523,7 @@ fn should_require_authentication_to_check_tentative_device_verified() {
         identity_number,
     );
 
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("[a-z0-9-]+ could not be authenticated.").unwrap(),
-    );
+    assert_eq!(result, Ok(Err(CheckTentativeDeviceError::Unauthorized)));
 }
 
 #[test]
