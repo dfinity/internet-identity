@@ -660,9 +660,10 @@ async fn random_salt() -> Salt {
 mod v2_api {
     use crate::{
         anchor_management::tentative_device_registration::{
-            check_tentative_device_verified, CheckTentativeDeviceVerifiedError,
+            check_tentative_device_verified, RegistrationId,
         },
         state::get_identity_number_by_registration_id,
+        CheckTentativeDeviceVerifiedError,
     };
 
     use super::*;
@@ -866,12 +867,15 @@ mod v2_api {
     #[update]
     fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
-        id: RegistrationId,
-    ) -> Result<RegistrationModeInfo, ()> {
+        id: String,
+    ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
         check_authz_and_record_activity(identity_number)
             .unwrap_or_else(|err| trap(&format!("{err}")));
-        let timeout =
-            tentative_device_registration::enter_device_registration_mode_v2(identity_number, id);
+        let timeout = tentative_device_registration::enter_device_registration_mode_v2(
+            identity_number,
+            RegistrationId::new(id)
+                .map_err(|err| AuthnMethodRegistrationModeEnterError::InvalidId(err))?,
+        );
         Ok(RegistrationModeInfo {
             expiration: timeout,
         })
@@ -937,8 +941,13 @@ mod v2_api {
     }
 
     #[query]
-    fn lookup_by_registration_mode_id(id: RegistrationId) -> Option<IdentityNumber> {
-        get_identity_number_by_registration_id(&id)
+    fn lookup_by_registration_mode_id(
+        id: String,
+    ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
+        let res = get_identity_number_by_registration_id(
+            &RegistrationId::new(id).map_err(|err| LookupByRegistrationIdError::InvalidId(err))?,
+        );
+        Ok(res)
     }
 }
 

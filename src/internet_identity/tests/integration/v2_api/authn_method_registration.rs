@@ -8,7 +8,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
-    AuthnMethodRegistration,
+    AuthnMethodRegistration, RegistrationId,
 };
 use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
@@ -21,12 +21,14 @@ fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     let result = api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -43,12 +45,14 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     let result = api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         Principal::anonymous(),
         identity_number,
+        registration_mode_id,
     );
 
     expect_user_error_with_message(
@@ -64,12 +68,14 @@ fn should_register_authn_method() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -99,12 +105,14 @@ fn should_verify_authn_method_after_failed_attempt() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -147,12 +155,14 @@ fn identity_info_should_return_authn_method() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -180,6 +190,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallEr
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     let result = api_v2::authn_method_register(
         &env,
@@ -198,6 +209,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallEr
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
     api_v2::authn_method_registration_mode_exit(
@@ -229,12 +241,14 @@ fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), Ca
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -260,12 +274,14 @@ fn should_reject_confirmation_without_authn_method() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -291,12 +307,14 @@ fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let registration_mode_id = "0fZr4".to_string();
 
     api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
+        registration_mode_id,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
