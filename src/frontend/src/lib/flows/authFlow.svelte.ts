@@ -45,6 +45,7 @@ export class AuthFlow {
     solve: (solution: string) => void;
   }>();
   systemOverlay = $state(false);
+  authenticating = $state(false);
   #options: AuthFlowOptions;
 
   constructor(options: AuthFlowOptions) {
@@ -60,21 +61,26 @@ export class AuthFlow {
   };
 
   continueWithExistingPasskey = async (): Promise<void> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
-    const { identity, identityNumber, credentialId } =
-      await authenticateWithPasskey({
-        canisterId,
-        session: get(sessionStore),
+    this.authenticating = true;
+    try {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+      const { identity, identityNumber, credentialId } =
+        await authenticateWithPasskey({
+          canisterId,
+          session: get(sessionStore),
+        });
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { passkey: { credentialId } },
       });
-    authenticationStore.set({ identity, identityNumber });
-    const info =
-      await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-    lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber,
-      name: info.name[0],
-      authMethod: { passkey: { credentialId } },
-    });
-    this.#options.onSignIn(identityNumber);
+      this.#options.onSignIn(identityNumber);
+    } finally {
+      this.authenticating = false;
+    }
   };
 
   setupNewPasskey = (): void => {
@@ -83,6 +89,7 @@ export class AuthFlow {
   };
 
   createPasskey = async (name: string): Promise<void> => {
+    this.authenticating = true;
     try {
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.StartWebauthnCreation,
@@ -96,6 +103,8 @@ export class AuthFlow {
     } catch (error) {
       this.view = "chooseMethod";
       throw error;
+    } finally {
+      this.authenticating = false;
     }
   };
 
@@ -107,6 +116,7 @@ export class AuthFlow {
     }
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
+      this.authenticating = true;
       const requestConfig = createGoogleRequestConfig(clientId);
       this.systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
@@ -114,10 +124,11 @@ export class AuthFlow {
         mediation: "required",
       });
     } catch (error) {
-      this.systemOverlay = false;
+      this.authenticating = false;
       this.view = "chooseMethod";
       throw error;
     } finally {
+      this.systemOverlay = false;
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
     }
@@ -157,7 +168,7 @@ export class AuthFlow {
       this.view = "chooseMethod";
       throw error;
     } finally {
-      this.systemOverlay = false;
+      this.authenticating = false;
     }
   };
 

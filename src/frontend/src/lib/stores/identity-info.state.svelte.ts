@@ -18,8 +18,6 @@ import {
   lastUsedIdentitiesStore,
   lastUsedIdentityStore,
 } from "./last-used-identities.store";
-import { authorizationStore } from "./authorization.store";
-import { goto } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -163,9 +161,9 @@ class IdentityInfo {
   };
 
   logout = () => {
-    this.reset();
-    void authorizationStore.init();
-    void goto("/");
+    // TODO: When we keep a session open we'll need to clean that session.
+    // For now we just reload the page to make sure all the states are cleared
+    window.location.reload();
   };
 
   isCurrentAccessMethod = (
