@@ -23,6 +23,7 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { goto } from "$app/navigation";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const gotoManage = () => goto("/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
@@ -78,12 +79,21 @@
             <ul class="contents">
               {#each lastUsedIdentities as identity}
                 <li class="contents">
-                  <ButtonCard onclick={() => handleContinueAs(identity)}>
+                  <ButtonCard
+                    onclick={() => handleContinueAs(identity)}
+                    disabled={nonNullish(
+                      authLastUsedFlow.authenticatingIdentity,
+                    )}
+                  >
                     <Avatar size="sm">
-                      <UserIcon size="1.25rem" />
+                      {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
+                        <ProgressRing />
+                      {:else}
+                        <UserIcon size="1.25rem" />
+                      {/if}
                     </Avatar>
                     <div class="flex flex-col text-left text-sm">
-                      <div class="text-text-primary font-semibold">
+                      <div class="font-semibold">
                         {identity.name ?? identity.identityNumber}
                       </div>
                       <div class="text-text-tertiary" aria-hidden="true">
@@ -96,7 +106,10 @@
                 </li>
               {/each}
             </ul>
-            <ButtonCard onclick={() => (isAuthDialogOpen = true)}>
+            <ButtonCard
+              onclick={() => (isAuthDialogOpen = true)}
+              disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+            >
               <FeaturedIcon size="sm">
                 <PlusIcon size="1.25rem" />
               </FeaturedIcon>
