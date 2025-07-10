@@ -84,11 +84,11 @@ pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
             prune_expired_tentative_device_registrations_v2(registrations, lookup);
-            if let Some(TentativeDeviceRegistration { id, .. }) = registrations.get(&anchor_number)
+            if let Some(TentativeDeviceRegistration {
+                id: Some(reg_id), ..
+            }) = registrations.get(&anchor_number)
             {
-                if let Some(reg_id) = id {
-                    lookup.remove(reg_id);
-                }
+                lookup.remove(reg_id);
             }
             registrations.remove(&anchor_number);
         });
