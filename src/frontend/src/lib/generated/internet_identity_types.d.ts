@@ -113,6 +113,7 @@ export interface CheckCaptchaArg { 'solution' : string }
 export type CheckCaptchaError = { 'NoRegistrationFlow' : null } |
   { 'UnexpectedCall' : { 'next_step' : RegistrationFlowNextStep } } |
   { 'WrongSolution' : { 'new_captcha_png_base64' : string } };
+export type CheckTentativeDeviceError = { 'Unauthorized' : null };
 export type CreateAccountError = { 'AccountLimitReached' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal } |
@@ -279,6 +280,7 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LookupByRegistrationIdError = { 'InvalidId' : string };
 export type MetadataMap = Array<
   [
     string,
@@ -408,10 +410,20 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodAddError }
   >,
+  'authn_method_check_tentative_device' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : boolean } |
+      { 'Err' : CheckTentativeDeviceError }
+  >,
   'authn_method_confirm' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodConfirmationError }
+  >,
+  'authn_method_lookup_by_regiatration_mode_id' : ActorMethod<
+    [string],
+    { 'Ok' : [] | [IdentityNumber] } |
+      { 'Err' : LookupByRegistrationIdError }
   >,
   'authn_method_metadata_replace' : ActorMethod<
     [IdentityNumber, PublicKey, MetadataMapV2],

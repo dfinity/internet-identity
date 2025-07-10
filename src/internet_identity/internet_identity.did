@@ -513,6 +513,14 @@ type AuthnMethodConfirmationError = variant {
     NoAuthnMethodToConfirm;
 };
 
+type CheckTentativeDeviceError = variant {
+    Unauthorized;
+};
+
+type LookupByRegistrationIdError = variant {
+    InvalidId : text;
+};
+
 type IdentityAuthnInfo = record {
     authn_methods : vec AuthnMethod;
     recovery_authn_methods : vec AuthnMethod;
@@ -854,6 +862,10 @@ service : (opt InternetIdentityInit) -> {
     // subsequently be used for authentication for that identity.
     // Requires authentication.
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
+
+    authn_method_check_tentative_device : (IdentityNumber) -> (variant { Ok : bool; Err: CheckTentativeDeviceError });
+
+    authn_method_lookup_by_regiatration_mode_id : (text) -> (variant { Ok : opt IdentityNumber; Err : LookupByRegistrationIdError });
 
     // Authentication protocol
     // =======================
