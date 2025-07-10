@@ -31,7 +31,11 @@
   const authFlow = new AuthFlow({ onSignIn, onSignUp });
 </script>
 
-<Dialog {onClose}>
+<Dialog
+  {onClose}
+  showCloseButton={!authFlow.authenticating}
+  closeOnOutsideClick={!authFlow.authenticating}
+>
   {#if nonNullish(authFlow.captcha)}
     <SolveCaptcha {...authFlow.captcha} />
   {:else if authFlow.view === "chooseMethod"}
