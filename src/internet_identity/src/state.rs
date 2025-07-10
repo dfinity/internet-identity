@@ -1,3 +1,4 @@
+use crate::anchor_management::tentative_device_registration::RegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;

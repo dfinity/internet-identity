@@ -68,7 +68,7 @@ pub fn enter_device_registration_mode_v2(
                         TentativeDeviceRegistration {
                             expiration,
                             state: DeviceRegistrationModeActive,
-                            id: Some(id),
+                            id: Some(id.clone()),
                         },
                     );
                     lookup.insert(id, identity_number);
@@ -214,17 +214,6 @@ fn get_verified_device(
     })
 }
 
-#[derive(CandidType)]
-pub enum CheckTentativeDeviceVerifiedError {
-    Unauthorized,
-}
-
-impl From<AuthorizationError> for CheckTentativeDeviceVerifiedError {
-    fn from(_err: AuthorizationError) -> Self {
-        CheckTentativeDeviceVerifiedError::Unauthorized
-    }
-}
-
 /// Checks whether a tentative device has been verified without mutating anything
 /// This is so that on the new client we can prompt for adding the final passkey as soon as
 /// on the old client we have verified the temporary key
@@ -272,9 +261,37 @@ fn prune_expired_tentative_device_registrations_v2(
             true
         } else {
             if id.is_some() {
-                lookup.remove(&id.unwrap());
+                lookup.remove(&id.clone().unwrap());
             }
             false
         }
     })
+}
+
+#[derive(CandidType)]
+pub enum CheckTentativeDeviceVerifiedError {
+    Unauthorized,
+}
+
+impl From<AuthorizationError> for CheckTentativeDeviceVerifiedError {
+    fn from(_err: AuthorizationError) -> Self {
+        CheckTentativeDeviceVerifiedError::Unauthorized
+    }
+}
+
+#[derive(CandidType, Clone, Eq, PartialEq, Hash)]
+pub struct RegistrationId(String);
+
+impl RegistrationId {
+    pub fn new(s: String) -> Result<Self, String> {
+        if s.chars().count() == 5 {
+            Ok(RegistrationId(s))
+        } else {
+            Err("RegistrationId must be exactly 5 characters".to_string())
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
