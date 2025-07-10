@@ -29,9 +29,16 @@
   }: Props = $props();
 
   const authFlow = new AuthFlow({ onSignIn, onSignUp });
+
+  const handleClose = () => {
+    // Allow closing only if not authenticating.
+    if (!authFlow.authenticating) {
+      onClose();
+    }
+  };
 </script>
 
-<Dialog {onClose}>
+<Dialog onClose={handleClose} showCloseButton={!authFlow.authenticating}>
   {#if nonNullish(authFlow.captcha)}
     <SolveCaptcha {...authFlow.captcha} />
   {:else if authFlow.view === "chooseMethod"}
