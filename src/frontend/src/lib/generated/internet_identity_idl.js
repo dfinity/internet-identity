@@ -141,11 +141,13 @@ export const idlFactory = ({ IDL }) => {
     'authn_method' : AuthnMethod,
   });
   const AuthnMethodAddError = IDL.Variant({ 'InvalidMetadata' : IDL.Text });
+  const CheckTentativeDeviceError = IDL.Variant({ 'Unauthorized' : IDL.Null });
   const AuthnMethodConfirmationError = IDL.Variant({
     'RegistrationModeOff' : IDL.Null,
     'NoAuthnMethodToConfirm' : IDL.Null,
     'WrongCode' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
   });
+  const LookupByRegistrationIdError = IDL.Variant({ 'InvalidId' : IDL.Text });
   const AuthnMethodMetadataReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
@@ -476,12 +478,27 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : AuthnMethodAddError })],
         [],
       ),
+    'authn_method_check_tentative_device' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Variant({ 'Ok' : IDL.Bool, 'Err' : CheckTentativeDeviceError })],
+        [],
+      ),
     'authn_method_confirm' : IDL.Func(
         [IdentityNumber, IDL.Text],
         [
           IDL.Variant({
             'Ok' : IDL.Null,
             'Err' : AuthnMethodConfirmationError,
+          }),
+        ],
+        [],
+      ),
+    'authn_method_lookup_by_regiatration_mode_id' : IDL.Func(
+        [IDL.Text],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(IdentityNumber),
+            'Err' : LookupByRegistrationIdError,
           }),
         ],
         [],
