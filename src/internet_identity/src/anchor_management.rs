@@ -1,7 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
@@ -10,8 +8,7 @@ use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operat
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
-    DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace,
-    MetadataEntry,
+    DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace, MetadataEntry,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -41,16 +38,9 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let tentative_device_registration =
         state::get_tentative_device_registration_by_identity(anchor_number);
 
-    let tentative_device_registration_v2 =
-        state::get_tentative_device_registrations_by_identity_v2(anchor_number);
-
     IdentityAnchorInfo {
         devices,
         device_registration: tentative_device_registration.and_then(|reg| reg.to_maybe_info(now)),
-        device_registrations_v2: tentative_device_registration_v2
-            .iter()
-            .filter_map(|reg| reg.to_maybe_info(now))
-            .collect(),
         openid_credentials,
         name,
     }
