@@ -257,7 +257,7 @@ fn prune_expired_tentative_device_registrations(
 ) {
     let now = time();
 
-    registrations.retain(|_, TentativeDeviceRegistration { expiration, id, .. }| *expiration > now)
+    registrations.retain(|_, TentativeDeviceRegistration { expiration, .. }| *expiration > now)
 }
 
 /// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
