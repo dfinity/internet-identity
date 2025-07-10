@@ -6,7 +6,6 @@ import { Funnel } from "./Funnel";
  * Square brackets [] indicate optional events.
  *
  * Authentication flow events:
- *  last-used-present
  *    continue-as-screen
  *      use-another
  *        -> Move to select-method-screen
@@ -14,26 +13,27 @@ import { Funnel } from "./Funnel";
  *        auth-success
  *      continue-as-google
  *        auth-success
- *  last-used-not-present
  *    select-method-screen
  *      continue-with-google
  *        register-with-google
  *          successful-google-registration
  *            auth-success
+ *          jwt-verification-failed
+ *          jwt-verification-expired
  *        login-with-google
  *          auth-success
+ *          jwt-verification-failed
+ *          jwt-verification-expired
  *      continue-with-passkey-screen
- *        register-with-passkey
- *          enter-name-screen
- *            start-webauthn-creation
+ *        enter-name-screen
+ *          start-webauthn-creation
+ *            register-with-passkey
  *              successful-passkey-registration
  *                auth-success
  *        use-existing-passkey
  *          auth-success
  */
 export const AuthenticationV2Events = {
-  LastUsedPresent: "last-used-present",
-  LastUsedNotPresent: "last-used-not-present",
   UseAnother: "use-another",
   ContinueAsScreen: "continue-as-screen",
   ContinueAsPasskey: "continue-as-passkey",
@@ -44,12 +44,14 @@ export const AuthenticationV2Events = {
   SuccessfulGoogleRegistration: "successful-google-registration",
   LoginWithGoogle: "login-with-google",
   ContinueWithPasskeyScreen: "continue-with-passkey-screen",
-  RegisterWithPasskey: "register-with-passkey",
   EnterNameScreen: "enter-name-screen",
   StartWebauthnCreation: "start-webauthn-creation",
+  RegisterWithPasskey: "register-with-passkey",
   SuccessfulPasskeyRegistration: "successful-passkey-registration",
   UseExistingPasskey: "use-existing-passkey",
   AuthSuccess: "auth-success",
+  JwtVerificationFailed: "jwt-verification-failed",
+  JwtVerificationExpired: "jwt-verification-expired",
 } as const;
 
 export const authenticationV2Funnel = new Funnel<typeof AuthenticationV2Events>(

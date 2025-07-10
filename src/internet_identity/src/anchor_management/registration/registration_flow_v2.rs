@@ -224,8 +224,7 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 let openid_credential = provider.verify(jwt, salt)?;
                 let name = provider.metadata_name(openid_credential.metadata.clone());
                 Ok((openid_credential, name))
-            })
-            .map_err(IdRegFinishError::InvalidAuthnMethod)?;
+            })?;
             add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             set_name(&mut identity, name)
