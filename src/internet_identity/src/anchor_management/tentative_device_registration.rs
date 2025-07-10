@@ -82,8 +82,16 @@ pub fn enter_device_registration_mode_v2(
 
 pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     state::tentative_device_registrations_mut(|registrations| {
-        prune_expired_tentative_device_registrations(registrations);
-        registrations.remove(&anchor_number)
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            if let Some(TentativeDeviceRegistration { id, .. }) = registrations.get(&anchor_number)
+            {
+                if let Some(reg_id) = id {
+                    lookup.remove(reg_id);
+                }
+            }
+            registrations.remove(&anchor_number);
+        });
     });
 }
 
