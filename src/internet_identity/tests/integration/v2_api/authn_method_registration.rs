@@ -523,7 +523,10 @@ fn should_require_authentication_to_check_tentative_device() {
         identity_number,
     );
 
-    assert_eq!(result, Ok(Err(CheckTentativeDeviceError::Unauthorized)));
+    assert!(matches!(
+        result,
+        Ok(Err(CheckTentativeDeviceError::Unauthorized))
+    ));
 }
 
 #[test]
