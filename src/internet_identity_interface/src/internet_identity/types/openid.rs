@@ -23,6 +23,7 @@ pub enum OpenIdCredentialAddError {
     JwtVerificationFailed,
     OpenIdCredentialAlreadyRegistered,
     InternalCanisterError(String),
+    JwtExpired,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -44,6 +45,7 @@ pub enum OpenIdDelegationError {
     NoSuchAnchor,
     NoSuchDelegation,
     JwtVerificationFailed,
+    JwtExpired,
 }
 
 pub type OpenIdCredentialKey = (Iss, Sub);

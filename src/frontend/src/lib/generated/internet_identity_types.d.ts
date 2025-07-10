@@ -308,6 +308,7 @@ export type OpenIdCredentialAddError = {
     'OpenIdCredentialAlreadyRegistered' : null
   } |
   { 'InternalCanisterError' : string } |
+  { 'JwtExpired' : null } |
   { 'Unauthorized' : Principal } |
   { 'JwtVerificationFailed' : null };
 export type OpenIdCredentialKey = [Iss, Sub];
@@ -316,6 +317,7 @@ export type OpenIdCredentialRemoveError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
 export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
+  { 'JwtExpired' : null } |
   { 'JwtVerificationFailed' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,

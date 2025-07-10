@@ -537,6 +537,9 @@ export const displayManage = async (
             case "JwtVerificationFailed":
               toast.error(copy.jwt_signature_invalid);
               break;
+            case "JwtExpired":
+              toast.error(copy.jwt_signature_invalid);
+              break;
             case "OpenIdCredentialAlreadyRegistered":
               toast.error(copy.account_already_linked);
               break;

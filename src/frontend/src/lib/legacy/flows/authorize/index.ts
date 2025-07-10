@@ -324,7 +324,7 @@ export const authFlowAuthorize = async (
     return window.location.assign("/") as never;
   }
 
-  if (result === "failure") {
+  if (result === "failure" || result === "unverified-origin") {
     showMessage({
       message: copy.auth_failed,
     });

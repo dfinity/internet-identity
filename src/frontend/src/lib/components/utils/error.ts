@@ -3,12 +3,17 @@ import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
   CheckCaptchaError,
+  CreateAccountError,
   IdRegFinishError,
   IdRegStartError,
   OpenIdCredentialAddError,
   OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import { isOpenIdCancelError } from "$lib/utils/openID";
+import {
+  AuthenticationV2Events,
+  authenticationV2Funnel,
+} from "$lib/utils/analytics/authenticationV2Funnel";
 
 export const handleError = (error: unknown) => {
   // Handle browser errors
@@ -27,6 +32,7 @@ export const handleError = (error: unknown) => {
       | IdRegStartError
       | IdRegFinishError
       | CheckCaptchaError
+      | CreateAccountError
       | OpenIdCredentialAddError
       | OpenIdCredentialRemoveError
     >(error)
@@ -52,12 +58,10 @@ export const handleError = (error: unknown) => {
           description: error.value(error.type),
         });
         break;
-      case "AlreadyInProgress":
-      case "WrongSolution":
-        // Should be handled up the stack; reaching here means they weren’t.
-        toaster.error({
-          title: "Unhandled error",
-          description: error.type,
+      case "AccountLimitReached":
+        toaster.warning({
+          title: "Limit reached",
+          description: "No more additional accounts can be created",
         });
         break;
       case "OpenIdCredentialAlreadyRegistered":
@@ -65,27 +69,71 @@ export const handleError = (error: unknown) => {
           title: "This account is already linked to another identity",
         });
         break;
+      case "JwtVerificationFailed":
+        toaster.error({
+          title: "Authorization invalid",
+          description:
+            "There was an error verifying your account — please try again.",
+        });
+        // This is triggered also with errors from the dashboard.
+        // Plausible Funnels filter by the user triggering specific events before.
+        // Triggering the error here, means we'll get the total of these errors.
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.JwtVerificationFailed,
+        );
+        break;
+      case "JwtExpired":
+        toaster.error({
+          title: "Expired JWT",
+          description:
+            "The JWT has expired — please try again in a few minutes.",
+        });
+        // This is triggered also with errors from the dashboard.
+        // Plausible Funnels filter by the user triggering specific events before.
+        // Triggering the error here, means we'll get the total of these errors.
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.JwtVerificationExpired,
+        );
+        break;
+      case "OpenIdCredentialNotFound":
+        toaster.error({
+          title: "This account has already been unlinked",
+        });
+        break;
+      case "AlreadyInProgress":
+      case "WrongSolution":
+        // Should be handled up the stack; reaching here means they weren't.
+        toaster.error({
+          title: "Unhandled error",
+          description: error.type,
+        });
+        console.error(error);
+        break;
+      case "NameTooLong":
       case "Unauthorized":
+        // Shouldn't have happened; reaching here means they weren't avoided.
+        toaster.error({
+          title: "Unexpected error",
+          description: error.type,
+        });
+        console.error(error);
         break;
       case "InternalCanisterError":
+        // Should never happen; reaching here means there's a technical issue.
         toaster.error({
           title: "An internal error occurred",
           description: error.value(error.type),
         });
-        break;
-      case "JwtVerificationFailed":
-        toaster.error({
-          title: "Authorization invalid",
-          description: "It may have expired — please try again",
-        });
-        break;
-      case "OpenIdCredentialNotFound":
-        toaster.error({
-          title: "This credential is not linked to this identity",
-        });
+        console.error(error);
         break;
       default: {
+        // Should be avoided; reaching here means an error is missing above.
         void (error.type satisfies never);
+        toaster.error({
+          title: "Unknown error",
+          description: error.type,
+        });
+        console.error(error);
       }
     }
     return;
