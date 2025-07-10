@@ -47,7 +47,7 @@ export class AddAccessMethodFlow {
       this.view = "addPasskey";
     }
     this.newDeviceLink = new URL(
-      `/new-device/${get(authenticatedStore).identityNumber.toString(16)}`,
+      `/new-device?${get(authenticatedStore).identityNumber.toString(16)}`,
       window.location.origin,
     );
   }

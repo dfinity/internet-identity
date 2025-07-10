@@ -2,7 +2,7 @@
   import Header from "$lib/components/layout/Header.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { RegisterAccessMethodFlow } from "$lib/flows/registerAccessMethodFlow.svelte";
+  import { RegisterAccessMethodFlow } from "$lib/flows/registerAccessMethodFlow.svelte.js";
   import type { PageProps } from "./$types";
   import { CopyIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
