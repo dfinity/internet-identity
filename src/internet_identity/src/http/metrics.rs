@@ -156,7 +156,7 @@ fn encode_metrics(w: &mut MetricsEncoder<Vec<u8>>) -> std::io::Result<()> {
     })?;
     state::lookup_tentative_device_registration(|lookup_tentative_device_registration_v2| {
         w.encode_gauge(
-            "internet_identity_users_in_registration_mode_2.0",
+            "internet_identity_users_in_registration_mode_v2",
             lookup_tentative_device_registration_v2.len() as f64,
             "The number of users in registration mode 2.0",
         )
