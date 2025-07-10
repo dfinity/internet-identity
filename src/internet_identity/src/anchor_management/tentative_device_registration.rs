@@ -217,9 +217,9 @@ fn get_verified_device(
 /// Checks whether a tentative device has been verified without mutating anything
 /// This is so that on the new client we can prompt for adding the final passkey as soon as
 /// on the old client we have verified the temporary key
-pub fn check_tentative_device_verified(identity_number: IdentityNumber) -> bool {
+pub fn check_tentative_device(identity_number: IdentityNumber) -> bool {
     state::tentative_device_registrations(|registrations| {
-        registrations.get(&identity_number).is_none()
+        registrations.get(&identity_number).is_some()
     })
 }
 
@@ -269,13 +269,13 @@ fn prune_expired_tentative_device_registrations_v2(
 }
 
 #[derive(CandidType)]
-pub enum CheckTentativeDeviceVerifiedError {
+pub enum CheckTentativeDeviceError {
     Unauthorized,
 }
 
-impl From<AuthorizationError> for CheckTentativeDeviceVerifiedError {
+impl From<AuthorizationError> for CheckTentativeDeviceError {
     fn from(_err: AuthorizationError) -> Self {
-        CheckTentativeDeviceVerifiedError::Unauthorized
+        CheckTentativeDeviceError::Unauthorized
     }
 }
 

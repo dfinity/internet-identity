@@ -243,12 +243,12 @@ pub enum CreateIdentityData {
 #[derive(CandidType, Clone, Eq, PartialEq, Hash)]
 pub struct RegistrationId(String);
 
-#[derive(CandidType, Deserialize)]
-pub enum CheckTentativeDeviceVerifiedError {
+#[derive(CandidType, Deserialize, Debug)]
+pub enum CheckTentativeDeviceError {
     Unauthorized,
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(CandidType, Deserialize, Debug)]
 pub enum LookupByRegistrationIdError {
     InvalidId(String),
 }

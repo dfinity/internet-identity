@@ -6,7 +6,6 @@ use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
-use crate::tentative_device_registration::CheckTentativeDeviceVerifiedError;
 use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -660,10 +659,9 @@ async fn random_salt() -> Salt {
 mod v2_api {
     use crate::{
         anchor_management::tentative_device_registration::{
-            check_tentative_device_verified, RegistrationId,
+            check_tentative_device, CheckTentativeDeviceError, RegistrationId,
         },
         state::get_identity_number_by_registration_id,
-        CheckTentativeDeviceVerifiedError,
     };
 
     use super::*;
@@ -932,11 +930,11 @@ mod v2_api {
     }
 
     #[query]
-    fn authn_method_check_tentative_device_verified(
+    fn authn_method_check_tentative_device(
         identity_number: IdentityNumber,
-    ) -> Result<bool, CheckTentativeDeviceVerifiedError> {
-        check_authorization(identity_number).map_err(CheckTentativeDeviceVerifiedError::from)?;
-        Ok(check_tentative_device_verified(identity_number))
+    ) -> Result<bool, CheckTentativeDeviceError> {
+        check_authorization(identity_number).map_err(CheckTentativeDeviceError::from)?;
+        Ok(check_tentative_device(identity_number))
     }
 
     #[query]

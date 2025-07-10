@@ -299,18 +299,18 @@ pub fn authn_method_confirm(
     .map(|(x,)| x)
 }
 
-pub fn authn_method_check_tentative_device_verified(
+pub fn authn_method_check_tentative_device(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<bool, CheckTentativeDeviceVerifiedError>, CallError> {
+) -> Result<Result<bool, CheckTentativeDeviceError>, CallError> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "authn_method_check_tentative_device_verified",
+        "authn_method_check_tentative_device",
         (identity_number,),
     )
     .map(|(x,)| x)
@@ -321,7 +321,7 @@ pub fn authn_method_lookup_by_registration_mode_id(
     canister_id: CanisterId,
     sender: Principal,
     id: String,
-) -> Result<Result<bool, CheckTentativeDeviceVerifiedError>, CallError> {
+) -> Result<Result<Option<IdentityNumber>, LookupByRegistrationIdError>, CallError> {
     call_candid_as(
         env,
         canister_id,
