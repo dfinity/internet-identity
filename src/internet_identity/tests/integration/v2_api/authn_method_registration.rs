@@ -8,7 +8,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
-    AuthnMethodRegistration, RegistrationId,
+    AuthnMethodRegistration,
 };
 use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
