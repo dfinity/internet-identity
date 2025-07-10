@@ -77,7 +77,8 @@ pub fn enter_device_registration_mode_v2(
                             },
                         ),
                     );
-                    lookup;
+                    add_tentative_registration_to_lookup(identity_number, id, lookup);
+
                     expiration
                 }
             }
@@ -277,19 +278,38 @@ fn prune_expired_tentative_device_registrations_v2(
             if *expiration > now {
                 true
             } else {
-                let mut len = 0;
-                lookup.entry(*identity_number).and_modify(|ids| {
-                    let temp_ids: Vec<[u8; 5]> =
-                        ids.iter().filter(|id| **id == *reg_id).cloned().collect();
-                    len = temp_ids.len();
-                    *ids = temp_ids;
-                });
-                // If we just removed the last id, clean up the entire entry
-                if len == 0 {
-                    lookup.remove(identity_number);
-                }
+                remove_tentative_registration_from_lookup(*identity_number, reg_id, lookup);
                 false
             }
         },
     )
+}
+
+pub fn add_tentative_registration_to_lookup(
+    identity_number: IdentityNumber,
+    id: RegistrationId,
+    lookup: &mut HashMap<IdentityNumber, Vec<RegistrationId>>,
+) {
+    lookup.entry(identity_number).or_insert(vec![]).push(id)
+}
+
+pub fn remove_tentative_registration_from_lookup(
+    identity_number: IdentityNumber,
+    removable_id: &RegistrationId,
+    lookup: &mut HashMap<IdentityNumber, Vec<RegistrationId>>,
+) {
+    let mut len = 0;
+    lookup.entry(identity_number).and_modify(|ids| {
+        let temp_ids: Vec<[u8; 5]> = ids
+            .iter()
+            .filter(|id| **id == *removable_id)
+            .cloned()
+            .collect();
+        len = temp_ids.len();
+        *ids = temp_ids;
+    });
+    // If we just removed the last id, clean up the entire entry
+    if len == 0 {
+        lookup.remove(&identity_number);
+    }
 }

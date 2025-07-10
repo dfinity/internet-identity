@@ -358,7 +358,6 @@ pub fn tentative_device_registrations_v2_mut<R>(
     STATE.with(|s| f(&mut s.tentative_device_registrations_v2.borrow_mut()))
 }
 
-#[allow(dead_code)] // For now this is not used
 pub fn lookup_tentative_device_registration_v2<R>(
     f: impl FnOnce(&HashMap<IdentityNumber, Vec<RegistrationId>>) -> R,
 ) -> R {
@@ -392,6 +391,7 @@ pub fn get_tentative_device_registrations_by_identity_v2(
     })
 }
 
+#[allow(dead_code)] // For now this is not used
 pub fn get_identity_number_by_registration_id(id: &RegistrationId) -> Option<IdentityNumber> {
     tentative_device_registrations_v2(|registrations| {
         registrations
