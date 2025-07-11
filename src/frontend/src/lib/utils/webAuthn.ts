@@ -1,4 +1,7 @@
-import type { DeviceData } from "$lib/generated/internet_identity_types";
+import type {
+  AuthnMethodData,
+  DeviceData,
+} from "$lib/generated/internet_identity_types";
 import { features } from "$lib/legacy/features";
 import {
   DummyIdentity,
@@ -7,6 +10,7 @@ import {
 } from "$lib/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
+import { bufEquals } from "@dfinity/agent";
 
 export const constructIdentity = async ({
   devices,
@@ -66,4 +70,26 @@ export const lookupAAGUID = async (
     await import("$lib/legacy/assets/passkey_aaguid_data.json")
   ).default;
   return knownList[aaguid as keyof typeof knownList];
+};
+
+/**
+ * Check if two `AuthnMethodData` values are equal to one another
+ */
+export const authnMethodEqual = (
+  a: AuthnMethodData,
+  b: AuthnMethodData,
+): boolean => {
+  if ("WebAuthn" in a.authn_method && "WebAuthn" in b.authn_method) {
+    return bufEquals(
+      new Uint8Array(a.authn_method.WebAuthn.pubkey),
+      new Uint8Array(b.authn_method.WebAuthn.pubkey),
+    );
+  }
+  if ("PubKey" in a.authn_method && "PubKey" in b.authn_method) {
+    return bufEquals(
+      new Uint8Array(a.authn_method.PubKey.pubkey),
+      new Uint8Array(b.authn_method.PubKey.pubkey),
+    );
+  }
+  return false;
 };
