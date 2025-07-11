@@ -50,7 +50,7 @@ pub struct TentativeDeviceRegistration {
 }
 
 impl TentativeDeviceRegistration {
-    pub fn to_maybe_info(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
+    pub fn to_info_if_still_valid(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
         match self {
             TentativeDeviceRegistration {
                 expiration,
