@@ -493,7 +493,7 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'authn_method_lookup_by_regiatration_mode_id' : IDL.Func(
+    'authn_method_lookup_by_registration_mode_id' : IDL.Func(
         [IDL.Text],
         [
           IDL.Variant({
