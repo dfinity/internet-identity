@@ -161,6 +161,10 @@ export const idlFactory = ({ IDL }) => {
     'RegistrationAlreadyInProgress' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
+  const RegistrationId = IDL.Text;
+  const AuthnMethodRegistrationModeEnterError = IDL.Variant({
+    'InvalidId' : IDL.Text,
+  });
   const AuthnMethodReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
@@ -501,7 +505,7 @@ export const idlFactory = ({ IDL }) => {
             'Err' : LookupByRegistrationIdError,
           }),
         ],
-        [],
+        ['query'],
       ),
     'authn_method_metadata_replace' : IDL.Func(
         [IdentityNumber, PublicKey, MetadataMapV2],
@@ -524,11 +528,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'authn_method_registration_mode_enter' : IDL.Func(
-        [IdentityNumber],
+        [IdentityNumber, RegistrationId],
         [
           IDL.Variant({
             'Ok' : IDL.Record({ 'expiration' : Timestamp }),
-            'Err' : IDL.Null,
+            'Err' : AuthnMethodRegistrationModeEnterError,
           }),
         ],
         [],
