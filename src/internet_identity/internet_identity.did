@@ -865,7 +865,7 @@ service : (opt InternetIdentityInit) -> {
 
     authn_method_check_tentative_device : (IdentityNumber) -> (variant { Ok : bool; Err: CheckTentativeDeviceError });
 
-    authn_method_lookup_by_regiatration_mode_id : (text) -> (variant { Ok : opt IdentityNumber; Err : LookupByRegistrationIdError });
+    authn_method_lookup_by_registration_mode_id : (text) -> (variant { Ok : opt IdentityNumber; Err : LookupByRegistrationIdError });
 
     // Authentication protocol
     // =======================
