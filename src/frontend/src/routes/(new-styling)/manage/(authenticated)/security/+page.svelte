@@ -9,16 +9,16 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
-  import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
   import { invalidateAll } from "$app/navigation";
   import type {
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
+  import AddAccessMethodWizard from "$lib/components/wizards/AddAccessMethodWizard.svelte";
 
   const MAX_PASSKEYS = 8;
 
-  let isAddAccessMethodDialogOpen = $state(false);
+  let isAddAccessMethodWizardOpen = $state(false);
 
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const authnMethods = $derived(identityInfo.authnMethods);
@@ -39,7 +39,6 @@
     openIdCredentials.push(credential);
     invalidateAll();
   };
-
   const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
     authnMethods.push(authnMethod);
     invalidateAll();
@@ -64,7 +63,7 @@
     {#if isAddAccessMethodVisible}
       <div>
         <Button
-          onclick={() => (isAddAccessMethodDialogOpen = true)}
+          onclick={() => (isAddAccessMethodWizardOpen = true)}
           class="max-md:w-full"
         >
           <span>Add</span>
@@ -76,7 +75,7 @@
   <div
     class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
   >
-    {#each authnMethods as authnMethod}
+    {#each identityInfo.authnMethods as authnMethod}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
@@ -127,18 +126,19 @@
   />
 {/if}
 
-{#if isAddAccessMethodDialogOpen}
+{#if isAddAccessMethodWizardOpen}
   {#if $ADD_ACCESS_METHOD}
-    <AddAccessMethodDialog
+    <AddAccessMethodWizard
       onGoogleLinked={handleGoogleLinked}
       onPasskeyRegistered={handlePasskeyRegistered}
-      onClose={() => (isAddAccessMethodDialogOpen = false)}
+      onOtherDeviceRegistered={invalidateAll}
+      onClose={() => (isAddAccessMethodWizardOpen = false)}
       {isMaxOpenIdCredentialsReached}
       {isUsingPasskeys}
     />
   {:else}
     <AddOpenIdCredential
-      onClose={() => (isAddAccessMethodDialogOpen = false)}
+      onClose={() => (isAddAccessMethodWizardOpen = false)}
     />
   {/if}
 {/if}
