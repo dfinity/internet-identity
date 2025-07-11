@@ -137,6 +137,12 @@ pub enum AuthnMethodRegisterError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AuthnMethodRegistrationModeEnterError {
+    AuthorizationFailure(String),
+    InvalidId(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodConfirmationError {
     WrongCode { retries_left: u8 },
     RegistrationModeOff,
@@ -233,4 +239,17 @@ pub enum IdRegFinishError {
 pub enum CreateIdentityData {
     PubkeyAuthn(IdRegFinishArg),
     OpenID(OpenIDRegFinishArg),
+}
+
+#[derive(CandidType, Clone, Eq, PartialEq, Hash)]
+pub struct RegistrationId(String);
+
+#[derive(CandidType, Deserialize, Debug)]
+pub enum CheckTentativeDeviceError {
+    Unauthorized,
+}
+
+#[derive(CandidType, Deserialize, Debug)]
+pub enum LookupByRegistrationIdError {
+    InvalidId(String),
 }

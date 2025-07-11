@@ -657,6 +657,13 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
+    use crate::{
+        anchor_management::tentative_device_registration::{
+            check_tentative_device, CheckTentativeDeviceError, RegistrationId,
+        },
+        state::get_identity_number_by_registration_id,
+    };
+
     use super::*;
 
     #[query]
@@ -858,11 +865,30 @@ mod v2_api {
     #[update]
     fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
-    ) -> Result<RegistrationModeInfo, ()> {
-        let timeout = enter_device_registration_mode(identity_number);
-        Ok(RegistrationModeInfo {
-            expiration: timeout,
-        })
+        id: Option<String>,
+    ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
+        check_authz_and_record_activity(identity_number).map_err(|err| {
+            AuthnMethodRegistrationModeEnterError::AuthorizationFailure(err.to_string())
+        })?;
+        match id {
+            Some(reg_id) => {
+                let timeout = tentative_device_registration::enter_device_registration_mode_v2(
+                    identity_number,
+                    RegistrationId::new(reg_id)
+                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidId)?,
+                );
+                Ok(RegistrationModeInfo {
+                    expiration: timeout,
+                })
+            }
+            None => {
+                let timeout =
+                    tentative_device_registration::enter_device_registration_mode(identity_number);
+                Ok(RegistrationModeInfo {
+                    expiration: timeout,
+                })
+            }
+        }
     }
 
     #[update]
@@ -914,6 +940,24 @@ mod v2_api {
                 Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
             }
         }
+    }
+
+    #[query]
+    fn authn_method_check_tentative_device(
+        identity_number: IdentityNumber,
+    ) -> Result<bool, CheckTentativeDeviceError> {
+        check_authorization(identity_number).map_err(CheckTentativeDeviceError::from)?;
+        Ok(check_tentative_device(identity_number))
+    }
+
+    #[query]
+    fn authn_method_lookup_by_registration_mode_id(
+        id: String,
+    ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
+        let res = get_identity_number_by_registration_id(
+            &RegistrationId::new(id).map_err(LookupByRegistrationIdError::InvalidId)?,
+        );
+        Ok(res)
     }
 }
 

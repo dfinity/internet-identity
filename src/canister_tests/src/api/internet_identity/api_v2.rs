@@ -235,14 +235,15 @@ pub fn authn_method_registration_mode_enter(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<RegistrationModeInfo, ()>, CallError> {
+    id: Option<String>,
+) -> Result<Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError>, CallError> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "authn_method_registration_mode_enter",
-        (identity_number,),
+        (identity_number, id),
     )
     .map(|(x,)| x)
 }
@@ -294,6 +295,40 @@ pub fn authn_method_confirm(
         sender,
         "authn_method_confirm",
         (identity_number, confirmation_code),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn authn_method_check_tentative_device(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<Result<bool, CheckTentativeDeviceError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "authn_method_check_tentative_device",
+        (identity_number,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn authn_method_lookup_by_registration_mode_id(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    id: String,
+) -> Result<Result<Option<IdentityNumber>, LookupByRegistrationIdError>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "authn_method_lookup_by_registration_mode_id",
+        (id,),
     )
     .map(|(x,)| x)
 }

@@ -1,10 +1,10 @@
 use crate::anchor_management::add_device;
-use crate::authz_utils::IdentityUpdateError;
+use crate::authz_utils::{AuthorizationError, IdentityUpdateError};
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::Anchor;
 use crate::{secs_to_nanos, state};
-use candid::Principal;
+use candid::{CandidType, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use internet_identity_interface::archive::types::Operation;
@@ -37,6 +37,7 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
                     TentativeDeviceRegistration {
                         expiration,
                         state: DeviceRegistrationModeActive,
+                        id: None,
                     },
                 );
                 expiration
@@ -45,10 +46,52 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
     })
 }
 
+/// Enables device registration mode for the given anchor and returns the expiration timestamp (when it will be disabled again).
+/// If the device registration mode is already active it will just return the expiration timestamp again.
+pub fn enter_device_registration_mode_v2(
+    identity_number: IdentityNumber,
+    id: RegistrationId,
+) -> Timestamp {
+    state::tentative_device_registrations_mut(|registrations| {
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
+                trap("too many anchors in device registration mode");
+            }
+
+            match registrations.get(&identity_number) {
+                Some(TentativeDeviceRegistration { expiration, .. }) => *expiration, // already enabled, just return the existing expiration
+                None => {
+                    let expiration = time() + REGISTRATION_MODE_DURATION;
+                    registrations.insert(
+                        identity_number,
+                        TentativeDeviceRegistration {
+                            expiration,
+                            state: DeviceRegistrationModeActive,
+                            id: Some(id.clone()),
+                        },
+                    );
+                    lookup.insert(id, identity_number);
+
+                    expiration
+                }
+            }
+        })
+    })
+}
+
 pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     state::tentative_device_registrations_mut(|registrations| {
-        prune_expired_tentative_device_registrations(registrations);
-        registrations.remove(&anchor_number)
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            if let Some(TentativeDeviceRegistration {
+                id: Some(reg_id), ..
+            }) = registrations.get(&anchor_number)
+            {
+                lookup.remove(reg_id);
+            }
+            registrations.remove(&anchor_number);
+        });
     });
 }
 
@@ -144,38 +187,57 @@ fn get_verified_device(
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceError> {
     state::tentative_device_registrations_mut(|registrations| {
-        prune_expired_tentative_device_registrations(registrations);
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
 
-        let mut tentative_registration = registrations
-            .remove(&anchor_number)
-            .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
+            let mut tentative_registration = registrations
+                .remove(&anchor_number)
+                .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
 
-        match tentative_registration.state {
-            DeviceRegistrationModeActive => Err(VerifyTentativeDeviceError::NoDeviceToVerify),
-            DeviceTentativelyAdded {
-                failed_attempts,
-                verification_code,
-                tentative_device,
-            } => {
-                if user_verification_code == verification_code {
-                    return Ok(tentative_device);
-                }
-
-                let failed_attempts = failed_attempts + 1;
-                if failed_attempts < MAX_DEVICE_REGISTRATION_ATTEMPTS {
-                    tentative_registration.state = DeviceTentativelyAdded {
-                        failed_attempts,
-                        tentative_device,
-                        verification_code,
-                    };
-                    // reinsert because retries are allowed
-                    registrations.insert(anchor_number, tentative_registration);
-                }
-                Err(VerifyTentativeDeviceError::WrongCode {
-                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
-                })
+            if let TentativeDeviceRegistration {
+                id: Some(ref reg_id),
+                ..
+            } = tentative_registration
+            {
+                lookup.remove(reg_id);
             }
-        }
+
+            match tentative_registration.state {
+                DeviceRegistrationModeActive => Err(VerifyTentativeDeviceError::NoDeviceToVerify),
+                DeviceTentativelyAdded {
+                    failed_attempts,
+                    verification_code,
+                    tentative_device,
+                } => {
+                    if user_verification_code == verification_code {
+                        return Ok(tentative_device);
+                    }
+
+                    let failed_attempts = failed_attempts + 1;
+                    if failed_attempts < MAX_DEVICE_REGISTRATION_ATTEMPTS {
+                        tentative_registration.state = DeviceTentativelyAdded {
+                            failed_attempts,
+                            tentative_device,
+                            verification_code,
+                        };
+                        // reinsert because retries are allowed
+                        registrations.insert(anchor_number, tentative_registration);
+                    }
+                    Err(VerifyTentativeDeviceError::WrongCode {
+                        retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
+                    })
+                }
+            }
+        })
+    })
+}
+
+/// Checks whether a tentative device has been verified without mutating anything
+/// This is so that on the new client we can prompt for adding the final passkey as soon as
+/// on the old client we have verified the temporary key
+pub fn check_tentative_device(identity_number: IdentityNumber) -> bool {
+    state::tentative_device_registrations(|registrations| {
+        registrations.get(&identity_number).is_some()
     })
 }
 
@@ -203,4 +265,47 @@ fn prune_expired_tentative_device_registrations(
     let now = time();
 
     registrations.retain(|_, TentativeDeviceRegistration { expiration, .. }| *expiration > now)
+}
+
+/// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
+fn prune_expired_tentative_device_registrations_v2(
+    registrations: &mut HashMap<AnchorNumber, TentativeDeviceRegistration>,
+    lookup: &mut HashMap<RegistrationId, AnchorNumber>,
+) {
+    let now = time();
+
+    registrations.retain(|_, TentativeDeviceRegistration { expiration, id, .. }| {
+        if *expiration > now {
+            true
+        } else {
+            if id.is_some() {
+                lookup.remove(&id.clone().unwrap());
+            }
+            false
+        }
+    })
+}
+
+#[derive(CandidType)]
+pub enum CheckTentativeDeviceError {
+    Unauthorized,
+}
+
+impl From<AuthorizationError> for CheckTentativeDeviceError {
+    fn from(_err: AuthorizationError) -> Self {
+        CheckTentativeDeviceError::Unauthorized
+    }
+}
+
+#[derive(CandidType, Clone, Eq, PartialEq, Hash)]
+pub struct RegistrationId(String);
+
+impl RegistrationId {
+    pub fn new(s: String) -> Result<Self, String> {
+        if s.chars().count() == 5 {
+            Ok(RegistrationId(s))
+        } else {
+            Err("RegistrationId must be exactly 5 characters".to_string())
+        }
+    }
 }
