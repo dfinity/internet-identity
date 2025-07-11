@@ -138,6 +138,7 @@ pub enum AuthnMethodRegisterError {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodRegistrationModeEnterError {
+    AuthorizationFailure(String),
     InvalidId(String),
 }
 
