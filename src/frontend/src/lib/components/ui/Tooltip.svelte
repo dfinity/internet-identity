@@ -12,6 +12,8 @@
     align?: Align;
     distance?: string;
     hidden?: boolean;
+    arrow?: boolean;
+    manual?: boolean; // Always render tooltip, even when not hovered
     anchor?: HTMLElement;
   };
 
@@ -23,6 +25,8 @@
     align = "center",
     distance = "0.5rem",
     hidden = false,
+    manual = false,
+    arrow = true,
     anchor,
     children,
     class: className,
@@ -31,7 +35,7 @@
 
   let wrapperRef = $state<HTMLElement>();
   let tooltipRef = $state<HTMLElement>();
-  let isTooltipVisible = $state(false);
+  let isTooltipVisible = $state(manual ? hidden : false);
 
   const anchorRef = $derived(
     anchor ??
@@ -94,20 +98,26 @@
       tooltipRef?.hidePopover();
     }
   });
+
+  $effect(() => {
+    if (manual) {
+      isTooltipVisible = !hidden;
+    }
+  });
 </script>
 
-{#if hidden}
+{#if !manual && hidden}
   {@render children?.()}
 {:else}
   <!-- Wrapper used for event handlers and (optionally) anchoring -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     bind:this={wrapperRef}
-    onmouseenter={() => (isTooltipVisible = true)}
-    onmouseleave={() => (isTooltipVisible = false)}
-    onfocusin={() => (isTooltipVisible = true)}
-    onfocusout={() => (isTooltipVisible = false)}
-    ontouchend={() => (isTooltipVisible = !isTooltipVisible)}
+    onmouseenter={() => !manual && (isTooltipVisible = true)}
+    onmouseleave={() => !manual && (isTooltipVisible = false)}
+    onfocusin={() => !manual && (isTooltipVisible = true)}
+    onfocusout={() => !manual && (isTooltipVisible = false)}
+    ontouchend={() => !manual && (isTooltipVisible = !isTooltipVisible)}
     class="contents"
     aria-describedby={id}
   >
@@ -161,45 +171,47 @@
         </span>
       {/if}
       <!-- Tooltip arrow -->
-      <div
-        class={[
-          "absolute size-0",
-          {
-            up: {
-              start: "bottom-0 left-7",
-              center: "bottom-0 left-[50%]",
-              end: "right-7 bottom-0",
-            }[align],
-            right: {
-              start: "top-7 left-0",
-              center: "top-[50%] left-0",
-              end: "bottom-7 left-0",
-            }[align],
-            down: {
-              start: "top-0 left-7",
-              center: "top-0 left-[50%]",
-              end: "top-0 right-7",
-            }[align],
-            left: {
-              start: "top-7 right-0",
-              center: "top-[50%] right-0",
-              end: "right-0 bottom-7",
-            }[align],
-          }[direction],
-        ]}
-      >
+      {#if arrow}
         <div
           class={[
-            "bg-fg-primary size-2 origin-center -translate-1 rotate-45",
+            "absolute size-0",
             {
-              up: "rounded-br-xs",
-              right: "rounded-bl-xs",
-              down: "rounded-tl-xs",
-              left: "rounded-tr-xs",
+              up: {
+                start: "bottom-0 left-7",
+                center: "bottom-0 left-[50%]",
+                end: "right-7 bottom-0",
+              }[align],
+              right: {
+                start: "top-7 left-0",
+                center: "top-[50%] left-0",
+                end: "bottom-7 left-0",
+              }[align],
+              down: {
+                start: "top-0 left-7",
+                center: "top-0 left-[50%]",
+                end: "top-0 right-7",
+              }[align],
+              left: {
+                start: "top-7 right-0",
+                center: "top-[50%] right-0",
+                end: "right-0 bottom-7",
+              }[align],
             }[direction],
           ]}
-        ></div>
-      </div>
+        >
+          <div
+            class={[
+              "bg-fg-primary size-2 origin-center -translate-1 rotate-45",
+              {
+                up: "rounded-br-xs",
+                right: "rounded-bl-xs",
+                down: "rounded-tl-xs",
+                left: "rounded-tr-xs",
+              }[direction],
+            ]}
+          ></div>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
