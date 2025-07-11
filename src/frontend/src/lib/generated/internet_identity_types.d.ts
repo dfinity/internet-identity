@@ -76,7 +76,8 @@ export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
-export type AuthnMethodRegistrationModeEnterError = { 'InvalidId' : string };
+export type AuthnMethodRegistrationModeEnterError = { 'InvalidId' : string } |
+  { 'AuthorizationFailure' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
@@ -423,7 +424,7 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodConfirmationError }
   >,
   'authn_method_lookup_by_registration_mode_id' : ActorMethod<
-    [string],
+    [RegistrationId],
     { 'Ok' : [] | [IdentityNumber] } |
       { 'Err' : LookupByRegistrationIdError }
   >,
@@ -438,7 +439,7 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegisterError }
   >,
   'authn_method_registration_mode_enter' : ActorMethod<
-    [IdentityNumber, RegistrationId],
+    [IdentityNumber, [] | [RegistrationId]],
     { 'Ok' : { 'expiration' : Timestamp } } |
       { 'Err' : AuthnMethodRegistrationModeEnterError }
   >,

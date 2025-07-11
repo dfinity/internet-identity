@@ -854,7 +854,7 @@ service : (opt InternetIdentityInit) -> {
     // confirmed before it can be used for authentication on this identity.
     // The registration mode is automatically exited after the returned expiration timestamp.
     // Requires authentication.
-    authn_method_registration_mode_enter : (IdentityNumber, RegistrationId) -> (variant { Ok : record { expiration : Timestamp }; Err : AuthnMethodRegistrationModeEnterError });
+    authn_method_registration_mode_enter : (IdentityNumber, opt RegistrationId) -> (variant { Ok : record { expiration : Timestamp }; Err : AuthnMethodRegistrationModeEnterError });
 
     // Exits the authentication method registration mode for the identity.
     // Requires authentication.
