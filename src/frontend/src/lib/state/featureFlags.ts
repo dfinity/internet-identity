@@ -85,7 +85,7 @@ export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
 );
 export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
-  false,
+  true,
 );
 
 export default {
