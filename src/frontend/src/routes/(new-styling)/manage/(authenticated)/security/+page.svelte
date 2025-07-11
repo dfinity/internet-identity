@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { Link2Off, Plus } from "@lucide/svelte";
+  import { Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
@@ -9,22 +9,26 @@
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
   import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
   import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
-  import AddAccessMethodDialog from "$lib/components/views/AddAccessMethodDialog.svelte";
   import { invalidateAll } from "$app/navigation";
   import type {
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
+  import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
+  import { nonNullish } from "@dfinity/utils";
+  import { handleError } from "$lib/components/utils/error";
+  import AddAccessMethodWizard from "$lib/components/wizards/AddAccessMethodWizard.svelte";
 
   const MAX_PASSKEYS = 8;
 
-  let isAddAccessMethodDialogOpen = $state(false);
+  let isAddAccessMethodWizardOpen = $state(false);
 
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const authnMethods = $derived(identityInfo.authnMethods);
   const isMaxOpenIdCredentialsReached = $derived(
     identityInfo.openIdCredentials.length >= 1,
   );
+
   const isMaxPasskeysReached = $derived(
     identityInfo.authnMethods.length >= MAX_PASSKEYS,
   );
@@ -34,15 +38,48 @@
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
       : !isMaxOpenIdCredentialsReached,
   );
+  const isRemoveAccessMethodVisible = $derived(
+    authnMethods.length + openIdCredentials.length > 1,
+  );
+  const isRemovableAuthnMethodCurrentAccessMethod = $derived(
+    nonNullish(identityInfo.removableAuthnMethod) &&
+      "WebAuthn" in identityInfo.removableAuthnMethod.authn_method &&
+      identityInfo.isCurrentAccessMethod({
+        passkey: {
+          credentialId: new Uint8Array(
+            identityInfo.removableAuthnMethod.authn_method.WebAuthn.credential_id,
+          ),
+        },
+      }),
+  );
+  const isRemovableOpenIdCredentialCurrentAccessMethod = $derived(
+    nonNullish(identityInfo.removableOpenIdCredential) &&
+      identityInfo.isCurrentAccessMethod({
+        openid: identityInfo.removableOpenIdCredential,
+      }),
+  );
 
   const handleGoogleLinked = (credential: OpenIdCredential) => {
     openIdCredentials.push(credential);
     invalidateAll();
   };
-
   const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
     authnMethods.push(authnMethod);
     invalidateAll();
+  };
+  const handleRemoveOpenIdCredential = async () => {
+    try {
+      await identityInfo.removeGoogle();
+    } catch (error) {
+      handleError(error);
+    }
+  };
+  const handleRemovePasskey = async () => {
+    try {
+      await identityInfo.removePasskey();
+    } catch (error) {
+      handleError(error);
+    }
   };
 </script>
 
@@ -64,11 +101,11 @@
     {#if isAddAccessMethodVisible}
       <div>
         <Button
-          onclick={() => (isAddAccessMethodDialogOpen = true)}
+          onclick={() => (isAddAccessMethodWizardOpen = true)}
           class="max-md:w-full"
         >
           <span>Add</span>
-          <Plus size="1.25rem" />
+          <PlusIcon size="1.25rem" />
         </Button>
       </div>
     {/if}
@@ -86,9 +123,18 @@
           <PasskeyIcon />
         </div>
         <AccessMethod accessMethod={authnMethod} />
-        <!-- for layout consistency -->
-        <!-- TODO: this is where we would add interactions like removal -->
-        <div class="min-h-10 min-w-[52px]"></div>
+        <div class="flex items-center justify-center pr-4">
+          {#if isRemoveAccessMethodVisible}
+            <Button
+              onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
+              variant="tertiary"
+              iconOnly
+              class="!text-fg-error-secondary"
+            >
+              <Trash2Icon size="1.25rem" />
+            </Button>
+          {/if}
+        </div>
       </div>
     {/each}
     {#each openIdCredentials as credential}
@@ -104,14 +150,15 @@
         <AccessMethod accessMethod={credential} />
 
         <div class="flex items-center justify-center pr-4">
-          {#if identityInfo.totalAccessMethods > 1}
+          {#if isRemoveAccessMethodVisible}
             <Button
-              variant="tertiary"
-              iconOnly={true}
               onclick={() =>
                 (identityInfo.removableOpenIdCredential = credential)}
+              variant="tertiary"
+              iconOnly
+              class="!text-fg-error-secondary"
             >
-              <Link2Off class="stroke-fg-error-secondary" />
+              <Link2OffIcon size="1.25rem" />
             </Button>
           {/if}
         </div>
@@ -122,23 +169,33 @@
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
-    credentialToBeRemoved={identityInfo.removableOpenIdCredential}
+    onRemove={handleRemoveOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
+    isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
   />
 {/if}
 
-{#if isAddAccessMethodDialogOpen}
+{#if identityInfo.removableAuthnMethod}
+  <RemovePasskeyDialog
+    onRemove={handleRemovePasskey}
+    onClose={() => (identityInfo.removableAuthnMethod = null)}
+    isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
+  />
+{/if}
+
+{#if isAddAccessMethodWizardOpen}
   {#if $ADD_ACCESS_METHOD}
-    <AddAccessMethodDialog
+    <AddAccessMethodWizard
       onGoogleLinked={handleGoogleLinked}
       onPasskeyRegistered={handlePasskeyRegistered}
-      onClose={() => (isAddAccessMethodDialogOpen = false)}
+      onOtherDeviceRegistered={invalidateAll}
+      onClose={() => (isAddAccessMethodWizardOpen = false)}
       {isMaxOpenIdCredentialsReached}
       {isUsingPasskeys}
     />
   {:else}
     <AddOpenIdCredential
-      onClose={() => (isAddAccessMethodDialogOpen = false)}
+      onClose={() => (isAddAccessMethodWizardOpen = false)}
     />
   {/if}
 {/if}

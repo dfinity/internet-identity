@@ -401,12 +401,15 @@ export const isCanisterError = <T extends Record<string, unknown>>(
 };
 
 export const throwCanisterError = <
-  T extends { Ok: unknown } | { Err: Record<string, unknown> },
+  T extends { Ok: unknown } | { Err: Record<string, unknown> | null },
   S = T extends { Ok: infer Ok } ? Ok : never,
 >(
   response: T,
 ): Promise<S> => {
   if ("Err" in response) {
+    if (isNullish(response.Err)) {
+      throw new Error("Unexpected error occurred");
+    }
     throw new CanisterError(response.Err);
   }
   return response.Ok as Promise<S>;
