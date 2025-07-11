@@ -7,7 +7,6 @@ import {
   DummyIdentity,
   IIWebAuthnIdentity,
   creationOptions,
-  bufferEqual,
 } from "$lib/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
 import { WebAuthnIdentity } from "./webAuthnIdentity";

@@ -20,8 +20,6 @@ import {
 } from "./last-used-identities.store";
 import { bufEquals } from "@dfinity/agent";
 import { authnMethodEqual } from "$lib/utils/webAuthn";
-import { handleError } from "$lib/components/utils/error";
-import { invalidateAll } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
