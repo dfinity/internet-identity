@@ -77,9 +77,6 @@
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
       linkGoogleAccount={handleContinueWithGoogle}
     />
-    {#if addAccessMethodFlow.isSystemOverlayVisible}
-      <SystemOverlayBackdrop />
-    {/if}
   {:else if addAccessMethodFlow.view === "addPasskey"}
     <AddPasskey
       createPasskey={handleCreatePasskey}
@@ -95,5 +92,10 @@
     />
   {:else if addAccessMethodFlow.view === "continueOnNewDevice"}
     <ContinueOnNewDevice />
+  {/if}
+
+  <!-- Rendered within dialog to be on top of it -->
+  {#if addAccessMethodFlow.isSystemOverlayVisible}
+    <SystemOverlayBackdrop />
   {/if}
 </Dialog>
