@@ -481,7 +481,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_method_check_tentative_device' : IDL.Func(
         [IdentityNumber],
         [IDL.Variant({ 'Ok' : IDL.Bool, 'Err' : CheckTentativeDeviceError })],
-        [],
+        ['query'],
       ),
     'authn_method_confirm' : IDL.Func(
         [IdentityNumber, IDL.Text],
