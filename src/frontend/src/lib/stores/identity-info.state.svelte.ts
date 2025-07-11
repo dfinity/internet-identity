@@ -18,6 +18,10 @@ import {
   lastUsedIdentitiesStore,
   lastUsedIdentityStore,
 } from "./last-used-identities.store";
+import { bufEquals } from "@dfinity/agent";
+import { authnMethodEqual } from "$lib/utils/webAuthn";
+import { handleError } from "$lib/components/utils/error";
+import { invalidateAll } from "$app/navigation";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -40,6 +44,7 @@ class IdentityInfo {
 
   openIdCredentials = $state<OpenIdCredential[]>([]);
   removableOpenIdCredential = $state<OpenIdCredential | null>(null);
+  removableAuthnMethod = $state<AuthnMethodData | null>(null);
 
   totalAccessMethods = $derived<number>(
     this.authnMethods.length + this.openIdCredentials.length,
@@ -160,6 +165,34 @@ class IdentityInfo {
     await throwCanisterError(googleRemoveResult);
   };
 
+  async removePasskey(): Promise<void> {
+    const { actor, identityNumber } = get(authenticatedStore);
+    if (isNullish(this.removableAuthnMethod)) {
+      throw new Error("No passkey to remove");
+    }
+    const authnMethod = this.removableAuthnMethod;
+    const publicKey = new Uint8Array(
+      "WebAuthn" in authnMethod.authn_method
+        ? authnMethod.authn_method.WebAuthn.pubkey
+        : authnMethod.authn_method.PubKey.pubkey,
+    );
+    this.removableAuthnMethod = null;
+    const index = this.authnMethods.findIndex((value) =>
+      authnMethodEqual(value, authnMethod),
+    );
+    this.authnMethods.splice(index, 1);
+    try {
+      await actor
+        .authn_method_remove(identityNumber, publicKey)
+        .then(throwCanisterError);
+    } catch (error) {
+      this.authnMethods.splice(index, 0, authnMethod);
+      throw error;
+    } finally {
+      await this.fetch();
+    }
+  }
+
   logout = () => {
     // TODO: When we keep a session open we'll need to clean that session.
     // For now we just reload the page to make sure all the states are cleared
@@ -173,21 +206,24 @@ class IdentityInfo {
   ) => {
     const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod;
     if (
-      lastUsedAuthMethod &&
+      nonNullish(lastUsedAuthMethod) &&
       "openid" in lastUsedAuthMethod &&
-      "openid" in accessMethod &&
-      lastUsedAuthMethod.openid.sub === accessMethod.openid.sub
+      "openid" in accessMethod
     ) {
-      return true;
+      return (
+        lastUsedAuthMethod.openid.iss === accessMethod.openid.iss &&
+        lastUsedAuthMethod.openid.sub === accessMethod.openid.sub
+      );
     }
     if (
-      lastUsedAuthMethod &&
+      nonNullish(lastUsedAuthMethod) &&
       "passkey" in lastUsedAuthMethod &&
-      "passkey" in accessMethod &&
-      lastUsedAuthMethod.passkey.credentialId ===
-        accessMethod.passkey.credentialId
+      "passkey" in accessMethod
     ) {
-      return true;
+      return bufEquals(
+        lastUsedAuthMethod.passkey.credentialId,
+        accessMethod.passkey.credentialId,
+      );
     }
     return false;
   };

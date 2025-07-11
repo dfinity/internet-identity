@@ -14,6 +14,9 @@
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
+  import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
+  import { nonNullish } from "@dfinity/utils";
+  import { handleError } from "$lib/components/utils/error";
   import AddAccessMethodWizard from "$lib/components/wizards/AddAccessMethodWizard.svelte";
 
   const MAX_PASSKEYS = 8;
@@ -25,6 +28,7 @@
   const isMaxOpenIdCredentialsReached = $derived(
     identityInfo.openIdCredentials.length >= 1,
   );
+
   const isMaxPasskeysReached = $derived(
     identityInfo.authnMethods.length >= MAX_PASSKEYS,
   );
@@ -34,6 +38,29 @@
       ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
       : !isMaxOpenIdCredentialsReached,
   );
+  const isRemoveAccessMethodVisible = $derived(
+    authnMethods.length > 1 || openIdCredentials.length > 1,
+  );
+  const isRemovableCurrentAccessMethod = $derived.by(() => {
+    if (nonNullish(identityInfo.removableAuthnMethod)) {
+      return (
+        "WebAuthn" in identityInfo.removableAuthnMethod.authn_method &&
+        identityInfo.isCurrentAccessMethod({
+          passkey: {
+            credentialId: new Uint8Array(
+              identityInfo.removableAuthnMethod.authn_method.WebAuthn.credential_id,
+            ),
+          },
+        })
+      );
+    }
+    if (nonNullish(identityInfo.removableOpenIdCredential)) {
+      return identityInfo.isCurrentAccessMethod({
+        openid: identityInfo.removableOpenIdCredential,
+      });
+    }
+    return false;
+  });
 
   const handleGoogleLinked = (credential: OpenIdCredential) => {
     openIdCredentials.push(credential);
@@ -42,6 +69,20 @@
   const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
     authnMethods.push(authnMethod);
     invalidateAll();
+  };
+  const handleRemoveOpenIdCredential = async () => {
+    try {
+      await identityInfo.removeGoogle();
+    } catch (error) {
+      handleError(error);
+    }
+  };
+  const handleRemovePasskey = async () => {
+    try {
+      await identityInfo.removePasskey();
+    } catch (error) {
+      handleError(error);
+    }
   };
 </script>
 
@@ -75,7 +116,7 @@
   <div
     class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
   >
-    {#each identityInfo.authnMethods as authnMethod}
+    {#each authnMethods as authnMethod}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
@@ -85,9 +126,17 @@
           <PasskeyIcon />
         </div>
         <AccessMethod accessMethod={authnMethod} />
-        <!-- for layout consistency -->
-        <!-- TODO: this is where we would add interactions like removal -->
-        <div class="min-h-10 min-w-[52px]"></div>
+        <div class="flex items-center justify-center pr-4">
+          {#if isRemoveAccessMethodVisible}
+            <Button
+              variant="tertiary"
+              iconOnly={true}
+              onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
+            >
+              <Link2Off class="stroke-fg-error-secondary" />
+            </Button>
+          {/if}
+        </div>
       </div>
     {/each}
     {#each openIdCredentials as credential}
@@ -103,7 +152,7 @@
         <AccessMethod accessMethod={credential} />
 
         <div class="flex items-center justify-center pr-4">
-          {#if identityInfo.totalAccessMethods > 1}
+          {#if isRemoveAccessMethodVisible}
             <Button
               variant="tertiary"
               iconOnly={true}
@@ -121,8 +170,17 @@
 
 {#if identityInfo.removableOpenIdCredential}
   <RemoveOpenIdCredential
-    credentialToBeRemoved={identityInfo.removableOpenIdCredential}
+    onRemove={handleRemoveOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
+    isCurrentAccessMethod={isRemovableCurrentAccessMethod}
+  />
+{/if}
+
+{#if identityInfo.removableAuthnMethod}
+  <RemovePasskeyDialog
+    onRemove={handleRemovePasskey}
+    onClose={() => (identityInfo.removableAuthnMethod = null)}
+    isCurrentAccessMethod={isRemovableCurrentAccessMethod}
   />
 {/if}
 
