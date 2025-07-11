@@ -593,7 +593,6 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
         registration_mode_id,
     )?
     .expect("lookup_by_registration_mode_id failed");
-    println!("{:?}", result);
     assert!(result.is_none());
     Ok(())
 }
