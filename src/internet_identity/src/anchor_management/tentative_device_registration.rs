@@ -199,7 +199,7 @@ fn get_verified_device(
                 ..
             } = tentative_registration
             {
-                lookup.remove(&reg_id);
+                lookup.remove(reg_id);
             }
 
             match tentative_registration.state {
