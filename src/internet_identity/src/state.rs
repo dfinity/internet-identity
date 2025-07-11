@@ -364,7 +364,21 @@ pub fn get_tentative_device_registration_by_identity(
 }
 
 pub fn get_identity_number_by_registration_id(id: &RegistrationId) -> Option<IdentityNumber> {
-    lookup_tentative_device_registration(|lookup| lookup.get(id).copied())
+    lookup_tentative_device_registration(|lookup| lookup.get(id).copied()).and_then(
+        |identity_number| {
+            if let Some(TentativeDeviceRegistration { expiration, .. }) =
+                get_tentative_device_registration_by_identity(identity_number)
+            {
+                if expiration > time() {
+                    Some(identity_number)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        },
+    )
 }
 
 pub fn assets_mut<R>(f: impl FnOnce(&mut CertifiedAssets) -> R) -> R {
