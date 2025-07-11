@@ -880,7 +880,7 @@ mod v2_api {
 
     #[update]
     fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
-        exit_device_registration_mode(identity_number);
+        tentative_device_registration::exit_device_registration_mode(identity_number);
         Ok(())
     }
 
