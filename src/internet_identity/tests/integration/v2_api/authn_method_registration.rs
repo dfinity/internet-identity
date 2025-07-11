@@ -774,6 +774,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
     Ok(())
 }
 
+#[test]
 fn should_exit_registrations_separately() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -820,6 +821,35 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
         &env,
         canister_id,
         Principal::anonymous(),
+        registration_mode_id1.clone(),
+    )?
+    .expect("lookup_by_registration_mode_id failed");
+
+    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+        &env,
+        canister_id,
+        Principal::anonymous(),
+        registration_mode_id2.clone(),
+    )?
+    .expect("lookup_by_registration_mode_id failed");
+
+    assert_eq!(result1, None);
+    assert_eq!(result2, Some(identity_number2));
+
+    // Exit registration mode for second identity
+    api_v2::authn_method_registration_mode_exit(
+        &env,
+        canister_id,
+        authn_method2.principal(),
+        identity_number2,
+    )?
+    .expect("authn_method_registration_mode_enter failed");
+
+    // Verify both lookups work correctly
+    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+        &env,
+        canister_id,
+        Principal::anonymous(),
         registration_mode_id1,
     )?
     .expect("lookup_by_registration_mode_id failed");
@@ -833,7 +863,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     .expect("lookup_by_registration_mode_id failed");
 
     assert_eq!(result1, None);
-    assert_eq!(result2, Some(identity_number2));
+    assert_eq!(result2, None);
 
     Ok(())
 }
