@@ -139,7 +139,7 @@ export class AddAccessMethodFlow {
     // Always exit any ongoing registration mode first
     await actor.authn_method_registration_mode_exit(identityNumber);
     const { expiration } = await actor
-      .authn_method_registration_mode_enter(identityNumber)
+      .authn_method_registration_mode_enter(identityNumber, [])
       .then(throwCanisterError);
     while (!this.isRegistrationWindowPassed) {
       const info = await actor
