@@ -187,38 +187,48 @@ fn get_verified_device(
     user_verification_code: DeviceVerificationCode,
 ) -> Result<DeviceData, VerifyTentativeDeviceError> {
     state::tentative_device_registrations_mut(|registrations| {
-        prune_expired_tentative_device_registrations(registrations);
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
 
-        let mut tentative_registration = registrations
-            .remove(&anchor_number)
-            .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
+            let mut tentative_registration = registrations
+                .remove(&anchor_number)
+                .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
 
-        match tentative_registration.state {
-            DeviceRegistrationModeActive => Err(VerifyTentativeDeviceError::NoDeviceToVerify),
-            DeviceTentativelyAdded {
-                failed_attempts,
-                verification_code,
-                tentative_device,
-            } => {
-                if user_verification_code == verification_code {
-                    return Ok(tentative_device);
-                }
-
-                let failed_attempts = failed_attempts + 1;
-                if failed_attempts < MAX_DEVICE_REGISTRATION_ATTEMPTS {
-                    tentative_registration.state = DeviceTentativelyAdded {
-                        failed_attempts,
-                        tentative_device,
-                        verification_code,
-                    };
-                    // reinsert because retries are allowed
-                    registrations.insert(anchor_number, tentative_registration);
-                }
-                Err(VerifyTentativeDeviceError::WrongCode {
-                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
-                })
+            if let TentativeDeviceRegistration {
+                id: Some(ref reg_id),
+                ..
+            } = tentative_registration
+            {
+                lookup.remove(&reg_id);
             }
-        }
+
+            match tentative_registration.state {
+                DeviceRegistrationModeActive => Err(VerifyTentativeDeviceError::NoDeviceToVerify),
+                DeviceTentativelyAdded {
+                    failed_attempts,
+                    verification_code,
+                    tentative_device,
+                } => {
+                    if user_verification_code == verification_code {
+                        return Ok(tentative_device);
+                    }
+
+                    let failed_attempts = failed_attempts + 1;
+                    if failed_attempts < MAX_DEVICE_REGISTRATION_ATTEMPTS {
+                        tentative_registration.state = DeviceTentativelyAdded {
+                            failed_attempts,
+                            tentative_device,
+                            verification_code,
+                        };
+                        // reinsert because retries are allowed
+                        registrations.insert(anchor_number, tentative_registration);
+                    }
+                    Err(VerifyTentativeDeviceError::WrongCode {
+                        retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
+                    })
+                }
+            }
+        })
     })
 }
 
