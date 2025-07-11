@@ -28,7 +28,7 @@ fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -52,7 +52,7 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
         canister_id,
         Principal::anonymous(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     );
 
     expect_user_error_with_message(
@@ -75,7 +75,7 @@ fn should_register_authn_method() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -112,7 +112,7 @@ fn should_verify_authn_method_after_failed_attempt() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -162,7 +162,7 @@ fn identity_info_should_return_authn_method() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -209,7 +209,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallEr
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
     api_v2::authn_method_registration_mode_exit(
@@ -248,7 +248,7 @@ fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), Ca
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -281,7 +281,7 @@ fn should_reject_confirmation_without_authn_method() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -314,7 +314,7 @@ fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -387,7 +387,7 @@ fn should_return_true_when_tentative_device_not_verified() -> Result<(), CallErr
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -426,7 +426,7 @@ fn should_return_false_when_tentative_device_verified() -> Result<(), CallError>
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -475,7 +475,7 @@ fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id,
+        Some(registration_mode_id),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -543,7 +543,7 @@ fn should_return_identity_number_for_existing_registration_id() -> Result<(), Ca
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id.clone(),
+        Some(registration_mode_id.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -573,7 +573,7 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id.clone(),
+        Some(registration_mode_id.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -611,7 +611,7 @@ fn should_return_none_after_tentative_device_confirmation() -> Result<(), CallEr
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id.clone(),
+        Some(registration_mode_id.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -660,7 +660,7 @@ fn should_return_none_after_registration_mode_expiration() -> Result<(), CallErr
         canister_id,
         authn_method.principal(),
         identity_number,
-        registration_mode_id.clone(),
+        Some(registration_mode_id.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -738,7 +738,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
         canister_id,
         authn_method1.principal(),
         identity_number1,
-        registration_mode_id1.clone(),
+        Some(registration_mode_id1.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -748,7 +748,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
         canister_id,
         authn_method2.principal(),
         identity_number2,
-        registration_mode_id2.clone(),
+        Some(registration_mode_id2.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -793,7 +793,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
         canister_id,
         authn_method1.principal(),
         identity_number1,
-        registration_mode_id1.clone(),
+        Some(registration_mode_id1.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -803,7 +803,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
         canister_id,
         authn_method2.principal(),
         identity_number2,
-        registration_mode_id2.clone(),
+        Some(registration_mode_id2.clone()),
     )?
     .expect("authn_method_registration_mode_enter failed");
 
