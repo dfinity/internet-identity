@@ -3,16 +3,13 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{
-    env, expect_user_error_with_message, install_ii_with_archive, time,
-};
+use canister_tests::framework::{env, install_ii_with_archive, time};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
-    AuthnMethodRegistration, CheckTentativeDeviceError, LookupByRegistrationIdError,
+    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError, CheckTentativeDeviceError,
+    LookupByRegistrationIdError,
 };
 use pocket_ic::CallError;
-use pocket_ic::ErrorCode::CanisterCalledTrap;
-use regex::Regex;
 use std::time::Duration;
 
 #[test]
@@ -55,11 +52,12 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
         Some(registration_mode_id),
     );
 
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("[a-z0-9-]+ could not be authenticated.").unwrap(),
-    );
+    assert!(matches!(
+        result.unwrap(),
+        Err(AuthnMethodRegistrationModeEnterError::AuthorizationFailure(
+            _
+        ))
+    ))
 }
 
 #[test]
