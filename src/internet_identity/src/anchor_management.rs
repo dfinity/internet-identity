@@ -40,7 +40,8 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
 
     IdentityAnchorInfo {
         devices,
-        device_registration: tentative_device_registration.and_then(|reg| reg.to_maybe_info(now)),
+        device_registration: tentative_device_registration
+            .and_then(|reg| reg.to_info_if_still_valid(now)),
         openid_credentials,
         name,
     }
