@@ -76,6 +76,7 @@ export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
+export type AuthnMethodRegistrationModeEnterError = { 'InvalidId' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
@@ -357,6 +358,7 @@ export type RegistrationFlowNextStep = {
     'CheckCaptcha' : { 'captcha_png_base64' : string }
   } |
   { 'Finish' : null };
+export type RegistrationId = string;
 export type Salt = Uint8Array | number[];
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
@@ -436,9 +438,9 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegisterError }
   >,
   'authn_method_registration_mode_enter' : ActorMethod<
-    [IdentityNumber],
+    [IdentityNumber, RegistrationId],
     { 'Ok' : { 'expiration' : Timestamp } } |
-      { 'Err' : null }
+      { 'Err' : AuthnMethodRegistrationModeEnterError }
   >,
   'authn_method_registration_mode_exit' : ActorMethod<
     [IdentityNumber],
