@@ -19,7 +19,7 @@
   </FeaturedIcon>
   <h1 class="text-text-primary mb-3 text-2xl font-medium">Are you sure?</h1>
   <p class="text-text-tertiary mb-8 font-medium">
-    Removing this passkeys means you won't be able to use it to sign in anymore.
+    Removing this passkey means you won't be able to use it to sign in anymore.
     You can always add a new one later.
     {#if isCurrentAccessMethod}
       <br /><br />
