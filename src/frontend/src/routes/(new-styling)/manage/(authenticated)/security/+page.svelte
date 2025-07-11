@@ -39,7 +39,7 @@
       : !isMaxOpenIdCredentialsReached,
   );
   const isRemoveAccessMethodVisible = $derived(
-    authnMethods.length > 1 || openIdCredentials.length > 1,
+    authnMethods.length + openIdCredentials.length > 1,
   );
   const isRemovableAuthnMethodCurrentAccessMethod = $derived(
     nonNullish(identityInfo.removableAuthnMethod) &&
