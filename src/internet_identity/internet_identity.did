@@ -517,6 +517,7 @@ type AuthnMethodConfirmationError = variant {
 
 type AuthnMethodRegistrationModeEnterError = variant { 
     InvalidId : text;
+    AuthorizationFailure : text;
 };
 
 type CheckTentativeDeviceError = variant {

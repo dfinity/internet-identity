@@ -865,17 +865,30 @@ mod v2_api {
     #[update]
     fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
-        id: String,
+        id: Option<String>,
     ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
-        check_authz_and_record_activity(identity_number)
-            .unwrap_or_else(|err| trap(&format!("{err}")));
-        let timeout = tentative_device_registration::enter_device_registration_mode_v2(
-            identity_number,
-            RegistrationId::new(id).map_err(AuthnMethodRegistrationModeEnterError::InvalidId)?,
-        );
-        Ok(RegistrationModeInfo {
-            expiration: timeout,
-        })
+        check_authz_and_record_activity(identity_number).map_err(|err| {
+            AuthnMethodRegistrationModeEnterError::AuthorizationFailure(err.to_string())
+        })?;
+        match id {
+            Some(reg_id) => {
+                let timeout = tentative_device_registration::enter_device_registration_mode_v2(
+                    identity_number,
+                    RegistrationId::new(reg_id)
+                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidId)?,
+                );
+                Ok(RegistrationModeInfo {
+                    expiration: timeout,
+                })
+            }
+            None => {
+                let timeout =
+                    tentative_device_registration::enter_device_registration_mode(identity_number);
+                Ok(RegistrationModeInfo {
+                    expiration: timeout,
+                })
+            }
+        }
     }
 
     #[update]
