@@ -185,11 +185,25 @@ class IdentityInfo {
       await actor
         .authn_method_remove(identityNumber, publicKey)
         .then(throwCanisterError);
+
+      if (
+        "WebAuthn" in authnMethod.authn_method &&
+        this.isCurrentAccessMethod({
+          passkey: {
+            credentialId: new Uint8Array(
+              authnMethod.authn_method.WebAuthn.credential_id,
+            ),
+          },
+        })
+      ) {
+        lastUsedIdentitiesStore.removeIdentity(identityNumber);
+        this.logout();
+        return;
+      }
+      await this.fetch();
     } catch (error) {
       this.authnMethods.splice(index, 0, authnMethod);
       throw error;
-    } finally {
-      await this.fetch();
     }
   }
 

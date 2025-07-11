@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { Link2Off, Plus } from "@lucide/svelte";
+  import { Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
@@ -41,26 +41,23 @@
   const isRemoveAccessMethodVisible = $derived(
     authnMethods.length > 1 || openIdCredentials.length > 1,
   );
-  const isRemovableCurrentAccessMethod = $derived.by(() => {
-    if (nonNullish(identityInfo.removableAuthnMethod)) {
-      return (
-        "WebAuthn" in identityInfo.removableAuthnMethod.authn_method &&
-        identityInfo.isCurrentAccessMethod({
-          passkey: {
-            credentialId: new Uint8Array(
-              identityInfo.removableAuthnMethod.authn_method.WebAuthn.credential_id,
-            ),
-          },
-        })
-      );
-    }
-    if (nonNullish(identityInfo.removableOpenIdCredential)) {
-      return identityInfo.isCurrentAccessMethod({
+  const isRemovableAuthnMethodCurrentAccessMethod = $derived(
+    nonNullish(identityInfo.removableAuthnMethod) &&
+      "WebAuthn" in identityInfo.removableAuthnMethod.authn_method &&
+      identityInfo.isCurrentAccessMethod({
+        passkey: {
+          credentialId: new Uint8Array(
+            identityInfo.removableAuthnMethod.authn_method.WebAuthn.credential_id,
+          ),
+        },
+      }),
+  );
+  const isRemovableOpenIdCredentialCurrentAccessMethod = $derived(
+    nonNullish(identityInfo.removableOpenIdCredential) &&
+      identityInfo.isCurrentAccessMethod({
         openid: identityInfo.removableOpenIdCredential,
-      });
-    }
-    return false;
-  });
+      }),
+  );
 
   const handleGoogleLinked = (credential: OpenIdCredential) => {
     openIdCredentials.push(credential);
@@ -108,7 +105,7 @@
           class="max-md:w-full"
         >
           <span>Add</span>
-          <Plus size="1.25rem" />
+          <PlusIcon size="1.25rem" />
         </Button>
       </div>
     {/if}
@@ -129,11 +126,12 @@
         <div class="flex items-center justify-center pr-4">
           {#if isRemoveAccessMethodVisible}
             <Button
-              variant="tertiary"
-              iconOnly={true}
               onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
+              variant="tertiary"
+              iconOnly
+              class="!text-fg-error-secondary"
             >
-              <Link2Off class="stroke-fg-error-secondary" />
+              <Trash2Icon size="1.25rem" />
             </Button>
           {/if}
         </div>
@@ -154,12 +152,13 @@
         <div class="flex items-center justify-center pr-4">
           {#if isRemoveAccessMethodVisible}
             <Button
-              variant="tertiary"
-              iconOnly={true}
               onclick={() =>
                 (identityInfo.removableOpenIdCredential = credential)}
+              variant="tertiary"
+              iconOnly
+              class="!text-fg-error-secondary"
             >
-              <Link2Off class="stroke-fg-error-secondary" />
+              <Link2OffIcon size="1.25rem" />
             </Button>
           {/if}
         </div>
@@ -172,7 +171,7 @@
   <RemoveOpenIdCredential
     onRemove={handleRemoveOpenIdCredential}
     onClose={() => (identityInfo.removableOpenIdCredential = null)}
-    isCurrentAccessMethod={isRemovableCurrentAccessMethod}
+    isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
   />
 {/if}
 
@@ -180,7 +179,7 @@
   <RemovePasskeyDialog
     onRemove={handleRemovePasskey}
     onClose={() => (identityInfo.removableAuthnMethod = null)}
-    isCurrentAccessMethod={isRemovableCurrentAccessMethod}
+    isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
   />
 {/if}
 
