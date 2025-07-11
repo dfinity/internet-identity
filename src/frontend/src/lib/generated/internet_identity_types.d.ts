@@ -420,7 +420,7 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodConfirmationError }
   >,
-  'authn_method_lookup_by_regiatration_mode_id' : ActorMethod<
+  'authn_method_lookup_by_registration_mode_id' : ActorMethod<
     [string],
     { 'Ok' : [] | [IdentityNumber] } |
       { 'Err' : LookupByRegistrationIdError }
