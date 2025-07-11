@@ -236,7 +236,7 @@ pub fn authn_method_registration_mode_enter(
     sender: Principal,
     identity_number: IdentityNumber,
     id: Option<String>,
-) -> Result<Result<RegistrationModeInfo, ()>, CallError> {
+) -> Result<Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError>, CallError> {
     call_candid_as(
         env,
         canister_id,
