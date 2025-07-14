@@ -26,16 +26,9 @@ test.describe("Dashboard Navigation", () => {
       page.getByRole("heading", { level: 5, name: TEST_USER_NAME }),
     ).toBeVisible();
 
-    // Navigate to security page
-    await page
-      .getByRole("navigation")
-      .getByRole("link", { name: "Security" })
-      .click();
-
-    await page.waitForURL(II_URL + "/manage/security");
-    await expect(page.getByRole("heading", { name: "Security" })).toBeVisible();
-    // Needed to make sure the navigation is done
-    await expect(page.getByLabel("Go to Security")).not.toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 2, name: "Access methods" }),
+    ).toBeVisible();
 
     // Check that we have one passkey listed
     const passkey = await page.getByText("Chrome");
