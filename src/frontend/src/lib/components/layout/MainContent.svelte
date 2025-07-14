@@ -14,7 +14,7 @@
   <div
     class="bg-bg-primary_alt col-start-1 col-end-4 row-start-1 row-end-6"
   ></div>
-  <div class="col-start-2 col-end-3 row-start-3 row-end-4 p-4 md:p-0">
+  <div class="col-start-2 col-end-3 row-start-3 row-end-4 p-4">
     {@render content?.()}
   </div>
   <header class="col-start-2 col-end-5 row-start-1 row-end-2 pt-2 pr-0 md:pr-6">
@@ -28,7 +28,7 @@
 <style>
   .sidebar-layout {
     display: grid;
-    grid-template-columns: 1fr 4fr 1fr;
+    grid-template-columns: 1fr minmax(auto, 920px) 1fr;
 
     grid-template-rows: min-content 1fr max-content 1fr min-content;
     min-height: 100dvh;

@@ -135,7 +135,7 @@
             isWebAuthnMetaData(lastUsedAccessMethod) &&
             authnMethodEqual(authnMethod, lastUsedAccessMethod)}
         />
-        <div class="flex items-center justify-center pr-4">
+        <div class="flex items-center justify-center px-4">
           {#if isRemoveAccessMethodVisible}
             <Button
               onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
@@ -166,7 +166,7 @@
             lastUsedAccessMethod.sub === credential.sub}
         />
 
-        <div class="flex items-center justify-center pr-4">
+        <div class="flex items-center justify-center px-4">
           {#if isRemoveAccessMethodVisible}
             <Button
               onclick={() =>
