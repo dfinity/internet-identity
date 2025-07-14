@@ -3,9 +3,10 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
-    confirm: (confirmationCode: string) => void;
+    confirm: (confirmationCode: string) => Promise<void>;
     restart: () => void;
   }
 
@@ -13,12 +14,25 @@
 
   let inputRef = $state<HTMLInputElement>();
   let confirmationCode = $state("");
-  let loading = $state(false);
+  let isConfirming = $state(false);
+  let isInvalidCode = $state(true);
 
-  const handleSubmit = () => {
-    loading = true;
-    confirm(confirmationCode);
+  const handleSubmit = async () => {
+    isConfirming = true;
+    try {
+      await confirm(confirmationCode);
+    } catch (error) {
+      isInvalidCode = true;
+    } finally {
+      isConfirming = false;
+    }
   };
+
+  $effect(() => {
+    if (confirmationCode.length > 0) {
+      isInvalidCode = false;
+    }
+  });
 
   onMount(() => {
     inputRef?.focus();
@@ -45,18 +59,29 @@
     placeholder="XXXXXX"
     size="md"
     class="mb-8"
+    error={isInvalidCode ? "Invalid code, please try again" : undefined}
   />
   <Button
     onclick={handleSubmit}
     variant="primary"
     size="xl"
     type="submit"
-    disabled={confirmationCode.length === 0 || loading}
+    disabled={confirmationCode.length === 0 || isConfirming}
     class="mb-3"
   >
-    Confirm sign-in
+    {#if isConfirming}
+      <ProgressRing />
+      <span>Confirming...</span>
+    {:else}
+      <span>Confirm sign-in</span>
+    {/if}
   </Button>
-  <Button onclick={restart} variant="secondary" size="xl" disabled={loading}>
+  <Button
+    onclick={restart}
+    variant="secondary"
+    size="xl"
+    disabled={isConfirming}
+  >
     Start over
   </Button>
 </form>
