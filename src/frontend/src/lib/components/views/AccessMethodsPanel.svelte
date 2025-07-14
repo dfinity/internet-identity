@@ -18,11 +18,22 @@
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
   import AddAccessMethodWizard from "$lib/components/wizards/AddAccessMethodWizard.svelte";
+  import {
+    getLastUsedAccessMethod,
+    isWebAuthnMetaData,
+  } from "$lib/utils/accessMethods";
+  import { authnMethodEqual } from "$lib/utils/webAuthn";
 
   const MAX_PASSKEYS = 8;
 
   let isAddAccessMethodWizardOpen = $state(false);
 
+  const lastUsedAccessMethod = $derived(
+    getLastUsedAccessMethod(
+      identityInfo.authnMethods,
+      identityInfo.openIdCredentials,
+    ),
+  );
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const authnMethods = $derived(identityInfo.authnMethods);
   const isMaxOpenIdCredentialsReached = $derived(
@@ -83,10 +94,6 @@
   };
 </script>
 
-<h1 class="text-text-primary mb-4 text-3xl font-semibold">Security</h1>
-<p class="text-text-tertiary text-md mb-12">
-  Settings and recommendations to keep your identity secure
-</p>
 <Panel>
   <div class="flex flex-col justify-between gap-5 p-4 pb-5 md:flex-row">
     <div>
@@ -122,7 +129,12 @@
         >
           <PasskeyIcon />
         </div>
-        <AccessMethod accessMethod={authnMethod} />
+        <AccessMethod
+          accessMethod={authnMethod}
+          isCurrent={nonNullish(lastUsedAccessMethod) &&
+            isWebAuthnMetaData(lastUsedAccessMethod) &&
+            authnMethodEqual(authnMethod, lastUsedAccessMethod)}
+        />
         <div class="flex items-center justify-center pr-4">
           {#if isRemoveAccessMethodVisible}
             <Button
@@ -147,7 +159,12 @@
           <GoogleIcon />
         </div>
 
-        <AccessMethod accessMethod={credential} />
+        <AccessMethod
+          accessMethod={credential}
+          isCurrent={nonNullish(lastUsedAccessMethod) &&
+            !isWebAuthnMetaData(lastUsedAccessMethod) &&
+            lastUsedAccessMethod.sub === credential.sub}
+        />
 
         <div class="flex items-center justify-center pr-4">
           {#if isRemoveAccessMethodVisible}
