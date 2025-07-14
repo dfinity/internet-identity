@@ -15,7 +15,7 @@
   class={[
     "grid w-full flex-col overflow-hidden rounded-xl px-4 pt-5 pb-8",
     "max-sm:flex-1",
-    "sm:bg-bg-secondary sm:border-border-secondary sm:border sm:px-6",
+    // "sm:bg-bg-secondary sm:border-border-secondary sm:border sm:px-6",
     className,
   ]}
 >

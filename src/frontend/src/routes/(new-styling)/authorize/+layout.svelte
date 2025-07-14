@@ -70,137 +70,160 @@
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
-  <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header>
-    {#if nonNullish(selectedIdentity)}
-      <Button
-        bind:element={identityButtonRef}
-        onclick={() => (isIdentityPopoverOpen = true)}
-        variant="tertiary"
-        class="ml-auto gap-2.5 pr-3 md:-mr-3"
-        aria-label="Switch identity"
-      >
-        <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
-        <ChevronDownIcon size="1rem" />
-      </Button>
-      {#if isIdentityPopoverOpen}
-        <Popover
-          anchor={identityButtonRef}
-          onClose={() => (isIdentityPopoverOpen = false)}
-          direction="down"
-          align="end"
-          distance="0.75rem"
+  <div class="fixed top-0 right-0 left-0">
+    <div class="h-[env(safe-area-inset-top)]"></div>
+    <Header>
+      {#if nonNullish(selectedIdentity)}
+        <Button
+          bind:element={identityButtonRef}
+          onclick={() => (isIdentityPopoverOpen = true)}
+          variant="tertiary"
+          class="ml-auto gap-2.5 pr-3 md:-mr-3"
+          aria-label="Switch identity"
         >
-          <IdentitySwitcher
-            selected={selectedIdentity.identityNumber}
-            identities={lastUsedIdentities}
-            switchIdentity={(identityNumber) => {
-              authenticationStore.reset();
-              lastUsedIdentitiesStore.selectIdentity(identityNumber);
-              isIdentityPopoverOpen = false;
-            }}
-            useAnotherIdentity={() => {
-              isIdentityPopoverOpen = false;
-              isAuthDialogOpen = true;
-            }}
+          <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span
+          >
+          <ChevronDownIcon size="1rem" />
+        </Button>
+        {#if isIdentityPopoverOpen}
+          <Popover
+            anchor={identityButtonRef}
             onClose={() => (isIdentityPopoverOpen = false)}
+            direction="down"
+            align="end"
+            distance="0.75rem"
+          >
+            <IdentitySwitcher
+              selected={selectedIdentity.identityNumber}
+              identities={lastUsedIdentities}
+              switchIdentity={(identityNumber) => {
+                authenticationStore.reset();
+                lastUsedIdentitiesStore.selectIdentity(identityNumber);
+                isIdentityPopoverOpen = false;
+              }}
+              useAnotherIdentity={() => {
+                isIdentityPopoverOpen = false;
+                isAuthDialogOpen = true;
+              }}
+              onClose={() => (isIdentityPopoverOpen = false)}
+            />
+          </Popover>
+        {/if}
+        {#if isAuthDialogOpen}
+          <AuthDialog
+            title="Use another identity"
+            subtitle="Choose method"
+            {onSignIn}
+            {onSignUp}
+            onClose={() => (isAuthDialogOpen = false)}
           />
-        </Popover>
+        {/if}
       {/if}
-      {#if isAuthDialogOpen}
-        <AuthDialog
-          title="Use another identity"
-          subtitle="Choose method"
-          {onSignIn}
-          {onSignUp}
-          onClose={() => (isAuthDialogOpen = false)}
-        />
-      {/if}
-    {/if}
-  </Header>
-  <div class="flex flex-1 flex-col items-center justify-center">
-    {#if status === "authenticating"}
-      <div
-        class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100"
-      >
-        {#if nonNullish(selectedIdentity)}
-          {#key selectedIdentity.identityNumber}
-            <div
-              bind:this={animationWrapperRef}
-              class="col-start-1 row-start-1 flex flex-col"
-              in:fly={{ duration: 300, y: 60, delay: 200 }}
-              out:scale={{ duration: 500, start: 0.9 }}
-              onoutrostart={() =>
-                animationWrapperRef?.setAttribute("aria-hidden", "true")}
-            >
+    </Header>
+  </div>
+  <div class="flex flex-1">
+    <div
+      class="bg-bg-secondary flex flex-1 flex-col items-center justify-center"
+    >
+      <div>
+        <h1 class="text-text-primary mb-4 text-4xl font-medium">
+          Welcome to Internet Identity
+        </h1>
+        <p class="text-text-tertiary mb-12 text-xl">
+          Safe. Private. Decentralized.
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-1 flex-col items-center justify-center">
+      <div class="h-[env(safe-area-inset-top)]"></div>
+      {#if status === "authenticating"}
+        <div
+          class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100"
+        >
+          {#if nonNullish(selectedIdentity)}
+            {#key selectedIdentity.identityNumber}
+              <div
+                bind:this={animationWrapperRef}
+                class="col-start-1 row-start-1 flex flex-col"
+                in:fly={{ duration: 300, y: 60, delay: 200 }}
+                out:scale={{ duration: 500, start: 0.9 }}
+                onoutrostart={() =>
+                  animationWrapperRef?.setAttribute("aria-hidden", "true")}
+              >
+                <AuthPanel>
+                  {@render children()}
+                </AuthPanel>
+              </div>
+            {/key}
+          {:else}
+            <div class="col-start-1 row-start-1 flex flex-col">
               <AuthPanel>
                 {@render children()}
               </AuthPanel>
             </div>
-          {/key}
-        {:else}
-          <div class="col-start-1 row-start-1 flex flex-col">
-            <AuthPanel>
-              {@render children()}
-            </AuthPanel>
-          </div>
-        {/if}
-      </div>
-    {:else if status === "authorizing"}
-      <!-- Spinner is not shown for other statuses to avoid flicker -->
-      <div class="flex flex-col items-center justify-center gap-4">
-        <ProgressRing class="text-fg-primary size-14" />
-        <p class="text-text-secondary text-lg">Redirecting to the app</p>
-      </div>
-    {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure" || status === "unverified-origin"}
-      {@const title = {
-        orphan: "Missing request",
-        closed: "Connection closed",
-        invalid: "Invalid request",
-        failure: "Something went wrong",
-        "unverified-origin": "Unverified origin",
-      }[status]}
-      {@const description = {
-        orphan:
-          "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer.",
-        closed:
-          "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support.",
-        invalid:
-          "It seems like an invalid authentication request was received.",
-        failure:
-          "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
-        "unverified-origin":
-          "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page.",
-      }[status]}
-      <Dialog>
-        <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-          <CircleAlertIcon size="1.5rem" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">{title}</h1>
-        <p class="text-md text-text-tertiary mb-6 font-medium">{description}</p>
-        <Button onclick={() => window.close()} variant="secondary">
-          <RotateCcwIcon size="1rem" />
-          Return to app
-        </Button>
-      </Dialog>
-    {:else if status === "late-success"}
-      <Dialog>
-        <FeaturedIcon size="lg" class="mb-4 self-start">
-          <CircleAlertIcon size="1.5rem" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">
-          Authentication successful
-        </h1>
-        <p class="text-md text-text-tertiary mb-6 font-medium">
-          You may close this page.
-        </p>
-        <Button onclick={() => window.close()} variant="secondary">
-          <RotateCcwIcon size="1rem" />
-          Return to app
-        </Button>
-      </Dialog>
-    {/if}
+          {/if}
+        </div>
+      {:else if status === "authorizing"}
+        <!-- Spinner is not shown for other statuses to avoid flicker -->
+        <div class="flex flex-col items-center justify-center gap-4">
+          <ProgressRing class="text-fg-primary size-14" />
+          <p class="text-text-secondary text-lg">Redirecting to the app</p>
+        </div>
+      {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure" || status === "unverified-origin"}
+        {@const title = {
+          orphan: "Missing request",
+          closed: "Connection closed",
+          invalid: "Invalid request",
+          failure: "Something went wrong",
+          "unverified-origin": "Unverified origin",
+        }[status]}
+        {@const description = {
+          orphan:
+            "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer.",
+          closed:
+            "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support.",
+          invalid:
+            "It seems like an invalid authentication request was received.",
+          failure:
+            "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
+          "unverified-origin":
+            "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page.",
+        }[status]}
+        <Dialog>
+          <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
+            <CircleAlertIcon size="1.5rem" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">{title}</h1>
+          <p class="text-md text-text-tertiary mb-6 font-medium">
+            {description}
+          </p>
+          <Button onclick={() => window.close()} variant="secondary">
+            <RotateCcwIcon size="1rem" />
+            Return to app
+          </Button>
+        </Dialog>
+      {:else if status === "late-success"}
+        <Dialog>
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <CircleAlertIcon size="1.5rem" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            Authentication successful
+          </h1>
+          <p class="text-md text-text-tertiary mb-6 font-medium">
+            You may close this page.
+          </p>
+          <Button onclick={() => window.close()} variant="secondary">
+            <RotateCcwIcon size="1rem" />
+            Return to app
+          </Button>
+        </Dialog>
+      {/if}
+      <div class="h-[env(safe-area-inset-bottom)]"></div>
+    </div>
   </div>
-  <Footer />
-  <div class="h-[env(safe-area-inset-bottom)]"></div>
+  <div class="fixed right-0 bottom-0 left-0">
+    <Footer />
+    <div class="h-[env(safe-area-inset-bottom)]"></div>
+  </div>
 </div>

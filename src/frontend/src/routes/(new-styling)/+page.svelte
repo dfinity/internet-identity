@@ -58,97 +58,117 @@
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
-  <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header />
-  <div class="flex flex-1 flex-col items-center justify-center">
-    <AuthPanel class="sm:max-w-100">
-      <div class="flex-1"></div>
-      {#if nonNullish(authFlow.captcha)}
-        <SolveCaptcha {...authFlow.captcha} />
-      {:else}
-        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {lastUsedIdentities.length > 0 ? "Choose identity" : "Sign in"}
+  <div class="fixed top-0 right-0 left-0">
+    <div class="h-[env(safe-area-inset-top)]"></div>
+    <Header />
+  </div>
+  <div class="flex flex-1">
+    <div
+      class="bg-bg-secondary flex flex-1 flex-col items-center justify-center"
+    >
+      <div>
+        <h1 class="text-text-primary mb-4 text-4xl font-medium">
+          Manage your Internet Identity
         </h1>
-        <p class="text-text-secondary mb-6 self-start text-sm">
-          {lastUsedIdentities.length > 0
-            ? "you want to manage"
-            : "to manage your identity"}
+        <p class="text-text-tertiary mb-12 text-xl">
+          Safe. Private. Decentralized.
         </p>
-        {#if lastUsedIdentities.length > 0}
-          <div class="flex flex-col gap-1.5">
-            <ul class="contents">
-              {#each lastUsedIdentities as identity}
-                <li class="contents">
-                  <ButtonCard
-                    onclick={() => handleContinueAs(identity)}
-                    disabled={nonNullish(
-                      authLastUsedFlow.authenticatingIdentity,
-                    )}
-                  >
-                    <Avatar size="sm">
-                      {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
-                        <ProgressRing />
-                      {:else}
-                        <UserIcon size="1.25rem" />
-                      {/if}
-                    </Avatar>
-                    <div class="flex flex-col text-left text-sm">
-                      <div class="font-semibold">
-                        {identity.name ?? identity.identityNumber}
-                      </div>
-                      <div class="text-text-tertiary" aria-hidden="true">
-                        {"passkey" in identity.authMethod
-                          ? "Passkey"
-                          : "Google"}
-                      </div>
-                    </div>
-                  </ButtonCard>
-                </li>
-              {/each}
-            </ul>
-            <ButtonCard
-              onclick={() => (isAuthDialogOpen = true)}
-              disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-            >
-              <FeaturedIcon size="sm">
-                <PlusIcon size="1.25rem" />
-              </FeaturedIcon>
-              <span>Use another identity</span>
-            </ButtonCard>
-          </div>
-          {#if isAuthDialogOpen}
-            <AuthDialog
-              {onSignIn}
-              {onSignUp}
-              title="Use another identity"
-              subtitle="Choose method"
-              onClose={() => (isAuthDialogOpen = false)}
-            />
-          {/if}
+      </div>
+    </div>
+    <div class="flex flex-1 flex-col items-center justify-center">
+      <div class="h-[env(safe-area-inset-top)]"></div>
+      <AuthPanel class="sm:max-w-100">
+        <div class="flex-1"></div>
+        {#if nonNullish(authFlow.captcha)}
+          <SolveCaptcha {...authFlow.captcha} />
         {:else}
-          <PickAuthenticationMethod
-            setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
-            continueWithGoogle={authFlow.continueWithGoogle}
-          />
-          {#if authFlow.view !== "chooseMethod"}
-            <Dialog onClose={() => (authFlow.view = "chooseMethod")}>
-              {#if authFlow.view === "setupOrUseExistingPasskey"}
-                <SetupOrUseExistingPasskey
-                  setupNew={authFlow.setupNewPasskey}
-                  useExisting={authFlow.continueWithExistingPasskey}
-                />
-              {:else if authFlow.view === "setupNewPasskey"}
-                <CreatePasskey create={authFlow.createPasskey} />
-              {/if}
-            </Dialog>
+          <h2 class="text-text-primary my-2 self-start text-2xl font-medium">
+            {lastUsedIdentities.length > 0 ? "Choose identity" : "Sign in"}
+          </h2>
+          <p class="text-text-secondary mb-6 self-start text-sm">
+            {lastUsedIdentities.length > 0
+              ? "you want to manage"
+              : "to manage your identity"}
+          </p>
+          {#if lastUsedIdentities.length > 0}
+            <div class="flex flex-col gap-1.5">
+              <ul class="contents">
+                {#each lastUsedIdentities as identity}
+                  <li class="contents">
+                    <ButtonCard
+                      onclick={() => handleContinueAs(identity)}
+                      disabled={nonNullish(
+                        authLastUsedFlow.authenticatingIdentity,
+                      )}
+                    >
+                      <Avatar size="sm">
+                        {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
+                          <ProgressRing />
+                        {:else}
+                          <UserIcon size="1.25rem" />
+                        {/if}
+                      </Avatar>
+                      <div class="flex flex-col text-left text-sm">
+                        <div class="font-semibold">
+                          {identity.name ?? identity.identityNumber}
+                        </div>
+                        <div class="text-text-tertiary" aria-hidden="true">
+                          {"passkey" in identity.authMethod
+                            ? "Passkey"
+                            : "Google"}
+                        </div>
+                      </div>
+                    </ButtonCard>
+                  </li>
+                {/each}
+              </ul>
+              <ButtonCard
+                onclick={() => (isAuthDialogOpen = true)}
+                disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+              >
+                <FeaturedIcon size="sm">
+                  <PlusIcon size="1.25rem" />
+                </FeaturedIcon>
+                <span>Use another identity</span>
+              </ButtonCard>
+            </div>
+            {#if isAuthDialogOpen}
+              <AuthDialog
+                {onSignIn}
+                {onSignUp}
+                title="Use another identity"
+                subtitle="Choose method"
+                onClose={() => (isAuthDialogOpen = false)}
+              />
+            {/if}
+          {:else}
+            <PickAuthenticationMethod
+              setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
+              continueWithGoogle={authFlow.continueWithGoogle}
+            />
+            {#if authFlow.view !== "chooseMethod"}
+              <Dialog onClose={() => (authFlow.view = "chooseMethod")}>
+                {#if authFlow.view === "setupOrUseExistingPasskey"}
+                  <SetupOrUseExistingPasskey
+                    setupNew={authFlow.setupNewPasskey}
+                    useExisting={authFlow.continueWithExistingPasskey}
+                  />
+                {:else if authFlow.view === "setupNewPasskey"}
+                  <CreatePasskey create={authFlow.createPasskey} />
+                {/if}
+              </Dialog>
+            {/if}
           {/if}
         {/if}
-      {/if}
-      {#if authFlow.systemOverlay || authLastUsedFlow.systemOverlay}
-        <SystemOverlayBackdrop />
-      {/if}
-    </AuthPanel>
+        {#if authFlow.systemOverlay || authLastUsedFlow.systemOverlay}
+          <SystemOverlayBackdrop />
+        {/if}
+      </AuthPanel>
+      <div class="h-[env(safe-area-inset-bottom)]"></div>
+    </div>
   </div>
-  <Footer />
-  <div class="h-[env(safe-area-inset-bottom)]"></div>
+  <div class="fixed right-0 bottom-0 left-0">
+    <Footer />
+    <div class="h-[env(safe-area-inset-bottom)]"></div>
+  </div>
 </div>
