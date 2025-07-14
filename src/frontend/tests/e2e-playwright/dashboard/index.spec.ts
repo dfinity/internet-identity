@@ -27,7 +27,11 @@ test.describe("Dashboard Navigation", () => {
     ).toBeVisible();
 
     await expect(
-      page.getByRole("heading", { level: 2, name: "Access methods" }),
+      page.getByRole("heading", {
+        level: 2,
+        exact: true,
+        name: "Access methods",
+      }),
     ).toBeVisible();
 
     // Check that we have one passkey listed
