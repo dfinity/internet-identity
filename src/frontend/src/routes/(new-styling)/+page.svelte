@@ -67,12 +67,12 @@
         <SolveCaptcha {...authFlow.captcha} />
       {:else}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {lastUsedIdentities.length > 0 ? "Choose identity" : "Sign in"}
+          Manage your Internet&nbsp;Identity
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
           {lastUsedIdentities.length > 0
-            ? "you want to manage"
-            : "to manage your identity"}
+            ? "choose identity to continue"
+            : "sign in to continue"}
         </p>
         {#if lastUsedIdentities.length > 0}
           <div class="flex flex-col gap-1.5">
