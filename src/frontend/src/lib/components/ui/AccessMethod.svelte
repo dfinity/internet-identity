@@ -9,6 +9,9 @@
   import PlaceHolder from "./PlaceHolder.svelte";
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
+  import EditName from "./EditName.svelte";
+  import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import { handleError } from "$lib/components/utils/error";
 
   let {
     accessMethod,
@@ -51,6 +54,15 @@
     return undefined;
   };
 
+  const renamePasskeyFactory =
+    (authnMethod: AuthnMethodData) => async (name: string) => {
+      try {
+        await identityInfo.renamePasskey(authnMethod, name);
+      } catch (error) {
+        handleError(error);
+      }
+    };
+
   let openIdHasName = $derived(
     accessMethod &&
       !("authn_method" in accessMethod) &&
@@ -75,7 +87,10 @@
       out:fade={{ duration: 30 }}
     >
       <div class="flex min-w-32 items-center pr-3">
-        {getAuthnMethodAlias(accessMethod)}
+        <EditName
+          name={getAuthnMethodAlias(accessMethod)}
+          onSave={renamePasskeyFactory(accessMethod)}
+        />
         {#if isCurrent}
           <span class="ml-2">
             <PulsatingCircleIcon />

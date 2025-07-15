@@ -2,6 +2,7 @@ import { get } from "svelte/store";
 import {
   AuthnMethodData,
   AuthnMethodRegistrationInfo,
+  MetadataMapV2,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
@@ -19,7 +20,7 @@ import {
   lastUsedIdentityStore,
 } from "./last-used-identities.store";
 import { bufEquals } from "@dfinity/agent";
-import { authnMethodEqual } from "$lib/utils/webAuthn";
+import { authnMethodEqual, getPublicKey } from "$lib/utils/webAuthn";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -203,6 +204,36 @@ class IdentityInfo {
       this.authnMethods.splice(index, 0, authnMethod);
       throw error;
     }
+  }
+
+  async renamePasskey(
+    authnMethod: AuthnMethodData,
+    newName: string,
+  ): Promise<void> {
+    const newMetadata: MetadataMapV2 = authnMethod.metadata.map(
+      ([key, value]) => {
+        if (key === "alias") {
+          return [key, { String: newName }];
+        }
+        return [key, value];
+      },
+    );
+    const { actor, identityNumber } = get(authenticatedStore);
+    await actor
+      .authn_method_metadata_replace(
+        identityNumber,
+        getPublicKey(authnMethod),
+        newMetadata,
+      )
+      .then(throwCanisterError);
+    const index = this.authnMethods.findIndex((value) =>
+      authnMethodEqual(value, authnMethod),
+    );
+    this.authnMethods[index] = {
+      ...authnMethod,
+      metadata: newMetadata,
+    };
+    await this.fetch();
   }
 
   logout = () => {
