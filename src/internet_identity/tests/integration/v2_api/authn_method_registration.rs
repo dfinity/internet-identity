@@ -403,7 +403,7 @@ fn should_return_registrations_when_tentative_device_not_verified() -> Result<()
 }
 
 #[test]
-fn should_return_registrations_when_tentative_device_verified() -> Result<(), CallError> {
+fn should_return_no_registrations_when_tentative_device_verified() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -443,7 +443,7 @@ fn should_return_registrations_when_tentative_device_verified() -> Result<(), Ca
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
             .expect("identity_info failed");
 
-    assert!(identity_info.authn_method_registration.is_some());
+    assert!(identity_info.authn_method_registration.is_none());
     Ok(())
 }
 

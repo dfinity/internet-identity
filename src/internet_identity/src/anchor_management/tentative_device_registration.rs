@@ -186,44 +186,58 @@ fn get_verified_device(
         state::lookup_tentative_device_registration_mut(|lookup| {
             prune_expired_tentative_device_registrations_v2(registrations, lookup);
 
-            let mut tentative_registration = registrations
-                .remove(&anchor_number)
-                .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
-
-            if let TentativeDeviceRegistration {
-                id: Some(ref reg_id),
-                ..
-            } = tentative_registration
-            {
-                lookup.remove(reg_id);
+            // Check if the registration exists
+            if !registrations.contains_key(&anchor_number) {
+                return Err(VerifyTentativeDeviceError::DeviceRegistrationModeOff);
             }
 
-            match tentative_registration.state {
-                DeviceRegistrationModeActive => Err(VerifyTentativeDeviceError::NoDeviceToVerify),
-                DeviceTentativelyAdded {
-                    failed_attempts,
-                    verification_code,
-                    tentative_device,
-                } => {
-                    if user_verification_code == verification_code {
-                        return Ok(tentative_device);
+            // Check the state and prepare the response without keeping a mutable reference
+            let (should_remove, response) =
+                match &mut registrations.get_mut(&anchor_number).unwrap().state {
+                    DeviceRegistrationModeActive => {
+                        (false, Err(VerifyTentativeDeviceError::NoDeviceToVerify))
                     }
+                    DeviceTentativelyAdded {
+                        failed_attempts,
+                        verification_code,
+                        tentative_device,
+                    } => {
+                        if user_verification_code == *verification_code {
+                            // Verification successful - we'll remove the registration
+                            (true, Ok(tentative_device.clone()))
+                        } else {
+                            // Increment failed attempts counter
+                            *failed_attempts += 1;
 
-                    let failed_attempts = failed_attempts + 1;
-                    if failed_attempts < MAX_DEVICE_REGISTRATION_ATTEMPTS {
-                        tentative_registration.state = DeviceTentativelyAdded {
-                            failed_attempts,
-                            tentative_device,
-                            verification_code,
-                        };
-                        // reinsert because retries are allowed
-                        registrations.insert(anchor_number, tentative_registration);
+                            // Check if max attempts reached
+                            let should_remove =
+                                *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS;
+
+                            (
+                                should_remove,
+                                Err(VerifyTentativeDeviceError::WrongCode {
+                                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS
+                                        - *failed_attempts),
+                                }),
+                            )
+                        }
                     }
-                    Err(VerifyTentativeDeviceError::WrongCode {
-                        retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - failed_attempts),
-                    })
+                };
+
+            // Now handle removal if needed, after we're done with the mutable borrow
+            if should_remove {
+                if let Some(registration) = registrations.remove(&anchor_number) {
+                    // Clean up the lookup table
+                    if let TentativeDeviceRegistration {
+                        id: Some(reg_id), ..
+                    } = registration
+                    {
+                        lookup.remove(&reg_id);
+                    }
                 }
             }
+
+            response
         })
     })
 }
