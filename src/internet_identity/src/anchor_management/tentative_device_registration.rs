@@ -226,14 +226,11 @@ fn get_verified_device(
 
             // Now handle removal if needed, after we're done with the mutable borrow
             if should_remove {
-                if let Some(registration) = registrations.remove(&anchor_number) {
+                if let Some(TentativeDeviceRegistration {
+                    id: Some(reg_id), ..
+                }) = registrations.remove(&anchor_number) {
                     // Clean up the lookup table
-                    if let TentativeDeviceRegistration {
-                        id: Some(reg_id), ..
-                    } = registration
-                    {
-                        lookup.remove(&reg_id);
-                    }
+                    lookup.remove(&reg_id);
                 }
             }
 
@@ -280,7 +277,7 @@ fn prune_expired_tentative_device_registrations_v2(
             true
         } else {
             if let Some(id) = id {
-                lookup.remove(&id);
+                lookup.remove(id);
             }
             false
         }

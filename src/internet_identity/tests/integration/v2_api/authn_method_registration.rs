@@ -6,8 +6,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_with_archive, time};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
-    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError, CheckTentativeDeviceError,
-    LookupByRegistrationIdError,
+    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError, LookupByRegistrationIdError,
 };
 use pocket_ic::CallError;
 use std::time::Duration;
