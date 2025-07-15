@@ -943,14 +943,6 @@ mod v2_api {
     }
 
     #[query]
-    fn authn_method_check_tentative_device(
-        identity_number: IdentityNumber,
-    ) -> Result<bool, CheckTentativeDeviceError> {
-        check_authorization(identity_number).map_err(CheckTentativeDeviceError::from)?;
-        Ok(check_tentative_device(identity_number))
-    }
-
-    #[query]
     fn authn_method_lookup_by_registration_mode_id(
         id: String,
     ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {

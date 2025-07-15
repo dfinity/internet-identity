@@ -353,13 +353,13 @@ fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_false_when_no_tentative_device() -> Result<(), CallError> {
+fn should_return_no_registration_when_no_tentative_device() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let result = api_v2::authn_method_check_tentative_device(
+    let identity_info = api_v2::identity_info(
         &env,
         canister_id,
         authn_method.principal(),
@@ -367,12 +367,12 @@ fn should_return_false_when_no_tentative_device() -> Result<(), CallError> {
     )?
     .expect("check_tentative_device_verified failed");
 
-    assert!(!result);
+    assert!(identity_info.authn_method_registration.is_none());
     Ok(())
 }
 
 #[test]
-fn should_return_true_when_tentative_device_not_verified() -> Result<(), CallError> {
+fn should_return_registrations_when_tentative_device_not_verified() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -398,7 +398,7 @@ fn should_return_true_when_tentative_device_not_verified() -> Result<(), CallErr
     )?
     .expect("authn_method_register failed");
 
-    let result = api_v2::authn_method_check_tentative_device(
+    let identity_info = api_v2::identity_info(
         &env,
         canister_id,
         authn_method.principal(),
@@ -406,12 +406,12 @@ fn should_return_true_when_tentative_device_not_verified() -> Result<(), CallErr
     )?
     .expect("check_tentative_device_verified failed");
 
-    assert!(result);
+    assert!(identity_info.authn_method_registration.is_some());
     Ok(())
 }
 
 #[test]
-fn should_return_false_when_tentative_device_verified() -> Result<(), CallError> {
+fn should_return_registrations_when_tentative_device_verified() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -447,7 +447,7 @@ fn should_return_false_when_tentative_device_verified() -> Result<(), CallError>
     )?
     .expect("authn_method_confirm failed");
 
-    let result = api_v2::authn_method_check_tentative_device(
+    let identity_info = api_v2::identity_info(
         &env,
         canister_id,
         authn_method.principal(),
@@ -455,7 +455,7 @@ fn should_return_false_when_tentative_device_verified() -> Result<(), CallError>
     )?
     .expect("check_tentative_device_verified failed");
 
-    assert!(!result);
+    assert!(identity_info.authn_method_registration.is_some());
     Ok(())
 }
 
@@ -495,36 +495,16 @@ fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
     )?
     .expect("authn_method_registration_mode_exit failed");
 
-    let result = api_v2::authn_method_check_tentative_device(
+    let identity_info = api_v2::identity_info(
         &env,
         canister_id,
         authn_method.principal(),
         identity_number,
     )?
-    .expect("check_tentative_device_verified failed");
+    .expect("identity_info failed");
 
-    assert!(!result);
+    assert!(identity_info.authn_method_registration.is_none());
     Ok(())
-}
-
-#[test]
-fn should_require_authentication_to_check_tentative_device() {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method = test_authn_method();
-    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
-
-    let result = api_v2::authn_method_check_tentative_device(
-        &env,
-        canister_id,
-        Principal::anonymous(),
-        identity_number,
-    );
-
-    assert!(matches!(
-        result,
-        Ok(Err(CheckTentativeDeviceError::Unauthorized))
-    ));
 }
 
 #[test]

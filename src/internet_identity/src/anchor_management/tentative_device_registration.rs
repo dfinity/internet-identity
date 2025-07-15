@@ -227,15 +227,6 @@ fn get_verified_device(
     })
 }
 
-/// Checks whether a tentative device has been verified without mutating anything
-/// This is so that on the new client we can prompt for adding the final passkey as soon as
-/// on the old client we have verified the temporary key
-pub fn check_tentative_device(identity_number: IdentityNumber) -> bool {
-    state::tentative_device_registrations(|registrations| {
-        registrations.contains_key(&identity_number)
-    })
-}
-
 /// Return a decimal representation of a random `u32` to be used as verification code
 async fn new_verification_code() -> DeviceVerificationCode {
     let res: Vec<u8> = match call(Principal::management_canister(), "raw_rand", ()).await {

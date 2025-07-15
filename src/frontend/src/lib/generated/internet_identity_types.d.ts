@@ -413,11 +413,6 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodAddError }
   >,
-  'authn_method_check_tentative_device' : ActorMethod<
-    [IdentityNumber],
-    { 'Ok' : boolean } |
-      { 'Err' : CheckTentativeDeviceError }
-  >,
   'authn_method_confirm' : ActorMethod<
     [IdentityNumber, string],
     { 'Ok' : null } |
