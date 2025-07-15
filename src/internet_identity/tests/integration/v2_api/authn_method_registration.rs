@@ -864,3 +864,69 @@ fn should_return_none_for_nonexistent_registration_id() -> Result<(), CallError>
     assert!(result.is_none());
     Ok(())
 }
+
+#[test]
+fn should_reject_second_registration_with_different_id() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let authn_method = test_authn_method();
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let first_registration_id = "0fZr4".to_string();
+    let second_registration_id = "abc12".to_string();
+
+    // First call with the first registration ID should succeed
+    api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(first_registration_id),
+    )?
+    .expect("First authn_method_registration_mode_enter failed");
+
+    // Second call with a different registration ID should fail with InvalidRegistrationId
+    let result = api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(second_registration_id.clone()),
+    )?;
+
+    assert!(matches!(
+        result,
+        Err(AuthnMethodRegistrationModeEnterError::AlreadyInProgress)
+    ));
+    Ok(())
+}
+
+#[test]
+fn should_return_registration_with_same_id() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let authn_method = test_authn_method();
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let first_registration_id = "0fZr4".to_string();
+
+    // First call with the first registration ID should succeed
+    let result_1 =api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(first_registration_id.clone()),
+    )?
+    .expect("First authn_method_registration_mode_enter failed");
+
+    // Second call with a different registration ID should fail with InvalidRegistrationId
+    let result_2 = api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(first_registration_id.clone()),
+    )?.expect("Second authn_method_registration_mode_enter failed");
+
+    assert_eq!(result_1, result_2);
+    Ok(())
+}

@@ -869,13 +869,13 @@ mod v2_api {
             .map_err(AuthnMethodRegistrationModeEnterError::from)?;
         match id {
             Some(reg_id) => {
-                let timeout = tentative_device_registration::enter_device_registration_mode_v2(
+                let expiration = tentative_device_registration::enter_device_registration_mode_v2(
                     identity_number,
                     ValidatedRegistrationId::try_new(reg_id)
                         .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
-                );
+                )?;
                 Ok(RegistrationModeInfo {
-                    expiration: timeout,
+                    expiration,
                 })
             }
             None => {

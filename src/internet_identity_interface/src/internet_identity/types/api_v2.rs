@@ -141,6 +141,7 @@ pub enum AuthnMethodRegisterError {
 pub enum AuthnMethodRegistrationModeEnterError {
     Unauthorized(Principal),
     InternalError(String),
+    AlreadyInProgress,
     InvalidRegistrationId(String),
 }
 

@@ -79,6 +79,7 @@ export interface AuthnMethodRegistrationInfo {
 export type AuthnMethodRegistrationModeEnterError = {
     'InvalidRegistrationId' : string
   } |
+  { 'AlreadyInProgress' : null } |
   { 'Unauthorized' : Principal } |
   { 'InternalError' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |

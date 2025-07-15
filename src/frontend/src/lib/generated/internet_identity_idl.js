@@ -165,6 +165,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const AuthnMethodRegistrationModeEnterError = IDL.Variant({
     'InvalidRegistrationId' : IDL.Text,
+    'AlreadyInProgress' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'InternalError' : IDL.Text,
   });
