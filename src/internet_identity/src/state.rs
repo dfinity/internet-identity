@@ -363,7 +363,9 @@ pub fn get_tentative_device_registration_by_identity(
     tentative_device_registrations(|registrations| registrations.get(&identity_number).cloned())
 }
 
-pub fn get_identity_number_by_registration_id(id: &RegistrationIdInternal) -> Option<IdentityNumber> {
+pub fn get_identity_number_by_registration_id(
+    id: &RegistrationIdInternal,
+) -> Option<IdentityNumber> {
     lookup_tentative_device_registration(|lookup| lookup.get(id).copied()).and_then(
         |identity_number| {
             let TentativeDeviceRegistration { expiration, .. } =

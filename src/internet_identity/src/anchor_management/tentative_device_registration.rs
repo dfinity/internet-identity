@@ -228,7 +228,8 @@ fn get_verified_device(
             if should_remove {
                 if let Some(TentativeDeviceRegistration {
                     id: Some(reg_id), ..
-                }) = registrations.remove(&anchor_number) {
+                }) = registrations.remove(&anchor_number)
+                {
                     // Clean up the lookup table
                     lookup.remove(&reg_id);
                 }
