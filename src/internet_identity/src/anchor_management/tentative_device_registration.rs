@@ -59,23 +59,19 @@ pub fn enter_device_registration_mode_v2(
                 trap("too many anchors in device registration mode");
             }
 
-            match registrations.get(&identity_number) {
-                Some(TentativeDeviceRegistration { expiration, .. }) => *expiration, // already enabled, just return the existing expiration
-                None => {
+            let expiration = registrations.entry(identity_number)
+                .or_insert_with(|| {
                     let expiration = time() + REGISTRATION_MODE_DURATION;
-                    registrations.insert(
-                        identity_number,
-                        TentativeDeviceRegistration {
-                            expiration,
-                            state: DeviceRegistrationModeActive,
-                            id: Some(id.clone()),
-                        },
-                    );
-                    lookup.insert(id, identity_number);
-
-                    expiration
-                }
-            }
+                    lookup.insert(id.clone(), identity_number);
+                    TentativeDeviceRegistration {
+                        expiration,
+                        state: DeviceRegistrationModeActive,
+                        id: Some(id.clone()),
+                    }
+                })
+                .expiration;
+            
+            expiration
         })
     })
 }
@@ -86,11 +82,10 @@ pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
             prune_expired_tentative_device_registrations_v2(registrations, lookup);
             if let Some(TentativeDeviceRegistration {
                 id: Some(reg_id), ..
-            }) = registrations.get(&anchor_number)
+            }) = registrations.remove(&anchor_number)
             {
-                lookup.remove(reg_id);
+                lookup.remove(&reg_id);
             }
-            registrations.remove(&anchor_number);
         });
     });
 }
@@ -237,7 +232,7 @@ fn get_verified_device(
 /// on the old client we have verified the temporary key
 pub fn check_tentative_device(identity_number: IdentityNumber) -> bool {
     state::tentative_device_registrations(|registrations| {
-        registrations.get(&identity_number).is_some()
+        registrations.contains_key(&identity_number)
     })
 }
 
@@ -278,8 +273,8 @@ fn prune_expired_tentative_device_registrations_v2(
         if *expiration > now {
             true
         } else {
-            if id.is_some() {
-                lookup.remove(&id.clone().unwrap());
+            if let Some(id) = id {
+                lookup.remove(&id);
             }
             false
         }
@@ -301,7 +296,7 @@ impl From<AuthorizationError> for CheckTentativeDeviceError {
 pub struct RegistrationId(String);
 
 impl RegistrationId {
-    pub fn new(s: String) -> Result<Self, String> {
+    pub fn try_new(s: String) -> Result<Self, String> {
         if s.chars().count() == 5 {
             Ok(RegistrationId(s))
         } else {

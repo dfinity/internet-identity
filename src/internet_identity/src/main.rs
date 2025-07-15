@@ -874,7 +874,7 @@ mod v2_api {
             Some(reg_id) => {
                 let timeout = tentative_device_registration::enter_device_registration_mode_v2(
                     identity_number,
-                    RegistrationId::new(reg_id)
+                    RegistrationId::try_new(reg_id)
                         .map_err(AuthnMethodRegistrationModeEnterError::InvalidId)?,
                 );
                 Ok(RegistrationModeInfo {
@@ -955,7 +955,7 @@ mod v2_api {
         id: String,
     ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
         let res = get_identity_number_by_registration_id(
-            &RegistrationId::new(id).map_err(LookupByRegistrationIdError::InvalidId)?,
+            &RegistrationId::try_new(id).map_err(LookupByRegistrationIdError::InvalidId)?,
         );
         Ok(res)
     }
