@@ -244,11 +244,6 @@ pub enum CreateIdentityData {
 }
 
 #[derive(CandidType, Deserialize, Debug)]
-pub enum CheckTentativeDeviceError {
-    Unauthorized,
-}
-
-#[derive(CandidType, Deserialize, Debug)]
 pub enum LookupByRegistrationIdError {
     InvalidRegistrationId(String),
 }

@@ -285,17 +285,6 @@ fn prune_expired_tentative_device_registrations_v2(
     })
 }
 
-#[derive(CandidType)]
-pub enum CheckTentativeDeviceError {
-    Unauthorized,
-}
-
-impl From<AuthorizationError> for CheckTentativeDeviceError {
-    fn from(_err: AuthorizationError) -> Self {
-        CheckTentativeDeviceError::Unauthorized
-    }
-}
-
 #[derive(CandidType, Clone, Eq, PartialEq, Hash)]
 pub struct ValidatedRegistrationId(String);
 

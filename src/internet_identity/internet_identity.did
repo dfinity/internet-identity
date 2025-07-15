@@ -521,10 +521,6 @@ type AuthnMethodRegistrationModeEnterError = variant {
     InternalError : text;
 };
 
-type CheckTentativeDeviceError = variant {
-    Unauthorized;
-};
-
 type LookupByRegistrationIdError = variant {
     InvalidRegistrationId : text;
 };
