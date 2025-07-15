@@ -447,7 +447,7 @@ fn should_return_no_registrations_when_tentative_device_verified() -> Result<(),
 }
 
 #[test]
-fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
+fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
