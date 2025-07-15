@@ -210,14 +210,19 @@ class IdentityInfo {
     authnMethod: AuthnMethodData,
     newName: string,
   ): Promise<void> {
+    let renamed = false;
     const newMetadata: MetadataMapV2 = authnMethod.metadata.map(
       ([key, value]) => {
         if (key === "alias") {
+          renamed = true;
           return [key, { String: newName }];
         }
         return [key, value];
       },
     );
+    if (!renamed) {
+      newMetadata.push(["alias", { String: newName }]);
+    }
     const { actor, identityNumber } = get(authenticatedStore);
     await actor
       .authn_method_metadata_replace(
