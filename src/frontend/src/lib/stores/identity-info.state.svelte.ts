@@ -14,7 +14,7 @@ import {
   decodeJWTWithNameAndEmail,
   requestJWT,
 } from "$lib/utils/openID";
-import { throwCanisterError } from "$lib/utils/utils";
+import { CanisterError, throwCanisterError } from "$lib/utils/utils";
 import {
   lastUsedIdentitiesStore,
   lastUsedIdentityStore,
@@ -210,6 +210,9 @@ class IdentityInfo {
     authnMethod: AuthnMethodData,
     newName: string,
   ): Promise<void> {
+    if (newName === "") {
+      throw new CanisterError({ InvalidMetadata: "Name cannot be empty." });
+    }
     let renamed = false;
     const newMetadata: MetadataMapV2 = authnMethod.metadata.map(
       ([key, value]) => {

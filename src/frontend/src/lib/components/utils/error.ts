@@ -145,7 +145,7 @@ export const handleError = (error: unknown) => {
         break;
       case "InvalidMetadata":
         toaster.error({
-          title: "Invalid metadata",
+          title: `Invalid metadata. ${error.value(error.type)}`,
         });
         break;
       default: {
