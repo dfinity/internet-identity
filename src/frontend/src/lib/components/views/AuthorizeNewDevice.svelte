@@ -1,9 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import Input from "$lib/components/ui/Input.svelte";
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import CodeInput from "$lib/components/ui/CodeInput.svelte";
+  import { RotateCcwIcon } from "@lucide/svelte";
+
+  const CODE_LENGTH = 6;
 
   interface Props {
     confirm: (confirmationCode: string) => Promise<void>;
@@ -13,9 +16,9 @@
   const { confirm, restart }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let confirmationCode = $state("");
+  let confirmationCode = $state<string>("");
   let isConfirming = $state(false);
-  let isInvalidCode = $state(true);
+  let isInvalidCode = $state(false);
 
   const handleSubmit = async () => {
     isConfirming = true;
@@ -23,13 +26,15 @@
       await confirm(confirmationCode);
     } catch (error) {
       isInvalidCode = true;
+      confirmationCode = "";
+      inputRef?.focus();
     } finally {
       isConfirming = false;
     }
   };
 
   $effect(() => {
-    if (confirmationCode.length > 0) {
+    if (confirmationCode) {
       isInvalidCode = false;
     }
   });
@@ -54,19 +59,21 @@
     <br /><br />
     <b class="text-text-primary">Never</b> enter a code from another source.
   </p>
-  <Input
+  <CodeInput
+    bind:element={inputRef}
     bind:value={confirmationCode}
-    placeholder="XXXXXX"
-    size="md"
-    class="mb-8"
-    error={isInvalidCode ? "Invalid code, please try again" : undefined}
+    length={CODE_LENGTH}
+    class="mb-1"
   />
+  <div class="text-text-error-primary mb-3 h-5 text-sm">
+    {isInvalidCode ? "Invalid code. Please check and try again." : ""}
+  </div>
   <Button
     onclick={handleSubmit}
     variant="primary"
     size="xl"
     type="submit"
-    disabled={confirmationCode.length === 0 || isConfirming}
+    disabled={confirmationCode.length < CODE_LENGTH || isConfirming}
     class="mb-3"
   >
     {#if isConfirming}
@@ -82,7 +89,8 @@
     size="xl"
     disabled={isConfirming}
   >
-    Start over
+    <RotateCcwIcon size="1rem" />
+    <span>Start over</span>
   </Button>
 </form>
 

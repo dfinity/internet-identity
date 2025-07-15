@@ -68,7 +68,7 @@
         isCanisterError<AuthnMethodConfirmationError>(error) &&
         error.type === "WrongCode"
       ) {
-        // This error is handled by view
+        // Handle this error in child view instead
         throw error;
       }
       onError(error);
