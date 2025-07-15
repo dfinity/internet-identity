@@ -361,7 +361,7 @@ fn should_return_no_registration_when_no_tentative_device() -> Result<(), CallEr
 
     let identity_info =
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
-            .expect("check_tentative_device_verified failed");
+            .expect("identity_info failed");
 
     assert!(identity_info.authn_method_registration.is_none());
     Ok(())
@@ -396,7 +396,7 @@ fn should_return_registrations_when_tentative_device_not_verified() -> Result<()
 
     let identity_info =
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
-            .expect("check_tentative_device_verified failed");
+            .expect("identity_info failed");
 
     assert!(identity_info.authn_method_registration.is_some());
     Ok(())
@@ -441,7 +441,7 @@ fn should_return_registrations_when_tentative_device_verified() -> Result<(), Ca
 
     let identity_info =
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
-            .expect("check_tentative_device_verified failed");
+            .expect("identity_info failed");
 
     assert!(identity_info.authn_method_registration.is_some());
     Ok(())

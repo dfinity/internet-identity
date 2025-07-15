@@ -658,9 +658,7 @@ async fn random_salt() -> Salt {
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
     use crate::{
-        anchor_management::tentative_device_registration::{
-            check_tentative_device, CheckTentativeDeviceError, RegistrationId,
-        },
+        anchor_management::tentative_device_registration::RegistrationId,
         state::get_identity_number_by_registration_id,
     };
 
