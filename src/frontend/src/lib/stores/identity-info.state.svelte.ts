@@ -237,6 +237,10 @@ class IdentityInfo {
     const index = this.authnMethods.findIndex((value) =>
       authnMethodEqual(value, authnMethod),
     );
+    if (index < 0) {
+      throw new Error("Authentication method not found in authnMethods.");
+    }
+
     this.authnMethods[index] = {
       ...authnMethod,
       metadata: newMetadata,

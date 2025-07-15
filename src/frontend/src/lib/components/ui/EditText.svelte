@@ -37,8 +37,11 @@
 
     isEditing = false;
     isLoading = true;
-    await onSave(inputValue);
-    isLoading = false;
+    try {
+      await onSave(inputValue);
+    } finally {
+      isLoading = false;
+    }
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {

@@ -101,5 +101,7 @@ export const getPublicKey = (authnMethod: AuthnMethodData): Uint8Array => {
   if ("PubKey" in authnMethod.authn_method) {
     return new Uint8Array(authnMethod.authn_method.PubKey.pubkey);
   }
-  throw new Error("Unknown authn method");
+  throw new Error(
+    `Unknown authentication method: ${JSON.stringify(authnMethod.authn_method)}`,
+  );
 };
