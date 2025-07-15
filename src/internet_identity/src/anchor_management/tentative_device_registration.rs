@@ -50,7 +50,7 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
 /// If the device registration mode is already active it will just return the expiration timestamp again.
 pub fn enter_device_registration_mode_v2(
     identity_number: IdentityNumber,
-    id: RegistrationIdInternal,
+    id: ValidatedRegistrationId,
 ) -> Timestamp {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
@@ -269,7 +269,7 @@ fn prune_expired_tentative_device_registrations(
 /// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
 fn prune_expired_tentative_device_registrations_v2(
     registrations: &mut HashMap<AnchorNumber, TentativeDeviceRegistration>,
-    lookup: &mut HashMap<RegistrationIdInternal, AnchorNumber>,
+    lookup: &mut HashMap<ValidatedRegistrationId, AnchorNumber>,
 ) {
     let now = time();
 
@@ -297,15 +297,22 @@ impl From<AuthorizationError> for CheckTentativeDeviceError {
 }
 
 #[derive(CandidType, Clone, Eq, PartialEq, Hash)]
-pub struct RegistrationIdInternal(String);
+pub struct ValidatedRegistrationId(String);
 
-impl RegistrationIdInternal {
+impl ValidatedRegistrationId {
     pub fn try_new(s: String) -> Result<Self, String> {
-        if s.chars().count() == 5 {
-            Ok(RegistrationIdInternal(s))
-        } else {
-            Err("RegistrationId must be exactly 5 characters".to_string())
+        if s.chars().count() != 5 {
+            return Err("RegistrationId must be exactly 5 characters".to_string());
         }
+
+        if !s.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err(
+                "RegistrationId must only contain characters from base62 encoding (0-9, A-Z, a-z)"
+                    .to_string(),
+            );
+        }
+
+        Ok(ValidatedRegistrationId(s))
     }
 }
 
@@ -316,9 +323,9 @@ impl From<IdentityUpdateError> for AuthnMethodRegistrationModeEnterError {
                 AuthnMethodRegistrationModeEnterError::Unauthorized(principal)
             }
             IdentityUpdateError::StorageError(identity_nr, storage_err) => {
-                AuthnMethodRegistrationModeEnterError::InternalError(
-                    format!("Storage error for identity {identity_nr}: {storage_err}")
-                )
+                AuthnMethodRegistrationModeEnterError::InternalError(format!(
+                    "Storage error for identity {identity_nr}: {storage_err}"
+                ))
             }
         }
     }

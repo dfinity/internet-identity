@@ -679,6 +679,26 @@ fn should_reject_registration_id_too_long() -> Result<(), CallError> {
 }
 
 #[test]
+fn should_reject_registration_id_invalid_chars() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let invalid_id = "abcdç".to_string(); // Invalid chars
+
+    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+        &env,
+        canister_id,
+        Principal::anonymous(),
+        invalid_id,
+    )?;
+
+    assert!(matches!(
+        result,
+        Err(LookupByRegistrationIdError::InvalidRegistrationId(_))
+    ));
+    Ok(())
+}
+
+#[test]
 fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);

@@ -658,7 +658,7 @@ async fn random_salt() -> Salt {
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
     use crate::{
-        anchor_management::tentative_device_registration::RegistrationIdInternal,
+        anchor_management::tentative_device_registration::ValidatedRegistrationId,
         state::get_identity_number_by_registration_id,
     };
 
@@ -871,7 +871,7 @@ mod v2_api {
             Some(reg_id) => {
                 let timeout = tentative_device_registration::enter_device_registration_mode_v2(
                     identity_number,
-                    RegistrationIdInternal::try_new(reg_id)
+                    ValidatedRegistrationId::try_new(reg_id)
                         .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
                 );
                 Ok(RegistrationModeInfo {
@@ -944,7 +944,7 @@ mod v2_api {
         id: String,
     ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
         let res = get_identity_number_by_registration_id(
-            &RegistrationIdInternal::try_new(id)
+            &ValidatedRegistrationId::try_new(id)
                 .map_err(LookupByRegistrationIdError::InvalidRegistrationId)?,
         );
         Ok(res)
