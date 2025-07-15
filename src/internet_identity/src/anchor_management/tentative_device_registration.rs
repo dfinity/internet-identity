@@ -42,7 +42,7 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
                 );
                 expiration
             }
-        }   
+        }
     })
 }
 
@@ -56,13 +56,12 @@ pub fn enter_device_registration_mode_v2(
         state::lookup_tentative_device_registration_mut(|lookup| {
             prune_expired_tentative_device_registrations_v2(registrations, lookup);
             if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
-                return Err(AuthnMethodRegistrationModeEnterError::InternalError("too many anchors in device registration mode".to_string()));
+                return Err(AuthnMethodRegistrationModeEnterError::InternalError(
+                    "too many anchors in device registration mode".to_string(),
+                ));
             }
 
-            
-            let registration = registrations
-            .entry(identity_number)
-            .or_insert_with(|| {
+            let registration = registrations.entry(identity_number).or_insert_with(|| {
                 let expiration = time() + REGISTRATION_MODE_DURATION;
                 lookup.insert(id.clone(), identity_number);
                 TentativeDeviceRegistration {
@@ -71,9 +70,11 @@ pub fn enter_device_registration_mode_v2(
                     id: Some(id.clone()),
                 }
             });
-            
-            
-            if let TentativeDeviceRegistration { id: Some(reg_id), .. } = registration {
+
+            if let TentativeDeviceRegistration {
+                id: Some(reg_id), ..
+            } = registration
+            {
                 if reg_id != &id {
                     return Err(AuthnMethodRegistrationModeEnterError::AlreadyInProgress);
                 }

@@ -909,7 +909,7 @@ fn should_return_registration_with_same_id() -> Result<(), CallError> {
     let first_registration_id = "0fZr4".to_string();
 
     // First call with the first registration ID should succeed
-    let result_1 =api_v2::authn_method_registration_mode_enter(
+    let result_1 = api_v2::authn_method_registration_mode_enter(
         &env,
         canister_id,
         authn_method.principal(),
@@ -925,7 +925,8 @@ fn should_return_registration_with_same_id() -> Result<(), CallError> {
         authn_method.principal(),
         identity_number,
         Some(first_registration_id.clone()),
-    )?.expect("Second authn_method_registration_mode_enter failed");
+    )?
+    .expect("Second authn_method_registration_mode_enter failed");
 
     assert_eq!(result_1, result_2);
     Ok(())

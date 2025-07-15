@@ -874,9 +874,7 @@ mod v2_api {
                     ValidatedRegistrationId::try_new(reg_id)
                         .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
                 )?;
-                Ok(RegistrationModeInfo {
-                    expiration,
-                })
+                Ok(RegistrationModeInfo { expiration })
             }
             None => {
                 let timeout =
