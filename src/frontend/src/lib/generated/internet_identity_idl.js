@@ -147,7 +147,9 @@ export const idlFactory = ({ IDL }) => {
     'WrongCode' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
   });
   const RegistrationId = IDL.Text;
-  const LookupByRegistrationIdError = IDL.Variant({ 'InvalidId' : IDL.Text });
+  const LookupByRegistrationIdError = IDL.Variant({
+    'InvalidRegistrationId' : IDL.Text,
+  });
   const AuthnMethodMetadataReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
@@ -162,8 +164,9 @@ export const idlFactory = ({ IDL }) => {
     'InvalidMetadata' : IDL.Text,
   });
   const AuthnMethodRegistrationModeEnterError = IDL.Variant({
-    'InvalidId' : IDL.Text,
-    'AuthorizationFailure' : IDL.Text,
+    'InvalidRegistrationId' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'InternalError' : IDL.Text,
   });
   const AuthnMethodReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,

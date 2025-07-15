@@ -53,9 +53,7 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
 
     assert!(matches!(
         result.unwrap(),
-        Err(AuthnMethodRegistrationModeEnterError::AuthorizationFailure(
-            _
-        ))
+        Err(AuthnMethodRegistrationModeEnterError::Unauthorized(_))
     ))
 }
 
@@ -655,7 +653,7 @@ fn should_reject_registration_id_too_short() -> Result<(), CallError> {
 
     assert!(matches!(
         result,
-        Err(LookupByRegistrationIdError::InvalidId(_))
+        Err(LookupByRegistrationIdError::InvalidRegistrationId(_))
     ));
     Ok(())
 }
@@ -675,7 +673,7 @@ fn should_reject_registration_id_too_long() -> Result<(), CallError> {
 
     assert!(matches!(
         result,
-        Err(LookupByRegistrationIdError::InvalidId(_))
+        Err(LookupByRegistrationIdError::InvalidRegistrationId(_))
     ));
     Ok(())
 }

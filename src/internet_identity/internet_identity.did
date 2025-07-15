@@ -516,8 +516,9 @@ type AuthnMethodConfirmationError = variant {
 };
 
 type AuthnMethodRegistrationModeEnterError = variant { 
-    InvalidId : text;
-    AuthorizationFailure : text;
+    InvalidRegistrationId : text;
+    Unauthorized : principal;
+    InternalError : text;
 };
 
 type CheckTentativeDeviceError = variant {
@@ -525,7 +526,7 @@ type CheckTentativeDeviceError = variant {
 };
 
 type LookupByRegistrationIdError = variant {
-    InvalidId : text;
+    InvalidRegistrationId : text;
 };
 
 type IdentityAuthnInfo = record {

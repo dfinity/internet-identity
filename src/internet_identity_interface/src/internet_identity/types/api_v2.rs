@@ -139,8 +139,9 @@ pub enum AuthnMethodRegisterError {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodRegistrationModeEnterError {
-    AuthorizationFailure(String),
-    InvalidId(String),
+    Unauthorized(Principal),
+    InternalError(String),
+    InvalidRegistrationId(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -249,5 +250,5 @@ pub enum CheckTentativeDeviceError {
 
 #[derive(CandidType, Deserialize, Debug)]
 pub enum LookupByRegistrationIdError {
-    InvalidId(String),
+    InvalidRegistrationId(String),
 }

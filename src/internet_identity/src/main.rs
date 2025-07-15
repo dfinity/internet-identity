@@ -865,15 +865,13 @@ mod v2_api {
         identity_number: IdentityNumber,
         id: Option<RegistrationId>,
     ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
-        check_authz_and_record_activity(identity_number).map_err(|err| {
-            AuthnMethodRegistrationModeEnterError::AuthorizationFailure(err.to_string())
-        })?;
+        check_authz_and_record_activity(identity_number).map_err(AuthnMethodRegistrationModeEnterError::from)?;
         match id {
             Some(reg_id) => {
                 let timeout = tentative_device_registration::enter_device_registration_mode_v2(
                     identity_number,
                     RegistrationIdInternal::try_new(reg_id)
-                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidId)?,
+                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
                 );
                 Ok(RegistrationModeInfo {
                     expiration: timeout,
@@ -945,7 +943,7 @@ mod v2_api {
         id: String,
     ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
         let res = get_identity_number_by_registration_id(
-            &RegistrationIdInternal::try_new(id).map_err(LookupByRegistrationIdError::InvalidId)?,
+            &RegistrationIdInternal::try_new(id).map_err(LookupByRegistrationIdError::InvalidRegistrationId)?,
         );
         Ok(res)
     }

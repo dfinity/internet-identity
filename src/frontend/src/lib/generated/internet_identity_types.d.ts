@@ -76,8 +76,11 @@ export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
-export type AuthnMethodRegistrationModeEnterError = { 'InvalidId' : string } |
-  { 'AuthorizationFailure' : string };
+export type AuthnMethodRegistrationModeEnterError = {
+    'InvalidRegistrationId' : string
+  } |
+  { 'Unauthorized' : Principal } |
+  { 'InternalError' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
@@ -282,7 +285,7 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
-export type LookupByRegistrationIdError = { 'InvalidId' : string };
+export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
 export type MetadataMap = Array<
   [
     string,
