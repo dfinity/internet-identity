@@ -11,6 +11,7 @@
     inputClass?: ClassValue;
     size?: Size;
     error?: string;
+    errorBorder?: boolean;
   };
 
   const id = $props.id();
@@ -23,6 +24,7 @@
     value = $bindable(),
     size = "md",
     error,
+    errorBorder = nonNullish(error),
     ...restProps
   }: Props = $props();
 </script>
@@ -41,13 +43,9 @@
       {...restProps}
       class={[
         "text-md bg-bg-primary text-text-primary placeholder:text-text-placeholder flex-1 rounded-lg border border-none p-0 opacity-100 ring outline-none ring-inset not-dark:shadow-xs",
-        nonNullish(error)
-          ? "ring-border-error_subtle"
-          : "ring-border-secondary",
+        errorBorder ? "ring-border-error_subtle" : "ring-border-secondary",
         "focus:ring-2",
-        nonNullish(error)
-          ? "focus:ring-border-error"
-          : "focus:ring-border-brand",
+        errorBorder ? "focus:ring-border-error" : "focus:ring-border-brand",
         "disabled:!ring-border-disabled disabled:bg-bg-disabled_subtle disabled:text-text-disabled disabled:placeholder:text-text-disabled",
         {
           sm: "h-10 px-3",

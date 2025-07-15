@@ -1,17 +1,22 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
   import type { HTMLAttributes } from "svelte/elements";
+  import { nonNullish } from "@dfinity/utils";
 
   interface Props extends HTMLAttributes<HTMLDivElement> {
     element: HTMLInputElement | undefined;
     value: string;
     length: number;
+    hint?: string;
+    error?: string;
   }
 
   let {
     length,
     element = $bindable(),
     value = $bindable(),
+    hint,
+    error,
     class: className,
     ...props
   }: Props = $props();
@@ -61,30 +66,43 @@
   });
 </script>
 
-<div {...props} class={["flex gap-2", className]}>
-  {#each { length } as _, index}
-    <Input
-      bind:element={
-        () => inputRefs[index], (element) => (inputRefs[index] = element)
-      }
-      size="md"
-      class="w-0 flex-1"
-      inputClass="w-full text-center text-lg font-bold h-13"
-      inputmode="numeric"
-      autocomplete="off"
-      autocorrect="off"
-      spellcheck="false"
-      bind:value={
-        () => `${code[index] ?? ""}`,
-        (value) => {
-          if (/\d/.test(value.slice(-1))) {
-            code[index] = value.slice(-1);
-            inputRefs[index + 1]?.focus();
+<div {...props} class={["flex flex-col gap-1", className]}>
+  <div class="flex gap-2">
+    {#each { length } as _, index}
+      <Input
+        bind:element={
+          () => inputRefs[index], (element) => (inputRefs[index] = element)
+        }
+        size="md"
+        class="w-0 flex-1"
+        inputClass="w-full text-center text-lg font-bold h-13"
+        inputmode="numeric"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        bind:value={
+          () => `${code[index] ?? ""}`,
+          (value) => {
+            if (/\d/.test(value.slice(-1))) {
+              code[index] = value.slice(-1);
+              inputRefs[index + 1]?.focus();
+            }
           }
         }
-      }
-      onkeydown={(event) => handleKeyDown(event, index)}
-      onpaste={handlePaste}
-    />
-  {/each}
+        onkeydown={(event) => handleKeyDown(event, index)}
+        onpaste={handlePaste}
+        errorBorder={nonNullish(error)}
+      />
+    {/each}
+  </div>
+  {#if nonNullish(error) || nonNullish(hint)}
+    <div
+      class={[
+        "text-sm",
+        nonNullish(error) ? "text-text-error-primary" : "text-text-tertiary",
+      ]}
+    >
+      {error ?? hint}
+    </div>
+  {/if}
 </div>

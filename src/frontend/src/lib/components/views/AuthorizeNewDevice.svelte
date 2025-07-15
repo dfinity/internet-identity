@@ -63,11 +63,12 @@
     bind:element={inputRef}
     bind:value={confirmationCode}
     length={CODE_LENGTH}
-    class="mb-1"
+    class="mb-3"
+    error={isInvalidCode
+      ? "Invalid code. Please check and try again."
+      : undefined}
+    hint={"\u00a0"}
   />
-  <div class="text-text-error-primary mb-3 h-5 text-sm">
-    {isInvalidCode ? "Invalid code. Please check and try again." : ""}
-  </div>
   <Button
     onclick={handleSubmit}
     variant="primary"

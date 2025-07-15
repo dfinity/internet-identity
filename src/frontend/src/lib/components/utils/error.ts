@@ -2,6 +2,7 @@ import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
+  AuthnMethodConfirmationError,
   CheckCaptchaError,
   CreateAccountError,
   IdRegFinishError,
@@ -35,6 +36,7 @@ export const handleError = (error: unknown) => {
       | CreateAccountError
       | OpenIdCredentialAddError
       | OpenIdCredentialRemoveError
+      | AuthnMethodConfirmationError
     >(error)
   ) {
     switch (error.type) {
@@ -100,8 +102,15 @@ export const handleError = (error: unknown) => {
           title: "This account has already been unlinked",
         });
         break;
+      case "RegistrationModeOff":
+        toaster.error({
+          title: "Device registration closed",
+          description: "Too many attempts or time has expired.",
+        });
+        break;
       case "AlreadyInProgress":
       case "WrongSolution":
+      case "WrongCode":
         // Should be handled up the stack; reaching here means they weren't.
         toaster.error({
           title: "Unhandled error",
@@ -111,6 +120,7 @@ export const handleError = (error: unknown) => {
         break;
       case "NameTooLong":
       case "Unauthorized":
+      case "NoAuthnMethodToConfirm":
         // Shouldn't have happened; reaching here means they weren't avoided.
         toaster.error({
           title: "Unexpected error",
