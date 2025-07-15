@@ -359,13 +359,9 @@ fn should_return_no_registration_when_no_tentative_device() -> Result<(), CallEr
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let identity_info = api_v2::identity_info(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("check_tentative_device_verified failed");
 
     assert!(identity_info.authn_method_registration.is_none());
     Ok(())
@@ -398,13 +394,9 @@ fn should_return_registrations_when_tentative_device_not_verified() -> Result<()
     )?
     .expect("authn_method_register failed");
 
-    let identity_info = api_v2::identity_info(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("check_tentative_device_verified failed");
 
     assert!(identity_info.authn_method_registration.is_some());
     Ok(())
@@ -447,13 +439,9 @@ fn should_return_registrations_when_tentative_device_verified() -> Result<(), Ca
     )?
     .expect("authn_method_confirm failed");
 
-    let identity_info = api_v2::identity_info(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("check_tentative_device_verified failed");
 
     assert!(identity_info.authn_method_registration.is_some());
     Ok(())
@@ -495,13 +483,9 @@ fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
     )?
     .expect("authn_method_registration_mode_exit failed");
 
-    let identity_info = api_v2::identity_info(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("identity_info failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity_info failed");
 
     assert!(identity_info.authn_method_registration.is_none());
     Ok(())

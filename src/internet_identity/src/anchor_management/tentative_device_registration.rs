@@ -59,7 +59,8 @@ pub fn enter_device_registration_mode_v2(
                 trap("too many anchors in device registration mode");
             }
 
-            let expiration = registrations.entry(identity_number)
+            let expiration = registrations
+                .entry(identity_number)
                 .or_insert_with(|| {
                     let expiration = time() + REGISTRATION_MODE_DURATION;
                     lookup.insert(id.clone(), identity_number);
@@ -70,7 +71,7 @@ pub fn enter_device_registration_mode_v2(
                     }
                 })
                 .expiration;
-            
+
             expiration
         })
     })
