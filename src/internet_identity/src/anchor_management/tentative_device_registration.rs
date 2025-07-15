@@ -50,7 +50,7 @@ pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp 
 /// If the device registration mode is already active it will just return the expiration timestamp again.
 pub fn enter_device_registration_mode_v2(
     identity_number: IdentityNumber,
-    id: RegistrationId,
+    id: RegistrationIdInternal,
 ) -> Timestamp {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
@@ -268,7 +268,7 @@ fn prune_expired_tentative_device_registrations(
 /// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
 fn prune_expired_tentative_device_registrations_v2(
     registrations: &mut HashMap<AnchorNumber, TentativeDeviceRegistration>,
-    lookup: &mut HashMap<RegistrationId, AnchorNumber>,
+    lookup: &mut HashMap<RegistrationIdInternal, AnchorNumber>,
 ) {
     let now = time();
 
@@ -296,12 +296,12 @@ impl From<AuthorizationError> for CheckTentativeDeviceError {
 }
 
 #[derive(CandidType, Clone, Eq, PartialEq, Hash)]
-pub struct RegistrationId(String);
+pub struct RegistrationIdInternal(String);
 
-impl RegistrationId {
+impl RegistrationIdInternal {
     pub fn try_new(s: String) -> Result<Self, String> {
         if s.chars().count() == 5 {
-            Ok(RegistrationId(s))
+            Ok(RegistrationIdInternal(s))
         } else {
             Err("RegistrationId must be exactly 5 characters".to_string())
         }
