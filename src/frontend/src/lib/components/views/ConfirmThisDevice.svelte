@@ -41,7 +41,7 @@
   <Button
     onclick={handleCopyCode}
     variant="secondary"
-    size="lg"
+    size="xl"
     disabled={isNullish(confirmationCode)}
   >
     {#if nonNullish(confirmationCode)}
