@@ -1,5 +1,5 @@
 use crate::anchor_management::add_device;
-use crate::authz_utils::{AuthorizationError, IdentityUpdateError};
+use crate::authz_utils::IdentityUpdateError;
 use crate::state::RegistrationState::{DeviceRegistrationModeActive, DeviceTentativelyAdded};
 use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::Anchor;
