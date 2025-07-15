@@ -316,10 +316,9 @@ impl From<IdentityUpdateError> for AuthnMethodRegistrationModeEnterError {
                 AuthnMethodRegistrationModeEnterError::Unauthorized(principal)
             }
             IdentityUpdateError::StorageError(identity_nr, storage_err) => {
-                AuthnMethodRegistrationModeEnterError::InternalError(format!(
-                    "Storage error for identity {}: {}",
-                    identity_nr, storage_err
-                ))
+                AuthnMethodRegistrationModeEnterError::InternalError(
+                    format!("Storage error for identity {identity_nr}: {storage_err}")
+                )
             }
         }
     }
