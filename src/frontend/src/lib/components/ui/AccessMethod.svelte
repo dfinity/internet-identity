@@ -9,7 +9,7 @@
   import PlaceHolder from "./PlaceHolder.svelte";
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
-  import EditName from "./EditName.svelte";
+  import EditName from "./EditText.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { handleError } from "$lib/components/utils/error";
 
@@ -88,7 +88,7 @@
     >
       <div class="flex min-w-32 items-center pr-3">
         <EditName
-          name={getAuthnMethodAlias(accessMethod)}
+          text={getAuthnMethodAlias(accessMethod) ?? ""}
           onSave={renamePasskeyFactory(accessMethod)}
         />
         {#if isCurrent}

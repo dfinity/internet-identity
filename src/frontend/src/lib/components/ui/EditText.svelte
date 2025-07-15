@@ -5,20 +5,20 @@
   import PlaceHolder from "./PlaceHolder.svelte";
 
   type Props = {
-    name: string;
+    text: string;
     // onSave should handle the error.
-    onSave: (name: string) => Promise<void>;
+    onSave: (text: string) => Promise<void>;
   };
 
-  let { name, onSave } = $props();
+  let { text, onSave }: Props = $props();
 
   let isEditing = $state(false);
   let isLoading = $state(false);
-  let inputValue = $state(name);
+  let inputValue = $state(text);
   let inputElement = $state<HTMLInputElement>();
 
   const startEditing = () => {
-    inputValue = name;
+    inputValue = text;
     isEditing = true;
 
     // Focus the input after the DOM updates
@@ -30,7 +30,7 @@
   };
 
   const handleSave = async () => {
-    if (!isEditing || inputValue === name) {
+    if (!isEditing || inputValue === text) {
       isEditing = false;
       return;
     }
@@ -45,7 +45,7 @@
     if (event.key === "Enter") {
       handleSave();
     } else if (event.key === "Escape") {
-      inputValue = name;
+      inputValue = text;
       isEditing = false;
     }
   };
@@ -65,7 +65,7 @@
   {:else if isLoading}
     <PlaceHolder class="w-30" />
   {:else}
-    <span class="name-display">{name}</span>
+    <span class="name-display">{text}</span>
     <Button
       variant="tertiary"
       iconOnly
