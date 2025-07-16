@@ -38,7 +38,7 @@
   >
     <Button onclick={handleCopyLink} variant="secondary" size="xl" class="mt-6">
       <span>
-        {url.host + url.pathname + url.search}
+        {url.host + url.pathname + url.hash}
       </span>
       <CopyIcon size="1.25rem" />
     </Button>
