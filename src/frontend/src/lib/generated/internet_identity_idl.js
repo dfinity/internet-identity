@@ -146,10 +146,6 @@ export const idlFactory = ({ IDL }) => {
     'NoAuthnMethodToConfirm' : IDL.Null,
     'WrongCode' : IDL.Record({ 'retries_left' : IDL.Nat8 }),
   });
-  const RegistrationId = IDL.Text;
-  const LookupByRegistrationIdError = IDL.Variant({
-    'InvalidRegistrationId' : IDL.Text,
-  });
   const AuthnMethodMetadataReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
@@ -163,6 +159,7 @@ export const idlFactory = ({ IDL }) => {
     'RegistrationAlreadyInProgress' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
+  const RegistrationId = IDL.Text;
   const AuthnMethodRegistrationModeEnterError = IDL.Variant({
     'InvalidRegistrationId' : IDL.Text,
     'AlreadyInProgress' : IDL.Null,
@@ -387,6 +384,9 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const LookupByRegistrationIdError = IDL.Variant({
+    'InvalidRegistrationId' : IDL.Text,
+  });
   const DeviceKeyWithAnchor = IDL.Record({
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
@@ -495,16 +495,6 @@ export const idlFactory = ({ IDL }) => {
           }),
         ],
         [],
-      ),
-    'authn_method_lookup_by_registration_mode_id' : IDL.Func(
-        [RegistrationId],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Opt(IdentityNumber),
-            'Err' : LookupByRegistrationIdError,
-          }),
-        ],
-        ['query'],
       ),
     'authn_method_metadata_replace' : IDL.Func(
         [IdentityNumber, PublicKey, MetadataMapV2],
@@ -673,6 +663,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'lookup_by_registration_mode_id' : IDL.Func(
+        [RegistrationId],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Opt(IdentityNumber),
+            'Err' : LookupByRegistrationIdError,
+          }),
+        ],
+        ['query'],
+      ),
     'lookup_device_key' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
         [IDL.Opt(DeviceKeyWithAnchor)],

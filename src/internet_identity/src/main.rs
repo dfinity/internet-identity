@@ -938,7 +938,7 @@ mod v2_api {
     }
 
     #[query]
-    fn authn_method_lookup_by_registration_mode_id(
+    fn lookup_by_registration_mode_id(
         id: String,
     ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
         let res = get_identity_number_by_registration_id(

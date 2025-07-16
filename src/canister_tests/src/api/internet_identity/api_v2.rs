@@ -299,7 +299,7 @@ pub fn authn_method_confirm(
     .map(|(x,)| x)
 }
 
-pub fn authn_method_lookup_by_registration_mode_id(
+pub fn lookup_by_registration_mode_id(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
@@ -310,7 +310,7 @@ pub fn authn_method_lookup_by_registration_mode_id(
         canister_id,
         RawEffectivePrincipal::None,
         sender,
-        "authn_method_lookup_by_registration_mode_id",
+        "lookup_by_registration_mode_id",
         (id,),
     )
     .map(|(x,)| x)

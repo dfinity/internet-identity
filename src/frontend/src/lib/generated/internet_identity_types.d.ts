@@ -421,11 +421,6 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodConfirmationError }
   >,
-  'authn_method_lookup_by_registration_mode_id' : ActorMethod<
-    [RegistrationId],
-    { 'Ok' : [] | [IdentityNumber] } |
-      { 'Err' : LookupByRegistrationIdError }
-  >,
   'authn_method_metadata_replace' : ActorMethod<
     [IdentityNumber, PublicKey, MetadataMapV2],
     { 'Ok' : null } |
@@ -533,6 +528,11 @@ export interface _SERVICE {
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
+  'lookup_by_registration_mode_id' : ActorMethod<
+    [RegistrationId],
+    { 'Ok' : [] | [IdentityNumber] } |
+      { 'Err' : LookupByRegistrationIdError }
+  >,
   'lookup_device_key' : ActorMethod<
     [Uint8Array | number[]],
     [] | [DeviceKeyWithAnchor]

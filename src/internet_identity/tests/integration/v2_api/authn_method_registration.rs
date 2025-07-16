@@ -506,7 +506,7 @@ fn should_return_identity_number_for_existing_registration_id() -> Result<(), Ca
     )?
     .expect("authn_method_registration_mode_enter failed");
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -545,7 +545,7 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
     )?
     .expect("authn_method_registration_mode_exit failed");
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -592,7 +592,7 @@ fn should_return_none_after_tentative_device_confirmation() -> Result<(), CallEr
     )?
     .expect("authn_method_confirm failed");
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -626,7 +626,7 @@ fn should_return_none_after_registration_mode_expiration() -> Result<(), CallErr
     // Advance time past expiration
     env.advance_time(REGISTRATION_MODE_EXPIRATION + std::time::Duration::from_secs(1));
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -644,7 +644,7 @@ fn should_reject_registration_id_too_short() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abc1".to_string(); // Too short
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -664,7 +664,7 @@ fn should_reject_registration_id_too_long() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdef".to_string(); // Too long
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -684,7 +684,7 @@ fn should_reject_registration_id_invalid_chars() -> Result<(), CallError> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdç".to_string(); // Invalid chars
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -732,7 +732,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
     .expect("authn_method_registration_mode_enter failed");
 
     // Verify both lookups work correctly
-    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result1 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -740,7 +740,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
     )?
     .expect("lookup_by_registration_mode_id failed");
 
-    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -796,7 +796,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     .expect("authn_method_registration_mode_enter failed");
 
     // Verify both lookups work correctly
-    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result1 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -804,7 +804,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     )?
     .expect("lookup_by_registration_mode_id failed");
 
-    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -825,7 +825,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     .expect("authn_method_registration_mode_enter failed");
 
     // Verify both lookups work correctly
-    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result1 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -833,7 +833,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     )?
     .expect("lookup_by_registration_mode_id failed");
 
-    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
@@ -853,7 +853,7 @@ fn should_return_none_for_nonexistent_registration_id() -> Result<(), CallError>
     let canister_id = install_ii_with_archive(&env, None, None);
     let nonexistent_id = "abc12".to_string();
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
