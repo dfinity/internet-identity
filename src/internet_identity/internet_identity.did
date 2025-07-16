@@ -493,6 +493,8 @@ type AuthnMethodConfirmationCode = record {
     expiration : Timestamp;
 };
 
+type RegistrationId = text;
+
 type AuthnMethodRegisterError = variant {
     // Authentication method registration mode is off, either due to timeout or because it was never enabled.
     RegistrationModeOff;
@@ -511,6 +513,17 @@ type AuthnMethodConfirmationError = variant {
     RegistrationModeOff;
     // There is no registered authentication method to be confirmed.
     NoAuthnMethodToConfirm;
+};
+
+type AuthnMethodRegistrationModeEnterError = variant { 
+    InvalidRegistrationId : text;
+    Unauthorized : principal;
+    AlreadyInProgress;
+    InternalError : text;
+};
+
+type LookupByRegistrationIdError = variant {
+    InvalidRegistrationId : text;
 };
 
 type IdentityAuthnInfo = record {
@@ -839,7 +852,7 @@ service : (opt InternetIdentityInit) -> {
     // confirmed before it can be used for authentication on this identity.
     // The registration mode is automatically exited after the returned expiration timestamp.
     // Requires authentication.
-    authn_method_registration_mode_enter : (IdentityNumber) -> (variant { Ok : record { expiration : Timestamp }; Err });
+    authn_method_registration_mode_enter : (IdentityNumber, opt RegistrationId) -> (variant { Ok : record { expiration : Timestamp }; Err : AuthnMethodRegistrationModeEnterError });
 
     // Exits the authentication method registration mode for the identity.
     // Requires authentication.
@@ -854,6 +867,8 @@ service : (opt InternetIdentityInit) -> {
     // subsequently be used for authentication for that identity.
     // Requires authentication.
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
+
+    lookup_by_registration_mode_id : (RegistrationId) -> (opt IdentityNumber) query;
 
     // Authentication protocol
     // =======================

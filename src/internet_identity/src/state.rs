@@ -1,6 +1,8 @@
+use crate::anchor_management::tentative_device_registration::ValidatedRegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
+use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
@@ -40,12 +42,40 @@ thread_local! {
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
 }
 
+#[derive(Clone)]
 pub struct TentativeDeviceRegistration {
     pub expiration: Timestamp,
     pub state: RegistrationState,
+    pub id: Option<ValidatedRegistrationId>,
+}
+
+impl TentativeDeviceRegistration {
+    pub fn to_info_if_still_valid(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
+        match self {
+            TentativeDeviceRegistration {
+                expiration,
+                state:
+                    DeviceTentativelyAdded {
+                        tentative_device, ..
+                    },
+                ..
+            } if *expiration > now => Some(DeviceRegistrationInfo {
+                expiration: *expiration,
+                tentative_device: Some(tentative_device.clone()),
+            }),
+            TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
+                Some(DeviceRegistrationInfo {
+                    expiration: *expiration,
+                    tentative_device: None,
+                })
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Registration state of new devices added using the two step device add flow
+#[derive(Clone)]
 pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
@@ -190,6 +220,8 @@ struct State {
     // tentative device registrations, not persisted across updates
     // if an anchor number is present in this map then registration mode is active until expiration
     tentative_device_registrations: RefCell<HashMap<AnchorNumber, TentativeDeviceRegistration>>,
+    // lookup table so we can easily return a user's active registrations in identity_info
+    lookup_tentative_device_registration: RefCell<HashMap<ValidatedRegistrationId, AnchorNumber>>,
     // additional usage metrics, NOT persisted across updates (but probably should be in the future)
     usage_metrics: RefCell<UsageMetrics>,
     // State that is temporarily persisted in stable memory during upgrades using
@@ -311,6 +343,40 @@ pub fn tentative_device_registrations_mut<R>(
     f: impl FnOnce(&mut HashMap<AnchorNumber, TentativeDeviceRegistration>) -> R,
 ) -> R {
     STATE.with(|s| f(&mut s.tentative_device_registrations.borrow_mut()))
+}
+
+pub fn lookup_tentative_device_registration<R>(
+    f: impl FnOnce(&HashMap<ValidatedRegistrationId, AnchorNumber>) -> R,
+) -> R {
+    STATE.with(|s| f(&s.lookup_tentative_device_registration.borrow()))
+}
+
+pub fn lookup_tentative_device_registration_mut<R>(
+    f: impl FnOnce(&mut HashMap<ValidatedRegistrationId, AnchorNumber>) -> R,
+) -> R {
+    STATE.with(|s| f(&mut s.lookup_tentative_device_registration.borrow_mut()))
+}
+
+pub fn get_tentative_device_registration_by_identity(
+    identity_number: IdentityNumber,
+) -> Option<TentativeDeviceRegistration> {
+    tentative_device_registrations(|registrations| registrations.get(&identity_number).cloned())
+}
+
+pub fn get_identity_number_by_registration_id(
+    id: &ValidatedRegistrationId,
+) -> Option<IdentityNumber> {
+    lookup_tentative_device_registration(|lookup| lookup.get(id).copied()).and_then(
+        |identity_number| {
+            let TentativeDeviceRegistration { expiration, .. } =
+                get_tentative_device_registration_by_identity(identity_number)?;
+            if expiration > time() {
+                Some(identity_number)
+            } else {
+                None
+            }
+        },
+    )
 }
 
 pub fn assets_mut<R>(f: impl FnOnce(&mut CertifiedAssets) -> R) -> R {

@@ -235,14 +235,15 @@ pub fn authn_method_registration_mode_enter(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<RegistrationModeInfo, ()>, CallError> {
+    id: Option<String>,
+) -> Result<Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError>, CallError> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "authn_method_registration_mode_enter",
-        (identity_number,),
+        (identity_number, id),
     )
     .map(|(x,)| x)
 }
@@ -294,6 +295,23 @@ pub fn authn_method_confirm(
         sender,
         "authn_method_confirm",
         (identity_number, confirmation_code),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn lookup_by_registration_mode_id(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    id: String,
+) -> Result<Option<IdentityNumber>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "lookup_by_registration_mode_id",
+        (id,),
     )
     .map(|(x,)| x)
 }

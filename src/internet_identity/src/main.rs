@@ -657,6 +657,11 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
+    use crate::{
+        anchor_management::tentative_device_registration::ValidatedRegistrationId,
+        state::get_identity_number_by_registration_id,
+    };
+
     use super::*;
 
     #[query]
@@ -858,11 +863,27 @@ mod v2_api {
     #[update]
     fn authn_method_registration_mode_enter(
         identity_number: IdentityNumber,
-    ) -> Result<RegistrationModeInfo, ()> {
-        let timeout = enter_device_registration_mode(identity_number);
-        Ok(RegistrationModeInfo {
-            expiration: timeout,
-        })
+        id: Option<RegistrationId>,
+    ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
+        check_authz_and_record_activity(identity_number)
+            .map_err(AuthnMethodRegistrationModeEnterError::from)?;
+        match id {
+            Some(reg_id) => {
+                let expiration = tentative_device_registration::enter_device_registration_mode_v2(
+                    identity_number,
+                    ValidatedRegistrationId::try_new(reg_id)
+                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
+                )?;
+                Ok(RegistrationModeInfo { expiration })
+            }
+            None => {
+                let timeout =
+                    tentative_device_registration::enter_device_registration_mode(identity_number);
+                Ok(RegistrationModeInfo {
+                    expiration: timeout,
+                })
+            }
+        }
     }
 
     #[update]
@@ -914,6 +935,15 @@ mod v2_api {
                 Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
             }
         }
+    }
+
+    #[query]
+    fn lookup_by_registration_mode_id(id: String) -> Option<IdentityNumber> {
+        let validated_id = match ValidatedRegistrationId::try_new(id) {
+            Ok(id) => id,
+            Err(_) => return None,
+        };
+        get_identity_number_by_registration_id(&validated_id)
     }
 }
 

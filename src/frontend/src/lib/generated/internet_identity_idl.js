@@ -159,6 +159,13 @@ export const idlFactory = ({ IDL }) => {
     'RegistrationAlreadyInProgress' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
+  const RegistrationId = IDL.Text;
+  const AuthnMethodRegistrationModeEnterError = IDL.Variant({
+    'InvalidRegistrationId' : IDL.Text,
+    'AlreadyInProgress' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+    'InternalError' : IDL.Text,
+  });
   const AuthnMethodReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
@@ -507,11 +514,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'authn_method_registration_mode_enter' : IDL.Func(
-        [IdentityNumber],
+        [IdentityNumber, IDL.Opt(RegistrationId)],
         [
           IDL.Variant({
             'Ok' : IDL.Record({ 'expiration' : Timestamp }),
-            'Err' : IDL.Null,
+            'Err' : AuthnMethodRegistrationModeEnterError,
           }),
         ],
         [],
@@ -653,6 +660,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'init_salt' : IDL.Func([], [], []),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
+    'lookup_by_registration_mode_id' : IDL.Func(
+        [RegistrationId],
+        [IDL.Opt(IdentityNumber)],
+        ['query'],
+      ),
     'lookup_device_key' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],
         [IDL.Opt(DeviceKeyWithAnchor)],

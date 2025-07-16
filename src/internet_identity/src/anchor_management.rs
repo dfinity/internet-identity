@@ -1,7 +1,5 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::state::RegistrationState::DeviceTentativelyAdded;
-use crate::state::TentativeDeviceRegistration;
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use crate::{state, stats::activity_stats};
 use ic_cdk::api::time;
@@ -10,8 +8,7 @@ use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operat
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
-    DeviceRegistrationInfo, DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace,
-    MetadataEntry,
+    DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace, MetadataEntry,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -38,42 +35,16 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let name = anchor.name();
     let now = time();
 
-    state::tentative_device_registrations(|tentative_device_registrations| {
-        match tentative_device_registrations.get(&anchor_number) {
-            Some(TentativeDeviceRegistration {
-                expiration,
-                state:
-                    DeviceTentativelyAdded {
-                        tentative_device, ..
-                    },
-            }) if *expiration > now => IdentityAnchorInfo {
-                devices,
-                device_registration: Some(DeviceRegistrationInfo {
-                    expiration: *expiration,
-                    tentative_device: Some(tentative_device.clone()),
-                }),
-                openid_credentials,
-                name,
-            },
-            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration > now => {
-                IdentityAnchorInfo {
-                    devices,
-                    device_registration: Some(DeviceRegistrationInfo {
-                        expiration: *expiration,
-                        tentative_device: None,
-                    }),
-                    openid_credentials,
-                    name,
-                }
-            }
-            None | Some(_) => IdentityAnchorInfo {
-                devices,
-                device_registration: None,
-                openid_credentials,
-                name,
-            },
-        }
-    })
+    let tentative_device_registration =
+        state::get_tentative_device_registration_by_identity(anchor_number);
+
+    IdentityAnchorInfo {
+        devices,
+        device_registration: tentative_device_registration
+            .and_then(|reg| reg.to_info_if_still_valid(now)),
+        openid_credentials,
+        name,
+    }
 }
 
 /// Handles all the bookkeeping required on anchor activity:

@@ -76,6 +76,12 @@ export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
   'authn_method' : [] | [AuthnMethodData],
 }
+export type AuthnMethodRegistrationModeEnterError = {
+    'InvalidRegistrationId' : string
+  } |
+  { 'AlreadyInProgress' : null } |
+  { 'Unauthorized' : Principal } |
+  { 'InternalError' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
@@ -279,6 +285,7 @@ export type KeyType = { 'platform' : null } |
   { 'cross_platform' : null } |
   { 'unknown' : null } |
   { 'browser_storage_key' : null };
+export type LookupByRegistrationIdError = { 'InvalidRegistrationId' : string };
 export type MetadataMap = Array<
   [
     string,
@@ -355,6 +362,7 @@ export type RegistrationFlowNextStep = {
     'CheckCaptcha' : { 'captcha_png_base64' : string }
   } |
   { 'Finish' : null };
+export type RegistrationId = string;
 export type Salt = Uint8Array | number[];
 export type SessionKey = PublicKey;
 export interface SignedDelegation {
@@ -424,9 +432,9 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegisterError }
   >,
   'authn_method_registration_mode_enter' : ActorMethod<
-    [IdentityNumber],
+    [IdentityNumber, [] | [RegistrationId]],
     { 'Ok' : { 'expiration' : Timestamp } } |
-      { 'Err' : null }
+      { 'Err' : AuthnMethodRegistrationModeEnterError }
   >,
   'authn_method_registration_mode_exit' : ActorMethod<
     [IdentityNumber],
@@ -520,6 +528,10 @@ export interface _SERVICE {
   >,
   'init_salt' : ActorMethod<[], undefined>,
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
+  'lookup_by_registration_mode_id' : ActorMethod<
+    [RegistrationId],
+    [] | [IdentityNumber]
+  >,
   'lookup_device_key' : ActorMethod<
     [Uint8Array | number[]],
     [] | [DeviceKeyWithAnchor]
