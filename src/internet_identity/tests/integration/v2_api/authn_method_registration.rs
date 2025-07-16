@@ -49,10 +49,10 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
         Principal::anonymous(),
         identity_number,
         Some(registration_mode_id),
-    );
+    ).expect("authn_method_registration_mode_enter failed");
 
     assert!(matches!(
-        result.unwrap(),
+        result,
         Err(AuthnMethodRegistrationModeEnterError::Unauthorized(_))
     ))
 }
