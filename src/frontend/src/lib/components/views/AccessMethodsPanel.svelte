@@ -17,12 +17,12 @@
   import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
-  import AddAccessMethodWizard from "$lib/components/wizards/AddAccessMethodWizard.svelte";
   import {
     getLastUsedAccessMethod,
     isWebAuthnMetaData,
   } from "$lib/utils/accessMethods";
   import { authnMethodEqual } from "$lib/utils/webAuthn";
+  import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
 
   const MAX_PASSKEYS = 8;
 

@@ -8,11 +8,11 @@
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import AuthorizeNewDevice from "$lib/components/views/AuthorizeNewDevice.svelte";
-  import ContinueOnAnotherDevice from "$lib/components/views/ContinueOnAnotherDevice.svelte";
-  import ContinueOnNewDevice from "$lib/components/views/ContinueOnNewDevice.svelte";
-  import AddAccessMethod from "$lib/components/views/AddAccessMethod.svelte";
-  import AddPasskey from "$lib/components/views/AddPasskey.svelte";
+  import AuthorizeNewDevice from "$lib/components/wizards/addAccessMethod/views/AuthorizeNewDevice.svelte";
+  import ContinueOnAnotherDevice from "$lib/components/wizards/addAccessMethod/views/ContinueOnAnotherDevice.svelte";
+  import ContinueOnNewDevice from "$lib/components/wizards/addAccessMethod/views/ContinueOnNewDevice.svelte";
+  import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
+  import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
   import { isCanisterError } from "$lib/utils/utils";
 
   interface Props {
