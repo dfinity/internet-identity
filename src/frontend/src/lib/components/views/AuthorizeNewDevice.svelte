@@ -45,7 +45,7 @@
 </script>
 
 <form class="flex flex-col items-stretch">
-  <div class={["illustration self-center"]}>
+  <div class={["illustration self-center max-sm:hidden"]}>
     <ConfirmDeviceIllustration class="text-text-primary mt-4 mb-8 h-32" />
   </div>
   <h1 class="text-text-primary mb-3 text-2xl font-medium">
