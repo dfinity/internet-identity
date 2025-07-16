@@ -1,32 +1,51 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import Input from "$lib/components/ui/Input.svelte";
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import CodeInput from "$lib/components/ui/CodeInput.svelte";
+  import { RotateCcwIcon } from "@lucide/svelte";
+
+  const CODE_LENGTH = 6;
 
   interface Props {
-    confirm: (confirmationCode: string) => void;
+    confirm: (confirmationCode: string) => Promise<void>;
     restart: () => void;
   }
 
   const { confirm, restart }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let confirmationCode = $state("");
-  let loading = $state(false);
+  let confirmationCode = $state<string>("");
+  let isConfirming = $state(false);
+  let isInvalidCode = $state(false);
 
-  const handleSubmit = () => {
-    loading = true;
-    confirm(confirmationCode);
+  const handleSubmit = async () => {
+    isConfirming = true;
+    try {
+      await confirm(confirmationCode);
+    } catch (error) {
+      isInvalidCode = true;
+      confirmationCode = "";
+    } finally {
+      isConfirming = false;
+    }
   };
 
-  onMount(() => {
-    inputRef?.focus();
+  $effect(() => {
+    if (confirmationCode) {
+      isInvalidCode = false;
+    }
+  });
+
+  $effect(() => {
+    if (!isConfirming) {
+      inputRef?.focus();
+    }
   });
 </script>
 
 <form class="flex flex-col items-stretch">
-  <div class={["illustration self-center"]}>
+  <div class={["illustration self-center max-sm:hidden"]}>
     <ConfirmDeviceIllustration class="text-text-primary mt-4 mb-8 h-32" />
   </div>
   <h1 class="text-text-primary mb-3 text-2xl font-medium">
@@ -40,24 +59,40 @@
     <br /><br />
     <b class="text-text-primary">Never</b> enter a code from another source.
   </p>
-  <Input
+  <CodeInput
+    bind:element={inputRef}
     bind:value={confirmationCode}
-    placeholder="XXXXXX"
-    size="md"
-    class="mb-8"
+    length={CODE_LENGTH}
+    class="mb-3"
+    error={isInvalidCode
+      ? "Invalid code. Please check and try again."
+      : undefined}
+    hint={"\u00a0"}
+    disabled={isConfirming}
   />
   <Button
     onclick={handleSubmit}
     variant="primary"
     size="xl"
     type="submit"
-    disabled={confirmationCode.length === 0 || loading}
+    disabled={confirmationCode.length < CODE_LENGTH || isConfirming}
     class="mb-3"
   >
-    Confirm sign-in
+    {#if isConfirming}
+      <ProgressRing />
+      <span>Confirming...</span>
+    {:else}
+      <span>Confirm sign-in</span>
+    {/if}
   </Button>
-  <Button onclick={restart} variant="secondary" size="xl" disabled={loading}>
-    Start over
+  <Button
+    onclick={restart}
+    variant="secondary"
+    size="xl"
+    disabled={isConfirming}
+  >
+    <RotateCcwIcon size="1rem" />
+    <span>Start over</span>
   </Button>
 </form>
 

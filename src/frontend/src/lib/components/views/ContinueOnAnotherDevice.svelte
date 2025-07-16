@@ -36,7 +36,7 @@
     arrow={false}
     manual
   >
-    <Button onclick={handleCopyLink} variant="secondary" size="lg" class="mt-6">
+    <Button onclick={handleCopyLink} variant="secondary" size="xl" class="mt-6">
       <span>
         {url.host + url.pathname + url.search}
       </span>

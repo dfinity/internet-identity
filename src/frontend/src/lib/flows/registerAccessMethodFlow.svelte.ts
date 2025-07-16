@@ -9,32 +9,29 @@ import {
   authenticatedStore,
   authenticationStore,
 } from "$lib/stores/authentication.store";
-import { AuthnMethodRegisterError } from "$lib/generated/internet_identity_types";
 import { features } from "$lib/legacy/features";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import { AuthnMethodRegisterError } from "$lib/generated/internet_identity_types";
 
 const POLL_INTERVAL = 3000;
 
 export class RegisterAccessMethodFlow {
   readonly #identityNumber: bigint;
 
-  view = $state<
-    "confirmDevice" | "confirmSignIn" | "linkExpired" | "unableToComplete"
-  >("confirmDevice");
+  view = $state<"confirmDevice" | "confirmSignIn">("confirmDevice");
   confirmationCode = $state<string>();
-  isConfirmationWindowPassed = $state(false);
+  isUnableToComplete = $state(false);
   identityName = $state<string>();
 
   constructor(identityNumber: bigint) {
     this.#identityNumber = identityNumber;
-    void this.init();
   }
 
-  init = async (): Promise<void> => {
+  registerTempKey = async (): Promise<void> => {
     const session = get(sessionStore);
     const credentialId = crypto.getRandomValues(new Uint8Array(32));
     const authnMethodData = passkeyAuthnMethodData({
@@ -54,17 +51,15 @@ export class RegisterAccessMethodFlow {
       if (isCanisterError<AuthnMethodRegisterError>(error)) {
         switch (error.type) {
           case "RegistrationModeOff":
-            this.view = "linkExpired";
-            return;
           case "RegistrationAlreadyInProgress":
-            this.view = "unableToComplete";
+            this.isUnableToComplete = true;
             return;
         }
       }
       throw error;
     }
 
-    while (!this.isConfirmationWindowPassed) {
+    while (!this.isUnableToComplete) {
       const { authn_methods } = await anonymousActor
         .identity_authn_info(this.#identityNumber)
         .then(throwCanisterError);
@@ -94,7 +89,7 @@ export class RegisterAccessMethodFlow {
       // Wait before retrying
       await waitFor(POLL_INTERVAL);
       // Check if we're still in the confirmation time window
-      this.isConfirmationWindowPassed =
+      this.isUnableToComplete =
         BigInt(Date.now()) * BigInt(1_000_000) > expiration;
     }
   };

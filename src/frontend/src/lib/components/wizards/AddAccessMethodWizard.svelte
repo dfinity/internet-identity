@@ -4,6 +4,7 @@
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { AddAccessMethodFlow } from "$lib/flows/addAccessMethodFlow.svelte.js";
   import type {
+    AuthnMethodConfirmationError,
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
@@ -12,6 +13,7 @@
   import ContinueOnNewDevice from "$lib/components/views/ContinueOnNewDevice.svelte";
   import AddAccessMethod from "$lib/components/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/views/AddPasskey.svelte";
+  import { isCanisterError } from "$lib/utils/utils";
 
   interface Props {
     onGoogleLinked: (credential: OpenIdCredential) => void;
@@ -62,6 +64,13 @@
       onOtherDeviceRegistered();
       onClose();
     } catch (error) {
+      if (
+        isCanisterError<AuthnMethodConfirmationError>(error) &&
+        error.type === "WrongCode"
+      ) {
+        // Handle this error in child view instead
+        throw error;
+      }
       onError(error);
     }
   };
