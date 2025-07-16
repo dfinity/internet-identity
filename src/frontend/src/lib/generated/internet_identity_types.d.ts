@@ -530,8 +530,7 @@ export interface _SERVICE {
   'lookup' : ActorMethod<[UserNumber], Array<DeviceData>>,
   'lookup_by_registration_mode_id' : ActorMethod<
     [RegistrationId],
-    { 'Ok' : [] | [IdentityNumber] } |
-      { 'Err' : LookupByRegistrationIdError }
+    [] | [IdentityNumber]
   >,
   'lookup_device_key' : ActorMethod<
     [Uint8Array | number[]],

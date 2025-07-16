@@ -6,7 +6,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_with_archive, time};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
-    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError, LookupByRegistrationIdError,
+    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError,
 };
 use pocket_ic::CallError;
 use std::time::Duration;
@@ -511,8 +511,7 @@ fn should_return_identity_number_for_existing_registration_id() -> Result<(), Ca
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result, Some(identity_number));
     Ok(())
@@ -550,8 +549,7 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
     assert!(result.is_none());
     Ok(())
 }
@@ -597,8 +595,7 @@ fn should_return_none_after_tentative_device_confirmation() -> Result<(), CallEr
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert!(result.is_none());
     Ok(())
@@ -631,15 +628,14 @@ fn should_return_none_after_registration_mode_expiration() -> Result<(), CallErr
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert!(result.is_none());
     Ok(())
 }
 
 #[test]
-fn should_reject_registration_id_too_short() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_too_short() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abc1".to_string(); // Too short
@@ -651,15 +647,12 @@ fn should_reject_registration_id_too_short() -> Result<(), CallError> {
         invalid_id,
     )?;
 
-    assert!(matches!(
-        result,
-        Err(LookupByRegistrationIdError::InvalidRegistrationId(_))
-    ));
+    assert!(result.is_none());
     Ok(())
 }
 
 #[test]
-fn should_reject_registration_id_too_long() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_too_long() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdef".to_string(); // Too long
@@ -671,15 +664,12 @@ fn should_reject_registration_id_too_long() -> Result<(), CallError> {
         invalid_id,
     )?;
 
-    assert!(matches!(
-        result,
-        Err(LookupByRegistrationIdError::InvalidRegistrationId(_))
-    ));
+    assert!(result.is_none());
     Ok(())
 }
 
 #[test]
-fn should_reject_registration_id_invalid_chars() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_invalid_chars() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdç".to_string(); // Invalid chars
@@ -691,10 +681,7 @@ fn should_reject_registration_id_invalid_chars() -> Result<(), CallError> {
         invalid_id,
     )?;
 
-    assert!(matches!(
-        result,
-        Err(LookupByRegistrationIdError::InvalidRegistrationId(_))
-    ));
+    assert!(result.is_none());
     Ok(())
 }
 
@@ -737,16 +724,14 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
         canister_id,
         Principal::anonymous(),
         registration_mode_id1,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id2,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result1, Some(identity_number1));
     assert_eq!(result2, Some(identity_number2));
@@ -801,16 +786,14 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
         canister_id,
         Principal::anonymous(),
         registration_mode_id1.clone(),
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id2.clone(),
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result1, None);
     assert_eq!(result2, Some(identity_number2));
@@ -830,16 +813,14 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
         canister_id,
         Principal::anonymous(),
         registration_mode_id1,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id2,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result1, None);
     assert_eq!(result2, None);
@@ -858,8 +839,7 @@ fn should_return_none_for_nonexistent_registration_id() -> Result<(), CallError>
         canister_id,
         Principal::anonymous(),
         nonexistent_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert!(result.is_none());
     Ok(())

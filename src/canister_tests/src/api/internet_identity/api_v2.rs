@@ -304,7 +304,7 @@ pub fn lookup_by_registration_mode_id(
     canister_id: CanisterId,
     sender: Principal,
     id: String,
-) -> Result<Result<Option<IdentityNumber>, LookupByRegistrationIdError>, CallError> {
+) -> Result<Option<IdentityNumber>, CallError> {
     call_candid_as(
         env,
         canister_id,

@@ -938,14 +938,12 @@ mod v2_api {
     }
 
     #[query]
-    fn lookup_by_registration_mode_id(
-        id: String,
-    ) -> Result<Option<IdentityNumber>, LookupByRegistrationIdError> {
-        let res = get_identity_number_by_registration_id(
-            &ValidatedRegistrationId::try_new(id)
-                .map_err(LookupByRegistrationIdError::InvalidRegistrationId)?,
-        );
-        Ok(res)
+    fn lookup_by_registration_mode_id(id: String) -> Option<IdentityNumber> {
+        let validated_id = match ValidatedRegistrationId::try_new(id) {
+            Ok(id) => id,
+            Err(_) => return None,
+        };
+        get_identity_number_by_registration_id(&validated_id)
     }
 }
 

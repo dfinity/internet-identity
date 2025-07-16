@@ -384,9 +384,6 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
-  const LookupByRegistrationIdError = IDL.Variant({
-    'InvalidRegistrationId' : IDL.Text,
-  });
   const DeviceKeyWithAnchor = IDL.Record({
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
@@ -665,12 +662,7 @@ export const idlFactory = ({ IDL }) => {
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'lookup_by_registration_mode_id' : IDL.Func(
         [RegistrationId],
-        [
-          IDL.Variant({
-            'Ok' : IDL.Opt(IdentityNumber),
-            'Err' : LookupByRegistrationIdError,
-          }),
-        ],
+        [IDL.Opt(IdentityNumber)],
         ['query'],
       ),
     'lookup_device_key' : IDL.Func(

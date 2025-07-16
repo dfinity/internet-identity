@@ -868,7 +868,7 @@ service : (opt InternetIdentityInit) -> {
     // Requires authentication.
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
 
-    lookup_by_registration_mode_id : (RegistrationId) -> (variant { Ok : opt IdentityNumber; Err : LookupByRegistrationIdError }) query;
+    lookup_by_registration_mode_id : (RegistrationId) -> (opt IdentityNumber) query;
 
     // Authentication protocol
     // =======================
