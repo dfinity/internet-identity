@@ -295,11 +295,22 @@ deploy_release_candidate() {
 }
 
 test_release_candidate() {
-  echo "Test release candidate"
-  echo "Check that the release candidate is deployed and working"
-  echo "Beta: https://beta.identity.ic0.app/"
+  echo "Copy the following text and share it on Slack #eng-identity-private"
+  echo "----------"
+  echo "This is a call for help 🙏"
+  echo ""
+  echo "New release candidate has been deployed and is ready for testing"
+  echo ""
+  echo "Beta 1.0: https://beta.identity.ic0.app/"
+  echo "Beta 2.0: https://beta.id.ai/"
+  echo "Testing applications 1.0: https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io/"
+  echo "Testing applications 2.0: https://try.id.ai/"
   echo "Dummy relying party: https://l7rua-raaaa-aaaap-ahh6a-cai.icp0.io/"
-  echo "Make sure to check various devices and ask others to also check"
+  echo ""
+  echo "Please, share the outcome of your tesing in this thread and specify which device and browser you used."
+  echo "----------"
+  echo ""
+  echo "Perform some testing yourself and wait for feedback from the team before moving forward."
 }
 
 share_proposal() {
