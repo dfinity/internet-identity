@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -27,7 +26,6 @@
     } catch (error) {
       isInvalidCode = true;
       confirmationCode = "";
-      inputRef?.focus();
     } finally {
       isConfirming = false;
     }
@@ -39,8 +37,10 @@
     }
   });
 
-  onMount(() => {
-    inputRef?.focus();
+  $effect(() => {
+    if (!isConfirming) {
+      inputRef?.focus();
+    }
   });
 </script>
 
@@ -68,6 +68,7 @@
       ? "Invalid code. Please check and try again."
       : undefined}
     hint={"\u00a0"}
+    disabled={isConfirming}
   />
   <Button
     onclick={handleSubmit}

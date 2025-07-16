@@ -9,6 +9,7 @@
     length: number;
     hint?: string;
     error?: string;
+    disabled?: boolean;
   }
 
   let {
@@ -17,19 +18,19 @@
     value = $bindable(),
     hint,
     error,
+    disabled,
     class: className,
     ...props
   }: Props = $props();
 
-  let code = $state<string[]>([]);
   let inputRefs = $state<HTMLInputElement[]>([]);
 
   const handleKeyDown = (event: KeyboardEvent, index: number) => {
     if (event.code === "Backspace") {
-      if ((code[index] ?? "").length === 0) {
-        inputRefs[index - 1]?.focus();
-      }
-      code[index] = "";
+      inputRefs[index - 1]?.focus();
+      const code = value.padEnd(length, "").split("");
+      code[index] = " ";
+      value = code.join("").trimEnd();
       event.preventDefault();
     }
     if (event.code === "ArrowLeft") {
@@ -42,25 +43,15 @@
     }
   };
   const handlePaste = (event: ClipboardEvent) => {
-    code =
+    value =
       event.clipboardData
         ?.getData("text/plain")
-        .replace(/\D/g, "")
-        .slice(0, length)
-        .split("") ?? [];
-    inputRefs[code.length - 1]?.focus();
+        .replace(/[^\d ]/g, "")
+        .slice(0, length) ?? "";
+    inputRefs[value.length - 1]?.focus();
     event.preventDefault();
   };
 
-  // Keep value and code in sync
-  $effect(() => {
-    value = code.join("");
-  });
-  $effect(() => {
-    if (value !== code.join("")) {
-      code = value.split("");
-    }
-  });
   $effect(() => {
     element = inputRefs[0];
   });
@@ -81,10 +72,12 @@
         autocorrect="off"
         spellcheck="false"
         bind:value={
-          () => `${code[index] ?? ""}`,
-          (value) => {
-            if (/\d/.test(value.slice(-1))) {
-              code[index] = value.slice(-1);
+          () => value.slice(index, index + 1).trim(),
+          (v) => {
+            if (/[\d ]/.test(v.slice(-1))) {
+              const code = value.padEnd(length, "").split("");
+              code[index] = v.slice(-1);
+              value = code.join("").trimEnd();
               inputRefs[index + 1]?.focus();
             }
           }
@@ -92,6 +85,7 @@
         onkeydown={(event) => handleKeyDown(event, index)}
         onpaste={handlePaste}
         errorBorder={nonNullish(error)}
+        {disabled}
       />
     {/each}
   </div>
