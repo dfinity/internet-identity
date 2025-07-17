@@ -35,6 +35,10 @@ test("should fetch alternative origins file from expected URL", async () => {
       fetchUrl: `https://${TEST_CANISTER_ID}.icp0.io/.well-known/ii-alternative-origins`,
     },
     {
+      iiUrl: "https://id.ai",
+      fetchUrl: `https://${TEST_CANISTER_ID}.icp0.io/.well-known/ii-alternative-origins`,
+    },
+    {
       iiUrl: "https://identity.raw.ic0.app",
       fetchUrl: `https://${TEST_CANISTER_ID}.icp0.io/.well-known/ii-alternative-origins`,
     },
@@ -86,16 +90,6 @@ test("should fetch alternative origins file from expected URL", async () => {
       iiUrl: "https://127.0.0.1/?canisterId=222ew-7aaaa-aaaar-akaia-cai",
       fetchUrl: `https://127.0.0.1/.well-known/ii-alternative-origins?canisterId=${TEST_CANISTER_ID}`,
     },
-    {
-      iiUrl:
-        "https://totally-custom.com/?canisterId=222ew-7aaaa-aaaar-akaia-cai",
-      fetchUrl: `https://totally-custom.com/.well-known/ii-alternative-origins?canisterId=${TEST_CANISTER_ID}`,
-    },
-    {
-      iiUrl:
-        "http://totally-custom.com:8080/?canisterId=222ew-7aaaa-aaaar-akaia-cai",
-      fetchUrl: `https://totally-custom.com:8080/.well-known/ii-alternative-origins?canisterId=${TEST_CANISTER_ID}`,
-    },
   ];
 
   for (const { iiUrl, fetchUrl } of testCases) {
@@ -117,27 +111,6 @@ test("should fetch alternative origins file from expected URL", async () => {
   }
 });
 
-test("should fetch alternative origins file using non-raw URL", async () => {
-  const fetchMock = setupMocks({
-    iiUrl: "https://identity.ic0.app",
-    response: Response.json({
-      alternativeOrigins: [`https://${TEST_CANISTER_ID}.raw.ic0.app`],
-    }),
-  });
-
-  const result = await validateDerivationOrigin({
-    requestOrigin: `https://${TEST_CANISTER_ID}.raw.ic0.app`,
-    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
-    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
-  });
-
-  expect(result).toEqual({ result: "valid" });
-  expect(fetchMock).toHaveBeenLastCalledWith(
-    `https://${TEST_CANISTER_ID}.icp0.io/.well-known/ii-alternative-origins`,
-    FETCH_OPTS,
-  );
-});
-
 test("should not validate if canister id resolution fails", async () => {
   const result = await validateDerivationOrigin({
     requestOrigin: "https://example.com",
@@ -147,69 +120,98 @@ test("should not validate if canister id resolution fails", async () => {
   expect(result.result).toBe("invalid");
 });
 
-test("should not validate if origin not allowed", async () => {
-  setupMocks({
-    iiUrl: "https://identity.ic0.app",
-    response: Response.json({
-      alternativeOrigins: ["https://not-example.com"],
-    }),
+const validIIUrls = [
+  "https://identity.ic0.app",
+  "https://identity.internetcomputer.org",
+  "https://id.ai",
+];
+
+for (const iiUrl of validIIUrls) {
+  test("should fetch alternative origins file using non-raw URL", async () => {
+    const fetchMock = setupMocks({
+      iiUrl,
+      response: Response.json({
+        alternativeOrigins: [`https://${TEST_CANISTER_ID}.raw.ic0.app`],
+      }),
+    });
+
+    const result = await validateDerivationOrigin({
+      requestOrigin: `https://${TEST_CANISTER_ID}.raw.ic0.app`,
+      derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+      resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+    });
+
+    expect(result).toEqual({ result: "valid" });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      `https://${TEST_CANISTER_ID}.icp0.io/.well-known/ii-alternative-origins`,
+      FETCH_OPTS,
+    );
   });
 
-  const result = await validateDerivationOrigin({
-    requestOrigin: "https://example.com",
-    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
-    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+  test("should not validate if origin not allowed", async () => {
+    setupMocks({
+      iiUrl: "https://identity.ic0.app",
+      response: Response.json({
+        alternativeOrigins: ["https://not-example.com"],
+      }),
+    });
+
+    const result = await validateDerivationOrigin({
+      requestOrigin: "https://example.com",
+      derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+      resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+    });
+
+    expect(result.result).toBe("invalid");
   });
 
-  expect(result.result).toBe("invalid");
-});
+  test("should not validate if alternative origins file malformed", async () => {
+    setupMocks({
+      iiUrl: "https://identity.ic0.app",
+      response: Response.json({
+        notAlternativeOrigins: ["https://example.com"],
+      }),
+    });
 
-test("should not validate if alternative origins file malformed", async () => {
-  setupMocks({
-    iiUrl: "https://identity.ic0.app",
-    response: Response.json({
-      notAlternativeOrigins: ["https://example.com"],
-    }),
+    const result = await validateDerivationOrigin({
+      requestOrigin: "https://example.com",
+      derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+      resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+    });
+
+    expect(result.result).toBe("invalid");
   });
 
-  const result = await validateDerivationOrigin({
-    requestOrigin: "https://example.com",
-    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
-    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+  test("should not validate on alternative origins redirect", async () => {
+    setupMocks({
+      iiUrl: "https://identity.ic0.app",
+      response: Response.redirect("https://some-evil-url.com"),
+    });
+
+    const result = await validateDerivationOrigin({
+      requestOrigin: "https://example.com",
+      derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+      resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+    });
+
+    expect(result.result).toBe("invalid");
   });
 
-  expect(result.result).toBe("invalid");
-});
+  test("should not validate on alternative origins error", async () => {
+    setupMocks({
+      iiUrl: "https://identity.ic0.app",
+      response: new Response(undefined, { status: 404 }),
+    });
 
-test("should not validate on alternative origins redirect", async () => {
-  setupMocks({
-    iiUrl: "https://identity.ic0.app",
-    response: Response.redirect("https://some-evil-url.com"),
+    const result = await validateDerivationOrigin({
+      requestOrigin: "https://example.com",
+      derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
+      resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
+    });
+
+    expect(result.result).toBe("invalid");
   });
-
-  const result = await validateDerivationOrigin({
-    requestOrigin: "https://example.com",
-    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
-    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
-  });
-
-  expect(result.result).toBe("invalid");
-});
-
-test("should not validate on alternative origins error", async () => {
-  setupMocks({
-    iiUrl: "https://identity.ic0.app",
-    response: new Response(undefined, { status: 404 }),
-  });
-
-  const result = await validateDerivationOrigin({
-    requestOrigin: "https://example.com",
-    derivationOrigin: "https://some-url.com", // different from requestOrigin so that we need to fetch the alternative origins
-    resolveCanisterId: () => Promise.resolve({ ok: TEST_CANISTER_ID }),
-  });
-
-  expect(result.result).toBe("invalid");
-});
+}
 
 const setupMocks = ({
   iiUrl,
