@@ -1,8 +1,12 @@
 import { Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
+import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 
+const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
 export const TEST_APP_URL = "https://nice-name.com";
+export const NOT_TEST_APP_URL = "https://very-nice-name.com";
+export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
 export type DummyAuthFn = (page: Page) => void;
 

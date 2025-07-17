@@ -137,16 +137,6 @@ const inferAlternativeOriginsUrl = ({
     return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
   }
 
-  if (
-    location.hostname.endsWith("icp0.io") ||
-    location.hostname.endsWith("ic0.app") ||
-    location.hostname.endsWith("internetcomputer.org")
-  ) {
-    // If this is a canister running on one of the official IC domains, then return the
-    // official canister id based API endpoint
-    return `https://${canisterId}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
-  }
-
   // Local deployment -> add query parameter
   // For this asset the query parameter should work regardless of whether we use a canister id based subdomain or not
   if (location.hostname.endsWith("localhost")) {
@@ -162,9 +152,6 @@ const inferAlternativeOriginsUrl = ({
     return `${location.protocol}//${location.host}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
   }
 
-  // Otherwise assume it's a custom setup expecting the gateway to
-  // - be on the same domain
-  // - use HTTPS
-  // - support query parameter based routing
-  return `https://${location.host}${ALTERNATIVE_ORIGINS_PATH}?canisterId=${canisterId}`;
+  // Otherwise, assume it's a mainnet environment.
+  return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;
 };
