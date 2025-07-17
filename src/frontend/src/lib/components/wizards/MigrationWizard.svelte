@@ -1,14 +1,9 @@
 <script lang="ts">
-  import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import Header from "$lib/components/layout/Header.svelte";
-  import Footer from "$lib/components/layout/Footer.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
   import { MigrationFlow } from "$lib/flows/migrationFlow.svelte";
-  import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
-  import { goto } from "$app/navigation";
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { handleError } from "$lib/components/utils/error";
 

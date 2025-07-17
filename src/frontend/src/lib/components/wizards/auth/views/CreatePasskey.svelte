@@ -6,26 +6,23 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
     create: (name: string) => Promise<void>;
-    onError?: (error: unknown) => void;
   }
 
-  const { create, onError = handleError }: Props = $props();
+  const { create }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
-  let loading = $state(false);
+  let creating = $state(false);
 
-  const handleSubmit = async () => {
-    loading = true;
+  const handleCreate = async () => {
+    creating = true;
     try {
       await create(name.trim());
-    } catch (error) {
-      loading = false;
-      onError(error);
+    } finally {
+      creating = false;
     }
   };
 
@@ -56,20 +53,20 @@
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
-      disabled={loading}
+      disabled={creating}
       error={name.length > 64 ? "Maximum length is 64 characters." : undefined}
       aria-label="Identity name"
     />
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">
     <Button
-      onclick={handleSubmit}
+      onclick={handleCreate}
       variant="primary"
       size="lg"
       type="submit"
-      disabled={name.length === 0 || name.length > 64 || loading}
+      disabled={name.length === 0 || name.length > 64 || creating}
     >
-      {#if loading}
+      {#if creating}
         <ProgressRing />
         <span>Creating Passkey...</span>
       {:else}

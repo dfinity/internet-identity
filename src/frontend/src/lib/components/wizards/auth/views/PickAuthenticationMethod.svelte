@@ -6,30 +6,22 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
-    onError?: (error: unknown) => void;
   }
 
-  const {
-    setupOrUseExistingPasskey,
-    continueWithGoogle,
-    onError = handleError,
-  }: Props = $props();
+  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
 
-  let googleLoading = $state(false);
+  let authenticating = $state(false);
 
   const handleContinueWithGoogle = async () => {
-    googleLoading = true;
+    authenticating = true;
     try {
       await continueWithGoogle();
-    } catch (error) {
-      onError(error);
     } finally {
-      googleLoading = false;
+      authenticating = false;
     }
   };
 
@@ -48,7 +40,7 @@
   <div class="flex flex-col items-stretch gap-3">
     <Button
       onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || googleLoading}
+      disabled={!supportsPasskeys || authenticating}
       size="xl"
     >
       <PasskeyIcon />
@@ -58,10 +50,10 @@
       <Button
         onclick={handleContinueWithGoogle}
         variant="secondary"
-        disabled={googleLoading}
+        disabled={authenticating}
         size="xl"
       >
-        {#if googleLoading}
+        {#if authenticating}
           <ProgressRing />
           <span>Authenticating with Google...</span>
         {:else}

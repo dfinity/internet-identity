@@ -2,28 +2,22 @@
   import { nonNullish } from "@dfinity/utils";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { handleError } from "$lib/components/utils/error";
-  import PickAuthenticationMethod from "$lib/components/views/PickAuthenticationMethod.svelte";
   import {
     lastUsedIdentitiesStore,
     type LastUsedIdentity,
   } from "$lib/stores/last-used-identities.store";
   import { toaster } from "$lib/components/utils/toaster";
-  import SolveCaptcha from "$lib/components/views/SolveCaptcha.svelte";
-  import SetupOrUseExistingPasskey from "$lib/components/views/SetupOrUseExistingPasskey.svelte";
-  import CreatePasskey from "$lib/components/views/CreatePasskey.svelte";
-  import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
-  import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { PlusIcon, UserIcon } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import AuthDialog from "$lib/components/views/AuthDialog.svelte";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { goto } from "$app/navigation";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { AuthWizard } from "$lib/components/wizards/auth";
 
   const gotoManage = () => goto("/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
@@ -40,7 +34,6 @@
     await gotoManage();
     isAuthDialogOpen = false;
   };
-  const authFlow = new AuthFlow({ onSignIn, onSignUp });
   const authLastUsedFlow = new AuthLastUsedFlow();
 
   const lastUsedIdentities = $derived(
@@ -50,6 +43,11 @@
   );
 
   let isAuthDialogOpen = $state(false);
+  let isAuthenticating = $state(false);
+
+  $effect(() => {
+    console.log("isAuthenticating", isAuthenticating);
+  });
 
   const handleContinueAs = async (identity: LastUsedIdentity) => {
     await authLastUsedFlow.authenticate(identity).catch(handleError);
@@ -63,89 +61,86 @@
   <div class="flex flex-1 flex-col items-center justify-center">
     <AuthPanel class="sm:max-w-100">
       <div class="flex-1"></div>
-      {#if nonNullish(authFlow.captcha)}
-        <SolveCaptcha {...authFlow.captcha} />
-      {:else}
+      {#if lastUsedIdentities.length > 0}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
           Manage your Internet&nbsp;Identity
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
-          {lastUsedIdentities.length > 0
-            ? "choose identity to continue"
-            : "sign in to continue"}
+          choose identity to continue
         </p>
-        {#if lastUsedIdentities.length > 0}
-          <div class="flex flex-col gap-1.5">
-            <ul class="contents">
-              {#each lastUsedIdentities as identity}
-                <li class="contents">
-                  <ButtonCard
-                    onclick={() => handleContinueAs(identity)}
-                    disabled={nonNullish(
-                      authLastUsedFlow.authenticatingIdentity,
-                    )}
-                  >
-                    <Avatar size="sm">
-                      {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
-                        <ProgressRing />
-                      {:else}
-                        <UserIcon size="1.25rem" />
-                      {/if}
-                    </Avatar>
-                    <div class="flex flex-col text-left text-sm">
-                      <div class="font-semibold">
-                        {identity.name ?? identity.identityNumber}
-                      </div>
-                      <div class="text-text-tertiary" aria-hidden="true">
-                        {"passkey" in identity.authMethod
-                          ? "Passkey"
-                          : "Google"}
-                      </div>
+        <div class="flex flex-col gap-1.5">
+          <ul class="contents">
+            {#each lastUsedIdentities as identity}
+              <li class="contents">
+                <ButtonCard
+                  onclick={() => handleContinueAs(identity)}
+                  disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+                >
+                  <Avatar size="sm">
+                    {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
+                      <ProgressRing />
+                    {:else}
+                      <UserIcon size="1.25rem" />
+                    {/if}
+                  </Avatar>
+                  <div class="flex flex-col text-left text-sm">
+                    <div class="font-semibold">
+                      {identity.name ?? identity.identityNumber}
                     </div>
-                  </ButtonCard>
-                </li>
-              {/each}
-            </ul>
-            <ButtonCard
-              onclick={() => (isAuthDialogOpen = true)}
-              disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-            >
-              <FeaturedIcon size="sm">
-                <PlusIcon size="1.25rem" />
-              </FeaturedIcon>
-              <span>Use another identity</span>
-            </ButtonCard>
-          </div>
-          {#if isAuthDialogOpen}
-            <AuthDialog
+                    <div class="text-text-tertiary" aria-hidden="true">
+                      {"passkey" in identity.authMethod ? "Passkey" : "Google"}
+                    </div>
+                  </div>
+                </ButtonCard>
+              </li>
+            {/each}
+          </ul>
+          <ButtonCard
+            onclick={() => (isAuthDialogOpen = true)}
+            disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+          >
+            <FeaturedIcon size="sm">
+              <PlusIcon size="1.25rem" />
+            </FeaturedIcon>
+            <span>Use another identity</span>
+          </ButtonCard>
+        </div>
+        {#if isAuthDialogOpen}
+          <Dialog
+            onClose={() => (isAuthDialogOpen = false)}
+            showCloseButton={!isAuthenticating}
+            closeOnOutsideClick={!isAuthenticating}
+          >
+            <AuthWizard
+              bind:isAuthenticating
               {onSignIn}
               {onSignUp}
-              title="Use another identity"
-              subtitle="Choose method"
-              onClose={() => (isAuthDialogOpen = false)}
-            />
-          {/if}
-        {:else}
-          <PickAuthenticationMethod
-            setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
-            continueWithGoogle={authFlow.continueWithGoogle}
-          />
-          {#if authFlow.view !== "chooseMethod"}
-            <Dialog onClose={() => (authFlow.view = "chooseMethod")}>
-              {#if authFlow.view === "setupOrUseExistingPasskey"}
-                <SetupOrUseExistingPasskey
-                  setupNew={authFlow.setupNewPasskey}
-                  useExisting={authFlow.continueWithExistingPasskey}
-                />
-              {:else if authFlow.view === "setupNewPasskey"}
-                <CreatePasskey create={authFlow.createPasskey} />
-              {/if}
-            </Dialog>
-          {/if}
+              onError={(error) => {
+                isAuthDialogOpen = false;
+                handleError(error);
+              }}
+              withinDialog
+            >
+              <h1
+                class="text-text-primary my-2 self-start text-2xl font-medium"
+              >
+                Use another identity
+              </h1>
+              <p class="text-text-secondary mb-6 self-start text-sm">
+                choose method
+              </p>
+            </AuthWizard>
+          </Dialog>
         {/if}
-      {/if}
-      {#if authFlow.systemOverlay || authLastUsedFlow.systemOverlay}
-        <SystemOverlayBackdrop />
+      {:else}
+        <AuthWizard {onSignIn} {onSignUp} onError={handleError}>
+          <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+            Manage your Internet&nbsp;Identity
+          </h1>
+          <p class="text-text-secondary mb-6 self-start text-sm">
+            sign in to continue
+          </p>
+        </AuthWizard>
       {/if}
     </AuthPanel>
   </div>
