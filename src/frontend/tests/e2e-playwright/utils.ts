@@ -57,6 +57,27 @@ export const authorize = async (
 };
 
 /**
+ * Creates a new identity in II page assuming there is no stored identity
+ *
+ * @param page
+ * @param name
+ * @param dummyAuth
+ */
+export const createNewIdentityInII = async (
+  page: Page,
+  name: string,
+  dummyAuth: DummyAuthFn,
+): Promise<void> => {
+  await page.goto(II_URL);
+  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await page.getByLabel("Identity name").fill(name);
+  dummyAuth(page);
+  await page.getByRole("button", { name: "Create Passkey" }).click();
+  await page.waitForURL(II_URL + "/manage");
+};
+
+/**
  * Create passkey identity with dummy auth
  * @param page The authorization page (either initial or continue)
  * @param name The name that should be given to the identity
