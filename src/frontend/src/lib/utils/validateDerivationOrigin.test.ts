@@ -150,7 +150,7 @@ for (const iiUrl of validIIUrls) {
 
   test("should not validate if origin not allowed", async () => {
     setupMocks({
-      iiUrl: "https://identity.ic0.app",
+      iiUrl,
       response: Response.json({
         alternativeOrigins: ["https://not-example.com"],
       }),
@@ -167,7 +167,7 @@ for (const iiUrl of validIIUrls) {
 
   test("should not validate if alternative origins file malformed", async () => {
     setupMocks({
-      iiUrl: "https://identity.ic0.app",
+      iiUrl,
       response: Response.json({
         notAlternativeOrigins: ["https://example.com"],
       }),
@@ -184,7 +184,7 @@ for (const iiUrl of validIIUrls) {
 
   test("should not validate on alternative origins redirect", async () => {
     setupMocks({
-      iiUrl: "https://identity.ic0.app",
+      iiUrl,
       response: Response.redirect("https://some-evil-url.com"),
     });
 
@@ -199,7 +199,7 @@ for (const iiUrl of validIIUrls) {
 
   test("should not validate on alternative origins error", async () => {
     setupMocks({
-      iiUrl: "https://identity.ic0.app",
+      iiUrl,
       response: new Response(undefined, { status: 404 }),
     });
 
