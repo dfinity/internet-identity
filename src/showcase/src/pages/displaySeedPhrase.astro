@@ -1,0 +1,22 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display Seed Phrase" pageName="displaySeedPhrase">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { recoveryAnchorWord, recoveryWords } from "../constants";
+    import { i18n } from "../i18n";
+    import { displaySeedPhrasePage } from "$lib/legacy/flows/recovery/displaySeedPhrase";
+
+    displaySeedPhrasePage({
+      operation: "create",
+      userNumberWord: recoveryAnchorWord,
+      words: recoveryWords,
+      cancel: () => toast.info("cancel"),
+      onContinue: () => toast.info("continue with:"),
+      copyPhrase: () => Promise.resolve(toast.info("copied")),
+      i18n
+    });
+  </script>
+</Screen>

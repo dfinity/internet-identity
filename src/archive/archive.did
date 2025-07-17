@@ -1,0 +1,265 @@
+type Timestamp = nat64;
+type Anchor = nat64;
+type CredentialId = blob;
+type PublicKey = blob;
+type DeviceKey = PublicKey;
+
+type Purpose = variant {
+    recovery;
+    authentication;
+};
+
+type KeyType = variant {
+    unknown;
+    platform;
+    cross_platform;
+    seed_phrase;
+    browser_storage_key;
+};
+
+type DeviceProtection = variant {
+    protected;
+    unprotected;
+};
+
+type Operation = variant {
+    register_anchor : record {
+        device : DeviceDataWithoutAlias;
+    };
+    add_device : record {
+        device : DeviceDataWithoutAlias;
+    };
+    update_device : record {
+        device : PublicKey;
+        new_values : DeviceDataUpdate;
+    };
+    // Atomically replace device with new_device
+    replace_device : record {
+        old_device : PublicKey;
+        new_device : DeviceDataWithoutAlias;
+    };
+    remove_device : record {
+        device : PublicKey;
+    };
+    identity_metadata_replace : record {
+        // If present, the metadata has been replaced and now contains the given keys.
+        // Only the top level keys are archived for privacy reasons.
+        metadata_keys : vec text;
+    };
+    add_openid_credential : record {
+        iss : text;
+    };
+    remove_openid_credential : record {
+        iss : text;
+    };
+    register_anchor_with_openid_credential : record {
+        iss : text;
+    };
+    add_name;
+    update_name;
+    remove_name;
+    create_account : record {
+        name : Private;
+    };
+    update_account : record {
+        name : opt Private;
+    };
+    delete_account;
+};
+
+type Entry = record {
+    anchor : Anchor;
+    operation : Operation;
+    timestamp : Timestamp;
+    caller : principal;
+    sequence_number : nat64;
+};
+
+type DeviceDataWithoutAlias = record {
+    pubkey : DeviceKey;
+    credential_id : opt CredentialId;
+    purpose : Purpose;
+    key_type : KeyType;
+    protection : DeviceProtection;
+    origin : opt text;
+    // Only the top level keys are archived for privacy reasons.
+    metadata_keys : opt vec text;
+};
+
+type DeviceDataUpdate = record {
+    alias : opt Private;
+    credential_id : opt CredentialId;
+    purpose : opt Purpose;
+    key_type : opt KeyType;
+    protection : opt DeviceProtection;
+    origin : opt opt text;
+    // If present, the metadata has been changed and now contains the given keys.
+    // Only the top level keys are archived for privacy reasons.
+    metadata_keys : opt vec text;
+};
+
+type Private = variant {
+    // Placeholder for information that has been hidden for privacy reasons.
+    redacted;
+};
+
+type Cursor = variant {
+    timestamp : record {
+        // get entries starting from this timestamp
+        timestamp : Timestamp;
+    };
+    next_token : record {
+        // submit previously received token to fetch the next page of entries
+        next_token : blob;
+    };
+};
+
+type AnchorEntries = record {
+    entries : vec opt Entry;
+    cursor : opt Cursor // cursor to fetch the next page of entries (if any)
+};
+
+type Entries = record {
+    entries : vec opt Entry;
+};
+
+type ArchiveInit = record {
+    // Principal of the internet identity canister allowed to write entries.
+    // This value is configurable to allow dynamic deployments of II.
+    ii_canister : principal;
+    // The maximum number of entries to be returned per call.
+    max_entries_per_call : nat16;
+    // Polling interval to fetch new entries from II (in nanoseconds).
+    polling_interval_ns : nat64;
+    // Number of call errors to keep.
+    error_buffer_limit : nat16;
+};
+
+// Information about the archive
+type ArchiveStatus = record {
+    // The init argument of the archive used for the last deployment.
+    init : ArchiveInit;
+    // Information about the calls that the archive canister makes (to retrieve archive entries).
+    call_info : CallInfo;
+    // The canister status of the archive as provided by the management canister.
+    canister_status : CanisterStatus;
+};
+
+type CallInfo = record {
+    // Information about the last successful run of `fetch_entries`, if any.
+    last_successful_fetch : opt FetchInfo;
+    // A small buffer to keep the last call errors to help debugging in case of an incident.
+    // Can be retrieved using the status query.
+    call_errors : vec CallErrorInfo;
+};
+
+type FetchInfo = record {
+    // Timestamp when the last execution of the archive `fetch_entries` method finished.
+    timestamp : Timestamp;
+    // The number of entries fetched (regardless of how many of those were actually archived).
+    number_of_entries : nat16;
+};
+
+// Information about a call that the archive canister made to another canister that resulted in a rejection.
+type CallErrorInfo = record {
+    time : Timestamp;
+    canister : principal;
+    method : text;
+    argument : blob;
+    rejection_code : int32;
+    message : text;
+};
+
+// HTTP gateway types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway-interface
+
+type HeaderField = record {
+    text;
+    text;
+};
+
+type HttpRequest = record {
+    method : text;
+    url : text;
+    headers : vec HeaderField;
+    body : blob;
+    certificate_version : opt nat16;
+};
+
+type HttpResponse = record {
+    status_code : nat16;
+    headers : vec HeaderField;
+    body : blob;
+    upgrade : opt bool;
+    streaming_strategy : opt StreamingStrategy;
+};
+
+type StreamingCallbackHttpResponse = record {
+    body : blob;
+    token : opt Token;
+};
+
+type Token = record {};
+
+type StreamingStrategy = variant {
+    Callback : record {
+        callback : func(Token) -> (StreamingCallbackHttpResponse) query;
+        token : Token;
+    };
+};
+
+// management canister types: https://internetcomputer.org/docs/current/references/ic-interface-spec/#ic-candid
+
+type DefiniteCanisterSettings = record {
+    controllers : vec principal;
+    compute_allocation : nat;
+    memory_allocation : nat;
+    freezing_threshold : nat;
+};
+
+type CanisterStatus = record {
+    status : variant {
+        running;
+        stopping;
+        stopped;
+    };
+    settings : DefiniteCanisterSettings;
+    module_hash : opt blob;
+    memory_size : nat;
+    cycles : nat;
+    idle_cycles_burned_per_day : nat;
+    query_stats : record {
+        num_calls_total : nat;
+        num_instructions_total : nat;
+        request_payload_bytes_total : nat;
+        response_payload_bytes_total : nat;
+    };
+};
+
+service : (ArchiveInit) -> {
+    // Returns the entries for the given anchor. If a timestamp is given, only the entries starting from that timestamp are
+    // returned. Use the Cursor to skip to later entries.
+    // This function can be called anonymously.
+    //
+    // Parameters:
+    // 1. anchor to fetch the entries for
+    // 2. optional cursor to specify which entries to fetch
+    // 3. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
+    get_anchor_entries : (Anchor, opt Cursor, opt nat16) -> (AnchorEntries) query;
+
+    // Returns the latest entries. If an index is given, entries starting from the given index are returned.
+    // This function can be called anonymously.
+    //
+    // Parameters:
+    // 1. optional index into the list of entries
+    // 2. optional limit of the number of entries. If no limit is given, at most the configured number (see ArchiveInit) entries are returned.
+    get_entries : (opt nat64, opt nat16) -> (Entries) query;
+
+    // Writes an entry. Only the Internet Identity canister (configured using ArchiveInit) is authorized to call this function.
+    write_entry : (Anchor, Timestamp, blob) -> ();
+
+    // HTTP endpoint to expose metrics for Prometheus.
+    http_request : (request : HttpRequest) -> (HttpResponse) query;
+
+    // Exposes metadata about this canister.
+    status : () -> (ArchiveStatus);
+};

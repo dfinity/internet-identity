@@ -1,0 +1,263 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Builds Internet Identity and Archive Canisters"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 [--only-dependencies] [--internet-identity] [--archive]
+
+Options:
+  --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
+  --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Builds the Internet Identity and the Archive canister.
+
+NOTE: This requires a working rust toolchain as well as ic-wasm.
+EOF
+
+}
+
+ONLY_DEPS=
+CANISTERS=()
+
+while [[ $# -gt 0  ]]
+do
+    case "$1" in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --only-dependencies)
+            ONLY_DEPS=1
+            shift
+            ;;
+        --internet-identity)
+            CANISTERS+=("internet_identity")
+            shift
+            ;;
+        --archive)
+            CANISTERS+=("archive")
+            shift
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'build --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+export II_VERSION=${II_VERSION:-$(./scripts/version)}
+echo "The following version will be used: '$II_VERSION'"
+
+# build II by default
+if [ ${#CANISTERS[@]} -eq 0 ]; then
+    CANISTERS=("internet_identity")
+fi
+
+# Checking for dependencies
+if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.8.5" ]]
+then
+    echo "could not find ic-wasm 0.8.5"
+    echo "ic-wasm version 0.8.5 is needed, please run the following command:"
+    echo "  cargo install ic-wasm --version 0.8.5"
+    exit 1
+fi
+
+# Check for exact node version
+if [[ "$(node --version)" !=  "v$(cat .node-version)" ]]
+then
+    echo; echo
+    echo "!!!WARNING!!!: could not find node with exact expected version: v$(cat .node-version)"
+    # On CI we abort
+    if [ -n "${CI:-}" ]
+    then
+        exit 1
+    fi
+    # If the node version doesn't match 100% the build might still succeed though is less likely
+    # to be reproducible. For developer convenience we still try to go through.
+    echo "This might cause build or reproducibility issues."
+    echo; echo
+fi
+
+# Builds a single canister
+# build_canister CANISTER EXTRA_BUILD_ARGS...
+# CANISTER: possible values: [internet_identity, archive]
+# EXTRA_BUILD_ARGS: extra arguments supplied to cargo when building the canister
+function build_canister() {
+    local canister=$1
+    shift
+    local extra_build_args=("$@")
+
+    echo "Building $canister"
+    echo
+
+    SRC_DIR="$PWD/src/$canister"
+    TARGET="wasm32-unknown-unknown"
+    # standardize source references
+    CARGO_HOME="${CARGO_HOME:-"$HOME/.cargo"}"
+    RUSTFLAGS="--remap-path-prefix $CARGO_HOME=/cargo -C link-args=-zstack-size=3000000"
+
+    cargo_build_args=(
+        --manifest-path "$SRC_DIR/Cargo.toml"
+        --target "$TARGET"
+        --release
+        -j1
+        )
+    # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
+    cargo_build_args+=(${extra_build_args[@]+"${extra_build_args[@]}"})
+
+    echo Running cargo build "${cargo_build_args[@]}"
+    echo RUSTFLAGS: "$RUSTFLAGS"
+
+    RUSTFLAGS="$RUSTFLAGS" cargo build "${cargo_build_args[@]}"
+
+    if [ "$ONLY_DEPS" != "1" ]
+    then
+        CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$SRC_DIR/../../target/}"
+
+        ic-wasm \
+            "$CARGO_TARGET_DIR/$TARGET/release/$canister.wasm" \
+            -o "./$canister.wasm" \
+            shrink
+        ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:service -f "$SRC_DIR/$canister.did" -v public
+
+        # indicate support for certificate version 1 and 2 in the canister metadata
+        ic-wasm "$canister.wasm" -o "$canister.wasm" metadata supported_certificate_versions -d "1,2" -v public
+
+        if [ "$canister" == "internet_identity" ]
+        then
+          # indicate the II canister init argument type
+          ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "(opt InternetIdentityInit)" -v public
+
+
+          # Write metadata for dfx.
+          # The metadata includes a link to the release, which only exists if this is a release build.
+          # In case of a release build, the version looks like this: <commit>,<release>,<dirty>
+          # We include the URL of a checksum file so that dfx clients can check the hash
+          # of the build (for caching & integrity checking)
+          IFS=,
+          read -r -a version_parts <<< "$II_VERSION"
+          release="${version_parts[1]}"
+          if [ -n "$release" ]
+          then
+              asset_name="internet_identity_dev.wasm.gz"
+              wasm_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name"
+              wasm_hash_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name.sha256"
+              # init_arg that disables the captcha, appropriate for the dev build
+              init_arg="(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})"
+              init_guide="Use '(null)' for sensible defaults. See the candid interface for more details."
+              metadata_json=$(echo '{}' | jq -cMr \
+                  --arg wasm_url "$wasm_url" \
+                  --arg wasm_hash_url "$wasm_hash_url" \
+                  --arg init_arg "$init_arg" \
+                  --arg init_guide "$init_guide" \
+                  '. | .pullable = { wasm_url: $wasm_url, wasm_hash_url: $wasm_hash_url, dependencies: [], init_arg: $init_arg, init_guide: $init_guide} ')
+              ic-wasm "$canister.wasm" -o "$canister.wasm" metadata dfx -d "$metadata_json" -v public
+          fi
+
+        fi
+        gzip --no-name --force "$canister.wasm"
+    fi
+}
+
+function build_internet_identity() {
+  if [ "$ONLY_DEPS" != "1" ]
+  then
+      DIST_DIR="$SCRIPTS_DIR/../dist"
+      
+      # Compile frontend assets to dist
+      echo Compiling internet_identity frontend assets
+      npm run build
+      
+      # Add preload links for all css files in every html file
+      CSS_LINKS=""
+      TMP_HTML_FILE=$(mktemp)
+      while IFS= read -r css_file; do
+          css_file_relative="/${css_file#$DIST_DIR/}"
+          CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">"
+      done < <(find "$DIST_DIR" -type f -name "*.css" | sort)
+      find "$DIST_DIR" -type f -name "*.html" | while read -r html_file; do
+        sed "s#</head>#${CSS_LINKS}</head>#" "$html_file" > "$TMP_HTML_FILE" && mv "$TMP_HTML_FILE" "$html_file"
+      done
+      
+      # II canister only supports one content type per resource. 
+      # That is why we only keep either compressed or uncompressed.
+      find "$DIST_DIR" -type f -name "*.gz" | while read -r gz_file; do
+          # Remove the .gz suffix to get the base filename
+          base_file="${gz_file%.gz}"
+          
+          # Generate the .br filename
+          br_file="${base_file}.br"
+      
+          # Delete the .br file if it exists
+          if [[ -f "$br_file" ]]; then
+              rm -f "$br_file"
+          fi
+          
+          # Keep files not ending in .js or .woff2 as uncompressed files
+          if [[ ! "$base_file" =~ \.(js|woff2)$ ]]; then
+              rm -f "$gz_file"
+              continue
+          fi
+      
+          # Delete the base file if it exists
+          if [[ -f "$base_file" ]]; then
+              rm -f "$base_file"
+          fi
+      done
+  fi
+
+  # This enables the "dummy_captcha" feature which makes sure the captcha string
+  # is always "a".
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production.
+  extra_build_args=()
+  if [ "${II_DUMMY_CAPTCHA:-}" == "1" ]
+  then
+      echo "USING DUMMY CAPTCHA"
+      extra_build_args+=( --features dummy_captcha )
+  fi
+  # This enables the "dev_csp" feature which weakens the content security policy to facilitate development.
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production.
+  if [ "${II_DEV_CSP:-}" == "1" ]
+  then
+      echo "USING DEV CONTENT SECURITY POLICY"
+      extra_build_args+=( --features dev_csp )
+  fi
+  # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
+  build_canister "internet_identity" ${extra_build_args[@]+"${extra_build_args[@]}"}
+}
+
+for canister in "${CANISTERS[@]}"
+do
+  if [ "$canister" == "internet_identity" ]
+  then
+    build_internet_identity
+  else
+    build_canister "$canister"
+  fi
+done

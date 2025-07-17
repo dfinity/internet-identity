@@ -1,0 +1,21 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Toasts" pageName="toasts">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { showMessage } from "$lib/templates/message";
+
+    showMessage({ message: "hello" });
+    toast.info("This is an info!");
+    toast.success("This is a success!");
+    toast.error("This is an error!");
+    toast.error(
+      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec varius tellus id massa lobortis, et luctus nulla consequat. Phasellus lacinia velit non quam placerat imperdiet. In elementum orci sit amet malesuada eleifend. Vestibulum ultricies fringilla lorem sit amet laoreet. Suspendisse aliquet tincidunt risus, sed pellentesque purus porttitor nec."
+    );
+    toast.error(
+      "Loremipsumdolorsitamet,consecteturadipiscingelit.Donecvariustellusidmassalobortis,etluctusnullaconsequat.Phaselluslaciniavelitnonquamplaceratimperdiet.Inelementumorcisitametmalesuadaeleifend.Vestibulumultriciesfringillaloremsitametlaoreet.Suspendissealiquettinciduntrisus,sedpellentesquepurusporttitornec."
+    );
+  </script>
+</Screen>

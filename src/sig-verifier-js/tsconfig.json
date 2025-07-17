@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["vitests.config.ts", "tests.ts"],
+  "compilerOptions": {
+    "outDir": "./dist",
+    "composite": true
+  }
+}

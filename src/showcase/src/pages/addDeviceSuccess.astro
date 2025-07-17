@@ -1,0 +1,19 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Add Device Success" pageName="addDeviceSuccess">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { chromeDevice, userNumber } from "../constants";
+    import { addDeviceSuccessPage } from "$lib/legacy/flows/addDevice/addDeviceSuccess";
+
+    addDeviceSuccessPage({
+      i18n,
+      userNumber,
+      deviceAlias: chromeDevice.alias,
+      onContinue: () => toast.info("Continue")
+    });
+  </script>
+</Screen>

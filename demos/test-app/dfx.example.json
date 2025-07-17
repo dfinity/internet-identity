@@ -1,0 +1,16 @@
+{
+  "canisters": {
+    "test_app": {
+      "type": "custom",
+      "candid": "test_app.did",
+      "wasm": "test_app.wasm",
+      "build": "./build.sh"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "version": 1
+}

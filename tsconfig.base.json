@@ -1,0 +1,22 @@
+{
+  "include": ["src/showcase", "src/frontend"],
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2021", "DOM"],
+    "module": "esnext",
+    "strict": true,
+    "target": "es2018",
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "noFallthroughCasesInSwitch": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "types": ["node", "vite/client", "vitest/globals"]
+  },
+  "exclude": ["src/frontend/src/lib/generated/*"]
+}

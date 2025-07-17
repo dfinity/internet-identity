@@ -1,0 +1,19 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Confirm Pin" pageName="confirmPin">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { confirmPinPage } from "$lib/legacy/flows/pin/confirmPin";
+    import { i18n } from "../i18n";
+
+    confirmPinPage({
+      i18n,
+      onContinue: () => toast.info("PIN confirmed"),
+      expectedPin: "123456",
+      cancel: () => toast.info("cancel"),
+      retry: () => toast.info("retry")
+    });
+  </script>
+</Screen>

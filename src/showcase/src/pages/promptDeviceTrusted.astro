@@ -1,0 +1,19 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Prompt for Device Trusted" pageName="promptDeviceTrusted">
+  <script>
+    import { userNumber } from "../constants";
+    import { promptDeviceTrustedPage } from "$lib/legacy/flows/addDevice/welcomeView/promptDeviceTrusted";
+    import { i18n } from "../i18n";
+    import { toast } from "$lib/templates/toast";
+
+    promptDeviceTrustedPage({
+      userNumber,
+      cancel: () => toast.info("canceled"),
+      confirm: () => toast.info("confirmed"),
+      i18n
+    });
+  </script>
+</Screen>

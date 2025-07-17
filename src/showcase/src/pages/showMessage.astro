@@ -1,0 +1,13 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Show Message" pageName="showMessage">
+  <script>
+    import { showMessagePage } from "$lib/templates/message";
+
+    showMessagePage({
+      message: "You may close this page."
+    });
+  </script>
+</Screen>

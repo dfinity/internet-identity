@@ -1,0 +1,37 @@
+{
+  "canisters": {
+    "internet_identity": {
+      "type": "custom",
+      "candid": "src/internet_identity/internet_identity.did",
+      "wasm": "internet_identity.wasm.gz",
+      "build": "bash -c 'II_DEV_CSP=1 II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-1} scripts/build'",
+      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}; openid_google = opt opt record { client_id = \"775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com\" }; related_origins = opt vec { \"https://identity.internetcomputer.org\"; \"https://identity.ic0.app\" } })",
+      "shrink": false
+    },
+    "test_app": {
+      "type": "custom",
+      "candid": "demos/test-app/test_app.did",
+      "wasm": "demos/test-app/test_app.wasm",
+      "build": "demos/test-app/build.sh"
+    },
+    "issuer": {
+      "type": "custom",
+      "candid": "demos/vc_issuer/vc_demo_issuer.did",
+      "wasm": "demos/vc_issuer/vc_demo_issuer.wasm.gz",
+      "build": "demos/vc_issuer/build.sh",
+      "post_install": "bash -c 'demos/vc_issuer/provision'",
+      "dependencies": ["internet_identity"]
+    },
+    "try_ii": {
+      "source": ["src/try-ii/src/try-ii-frontend/dist"],
+      "type": "assets"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "dfx": "0.28.0",
+  "version": 1
+}

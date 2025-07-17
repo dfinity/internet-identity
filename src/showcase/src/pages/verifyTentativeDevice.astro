@@ -1,0 +1,28 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Verify Tentative Device" pageName="verifyTentativeDevice">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { chromeDevice, userNumber } from "../constants";
+    import { verifyTentativeDevicePage } from "$lib/legacy/flows/addDevice/manage/verifyTentativeDevice";
+
+    verifyTentativeDevicePage({
+      userNumber,
+      alias: chromeDevice.alias,
+      cancel: () => toast.info("canceled"),
+      // We accept anything that ends with "2"
+      verify: (pin: string) =>
+        Promise.resolve(
+          pin.endsWith("2") ? { retry: false, value: pin } : { retry: true }
+        ),
+      doContinue: (v) => toast.info(`continue with: ${v}`),
+      remaining: {
+        async* [Symbol.asyncIterator]() {
+          yield "00:34";
+        }
+      }
+    });
+  </script>
+</Screen>

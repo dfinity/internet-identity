@@ -1,0 +1,21 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display User Number" pageName="displayUserNumber">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { userNumber } from "../constants";
+    import { displayUserNumberPage } from "$lib/legacy/flows/register/finish";
+    import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png";
+    import { PreLoadImage } from "$lib/utils/preLoadImage";
+
+    const identityBackground = new PreLoadImage(identityCardBackground.src);
+
+    displayUserNumberPage({
+      identityBackground,
+      userNumber,
+      onContinue: () => toast.info("done")
+    });
+  </script>
+</Screen>

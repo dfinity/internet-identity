@@ -1,0 +1,11 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Prompt User Number" pageName="promptUserNumber">
+  <script>
+    import { promptUserNumber } from "$lib/templates/promptUserNumber";
+
+    promptUserNumber({ title: "hello" });
+  </script>
+</Screen>

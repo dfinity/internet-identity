@@ -1,0 +1,23 @@
+name: 'File Size'
+description: 'Record the file size in git notes'
+inputs:
+  file:
+    description: 'File of which to compute the size'
+    required: true
+  save:
+    description: 'When true (default), the size is uploaded to origin in a git note.'
+    required: true
+    default: true
+outputs:
+  size:
+    description: "The size of the file, in bytes"
+    value: ${{ steps.run-script.outputs.size }}
+runs:
+  using: "composite"
+  steps:
+    - id: run-script
+      run: ${{ github.action_path }}/run.sh
+      shell: bash
+      env:
+        INPUT_FILE: ${{ inputs.file }}
+        INPUT_SAVE: ${{ inputs.save }}

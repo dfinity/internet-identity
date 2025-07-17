@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+
+declare expected_ii_hash=
+declare expected_archive_hash=
+
+GREEN=
+RED=
+NC=
+
+# Check that colors are supported (i.e. that we are running in a terminal)
+# I.e. github actions does not support colors
+if [ -n "$TERM" ] && [ "$TERM" != "dumb" ]
+then
+    GREEN=$(tput setaf 2)
+    RED=$(tput setaf 1)
+    NC=$(tput sgr0)
+fi
+
+print_red() {
+    echo "${RED}$*${NC}"
+}
+
+print_green() {
+    echo "${GREEN}$*${NC}"
+}
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Verifies the hash of the II and archive wasm files"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 --ii-hash II_HASH [--archive-hash ARCHIVE_HASH]
+
+Options:
+  --ii-hash HASH                  Expected II SHA256 hash of the II wasm.
+  --archive-hash ARCHIVE_HASH     Optional archive hash, if the archive needs to be verified as well.
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Builds the II canister (and optionally also the archive) and compares the hash of the built wasm with the expected hash.
+EOF
+}
+
+# ARGUMENT PARSING
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        --help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --ii-hash)
+            expected_ii_hash="${2:?missing value for '--ii-hash'}"
+            shift; # shift past --ii-hash and value
+            shift;
+            ;;
+        --archive-hash)
+            expected_archive_hash="${2:?missing value for '--archive-hash'}"
+            shift; # shift past --archive-hash and value
+            shift;
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'release --help' for more information."
+            exit 1
+            ;;
+    esac
+done
+
+if [ -z "$expected_ii_hash" ]
+then
+    echo no II hash provided
+    usage
+    exit 1
+fi
+
+# Run the build
+./scripts/docker-build
+prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
+
+ii_match=false
+archive_match=false
+
+if [ "$prod_build_sha256" == "$expected_ii_hash" ]
+then
+  ii_match=true
+else
+  print_red "sha mismatch: $prod_build_sha256 /= $expected_ii_hash"
+  exit 1
+fi
+
+if [ -n "$expected_archive_hash" ]
+then
+  ./scripts/docker-build --archive
+  archive_sha256="$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)"
+  if [ "$archive_sha256" == "$expected_archive_hash" ]
+  then
+    archive_match=true
+  else
+    print_red "sha mismatch: $archive_sha256 /= $expected_archive_hash"
+    if $ii_match; then
+      print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+    fi
+    exit 1
+  fi
+fi
+
+if $ii_match; then
+  print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+fi
+
+if $archive_match; then
+  print_green "archive.wasm.gz sha256 matches expected hash $expected_archive_hash"
+fi
+
+print_green "Wasm verification successful!"

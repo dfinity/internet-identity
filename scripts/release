@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+declare -a filenames=( )
+declare tag_name
+declare generate_notes=
+declare notes_file=
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Release Internet Identity"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  release --tag TAG [--generate-notes] [--notes-file FILE] [-- FILE...]
+
+Options:
+  --tag TAG             specify the tag to release
+  --generate-notes      add GitHub generated notes
+  --notes-file FILE     use FILE as notes (prepended to generated notes if set)
+
+Environment:
+  GITHUB_TOKEN  (required) Personal Access Token for GitHub
+
+EOF
+}
+
+function help() {
+    cat << EOF
+
+Any files specified after '--' will be uploaded as release assets.
+
+NOTE: This does not generate release notes. A link will be displayed when the
+release is created. Visit that link to write release notes and click "Auto-generate release notes"
+to add contributions and commit information.
+
+EOF
+
+}
+
+# Check that the command "$1" is installed
+function need_cmd() {
+    if ! command -v "$1" >/dev/null
+    then
+        echo "please install $1"
+        exit 1
+    fi
+}
+
+##################
+# GITHUB HELPERS #
+##################
+
+# See also
+# https://docs.github.com/en/rest/reference/releases#list-releases
+
+# Ensure that GITHUB_TOKEN is set
+# token needs repo/public_repo scope
+function check_token() {
+    if [ -z "${GITHUB_TOKEN:-}" ]
+    then
+        echo "Please set GITHUB_TOKEN"
+        echo "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token"
+        exit 1
+    fi
+}
+
+# Basic curl wrapper to perform a GitHub request.
+function gh() {
+
+    # The request path, can be absolute (https://...) or relative
+    # (in which case it will be prepended with https://api.github.com)
+    local path=$1
+    shift
+    if [[ $path != https://* ]]
+    then
+        path="https://api.github.com/${path#"/"}"
+    fi
+
+    # Here we want to fail the script if the request is not successful.
+    # Regular curl can do this with --fail; unfortunately when doing so
+    # the body isn't returned, which makes debugging really complicated.
+    # Recent curls have '--fail-with-body', but it isn't available on
+    # GitHub Actions at the time of writing. March 2022
+    #
+    # Instead we write the body to a file and the status code to stdout,
+    # and check that the status code is 2XX.
+    local output; output=$(mktemp)
+    local http_code
+    http_code=$(curl -w '%{http_code}' -o "$output" --silent  \
+            --header "accept: application/vnd.github.v3+json" \
+            --header "authorization: token $GITHUB_TOKEN" \
+            "$path" \
+            "$@")
+
+    if [[ $http_code == 2* ]]
+    then
+        cat "$output"
+        rm "$output"
+    else
+        >&2 echo "Failed ($?) request to '$path' with '$*'"
+        >&2 jq <"$output"
+        rm "$output"
+        exit 1
+    fi
+}
+
+# Curl wrapper for sending a JSON document (read from stdin)
+function gh_post_json() {
+    local path="$1"
+    shift
+    gh "$path" --header "content-type: application/json" \
+        --data-binary @- \
+        "$@"
+}
+
+# Curl wrapper for sending a gzipped file (read from stdin)
+function gh_post_tgz() {
+    local path="$1"
+    local filename="$2"
+    shift; shift
+    gh "$path" --header "content-type: application/gzip" \
+        --data-binary "@$filename" \
+        "$@"
+}
+
+###########
+# RELEASE #
+###########
+
+# This performs the release by first _creating_ a release (using the value from --tag).
+# The response returned by GitHub includes "upload_url", which is a URL where assets
+# can be POSTed.
+function do_release() {
+
+    jq_args=(
+        --arg tag_name "$tag_name"
+        --rawfile body "$notes_file"
+        --argjson generate_release_notes "$([ "$generate_notes" == 1 ] && echo "true" || echo "false")"
+    )
+
+    local release_json
+    release_json=$(jq -n \
+        "${jq_args[@]}" \
+        '{ tag_name: $tag_name, generate_release_notes: $generate_release_notes, body: $body }' \
+        | gh_post_json /repos/dfinity/internet-identity/releases)
+
+    local release_id; release_id=$(echo "$release_json" | jq -cMr '.id')
+    local html_url; html_url="$(echo "$release_json" | jq -cMr '.html_url')"
+
+    echo "created release $release_id ($html_url)"
+
+    if [ ${#filenames[@]} -eq 0 ]
+    then
+        echo "no files to upload"
+    else
+        echo "uploading assets"
+        for filename in "${filenames[@]}"
+        do
+            filepath="$filename"
+            filename=$(basename "$filename")
+            echo -n " - $filename ($filepath)"
+            local upload_url; upload_url=$(echo "$release_json" | jq -cMr '.upload_url' | sed "s/{.*}/?name=$filename/")
+            echo -n "upload url: $upload_url"
+            gh_post_tgz "$upload_url" "$filepath" >/dev/null
+            echo " (done)"
+        done
+    fi
+
+    echo "done creating release"
+    echo "  $html_url"
+}
+
+# ARGUMENT PARSING
+
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        --help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --tag)
+            tag_name="${2:?missing value for '--tag'}"
+            shift; # shift past --tag and value
+            shift;
+            ;;
+        --generate-notes)
+            generate_notes=1
+            shift;
+            ;;
+        --notes-file)
+            notes_file="${2:?missing value for '--notes-file'}"
+            shift; # shift past --notes-file and value
+            shift;
+            ;;
+        --)
+            shift
+            for filename in "$@"
+            do
+                filenames+=( "$filename" )
+                shift
+            done
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use 'release --help' for more information."
+            exit 1
+            ;;
+    esac
+done
+
+check_token
+
+if [ -z "$tag_name" ]
+then
+    echo no tag name
+    usage
+    exit 1
+fi
+
+need_cmd "curl"
+need_cmd "jq"
+
+do_release

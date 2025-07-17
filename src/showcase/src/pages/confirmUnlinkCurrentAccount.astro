@@ -1,0 +1,30 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Confirm Remove Device" pageName="confirmUnlinkAccount">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { confirmUnlinkAccountPage } from "$lib/legacy/flows/manage/confirmUnlinkAccount";
+    import { exampleAvatar } from "../constants";
+
+    confirmUnlinkAccountPage({
+      next: () => toast.info("ok"),
+      cancel: () => toast.info("cancelled"),
+      i18n,
+      credential: {
+        iss: "accounts.google.com",
+        sub: "2342987923",
+        aud: "example.com",
+        last_usage_timestamp: BigInt(1735825231139) * BigInt(1000000),
+        metadata: [
+          ["email", { String: "john.doe@gmail.com" }],
+          ["name", { String: "John Doe" }],
+          ["picture", { String: exampleAvatar }]
+        ]
+      },
+      isCurrentCredential: true
+    });
+  </script>
+</Screen>

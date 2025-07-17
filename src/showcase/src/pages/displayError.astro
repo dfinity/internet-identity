@@ -1,0 +1,16 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display Error" pageName="displayError">
+  <script>
+    import { displayError } from "$lib/templates/displayError";
+
+    displayError({
+      title: "Authentication Failed",
+      message: "An error occurred during authentication.",
+      detail: "oh my, so much to say. SO MUCH!",
+      primaryButton: "Try again"
+    });
+  </script>
+</Screen>

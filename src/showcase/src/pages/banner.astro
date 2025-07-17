@@ -1,0 +1,17 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Banner" pageName="banner">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { manage } from "../templates";
+    import { showWarning } from "$lib/legacy/banner";
+
+    manage.firstTime({
+      useExisting: () => toast.info("Asked for existing"),
+      register: () => toast.info("Asked for registration")
+    });
+    showWarning("This is a test page, be very careful!");
+  </script>
+</Screen>

@@ -1,0 +1,48 @@
+# Various IDEs and Editors
+.vscode/
+.idea/
+**/*~
+.windsurf/
+
+# Mac OSX temporary files
+.DS_Store
+**/.DS_Store
+
+# dfx temporary files
+.dfx/
+
+# frontend code
+node_modules/
+dist/
+dist-showcase/
+.env
+lib
+!src/frontend/src/lib
+!src/try-ii/src/try-ii-frontend/src/lib
+/.svelte-kit
+
+# Cargo build output
+target/
+
+# End-to-end test artifacts
+test-failures/
+
+# built canisters
+*.wasm
+*.wasm.gz
+ic-test-state-machine
+pocket-ic
+
+*.tsbuildinfo
+
+# Proposals
+release*.json
+arg.bin
+args.txt
+proposal.md
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

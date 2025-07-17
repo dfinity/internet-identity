@@ -1,0 +1,11 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Compatibility Notice" pageName="compatibilityNotice">
+  <script>
+    import { compatibilityNotice } from "$lib/legacy/flows/compatibilityNotice";
+
+    compatibilityNotice();
+  </script>
+</Screen>

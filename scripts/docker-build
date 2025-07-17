@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# vim: ft=bash
+# Build internet_identity.wasm inside docker. This outputs internet_identity.wasm.gz,
+# and / or archive.wasm.gz depending on the provided arguments in the top-level directory.
+
+set -euo pipefail
+
+# Make sure we always run from the root
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+function title() {
+    echo "Build Internet Identity inside Docker"
+}
+
+function usage() {
+    cat << EOF
+
+Usage:
+  $0 [--internet-identity] [--archive]
+
+Options:
+  --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+
+Environment:
+  II_FETCH_ROOT_KEY     When set to "1", enable the "II_FETCH_ROOT_KEY" feature.
+  II_DUMMY_CAPTCHA      When set to "1", enable the "II_DUMMY_CAPTCHA" feature.
+  II_DUMMY_AUTH         When set to "1", enable the "II_DUMMY_AUTH" feature.
+  II_DEV_CSP            When set to "1", enable the "II_DEV_CSP" feature.
+EOF
+}
+
+function help() {
+    cat << EOF
+
+This will create (and override) "./internet_identity.wasm.gz" or "./archive.wasm.gz". For more information on build features, see:
+    https://github.com/dfinity/internet-identity#build-features-and-flavors
+EOF
+}
+
+## Building
+
+# forward "feature" environment variables ("$2") to the docker build
+# NOTE: feature name ("$1") must be lower case as it's used in the image name
+function check_feature() {
+    local varname="$2"
+    local featurename="$1"
+    local value="${!varname:-}"
+
+    if [[ "$value" == "1" ]]
+    then
+        echo "Using feature $featurename ($varname)"
+        docker_build_args+=( --build-arg "$varname=$value" )
+        image_name="$image_name-$featurename"
+    fi
+}
+
+# Builds a single canister using docker
+# build_canister CANISTER
+# CANISTER: possible values: [internet_identity, archive]
+function build() {
+    local canister="$1"
+
+    # image name and build args, made global because they're used in
+    # check_feature()
+    image_name="ii-docker-build"
+    docker_build_args=( --target "scratch_$canister" )
+
+    check_feature "fetchrootkey" "II_FETCH_ROOT_KEY"
+    check_feature "dummycaptcha" "II_DUMMY_CAPTCHA"
+    check_feature "dummyauth" "II_DUMMY_AUTH"
+    check_feature "devcsp" "II_DEV_CSP"
+
+    docker_build_args+=(--tag "$image_name" .)
+
+    echo "The following image name will be used: $image_name"
+
+    tmp_outdir=$(mktemp -d)
+
+    local version="$(./scripts/version)"
+    echo "The following version will be used: '$version'"
+
+    set -x
+    DOCKER_BUILDKIT=1 docker build \
+        --build-arg II_VERSION="$version" \
+        "${docker_build_args[@]}" \
+        --output "$tmp_outdir"
+    set +x
+
+    echo "Copying build output from $tmp_outdir to $PWD"
+    cp "$tmp_outdir/$canister.wasm.gz" .
+
+    echo "Removing $tmp_outdir"
+    rm -rf "$tmp_outdir"
+}
+
+# ARGUMENT PARSING
+
+CANISTERS=()
+while [[ $# -gt 0 ]]
+do
+    case $1 in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --internet-identity)
+            CANISTERS+=("internet_identity")
+            shift
+            ;;
+        --archive)
+            CANISTERS+=("archive")
+            shift
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use '$0 --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+# build II by default
+if [ ${#CANISTERS[@]} -eq 0 ]; then
+    CANISTERS=("internet_identity")
+fi
+
+for canister in "${CANISTERS[@]}"
+do
+    build "$canister"
+done

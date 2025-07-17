@@ -1,0 +1,70 @@
+# A GitHub Actions workflow that regularly checks for new Rust toolchain release
+# and creates a PR on new versions.
+name: Rust Update
+
+on:
+  schedule:
+    # check for new rust versions weekly
+    - cron: "30 3 * * FRI"
+
+jobs:
+  rust-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+        # First, check rust GitHub releases for a new version. We assume that the
+        # latest version's tag name is the version.
+      - name: Check new rust version
+        id: update
+        run: |
+          current_rust_version=$(cat ./rust-toolchain.toml | sed -n 's/^channel[[:space:]]*=[[:space:]]"\(.*\)"/\1/p')
+          echo "current rust version '$current_rust_version'"
+          release_data=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/rust-lang/rust/releases/latest)
+          latest_rust_version=$(echo -n "$release_data" | jq -cMr .tag_name)
+
+          # The GitHub API has some hiccups, so we check the value before going further
+          if [ -z "$latest_rust_version" ] || [ "$latest_rust_version" = "null" ]
+          then
+            echo "expected a rust version, got '$latest_rust_version'"
+            echo "data received from API:"
+            echo "$release_data"
+            exit 1
+          fi
+
+          echo "latest rust version '$latest_rust_version'"
+
+          if [ "$current_rust_version" != "$latest_rust_version" ]
+          then
+            echo rust toolchain needs an update
+            sed -i -e "s/$current_rust_version/$latest_rust_version/g" ./rust-toolchain.toml
+            echo "updated=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=0" >> "$GITHUB_OUTPUT"
+          fi
+
+          cat ./rust-toolchain.toml
+
+        # If the rust-toolchain was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: ./rust-toolchain.toml
+          commit-message: Update rust version
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-rust-update
+          delete-branch: true
+          title: "Update rust version"
+
+        # Since the this is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Rust update failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

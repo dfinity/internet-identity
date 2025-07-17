@@ -1,0 +1,30 @@
+{
+  "name": "@dfinity/internet-identity-e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "opts": "NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
+    "wdio": "wdio run ./wdio.conf.ts",
+    "test": "npm run opts -- ./test.ts",
+    "format": "prettier --write --plugin-search-dir=. .",
+    "build": "tsc --noEmit && vite build",
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@wdio/globals": "8.32.3",
+    "@wdio/cli": "8.32.3",
+    "@wdio/local-runner": "8.32.3",
+    "@wdio/mocha-framework": "8.32.3",
+    "@wdio/spec-reporter": "^8.21.0",
+    "prettier": "^2.7.1",
+    "prettier-plugin-organize-imports": "^3.2.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4",
+    "vite": "^5.4.19"
+  },
+  "dependencies": {
+    "@dfinity/auth-client": "^2.1.1"
+  }
+}

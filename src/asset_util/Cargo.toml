@@ -1,0 +1,21 @@
+[package]
+name = "asset_util"
+description = "Asset certification utility library for asset serving canisters"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+base64.workspace = true
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
+ic-certification.workspace = true
+ic-representation-independent-hash.workspace = true
+include_dir.workspace = true
+internet_identity_interface.workspace = true
+lazy_static.workspace = true
+serde.workspace = true
+serde_cbor.workspace = true
+sha2.workspace = true

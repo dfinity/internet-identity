@@ -1,0 +1,23 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Confirm Remove Device" pageName="confirmRemoveDevice">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { confirmRemoveDevicePage } from "$lib/legacy/flows/manage/confirmRemoveDevice";
+
+    confirmRemoveDevicePage({
+      next: () => toast.info("ok"),
+      cancel: () => toast.info("To confirm enter 'test' in the input."),
+      i18n,
+      purpose: { authentication: null },
+      alias: "test",
+      // This is used for screenshot testing, if we add a real date it will always change the screenshot
+      lastUsedNanoseconds: undefined,
+      originRegistered: "https://identity.internetcomputer.org",
+      isCurrentDevice: false
+    });
+  </script>
+</Screen>

@@ -1,0 +1,24 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Poll For Tentative Device Page" pageName="pollForTentativeDevicePage">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { pollForTentativeDevicePage } from "$lib/legacy/flows/addDevice/manage/pollForTentativeDevice";
+
+    pollForTentativeDevicePage({
+      cancel: () => toast.info("canceled"),
+      useFIDO: () => toast.info("use FIDO"),
+      origin: "https://identity.internetcomputer.org",
+      userNumber: BigInt(1234),
+      remaining: {
+        async* [Symbol.asyncIterator]() {
+          yield "00:34";
+        }
+      },
+      i18n
+    });
+  </script>
+</Screen>

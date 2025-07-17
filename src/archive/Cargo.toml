@@ -1,0 +1,28 @@
+[package]
+name = "archive"
+description = "Internet Identity Archive Canister"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# local dependencies
+internet_identity_interface.workspace = true
+# ic dependencies
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
+ic-cdk-timers.workspace = true
+ic-metrics-encoder.workspace = true
+ic-stable-structures.workspace = true
+# other
+serde.workspace = true
+serde_bytes.workspace = true
+
+[dev-dependencies]
+candid_parser.workspace = true
+canister_tests.workspace = true
+hex.workspace = true
+pocket-ic.workspace = true
+regex.workspace = true

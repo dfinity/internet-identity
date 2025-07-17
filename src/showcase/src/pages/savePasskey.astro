@@ -1,0 +1,20 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Save Passkey" pageName="savePasskey">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { savePasskeyPage } from "$lib/legacy/flows/register/passkey";
+
+    savePasskeyPage({
+      i18n,
+      cancel: () => toast.info("cancel"),
+      constructPasskey: () =>
+        new Promise((_) => {
+          toast.info("Identity Construction");
+        })
+    });
+  </script>
+</Screen>

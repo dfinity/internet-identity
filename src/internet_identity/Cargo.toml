@@ -1,0 +1,68 @@
+[package]
+name = "internet_identity"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+asset_util.workspace = true
+internet_identity_interface.workspace = true
+
+hex.workspace = true
+include_dir.workspace = true
+lazy_static.workspace = true
+serde.workspace = true
+serde_bytes.workspace = true
+serde_cbor.workspace = true
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+sha2 = { workspace = true, features = ["oid"] }
+base64.workspace = true
+rsa.workspace = true
+minicbor = { workspace = true, features = ["std", "derive"] }
+
+# Captcha deps
+lodepng = "*"
+
+rand = { version = "*", default-features = false }
+
+rand_core = { version = "*", default-features = false }
+rand_chacha = { version = "*", default-features = false }
+captcha = { git = "https://github.com/dfinity/captcha", rev = "9c0d2dd9bf519e255eaa239d9f4e9fdc83f65391" }
+
+# OpenID deps
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git", rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false }
+
+# All IC deps
+candid.workspace = true
+ic-cdk = { workspace = true, features = ["transform-closure"] }
+ic-cdk-macros.workspace = true
+ic-cdk-timers.workspace = true
+ic-certification.workspace = true
+ic-metrics-encoder.workspace = true
+ic-stable-structures.workspace = true
+ic-canister-sig-creation.workspace = true
+ic-verifiable-credentials.workspace = true
+
+[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["custom"] }
+
+[dev-dependencies]
+ic-http-certification.workspace = true
+pocket-ic.workspace = true
+candid_parser.workspace = true
+canister_tests.workspace = true
+hex-literal = "0.4"
+regex.workspace = true
+ic-response-verification.workspace = true
+flate2 = "1.0"
+getrandom = "0.2"
+
+
+[features]
+# the dummy_captcha feature which ensures the captcha string is always "a"
+# (needed for tests)
+dummy_captcha = []
+# The dev_csp feature weakens the CSP in oder to facilitate development with a locally deployed II instance.
+# In particular, this allows
+# * accessing II using http instead of https
+# * II to connect to localhost both on http and https, which is useful when developint a vc issuer
+dev_csp = []

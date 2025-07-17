@@ -1,0 +1,30 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Prompt Captch" pageName="promptCaptcha">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { promptCaptchaPage } from "$lib/legacy/flows/register/captcha";
+    import { dummyChallenge } from "../constants";
+
+    promptCaptchaPage({
+      cancel: () => toast.info("canceled"),
+      focus: true,
+      captcha_png_base64: dummyChallenge.png_base64,
+      checkCaptcha: async (solution) => {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        if (solution !== "8wJ6Q") {
+          return {
+            kind: "wrongCaptchaSolution",
+            new_captcha_png_base64: dummyChallenge.png_base64
+          };
+        }
+        return undefined;
+      },
+      onContinue: () => toast.info("Done"),
+      i18n
+    });
+  </script>
+</Screen>

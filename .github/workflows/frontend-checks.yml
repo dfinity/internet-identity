@@ -1,0 +1,84 @@
+name: Frontend checks and lints
+
+on:
+  push:
+
+jobs:
+  frontend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # set a PAT so that add-and-commit can trigger CI runs
+          token: ${{ secrets.GIX_BOT_PAT }}
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+      - name: Run tsc
+        run: npm run check
+      - name: Run ESLint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format-check
+      - uses: ./.github/actions/setup-didc
+      - name: Generate type interfaces
+        run: |
+          npm run generate
+          cd demos/vc_issuer
+          npm run generate
+      - name: Check for dapp logos
+        run: |
+          while read -r logo
+          do
+            if [ ! -f src/frontend/src/assets/icons/"$logo" ]
+            then
+              echo "Logo not found: $logo"
+              exit 1
+            fi
+          done < <(jq <src/frontend/src/flows/dappsExplorer/dapps.json -cMr '.[] | .logo' )
+      - name: Commit type interfaces
+        uses: EndBug/add-and-commit@v9
+        # We don't want to commit automatic changes to main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        with:
+          add: |
+            src/frontend/generated
+            demos/vc_issuer/app/generated
+          default_author: github_actions
+          message: "🤖 npm run generate auto-update"
+
+  # Deploy the showcase to GitHub Pages
+  showcase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+
+      # Build the showcase with a special base URL (used in links and esp. routing)
+      # to match the deploy URL: https://dfinity.github.io/internet-identity/
+      - run: npm run build:showcase -- --base '/internet-identity/'
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "dist-showcase"
+
+  # Deploy the showcase to GitHub Pages
+  showcase-deploy:
+    runs-on: ubuntu-latest
+    needs: showcase
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+    permissions:
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        id: deployment

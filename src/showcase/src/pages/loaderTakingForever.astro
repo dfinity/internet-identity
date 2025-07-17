@@ -1,0 +1,18 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Loader" pageName="loader">
+  <script>
+    import { withLoader } from "$lib/templates/loader";
+    import { showMessage } from "$lib/templates/message";
+
+    withLoader(() => new Promise(() => showMessage({ message: "Loading..." })), true);
+  </script>
+  <style>
+      /* Disable loader animation */
+      .c-loader__image {
+          animation: none;
+      }
+  </style>
+</Screen>

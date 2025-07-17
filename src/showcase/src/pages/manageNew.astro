@@ -1,0 +1,15 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Manage New" pageName="manageNew">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { manage } from "../templates";
+
+    manage.firstTime({
+      useExisting: () => toast.info("Asked for existing"),
+      register: () => toast.info("Asked for registration")
+    });
+  </script>
+</Screen>

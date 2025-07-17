@@ -1,0 +1,23 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Confirm Seed Phrase" pageName="confirmSeedPhrase">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { recoveryAnchorWord, recoveryWords } from "../constants";
+    import { checkIndices, confirmSeedPhrasePage } from "$lib/legacy/flows/recovery/confirmSeedPhrase";
+
+    confirmSeedPhrasePage({
+      confirm: () => toast.info("confirmed"),
+      back: () => toast.info("back"),
+      userNumberWord: recoveryAnchorWord,
+      words: recoveryWords.map((word, i) => ({
+        word,
+        check: checkIndices.includes(i)
+      })),
+      i18n
+    });
+  </script>
+</Screen>

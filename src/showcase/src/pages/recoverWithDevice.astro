@@ -1,0 +1,15 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Recover With Device" pageName="recoverWithDevice">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { recoverWithDevicePage } from "$lib/legacy/flows/recovery/recoverWith/device";
+
+    recoverWithDevicePage({
+      next: () => toast.info("next"),
+      cancel: () => toast.info("cancel")
+    });
+  </script>
+</Screen>

@@ -1,0 +1,22 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Recover With Phrase" pageName="recoverWithPhrase">
+  <script>
+    import { recoverWithPhrasePage } from "$lib/legacy/flows/recovery/recoverWith/phrase";
+    import { toast } from "$lib/templates/toast";
+
+    recoverWithPhrasePage({
+      verify: ({ userNumber, words }) =>
+        Promise.resolve({
+          ok: true,
+          value: { kind: "loginSuccess", userNumber, words }
+        }),
+      confirm: ({ userNumber, words }) =>
+        toast.info(`confirmed: ${userNumber} ${words.join(" ")}`),
+      back: () => toast.info("remove"),
+      message: "Something cool will happen if you type your anchor"
+    });
+  </script>
+</Screen>

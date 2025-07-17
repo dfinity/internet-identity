@@ -1,0 +1,19 @@
+name: "Slack"
+description: "A simple action that sends a slack message to a channel."
+inputs:
+  message:
+    description: "The message to send. A link to the action run will be appended."
+    required: true
+  webhook_url:
+    description: "The webhook URL as described here: https://api.slack.com/messaging/webhooks"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        echo '{}' | jq --arg text "$MESSAGE" '.text = $text' | \
+            curl -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK_URL"
+      shell: bash
+      env:
+        WEBHOOK_URL: ${{ inputs.WEBHOOK_URL }}
+        MESSAGE: ${{ inputs.MESSAGE }}

@@ -1,0 +1,47 @@
+{
+  "__0": "dfx.json reference: https://internetcomputer.org/docs/current/references/dfx-json-reference/",
+  "__1": "We use '__X' fields (unknown fields are ignored by dfx) to leave comments.",
+  "canisters": {
+    "internet_identity": {
+      "__0": "The development build of Internet Identity. For more information, see https://github.com/dfinity/internet-identity#build-features-and-flavors",
+      "type": "custom",
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+
+      "__1": "This init arg will disable the captcha during registration",
+      "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
+
+      "__2": "The remote block indicates that this canister is only used locally and should not be deployed on the IC.",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      }
+    },
+
+    "whoami": {
+      "main": "whoami.mo",
+      "type": "motoko"
+    },
+
+    "webapp": {
+      "__0": "Canisters of type 'assets' are like buckets. When deployed, dfx creates a canister that is just one big empty map.",
+      "__1": "After the canister itself is created, dfx uploads all the files specified in the 'source' field.",
+      "__2": "Those files are then stored in the canister's map and served with http_request.",
+      "type": "assets",
+
+      "__3": "NOTE: dfx will run 'npm run build' when the canister is to be built (dfx build or dfx deploy)",
+      "__4": "(which in this case populates 'dist/', see package.json).",
+      "__5": "source must be a directory, otherwise we get a cryptic error.",
+      "source": ["dist/"],
+      "__6": "NOTE: the 'frontend' signals dfx that it is useful to print out the front-end URL of this canister when deploying. It is not strictly required.",
+      "frontend": {}
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "version": 1
+}

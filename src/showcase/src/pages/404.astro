@@ -1,0 +1,13 @@
+---
+---
+
+<div id="pageContent"></div>
+<script>
+  import { showMessagePage } from "$lib/templates/message";
+  import { html } from "lit-html";
+
+  showMessagePage({
+    message: html`<h1>404 not found</h1>
+    <p class="t-paragraph">Page was not found</p> `
+  });
+</script>

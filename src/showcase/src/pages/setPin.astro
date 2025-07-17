@@ -1,0 +1,17 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Set Pin" pageName="setPin">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { setPinPage } from "$lib/legacy/flows/pin/setPin";
+
+    setPinPage({
+      i18n,
+      onContinue: (pin) => toast.info(`PIN: ${pin}`),
+      cancel: () => toast.info("cancel")
+    });
+  </script>
+</Screen>

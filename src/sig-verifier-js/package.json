@@ -1,0 +1,29 @@
+{
+  "name": "@dfinity/sig-verifier-js",
+  "type": "module",
+  "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
+  "exports": {
+    "./sig_verifier_js": "./dist/sig_verifier_js.js",
+    "./sig_verifier_js_bg": "./dist/sig_verifier_js_bg.js",
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "sig_verifier_js": [
+        "dist/sig_verifier_js.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "wasm-pack build --out-dir dist --release --scope dfinity && rm dist/package.json",
+    "test": "tsc --noEmit && vitest --config ./vitest.config.ts"
+  },
+  "devDependencies": {
+    "@dfinity/internet-identity-vite-plugins": "*",
+    "typescript": "5.2.2",
+    "vite": "^6.3.4",
+    "vite-plugin-wasm": "^3.3.0",
+    "vitest": "^0.34.0"
+  }
+}

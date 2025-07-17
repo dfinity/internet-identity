@@ -1,0 +1,18 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Manage Use Existing" pageName="manageUseExisting">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { manage } from "../templates";
+
+    manage.useExisting({
+      register: () => toast.info("Asked for registration"),
+      recover: () => toast.info("Asked for recovery"),
+      onSubmit: (userNumber) =>
+        toast.info(`User number submitted: ${userNumber.toString()}`),
+      addDevice: () => toast.info("Asked for adding device")
+    });
+  </script>
+</Screen>

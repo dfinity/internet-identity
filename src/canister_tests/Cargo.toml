@@ -1,0 +1,26 @@
+[package]
+name = "canister_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+base64.workspace = true
+flate2 = "1.0"
+hex.workspace = true
+lazy_static.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_cbor.workspace = true
+serde_bytes.workspace = true
+sha2.workspace = true
+
+internet_identity_interface.workspace = true
+identity_jose = { git = "https://github.com/dfinity/identity.rs.git",  rev = "aa510ef7f441848d6c78058fe51ad4ad1d9bd5d8", default-features = false}
+
+# All IC deps
+candid.workspace = true
+ic-cdk.workspace = true
+ic-representation-independent-hash.workspace = true
+ic-verifiable-credentials.workspace = true
+pocket-ic.workspace = true
+url = "2.5"

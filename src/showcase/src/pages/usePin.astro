@@ -1,0 +1,33 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Use Pin" pageName="usePin">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { html } from "lit-html";
+    import { usePinPage } from "$lib/legacy/flows/pin/usePin";
+
+    usePinPage({
+      verify: (pin: string) => {
+        toast.info(`submitted pin: '${pin}'`);
+        if (pin !== "123456") {
+          toast.info("correct pin is '123456'");
+          return Promise.resolve({ ok: false, error: "Invalid PIN" });
+        }
+        return Promise.resolve({
+          ok: true,
+          value: pin
+        });
+      },
+      i18n,
+      onContinue: (pin) =>
+        toast.success(
+          html`Success, PIN: <strong class="t-strong">${pin}</strong>`
+        ),
+      onUsePasskey: () => toast.info("Requested to use passkey"),
+      cancel: () => toast.info("Canceled")
+    });
+  </script>
+</Screen>

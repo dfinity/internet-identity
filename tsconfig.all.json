@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/frontend"],
+  "exclude": ["src/frontend/src/lib/generated/*"],
+  "references": [
+    {
+      "path": "./src/vc-api"
+    },
+    {
+      "path": "./src/sig-verifier-js"
+    },
+    {
+      "path": "./demos/test-app"
+    },
+    {
+      "path": "./demos/vc_issuer"
+    },
+    {
+      "path": "./src/vite-plugins"
+    }
+  ]
+}

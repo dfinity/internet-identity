@@ -1,0 +1,19 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Add Phrase" pageName="addPhrase">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import {
+      registerCurrentDeviceCurrentOriginPage
+    } from "$lib/legacy/flows/addDevice/registerCurrentDeviceCurrentOrigin";
+
+    registerCurrentDeviceCurrentOriginPage({
+      add: () => toast.info("Register current device"),
+      skip: () => toast.info("Skip"),
+      i18n
+    });
+  </script>
+</Screen>

@@ -1,0 +1,124 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display Manage" pageName="displayManage">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { userNumber } from "../constants";
+    import { dapps } from "../constants";
+    import { displayManagePage } from "$lib/legacy/flows/manage";
+    import { html } from "lit-html";
+    import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png";
+    import { PreLoadImage } from "$lib/utils/preLoadImage";
+
+    const identityBackground = new PreLoadImage(identityCardBackground.src);
+
+    displayManagePage({
+      identityBackground,
+      userNumber,
+      devices: {
+        authenticators: [
+          {
+            alias: "Chrome on iPhone",
+            isCurrent: true,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [BigInt(Date.now() * 1000000)]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 7)
+            ]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+            ]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+            ]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+            ]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+            ]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+            ]
+          },
+          {
+            alias: "Yubikey Blue",
+            isCurrent: false,
+            remove: () => toast.info("remove"),
+            rename: () => toast.info("rename"),
+            last_usage: [
+              BigInt(Date.now() * 1000000 - 1_000_000_000 * 60 * 60 * 24 * 30)
+            ]
+          }
+        ],
+        recoveries: {
+          recoveryPhrase: {
+            isProtected: true,
+            unprotect: () => toast.info("unprotect"),
+            reset: () => toast.info("reset")
+          }
+        },
+        pinAuthenticators: []
+      },
+      onAddDevice: () => {
+        toast.info("add device requested");
+      },
+      addRecoveryPhrase: () => {
+        toast.info("add recovery phrase");
+      },
+      addRecoveryKey: () => {
+        toast.info("add recovery key");
+      },
+      credentials: [],
+      onLinkAccount: () => {
+        toast.info("link account");
+      },
+      onUnlinkAccount: () => {
+        toast.info("unlink account");
+      },
+      dapps,
+      exploreDapps: () => {
+        toast.info("explore dapps");
+      }
+    });
+  </script>
+</Screen>

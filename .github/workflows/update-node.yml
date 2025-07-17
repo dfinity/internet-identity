@@ -1,0 +1,63 @@
+# A GitHub Actions workflow that regularly checks for new nodejs releases
+# and creates a PR on new versions.
+name: Node Update
+
+on:
+  schedule:
+    # check for new node versions daily at 7:30
+    - cron: "30 7 * * *"
+
+jobs:
+  node-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+        # First, check node's releases for a new version.
+      - name: Check new node version
+        id: update
+        run: |
+          current_node_version=$(cat ./.node-version)
+          echo "current node version '$current_node_version'"
+
+          # We look for the last released version that starts with the currently used major
+          # version, and then drop the "v" prefix (which .node-version doesn't use)
+          latest_node_version=$(curl -sSl https://nodejs.org/download/release/index.json \
+            | jq -cMr --arg prefix "v${current_node_version%%.*}" \
+            'sort_by(.data) | [.[] | select(.lts) | select(.version | startswith($prefix))][0] | .version | sub("^v"; "")')
+          echo "latest node version '$latest_node_version'"
+
+          if [ "$current_node_version" != "$latest_node_version" ]
+          then
+            echo node needs an update
+            echo "$latest_node_version" > ./.node-version
+            echo "updated=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=0" >> "$GITHUB_OUTPUT"
+          fi
+
+          cat ./.node-version
+
+        # If the .node-version was updated, create a PR.
+      - name: Create Pull Request
+        if: ${{ steps.update.outputs.updated == '1' }}
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: ./.node-version
+          commit-message: Update node version
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-node-update
+          delete-branch: true
+          title: "Update node version"
+
+        # Since the this is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Node update failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

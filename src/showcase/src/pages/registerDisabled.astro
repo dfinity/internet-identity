@@ -1,0 +1,11 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Registration Disabled" pageName="registerDisabled">
+  <script>
+    import { registerDisabled } from "$lib/legacy/flows/registerDisabled";
+
+    registerDisabled(["https://identity.internetcomputer.org"]);
+  </script>
+</Screen>

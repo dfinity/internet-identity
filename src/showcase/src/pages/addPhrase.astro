@@ -1,0 +1,18 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Add Phrase" pageName="addPhrase">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { addPhrasePage } from "$lib/legacy/flows/recovery/recoveryWizard";
+
+    addPhrasePage({
+      ok: () => toast.info("ok"),
+      cancel: () => toast.info("cancel"),
+      i18n,
+      intent: "userInitiated"
+    });
+  </script>
+</Screen>

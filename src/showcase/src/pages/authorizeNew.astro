@@ -1,0 +1,16 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Authorize New" pageName="authorizeNew">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { html } from "lit-html";
+    import { authz } from "../templates";
+
+    authz.firstTime({
+      useExisting: () => toast.info(html`Asked for existing`),
+      register: () => toast.info(html`Asked for registration`)
+    });
+  </script>
+</Screen>

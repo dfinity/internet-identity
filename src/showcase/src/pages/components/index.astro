@@ -1,0 +1,25 @@
+---
+const allComponents = await Astro.glob("./*.astro");
+---
+
+<html lang="en">
+  <head>
+    <title>II - Components</title>
+  </head>
+  <ul>
+    {
+      allComponents.map((C) => (
+        <li>
+          <div>
+            <C.default />
+          </div>
+          <a style="display: block; text-align: center;" href={C.url}>
+            View at {C.url}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+
+
+</html>

@@ -1,0 +1,19 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Add Phrase" pageName="addPhrase">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { addDeviceWarningPage } from "$lib/legacy/flows/recovery/recoveryWizard";
+
+    addDeviceWarningPage({
+      ok: () => toast.info("ok"),
+      remindLater: () => toast.info("Remind later"),
+      doNotRemindAgain: () => toast.info("Do not remind again"),
+      i18n,
+      status: "pin-only"
+    });
+  </script>
+</Screen>

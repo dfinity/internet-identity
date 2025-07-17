@@ -1,0 +1,60 @@
+# A GitHub Actions workflow that regularly creates a pull request to update Passkey AAGUID data
+name: Passkey AAGUID data update
+
+on:
+  schedule:
+    # Check for updates every week
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+jobs:
+  aaguid-update:
+    runs-on: ubuntu-latest
+    steps:
+      # Create app token (needed to create pull request)
+      - name: Create GitHub App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_APP_ID }}
+          private-key: ${{ secrets.PR_AUTOMATION_BOT_PUBLIC_PRIVATE_KEY }}
+
+      # Checkout project
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Install dependencies (needed for formatter step)
+      - run: npm ci
+
+      # Run the update
+      - name: Check new Passkey AAGUID file
+        id: update
+        run: ./scripts/update-passkey-aaguid
+
+      # Run the formatter so that the passkey_aaguid_data.json file is formatted
+      - run: npm run format
+
+      # If the Passkey AAGUID data changed, create a PR.
+      # This action creates a PR only if there are changes.
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@6d6857d36972b65feb161a90e484f2984215f83e # v6.0.5
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          base: main
+          add-paths: src/frontend/src/assets/passkey_aaguid_data.json
+          commit-message: Update Passkey AAGUID
+          committer: GitHub <noreply@github.com>
+          branch: bot-passkey-aaguid-update
+          delete-branch: true
+          title: "Update Passkey AAGUID data"
+
+      # Since this is a scheduled job, a failure won't be shown on any PR status.
+      # To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Passkey AAGUID data update failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

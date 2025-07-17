@@ -1,0 +1,17 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Manage Pick" pageName="managePick">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { manage } from "../templates";
+
+    manage.pick({
+      anchors: [BigInt(10000), BigInt(243099)],
+      moreOptions: () => toast.info("Asked for more options"),
+      onSubmit: (userNumber) =>
+        toast.info(`User number submitted: ${userNumber.toString()}`)
+    });
+  </script>
+</Screen>

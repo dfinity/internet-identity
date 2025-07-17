@@ -1,0 +1,24 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Display User Number Temp Key" pageName="displayUserNumberTempKey">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { userNumber } from "../constants";
+    import { i18n } from "../i18n";
+    import { displayUserNumberPage } from "$lib/legacy/flows/register/finish";
+    import { tempKeyWarningBox } from "$lib/legacy/flows/manage/tempKeys";
+    import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png";
+    import { PreLoadImage } from "$lib/utils/preLoadImage";
+
+    const identityBackground = new PreLoadImage(identityCardBackground.src);
+
+    displayUserNumberPage({
+      identityBackground,
+      userNumber,
+      onContinue: () => toast.info("done"),
+      marketingIntroSlot: tempKeyWarningBox({ i18n })
+    });
+  </script>
+</Screen>

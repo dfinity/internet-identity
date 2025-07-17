@@ -1,0 +1,17 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Reset Phrase Info" pageName="resetPhraseInfo">
+  <script>
+    import { toast } from "$lib/templates/toast";
+    import { i18n } from "../i18n";
+    import { resetPhraseInfoPage } from "$lib/legacy/flows/manage/deviceSettings";
+
+    resetPhraseInfoPage({
+      next: () => toast.info("next"),
+      cancel: () => toast.info("cancel"),
+      i18n
+    });
+  </script>
+</Screen>

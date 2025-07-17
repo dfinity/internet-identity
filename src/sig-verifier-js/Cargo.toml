@@ -1,0 +1,24 @@
+[package]
+name = "sig_verifier_js"
+description = "JavaScript Wasm wrapper for verifying signatures"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+ic-canister-sig-creation.workspace = true
+ic-signature-verification = "0.2"
+candid.workspace = true
+hex = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["std"] }
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+assert_matches = "1.5"
+
+[lints.rust]
+# Needed to solve a clippy issue with `#[wasm_bindgen(js_name = validateDelegationAndGetPrincipal)]`
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(wasm_bindgen_unstable_test_coverage)'] }

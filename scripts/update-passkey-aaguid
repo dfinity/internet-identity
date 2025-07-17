@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+JSON_FILE="$PWD/src/frontend/src/lib/legacy/assets/passkey_aaguid_data.json"
+
+if [[ -f "$JSON_FILE" ]]; then
+    declare -A currentEntries
+    while IFS="= " read -r key value; do
+        currentEntries["$key"]="$value"
+    done < <(jq -r 'to_entries | map("\(.key)=\(.value)") | .[]' "$JSON_FILE")
+else
+    declare -A currentEntries=()
+fi
+
+curl_output=$(curl -sL "https://mds3.fidoalliance.org")
+base64_content=$(echo "$curl_output" | awk -F'.' '{printf "%s", $2}' | tr '_-' '/+')
+
+padding_needed=$((4 - ${#base64_content} % 4))
+if [ $padding_needed -ne 4 ]; then
+    base64_content="${base64_content}$(printf '=%.0s' $(seq 1 $padding_needed))"
+fi
+
+decoded_content=$(echo "$base64_content" | base64 --decode)
+
+declare -A fidoEntries
+fidoEntries_json=$(echo "$decoded_content" | jq -r '.entries | map(select(.aaguid) | "\(.aaguid)=\(.metadataStatement.description)") | .[]')
+while IFS="= " read -r key value; do
+    fidoEntries["$key"]="$value"
+done <<< "$fidoEntries_json"
+
+declare -A communityEntries
+while IFS="= " read -r key value; do
+    communityEntries["$key"]="$value"
+done < <(curl -sL "https://raw.githubusercontent.com/passkeydeveloper/passkey-authenticator-aaguids/main/aaguid.json" | jq -r 'to_entries | map("\(.key)=\(.value.name)") | .[]')
+
+# Merge entries, with communityEntries overriding fidoEntries and fidoEntries overriding currentEntries
+declare -A combinedEntries
+for key in "${!currentEntries[@]}"; do
+    combinedEntries["$key"]="${currentEntries[$key]}"
+done
+
+for key in "${!fidoEntries[@]}"; do
+    combinedEntries["$key"]="${fidoEntries[$key]}"
+done
+
+for key in "${!communityEntries[@]}"; do
+    combinedEntries["$key"]="${communityEntries[$key]}"
+done
+
+{
+    echo "{"
+    for key in "${!combinedEntries[@]}"; do
+        echo "  \"$key\": \"${combinedEntries[$key]}\","
+    done | sed '$ s/,$//'
+    echo "}"
+} > "$JSON_FILE"
+
+echo "Updated $JSON_FILE successfully."

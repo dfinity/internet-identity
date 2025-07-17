@@ -1,0 +1,142 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { readdirSync } from "fs";
+import Styleguide from "../components/Styleguide.astro";
+
+const files = readdirSync("./src/showcase/src/pages/");
+// This also includes the folders which is ok becuause they have an index.astro
+// file that can then be used to link from this home to their pages.
+const fileNames = files.map((file) => file.replace(".astro", ""));
+const NO_NAVBAR_ITESM = ["index", "404"];
+const navbarItems = fileNames.filter((file) => !NO_NAVBAR_ITESM.includes(file));
+---
+
+<style>
+    .showcase-grid {
+        display: grid;
+        list-style-type: none;
+        width: 100vw;
+        grid-template-columns: repeat(auto-fill, minmax(25rem, 1fr));
+    }
+
+    .showcase-grid > aside {
+        position: relative;
+        aspect-ratio: 0.75;
+    }
+
+    .showcase-grid a {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        outline: 1px solid #ccc;
+    }
+
+    .showcase-grid iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 200%;
+        height: 200%;
+        transform-origin: 0 0;
+        transform: scale(0.5);
+        border: none;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .showcase-grid h2 {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.25);
+        margin: 0;
+        color: #202124;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+        font-size: 1.25rem;
+    }
+
+    .i18n-example {
+        margin: 10rem auto;
+        max-width: 60rem;
+        padding: 0 2rem;
+    }
+</style>
+
+<Layout title="Showcase">
+  <main id="pageContent" aria-live="polite"></main>
+  <h1 class="t-title t-title--main">showcase</h1>
+  <div class="showcase-grid l-stack">
+    {navbarItems.map((pageName) => {
+      // '/' or '/internet-identity/'
+
+      const baseUrl = import.meta.env.BASE_URL ?? "/";
+      // '/myPage' or '/internet-identity/myPage'
+
+      const pageLink = baseUrl + pageName;
+      return <aside>
+        <a data-page-name={pageName} href={pageLink}>
+          <iframe src={pageLink} title={pageName}></iframe>
+          <h2>{pageName}</h2>
+        </a>
+      </aside>;
+    })}
+  </div>
+  <section class="i18n-example" id="i18n-example">
+  </section>
+  <Styleguide />
+
+  <script>
+    import { I18n } from "$lib/utils/i18n";
+    import { html, render } from "lit-html";
+    import { asyncReplace } from "lit-html/directives/async-replace.js";
+
+    const i18nExample = () => {
+      type Lang = "en" | "fr";
+      const exampleI18n = new I18n<Lang>("en");
+
+      const copy = exampleI18n.i18n({
+        en: {
+          title: "i18n support",
+          paragraph:
+            "This is an example of internationalization support in Internet Identity. Click a button to change the language."
+        },
+        fr: {
+          title: "support i18n",
+
+          paragraph:
+            "Ceci est un exemple de support multi-language dans Internet Identity. Cliquez un des boutons ci-dessous pour changer la langue."
+        }
+      });
+
+      const langIs = (lang: Lang) =>
+        asyncReplace(exampleI18n.getLanguageAsync(), (x) => x == lang);
+      const langButton = (lang: Lang) => html`
+        <button
+          ?disabled=${langIs(lang)}
+          class="c-button"
+          @click=${() => exampleI18n.setLanguage(lang)}
+        >
+          ${lang}
+        </button>
+      `;
+
+      return html`
+        <section class="i18n-example">
+          <article class="l-stack c-card c-card--highlight">
+            <h2 class="t-title t-tile--main">${copy.title}</h2>
+            <p class="t-lead">${copy.paragraph}</p>
+            <div class="c-button-group">
+              ${langButton("en")} ${langButton("fr")}
+            </div>
+          </article>
+        </section>
+      `;
+    };
+
+    const i18nExampleElement = document.getElementById("i18n-example") as HTMLElement;
+    render(i18nExample(), i18nExampleElement);
+  </script>
+</Layout>

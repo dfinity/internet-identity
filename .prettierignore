@@ -1,0 +1,25 @@
+# Various IDEs and Editors
+.vscode/
+.idea/
+**/*~
+
+# Mac OSX temporary files
+.DS_Store
+**/.DS_Store
+
+# dfx temporary files
+.dfx/
+
+# frontend code
+node_modules/
+src/frontend/generated/
+src/vc-api/src/generated/
+dist/
+.env
+lib
+!src/frontend/src/lib
+src/frontend/src/lib/generated
+demos/vc_issuer/app/generated/
+
+# Cargo build output
+target/

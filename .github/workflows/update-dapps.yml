@@ -1,0 +1,53 @@
+# A GitHub Actions workflow that regularly creates a pull request to update dapps list & logos
+name: Dapps Update
+
+on:
+  # TODO: Enable once we fix the script
+  # schedule:
+  # Check for updates daily
+  # - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  dapps-update:
+    runs-on: ubuntu-latest
+    steps:
+      - run: sudo apt-get update && sudo apt-get install -y imagemagick
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+
+      # Run the update
+      - name: Check new dapps file
+        id: update
+        run: ./scripts/update-dapps
+
+      # Run the formatter so that the dapps.json file is formatted
+      - run: npm run format
+
+      # If the dapps changed, create a PR.
+      # This action creates a PR only if there are changes.
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GIX_BOT_PAT }}
+          base: main
+          add-paths: |
+            src/frontend/src/flows/dappsExplorer/dapps.json
+            src/frontend/src/assets/icons
+          commit-message: Update dapps
+          committer: GitHub <noreply@github.com>
+          author: gix-bot <gix-bot@users.noreply.github.com>
+          branch: bot-dapps-update
+          delete-branch: true
+          title:
+            "Update dapps list"
+
+            # Since the this is a scheduled job, a failure won't be shown on any
+            # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Dapps update failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

@@ -1,0 +1,12 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Forgot II Number" pageName="forgotNumber">
+  <script>
+    import { forgotNumberPage } from "$lib/legacy/flows/recovery/forgotNumber";
+    import { toast } from "$lib/templates/toast";
+
+    forgotNumberPage({ cancel: () => toast.info("cancel") });
+  </script>
+</Screen>

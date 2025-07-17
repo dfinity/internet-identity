@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+#########
+# USAGE #
+#########
+
+function title() {
+    echo "Provisioning issuer canister" >&2
+}
+
+function usage() {
+    cat >&2 << EOF
+
+Usage:
+  $0 [--ii-canister-id CANISTER_ID] [--dfx-network NETWORK]
+
+Options:
+  --ii-canister-id CANISTER_ID    The canister ID to use as IDP, defaults to the local internet_identity canister
+  --dfx-network NETWORK           The network to use (typically "local" or "ic"), defaults to "local"
+  --issuer-canister CANISTER      The canister to configure (name or canister ID), defaults to "issuer"
+  --issuer-derivation-origin URL  The issuer's derivation origin, defaults to <issuer-canister-id>.icp0.io
+  --issuer-frontend-hostname URL  The issuer's frontend hostname, defaults to issuer's derivation origin
+  --wallet CANISTER_ID            Optional wallet canister ID to use to configure the issuer, if any.
+EOF
+}
+
+function help() {
+    cat >&2 << EOF
+
+The issuer canister needs some information to operate correctly. This reads data
+from the replica to ensure the issuer is provisioned correctly.
+EOF
+}
+
+II_CANISTER_ID=
+DFX_NETWORK=
+WALLET=
+
+while [[ $# -gt 0  ]]
+do
+    case "$1" in
+        -h|--help)
+            title
+            usage
+            help
+            exit 0
+            ;;
+        --ii-canister-id)
+            II_CANISTER_ID="${2:?missing value for '--ii-canister-id'}"
+            shift; # shift past --ii-canister-id & value
+            shift;
+            ;;
+        --dfx-network)
+            DFX_NETWORK="${2:?missing value for '--dfx-network'}"
+            shift; # shift past --dfx-network & value
+            shift;
+            ;;
+        --issuer-canister)
+            ISSUER_CANISTER="${2:?missing value for '--issuer-canister'}"
+            shift; # shift past --issuer-canister & value
+            shift;
+            ;;
+        --issuer-derivation-origin)
+            ISSUER_DERIVATION_ORIGIN="${2:?missing value for '--issuer-derivation-origin'}"
+            shift; # shift past --issuer-canister & value
+            shift;
+            ;;
+        --issuer-frontend-hostname)
+            ISSUER_FRONTEND_HOSTNAME="${2:?missing value for '--issuer-frontend-hostname'}"
+            shift; # shift past --issuer-canister & value
+            shift;
+            ;;
+        --wallet)
+            WALLET="${2:?missing value for '--wallet'}"
+            shift; # shift past --wallet & value
+            shift;
+            ;;
+        *)
+            echo "ERROR: unknown argument $1"
+            usage
+            echo
+            echo "Use '$0 --help' for more information"
+            exit 1
+            ;;
+    esac
+done
+
+
+DFX_NETWORK="${DFX_NETWORK:-local}"
+II_CANISTER_ID="${II_CANISTER_ID:-$(dfx canister id internet_identity)}"
+ISSUER_CANISTER="${ISSUER_CANISTER:-issuer}"
+ISSUER_CANISTER_ID=$(dfx canister id "$ISSUER_CANISTER")
+DEFAULT_DERIVATION_ORIGIN="https://$ISSUER_CANISTER_ID.icp0.io"
+ISSUER_DERIVATION_ORIGIN="${ISSUER_DERIVATION_ORIGIN:-$DEFAULT_DERIVATION_ORIGIN}"
+ISSUER_FRONTEND_HOSTNAME="${ISSUER_FRONTEND_HOSTNAME:-$ISSUER_DERIVATION_ORIGIN}"
+
+echo "Using DFX network: $DFX_NETWORK" >&2
+
+# At the time of writing dfx outputs incorrect JSON with dfx ping (commas between object
+# entries are missing).
+# In order to read the root key we grab the array from the '"root_key": [...]' bit, the brackets
+# to match what candid expects ({}), replace the commas between array entries to match
+# what candid expects (semicolon) and annotate the numbers with their type (otherwise dfx assumes 'nat'
+# instead of 'nat8').
+rootkey_did=$(dfx ping "$DFX_NETWORK" \
+    | sed -n 's/.*"root_key": \[\(.*\)\].*/{\1}/p' \
+    | sed 's/\([0-9][0-9]*\)/\1:nat8/g' \
+    | sed 's/,/;/g')
+
+echo "Parsed rootkey: ${rootkey_did:0:20}..." >&2
+
+echo "Using II canister: $II_CANISTER_ID" >&2
+echo "Using issuer derivation origin: $ISSUER_DERIVATION_ORIGIN" >&2
+echo "Using issuer frontend_hostname: $ISSUER_FRONTEND_HOSTNAME" >&2
+
+declare -a WALLET_ARG=( )
+
+if [ "$WALLET" ]
+then
+    echo "Using wallet: $WALLET" >&2
+    WALLET_ARG+=( "--wallet" "$WALLET")
+fi
+
+dfx canister call "${WALLET_ARG[@]}" --network "$DFX_NETWORK" "$ISSUER_CANISTER" configure \
+    '(record { idp_canister_ids = vec{ principal "'"$II_CANISTER_ID"'" }; ic_root_key_der = opt vec '"$rootkey_did"'; derivation_origin = "'"$ISSUER_DERIVATION_ORIGIN"'"; frontend_hostname = "'"$ISSUER_FRONTEND_HOSTNAME"'"})'

@@ -1,0 +1,106 @@
+# This workflow regularly performs a build using the latest release's code
+# and matches the resulting checksum against the checksum of the release's asset.
+#
+# We use this regular check to be notified early if our builds are not reproducible
+# over time (due to e.g. changing or missing dependencies).
+name: Release Build Check
+
+on:
+  schedule:
+    # check build daily at 7:30
+    - cron: "30 7 * * *"
+
+jobs:
+  # First, gather some info about the latest release, namely:
+  # * The tag name for the checkout
+  # * The checksum of the production asset
+  latest-release:
+    outputs:
+      ref: ${{ steps.release.outputs.ref }}
+      ii_prod_sha256: ${{ steps.release.outputs.ii_prod_sha256 }}
+      archive_sha256: ${{ steps.release.outputs.archive_sha256 }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get latest release information
+        run: |
+          release_data=$(curl --silent -H 'Accept: application/vnd.github.v3+json' https://api.github.com/repos/dfinity/internet-identity/releases/latest)
+          latest_release_ref=$(echo -n "$release_data" | jq -cMr .tag_name)
+          # The GitHub API has some hiccups, so we check the value before going further
+          if [ -z "$latest_release_ref" ] || [ "$latest_release_ref" = "null" ]
+          then
+            echo "expected a release ref, got '$latest_release_ref'"
+            exit 1
+          fi
+          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/internet_identity_production.wasm.gz" -o internet_identity_production.wasm.gz
+          curl --silent -SL "https://github.com/dfinity/internet-identity/releases/download/$latest_release_ref/archive.wasm.gz" -o archive.wasm.gz
+          latest_release_ii_prod_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
+          latest_release_archive_sha256=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1)
+          echo latest release is "$latest_release_ref"
+          echo latest prod release sha256 is "$latest_release_ii_prod_sha256"
+          echo latest archive release sha256 is "$latest_release_archive_sha256"
+          echo "ref=$latest_release_ref" >> "$GITHUB_OUTPUT"
+          echo "ii_prod_sha256=$latest_release_ii_prod_sha256" >> "$GITHUB_OUTPUT"
+          echo "archive_sha256=$latest_release_archive_sha256" >> "$GITHUB_OUTPUT"
+        id: release
+        # Since the release build check is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Release build check failed (could not get release): https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # Perform the clean build (non-docker), using the release as checkout
+  clean-build:
+    runs-on: ${{ matrix.os }}
+    needs: latest-release
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04, macos-13, macos-14]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "refs/tags/${{ needs.latest-release.outputs.ref }}"
+
+      - uses: ./.github/actions/check-build
+        with:
+          # we check that ubuntu builds match the latest release build
+          sha256: ${{ startsWith(matrix.os, 'ubuntu') && needs.latest-release.outputs.ii_prod_sha256 || '' }}
+
+        # Since the release build check is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Release build check failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  # Verify the hash using the verify-hash script, using the release as checkout.
+  # This runs the build using docker and should work on all platforms.
+  verify-build-dockerized:
+    runs-on: ${{ matrix.os }}
+    needs: latest-release
+    strategy:
+      matrix:
+        # docker builds on macos are flaky or not supported at all (in case of ARM based runners). The signal they gave
+        # was minimal, so we will skip them for now until there is a reliable way to run docker images on macos runners.
+        os: [ubuntu-22.04, ubuntu-20.04]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "refs/tags/${{ needs.latest-release.outputs.ref }}"
+
+      - name: "Verify Hash"
+        run: |
+          ./scripts/verify-hash --ii-hash ${{ needs.latest-release.outputs.ii_prod_sha256 }} --archive-hash ${{ needs.latest-release.outputs.archive_sha256 }}
+
+        # Since the release build check is a scheduled job, a failure won't be shown on any
+        # PR status. To notify the team, we send a message to our Slack channel on failure.
+      - name: Notify Slack on failure
+        uses: ./.github/actions/slack
+        if: ${{ failure() }}
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: "Verify hash check failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

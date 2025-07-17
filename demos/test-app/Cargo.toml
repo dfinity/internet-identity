@@ -1,0 +1,21 @@
+[workspace]
+
+[package]
+name = "test_app"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+asset_util = { path = "../../src/asset_util" }
+candid = "0.10"
+ic-cdk = "0.16"
+ic-cdk-macros = "0.16"
+serde = "1"
+serde_bytes = "0.11"
+include_dir = "0.7"

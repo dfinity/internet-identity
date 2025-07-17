@@ -1,0 +1,18 @@
+name: PR Review Requested
+
+on:
+  pull_request:
+    types: [review_requested]
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Send Slack notification on PR review requested
+        if: github.event.requested_reviewer.login == 'LXIF' || github.event.requested_reviewer.login == 'sea-snake' || github.event.requested_reviewer.login == 'lmuntaner'
+        uses: ./.github/actions/slack
+        with:
+          WEBHOOK_URL: ${{ secrets.SLACK_PRIVATE_IDENTITY_WEBHOOK_URL }}
+          MESSAGE: |
+            <@${{ github.event.requested_reviewer.login == 'LXIF' && 'U07QU4DNV5Y' || github.event.requested_reviewer.login == 'sea-snake' && 'U07QU79GX0T' || github.event.requested_reviewer.login == 'lmuntaner' && 'U02TEQHKV35' }}>: New PR ready for review: <${{ github.event.pull_request.html_url }}|${{ github.event.pull_request.title }}>.

@@ -1,0 +1,17 @@
+---
+import Screen from "../layouts/Screen.astro";
+---
+
+<Screen title="Prompt Recovery" pageName="promptRecovery">
+  <script>
+    import { promptRecoveryPage } from "$lib/legacy/flows/recovery/promptRecovery";
+    import { toast } from "$lib/templates/toast";
+
+    promptRecoveryPage({
+      onUsePhrase: () => toast.info("Use phrase"),
+      onUseDevice: () => toast.info("Use device"),
+      onForgotAnchor: () => toast.info("Anchor forgotten"),
+      cancel: () => toast.info("cancel")
+    });
+  </script>
+</Screen>
