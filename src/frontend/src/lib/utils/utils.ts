@@ -463,3 +463,24 @@ export const retryFor = async <T>(
   }
   throw lastError;
 };
+
+/**
+ * Generate secure random id
+ * @param length How long the generated id should be
+ * @param dictionary Characters to use to generate id (defaults to base62)
+ */
+export const secureRandomId = (
+  length: number,
+  dictionary = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+) => {
+  const chars: string[] = [];
+  while (chars.length < length) {
+    // Randomly pick character from dictionary through rejection sampling
+    const value = crypto.getRandomValues(new Uint8Array(1))[0];
+    if (value >= 256 - (256 % dictionary.length)) {
+      continue;
+    }
+    chars.push(dictionary[value % dictionary.length]);
+  }
+  return chars.join("");
+};

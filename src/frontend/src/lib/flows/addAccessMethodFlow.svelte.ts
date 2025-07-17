@@ -8,7 +8,7 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
-import { throwCanisterError, waitFor } from "$lib/utils/utils";
+import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
 import type {
   AuthnMethodData,
   OpenIdCredential,
@@ -22,8 +22,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { bufferEqual } from "$lib/utils/iiConnection";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
-const BASE_62_CHARS =
-  "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const REGISTRATION_ID_LENGTH = 5;
 
 export interface AddAccessMethodFlowOptions {
   isMaxOpenIdCredentialsReached?: boolean;
@@ -129,9 +128,7 @@ export class AddAccessMethodFlow {
 
   continueOnAnotherDevice = async (): Promise<void> => {
     const { actor, identityNumber } = get(authenticatedStore);
-    const registrationId = Array.from(crypto.getRandomValues(new Uint8Array(5)))
-      .map((value) => BASE_62_CHARS[value % 62])
-      .join("");
+    const registrationId = secureRandomId(REGISTRATION_ID_LENGTH);
 
     this.view = "continueOnAnotherDevice";
     this.isRegistrationWindowPassed = false;
