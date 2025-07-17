@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
   clearStorage,
-  createIdentity,
   createNewIdentityInII,
   dummyAuth,
   II_URL,
@@ -87,21 +86,21 @@ test("User can log in the dashboard and add a new passkey from another device", 
 
   await page.getByRole("button", { name: "Confirm sign-in" }).click();
 
-  await linkPage
-    .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
-    .waitFor();
-
   await page
     .getByRole("heading", { level: 1, name: "Continue on your new device" })
     .waitFor();
 
+  await linkPage
+    .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
+    .waitFor();
+
   // Create and register new passkey
   const authLinkPage = dummyAuth();
-  await linkPage.getByRole("button", { name: "Create passkey" }).click();
   authLinkPage(linkPage);
+  await linkPage.getByRole("button", { name: "Create passkey" }).click();
 
   await linkPage
-    .getByRole("button", { name: "Create passkey" })
+    .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
     .waitFor({ state: "hidden" });
 
   await page
