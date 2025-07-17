@@ -134,9 +134,9 @@ export class AddAccessMethodFlow {
       `/pair#${registrationId}`,
       window.location.origin,
     );
-    this.view = "continueOnAnotherDevice";
     this.isRegistrationWindowPassed = false;
     this.isRegistrationWindowOpen = true;
+    this.view = "continueOnAnotherDevice";
 
     try {
       // Always exit any ongoing registration mode first
