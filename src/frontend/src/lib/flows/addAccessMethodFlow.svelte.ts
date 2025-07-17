@@ -130,13 +130,13 @@ export class AddAccessMethodFlow {
     const { actor, identityNumber } = get(authenticatedStore);
     const registrationId = secureRandomId(REGISTRATION_ID_LENGTH);
 
-    this.view = "continueOnAnotherDevice";
-    this.isRegistrationWindowPassed = false;
-    this.isRegistrationWindowOpen = true;
     this.newDeviceLink = new URL(
       `/pair#${registrationId}`,
       window.location.origin,
     );
+    this.view = "continueOnAnotherDevice";
+    this.isRegistrationWindowPassed = false;
+    this.isRegistrationWindowOpen = true;
 
     try {
       // Always exit any ongoing registration mode first
