@@ -7,19 +7,13 @@ import {
   TEST_APP_URL,
 } from "../utils";
 
-// Define canonical URL for testing alternative origins
-// const TEST_APP_CANONICAL_URL = "https://canonical-name.ic0.app";
-
 test("Should not issue delegation when alternative origins are empty", async ({
   page,
 }) => {
-  // Navigate to the test app
   await page.goto(TEST_APP_URL);
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-
-  // Reset alternative origins
   await page.locator("#hostUrl").fill("https://icp-api.io");
   await page
     .locator("#newAlternativeOrigins")
@@ -48,13 +42,10 @@ test("Should not issue delegation when alternative origins are empty", async ({
 test("Should not issue delegation when origin is missing from /.well-known/ii-alternative-origins", async ({
   page,
 }) => {
-  // Navigate to the test app
   await page.goto(TEST_APP_URL);
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-
-  // Reset alternative origins
   await page.locator("#hostUrl").fill("https://icp-api.io");
   const alternativeOrigins = JSON.stringify({
     alternativeOrigins: [NOT_TEST_APP_URL],
@@ -85,7 +76,6 @@ test("Should not issue delegation when origin is missing from /.well-known/ii-al
 test("Should issue delegation when derivationOrigin is properly configured in /.well-known/ii-alternative-origins", async ({
   page,
 }) => {
-  // Navigate to the test app
   await page.goto(TEST_APP_URL);
 
   // Configure the test app
@@ -93,7 +83,6 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   const alternativeOrigins = JSON.stringify({
     alternativeOrigins: [TEST_APP_URL],
   });
-
   await page.locator("#hostUrl").fill("https://icp-api.io");
   await page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
   await page.locator("#certified").click();
