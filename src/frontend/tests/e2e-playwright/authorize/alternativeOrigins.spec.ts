@@ -103,10 +103,10 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   const authPage = await pagePromise;
 
   // Create a new identity in II
-  const auth = dummyAuth();
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
   await authPage.getByRole("button", { name: "Set up a new Passkey" }).click();
   await authPage.getByLabel("Identity name").fill("John Doe");
+  const auth = dummyAuth();
   auth(authPage);
   await authPage.getByRole("button", { name: "Create Passkey" }).click();
 
