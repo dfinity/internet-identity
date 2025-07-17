@@ -14,9 +14,11 @@
   let {
     xSpacing = 50,
     ySpacing = 50,
+    continuousRepel = false,
   }: {
     xSpacing?: number;
     ySpacing?: number;
+    continuousRepel?: boolean;
   } = $props();
 
   const STIFFNESS = 0.1;
@@ -70,12 +72,8 @@
   let springs: Spring<{ x: number; y: number }>[][] = $state([[]]);
 
   onMount(() => {
-    animateRepel();
+    if (continuousRepel) animateRepel();
   });
-
-  const createSpringsLocal = (xCount: number, yCount: number) => {
-    springs = createSprings(xCount, yCount, Spring, STIFFNESS, DAMPING);
-  };
 
   $effect(() => {
     if (xPositions.length > 0 && yPositions.length > 0) {
@@ -83,9 +81,30 @@
     }
   });
 
+  const createSpringsLocal = (xCount: number, yCount: number) => {
+    springs = createSprings(xCount, yCount, Spring, STIFFNESS, DAMPING);
+  };
+
   const handlePointerMove = (e: PointerEvent) => {
     pointerX = e.clientX;
     pointerY = e.clientY;
+    if (!continuousRepel && pointerInside) {
+      createContinuousWave(
+        pointerX,
+        pointerY,
+        xPositions,
+        yPositions,
+        offsetX,
+        offsetY,
+        springs,
+        xSpacing,
+        ySpacing,
+        MOUSE_RADIUS,
+        MOUSE_SCALAR,
+        WAVE_SPEED,
+        IMPULSE_DURATION,
+      );
+    }
   };
 
   const handlePointerEnter = () => {
@@ -109,7 +128,12 @@
   };
 
   function animateRepel() {
-    if (pointerInside && pointerX !== null && pointerY !== null) {
+    if (
+      continuousRepel &&
+      pointerInside &&
+      pointerX !== null &&
+      pointerY !== null
+    ) {
       createContinuousWave(
         pointerX,
         pointerY,
@@ -125,8 +149,8 @@
         WAVE_SPEED,
         IMPULSE_DURATION,
       );
+      requestAnimationFrame(animateRepel);
     }
-    requestAnimationFrame(animateRepel);
   }
 
   const handleReset = () => {

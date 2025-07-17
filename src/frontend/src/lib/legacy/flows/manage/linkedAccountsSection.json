@@ -1,0 +1,18 @@
+{
+  "en": {
+    "account_already_linked": "This account has already been linked",
+    "third_party_sign_in_permission_required": "You need to enable the \"Third-party sign-in\" browser permission for this site",
+    "link_your_account_to_hold_assets_and_sign_into_dapps": "Link your online account to hold assets and securely sign into dapps.",
+    "use_your_accounts_to_hold_assets_and_sign_into_dapps": "Use your online accounts to hold assets and securely sign into dapps.",
+    "link_account": "Link account",
+    "link_additional_account": "Link additional account",
+    "max_linked_accounts_reached": "You can link up to 100 online accounts. You must unlink an account before you can link another.",
+    "unlink": "Unlink",
+    "last_used": "Last used",
+    "authentication_failed": "Authentication failed",
+    "jwt_signature_invalid": "The account could not be linked due to an invalid signature.",
+    "account_not_found": "The account could not be found.",
+    "linking_google_accounts_is_unavailable": "Linking Google accounts is unavailable. Please try again later.",
+    "current_account_label": "Current account"
+  }
+}

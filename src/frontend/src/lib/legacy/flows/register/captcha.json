@@ -1,0 +1,11 @@
+{
+  "en": {
+    "title": "Prove you're not a robot",
+    "retry": "retry",
+    "instructions": "Type the characters you see",
+    "cancel": "Cancel",
+    "verifying": "Verifying...",
+    "next": "Next",
+    "incorrect": "Try one more time."
+  }
+}

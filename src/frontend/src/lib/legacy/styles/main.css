@@ -1,0 +1,3556 @@
+/*
+                                    _  _____  __    __   __
+                                   | |  | |  / /`  ( (` ( (`
+                                   |_|  |_|  \_\_, _)_) _)_)
+
+                                          `-.` '.-'
+                                       `-.    A   .-'.
+                                    `-.    -./_\.-    .-'
+                                        -.  /___\  .-
+                                    `-.   `/__|__\'   .-'.
+                                 `-.    -./.-"^"-.\.-      '
+                                    `-.  / <`(o)*> \  .-'
+                                 .-   .`/__`-...-'__\'   .-
+                                ,...`-./_/____|____\_\.-'.,.
+                                   ,-'    ,` . . ',   `-,
+                               _,-' /____/____.____\____\ `-,_
+                                       ,      |      .
+                                      /     ,.+.,     \
+
+   -<# ITCSS (Inverted Triangle CSS) -> (https://csswizardry.com/2018/11/itcss-and-skillshare/) #>-
+  __________________________________________________________________________________________________
+   \---------------------------/------------                          Generic CSS (Low specificity)
+    \                         /  I)   Settings (Design)                            Y
+     \-----------------------/----------------                                     |
+      \                     /    II)  Theme Settings                               |
+       \-------------------/--------------------                                   |
+        \                 /      III) Generic                                      |
+         \---------------/------------------------                                 |
+          \             /        IV)  Elements                                     |
+           \-----------/----------------------------                               |
+            \         /          V)   Objects                                      |
+             \-------/--------------------------------                             |
+              \     /            VI)  Components                                   |
+               \---/------------------------------------                           |
+                \ /              VII) Utilities (Trumps)                           V
+                 V                                                   Explicit CSS (High specificity)
+
+  I)   Settings:             Global variables, config switches.
+  II)  Theme Settings:       DarkMode, LightMode, Product Specific stuff
+  III) Generic:              Ground-zero styles (Normalize.css, resets, box-sizing).
+  IV)  Base:                 Un-classed HTML elements (type selectors).
+  V)   Objects:              Cosmetic-free design patterns (grids, layouts, etc).
+  VI)  Components:           Designed components, chunks of UI.
+  VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, etc)
+
+*/
+
+@font-face {
+  font-family: "Circular";
+  src: url("CircularXXWeb-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Circular";
+  src: url("CircularXXWeb-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Circular";
+  src: url("CircularXXWeb-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+/* Workaround font for pretending a field is a password without setting type="password"
+ * (all chars in the font are the dot symbol) */
+@font-face {
+  font-family: "password";
+  font-style: normal;
+  font-weight: 400;
+  src: url("dots.woff2") format("woff2");
+}
+
+/* I) Settings: Global variables, config switches. */
+
+:root {
+  /**
+     * z-index tokens: z-index (--z => valueZindex)
+     *
+     * z-index tokens are used to control the stacking order of elements.
+     * they are not a reference token, nor a value token as they are more about
+     * technical implementation than design.
+    **/
+
+  --z-background: 1;
+  --z-foreground: 2;
+  --z-backdrop: 5;
+  --z-tooltip: 10;
+  --z-loader: 30;
+  --z-toasts: 50;
+
+  /*
+   * value tokens
+   *
+   * raw basic values that should not be used within your components.
+   * they control the design system on a higher level and should be used only
+   * in the root element.
+   *
+   */
+
+  /* value tokens: colors (--vc => valueColor) */
+  --vc-raven: #202124;
+  --vc-snow: #ffffff;
+
+  --vc-mist: rgba(255, 255, 255, 0.3);
+  --vc-vapour: rgba(255, 255, 255, 0.6);
+  --vc-shadow: rgba(32, 33, 36, 0.6);
+  --vc-night: rgba(32, 33, 36, 0.8);
+
+  --vc-red: #ff0000;
+  --vc-silver: #d9d9d9;
+
+  --vc-brand-orange: #f15a24;
+  --vc-brand-yellow: #fbb03b;
+  --vc-brand-pink: #ed1e79;
+  --vc-brand-pink--light: rgba(251, 172, 202, 1);
+  --vc-brand-pink--transparent: rgba(237, 30, 121, 0.4);
+  --vc-brand-purple: #4b19d6;
+  --vc-brand-purple-light: #890eed;
+  --vc-brand-blue: #29abe2;
+  --vc-brand-blue--dark: #1f6ef4;
+  --vc-brand-green--light: hsl(89 76% 86%);
+  --vc-brand-green: #79d11c;
+  --vc-brand-alt: rgba(215, 205, 235, 1);
+  --vc-grey: grey;
+  --vc-light-grey: #d4d8e5;
+  --vc-brand-gradient:
+    radial-gradient(at 100% 100%, hsla(265, 80%, 75%, 1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(272, 86%, 55%, 1) 0px, transparent 50%),
+    radial-gradient(at 0% 18%, hsla(223, 79%, 66%, 1) 0px, transparent 50%);
+
+  /* NEW VALUE TOKENS
+  * As we are being asked to very quickly come up with a dark color scheme
+  * We are adding these additional tokens so we definitely don't break anything for now
+  */
+
+  /* #131620 */
+  --nvc-surface-medium: oklch(0.25 0.0206 271.51);
+  /* #060b15 */
+  --nvc-surface-dark: oklch(0.15 0.0236 261.52);
+  /* #1b1d1c */
+  --nvc-input-grey: oklch(0.23 0.0036 164.73);
+  /* #6353c4 */
+  --nvc-surface-purple-primary: oklch(0.52 0.1695 285.31);
+  --nvc-text-purple-primary: oklch(0.52 0.1695 285.31);
+  /* #9f95d9 */
+  --nvc-text-purple-secondary: oklch(0.7 0.0986 290.37);
+  /* #373737 */
+  --nvc-text-grey: oklch(0.34 0 0);
+  /* #ffffff */
+  --nvc-text-light: oklch(1 0 0);
+  /* #c6c6c6 */
+  --nvc-surface-light: oklch(0.83 0 259);
+
+  /**
+   * value tokens: sizes (--vs => valueSize)
+   * 1) general purpose spacer unit
+   * 2) vertical spaces outside of an element
+   * 3) horizontal spaces outside of an element
+   * 4) space inside an element (usually used for padding)
+   * 5) borders and lines (using PX here because we don't want lines to scale)
+  **/
+  --vs-gutter: 0.4rem; /* 1 */
+  --vs-stack: calc(var(--vs-gutter) * 2); /* 2 */
+  --vs-inline: calc(var(--vs-gutter) * 2); /* 3 */
+  --vs-bezel: calc(var(--vs-gutter) * 2); /* 4 */
+  --vs-line: 1px; /* 5 */
+
+  --vs-line-height: 1.4;
+
+  --vs-border-radius: 0.8rem;
+
+  --vs-screen-width: 40rem;
+
+  /*
+   * reference tokens
+   *
+   * pointers to value tokens or other reference tokens. They control the actual
+   * design rules.
+   *
+   */
+
+  /* reference tokens: colors (--rc => referenceColor) */
+
+  --rc-dark: var(--vc-raven);
+  --rc-light: var(--vc-snow);
+
+  --rc-dark-transparent: var(--vc-shadow);
+  --rc-light-transparent: var(--vc-vapour);
+
+  --rc-overlay-backdrop: var(--vc-night);
+
+  --rc-text: var(--rc-light);
+  --rc-text--disabled: var(--vc-shadow);
+
+  --rc-text-interaction: var(--vc-brand-purple);
+  --rc-text-interaction-inverted: var(--vc-snow);
+
+  --rc-background: var(--rc-light);
+  --rc-background-transparent: var(--rc-light-transparent);
+
+  --rc-footer: var(--rc-dark);
+  --rc-onFooter: var(--rc-light);
+
+  --rc-card: var(--rc-background-transparent);
+
+  --rc-card-backdrop: transparent;
+  --rc-background-card--background: transparent;
+
+  --rc-card--highlight-background: var(--vc-light-grey);
+
+  --rc-line: var(--vc-light-grey);
+  --rc-line-interaction: var(--vc-brand-purple);
+  --rc-line-inverted: var(--rc-dark);
+
+  --rc-button: var(--nvc-text-purple-primary);
+  --rc-button-pair: var(--nvc-text-purple-primary);
+
+  --rc-interaction: var(--vc-brand-blue);
+  --rc-interaction-text: var(--nvc-text-purple-secondary);
+  --rc-interactionHighlight-text: var(--vc-brand-purple-light);
+  --rc-loading: var(--vc-brand-purple);
+
+  --rc-marketing-icon: var(--vc-brand-purple);
+
+  --rc-button--disabled: var(--vc-shadow);
+
+  --rc-background-image--highlight: var(--vc-brand-gradient);
+  --rc-background--highlight: var(--nvc-surface-medium);
+  --rc-background--highlight-text: var(--vc-snow);
+
+  /*
+    color used to elevate something from its background
+    secondary button, card, icon button
+  */
+  --rc-surface: var(--vc-snow);
+
+  --rc-button-secondary: var(--rc-surface);
+  --rc-onButton-secondary: var(--rc-text-interaction);
+
+  --rc-onButton: var(--rc-text-interaction-inverted);
+  --rc-onButton--disabled: var(--rc-light-transparent);
+
+  --rc-errorLight: var(--vc-brand-pink--light);
+  --rc-error: var(--vc-brand-pink);
+  --rc-error-strong: var(--vc-red);
+  --rc-onError: var(--vc-snow);
+
+  --rc-warning: var(--vc-brand-yellow);
+  --rc-warning-orange: var(--vc-brand-orange);
+  --rc-onWarning: var(--rc-snow);
+
+  --rc-info: var(--vc-brand-purple);
+  --rc-onInfo: var(--vc-snow);
+  --rc-positive: var(--vc-brand-green);
+  --rc-onPositive: var(--rc-dark);
+
+  --rc-input-placeholder: var(--vc-grey);
+
+  --rc-input: var(--rc-light);
+  --rc-onInput: var(--rc-dark);
+
+  --rc-input-readonly: var(--vc-vapour);
+  --rc-input-onReadonly: var(--rc-dark);
+
+  --rc-input-error: var(--vc-brand-pink);
+  --rc-input-onError: var(--rc-light);
+
+  --rc-input-success: var(--vc-brand-green);
+  --rc-input-onSuccess: var(--rc-light);
+
+  /* reference tokens: gradients */
+  --rg-brand:
+    var(--vc-brand-yellow) 10%, var(--vc-brand-orange) 40%,
+    var(--vc-brand-pink) 50%, var(--vc-brand-purple) 90%;
+
+  --rg-brand-full:
+    var(--vc-brand-yellow), var(--vc-brand-orange), var(--vc-brand-pink),
+    var(--vc-brand-purple), var(--vc-brand-blue);
+
+  --rg-brand-alt: var(--vc-light-grey), white;
+  --rg-button: var(--rc-button), var(--rc-button-pair);
+  --rg-brand-bruised: var(--vc-brand-blue) 50%, var(--vc-brand-purple) 90%;
+
+  /* reference tokens: sizes */
+  --rs-main-content-width: var(--vs-screen-width);
+
+  --rs-inline-grid-gap: var(--vs-inline);
+  --rs-inline-icon-gap: var(--vs-inline);
+
+  --rs-inline-button-gap: calc(var(--vs-inline) * 1.5);
+
+  --rs-stack-section: calc(var(--vs-stack) * 4);
+  --rs-stack-section--small: calc(var(--vs-stack) * 2);
+  --rs-stack-section--spacious: calc(var(--vs-stack) * 5);
+  --rs-stack-section--tight: var(--vs-stack);
+
+  --rs-list-counter-space: calc(var(--vs-inline) * 4);
+  --rs-list-bullet-space: calc(var(--vs-inline) * 2.2);
+
+  --rs-list-item-stack: calc(var(--vs-stack) * 1.5);
+  --rs-list-parcel-bezel: var(--vs-bezel);
+  --rs-list-gutter: calc(var(--vs-gutter) * 2);
+
+  --rs-footer-stack: var(--vs-stack);
+  --rs-footer-gutter: calc(var(--vs-gutter) * 3.5);
+  --rs-footer-gap: var(--vs-inline);
+
+  --rs-logo-stack: calc(var(--vs-gutter) * 8);
+  --rs-logo-stack--top: calc(var(--vs-gutter) * 8);
+  --rs-logo-stack--bottom: calc(var(--vs-gutter) * 4);
+
+  --rs-card-bezel: calc(var(--vs-gutter) * 6);
+  --rs-card-bezel-x: calc(var(--vs-gutter) * 8);
+
+  --rs-card-stack: calc(var(--vs-stack) * 1.5);
+  --rs-card-bezel-narrow: calc(var(--rs-card-bezel) * 0.75);
+  --rs-card-border-radius: var(--vs-border-radius);
+  --rs-card-item-stack: calc(var(--vs-stack) * 0.75);
+
+  --rs-marketing-block-stack: calc(var(--vs-stack) * 5);
+
+  --rs-toasts-brezel: var(--vs-bezel);
+  --rs-toast-body-stack: calc(var(--vs-stack) * 0.5);
+  --rs-toast-stack: var(--rs-toast-body-stack);
+
+  --rs-button-bezel: calc(var(--vs-bezel) * 1.5);
+  --rs-button-stack: var(--vs-stack);
+  --rs-button-radius: var(--vs-border-radius);
+
+  --rs-input-bezel: calc(var(--rs-button-bezel) * 0.4);
+  --rs-input-bezel-narrow: calc(var(--rs-button-bezel) * 0.4);
+  --rs-input-stack: calc(var(--rs-button-stack) * 2);
+  --rs-input-message-stack: var(--vs-stack);
+  --rs-input-border-radius: var(--vs-border-radius);
+  --rs-input-inline: var(--rs-button-stack);
+
+  --rs-line-height-body: var(--vs-line-height);
+  --rs-dropdown-bezel: var(--vs-bezel);
+
+  --rs-marquee-gap: var(--vs-inline);
+
+  /* generic Lines uses on cards and other separation elements */
+  --rs-line: var(--vs-line);
+  --rs-line--thick: calc(var(--rs-line) * 4);
+
+  --rs-footer-height: 4rem;
+
+  --rs-split-page-bezzel--mobile: calc(var(--vs-stack) * 3);
+  --rs-split-page-left-pane-bezzel: calc(var(--vs-gutter) * 8);
+  --rs-split-page-right-pane-bezzel--desktop: 10vmax;
+  --rs-split-page-right-pane-bezzel--mobile: calc(var(--vs-stack) * 4);
+  --rs-split-page-stack: calc(var(--vs-stack) * 4);
+  --rs-split-page-stack--large: calc(var(--vs-stack) * 6);
+  --rs-split-page-title-landing: calc(1.2rem + 1.1vw);
+  --rs-split-page-title-authorize: calc(2.8rem + 1vw);
+
+  /* This is not used in CSS, but it's used to compensate for the logo size. */
+  --rs-logo-height: 3rem;
+}
+
+/* II) Optional Theme Settings: DarkMode, LightMode, Product Specific stuff */
+
+/***
+ * III) Generic: Ground-zero styles (Normalize.css, resets, box-sizing)
+ *
+ * The new CSS reset - version 1.7.2 (last updated 23.6.2022)
+ * GitHub page: https://github.com/elad2412/the-new-css-reset
+***/
+
+/*
+Remove all the styles of the "User-Agent-Stylesheet", except for the 'display' property
+- The "symbol *" part is to solve Firefox SVG sprite bug
+*/
+*:where(:not(html, iframe, canvas, img, svg, video):not(svg *, symbol *)) {
+  all: unset;
+  display: revert;
+}
+
+/* Preferred box-sizing value */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Reapply the pointer cursor for anchor tags */
+a,
+button {
+  cursor: revert;
+}
+
+/* Remove list styles (bullets/numbers) */
+ol,
+ul,
+menu {
+  list-style: none;
+}
+
+/* For images to not be able to exceed their container */
+img {
+  max-width: 100%;
+}
+
+/* removes spacing between cells in tables */
+table {
+  border-collapse: collapse;
+}
+
+/* Safari - solving issue when using user-select:none on the <body> text input doesn't working */
+input,
+textarea {
+  -webkit-user-select: auto;
+}
+
+/* revert the 'white-space' property for textarea elements on Safari */
+textarea {
+  white-space: revert;
+}
+
+/* minimum style to allow to style meter element */
+meter {
+  -webkit-appearance: revert;
+  appearance: revert;
+}
+
+/* reset default text opacity of input placeholder */
+::placeholder {
+  color: unset;
+}
+
+/* fix the feature of 'hidden' attribute.
+display:revert; revert to element instead of attribute */
+:where([hidden]) {
+  display: none;
+}
+
+/* revert for bug in Chromium browsers
+- fix for the content editable attribute will work properly.
+- webkit-user-select: auto; added for Safari in case of using user-select:none on wrapper element*/
+:where([contenteditable]:not([contenteditable="false"])) {
+  -moz-user-modify: read-write;
+  -webkit-user-modify: read-write;
+  overflow-wrap: break-word;
+  -webkit-line-break: after-white-space;
+  -webkit-user-select: auto;
+}
+
+/* apply back the draggable feature - exist only in Chromium and Safari */
+:where([draggable="true"]) {
+  -webkit-user-drag: element;
+}
+
+/* (not included in vanilla reset) Hide carets in summary/details on Safari */
+
+::-webkit-details-marker {
+  display: none;
+}
+
+/**
+ * IV) Base: Un-classed HTML elements (type selectors)
+ *
+ * Internet Identity Styles
+ **/
+
+:root {
+  /* general styles */
+  font-family: "Inter", sans-serif;
+  font-family: "Circular", sans-serif;
+  font-size: 62.5%; /* 10px */
+  font-size: max(62.5%, calc(0.6vh + 0.25rem));
+  font-weight: 350;
+  letter-spacing: -0.005em;
+
+  background: var(--nvc-surface-dark);
+  color: var(--nvc-text-light);
+}
+
+/**
+ * Make sure the backdrop doesn't leak out (which creates a horizontal scroll)
+ **/
+html,
+body {
+  overflow-x: hidden;
+  color-scheme: dark;
+}
+
+body {
+  font-size: 1.6rem;
+  line-height: var(--rs-line-height-body);
+  /* background: radial-gradient(circle at 50% 100%, var(--rg-brand-alt)); */
+  background-color: var(--nvc-surface-dark);
+  background-size: 100% 100%;
+  min-height: 100dvh;
+
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  font-smooth: always;
+}
+
+/**
+ * V) Objects: Cosmetic-free design patterns
+ *
+ * We generally use the BEM methodology.
+ * http://getbem.com/
+ *
+ * We prefix classes with the following convention:
+ * - `.c-` component
+ * - `.l-` layout
+ * - `.t-` typography
+ *
+ * We avoid element, id and attribute selectors when it is sane to do so¹.
+ * Use classes when possible.
+ *
+ * ¹ For example when needing to style the paths of an SVG it might be difficult
+ * to do because the SVG are made by people with little to no XML know-how.
+ */
+
+.t-strong {
+  font-weight: bold;
+}
+
+.t-weak {
+  font-weight: normal;
+  font-size: 0.8em;
+}
+
+.t-error {
+  color: var(--rc-error);
+}
+
+.t-centered {
+  text-align: center;
+}
+
+.t-title {
+  font-weight: 600;
+  font-size: 1.8rem;
+  line-height: 1.1;
+  margin-top: 1em;
+}
+
+.t-title:first-child {
+  margin-top: 0;
+}
+
+.t-title--complications {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+}
+
+.t-title__complication {
+  font-weight: 300;
+  font-size: 0.8em;
+  flex-grow: 0;
+}
+
+.t-title__complication:disabled {
+  color: var(--rc-text--disabled);
+}
+
+.t-title__complication--end {
+  flex-grow: 0;
+  text-align: right;
+}
+
+.t-title--main {
+  font-size: 2.7rem;
+  margin-top: 0.5em;
+}
+
+.t-title--list {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 0.25em;
+  margin-top: 0;
+}
+
+.t-lead {
+  font-size: 1.6rem;
+}
+
+.t-title + .t-lead {
+  margin-top: 0.75em;
+}
+
+.t-paragraph {
+  margin-top: 1em;
+}
+
+.t-paragraph:first-child {
+  margin-top: 0;
+}
+
+.t-paragraph--weak {
+  color: var(--nvc-text-light);
+}
+
+.t-vip {
+  font-size: 2.4rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.t-vip--small {
+  font-size: 1.5rem;
+}
+
+.t-muted {
+  color: var(--nvc-text-light);
+  font-size: 0.8em;
+}
+
+.t-discreet {
+  font-size: 0.8em;
+  vertical-align: baseline;
+}
+
+.t-wrap {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+.t-nowrap {
+  white-space: nowrap;
+}
+
+a,
+.t-link {
+  display: inline;
+  color: var(--nvc-text-light);
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.t-link:disabled,
+:disabled .t-link {
+  pointer-events: none;
+}
+
+.t-link--discreet {
+  font-weight: normal;
+  text-decoration: none;
+}
+
+a:focus,
+a:hover,
+.t-link:not([disabled]):focus,
+.t-link:not([disabled]):hover {
+  text-decoration: underline;
+  text-decoration-thickness: var(--rs-line);
+  text-underline-offset: 0.5ex;
+  color: var(--nvc-text-purple-secondary);
+}
+
+.t-link--discreet:not([disabled]):focus,
+.t-link--discreet:not([disabled]):hover {
+  text-decoration: underline;
+}
+
+.t-link__icon {
+  display: inline-block;
+  position: relative;
+  height: calc(1em * var(--rs-line-height-body));
+  aspect-ratio: 1;
+  vertical-align: middle;
+}
+
+.t-link__icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(-0.1em);
+  width: 100%;
+}
+
+.t-link__icon svg path {
+  stroke: var(--nvc-text-light);
+  fill: var(--nvc-text-light);
+}
+
+/* 
+  generic typography
+  .t-formatted us used as a wrapper around formatted text
+  typically used for text that comes from an outside source like a markdown parser 
+*/
+.t-formatted {
+  font-size: 1.3rem;
+  line-height: 1.4;
+}
+
+.t-formatted--monospace {
+  font-family: monospace;
+  font-size: 1.1rem;
+}
+
+.t-formatted hr {
+  border: none;
+  border-top: var(--rs-line) solid var(--rc-line);
+  margin: 1em 0;
+}
+
+.t-formatted a {
+  color: lightblue;
+  text-decoration: underline;
+}
+.t-formatted p,
+.t-formatted h1,
+.t-formatted h2,
+.t-formatted h3,
+.t-formatted h4,
+.t-formatted h5,
+.t-formatted h6 .t-formatted blockquote,
+.t-formatted pre,
+.t-formatted table {
+  margin-top: 1em;
+}
+
+.t-formatted ul,
+.t-formatted ol {
+  margin-left: 1.5em;
+  list-style: disc;
+  margin-top: 1.5em;
+}
+
+.t-formatted ol {
+  list-style: decimal;
+  margin-left: 1.7em;
+}
+
+.t-formatted li + li {
+  margin-top: 0.5em;
+}
+
+.t-formatted *:first-child {
+  margin-top: 0;
+}
+
+.t-formatted h1,
+.t-formatted h2,
+.t-formatted h3,
+.t-formatted h4,
+.t-formatted h5,
+.t-formatted h6,
+.t-formatted strong,
+.t-formatted b {
+  font-weight: bolder;
+}
+
+.t-formatted h1 {
+  font-size: 1.5rem;
+}
+.t-formatted h2 {
+  font-size: 1.4rem;
+}
+.t-formatted h3,
+.t-formatted h4,
+.t-formatted h5,
+.t-formatted h6 {
+  font-size: 1.2rem;
+}
+
+.t-formatted blockquote {
+  padding: 0.5em 1em;
+  font-style: italic;
+  margin-top: 1em;
+  border-left: 0.2em solid var(--rc-line);
+}
+
+.t-formatted em,
+.t-formatted i {
+  font-style: italic;
+}
+
+.t-formatted del {
+  text-decoration: line-through;
+}
+
+.t-formatted table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1em;
+  border: 1px solid var(--rc-line);
+}
+
+.t-formatted table th,
+.t-formatted table td {
+  padding: 0.5em;
+  border: 1px solid var(--rc-line);
+}
+
+.l-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 5vmax;
+}
+
+@media (max-width: 512px) {
+  .l-wrap {
+    padding: var(--rs-card-bezel);
+  }
+}
+
+.l-container {
+  position: relative;
+  font-size: 1.6rem;
+  min-width: var(--rs-main-content-width);
+  max-width: var(--rs-main-content-width);
+  /* centers the container and adds a bit of space to make sure the footer does not stick to it */
+  margin: 0 auto 2rem;
+}
+
+.l-container--wide {
+  max-width: 60rem;
+}
+
+.l-horizontal {
+  display: flex;
+  gap: var(--rs-inline-grid-gap);
+}
+
+.l-vertical {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.l-footer {
+  position: absolute;
+
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+/**
+ * Title with counter and Actions
+ */
+
+/**
+ * Icon components
+ */
+.c-icon {
+  display: inline-block;
+  position: relative;
+  height: calc(1em * var(--rs-line-height-body));
+  aspect-ratio: 1;
+  vertical-align: middle;
+}
+
+.c-icon [fill] {
+  fill: var(--onBgc);
+}
+
+/* Icons that have e.g. text to the right */
+.c-icon--inline {
+  margin-right: var(--rs-inline-icon-gap);
+}
+
+.c-icon svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+/* Big marketing icons (section title) */
+.c-icon--marketing {
+  height: 4.5rem;
+  width: 4.5rem;
+
+  color: var(--rc-marketing-icon);
+  --onBgc: transparent;
+}
+.c-icon--marketing {
+  fill: auto;
+}
+
+/* Small icons used to display status */
+.c-icon--ok,
+.c-icon--info__flipped,
+.c-icon--warning,
+.c-icon--error,
+.c-icon--error__flipped {
+  background: var(--bgc);
+}
+
+.c-icon--ok {
+  --onBgc: var(--rc-positive);
+}
+.c-icon--info__flipped {
+  --bgc: var(--nvc-text-purple-primary);
+  --onBgc: var(--rc-onInfo);
+  border-radius: 50%;
+}
+
+.c-icon--warning {
+  --onBgc: var(--rc-warning);
+}
+
+.c-icon--error {
+  --onBgc: var(--rc-error);
+  border-radius: 50%;
+}
+
+.c-icon--pin [fill] {
+  fill: var(--vc-brand-purple);
+}
+
+.c-icon--xs {
+  width: 12px;
+  height: 12px;
+}
+
+/* "Flipped" version where the background pops (instead
+ * of the icon itself) */
+.c-icon--error__flipped {
+  --bgc: var(--rc-error);
+  --onBgc: var(--rc-onError);
+  border-radius: 50%;
+}
+.c-icon--error__flipped svg {
+  /* Y value is a bit bigger to compensate visually: the triangle's center of mass
+   * should be centered, not the triangle's bounding box's center of mass. */
+  transform: translate(-50%, -53.5%) scale(0.65);
+}
+
+.c-icon--lock svg {
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+/* Dot menu */
+.c-icon--more {
+  position: relative;
+  width: 2rem;
+  height: 2rem;
+  display: inline-block;
+  --rotate: 0;
+  --offsetY: 0;
+  --bgc: currentColor;
+}
+:is(button, a, link, .c-dropdown)[aria-expanded="true"] .c-icon--more {
+  --rotate: -90deg;
+  background-color: var(--rc-button);
+  --bgc: var(--rc-onButton);
+}
+
+.c-icon--more__dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--nvc-text-light);
+  width: 0.3rem;
+  height: 0.3rem;
+  transform: translate(-50%, -50%) rotate(var(--rotate, 0deg))
+    translateY(var(--offsetY, 0));
+  transition:
+    200ms transform cubic-bezier(0.3, 0.7, 0, 1),
+    250ms background-color linear;
+  border-radius: 50%;
+}
+
+.c-icon--more__dot:nth-child(1) {
+  --offsetY: -0.4rem;
+  transition-delay: 50ms, 50ms;
+}
+
+.c-icon--more__dot:nth-child(3) {
+  --offsetY: 0.4rem;
+  transition-delay: 100ms, 100ms;
+}
+
+:is(button, a, link, .c-dropdown) .c-icon--outlined,
+.c-icon--outlined:is(button, a, link, .c-dropdown) {
+  border: 1px solid var(--nvc-text-grey);
+  border-radius: 1px;
+}
+
+:is(button, a, link, .c-dropdown):hover .c-icon--outlined {
+  opacity: 0.9;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 2px 4px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+}
+
+/* Circle icons */
+.c-icon--circle {
+  display: inline-block;
+  position: relative;
+  border-radius: 50%;
+  padding: 0.2rem;
+  width: 1.2em;
+  height: 1.2em;
+  background: rgba(0, 0, 0, 0.08);
+  --onBgc: transparent; /* reset primary color bc we don't want any fill */
+}
+
+.c-icon--circle svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  color: rgba(0, 0, 0, 0.5);
+}
+
+/**
+ * LandingPage component
+ */
+
+.c-landingPage {
+  height: 100dvh;
+}
+
+.c-landingPage__container {
+  display: grid;
+  grid-template-columns: 1fr minmax(var(--rs-main-content-width), 1fr);
+  grid-template-areas: "left right";
+
+  height: 100%;
+}
+
+.c-landingPage__title {
+  font-size: var(--rs-split-page-title-landing);
+  font-weight: 600;
+  line-height: 1.1;
+
+  display: flex;
+  flex-direction: column;
+
+  /* We don't want to break the lines of the title */
+  white-space: nowrap;
+}
+
+.c-landingPage__title__authorize {
+  font-size: var(--rs-split-page-title-authorize);
+  font-weight: 600;
+  line-height: 1.1;
+
+  display: flex;
+  flex-direction: column;
+
+  /* We don't want to break the lines of the title */
+  white-space: nowrap;
+}
+
+.c-landingPage__logo {
+  position: absolute;
+  left: var(--rs-split-page-left-pane-bezzel);
+  top: var(--rs-split-page-left-pane-bezzel);
+
+  color: var(--rc-background--highlight-text);
+}
+
+.c-landingPage__logo__marqueespaced {
+  top: 80px !important;
+}
+
+.c-landingPage__logo .c-logo {
+  padding: 0;
+}
+
+.c-landingPage__left {
+  /* background-image: var(--rc-background-image--highlight); */
+  background-color: var(--nvc-surface-medium);
+  color: var(--rc-background--highlight-text);
+
+  grid-area: left;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  padding: var(--rs-split-page-left-pane-bezzel);
+}
+
+.c-landingPage__left__content {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+
+  padding: 0 20%;
+
+  margin-top: var(--rs-logo-height);
+}
+
+.c-landingPage__logo--mobile {
+  display: none;
+}
+
+.c-landingPage__logo--desktop {
+  display: block;
+}
+
+.c-landingPage__right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+
+  grid-area: right;
+
+  overflow-y: scroll;
+}
+
+.c-landingPage__right__content {
+  min-width: var(--rs-main-content-width);
+  max-width: var(--rs-main-content-width);
+  /* This is necessary in case the content is bigger than the parent. */
+  /* It keeps the start of the box at the top of the container. */
+  max-height: 90%;
+  background-color: var(--nvc-surface-medium);
+  padding: 2rem;
+  border-radius: 1rem;
+
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.c-landingPage__right__info {
+  display: none;
+}
+
+.c-landingPage__right__content--full-width {
+  width: 100%;
+}
+
+.c-landingPage .c-footer__link {
+  padding: 0;
+}
+
+.c-landingPage__left__footer {
+  display: flex;
+  gap: var(--rs-list-bullet-space);
+}
+
+.c-landingPage__left__footer > a:hover,
+.c-landingPage__left__footer > a:active,
+.c-landingPage__left__footer > a:focus,
+.c-landingPage__left__footer > a:visited {
+  color: var(var(--nvc-text-purple-secondary));
+}
+
+@media (max-width: 1024px) {
+  .c-landingPage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    /* background-image: var(--rc-background-image--highlight); */
+    background-color: var(--nvc-surface-dark);
+
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .c-landingPage__container {
+    display: block;
+
+    padding: 0 var(--rs-split-page-bezzel--mobile);
+
+    width: var(--rs-main-content-width);
+  }
+
+  .c-landingPage__logo {
+    display: flex;
+    position: static;
+    top: unset;
+    left: unset;
+    justify-content: center;
+
+    order: 1;
+    color: var(--rc-background--highlight-text);
+
+    padding: var(--rs-split-page-stack) 0;
+  }
+
+  .c-landingPage__logo__marqueespaced {
+    padding-top: 80px !important;
+  }
+
+  .c-landingPage__left {
+    background: none;
+    order: 2;
+
+    padding: 0;
+    margin-top: var(--rs-split-page-stack--large);
+    padding-bottom: var(--rs-split-page-stack);
+
+    gap: var(--rs-split-page-stack--large);
+  }
+
+  .c-landingPage__left__content {
+    display: none;
+  }
+
+  .c-landingPage__right__info {
+    display: block;
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+
+  .c-landingPage__right__info h1 {
+    font-size: 3.2rem;
+    line-height: 1.25;
+    font-weight: bold;
+    margin-bottom: 0.8rem;
+  }
+
+  .c-landingPage__right__info h2 {
+    margin-bottom: 2rem;
+  }
+
+  .c-landingPage__right {
+    order: 1;
+
+    background: var(--nvc-surface-medium);
+    border-radius: var(--rs-card-border-radius);
+    /* padding: var(--rs-split-page-right-pane-bezzel--mobile); */
+    padding: 2rem;
+
+    overflow: auto;
+  }
+
+  .c-landingPage__right__content {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+  }
+}
+
+@media (max-width: 512px) {
+  .c-landingPage__container {
+    width: 100%;
+  }
+}
+
+/**
+ * Card components
+ */
+
+.c-card {
+  --bezel-x: var(--rs-card-bezel-x);
+  --bezel-y: var(--rs-card-bezel);
+
+  display: block;
+  position: relative;
+
+  padding: var(--bezel-y) var(--bezel-x);
+
+  background-color: var(--nvc-surface-medium);
+  border-radius: var(--rs-card-border-radius);
+}
+
+.c-card:has(.c-output--recovery) {
+  background-color: transparent !important;
+}
+
+.c-card--invisible {
+  background-color: transparent !important;
+}
+
+@media (max-width: 512px) {
+  .c-card:has([data-page="authenticate"]) {
+    margin: 1rem;
+  }
+}
+
+.c-card--vertically-centered {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+}
+
+.c-card--hide-overflow {
+  overflow: hidden;
+}
+
+/* c-cards pretty much fill up the screen on small devices so we disable rounding */
+@media (max-width: 512px) {
+  .c-card {
+    border-radius: 0;
+  }
+}
+
+.c-card--highlight,
+.c-card--background {
+  --bezel-x: var(--rs-card-bezel);
+  --bezel-y: var(--rs-card-bezel);
+
+  background-color: var(--nvc-surface-medium);
+  border: none;
+}
+
+/* .c-card--background .c-card--highlight {
+  background-color: transparent;
+} */
+
+/**
+  * Card Teaser
+  * it goes to the edge of the card
+  **/
+.c-card__teaser {
+  margin-top: calc(var(--bezel-x) * -1);
+  margin-left: calc(var(--bezel-x) * -1);
+  margin-right: calc(var(--bezel-x) * -1);
+  margin-bottom: var(--bezel-x);
+
+  -webkit-mask-image: linear-gradient(black 70%, transparent);
+  mask-image: linear-gradient (black 70%, transparent);
+}
+
+.c-card__teaser:last-child {
+  margin-bottom: calc(var(--bezel-x) * -1);
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.c-card--narrow {
+  --bezel-x: var(--rs-card-bezel-narrow);
+  --bezel-y: var(--rs-card-bezel-narrow);
+}
+
+.c-card--tight {
+  --bezel-x: calc(var(--rs-card-bezel-narrow) * 0.6);
+  --bezel-y: calc(var(--rs-card-bezel-narrow) * 0.5);
+}
+
+.c-card--background {
+  --bezel-x: calc(var(--rs-card-bezel) * 0.3);
+  --bezel-y: calc(var(--rs-card-bezel) * 0.3);
+
+  background-color: var(--nvc-surface-medium);
+}
+
+@media (max-width: 512px) {
+  .c-card--highlight {
+    border: none;
+    border-radius: var(--rs-card-border-radius);
+  }
+}
+
+/* Concent Cards */
+
+.c-card--consent {
+  --bezel-x: var(--rs-card-bezel-narrow);
+  --bezel-y: var(--rs-card-bezel-narrow);
+
+  max-height: 60vh;
+
+  overflow-y: auto;
+
+  background-color: var(--nvc-surface-medium);
+
+  border: var(--rs-line) solid var(--nvc-text-grey);
+
+  padding: var(--bezel-y) var(--bezel-x);
+
+  border-radius: var(--rs-card-border-radius);
+}
+
+/* Card label/titles */
+.c-card__label {
+  /* some labels have icons, so we center everything vertically */
+  display: flex;
+  align-items: center;
+
+  font-size: 1rem;
+  /* opacity only on text color not the full element */
+  color: color-mix(in srgb-linear, var(--rc-text), var(--rc-card) 30%);
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.c-card__label + .t-title {
+  margin-top: 0.2em;
+}
+
+/** can be replaced with :has(.c-card__icon) as soon as it's supported
+by all browsers (FF is missing) */
+.c-card__label--hasIcon {
+  border-bottom: var(--rs-line) solid var(--nvc-text-grey);
+  padding-bottom: calc(0.5 * var(--rs-card-bezel));
+  margin-bottom: calc(0.75 * var(--rs-card-bezel));
+  margin-top: calc(-0.15 * var(--rs-card-bezel));
+}
+
+.c-card__icon {
+  height: 2rem;
+}
+
+.c-card__logo {
+  height: 4rem;
+  width: 4rem;
+  flex: 0 0 4rem;
+  position: relative;
+}
+
+.c-card__logo img {
+  height: 80%;
+  object-fit: contain;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.c-card__close {
+  --scale: 1;
+  position: absolute;
+  right: var(--rs-card-bezel);
+  top: var(--rs-card-bezel);
+  width: 2.1rem;
+  aspect-ratio: 1;
+  background: var(--rc-button);
+  border-radius: 50%;
+  cursor: pointer;
+  transform: scale(var(--scale));
+  transition: 200ms transform cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.c-card__close:hover {
+  --scale: 1.3;
+}
+
+.c-card__close svg {
+  position: absolute;
+  display: block;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+.c-card__close svg {
+  fill: var(--nvc-text-light);
+  stroke: var(--nvc-text-light);
+}
+
+.c-card__title {
+  /*
+    approximation: to make sure the title
+    does not collide with the icon on the right
+  */
+  padding-right: 10%;
+}
+
+.c-card__paragraph {
+  margin-top: var(--rs-card-item-stack);
+}
+
+.c-card--warning,
+.c-card--modal {
+  position: relative;
+  border: none;
+  /* The before/after are used for the effects & background so we push
+   * them back with a negative z-index. This prevents them going behind
+   * the rest of the page. */
+  isolation: isolate;
+  border-radius: var(--rs-card-border-radius);
+}
+
+.c-card--warning::before,
+.c-card--modal::before,
+.c-card--warning::after,
+.c-card--modal::after {
+  position: absolute;
+  content: "";
+  z-index: -1;
+  inset: 0;
+}
+
+.c-card--warning::before,
+.c-card--modal::before {
+  background-image: linear-gradient(170deg, var(--rg-brand));
+  filter: blur(30px);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.c-card--warning::after,
+.c-card--modal::after {
+  background: var(--nvc-surface-medium);
+  border-radius: var(--rs-card-border-radius);
+  /* box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4); */
+}
+
+.c-marketing-block {
+  margin-top: var(--rs-marketing-block-stack);
+}
+
+/**
+ *  toast component
+ */
+
+.c-toasts {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toasts);
+  margin: 0 auto calc(var(--rs-footer-height) + 0.5rem);
+}
+
+@media screen and (max-width: 512px) {
+  .c-toasts {
+    min-width: unset;
+    padding: 0 var(--rs-toasts-brezel);
+  }
+}
+
+.c-toast + .c-toast {
+  margin-top: var(--rs-toast-stack);
+}
+
+.c-toast:last-child {
+  margin-bottom: var(--rs-toast-stack);
+}
+
+.c-toast {
+  position: relative;
+  animation: appearFromBottom 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--nvc-text-grey);
+}
+
+.c-toast--closing {
+  z-index: 1;
+  animation: disappearToBottom 200ms cubic-bezier(0.7, 0.3, 0, 1);
+}
+
+@keyframes appearFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes disappearToBottom {
+  0% {
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+/**
+ *  toast-body component
+ */
+.c-toast-body {
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--rs-card-bezel-x) * 0.25);
+
+  position: relative;
+  padding: calc(var(--rs-card-bezel) * 0.35) calc(var(--rs-card-bezel-x) * 0.35);
+  border: var(--rs-line) solid var(--rc-line);
+  background-color: var(--state-color);
+  border-radius: var(--rs-card-border-radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--state-onColor);
+}
+
+.c-toast-body + .c-toast-body {
+  margin-top: var(--rs-toast-body-stack);
+}
+
+.c-toast-body__icon {
+  position: relative;
+  flex: 0 0 4.5rem;
+  background: var(--state-onColor);
+  margin: calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel-x) * 0.1)
+    calc(var(--rs-card-bezel) * -0.25) calc(var(--rs-card-bezel) * -0.4);
+  border-radius: var(--rs-card-border-radius);
+}
+
+.c-toast-body__icon svg {
+  display: block;
+  width: 70%;
+  height: 70%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.c-toast-body__icon svg [fill] {
+  fill: #fff;
+}
+
+.c-toast-body__message {
+  /* Ensures the content doesn't grow out of the toast or push other items */
+  overflow-x: auto;
+
+  flex: 1 1 auto;
+  font-size: 0.8em;
+  line-height: 1.2;
+}
+
+.c-toast-body__close {
+  --scale: 1;
+  position: relative;
+  background: #fff;
+  border-radius: 50%;
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  cursor: pointer;
+  transition: 200ms transform cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(var(--scale));
+}
+
+.c-toast-body__close svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
+.c-toast-body__close:hover {
+  --scale: 1.3;
+}
+
+/** The various body types */
+.c-toast-body--info {
+  --state-color: var(--vc-brand-blue);
+  --state-onColor: var(--vc-brand-blue--dark);
+}
+
+.c-toast-body--success {
+  --state-color: var(--vc-brand-green--light);
+  --state-onColor: var(--vc-brand-green);
+}
+
+.c-toast-body--error {
+  --state-color: var(--rc-errorLight);
+  --state-onColor: var(--rc-error);
+}
+
+/**
+ *  logo component
+ */
+.c-logo {
+  display: block;
+  overflow: hidden;
+  padding: var(--rs-logo-stack--top) calc(var(--rs-card-bezel) * 1.3)
+    var(--rs-logo-stack--bottom);
+  font-weight: 600;
+  font-size: 0.6em;
+  display: flex;
+  align-items: center;
+  gap: 1em;
+}
+
+.c-logo svg {
+  display: block;
+  width: 14.5rem;
+  flex: 0 0 14.5rem;
+}
+
+.t-title + .c-logo {
+  margin: var(--rs-logo-stack) 0;
+}
+
+.t-action:hover {
+  color: var(--nvc-text-purple-secondary);
+}
+
+/**
+ *  spinner component
+ *
+ *  the spinner is made of layers, and is wrapped in an element that sets its size
+ */
+
+.c-spinner-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 10rem;
+}
+
+.c-spinner {
+  position: absolute;
+  width: min(12rem, 25%);
+  aspect-ratio: 1;
+  color: var(--rc-loading);
+
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%);
+  animation: rotate 2s linear infinite;
+}
+
+.c-spinner::after,
+.c-spinner::before,
+.c-spinner__inner,
+.c-spinner__inner::before,
+.c-spinner__inner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+/*
+  these are the brand rainbow layers
+  one is the outer ring that is sharp and the other one its blurred copy
+  to create a glow effect, as if the sharp layer was emitting colored light
+*/
+.c-spinner::after,
+.c-spinner::before {
+  background-image: conic-gradient(var(--rg-brand-full));
+}
+
+.c-spinner::before {
+  opacity: 0.75;
+  filter: blur(20px);
+}
+
+.c-spinner::after {
+  transform: scale(1.02);
+}
+
+/*
+ the inner element is a mask that hides the rainbow layers
+ slightly from the side (almost like a frosted glass effect)
+*/
+.c-spinner__inner {
+  z-index: 1;
+  background: var(--rc-background);
+  box-shadow: inset 0 0 0 var(--rs-line) var(--vc-vapour);
+}
+
+.c-spinner__inner::before {
+  filter: blur(20px);
+  opacity: 0.5;
+
+  background-image: conic-gradient(var(--rg-brand-full));
+}
+
+/*
+  the after element creates a masked gradient that emphasizes the
+  the conic-gradient (conical gradient with a round hole in the middle)
+*/
+.c-spinner__inner::after {
+  background: conic-gradient(transparent 50%, var(--vc-brand-purple));
+  mask: radial-gradient(farthest-side at 50% 50%, transparent 98%, #000 99%);
+  -webkit-mask: radial-gradient(
+    farthest-side at 50% 50%,
+    transparent 98%,
+    #000 99%
+  );
+}
+
+/**
+ *  Captcha's are set to a size of 220 × 120px
+ *  if this should ever change, update the aspect-ratio
+ */
+.c-captcha-placeholder {
+  width: 100%;
+  aspect-ratio: 220 / 120;
+}
+
+/**
+ *  Forms and Buttons
+ */
+
+.c-button {
+  background: linear-gradient(90deg, var(--rg-button));
+
+  color: var(--rc-onButton);
+  padding: var(--rs-button-bezel) var(--rs-button-bezel)
+    calc(0.9 * var(--rs-button-bezel));
+  margin-top: var(--rs-button-stack);
+  display: block;
+  width: 100%;
+  text-align: center;
+  border-radius: var(--rs-button-radius);
+  font-size: inherit;
+
+  font-weight: 600;
+}
+
+.c-button--minimal {
+  width: min-content;
+  flex-grow: 0;
+  flex-shrink: 1;
+  margin-top: 0;
+  font-size: 0.875em;
+  padding: calc(0.5 * var(--rs-button-bezel)) var(--rs-button-bezel)
+    calc(0.4 * var(--rs-button-bezel));
+}
+
+.c-button__icon svg {
+  height: 100%;
+}
+
+.c-button__icon:not([disabled]):focus,
+.c-button__icon:not([disabled]):hover {
+  fill: var(var(--nvc-text-purple-secondary));
+  stroke-width: 0.5px;
+  stroke: var(--nvc-text-light);
+}
+
+.c-button svg * {
+  fill: currentColor;
+}
+
+.c-button--textOnly {
+  background: transparent;
+  color: var(--rc-interaction-text);
+  border: none;
+}
+
+.c-button:not([disabled]):focus,
+.c-button:not([disabled]):hover {
+  /* color: var(--nvc-text-purple-secondary); */
+  opacity: 0.9;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 3px 5px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+  text-decoration: none;
+}
+
+.c-button--textOnly:not([disabled]):hover,
+.c-button--textOnly:not([disabled]):focus {
+  color: var(--nvc-text-light);
+}
+
+.c-button--secondary {
+  background: var(--nvc-surface-medium);
+  color: var(--nvc-text-light);
+  border: var(--rs-line) solid var(--nvc-text-grey);
+}
+
+.c-button--secondary {
+  background: var(--nvc-surface-medium);
+  color: var(--nvc-text-light);
+  border: var(--rs-line) solid var(--nvc-text-grey);
+}
+
+.c-button-transparent {
+  background-color: transparent !important;
+}
+
+/* .c-button--secondary:not([disabled]):hover,
+.c-button--secondary:not([disabled]):focus {
+  color: var(--nvc-text-purple-secondary);
+} */
+
+/* Copy pasted from the focus and hover, but with different opacity to show action */
+.c-button:not([disabled]):active {
+  opacity: 0.5;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 3px 5px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+}
+
+.c-button[disabled],
+.c-button--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.c-button__icon[disabled] {
+  color: var(--rc-onButton--disabled);
+  cursor: not-allowed;
+}
+
+.c-button--warning {
+  background: var(--rc-error);
+  color: var(--rc-onError);
+}
+
+.c-button__icon {
+  position: absolute;
+  bottom: 0;
+  right: 50%;
+  z-index: var(--z-foreground);
+  background-color: var(--rc-input);
+  border: var(--rs-line) solid var(--rc-line);
+  display: flex;
+  padding: var(--rs-input-bezel) calc(var(--rs-input-bezel) * 2);
+  border-radius: var(--rs-button-radius);
+  background: var(--rc-button);
+  color: var(--rc-onButton);
+  transform: translate(50%, 50%) scale(0.9);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: 400ms transform cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-button__icon:not([disabled]):hover {
+  transform: translate(50%, 50%) scale(0.99);
+}
+
+.c-button__icon svg {
+  width: 1.2em;
+  height: 1.2em;
+  margin-left: var(--rs-input-bezel);
+  margin-right: calc(var(--rs-input-bezel) * -0.25);
+}
+
+/* hides and show icons based on a class */
+
+.c-button__icon svg + svg {
+  margin-left: -1em;
+  visibility: hidden;
+  transform: scale(0.4);
+  opacity: 0;
+  transition:
+    transform 500ms cubic-bezier(0.3, 0.7, 0, 1) 100ms,
+    opacity 300ms linear;
+  color: greenyellow;
+}
+
+.c-button__icon.is-copied svg {
+  visibility: hidden;
+}
+
+.c-button__icon.is-copied svg + svg {
+  visibility: visible;
+  transform: scale(1.2);
+  opacity: 1;
+}
+
+.c-input {
+  --bezel-top: var(--rs-input-bezel-narrow);
+  --bezel-bottom: var(--rs-input-bezel-narrow);
+  --bezel-left: calc(3 * var(--rs-input-bezel));
+  --bezel-right: calc(3 * var(--rs-input-bezel));
+
+  --bezel: var(--bezel-top) var(--bezel-right) var(--bezel-bottom)
+    var(--bezel-left);
+
+  position: relative;
+  padding: var(--bezel);
+  background: var(--nvc-input-grey);
+  color: var(--nvc-text-light);
+  /* border: calc(var(--rs-line) * 2) solid var(--rc-line); */
+  word-break: break-word;
+  border-radius: var(--rs-input-border-radius);
+}
+
+/* An input with some margin on top, useful when e.g. coming directly
+ * after some text */
+.c-input--stack {
+  margin-top: var(--rs-input-stack);
+}
+
+.c-input--fullwidth {
+  display: block;
+  width: 100%;
+}
+
+.c-input::placeholder {
+  color: var(--rc-input-placeholder);
+}
+
+.c-button-group {
+  display: flex;
+  gap: var(--rs-inline-button-gap);
+  margin-top: var(--rs-button-stack);
+}
+
+.c-button-group--stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rs-list-gutter);
+  margin-top: var(--rs-button-stack);
+}
+
+.c-link-group {
+  display: flex;
+  gap: var(--rs-inline-button-gap);
+  justify-content: space-between;
+  border-top: var(--rs-line) solid var(--nvc-text-grey);
+  margin-top: calc(var(--vs-stack) * 6);
+  padding-top: calc(var(--vs-stack) * 2);
+}
+
+/**
+  * This is mostly used on buttons that don't look like buttons
+  * but we still want to make an arbitrary area clickable
+  */
+.c-click-area {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+
+/** An error state for an input
+ * We leave the text color as default to show the text is still
+ * interactable
+ */
+.c-input.has-error,
+.c-input.has-error:focus {
+  box-shadow: inset 0 0 0 calc(var(--rs-line) * 2) var(--rc-error);
+  border-image: none;
+}
+
+.c-input:focus {
+  opacity: 0.9;
+  box-shadow:
+    0 0 0 2px #ffffff,
+    0 0 3px 5px var(--rc-interaction);
+  outline: 2px dotted transparent;
+  outline-offset: 2px;
+}
+
+.c-input--centered {
+  text-align: center;
+}
+
+.c-input--spacious {
+  --bezel-top: calc(2 * var(--rs-input-bezel));
+  --bezel-bottom: calc(1.8 * var(--rs-input-bezel));
+}
+
+.c-input--vip {
+  --bezel-top: calc(1.2 * var(--rs-input-bezel));
+  --bezel-bottom: var(--rs-input-bezel);
+  font-size: 1.4em;
+  margin-top: calc(var(--rs-input-stack) * 1.5);
+}
+
+.c-input--vip::placeholder {
+  font-weight: normal;
+}
+
+.c-input--readonly {
+  background: var(--rc-input-readonly);
+  color: var(--rc-input-onReadonly);
+  /* border: var(--rs-line) var(--rc-line) solid; */
+}
+
+.c-input--textarea {
+  --bezel: calc(3 * var(--rs-input-bezel));
+}
+
+.c-input--textarea-narrow {
+  --bezel: calc(1.5 * var(--rs-input-bezel));
+}
+
+.c-input--with-button {
+  --bezel-top: calc(1.5 * var(--rs-input-bezel));
+  --bezel-bottom: calc(3 * var(--rs-input-bezel));
+  --bezel-left: calc(1.5 * var(--rs-input-bezel));
+  --bezel-right: calc(1.5 * var(--rs-input-bezel));
+}
+
+.c-input--id {
+}
+
+.c-input--id__wrap {
+  min-height: 10em;
+  position: relative;
+  margin: calc(-1 * var(--bezel));
+  padding: var(--bezel);
+  overflow: hidden;
+  border-radius: var(--rs-input-border-radius);
+}
+
+.c-input--id__art {
+  position: absolute;
+  object-fit: cover;
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  top: 0;
+  left: 0;
+}
+
+.c-origin-preview {
+  position: relative;
+  height: 15rem;
+}
+
+.c-origin-preview--header {
+  margin-top: -1.5rem;
+}
+
+.c-origin-preview__logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  height: 70%;
+}
+
+.c-origin-preview__logo--background {
+  filter: blur(20px);
+  opacity: 0.5;
+}
+
+.c-input--id__caption,
+.c-input--id__value {
+  position: relative;
+  z-index: 1;
+  color: var(--rc-input);
+}
+
+.c-input--id__caption {
+  font-size: 1.2;
+  margin-top: var(--rs-stack-section--tight);
+}
+
+.c-input--id__value {
+  font-size: 4rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.c-input--icon {
+  position: relative;
+  --bezel-top: calc(4 * var(--rs-input-bezel));
+
+  margin-bottom: calc(var(--rs-input-stack) * 2);
+}
+
+.c-input__message {
+  margin-top: var(--rs-input-message-stack);
+  color: var(--rc-error);
+}
+
+/**
+  *  Dialog component
+  */
+.c-modal[open] {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+
+.c-modal[open]::backdrop {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px) saturate(50%);
+}
+
+.c-modal__inner {
+  position: relative;
+  z-index: var(--z-foreground);
+}
+
+.c-modal__close {
+  position: absolute;
+  /* take the close icon to the edge of the card */
+  top: calc(-1 * var(--rs-card-bezel));
+  right: calc(-1 * var(--rs-card-bezel-x));
+  /* makes the close button stick ouf of the box a bit */
+  transform: translate(50%, -50%);
+
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  border-radius: 50%;
+  line-height: 1;
+
+  width: 2.5rem;
+  height: 2.5rem;
+
+  vertical-align: middle;
+  text-align: center;
+
+  background-color: var(--rc-background);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+}
+
+/**
+ *  Footer component
+ */
+
+.c-footer {
+  background: var(--nvc-surface-medium);
+  color: var(--nvc-text-light);
+  padding: var(--rs-footer-gutter);
+}
+
+.c-footer--inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.c-footer__link {
+  padding: 0 var(--rs-footer-gap);
+  color: inherit;
+}
+
+.c-footer__link svg {
+  height: 1.5rem;
+  transform: translateY(15%);
+}
+
+.c-list--flex {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.c-list--flex li {
+  margin: 0.5rem;
+}
+
+.c-list--numbered {
+  padding-left: var(--rs-list-counter-space);
+}
+
+.c-list--bulleted {
+  padding-left: var(--rs-list-bullet-space);
+  margin-top: 1em; /* match paragraph margin */
+}
+
+.c-list--bulleted {
+  list-style-type: disc;
+}
+
+.c-list--bulleted li,
+.c-list--numbered li {
+  margin-top: var(--rs-list-item-stack);
+}
+
+.c-list--numbered {
+  list-style-type: decimal;
+}
+
+/**
+ *  Pin Input
+ */
+
+.c-list--pin {
+  --pinDigits: 6;
+
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--rs-input-inline);
+}
+
+/*
+* The width of the digits is the result of the gap we want between them and the
+* number of digits we want to display. 
+* 100% is the full width of the container, so we divide it by the number of digits
+* and subtract the gap we want between them.
+*/
+.c-list__item--pin {
+  flex-basis: calc(100% / var(--pinDigits) - var(--rs-input-inline));
+}
+
+/* Use a fake font for "password"-style pin input */
+.c-input--pin__secret {
+  font-family: "password";
+}
+
+.c-input--pin {
+  text-align: center;
+
+  /* Sizing the input
+   *
+   * The 'input' is sized by its width (width here, or size=1 in HTML as fallback) and "height" (line-height), plus padding in both
+   * dimensions.
+   * */
+  font-size: 2em;
+  line-height: 1.2;
+  padding: 0.2em;
+  width: 100%;
+
+  font-weight: 600;
+}
+
+[data-haserror="true"] .c-input--pin {
+  border-color: var(--rc-error);
+}
+
+/**
+ *  Recovery phrase
+ *
+ *  We use a a pill style for each word
+ *  and a counter to number them
+ */
+
+/* The output element surrounding the recovery words */
+.c-output--recovery {
+  /* Needed for the floating "copy" button, if present */
+  position: relative;
+
+  background-color: var(--nvc-surface-medium);
+  border-radius: var(--rs-input-border-radius);
+  --bezel: calc(1.5 * var(--rs-input-bezel));
+  padding: var(--bezel);
+  display: block;
+  width: 100%;
+}
+
+.c-list--recovery {
+  position: relative;
+  flex-wrap: wrap;
+  counter-reset: recovery;
+  padding: 0;
+  list-style: none;
+
+  /* this makes sure that the after element is always behind the pill
+      but in front of the background */
+  z-index: 1;
+}
+
+.c-list--recovery-word {
+  /*
+    bg and fg stand for background and foreground
+    and are used to make sure that the text is always readable
+    and make it easier to understand the code going forward
+
+    it creates a scoped design logic that is easier to understand
+    and maintain.
+  */
+  --bg: var(--nvc-surface-medium);
+  --fg: var(--rc-onInput);
+
+  position: relative;
+  display: inline-flex;
+  background: var(--rc-background);
+  color: var(--fg);
+  border: var(--rs-line) var(--rc-line) solid;
+
+  border-radius: 999px;
+
+  padding: 0.5em 0.75em;
+  padding-right: 0.75em;
+  padding-left: 2.9em;
+
+  width: calc(33.33% - 1rem);
+  margin: 0.5rem;
+
+  font-size: 0.7em;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+@media screen and (max-width: 512px) {
+  .c-list--recovery-word {
+    width: calc(50% - 1rem);
+  }
+}
+
+/* Recovery phrase counter */
+.c-list--recovery-word::before {
+  position: absolute;
+  top: 50%;
+  left: 0.25em;
+  height: 85%;
+  width: 2.6em;
+
+  /* The counter displayed. We set this explicitly from the HTML because
+  * the index shown is important for recovery. Also this works around issues related
+  * to different counter behavior on Safari & Chrome. */
+  content: var(--index);
+  background-color: var(--nvc-surface-medium);
+  color: var(--nvc-text-light);
+  padding: 0 0.4em 0 0.4em;
+  font-size: 0.8em;
+  margin-right: 0.75em;
+  font-weight: 200;
+  border-radius: 50%;
+  display: flex;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+}
+
+/* This is the background color for each pill */
+.c-list--recovery-word::after {
+  position: absolute;
+  content: "";
+  inset: 0;
+  background-color: var(--bg);
+  border-radius: 999px;
+  filter: blur(10px);
+  z-index: -1;
+  opacity: 0.3;
+
+  transition:
+    200ms opacity linear,
+    400ms filter cubic-bezier(0.3, 0.7, 0, 1);
+
+  /*
+   * the blur does not render nicely in Safari if its not on its own paint layer,
+   * so we use will-change to let the browser know that we want to animate
+   * those properties. As a result, the browser will create a new paint layer
+   * for this element.
+   */
+  will-change: opacity, blur;
+}
+
+/* Make the blurred background more visible on focus */
+.c-list--recovery-word:focus-within::after {
+  opacity: 1;
+  filter: blur(3px);
+}
+
+.c-list--recovery-word__icon {
+  position: absolute;
+  top: 50%;
+  left: 0.6em;
+  transform: translateY(-50%);
+  z-index: 0;
+}
+.c-list--recovery-word__icon svg {
+  width: 1.25em;
+  height: 1.25em;
+  margin-top: 0.25em;
+}
+
+.c-list--recovery-word__icon svg [fill] {
+  fill: var(--fg);
+}
+
+.c-list--recovery-word__icon svg [stroke] {
+  stroke: var(--fg);
+}
+
+.c-list--recovery-word__attention::before,
+.c-list--recovery-word__attention .c-list--recovery-word__icon,
+.c-list--recovery-word__incorrect::before,
+.c-list--recovery-word__incorrect .c-list--recovery-word__icon,
+.c-list--recovery-word__correct::before,
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  --fg: var(--rc-onButton);
+  color: var(--fg);
+}
+
+/* When a word is disabled, make it more opaque to look non-interactive */
+.c-list--recovery-word__disabled {
+  --bg: var(--nvc-surface-medium);
+  --fg: var(--rc-onInput-readonly);
+  background-color: var(--vc-mist);
+  /* make sure the user can't select the word */
+  user-select: none;
+}
+
+/* When a word requires attention make it look interactive */
+.c-list--recovery-word__attention {
+  --bg: var(--nvc-surface-medium);
+}
+
+/* When a word requires attention, show with a green glow and show a checkmark instead of the counter */
+.c-list--recovery-word__correct {
+  --bg: var(--rc-input-success);
+}
+
+/* the check icon needs a bit of re-centering */
+.c-list--recovery-word__correct .c-list--recovery-word__icon {
+  margin-top: 0.15em;
+  margin-left: -0.05em;
+}
+
+/* When a word requires attention, show it as red and show a warning sign instead of the counter */
+.c-list--recovery-word__incorrect {
+  --bg: var(--rc-input-error);
+}
+
+/*
+  since correct & incorrect words have an icon, but we still want to make use of the circle
+  the number used to be in, we need to hide the number. We do this by making it transparent
+*/
+.c-list--recovery-word__correct::before,
+.c-list--recovery-word__incorrect::before {
+  color: transparent;
+}
+
+.c-list--recovery-word--important {
+  display: block;
+  margin: 0.5rem auto;
+}
+
+.c-recoveryInput {
+  display: block;
+
+  /* full width minus the counter */
+  width: calc(100% - 4em);
+  text-align: left;
+  color: var(--fg, currentColor);
+
+  height: calc(1em * var(--rs-line));
+
+  /* fixes layout-shifts in safari when input is empty */
+  position: absolute;
+}
+
+.c-recoveryInput::placeholder {
+  color: var(--rc-input-placeholder);
+}
+
+.c-list__item--vip {
+  font-size: 2rem;
+  font-weight: bold;
+}
+
+.c-list__parcel--select {
+  cursor: pointer;
+}
+
+.c-list__parcel--select:hover {
+  transition: background-color 400ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-list--anchors {
+  --border-radius: var(--rs-button-radius);
+}
+
+.c-list__item--icon {
+  position: relative;
+}
+
+.c-list__item--icon .c-list__parcel:last-of-type {
+  padding-right: calc(1.5em + 0.8em * 2);
+}
+
+.c-list--anchors .c-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  border: var(--rs-line) var(--rc-line) solid;
+  position: relative;
+}
+
+.c-list--anchors .c-list__item:focus-within,
+.c-list--anchors .c-list__item:focus,
+.c-list--anchors .c-list__item--focus {
+  z-index: var(--z-foreground);
+}
+
+.c-list--anchors .c-list__item::before,
+.c-list--anchors .c-list__item::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+}
+
+.c-list--anchors .c-list__item::after {
+  /* background: var(--vc-brand-alt); */
+  background-color: var(--nvc-surface-medium);
+  opacity: 0;
+  mix-blend-mode: darken;
+  transition: opacity 200ms linear;
+}
+
+.c-list--anchors .c-list__item:hover::after {
+  opacity: 0.3;
+}
+
+.c-list--anchors .c-list__item--noFocusStyle:hover::after {
+  opacity: 0;
+}
+
+.c-list--anchors .c-list__item::before {
+  will-change: filter;
+  background-image: linear-gradient(270deg, var(--rg-brand));
+  filter: blur(20px);
+  opacity: 0;
+  transform: scaleX(0.1) scaleY(0.7);
+  transition:
+    300ms opacity linear,
+    600ms transform cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-list--anchors .c-list__item:focus-within::before,
+.c-list--anchors .c-list__item--focus::before {
+  opacity: 1;
+  transform: scaleX(1) scaleY(0.8);
+}
+
+.c-list--anchors .c-list__item--noFocusStyle::before {
+  display: none;
+}
+
+.c-list--anchors .c-list__item:first-of-type {
+  border-top-left-radius: var(--border-radius);
+  border-top-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:first-of-type .c-list__parcel:first-of-type {
+  border-top-left-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:first-of-type .c-list__parcel:last-of-type {
+  border-top-right-radius: var(--border-radius);
+}
+
+.c-list--anchors
+  .c-list__item:first-of-type
+  .c-list__parcel--fullwidth:first-of-type {
+  border-top-left-radius: var(--border-radius);
+  border-top-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:last-of-type {
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:last-of-type .c-list__parcel:first-of-type {
+  border-bottom-left-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item:last-of-type .c-list__parcel:last-of-type {
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.c-list--anchors
+  .c-list__item:last-of-type
+  .c-list__parcel--fullwidth:last-of-type {
+  border-bottom-left-radius: var(--border-radius);
+  border-bottom-right-radius: var(--border-radius);
+}
+
+.c-list--anchors .c-list__item + .c-list__item {
+  margin-top: calc(-1 * var(--rs-line));
+}
+
+.c-list__parcel {
+  position: relative;
+  padding: var(--rs-list-parcel-bezel) 0.8em;
+  border: var(--rs-line) solid var(--nvc-text-grey);
+  flex-grow: 1;
+  margin: calc(-1 * var(--rs-line));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--nvc-surface-medium);
+}
+
+.c-list__parcel--detail {
+  overflow: hidden;
+  white-space: inherit;
+  padding: var(--rs-list-parcel-bezel) 0.8em;
+}
+
+.c-list__parcel--fullwidth {
+  flex: 1 0 100%;
+  width: 100%;
+}
+
+.c-list__icon {
+  position: absolute;
+  pointer-events: none;
+  top: 50%;
+  right: calc(var(--rs-list-parcel-bezel) * 1.5);
+  transform: translateY(-50%);
+  width: 1.5em;
+  height: 1.5em;
+  --stroke-width: 2;
+}
+
+/* This is a workaround for animating the arrow icon on all major browsers
+ * (Safari, Chrome, Firefox). SVG path update doesn't work on Safari, and
+ * svg transform is glitchy on Firefox. So instead we hide part of the
+ * arrow and "unhide" it on hover, which looks like the arrow is growing.
+ */
+.c-list__icon--masked {
+  clip-path: inset(0 0 0 35%);
+  transition: clip-path 300ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-list--anchors .c-list__item:hover .c-list__icon--masked {
+  clip-path: inset(0 0 0 0%);
+}
+
+.c-list__icon svg {
+  display: block;
+  width: 100%;
+}
+
+/**
+ *  Tooltip component
+ *  This is a CSS only tooltip that shows on hover
+ *  The element that triggers the tooltip must have a .c-tooltip class
+ *  and the element that appears on hover must have a .c-tooltip__content class.
+ *
+ *  In some cases tooltips are only shown when the element is disabled.
+ *  in those cases you can use the `.c-tooltip--onDisabled` modifier
+ */
+
+.c-tooltip {
+  position: relative;
+}
+
+.c-tooltip:focus {
+  outline: 1px solid var(--rc-interaction);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.c-tooltip:hover .c-tooltip__message,
+.c-tooltip:focus .c-tooltip__message {
+  visibility: visible;
+  opacity: 1;
+}
+
+.c-tooltip--onDisabled:hover .c-tooltip__message,
+.c-tooltip--onDisabled:focus .c-tooltip__message {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.c-tooltip--onDisabled:disabled:hover .c-tooltip__message {
+  visibility: visible;
+  opacity: 1;
+}
+
+.c-tooltip__message {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  opacity: 0;
+  color: var(--nvc-text-light);
+  visibility: hidden;
+  font-size: 0.8em;
+  line-height: 1.4;
+  z-index: var(--z-tooltip);
+  text-align: left;
+  min-width: 15rem;
+  max-width: 20rem;
+  transition: opacity 0.2s ease-in;
+  background-color: var(--nvc-surface-dark);
+
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+.c-tooltip--left .c-tooltip__message {
+  left: auto;
+  right: 0;
+}
+
+/* chasm: alternative to tooltips, where the card opens to reveal details */
+
+.c-chasm {
+  margin-left: calc(-1.25 * var(--rs-card-bezel));
+  margin-right: calc(-1.25 * var(--rs-card-bezel));
+  display: grid;
+  transition: grid-template-rows 150ms ease-out;
+  grid-template-rows: 0fr;
+}
+
+/* Work around to copy behavior of first t-lead paragraph after title,
+ * since in this case the chasm is inserted inbetween. */
+.c-chasm--title + .t-lead {
+  margin-top: 0.75em;
+}
+
+.c-chasm[aria-expanded="true"] {
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 400ms cubic-bezier(0.3, 0.7, 0, 1);
+}
+
+.c-chasm__inner {
+  overflow: hidden;
+}
+
+.c-chasm__content {
+  background-color: var(--nvc-input-grey);
+  padding: calc(1.25 * var(--rs-card-bezel));
+}
+
+.c-chasm__arrow {
+  margin: auto;
+  width: 0;
+  height: 0;
+  background: var(--nvc-input-grey);
+  width: 2.5rem;
+  height: 1.2rem;
+  /* triangle path */
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+.c-chasm__button {
+  transition: transform 300ms cubic-bezier(0.3, 0.7, 0, 1);
+  vertical-align: text-bottom;
+}
+.c-chasm__button svg {
+  transform: translate(-50%, -50%);
+}
+
+.c-chasm__button--flipped {
+  transform: rotate(180deg);
+}
+
+.c-action-list {
+  margin-top: 1rem;
+  background: var(--nvc-surface-medium);
+  border: var(--rs-line) solid var(--nvc-text-grey);
+  padding: var(--rs-list-parcel-bezel);
+}
+
+.c-action-list__item {
+  display: flex;
+  position: relative;
+  gap: var(--rs-list-gutter);
+  padding: calc(1.5 * var(--rs-list-parcel-bezel)) var(--rs-list-parcel-bezel);
+}
+
+a.c-action-list__item {
+  text-decoration: none;
+  color: var(--rc-text);
+}
+
+.c-action-list__icon {
+  height: 4rem;
+  width: 4rem;
+  flex: 0 0 4rem;
+  position: relative;
+}
+
+.c-action-list__icon img {
+  height: 80%;
+  object-fit: contain;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.c-action-list__avatar {
+  height: 4rem;
+  width: 4rem;
+  position: relative;
+}
+
+.c-action-list__avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.c-action-list__avatar--badge {
+  width: 2rem;
+  height: 2rem;
+  position: absolute;
+  bottom: -0.2rem;
+  right: -0.2rem;
+  background: var(--rc-light);
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rc-line);
+}
+
+.c-action-list__avatar--badge svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.c-action-list__item + .c-action-list__item::before {
+  content: "";
+  display: block;
+  height: var(--rs-line);
+  background: var(--nvc-text-grey);
+  position: absolute;
+  top: 0;
+  left: var(--rs-list-parcel-bezel);
+  right: var(--rs-list-parcel-bezel);
+}
+
+.c-action-list__actions {
+  display: flex;
+  gap: var(--rs-list-gutter);
+  padding: 0 var(--rs-list-parcel-bezel) var(--rs-list-parcel-bezel);
+}
+
+.c-action-list__label {
+  flex-grow: 1;
+}
+
+.c-action-list__action,
+.c-action-list__label,
+.c-action-list__status {
+  display: flex;
+  align-items: center;
+}
+
+.c-action-list__label--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.c-action-list__label--inverted {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.c-action-list__label--spacer {
+  width: 100%;
+}
+
+.c-action-list__action {
+  cursor: pointer;
+  color: var(--rc-text);
+  transition: 100ms color linear;
+}
+
+.c-action-list__action:hover {
+  color: var(--rc-interaction);
+}
+
+.c-action-list__action svg {
+  transition: 200ms opacity linear;
+}
+
+.c-action-list__action:hover {
+  border-color: var(--nvc-text-purple-secondary);
+}
+
+.c-action-list__action:hover svg {
+  opacity: 0.8;
+}
+
+.c-image {
+  width: 100%;
+  display: block;
+}
+
+.c-progress-container {
+  margin-bottom: 5rem;
+}
+
+.c-progress-stepper {
+  --bullet-size: 1.5em;
+
+  position: relative;
+  display: flex;
+  counter-reset: progress-step;
+  font-weight: 500;
+  text-align: center;
+}
+
+.c-progress-stepper--narrow {
+  padding-left: 10%;
+  padding-right: 10%;
+}
+
+.c-progress-stepper__step {
+  counter-increment: progress-step;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  position: relative;
+  color: var(--nvc-text-light);
+}
+
+.c-progress-stepper__step[aria-current="true"] ~ .c-progress-stepper__step {
+  color: var(--nvc-text-light);
+}
+
+.c-progress-stepper__step::before {
+  content: counter(progress-step);
+}
+
+.c-progress-stepper__step::before,
+.c-progress-stepper__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+
+  background: var(--nvc-text-light);
+
+  background-size: 200% 100%;
+  background-position: 0 0;
+
+  color: var(--nvc-surface-medium);
+
+  width: var(--bullet-size);
+  height: var(--bullet-size);
+
+  border-radius: 50%;
+  line-height: 1;
+
+  transition:
+    400ms background-position cubic-bezier(0.3, 0.7, 0, 1),
+    200ms color linear 200ms;
+}
+
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step::before,
+.c-progress-stepper__step[aria-current="true"]
+  ~ .c-progress-stepper__step
+  .c-progress-stepper__icon {
+  color: var(--nvc-surface-medium);
+  background-position: 100% 0;
+}
+
+.c-progress-stepper__icon svg {
+  width: 0.65em;
+  height: 0.65em;
+}
+
+.c-progress-stepper__icon path {
+  /*
+    this is a bit of a hack, the check-mark should not be a filled path
+    but a stroke.
+  */
+  stroke: currentColor;
+  fill: currentColor;
+  stroke-width: var(--rs-line);
+}
+
+.c-progress-stepper__step--final::before {
+  display: none;
+}
+
+/* the line between the steps */
+.c-progress-stepper__step::after {
+  content: "";
+  z-index: 1;
+  position: absolute;
+  top: calc(-1 * var(--rs-line) + var(--bullet-size) * 0.5);
+  left: 0;
+  right: 0;
+  border-bottom: var(--rs-line) solid var(--nvc-text-light);
+}
+
+.c-progress-stepper__step:first-child::after {
+  left: 50%;
+}
+
+.c-progress-stepper__step:last-child::after {
+  right: 50%;
+}
+
+.c-progress-stepper__label {
+  margin-top: 0.6em;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: var(--nvc-text-light);
+  width: min-content;
+  min-width: 8rem;
+}
+
+/** responsiveness */
+
+@media (max-width: 512px) {
+  .l-wrap {
+    justify-content: flex-start;
+    padding: 0;
+  }
+  .l-container {
+    width: 100%;
+
+    max-width: none;
+    /* centers the container and adds a bit of space to make sure the footer does not stick to it */
+    margin: 0 0 var(--rs-footer-height);
+  }
+
+  .l-container__marqueespaced {
+    padding-top: 50px !important;
+  }
+}
+
+/* VII) Utilities/Trumps:     Helpers and overrides. (hidden, error classes, */
+.is-hidden {
+  display: none !important;
+}
+
+.is-visible {
+  display: block !important;
+}
+
+.c-input--anchor {
+  position: relative;
+}
+
+.c-input--anchor__wrap {
+  position: relative;
+  display: block;
+  /* The halo around the input, used for style & feedback */
+  --halo: linear-gradient(270deg, var(--rg-brand));
+}
+
+[data-haserror="true"] .c-input--anchor__wrap--error,
+.c-input--anchor__wrap--error {
+  --halo: var(--rc-error-strong);
+}
+
+.c-input--anchor__wrap--valid {
+  --halo: var(--rc-positive);
+}
+
+.c-input--anchor__wrap::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  border-radius: 999999px;
+  background: var(--halo);
+  filter: blur(30px);
+  opacity: 0;
+  transform: scale(1) translateZ(0);
+  transition:
+    300ms transform cubic-bezier(0.7, 0.3, 0, 1),
+    300ms opacity linear;
+}
+
+[data-haserror="true"] .c-input--anchor__wrap::before,
+.c-input--anchor__wrap:focus-within::before,
+.c-input--anchor__wrap--error::before,
+.c-input--anchor__wrap--valid::before {
+  opacity: 0.8;
+  transform: scale(1) translateZ(0);
+}
+
+.c-input--anchor:focus-within input {
+  position: relative;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
+  border-color: transparent;
+}
+
+.c-input--anchor input {
+  position: relative;
+  z-index: 1;
+}
+
+.c-input__error {
+  left: 0px;
+  right: 0px;
+  position: absolute;
+
+  opacity: 0;
+  transition: opacity 0.2s ease-in;
+
+  min-width: 15rem;
+  text-align: left;
+  background-color: var(--rc-background);
+  color: var(--rc-text);
+  z-index: var(--z-tooltip);
+}
+
+.c-input__error--errored {
+  opacity: 1;
+}
+
+/* dropdown menus */
+
+.c-dropdown {
+  position: relative;
+}
+
+.c-dropdown__trigger {
+  transition: 100ms color linear;
+}
+
+.c-action-list__action.c-dropdown__trigger:hover {
+  color: var(--nvc-text-purple-secondary);
+}
+
+.c-dropdown__menu {
+  opacity: 0;
+  visibility: hidden;
+  position: absolute;
+  top: 100%;
+  right: calc(var(--rs-dropdown-bezel) * -1);
+  z-index: var(--z-tooltip);
+  min-width: 100%;
+  width: max-content;
+  background-color: var(--nvc-surface-light);
+  border-radius: var(--border-radius);
+  margin-top: calc(-1 * var(--rs-line));
+  text-align: right;
+  pointer-events: none;
+  transform: translateY(-2rem);
+  transition:
+    0ms opacity linear,
+    0ms visibility linear,
+    0ms transform;
+}
+
+.c-dropdown__menu::before {
+  z-index: -1;
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3);
+  transition:
+    100ms opacity linear 100ms,
+    100ms visibility linear 100ms,
+    0ms transform cubic-bezier(0.7, 0.3, 0, 1) 200ms;
+}
+
+.c-dropdown__trigger[aria-expanded="true"] + .c-dropdown__menu {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0rem);
+  transition:
+    200ms opacity linear,
+    200ms visibility linear,
+    300ms transform cubic-bezier(0.7, 0.3, 0, 1);
+}
+
+.c-dropdown__item {
+  display: block;
+  /* Dropdown has a light background */
+  color: var(--rc-dark);
+  text-decoration: none;
+}
+
+.c-dropdown__item + .c-dropdown__item {
+  border-top: var(--rs-line) solid var(--rc-line);
+}
+
+.c-dropdown__link {
+  display: block;
+  /* Dropdown has a light background */
+  color: var(--rc-dark);
+  font-size: 0.8em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: 100ms color linear;
+  padding: calc(var(--rs-dropdown-bezel) * 0.75) var(--rs-dropdown-bezel);
+}
+
+.c-dropdown__trigger[aria-expanded="true"]
+  + .c-dropdown__menu
+  .c-dropdown__link:hover {
+  color: var(--nvc-text-purple-secondary);
+}
+
+.c-dropdown__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-backdrop);
+}
+
+/* Needed to override the "reset" rules */
+/* Without this, the checkbox is simply not shown */
+input[type="checkbox"] {
+  -webkit-appearance: checkbox !important;
+  -moz-appearance: checkbox !important;
+  -ms-appearance: checkbox !important;
+  -o-appearance: checkbox !important;
+  appearance: checkbox !important;
+}
+
+@keyframes rotate {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.c-loader {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-loader);
+  background: var(--rc-overlay-backdrop);
+}
+
+/* Pretend the astronaut is moving in space */
+@keyframes astrodance {
+  0% {
+    transform: translate(-50%, -50%) rotate(-20deg);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) rotate(10deg);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(-20deg);
+  }
+}
+
+.c-loader__image {
+  width: 64px;
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  user-select: none;
+  animation-name: astrodance;
+  animation-duration: 5s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  transform: translate(-50%, -50%);
+}
+
+.c-loader__link {
+  color: var(--rc-surface);
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 72px);
+}
+
+.c-loader__link:hover,
+.c-loader__link:focus {
+  color: var(--nvc-text-purple-secondary);
+}
+
+/* Wrap QR codes in a white square (for legibility) and prettify a bit */
+.c-qrcode canvas {
+  display: block;
+  /* Make sure it has a white background to be easy to scan, not matter the background */
+  background: white;
+  /* Ensure the canvas doesn't overflow on small screens */
+  width: 100%;
+  /* Makes the canvas more sharp */
+  image-rendering: pixelated;
+}
+
+/*
+  Marquee
+
+  This is a very simple marquee implementation.
+  It works by having a row of logos, the contents of which are duplicated and
+  positioned next to each other. A keyframe animation then moves the logos horizontally
+  to create the illusion of a continuous marquee. Every second row is going in the opposite
+  direction to create a more natural movement.
+
+  The `--marqueeGap` variable, which is the amount of space between logos, is set in the
+  `c-marquee` class. `--rowIndex`, `--itemsPerRow` and `--totalRows` are set by the component itself.
+*/
+
+.c-marquee {
+  --marqueeGap: var(--rs-marquee-gap);
+
+  position: relative;
+  height: 35rem;
+}
+
+.c-marquee__list {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.c-marquee__row {
+  position: absolute;
+  top: calc(var(--rowIndex) / var(--totalRows) * 100% + var(--marqueeGap));
+  left: 0;
+  width: calc(200% + var(--marqueeGap) * var(--itemsPerRow) * 2);
+  height: calc(100% / var(--totalRows));
+
+  transform: rotate(-5deg);
+  transform-origin: 25% 50%;
+}
+
+.c-marquee__rowHalf {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  gap: var(--marqueeGap);
+  animation: marquee 70s linear infinite;
+}
+
+/* makes sure every second row animates in the oposite direction */
+.c-marquee__row:nth-child(2n) .c-marquee__rowHalf {
+  animation-direction: reverse;
+  /*
+    staggers the animation so that the icons don't start in the same position
+    for every row
+
+    X X X X X
+   X X X X X
+
+    otherwise, the animation would start like this:
+
+    X X X X X
+    X X X X X
+  */
+  animation-delay: -4.5s;
+}
+
+.c-marquee__rowHalf--second {
+  left: 50%;
+}
+
+@media (prefers-reduced-motion) {
+  .c-marquee__rowHalf {
+    animation-play-state: paused;
+  }
+}
+
+.c-marquee__item {
+  flex: 0 0 auto;
+  width: calc(100% / var(--itemsPerRow) - var(--marqueeGap));
+  height: 100%;
+  position: relative;
+  user-select: none;
+}
+
+.c-marquee__image-container {
+  position: absolute;
+  top: 50%;
+  transform: translate(0, -50%);
+  height: 65%;
+  aspect-ratio: 1;
+}
+
+.c-marquee__image {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  transition: opacity 0.3s ease-in;
+}
+
+.c-marquee__image--loading {
+  opacity: 0;
+}
+
+.c-marquee__image--loaded {
+  opacity: 1;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.c-separator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--vs-stack);
+}
+
+.c-separator__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--vc-brand-purple);
+}
+
+.c-separator__dot--small {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--vc-brand-purple);
+}
+
+.c-separator__dot--tiny {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background-color: var(--vc-brand-purple);
+}
+
+.c-warning {
+  color: var(--nvc-text-light);
+}
+
+/*
+ * stack helper classes
+ *
+ * it is fine to use value tokens here, because these are generic design
+ * helpers. They are not specific to a particular component.
+ */
+
+.l-stack {
+  margin-top: var(--rs-stack-section);
+}
+
+.l-stack--spacious {
+  margin-top: var(--rs-stack-section--spacious);
+}
+
+.l-stack--small {
+  margin-top: var(--rs-stack-section--small);
+}
+
+.l-stack--tight {
+  margin-top: var(--rs-stack-section--tight);
+}
+
+.l-stack--none {
+  margin-top: 0;
+}
+
+/* Add pulsating animation */
+@keyframes pulsate {
+  0% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.2));
+  }
+  50% {
+    opacity: 0.5;
+    filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4));
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.2));
+  }
+}
+
+.pulsating {
+  animation: pulsate 2s infinite;
+}

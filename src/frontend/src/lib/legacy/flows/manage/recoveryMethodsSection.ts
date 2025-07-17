@@ -1,0 +1,214 @@
+import {
+  checkmarkRoundIcon,
+  lockedIcon,
+  warningIcon,
+  warningRoundIcon,
+} from "$lib/templates/icons";
+import { DynamicKey, I18n } from "$lib/legacy/i18n";
+import {
+  recoveryKeyLabel,
+  recoveryPhraseLabel,
+} from "$lib/utils/recoveryDevice";
+import { isNullish } from "@dfinity/utils";
+import { TemplateResult, html } from "lit-html";
+import { settingsDropdown } from "./settingsDropdown";
+import { Devices, RecoveryPhrase } from "./types";
+
+import type { DeviceWithUsage } from "$lib/generated/internet_identity_types";
+import copyJson from "./recoveryMethodsSection.json";
+
+// The list of recovery devices
+export const recoveryMethodsSection = ({
+  recoveries: { recoveryPhrase, recoveryKey },
+  addRecoveryPhrase,
+  addRecoveryKey,
+  onRemoveDevice,
+}: {
+  recoveries: Devices["recoveries"];
+  addRecoveryPhrase: () => void;
+  addRecoveryKey: () => void;
+  onRemoveDevice: (device: DeviceWithUsage) => void;
+}): TemplateResult => {
+  const i18n = new I18n();
+
+  const copy = i18n.i18n(copyJson);
+  const warnNoRecovery = isNullish(recoveryPhrase) && isNullish(recoveryKey);
+  const wrapClasses = [
+    "l-stack",
+    "c-card",
+    "c-card--narrow",
+    ...(warnNoRecovery ? [""] : []),
+  ];
+
+  return html`
+    <aside class=${wrapClasses.join(" ")} data-role="recoveries">
+      ${warnNoRecovery
+        ? html`
+            <span
+              class="c-card__label c-card__label--hasIcon"
+              aria-hidden="true"
+            >
+              <i
+                class="c-card__icon c-icon c-icon--error__flipped c-icon--inline"
+                >${warningIcon}</i
+              >
+              <h2 class="c-warning">${copy.security_warning}</h2>
+            </span>
+          `
+        : ""}
+      <div class="t-title">
+        <h2>Recovery Methods</h2>
+      </div>
+      <p class="t-paragraph t-lead">${copy.enable_recovery_to_make_secure}</p>
+      <div class="c-action-list">
+        <ul>
+          ${isNullish(recoveryPhrase)
+            ? missingRecovery({ recovery: "phrase", addRecoveryPhrase })
+            : recoveryPhraseItem({ recoveryPhrase, i18n })}
+          ${isNullish(recoveryKey)
+            ? missingRecovery({ recovery: "key", addRecoveryKey })
+            : recoveryKeyItem({
+                onRemoveDevice: () => onRemoveDevice(recoveryKey.device),
+                i18n,
+              })}
+        </ul>
+      </div>
+    </aside>
+  `;
+};
+
+// Show a missing recovery method
+export const missingRecovery = (
+  args:
+    | {
+        recovery: "phrase";
+        addRecoveryPhrase: () => void;
+      }
+    | {
+        recovery: "key";
+        addRecoveryKey: () => void;
+      },
+) => {
+  const { icon, iconClass, recoveryName, message, fn, action } =
+    args.recovery === "phrase"
+      ? {
+          icon: warningRoundIcon,
+          iconClass: "c-icon--error",
+          recoveryName: "Recovery Phrase",
+          message: "For minimum security, enable a recovery phrase.",
+          fn: () => args.addRecoveryPhrase(),
+          action: "add-recovery-phrase",
+        }
+      : {
+          icon: warningIcon,
+          iconClass: "c-icon--warning",
+          recoveryName: "Recovery Device",
+          message: "For extra security, enable a recovery device.",
+          fn: () => args.addRecoveryKey(),
+          action: "add-recovery-device",
+        };
+  return html`
+    <li class="c-action-list__item">
+      <div class="c-action-list__status">
+        <span class="c-tooltip c-icon ${iconClass}" tabindex="0"
+          >${icon}
+          <span class="c-tooltip__message c-card c-card--tight"
+            >${message}</span
+          >
+        </span>
+      </div>
+      <div class="c-action-list__label">${recoveryName}</div>
+      <button
+        @click="${() => fn()}"
+        class="c-button c-button--primary c-button--minimal"
+        data-action=${action}
+        aria-label="Add recovery phrase"
+      >
+        Enable
+      </button>
+    </li>
+  `;
+};
+
+// List a recovery phrase
+export const recoveryPhraseItem = ({
+  recoveryPhrase,
+  i18n,
+}: {
+  recoveryPhrase: RecoveryPhrase;
+  i18n: I18n;
+}) => {
+  const alias = recoveryPhraseLabel;
+  const id = "recovery-phrase";
+  const settings = [
+    { action: "reset", caption: "Reset", fn: () => recoveryPhrase.reset() },
+    recoveryPhrase.isProtected
+      ? {
+          action: "unprotect",
+          caption: "Unlock",
+          fn: () => recoveryPhrase.unprotect(),
+        }
+      : {
+          action: "protect",
+          caption: "Lock",
+          fn: () => recoveryPhrase.protect(),
+        },
+  ];
+
+  const { recovery_phrase_enabled } = i18n.i18n(copyJson);
+
+  return html`
+    <li class="c-action-list__item" data-device=${alias}>
+      ${checkmark(recovery_phrase_enabled)}
+      <div class="c-action-list__label">${alias}</div>
+      ${recoveryPhrase.isProtected ? lock() : undefined}
+      ${settingsDropdown({ alias, id, settings })}
+    </li>
+  `;
+};
+
+const lock = (): TemplateResult => {
+  return html`
+    <div class="c-action-list__status" data-role="protected">
+      <span class="c-icon c-icon--ok c-icon--lock" tabindex="0"
+        >${lockedIcon}</span
+      >
+    </div>
+  `;
+};
+
+// List a recovery key (non-phrase recovery device)
+export const recoveryKeyItem = ({
+  onRemoveDevice,
+  i18n,
+}: {
+  onRemoveDevice: () => void;
+  i18n: I18n;
+}) => {
+  const alias = recoveryKeyLabel;
+  const id = "recovery-key";
+  const settings = [
+    { action: "remove", caption: "Remove", fn: onRemoveDevice },
+  ];
+
+  const { recovery_key_enabled } = i18n.i18n(copyJson);
+
+  return html`
+    <li class="c-action-list__item" data-device=${alias}>
+      ${checkmark(recovery_key_enabled)}
+      <div class="c-action-list__label">${alias}</div>
+      ${settingsDropdown({ alias, id, settings })}
+    </li>
+  `;
+};
+
+const checkmark = (label: DynamicKey | string): TemplateResult => {
+  return html`
+    <div class="c-action-list__status">
+      <span class="c-icon c-icon--ok c-tooltip"
+        >${checkmarkRoundIcon}
+        <span class="c-tooltip__message c-card c-card--tight">${label}</span>
+      </span>
+    </div>
+  `;
+};

@@ -1,0 +1,13 @@
+{
+  "en": {
+    "title_possibly_wrong_web_authn_flow": "Please try again",
+    "message_possibly_wrong_web_authn_flow_1": "The wrong domain was set for the passkey and the browser couldn't find it.",
+    "title_pin_another_domain": "Pin identity in another domain",
+    "title_trying_again": "Trying again",
+    "message_pin_another_domain_1": "You seem to be using a PIN identity created in another domain.",
+    "message_pin_another_domain_2": "To access this domain you need to go to the other domain and add a passkey.",
+    "sign_in_with_google_accounts_is_unavailable": "Google login is unavailable. Please try again later.",
+    "register_with_google_accounts_is_unavailable": "Registering with google is unavailable. Please try again later.",
+    "failed_to_login_with_google": "Could not log in with google."
+  }
+}
