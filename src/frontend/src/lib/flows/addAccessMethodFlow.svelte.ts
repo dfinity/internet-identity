@@ -23,7 +23,7 @@ import { bufferEqual } from "$lib/utils/iiConnection";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
 const BASE_62_CHARS =
-  "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 export interface AddAccessMethodFlowOptions {
   isMaxOpenIdCredentialsReached?: boolean;
