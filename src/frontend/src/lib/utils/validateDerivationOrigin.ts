@@ -140,7 +140,8 @@ const inferAlternativeOriginsUrl = ({
   if (
     location.hostname.endsWith("icp0.io") ||
     location.hostname.endsWith("ic0.app") ||
-    location.hostname.endsWith("internetcomputer.org")
+    location.hostname.endsWith("internetcomputer.org") ||
+    location.hostname.endsWith("id.ai")
   ) {
     // If this is a canister running on one of the official IC domains, then return the
     // official canister id based API endpoint
