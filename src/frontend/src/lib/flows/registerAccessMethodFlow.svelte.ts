@@ -20,18 +20,19 @@ import { AuthnMethodRegisterError } from "$lib/generated/internet_identity_types
 const POLL_INTERVAL = 3000;
 
 export class RegisterAccessMethodFlow {
-  readonly #identityNumber: bigint;
-
   view = $state<"confirmDevice" | "confirmSignIn">("confirmDevice");
   confirmationCode = $state<string>();
   isUnableToComplete = $state(false);
   identityName = $state<string>();
 
-  constructor(identityNumber: bigint) {
-    this.#identityNumber = identityNumber;
-  }
-
-  registerTempKey = async (): Promise<void> => {
+  registerTempKey = async (registrationId: string): Promise<void> => {
+    const identityNumber = (
+      await anonymousActor.lookup_by_registration_mode_id(registrationId)
+    )[0];
+    if (isNullish(identityNumber)) {
+      this.isUnableToComplete = true;
+      return;
+    }
     const session = get(sessionStore);
     const credentialId = crypto.getRandomValues(new Uint8Array(32));
     const authnMethodData = passkeyAuthnMethodData({
@@ -43,7 +44,7 @@ export class RegisterAccessMethodFlow {
     let expiration: bigint;
     try {
       const confirmation = await anonymousActor
-        .authn_method_register(this.#identityNumber, authnMethodData)
+        .authn_method_register(identityNumber, authnMethodData)
         .then(throwCanisterError);
       expiration = confirmation.expiration;
       this.confirmationCode = confirmation.confirmation_code;
@@ -61,7 +62,7 @@ export class RegisterAccessMethodFlow {
 
     while (!this.isUnableToComplete) {
       const { authn_methods } = await anonymousActor
-        .identity_authn_info(this.#identityNumber)
+        .identity_authn_info(identityNumber)
         .then(throwCanisterError);
       // Show confirm sign-in view if session key has been registered
       if (
@@ -77,10 +78,10 @@ export class RegisterAccessMethodFlow {
         const identity = await authenticateWithSession({ session });
         authenticationStore.set({
           identity,
-          identityNumber: this.#identityNumber,
+          identityNumber,
         });
         const { name } = await get(authenticatedStore)
-          .actor.identity_info(this.#identityNumber)
+          .actor.identity_info(identityNumber)
           .then(throwCanisterError);
         this.identityName = name[0];
         this.view = "confirmSignIn";
@@ -96,8 +97,8 @@ export class RegisterAccessMethodFlow {
 
   createPasskey = async (): Promise<void> => {
     const session = get(sessionStore);
-    const { actor } = get(authenticatedStore);
-    const name = this.identityName ?? this.#identityNumber.toString(10);
+    const { actor, identityNumber } = get(authenticatedStore);
+    const name = this.identityName ?? identityNumber.toString(10);
     const passkeyIdentity =
       features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
         ? await DiscoverableDummyIdentity.createNew(name)
@@ -122,13 +123,13 @@ export class RegisterAccessMethodFlow {
     });
     await actor
       .authn_method_replace(
-        this.#identityNumber,
+        identityNumber,
         new Uint8Array(session.identity.getPublicKey().toDer()),
         authnMethodData,
       )
       .then(throwCanisterError);
     lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber: this.#identityNumber,
+      identityNumber,
       name,
       authMethod: {
         passkey: {

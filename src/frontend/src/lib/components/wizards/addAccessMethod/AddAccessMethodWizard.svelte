@@ -14,6 +14,7 @@
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
   import { isCanisterError } from "$lib/utils/utils";
+  import { nonNullish } from "@dfinity/utils";
 
   interface Props {
     onGoogleLinked: (credential: OpenIdCredential) => void;
@@ -92,7 +93,7 @@
       continueOnAnotherDevice={addAccessMethodFlow.continueOnAnotherDevice}
       {isUsingPasskeys}
     />
-  {:else if addAccessMethodFlow.view === "continueOnAnotherDevice"}
+  {:else if addAccessMethodFlow.view === "continueOnAnotherDevice" && nonNullish(addAccessMethodFlow.newDeviceLink)}
     <ContinueOnAnotherDevice url={addAccessMethodFlow.newDeviceLink} />
   {:else if addAccessMethodFlow.view === "confirmationCode"}
     <AuthorizeNewDevice

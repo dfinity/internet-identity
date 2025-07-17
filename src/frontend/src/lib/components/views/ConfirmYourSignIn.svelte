@@ -2,9 +2,10 @@
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { nonNullish } from "@dfinity/utils";
 
   interface Props {
-    name: string;
+    name?: string;
     createPasskey: () => Promise<void>;
   }
 
@@ -27,7 +28,11 @@
   Confirm your sign-in
 </h1>
 <p class="text-md text-text-tertiary mb-8 font-medium text-balance">
-  You're signing in as <b class="text-text-primary">{name}</b>.
+  {#if nonNullish(name)}
+    You're signing in as <b class="text-text-primary">{name}</b>.
+  {:else}
+    You're about to sign in.
+  {/if}
   <br /><br />
   To continue, create a passkey to secure your identity and simplify future sign-ins.
 </p>

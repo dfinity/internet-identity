@@ -3,25 +3,16 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { RegisterAccessMethodFlow } from "$lib/flows/registerAccessMethodFlow.svelte.js";
-  import type { PageProps } from "./$types";
   import { goto } from "$app/navigation";
   import ConfirmYourSignIn from "$lib/components/views/ConfirmYourSignIn.svelte";
   import ConfirmThisDevice from "$lib/components/views/ConfirmThisDevice.svelte";
   import { onMount } from "svelte";
   import { handleError } from "$lib/components/utils/error";
-  import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
+  import { CircleAlertIcon } from "@lucide/svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
 
-  const { data }: PageProps = $props();
-
-  const registerAccessMethodFlow = new RegisterAccessMethodFlow(
-    data.identityNumber,
-  );
-  const name = $derived(
-    registerAccessMethodFlow.identityName ?? data.identityNumber.toString(),
-  );
+  const registerAccessMethodFlow = new RegisterAccessMethodFlow();
 
   const handleCreatePasskey = async () => {
     try {
@@ -34,7 +25,9 @@
 
   onMount(async () => {
     try {
-      await registerAccessMethodFlow.registerTempKey();
+      await registerAccessMethodFlow.registerTempKey(
+        window.location.hash.slice(1),
+      );
     } catch (error) {
       handleError(error);
     }
@@ -52,7 +45,10 @@
           confirmationCode={registerAccessMethodFlow.confirmationCode}
         />
       {:else if registerAccessMethodFlow.view === "confirmSignIn"}
-        <ConfirmYourSignIn {name} createPasskey={handleCreatePasskey} />
+        <ConfirmYourSignIn
+          name={registerAccessMethodFlow.identityName}
+          createPasskey={handleCreatePasskey}
+        />
       {/if}
     </AuthPanel>
   </div>

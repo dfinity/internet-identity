@@ -8,7 +8,7 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
-import { throwCanisterError, waitFor } from "$lib/utils/utils";
+import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
 import type {
   AuthnMethodData,
   OpenIdCredential,
@@ -22,6 +22,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { bufferEqual } from "$lib/utils/iiConnection";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
+const REGISTRATION_ID_LENGTH = 5;
 
 export interface AddAccessMethodFlowOptions {
   isMaxOpenIdCredentialsReached?: boolean;
@@ -40,16 +41,12 @@ export class AddAccessMethodFlow {
   isSystemOverlayVisible = $state(false);
   isRegistrationWindowOpen = $state(false);
   isRegistrationWindowPassed = $state(false);
-  newDeviceLink: URL;
+  newDeviceLink?: URL;
 
   constructor(options?: AddAccessMethodFlowOptions) {
     if (options?.isMaxOpenIdCredentialsReached === true) {
       this.view = "addPasskey";
     }
-    this.newDeviceLink = new URL(
-      `/new-device?${get(authenticatedStore).identityNumber.toString(16)}`,
-      window.location.origin,
-    );
   }
 
   linkGoogleAccount = async (): Promise<OpenIdCredential> => {
@@ -131,39 +128,49 @@ export class AddAccessMethodFlow {
 
   continueOnAnotherDevice = async (): Promise<void> => {
     const { actor, identityNumber } = get(authenticatedStore);
+    const registrationId = secureRandomId(REGISTRATION_ID_LENGTH);
 
-    this.view = "continueOnAnotherDevice";
+    this.newDeviceLink = new URL(
+      `/pair#${registrationId}`,
+      window.location.origin,
+    );
     this.isRegistrationWindowPassed = false;
     this.isRegistrationWindowOpen = true;
+    this.view = "continueOnAnotherDevice";
 
-    // Always exit any ongoing registration mode first
-    await actor.authn_method_registration_mode_exit(identityNumber);
-    const { expiration } = await actor
-      .authn_method_registration_mode_enter(identityNumber, [])
-      .then(throwCanisterError);
-    while (!this.isRegistrationWindowPassed) {
-      const info = await actor
-        .identity_info(identityNumber)
+    try {
+      // Always exit any ongoing registration mode first
+      await actor.authn_method_registration_mode_exit(identityNumber);
+      const { expiration } = await actor
+        .authn_method_registration_mode_enter(identityNumber, [registrationId])
         .then(throwCanisterError);
-      // Exit if registration window was manually closed
-      if (!this.isRegistrationWindowOpen) {
-        break;
+
+      while (!this.isRegistrationWindowPassed) {
+        const info = await actor
+          .identity_info(identityNumber)
+          .then(throwCanisterError);
+        // Exit if registration window was manually closed
+        if (!this.isRegistrationWindowOpen) {
+          break;
+        }
+        // Show confirmation code view if we got a pending authn method
+        if (nonNullish(info.authn_method_registration[0]?.authn_method[0])) {
+          this.#waitingForDevice =
+            info.authn_method_registration[0]?.authn_method[0];
+          this.view = "confirmationCode";
+          break;
+        }
+        // Wait before retrying
+        await waitFor(POLL_INTERVAL);
+        // Check if we're still in the registration time window
+        this.isRegistrationWindowPassed =
+          BigInt(Date.now()) * BigInt(1_000_000) > expiration;
       }
-      // Show confirmation code view if we got a pending authn method
-      if (nonNullish(info.authn_method_registration[0]?.authn_method[0])) {
-        this.#waitingForDevice =
-          info.authn_method_registration[0]?.authn_method[0];
-        this.view = "confirmationCode";
-        break;
-      }
-      // Wait before retrying
-      await waitFor(POLL_INTERVAL);
-      // Check if we're still in the registration time window
-      this.isRegistrationWindowPassed =
-        BigInt(Date.now()) * BigInt(1_000_000) > expiration;
+    } finally {
+      // Close registration window if passed or error was thrown
+      this.isRegistrationWindowOpen = false;
+      this.newDeviceLink = undefined;
     }
-    // Close registration window if passed
-    this.isRegistrationWindowOpen = false;
   };
 
   confirmDevice = async (confirmationCode: string): Promise<void> => {
