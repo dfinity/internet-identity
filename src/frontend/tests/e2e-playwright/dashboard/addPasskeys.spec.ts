@@ -81,7 +81,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
 
   for (let i = 0; i < confirmationCodeArray.length; i++) {
     const code = confirmationCodeArray[i];
-    await page.getByLabel(`Code Input ${i}`).fill(code);
+    await page.getByLabel(`Code input ${i}`).fill(code);
   }
 
   await page.getByRole("button", { name: "Confirm sign-in" }).click();
