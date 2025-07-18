@@ -40,17 +40,14 @@
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Enter") {
-      handleSave();
-    } else if (event.key === "Escape") {
+    if (event.key === "Escape") {
       onClose();
     }
   };
 
-  // Focus the input when the dialog opens
+  // Focus the input when the dialog opens and auto-select the text
   $effect(() => {
     if (inputElement) {
-      inputElement.focus();
       inputElement.select();
     }
   });
@@ -65,7 +62,7 @@
     Give your passkey a memorable name to help you identify it.
   </p>
 
-  <div class="mb-6">
+  <form onsubmit={handleSave} class="flex flex-col gap-6">
     <Input
       bind:element={inputElement}
       bind:value={inputValue}
@@ -73,18 +70,19 @@
       type="text"
       disabled={isLoading || inputValue.trim() === ""}
       class="w-full"
+      autofocus
     />
-  </div>
-
-  <Button
-    onclick={handleSave}
-    variant="primary"
-    class="mb-3"
-    disabled={isLoading || inputValue.trim() === ""}
-  >
-    {isLoading ? "Saving..." : "Save"}
-  </Button>
-  <Button onclick={onClose} variant="tertiary" disabled={isLoading}>
-    Cancel
-  </Button>
+    <div class="flex flex-col gap-3">
+      <Button
+        type="submit"
+        variant="primary"
+        disabled={isLoading || inputValue.trim() === ""}
+      >
+        {isLoading ? "Saving..." : "Save"}
+      </Button>
+      <Button onclick={onClose} variant="tertiary" disabled={isLoading}>
+        Cancel
+      </Button>
+    </div>
+  </form>
 </Dialog>

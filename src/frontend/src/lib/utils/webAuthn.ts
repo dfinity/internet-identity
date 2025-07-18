@@ -107,3 +107,13 @@ export const authnMethodToPublicKey = (
     `Unknown authentication method: ${JSON.stringify(authnMethod.authn_method)}`,
   );
 };
+
+export const getAuthnMethodAlias = (authnMethod: AuthnMethodData): string => {
+  const metadataAlias = authnMethod.metadata.find(
+    ([key, _val]) => key === "alias",
+  )?.[1];
+  if (metadataAlias && "String" in metadataAlias) {
+    return metadataAlias.String;
+  }
+  return "";
+};

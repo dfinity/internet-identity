@@ -22,8 +22,8 @@
     getLastUsedAccessMethod,
     isWebAuthnMetaData,
   } from "$lib/utils/accessMethods";
-  import { authnMethodEqual } from "$lib/utils/webAuthn";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
+  import { authnMethodEqual, getAuthnMethodAlias } from "$lib/utils/webAuthn";
 
   const MAX_PASSKEYS = 8;
 
@@ -100,16 +100,6 @@
     } catch (error) {
       handleError(error);
     }
-  };
-
-  const getAuthnMethodAlias = (authnMethod: AuthnMethodData) => {
-    const metadataAlias = authnMethod.metadata.find(
-      ([key, _val]) => key === "alias",
-    )?.[1]!;
-    if (metadataAlias && "String" in metadataAlias) {
-      return metadataAlias.String;
-    }
-    return "";
   };
 </script>
 
@@ -228,8 +218,7 @@
 
 {#if identityInfo.renamableAuthnMethod}
   <RenamePasskeyDialog
-    authnMethod={identityInfo.renamableAuthnMethod}
-    currentName={getAuthnMethodAlias(identityInfo.renamableAuthnMethod) ?? ""}
+    currentName={getAuthnMethodAlias(identityInfo.renamableAuthnMethod)}
     onRename={handleRenamePasskey}
     onClose={() => (identityInfo.renamableAuthnMethod = null)}
   />
