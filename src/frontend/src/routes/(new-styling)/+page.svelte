@@ -45,10 +45,6 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
 
-  $effect(() => {
-    console.log("isAuthenticating", isAuthenticating);
-  });
-
   const handleContinueAs = async (identity: LastUsedIdentity) => {
     await authLastUsedFlow.authenticate(identity).catch(handleError);
     await onSignIn(identity.identityNumber);
