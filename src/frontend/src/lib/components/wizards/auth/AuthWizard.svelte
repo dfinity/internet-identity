@@ -11,21 +11,21 @@
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
 
   interface Props {
+    isAuthenticating?: boolean;
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
     onError: (error: unknown) => void;
-    children?: Snippet;
     withinDialog?: boolean;
-    isAuthenticating?: boolean;
+    children?: Snippet;
   }
 
   let {
+    isAuthenticating = $bindable(),
     onSignIn,
     onSignUp,
-    children,
-    withinDialog = false,
     onError,
-    isAuthenticating = $bindable(),
+    withinDialog = false,
+    children,
   }: Props = $props();
 
   const authFlow = new AuthFlow();
