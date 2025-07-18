@@ -120,6 +120,16 @@ export const handleError = (error: unknown) => {
         });
         console.error(error);
         break;
+      case "AuthnMethodNotFound":
+        toaster.error({
+          title: "Authentication method not found",
+        });
+        break;
+      case "InvalidMetadata":
+        toaster.error({
+          title: `Invalid metadata. ${error.value(error.type)}`,
+        });
+        break;
       case "NameTooLong":
       case "Unauthorized":
       case "NoAuthnMethodToConfirm":
@@ -137,16 +147,6 @@ export const handleError = (error: unknown) => {
           description: error.value(error.type),
         });
         console.error(error);
-        break;
-      case "AuthnMethodNotFound":
-        toaster.error({
-          title: "Authentication method not found",
-        });
-        break;
-      case "InvalidMetadata":
-        toaster.error({
-          title: `Invalid metadata. ${error.value(error.type)}`,
-        });
         break;
       default: {
         // Should be avoided; reaching here means an error is missing above.

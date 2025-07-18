@@ -233,17 +233,15 @@ class IdentityInfo {
         newMetadata,
       )
       .then(throwCanisterError);
-    const index = this.authnMethods.findIndex((value) =>
-      authnMethodEqual(value, authnMethod),
+    // Update authnMethods locally for faster feedback
+    this.authnMethods = this.authnMethods.map((value) =>
+      authnMethodEqual(value, authnMethod)
+        ? {
+            ...value,
+            metadata: newMetadata,
+          }
+        : value,
     );
-    if (index < 0) {
-      throw new Error("Authentication method not found in authnMethods.");
-    }
-
-    this.authnMethods[index] = {
-      ...authnMethod,
-      metadata: newMetadata,
-    };
     await this.fetch();
   }
 
