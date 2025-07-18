@@ -155,4 +155,8 @@
   </svg>
 </div>
 
+<h1 class="text-text-brand-primary fixed bottom-3 w-full text-center text-3xl">
+  Click anywhere to make waves!
+</h1>
+
 <svelte:window bind:innerHeight bind:innerWidth />
