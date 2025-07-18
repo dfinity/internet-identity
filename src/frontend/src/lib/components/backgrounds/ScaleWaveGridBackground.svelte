@@ -218,7 +218,7 @@
   {#each xPositions as xPos, xIndex}
     {#each yPositions as yPos, yIndex}
       <div
-        class="bg-fg-brand-primary fixed h-1 w-1 -translate-1/2 rounded-full"
+        class="bg-bg-brand-solid fixed h-1 w-1 -translate-1/2 rounded-full"
         style="left: {leftPos(
           xPos,
           xIndex,
