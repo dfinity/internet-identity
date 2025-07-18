@@ -25,11 +25,6 @@
       return;
     }
 
-    if (inputValue === currentName) {
-      onClose();
-      return;
-    }
-
     isLoading = true;
 
     try {
