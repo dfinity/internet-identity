@@ -2,6 +2,7 @@ import { get } from "svelte/store";
 import {
   AuthnMethodData,
   AuthnMethodRegistrationInfo,
+  MetadataMapV2,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
@@ -19,7 +20,7 @@ import {
   lastUsedIdentityStore,
 } from "./last-used-identities.store";
 import { bufEquals } from "@dfinity/agent";
-import { authnMethodEqual } from "$lib/utils/webAuthn";
+import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -43,6 +44,7 @@ class IdentityInfo {
   openIdCredentials = $state<OpenIdCredential[]>([]);
   removableOpenIdCredential = $state<OpenIdCredential | null>(null);
   removableAuthnMethod = $state<AuthnMethodData | null>(null);
+  renamableAuthnMethod = $state<AuthnMethodData | null>(null);
 
   totalAccessMethods = $derived<number>(
     this.authnMethods.length + this.openIdCredentials.length,
@@ -203,6 +205,44 @@ class IdentityInfo {
       this.authnMethods.splice(index, 0, authnMethod);
       throw error;
     }
+  }
+
+  async renamePasskey(newName: string): Promise<void> {
+    if (!this.renamableAuthnMethod)
+      throw Error("Must first select a credential to be renamed!");
+
+    const authnMethod = this.renamableAuthnMethod;
+    let renamed = false;
+    const newMetadata: MetadataMapV2 = authnMethod.metadata.map(
+      ([key, value]) => {
+        if (key === "alias") {
+          renamed = true;
+          return [key, { String: newName }];
+        }
+        return [key, value];
+      },
+    );
+    if (!renamed) {
+      newMetadata.push(["alias", { String: newName }]);
+    }
+    const { actor, identityNumber } = get(authenticatedStore);
+    await actor
+      .authn_method_metadata_replace(
+        identityNumber,
+        authnMethodToPublicKey(authnMethod),
+        newMetadata,
+      )
+      .then(throwCanisterError);
+    // Update authnMethods locally for faster feedback
+    this.authnMethods = this.authnMethods.map((value) =>
+      authnMethodEqual(value, authnMethod)
+        ? {
+            ...value,
+            metadata: newMetadata,
+          }
+        : value,
+    );
+    await this.fetch();
   }
 
   logout = () => {

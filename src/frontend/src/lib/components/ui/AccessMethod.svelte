@@ -9,6 +9,7 @@
   import PlaceHolder from "./PlaceHolder.svelte";
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
+  import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
 
   let {
     accessMethod,
@@ -19,15 +20,6 @@
     class?: string;
     isCurrent?: boolean;
   } = $props();
-
-  const getAuthnMethodAlias = (authnMethod: AuthnMethodData) => {
-    const metadataAlias = authnMethod.metadata.find(
-      ([key, _val]) => key === "alias",
-    )?.[1]!;
-    if (metadataAlias && "String" in metadataAlias) {
-      return metadataAlias.String;
-    }
-  };
 
   const getOpenIdCredentialName = (credential: OpenIdCredential | null) => {
     if (!credential) return null;

@@ -3,6 +3,7 @@ import { toaster } from "$lib/components/utils/toaster";
 import { isCanisterError } from "$lib/utils/utils";
 import type {
   AuthnMethodConfirmationError,
+  AuthnMethodMetadataReplaceError,
   CheckCaptchaError,
   CreateAccountError,
   IdRegFinishError,
@@ -37,6 +38,7 @@ export const handleError = (error: unknown) => {
       | OpenIdCredentialAddError
       | OpenIdCredentialRemoveError
       | AuthnMethodConfirmationError
+      | AuthnMethodMetadataReplaceError
     >(error)
   ) {
     switch (error.type) {
@@ -117,6 +119,16 @@ export const handleError = (error: unknown) => {
           description: error.type,
         });
         console.error(error);
+        break;
+      case "AuthnMethodNotFound":
+        toaster.error({
+          title: "Authentication method not found",
+        });
+        break;
+      case "InvalidMetadata":
+        toaster.error({
+          title: `Invalid metadata. ${error.value(error.type)}`,
+        });
         break;
       case "NameTooLong":
       case "Unauthorized":
