@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Spring } from "svelte/motion";
   import {
-    createSprings,
+    createXYSprings,
     leftPos,
     topPos,
     createContinuousWave,
@@ -81,7 +81,7 @@
   });
 
   const createSpringsLocal = (xCount: number, yCount: number) => {
-    springs = createSprings(xCount, yCount, Spring, stiffness, damping);
+    springs = createXYSprings(xCount, yCount, Spring, stiffness, damping);
   };
 
   const handlePointerMove = (e: PointerEvent) => {
@@ -114,7 +114,7 @@
 
     // Scale the mouseScalar by speed, clamp for sanity
     const minScalar = 0;
-    const maxScalar = 2.0;
+    const maxScalar = 1.0;
     const dynamicScalar = Math.min(
       maxScalar,
       Math.max(minScalar, mouseScalar * speed),

@@ -1,13 +1,12 @@
 <script lang="ts">
-  import { Spring } from "svelte/motion";
   import {
-    createSprings,
-    leftPos,
-    topPos,
-    createContinuousWave,
-    createImpulse,
-    resetNodes,
+    createScalarSprings,
+    createContinuousScalarWave,
+    createScalarImpulse,
+    resetScalarNodes,
+    waveScale,
   } from "$lib/utils/UI/backgrounds/waveBackground";
+  import { type Spring } from "svelte/motion";
   let backgroundRef = $state<HTMLDivElement>();
 
   let {
@@ -24,9 +23,9 @@
   let stiffness = $state(0.1);
   let damping = $state(0.5);
   let mouseRadius = $state(200);
-  let mouseScalar = $state(0.1);
+  let mouseScalar = $state(0.03);
   let clickRadius = $state(600);
-  let impulseScalar = $state(0.3);
+  let impulseScalar = $state(0.01);
   let waveSpeed = $state(1.5);
   let impulseDuration = $state(80);
 
@@ -72,7 +71,7 @@
     innerHeight !== undefined ? (innerHeight - gridHeight) / 2 : 0,
   );
 
-  let springs: Spring<{ x: number; y: number }>[][] = $state([[]]);
+  let springs: Spring<number>[][] = $state([[]]);
 
   $effect(() => {
     if (xPositions.length > 0 && yPositions.length > 0) {
@@ -81,7 +80,7 @@
   });
 
   const createSpringsLocal = (xCount: number, yCount: number) => {
-    springs = createSprings(xCount, yCount, Spring, stiffness, damping);
+    springs = createScalarSprings(xCount, yCount, stiffness, damping);
   };
 
   const handlePointerMove = (e: PointerEvent) => {
@@ -114,14 +113,14 @@
 
     // Scale the mouseScalar by speed, clamp for sanity
     const minScalar = 0;
-    const maxScalar = 2.0;
+    const maxScalar = 0.3;
     const dynamicScalar = Math.min(
       maxScalar,
       Math.max(minScalar, mouseScalar * speed),
     );
 
     if (pointerInside) {
-      createContinuousWave(
+      createContinuousScalarWave(
         pointerX,
         pointerY,
         xPositions,
@@ -144,7 +143,7 @@
   };
 
   const handlePointerDown = (e: PointerEvent) => {
-    createImpulse(
+    createScalarImpulse(
       e.clientX,
       e.clientY,
       xPositions,
@@ -159,7 +158,7 @@
     );
 
     setTimeout(() => {
-      createImpulse(
+      createScalarImpulse(
         e.clientX,
         e.clientY,
         xPositions,
@@ -177,7 +176,7 @@
 
   function animateRepel() {
     if (pointerInside && pointerX !== null && pointerY !== null) {
-      createContinuousWave(
+      createContinuousScalarWave(
         pointerX,
         pointerY,
         xPositions,
@@ -198,7 +197,7 @@
 
   const handleReset = () => {
     pointerInside = false;
-    resetNodes(springs);
+    resetScalarNodes(springs);
   };
 
   const toggleControls = () => {
@@ -218,14 +217,9 @@
   {#each xPositions as xPos, xIndex}
     {#each yPositions as yPos, yIndex}
       <div
-        class="bg-bg-brand-solid fixed h-1 w-1 -translate-1/2 rounded-full"
-        style="left: {leftPos(
-          xPos,
-          xIndex,
-          yIndex,
-          offsetX,
-          springs,
-        )}px; top: {topPos(yPos, xIndex, yIndex, offsetY, springs)}px; "
+        class="bg-fg-brand-primary fixed h-1 w-1 -translate-1/2 rounded-full"
+        style="left: {xPos + offsetX}px; top: {yPos +
+          offsetY}px; transform: scale({waveScale(xIndex, yIndex, springs)})"
       ></div>
     {/each}
   {/each}
