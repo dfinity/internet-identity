@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
+  import { EditIcon, Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
@@ -15,6 +15,7 @@
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
   import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
+  import RenamePasskeyDialog from "$lib/components/views/RenamePasskeyDialog.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
   import {
@@ -92,6 +93,24 @@
       handleError(error);
     }
   };
+
+  const handleRenamePasskey = async (newName: string) => {
+    try {
+      await identityInfo.renamePasskey(newName);
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
+  const getAuthnMethodAlias = (authnMethod: AuthnMethodData) => {
+    const metadataAlias = authnMethod.metadata.find(
+      ([key, _val]) => key === "alias",
+    )?.[1]!;
+    if (metadataAlias && "String" in metadataAlias) {
+      return metadataAlias.String;
+    }
+    return "";
+  };
 </script>
 
 <Panel>
@@ -135,7 +154,14 @@
             isWebAuthnMetaData(lastUsedAccessMethod) &&
             authnMethodEqual(authnMethod, lastUsedAccessMethod)}
         />
-        <div class="flex items-center justify-center px-4">
+        <div class="flex items-center justify-end gap-2 px-4">
+          <Button
+            onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
+            variant="tertiary"
+            iconOnly
+          >
+            <EditIcon size="1.25rem" />
+          </Button>
           {#if isRemoveAccessMethodVisible}
             <Button
               onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
@@ -166,7 +192,7 @@
             lastUsedAccessMethod.sub === credential.sub}
         />
 
-        <div class="flex items-center justify-center px-4">
+        <div class="flex items-center justify-end px-4">
           {#if isRemoveAccessMethodVisible}
             <Button
               onclick={() =>
@@ -197,6 +223,15 @@
     onRemove={handleRemovePasskey}
     onClose={() => (identityInfo.removableAuthnMethod = null)}
     isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
+  />
+{/if}
+
+{#if identityInfo.renamableAuthnMethod}
+  <RenamePasskeyDialog
+    authnMethod={identityInfo.renamableAuthnMethod}
+    currentName={getAuthnMethodAlias(identityInfo.renamableAuthnMethod) ?? ""}
+    onRename={handleRenamePasskey}
+    onClose={() => (identityInfo.renamableAuthnMethod = null)}
   />
 {/if}
 

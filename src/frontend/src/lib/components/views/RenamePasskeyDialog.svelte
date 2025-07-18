@@ -1,0 +1,90 @@
+<script lang="ts">
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
+  import Input from "$lib/components/ui/Input.svelte";
+  import { EditIcon } from "@lucide/svelte";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
+
+  interface Props {
+    currentName: string;
+    onRename: (newName: string) => Promise<void>;
+    onClose: () => void;
+  }
+
+  const { currentName, onRename, onClose }: Props = $props();
+
+  let inputValue = $state(currentName);
+  let isLoading = $state(false);
+  let inputElement = $state<HTMLInputElement>();
+
+  const handleSave = async () => {
+    // Button is disabled so this shuoldn't happen.
+    if (inputValue.trim() === "") {
+      return;
+    }
+
+    if (inputValue === currentName) {
+      onClose();
+      return;
+    }
+
+    isLoading = true;
+
+    try {
+      await onRename(inputValue.trim());
+      onClose();
+    } finally {
+      isLoading = false;
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Enter") {
+      handleSave();
+    } else if (event.key === "Escape") {
+      onClose();
+    }
+  };
+
+  // Focus the input when the dialog opens
+  $effect(() => {
+    if (inputElement) {
+      inputElement.focus();
+      inputElement.select();
+    }
+  });
+</script>
+
+<Dialog onClose={isLoading ? undefined : onClose}>
+  <FeaturedIcon variant="info" size="lg" class="mb-3">
+    <EditIcon size="1.5rem" />
+  </FeaturedIcon>
+  <h1 class="text-text-primary mb-3 text-2xl font-medium">Rename passkey</h1>
+  <p class="text-text-tertiary mb-6 font-medium">
+    Give your passkey a memorable name to help you identify it.
+  </p>
+
+  <div class="mb-6">
+    <Input
+      bind:element={inputElement}
+      bind:value={inputValue}
+      onkeydown={handleKeyDown}
+      type="text"
+      disabled={isLoading || inputValue.trim() === ""}
+      class="w-full"
+    />
+  </div>
+
+  <Button
+    onclick={handleSave}
+    variant="primary"
+    class="mb-3"
+    disabled={isLoading || inputValue.trim() === ""}
+  >
+    {isLoading ? "Saving..." : "Save"}
+  </Button>
+  <Button onclick={onClose} variant="tertiary" disabled={isLoading}>
+    Cancel
+  </Button>
+</Dialog>

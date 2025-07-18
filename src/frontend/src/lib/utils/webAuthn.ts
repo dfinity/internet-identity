@@ -94,7 +94,9 @@ export const authnMethodEqual = (
   return false;
 };
 
-export const getPublicKey = (authnMethod: AuthnMethodData): Uint8Array => {
+export const authnMethodToPublicKey = (
+  authnMethod: AuthnMethodData,
+): Uint8Array => {
   if ("WebAuthn" in authnMethod.authn_method) {
     return new Uint8Array(authnMethod.authn_method.WebAuthn.pubkey);
   }

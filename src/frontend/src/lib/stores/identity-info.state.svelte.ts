@@ -14,13 +14,13 @@ import {
   decodeJWTWithNameAndEmail,
   requestJWT,
 } from "$lib/utils/openID";
-import { CanisterError, throwCanisterError } from "$lib/utils/utils";
+import { throwCanisterError } from "$lib/utils/utils";
 import {
   lastUsedIdentitiesStore,
   lastUsedIdentityStore,
 } from "./last-used-identities.store";
 import { bufEquals } from "@dfinity/agent";
-import { authnMethodEqual, getPublicKey } from "$lib/utils/webAuthn";
+import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -44,6 +44,7 @@ class IdentityInfo {
   openIdCredentials = $state<OpenIdCredential[]>([]);
   removableOpenIdCredential = $state<OpenIdCredential | null>(null);
   removableAuthnMethod = $state<AuthnMethodData | null>(null);
+  renamableAuthnMethod = $state<AuthnMethodData | null>(null);
 
   totalAccessMethods = $derived<number>(
     this.authnMethods.length + this.openIdCredentials.length,
@@ -206,13 +207,11 @@ class IdentityInfo {
     }
   }
 
-  async renamePasskey(
-    authnMethod: AuthnMethodData,
-    newName: string,
-  ): Promise<void> {
-    if (newName === "") {
-      throw new CanisterError({ InvalidMetadata: "Name cannot be empty." });
-    }
+  async renamePasskey(newName: string): Promise<void> {
+    if (!this.renamableAuthnMethod)
+      throw Error("Must first select a credential to be renamed!");
+
+    const authnMethod = this.renamableAuthnMethod;
     let renamed = false;
     const newMetadata: MetadataMapV2 = authnMethod.metadata.map(
       ([key, value]) => {
@@ -230,7 +229,7 @@ class IdentityInfo {
     await actor
       .authn_method_metadata_replace(
         identityNumber,
-        getPublicKey(authnMethod),
+        authnMethodToPublicKey(authnMethod),
         newMetadata,
       )
       .then(throwCanisterError);
