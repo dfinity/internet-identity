@@ -12,10 +12,12 @@
   import Button from "$lib/components/ui/Button.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
-  import AuthDialog from "$lib/components/views/AuthDialog.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import MainContent from "$lib/components/layout/MainContent.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
 
   const { children } = $props();
 
@@ -29,6 +31,7 @@
 
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
+  let isAuthenticating = $state(false);
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -227,13 +230,29 @@
         </Popover>
       {/if}
       {#if isAuthDialogOpen}
-        <AuthDialog
-          title="Use another identity"
-          subtitle="Choose method"
-          {onSignIn}
-          {onSignUp}
+        <Dialog
           onClose={() => (isAuthDialogOpen = false)}
-        />
+          showCloseButton={!isAuthenticating}
+          closeOnOutsideClick={!isAuthenticating}
+        >
+          <AuthWizard
+            bind:isAuthenticating
+            {onSignIn}
+            {onSignUp}
+            onError={(error) => {
+              isAuthDialogOpen = false;
+              handleError(error);
+            }}
+            withinDialog
+          >
+            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+              Use another identity
+            </h1>
+            <p class="text-text-secondary mb-6 self-start text-sm">
+              choose method
+            </p>
+          </AuthWizard>
+        </Dialog>
       {/if}
     </div>
   {/snippet}
@@ -242,8 +261,8 @@
       <p class="text-text-primary">© Internet Identity</p>
       <div class="flex-1"></div>
       <ButtonOrAnchor class="text-text-primary hover:underline" href="/support"
-        >Support</ButtonOrAnchor
-      >
+        >Support
+      </ButtonOrAnchor>
     </div>
   {/snippet}
 </MainContent>

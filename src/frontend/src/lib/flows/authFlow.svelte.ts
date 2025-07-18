@@ -22,7 +22,7 @@ import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdent
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
-import type {
+import {
   CheckCaptchaError,
   IdRegFinishError,
   IdRegStartError,
@@ -30,66 +30,74 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 
-export interface AuthFlowOptions {
-  onSignIn: (identityNumber: bigint) => void;
-  onSignUp: (identityNumber: bigint) => void;
-}
-
 export class AuthFlow {
-  view = $state<
+  #view = $state<
     "chooseMethod" | "setupOrUseExistingPasskey" | "setupNewPasskey"
   >("chooseMethod");
-  captcha = $state<{
+  #captcha = $state<{
     image: string;
     attempt: number;
     solve: (solution: string) => void;
   }>();
-  systemOverlay = $state(false);
-  authenticating = $state(false);
-  #options: AuthFlowOptions;
+  #systemOverlay = $state(false);
+  #confirmationCode = $state<string>();
 
-  constructor(options: AuthFlowOptions) {
-    this.#options = options;
-    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
+  get view() {
+    return this.#view;
   }
+
+  get captcha() {
+    return this.#captcha;
+  }
+
+  get systemOverlay() {
+    return this.#systemOverlay;
+  }
+
+  get confirmationCode() {
+    return this.#confirmationCode;
+  }
+
+  constructor() {
+    this.chooseMethod();
+  }
+
+  chooseMethod = (): void => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
+    this.#view = "chooseMethod";
+  };
 
   setupOrUseExistingPasskey = (): void => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.ContinueWithPasskeyScreen,
     );
-    this.view = "setupOrUseExistingPasskey";
+    this.#view = "setupOrUseExistingPasskey";
   };
 
-  continueWithExistingPasskey = async (): Promise<void> => {
-    this.authenticating = true;
-    try {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
-      const { identity, identityNumber, credentialId } =
-        await authenticateWithPasskey({
-          canisterId,
-          session: get(sessionStore),
-        });
-      authenticationStore.set({ identity, identityNumber });
-      const info =
-        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: { passkey: { credentialId } },
+  continueWithExistingPasskey = async (): Promise<bigint> => {
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+    const { identity, identityNumber, credentialId } =
+      await authenticateWithPasskey({
+        canisterId,
+        session: get(sessionStore),
       });
-      this.#options.onSignIn(identityNumber);
-    } finally {
-      this.authenticating = false;
-    }
+    authenticationStore.set({ identity, identityNumber });
+    const info =
+      await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+    lastUsedIdentitiesStore.addLastUsedIdentity({
+      identityNumber,
+      name: info.name[0],
+      authMethod: { passkey: { credentialId } },
+    });
+    return identityNumber;
   };
 
   setupNewPasskey = (): void => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
-    this.view = "setupNewPasskey";
+    this.#view = "setupNewPasskey";
   };
 
-  createPasskey = async (name: string): Promise<void> => {
-    this.authenticating = true;
+  createPasskey = async (name: string): Promise<bigint> => {
     try {
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.StartWebauthnCreation,
@@ -99,16 +107,17 @@ export class AuthFlow {
           ? await DiscoverableDummyIdentity.createNew(name)
           : await DiscoverablePasskeyIdentity.createNew(name);
       await this.#startRegistration();
-      this.#options.onSignUp(await this.#registerWithPasskey(passkeyIdentity));
+      return this.#registerWithPasskey(passkeyIdentity);
     } catch (error) {
-      this.view = "chooseMethod";
+      this.#view = "chooseMethod";
       throw error;
-    } finally {
-      this.authenticating = false;
     }
   };
 
-  continueWithGoogle = async (): Promise<void> => {
+  continueWithGoogle = async (): Promise<{
+    identityNumber: bigint;
+    type: "signIn" | "signUp";
+  }> => {
     let jwt: string | undefined = undefined;
     const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
     if (isNullish(clientId)) {
@@ -116,19 +125,17 @@ export class AuthFlow {
     }
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
-      this.authenticating = true;
       const requestConfig = createGoogleRequestConfig(clientId);
-      this.systemOverlay = true;
+      this.#systemOverlay = true;
       jwt = await requestJWT(requestConfig, {
         nonce: get(sessionStore).nonce,
         mediation: "required",
       });
     } catch (error) {
-      this.authenticating = false;
-      this.view = "chooseMethod";
+      this.#view = "chooseMethod";
       throw error;
     } finally {
-      this.systemOverlay = false;
+      this.#systemOverlay = false;
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
     }
@@ -151,7 +158,7 @@ export class AuthFlow {
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      this.#options.onSignIn(identityNumber);
+      return { identityNumber, type: "signIn" };
     } catch (error) {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
@@ -162,19 +169,17 @@ export class AuthFlow {
           AuthenticationV2Events.RegisterWithGoogle,
         );
         await this.#startRegistration();
-        this.#options.onSignUp(await this.#registerWithGoogle(jwt));
-        return;
+        const identityNumber = await this.#registerWithGoogle(jwt);
+        return { identityNumber, type: "signUp" };
       }
-      this.view = "chooseMethod";
+      this.#view = "chooseMethod";
       throw error;
-    } finally {
-      this.authenticating = false;
     }
   };
 
   #solveCaptcha = (image: string, attempt = 0): Promise<void> =>
     new Promise((resolve, reject) => {
-      this.captcha = {
+      this.#captcha = {
         image,
         attempt,
         solve: async (solution) => {
@@ -240,7 +245,7 @@ export class AuthFlow {
         name: passkeyIdentity.getName(),
         authMethod: { passkey: { credentialId } },
       });
-      this.captcha = undefined;
+      this.#captcha = undefined;
       return identityNumber;
     } catch (error) {
       if (isCanisterError<IdRegFinishError>(error)) {
@@ -319,7 +324,7 @@ export class AuthFlow {
         name: info.name[0],
         authMethod: { openid: { iss, sub } },
       });
-      this.captcha = undefined;
+      this.#captcha = undefined;
       return identityNumber;
     } catch (error) {
       if (
