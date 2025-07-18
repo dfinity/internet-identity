@@ -5,8 +5,10 @@
     leftPos,
     topPos,
     createContinuousWave,
+    createDirectionalImpulse,
     createImpulse,
     resetNodes,
+    createRotationalImpulse,
   } from "$lib/utils/UI/backgrounds/waveBackground";
   let backgroundRef = $state<HTMLDivElement>();
 
@@ -41,19 +43,26 @@
   let innerHeight = $state<number>();
   let innerWidth = $state<number>();
 
+  let motionAxis = $state<"xy" | "x" | "y">("xy");
+  let impulseCombo = $state<"off" | "xFirst" | "yFirst">("off");
+
+  let heldDirections = new Set<"up" | "down" | "left" | "right">();
+  let rHeld = $state<boolean>(false);
+
   let xPositions = $derived<number[]>(
     innerWidth
       ? Array.from(
-          { length: Math.floor(Math.abs(innerWidth / xSpacing)) },
+          { length: Math.max(1, Math.floor((innerWidth - 1) / xSpacing) + 1) },
           (_, i) => i * xSpacing,
         )
       : [0],
   );
+
   let yPositions = $derived<number[]>(
     innerHeight
       ? Array.from(
-          { length: Math.floor(Math.abs(innerHeight / ySpacing)) },
-          (_, i) => i * xSpacing,
+          { length: Math.max(1, Math.floor((innerHeight - 1) / ySpacing) + 1) },
+          (_, i) => i * ySpacing,
         )
       : [0],
   );
@@ -135,6 +144,7 @@
         dynamicScalar, // use dynamic scalar
         waveSpeed,
         impulseDuration,
+        motionAxis,
       );
     }
   };
@@ -144,21 +154,41 @@
   };
 
   const handlePointerDown = (e: PointerEvent) => {
-    createImpulse(
-      e.clientX,
-      e.clientY,
-      xPositions,
-      yPositions,
-      offsetX,
-      offsetY,
-      springs,
-      clickRadius,
-      impulseScalar,
-      waveSpeed,
-      impulseDuration,
-    );
-
-    setTimeout(() => {
+    const direction = heldDirections.values().next().value;
+    if (rHeld) {
+      // Randomly pick cw or ccw
+      const rotDir = Math.random() < 0.5 ? "cw" : "ccw";
+      createRotationalImpulse(
+        e.clientX,
+        e.clientY,
+        xPositions,
+        yPositions,
+        offsetX,
+        offsetY,
+        springs,
+        clickRadius,
+        impulseScalar * 0.8,
+        waveSpeed,
+        impulseDuration,
+        rotDir,
+      );
+      setTimeout(() => {
+        createRotationalImpulse(
+          e.clientX,
+          e.clientY,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          clickRadius * 1.3,
+          impulseScalar * 0.6,
+          waveSpeed / 2,
+          impulseDuration,
+          rotDir === "ccw" ? "cw" : "ccw",
+        );
+      }, 250);
+    } else if (heldDirections.size === 0 || !direction) {
       createImpulse(
         e.clientX,
         e.clientY,
@@ -167,34 +197,71 @@
         offsetX,
         offsetY,
         springs,
-        clickRadius * 1.3,
-        impulseScalar * 0.8,
-        waveSpeed / 2,
+        clickRadius,
+        impulseScalar,
+        waveSpeed,
         impulseDuration,
+        impulseCombo === "off" ? "xy" : impulseCombo === "xFirst" ? "x" : "y",
       );
-    }, 350);
-  };
-
-  function animateRepel() {
-    if (pointerInside && pointerX !== null && pointerY !== null) {
-      createContinuousWave(
-        pointerX,
-        pointerY,
+      setTimeout(() => {
+        createImpulse(
+          e.clientX,
+          e.clientY,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          clickRadius * 1.3,
+          impulseScalar * 0.8,
+          waveSpeed / 2,
+          impulseDuration,
+          impulseCombo === "off" ? "xy" : impulseCombo === "xFirst" ? "y" : "x",
+        );
+      }, 250);
+    } else {
+      // For simplicity, just use the first held direction
+      createDirectionalImpulse(
+        e.clientX,
+        e.clientY,
         xPositions,
         yPositions,
         offsetX,
         offsetY,
         springs,
-        xSpacing,
-        ySpacing,
-        mouseRadius,
-        mouseScalar,
+        clickRadius,
+        impulseScalar,
         waveSpeed,
         impulseDuration,
+        direction,
+        impulseCombo === "off" ? "xy" : impulseCombo === "xFirst" ? "x" : "y",
       );
-      requestAnimationFrame(animateRepel);
+      setTimeout(
+        () => {
+          createDirectionalImpulse(
+            e.clientX,
+            e.clientY,
+            xPositions,
+            yPositions,
+            offsetX,
+            offsetY,
+            springs,
+            clickRadius * 1.3,
+            impulseScalar * 0.8,
+            waveSpeed / 2,
+            impulseDuration,
+            direction,
+            impulseCombo === "off"
+              ? "xy"
+              : impulseCombo === "xFirst"
+                ? "y"
+                : "x",
+          );
+        },
+        impulseCombo === "off" ? 350 : 250,
+      );
     }
-  }
+  };
 
   const handleReset = () => {
     pointerInside = false;
@@ -204,6 +271,46 @@
   const toggleControls = () => {
     showControls = !showControls;
   };
+
+  function handleKeyDown(e: KeyboardEvent) {
+    switch (e.key) {
+      case "ArrowUp":
+        heldDirections.add("up");
+        break;
+      case "ArrowDown":
+        heldDirections.add("down");
+        break;
+      case "ArrowLeft":
+        heldDirections.add("left");
+        break;
+      case "ArrowRight":
+        heldDirections.add("right");
+        break;
+      case "r":
+        rHeld = true;
+        break;
+    }
+  }
+
+  function handleKeyUp(e: KeyboardEvent) {
+    switch (e.key) {
+      case "ArrowUp":
+        heldDirections.delete("up");
+        break;
+      case "ArrowDown":
+        heldDirections.delete("down");
+        break;
+      case "ArrowLeft":
+        heldDirections.delete("left");
+        break;
+      case "ArrowRight":
+        heldDirections.delete("right");
+        break;
+      case "r":
+        rHeld = false;
+        break;
+    }
+  }
 </script>
 
 <div
@@ -214,22 +321,32 @@
   onpointerdown={handlePointerDown}
   onpointermove={handlePointerMove}
   onpointerenter={handlePointerEnter}
+  style="pointer-events: auto;"
 >
-  {#each xPositions as xPos, xIndex}
-    {#each yPositions as yPos, yIndex}
-      <div
-        class="bg-fg-brand-primary fixed h-1 w-1 -translate-1/2 rounded-full"
-        style="left: {leftPos(
-          xPos,
-          xIndex,
-          yIndex,
-          offsetX,
-          springs,
-        )}px; top: {topPos(yPos, xIndex, yIndex, offsetY, springs)}px; "
-      ></div>
+  <svg
+    width={innerWidth}
+    height={innerHeight}
+    style="display: block; width: 100vw; height: 100vh; pointer-events: none; position: absolute; top: 0; left: 0;"
+  >
+    {#each xPositions as xPos, xIndex}
+      {#each yPositions as yPos, yIndex}
+        <circle
+          cx={leftPos(xPos, xIndex, yIndex, offsetX, springs)}
+          cy={topPos(yPos, xIndex, yIndex, offsetY, springs)}
+          r="2"
+          fill="var(--fg-brand-primary, #fff)"
+        />
+      {/each}
     {/each}
-  {/each}
+  </svg>
 </div>
+
+<h1
+  class="text-text-brand-primary bold fixed bottom-3 w-full text-center text-3xl"
+>
+  Hold directional key to constrain impulses to single direction. Hold r for
+  rotational impulses.
+</h1>
 
 <!-- Control Panel -->
 {#if showControls}
@@ -392,6 +509,39 @@
         />
       </div>
 
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700">
+          Motion Axis:
+        </label>
+        <div class="flex gap-2">
+          <label>
+            <input type="radio" bind:group={motionAxis} value="xy" /> XY
+          </label>
+          <label>
+            <input type="radio" bind:group={motionAxis} value="x" /> X Only
+          </label>
+          <label>
+            <input type="radio" bind:group={motionAxis} value="y" /> Y Only
+          </label>
+        </div>
+      </div>
+      <div>
+        <label class="mb-1 block text-sm font-medium text-gray-700">
+          Impulse Combo:
+        </label>
+        <div class="flex gap-2">
+          <label>
+            <input type="radio" bind:group={impulseCombo} value="off" /> off
+          </label>
+          <label>
+            <input type="radio" bind:group={impulseCombo} value="xFirst" /> x first
+          </label>
+          <label>
+            <input type="radio" bind:group={impulseCombo} value="yFirst" /> y first
+          </label>
+        </div>
+      </div>
+
       <!-- Reset Button -->
       <button
         onclick={handleReset}
@@ -416,4 +566,6 @@
   bind:innerHeight
   bind:innerWidth
   onpointermove={handlePointerMove}
+  onkeydown={handleKeyDown}
+  onkeyup={handleKeyUp}
 />

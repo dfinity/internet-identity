@@ -43,16 +43,17 @@
   let xPositions = $derived<number[]>(
     innerWidth
       ? Array.from(
-          { length: Math.floor(Math.abs(innerWidth / xSpacing)) },
+          { length: Math.max(1, Math.floor((innerWidth - 1) / xSpacing) + 1) },
           (_, i) => i * xSpacing,
         )
       : [0],
   );
+
   let yPositions = $derived<number[]>(
     innerHeight
       ? Array.from(
-          { length: Math.floor(Math.abs(innerHeight / ySpacing)) },
-          (_, i) => i * xSpacing,
+          { length: Math.max(1, Math.floor((innerHeight - 1) / ySpacing) + 1) },
+          (_, i) => i * ySpacing,
         )
       : [0],
   );
@@ -214,15 +215,24 @@
   onpointermove={handlePointerMove}
   onpointerenter={handlePointerEnter}
 >
-  {#each xPositions as xPos, xIndex}
-    {#each yPositions as yPos, yIndex}
-      <div
-        class="bg-fg-brand-primary fixed h-1 w-1 -translate-1/2 rounded-full"
-        style="left: {xPos + offsetX}px; top: {yPos +
-          offsetY}px; transform: scale({waveScale(xIndex, yIndex, springs)})"
-      ></div>
+  <svg
+    class="bg-bg-brand-primary fixed h-screen w-screen select-none"
+    aria-hidden="true"
+    width={innerWidth}
+    height={innerHeight}
+    style="top:0; left:0; position:fixed; pointer-events:none;"
+  >
+    {#each xPositions as xPos, xIndex}
+      {#each yPositions as yPos, yIndex}
+        <circle
+          cx={xPos + offsetX}
+          cy={yPos + offsetY}
+          r={2 * waveScale(xIndex, yIndex, springs)}
+          fill="var(--fg-brand-primary, #fff)"
+        />
+      {/each}
     {/each}
-  {/each}
+  </svg>
 </div>
 
 <!-- Control Panel -->
