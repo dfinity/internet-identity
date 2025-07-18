@@ -18,7 +18,8 @@
   let isLoading = $state(false);
   let inputElement = $state<HTMLInputElement>();
 
-  const handleSave = async () => {
+  const handleSave = async (e: SubmitEvent) => {
+    e.preventDefault();
     // Button is disabled so this shouldn't happen.
     if (inputValue.trim() === "") {
       return;
