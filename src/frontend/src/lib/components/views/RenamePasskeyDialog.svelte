@@ -19,7 +19,7 @@
   let inputElement = $state<HTMLInputElement>();
 
   const handleSave = async () => {
-    // Button is disabled so this shuoldn't happen.
+    // Button is disabled so this shouldn't happen.
     if (inputValue.trim() === "") {
       return;
     }
@@ -68,7 +68,7 @@
       bind:value={inputValue}
       onkeydown={handleKeyDown}
       type="text"
-      disabled={isLoading || inputValue.trim() === ""}
+      disabled={isLoading}
       class="w-full"
       autofocus
     />
