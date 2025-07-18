@@ -35,12 +35,6 @@
     }
   };
 
-  const handleKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      onClose();
-    }
-  };
-
   // Focus the input when the dialog opens and auto-select the text
   $effect(() => {
     if (inputElement) {
@@ -62,7 +56,6 @@
     <Input
       bind:element={inputElement}
       bind:value={inputValue}
-      onkeydown={handleKeyDown}
       type="text"
       disabled={isLoading}
       class="w-full"
