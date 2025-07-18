@@ -43,6 +43,7 @@
     variant="secondary"
     size="xl"
     disabled={isNullish(confirmationCode)}
+    aria-label="Confirmation code"
   >
     {#if nonNullish(confirmationCode)}
       <span>
