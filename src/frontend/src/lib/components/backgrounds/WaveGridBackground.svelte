@@ -27,7 +27,7 @@
   let stiffness = $state(0.1);
   let damping = $state(0.5);
   let mouseRadius = $state(200);
-  let mouseScalar = $state(0.3);
+  let mouseScalar = $state(0.1);
   let clickRadius = $state(600);
   let impulseScalar = $state(0.3);
   let waveSpeed = $state(1.5);
@@ -36,6 +36,10 @@
   let pointerX = $state<number>(0);
   let pointerY = $state<number>(0);
   let pointerInside = $state<boolean>(false);
+
+  let lastPointerX = $state<number | null>(null);
+  let lastPointerY = $state<number | null>(null);
+  let lastPointerTime = $state<number | null>(null);
 
   let innerHeight = $state<number>();
   let innerWidth = $state<number>();
@@ -88,8 +92,41 @@
   };
 
   const handlePointerMove = (e: PointerEvent) => {
+    const now = performance.now();
+    const prevX = lastPointerX;
+    const prevY = lastPointerY;
+    const prevTime = lastPointerTime;
+
     pointerX = e.clientX;
     pointerY = e.clientY;
+
+    let speed = 0;
+    if (
+      prevX !== null &&
+      prevY !== null &&
+      prevTime !== null &&
+      now > prevTime
+    ) {
+      const dx = pointerX - prevX;
+      const dy = pointerY - prevY;
+      const dt = now - prevTime;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      speed = dist / dt; // px per ms
+    }
+
+    // Store for next event
+    lastPointerX = pointerX;
+    lastPointerY = pointerY;
+    lastPointerTime = now;
+
+    // Scale the mouseScalar by speed, clamp for sanity
+    const minScalar = 0;
+    const maxScalar = 2.0;
+    const dynamicScalar = Math.min(
+      maxScalar,
+      Math.max(minScalar, mouseScalar * speed),
+    );
+
     if (!continuousRepel && pointerInside) {
       createContinuousWave(
         pointerX,
@@ -102,7 +139,7 @@
         xSpacing,
         ySpacing,
         mouseRadius,
-        mouseScalar,
+        dynamicScalar, // use dynamic scalar
         waveSpeed,
         impulseDuration,
       );
@@ -127,6 +164,22 @@
       waveSpeed,
       impulseDuration,
     );
+
+    setTimeout(() => {
+      createImpulse(
+        e.clientX,
+        e.clientY,
+        xPositions,
+        yPositions,
+        offsetX,
+        offsetY,
+        springs,
+        clickRadius * 1.3,
+        impulseScalar * 0.8,
+        waveSpeed / 2,
+        impulseDuration,
+      );
+    }, 350);
   };
 
   function animateRepel() {
