@@ -11,7 +11,7 @@ import {
 
 const TEST_USER_NAME = "Test User";
 
-test("User can log in the dashboard and add a new passkey from the same device and log in with it", async ({
+test("User can log into the dashboard and add a new passkey from the same device and log in with it", async ({
   page,
   context,
 }) => {
