@@ -35,6 +35,7 @@
     dotSize: "small",
     vignette: "none",
     bgType: "dots",
+    springOrTween: "spring",
   });
 
   // Whenever animOptions change, trigger animation immediately
@@ -133,6 +134,13 @@
           <option value="dots">dots</option>
           <option value="grid">grid</option>
           <option value="noisedots">noisedots</option>
+        </select>
+      </label>
+      <label>
+        Spring/Tween:
+        <select bind:value={flairBoxProps.springOrTween}>
+          <option value="spring">spring</option>
+          <option value="tween">tween</option>
         </select>
       </label>
     </div>
@@ -236,5 +244,6 @@
     | "top"
     | "bottom"}
   bgType={flairBoxProps.bgType as "dots" | "grid" | "noisedots"}
+  springOrTween={flairBoxProps.springOrTween as "spring" | "tween"}
   bind:triggerAnimation={animTrig}
 />
