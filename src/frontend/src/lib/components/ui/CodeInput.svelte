@@ -70,6 +70,7 @@
         inputmode="numeric"
         autocomplete="off"
         autocorrect="off"
+        aria-label={`Code input ${index}`}
         spellcheck="false"
         bind:value={
           () => value.slice(index, index + 1).trim(),
