@@ -149,6 +149,7 @@
             onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
             variant="tertiary"
             iconOnly
+            aria-label="Rename Passkey"
           >
             <EditIcon size="1.25rem" />
           </Button>
