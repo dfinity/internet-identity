@@ -94,7 +94,7 @@ test("User can rename a newly added passkey from the same device", async ({
   await expect(page.getByText(passkeyName)).toHaveCount(1);
 });
 
-test("User cannot rename passkey to an empty name nor it's renamed on cancel", async ({
+test("User cannot rename passkey to an empty name nor is it renamed on cancel", async ({
   page,
 }) => {
   const auth = dummyAuth();
