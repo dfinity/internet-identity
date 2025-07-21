@@ -1,7 +1,7 @@
-import {
+import type {
   FlairAnimationOptions,
   FlairBoxProps,
-} from "$lib/components/backgrounds/FlairBox.svelte";
+} from "$lib/components/backgrounds/FlairBox.d.ts";
 import { quadInOut } from "svelte/easing";
 import { Spring, Tween } from "svelte/motion";
 

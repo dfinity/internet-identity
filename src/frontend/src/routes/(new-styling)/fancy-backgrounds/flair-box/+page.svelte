@@ -1,7 +1,6 @@
 <script lang="ts">
-  import FlairBox, {
-    type FlairAnimationOptions,
-  } from "$lib/components/backgrounds/FlairBox.svelte";
+  import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairBox";
+  import FlairBox from "$lib/components/backgrounds/FlairBox.svelte";
   import { onDestroy, onMount } from "svelte";
 
   let flairBoxRef = $state();
@@ -226,10 +225,16 @@
 
 <FlairBox
   bind:this={flairBoxRef}
-  spacing={flairBoxProps.spacing}
-  aspect={flairBoxProps.aspect}
-  dotSize={flairBoxProps.dotSize}
-  vignette={flairBoxProps.vignette}
-  bgType={flairBoxProps.bgType}
+  spacing={flairBoxProps.spacing as "small" | "medium" | "large"}
+  aspect={flairBoxProps.aspect as "square" | "wide" | "ultrawide"}
+  dotSize={flairBoxProps.dotSize as "small" | "medium" | "large"}
+  vignette={flairBoxProps.vignette as
+    | "none"
+    | "left"
+    | "right"
+    | "center"
+    | "top"
+    | "bottom"}
+  bgType={flairBoxProps.bgType as "dots" | "grid" | "noisedots"}
   bind:triggerAnimation={animTrig}
 />
