@@ -4,7 +4,6 @@ import {
   II_URL,
   NOT_TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
-  TEST_APP_CANONICAL_URL_RAW,
   TEST_APP_URL,
 } from "../utils";
 
