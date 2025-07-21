@@ -9,6 +9,7 @@ pub struct DomainActiveAnchorCounter {
     pub start_timestamp: Timestamp,
     pub ic0_app_counter: u64,
     pub internetcomputer_org_counter: u64,
+    pub id_ai_counter: u64,
     pub both_ii_domains_counter: u64,
 }
 
@@ -22,6 +23,7 @@ impl DomainActiveAnchorCounter {
         match domain {
             IIDomain::Ic0App => self.ic0_app_counter += 1,
             IIDomain::InternetComputerOrg => self.internetcomputer_org_counter += 1,
+            IIDomain::IdAi => self.id_ai_counter += 1,
         }
     }
 
@@ -29,6 +31,7 @@ impl DomainActiveAnchorCounter {
         match domain {
             IIDomain::Ic0App => self.ic0_app_counter -= 1,
             IIDomain::InternetComputerOrg => self.internetcomputer_org_counter -= 1,
+            IIDomain::IdAi => self.id_ai_counter -= 1,
         }
     }
 }
@@ -40,6 +43,7 @@ impl ActivityCounter for DomainActiveAnchorCounter {
         Self {
             start_timestamp,
             ic0_app_counter: 0,
+            id_ai_counter: 0,
             internetcomputer_org_counter: 0,
             both_ii_domains_counter: 0,
         }
@@ -66,7 +70,7 @@ impl ActivityCounter for DomainActiveAnchorCounter {
             DomainActivity::None | DomainActivity::NonIIDomain => {
                 self.increment_counter_for_domain(&context.current_domain);
             }
-            DomainActivity::Ic0App | DomainActivity::InternetComputerOrg => {
+            DomainActivity::Ic0App | DomainActivity::InternetComputerOrg | DomainActivity::IdAi => {
                 if !context
                     .current_domain
                     .is_same_domain(&previous_domain_activity)

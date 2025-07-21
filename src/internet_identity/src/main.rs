@@ -61,6 +61,8 @@ const IC0_APP_DOMAIN: &str = "identity.ic0.app";
 const IC0_APP_ORIGIN: &str = "https://identity.ic0.app";
 const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
+const ID_AI_DOMAIN: &str = "id.ai";
+const ID_AI_ORIGIN: &str = "https://id.ai";
 
 #[update]
 async fn init_salt() {

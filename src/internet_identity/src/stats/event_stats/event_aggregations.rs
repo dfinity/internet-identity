@@ -1,4 +1,4 @@
-use crate::ii_domain::IIDomain::{Ic0App, InternetComputerOrg};
+use crate::ii_domain::IIDomain::{Ic0App, IdAi, InternetComputerOrg};
 use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::storage_borrow;
 use crate::stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
@@ -288,7 +288,8 @@ impl AggregationKey {
     fn upper_bound(&self) -> Bound<Self> {
         let empty_data = ByteBuf::from(vec![]);
         let next_ii_domain = match self.ii_domain {
-            None => Some(Ic0App),
+            None => Some(IdAi),
+            Some(IdAi) => Some(Ic0App),
             Some(Ic0App) => Some(InternetComputerOrg),
             Some(InternetComputerOrg) => None,
         };

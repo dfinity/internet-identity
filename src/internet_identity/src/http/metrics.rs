@@ -5,7 +5,7 @@ use crate::stats::activity_stats::activity_counter::ActivityCounter;
 use crate::stats::activity_stats::ActivityStats;
 use crate::stats::event_stats::AggregationWindow::{Day, Month};
 use crate::stats::event_stats::{retrieve_aggregation, Aggregation, PD_COUNT, PD_SESS_SEC};
-use crate::{state, IC0_APP_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
+use crate::{state, IC0_APP_DOMAIN, ID_AI_DOMAIN, INTERNETCOMPUTER_ORG_DOMAIN};
 use ic_cdk::api::stable::{stable_size, WASM_PAGE_SIZE_IN_BYTES};
 use ic_cdk::api::time;
 use ic_metrics_encoder::{LabeledMetricsBuilder, MetricsEncoder};
@@ -315,6 +315,10 @@ fn persistent_state_metrics(
             .value(
                 &[("domain", INTERNETCOMPUTER_ORG_DOMAIN)],
                 counter.internetcomputer_org_counter as f64,
+            )?
+            .value(
+                &[("domain", ID_AI_DOMAIN)],
+                counter.id_ai_counter as f64,
             )?
             .value(
                 &[("domain", BOTH_DOMAINS)],
