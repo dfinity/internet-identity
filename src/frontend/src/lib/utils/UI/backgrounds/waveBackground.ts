@@ -1,18 +1,33 @@
-import { Spring } from "svelte/motion";
+import {
+  FlairAnimationOptions,
+  FlairBoxProps,
+} from "$lib/components/backgrounds/FlairBox.svelte";
+import { quadInOut } from "svelte/easing";
+import { Spring, Tween } from "svelte/motion";
 
 export function createXYSprings(
   xCount: number,
   yCount: number,
-  SpringCtor: typeof Spring,
+  SpringCtor: typeof Spring | typeof Tween,
   stiffness: number,
   damping: number,
 ) {
-  return Array.from({ length: xCount }, (_, x) =>
-    Array.from(
-      { length: yCount },
-      () => new SpringCtor({ x: 0, y: 0 }, { stiffness, damping }),
-    ),
-  );
+  if (SpringCtor instanceof Spring) {
+    return Array.from({ length: xCount }, (_, x) =>
+      Array.from(
+        { length: yCount },
+        () => new SpringCtor({ x: 0, y: 0 }, { stiffness, damping }),
+      ),
+    );
+  } else {
+    return Array.from({ length: xCount }, (_, x) =>
+      Array.from(
+        { length: yCount },
+        () =>
+          new SpringCtor({ x: 0, y: 0 }, { duration: 200, easing: quadInOut }),
+      ),
+    );
+  }
 }
 
 export function createScalarSprings(
@@ -31,7 +46,13 @@ export function leftPos(
   xIndex: number,
   yIndex: number,
   offsetX: number,
-  springs: (Spring<{ x: number; y: number }> | undefined)[][] | undefined,
+  springs:
+    | (
+        | Spring<{ x: number; y: number }>
+        | Tween<{ x: number; y: number }>
+        | undefined
+      )[][]
+    | undefined,
 ) {
   if (
     springs === undefined ||
@@ -47,7 +68,13 @@ export function topPos(
   xIndex: number,
   yIndex: number,
   offsetY: number,
-  springs: (Spring<{ x: number; y: number }> | undefined)[][] | undefined,
+  springs:
+    | (
+        | Spring<{ x: number; y: number }>
+        | Tween<{ x: number; y: number }>
+        | undefined
+      )[][]
+    | undefined,
 ) {
   if (
     springs === undefined ||
@@ -61,7 +88,7 @@ export function topPos(
 export function waveScale(
   xIndex: number,
   yIndex: number,
-  springs: (Spring<number> | undefined)[][] | undefined,
+  springs: (Spring<number> | Tween<number> | undefined)[][] | undefined,
 ) {
   if (
     springs === undefined ||
@@ -80,30 +107,33 @@ export function createContinuousWave(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: Spring<{ x: number; y: number }>[][],
+  springs: (
+    | Spring<{ x: number; y: number }>
+    | Tween<{ x: number; y: number }>
+  )[][],
   xSpacing: number,
   ySpacing: number,
-  MOUSE_RADIUS: number,
-  MOUSE_SCALAR: number,
-  WAVE_SPEED: number,
-  IMPULSE_DURATION: number,
+  mouseRadius: number,
+  mouseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
   axis: "xy" | "x" | "y" = "xy",
 ) {
   const minX = Math.max(
     0,
-    Math.floor((mouseX - offsetX - MOUSE_RADIUS) / xSpacing),
+    Math.floor((mouseX - offsetX - mouseRadius) / xSpacing),
   );
   const maxX = Math.min(
     xPositions.length - 1,
-    Math.ceil((mouseX - offsetX + MOUSE_RADIUS) / xSpacing),
+    Math.ceil((mouseX - offsetX + mouseRadius) / xSpacing),
   );
   const minY = Math.max(
     0,
-    Math.floor((mouseY - offsetY - MOUSE_RADIUS) / ySpacing),
+    Math.floor((mouseY - offsetY - mouseRadius) / ySpacing),
   );
   const maxY = Math.min(
     yPositions.length - 1,
-    Math.ceil((mouseY - offsetY + MOUSE_RADIUS) / ySpacing),
+    Math.ceil((mouseY - offsetY + mouseRadius) / ySpacing),
   );
 
   for (let xIndex = minX; xIndex <= maxX; xIndex++) {
@@ -114,10 +144,10 @@ export function createContinuousWave(
       const dy = nodeY - mouseY;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < MOUSE_RADIUS) {
-        const delay = dist * WAVE_SPEED;
-        const falloff = Math.pow(1 - dist / MOUSE_RADIUS, 2);
-        const strength = falloff * MOUSE_SCALAR * MOUSE_RADIUS;
+      if (dist < mouseRadius) {
+        const delay = dist * waveSpeed;
+        const falloff = Math.pow(1 - dist / mouseRadius, 2);
+        const strength = falloff * mouseScalar * mouseRadius;
 
         setTimeout(() => {
           if (strength > 0.01) {
@@ -129,7 +159,7 @@ export function createContinuousWave(
 
             setTimeout(() => {
               springs[xIndex][yIndex].target = { x: 0, y: 0 };
-            }, IMPULSE_DURATION);
+            }, impulseDuration);
           }
         }, delay);
       } else {
@@ -146,29 +176,29 @@ export function createContinuousScalarWave(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: Spring<number>[][],
+  springs: Spring<number>[][] | Tween<number>[][],
   xSpacing: number,
   ySpacing: number,
-  MOUSE_RADIUS: number,
-  MOUSE_SCALAR: number,
-  WAVE_SPEED: number,
-  IMPULSE_DURATION: number,
+  mouseRadius: number,
+  mouseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
 ) {
   const minX = Math.max(
     0,
-    Math.floor((mouseX - offsetX - MOUSE_RADIUS) / xSpacing),
+    Math.floor((mouseX - offsetX - mouseRadius) / xSpacing),
   );
   const maxX = Math.min(
     xPositions.length - 1,
-    Math.ceil((mouseX - offsetX + MOUSE_RADIUS) / xSpacing),
+    Math.ceil((mouseX - offsetX + mouseRadius) / xSpacing),
   );
   const minY = Math.max(
     0,
-    Math.floor((mouseY - offsetY - MOUSE_RADIUS) / ySpacing),
+    Math.floor((mouseY - offsetY - mouseRadius) / ySpacing),
   );
   const maxY = Math.min(
     yPositions.length - 1,
-    Math.ceil((mouseY - offsetY + MOUSE_RADIUS) / ySpacing),
+    Math.ceil((mouseY - offsetY + mouseRadius) / ySpacing),
   );
 
   for (let xIndex = minX; xIndex <= maxX; xIndex++) {
@@ -179,17 +209,17 @@ export function createContinuousScalarWave(
       const dy = nodeY - mouseY;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < MOUSE_RADIUS) {
-        const delay = dist * WAVE_SPEED;
-        const falloff = Math.pow(1 - dist / MOUSE_RADIUS, 2);
-        const strength = falloff * MOUSE_SCALAR * MOUSE_RADIUS;
+      if (dist < mouseRadius) {
+        const delay = dist * waveSpeed;
+        const falloff = Math.pow(1 - dist / mouseRadius, 2);
+        const strength = falloff * mouseScalar * mouseRadius;
 
         setTimeout(() => {
           if (strength > 0.01) {
             springs[xIndex][yIndex].target = dist * strength;
             setTimeout(() => {
               springs[xIndex][yIndex].target = 0;
-            }, IMPULSE_DURATION);
+            }, impulseDuration);
           }
         }, delay);
       } else {
@@ -200,41 +230,46 @@ export function createContinuousScalarWave(
 }
 
 export function createImpulse(
-  mouseX: number,
-  mouseY: number,
+  x: number,
+  y: number,
   xPositions: number[],
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: Spring<{ x: number; y: number }>[][],
-  CLICK_RADIUS: number,
-  IMPULSE_SCALAR: number,
-  WAVE_SPEED: number,
-  IMPULSE_DURATION: number,
-  axis: "xy" | "x" | "y" = "xy",
+  springs: (
+    | Spring<{ x: number; y: number }>
+    | Tween<{ x: number; y: number }>
+  )[][],
+  clickRadius: number,
+  impulseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
+  direction: "omni" | "x" | "y",
 ) {
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
       const nodeX = xPositions[xIndex] + offsetX;
       const nodeY = yPositions[yIndex] + offsetY;
-      const dx = nodeX - mouseX;
-      const dy = nodeY - mouseY;
+      const dx = nodeX - x;
+      const dy = nodeY - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      const falloff = Math.max(0, 1 - dist / CLICK_RADIUS);
-      const strength = Math.pow(falloff, 2) * IMPULSE_SCALAR * CLICK_RADIUS;
-      const delay = dist * WAVE_SPEED;
+      if (dist < 1e-6) continue;
+
+      const falloff = Math.max(0, 1 - dist / clickRadius);
+      const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
+      const delay = dist * waveSpeed;
 
       setTimeout(() => {
         if (strength > 0.01) {
           let xVal = (dx / dist) * strength;
           let yVal = (dy / dist) * strength;
-          if (axis === "x") yVal = 0;
-          if (axis === "y") xVal = 0;
+          if (direction === "x") yVal = 0;
+          if (direction === "y") xVal = 0;
           springs[xIndex][yIndex].target = { x: xVal, y: yVal };
           setTimeout(() => {
             springs[xIndex][yIndex].target = { x: 0, y: 0 };
-          }, IMPULSE_DURATION);
+          }, impulseDuration);
         }
       }, delay);
     }
@@ -242,30 +277,33 @@ export function createImpulse(
 }
 
 export function createRotationalImpulse(
-  mouseX: number,
-  mouseY: number,
+  x: number,
+  y: number,
   xPositions: number[],
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: Spring<{ x: number; y: number }>[][],
-  CLICK_RADIUS: number,
-  IMPULSE_SCALAR: number,
-  WAVE_SPEED: number,
-  IMPULSE_DURATION: number,
+  springs: (
+    | Spring<{ x: number; y: number }>
+    | Tween<{ x: number; y: number }>
+  )[][],
+  clickRadius: number,
+  impulseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
   direction: "cw" | "ccw" = "cw", // clockwise or counterclockwise
 ) {
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
       const nodeX = xPositions[xIndex] + offsetX;
       const nodeY = yPositions[yIndex] + offsetY;
-      const dx = nodeX - mouseX;
-      const dy = nodeY - mouseY;
+      const dx = nodeX - x;
+      const dy = nodeY - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      const falloff = Math.max(0, 1 - dist / CLICK_RADIUS);
-      const strength = Math.pow(falloff, 2) * IMPULSE_SCALAR * CLICK_RADIUS;
-      const delay = dist * WAVE_SPEED;
+      const falloff = Math.max(0, 1 - dist / clickRadius);
+      const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
+      const delay = dist * waveSpeed;
 
       setTimeout(() => {
         if (strength > 0.01 && dist > 0.0001) {
@@ -284,7 +322,7 @@ export function createRotationalImpulse(
           };
           setTimeout(() => {
             springs[xIndex][yIndex].target = { x: 0, y: 0 };
-          }, IMPULSE_DURATION);
+          }, impulseDuration);
         }
       }, delay);
     }
@@ -298,11 +336,14 @@ export function createDirectionalImpulse(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: Spring<{ x: number; y: number }>[][],
-  CLICK_RADIUS: number,
-  IMPULSE_SCALAR: number,
-  WAVE_SPEED: number,
-  IMPULSE_DURATION: number,
+  springs: (
+    | Spring<{ x: number; y: number }>
+    | Tween<{ x: number; y: number }>
+  )[][],
+  clickRadius: number,
+  impulseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
   direction: "up" | "down" | "left" | "right",
   axis: "xy" | "x" | "y" = "xy",
 ) {
@@ -333,13 +374,10 @@ export function createDirectionalImpulse(
 
       // Only apply impulse if in the correct direction and not at the mouse position
       if (directionalScale > 0 && dist > 0.0001) {
-        const falloff = Math.max(0, 1 - dist / CLICK_RADIUS);
+        const falloff = Math.max(0, 1 - dist / clickRadius);
         const strength =
-          Math.pow(falloff, 2) *
-          IMPULSE_SCALAR *
-          CLICK_RADIUS *
-          directionalScale;
-        const delay = dist * WAVE_SPEED;
+          Math.pow(falloff, 2) * impulseScalar * clickRadius * directionalScale;
+        const delay = dist * waveSpeed;
 
         setTimeout(() => {
           if (strength > 0.01) {
@@ -350,7 +388,7 @@ export function createDirectionalImpulse(
             springs[xIndex][yIndex].target = { x: xVal, y: yVal };
             setTimeout(() => {
               springs[xIndex][yIndex].target = { x: 0, y: 0 };
-            }, IMPULSE_DURATION);
+            }, impulseDuration);
           }
         }, delay);
       }
@@ -365,11 +403,11 @@ export function createScalarImpulse(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: Spring<number>[][],
-  CLICK_RADIUS: number,
-  IMPULSE_SCALAR: number,
-  WAVE_SPEED: number,
-  IMPULSE_DURATION: number,
+  springs: Spring<number>[][] | Tween<number>[][],
+  clickRadius: number,
+  impulseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
 ) {
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
@@ -379,23 +417,28 @@ export function createScalarImpulse(
       const dy = nodeY - mouseY;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      const falloff = Math.max(0, 1 - dist / CLICK_RADIUS);
-      const strength = Math.pow(falloff, 2) * IMPULSE_SCALAR * CLICK_RADIUS;
-      const delay = dist * WAVE_SPEED;
+      const falloff = Math.max(0, 1 - dist / clickRadius);
+      const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
+      const delay = dist * waveSpeed;
 
       setTimeout(() => {
         if (strength > 0.01) {
           springs[xIndex][yIndex].target = dist * strength;
           setTimeout(() => {
             springs[xIndex][yIndex].target = 0;
-          }, IMPULSE_DURATION);
+          }, impulseDuration);
         }
       }, delay);
     }
   }
 }
 
-export function resetNodes(springs: Spring<{ x: number; y: number }>[][]) {
+export function resetNodes(
+  springs: (
+    | Spring<{ x: number; y: number }>
+    | Tween<{ x: number; y: number }>
+  )[][],
+) {
   for (let x = 0; x < springs.length; x++) {
     for (let y = 0; y < springs[x].length; y++) {
       springs[x][y].target = { x: 0, y: 0 };
@@ -403,10 +446,106 @@ export function resetNodes(springs: Spring<{ x: number; y: number }>[][]) {
   }
 }
 
-export function resetScalarNodes(springs: Spring<number>[][]) {
+export function resetScalarNodes(
+  springs: Spring<number>[][] | Tween<number>[][],
+) {
   for (let x = 0; x < springs.length; x++) {
     for (let y = 0; y < springs[x].length; y++) {
       springs[x][y].target = 0;
     }
   }
+}
+
+export function gridPath(x1: number, y1: number, x2: number, y2: number) {
+  const cx = (x1 + x2) / 2;
+  const cy = (y1 + y2) / 2;
+
+  return `M ${x1} ${y1} C ${cx} ${cy}, ${cx} ${cy}, ${x2} ${y2}`;
+}
+
+export function getImpulseLocation(
+  location: FlairAnimationOptions["location"],
+  innerWidth: number,
+  innerHeight: number,
+) {
+  switch (location) {
+    case "top":
+      return { x: innerWidth / 2, y: 0 };
+    case "left":
+      return { x: 0, y: innerHeight / 2 };
+    case "right":
+      return { x: innerWidth, y: innerHeight / 2 };
+    case "bottom":
+      return { x: innerWidth / 2, y: innerHeight };
+    case "topLeft":
+      return { x: 0, y: 0 };
+    case "topRight":
+      return { x: innerWidth, y: 0 };
+    case "bottomLeft":
+      return { x: 0, y: innerHeight };
+    case "bottomRight":
+      return { x: innerWidth, y: innerHeight };
+    case "center":
+      return { x: innerWidth / 2, y: innerHeight / 2 };
+    default:
+      if (
+        typeof location === "object" &&
+        location !== null &&
+        typeof location.x === "number" &&
+        typeof location.y === "number"
+      ) {
+        return location;
+      }
+      return { x: innerWidth / 2, y: innerHeight / 2 };
+  }
+}
+
+export function getVignetteConfig(
+  vignette: FlairBoxProps["vignette"],
+  innerHeight: number | undefined,
+  innerWidth: number | undefined,
+) {
+  // Margin from the edge of the viewport
+  const margin = 0;
+  // How much smaller the vignette is compared to the viewport
+  const scale = 0.9;
+
+  if (innerHeight === undefined || innerWidth === undefined) {
+    return { cx: 0, cy: 0, rx: 0, ry: 0 };
+  }
+
+  const w =
+    vignette === "top" || vignette === "bottom" ? innerWidth * 2 : innerWidth;
+  const h =
+    vignette === "left" || vignette === "right" ? innerHeight * 2 : innerHeight;
+  const rx = (w * scale) / 2;
+  const ry = (h * scale) / 2;
+
+  let cx = innerWidth / 2;
+  let cy = innerHeight / 2;
+
+  switch (vignette) {
+    case "top":
+      cy = 0;
+
+      break;
+    case "bottom":
+      cy = h - margin;
+
+      break;
+    case "left":
+      cx = margin;
+
+      break;
+    case "right":
+      cx = w - margin;
+
+      break;
+    case "center":
+    default:
+      // already centered
+      break;
+  }
+
+  return { cx, cy, rx, ry };
 }

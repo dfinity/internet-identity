@@ -8,8 +8,8 @@
   noise.noiseSeed(0);
 
   let {
-    xSpacing = 24,
-    ySpacing = 16,
+    xSpacing = 30,
+    ySpacing = 20,
     showControls = false,
   }: {
     xSpacing?: number;
@@ -106,7 +106,7 @@
     ripples.push(newRipple);
     setTimeout(() => {
       ripples = ripples.filter((ripple) => ripple.id !== id);
-    }, rippleDuration * 0.6);
+    }, rippleDuration);
   };
 
   onMount(() => {
