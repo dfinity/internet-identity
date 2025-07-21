@@ -7,6 +7,7 @@ export const II_URL = "https://id.ai";
 export const TEST_APP_URL = "https://nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
+export const TEST_APP_CANONICAL_URL_RAW = `https://${testAppCanisterId}.raw.icp0.io`;
 
 export type DummyAuthFn = (page: Page) => void;
 
