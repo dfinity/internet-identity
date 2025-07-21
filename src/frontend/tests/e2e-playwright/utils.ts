@@ -68,13 +68,34 @@ export const createNewIdentityInII = async (
   name: string,
   dummyAuth: DummyAuthFn,
 ): Promise<void> => {
-  await page.goto(II_URL);
+  // Wait for page to load
+  await Promise.any([
+    page.getByRole("button", { name: "Continue with Passkey" }).waitFor(),
+    page.getByRole("button", { name: "Switch identity" }).waitFor(),
+  ]);
+
+  // Check if we're on the continue screen or not
+  const onContinueScreen = await page
+    .getByRole("button", { name: "Continue with Passkey" })
+    .isHidden();
+  if (onContinueScreen) {
+    // If we're on the continue screen, go through the identity switcher
+    await page.getByRole("button", { name: "Switch identity" }).click();
+    await page.getByRole("button", { name: "Use another identity" }).click();
+  }
+
+  // Create passkey identity
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   await page.getByRole("button", { name: "Set up a new Passkey" }).click();
   await page.getByLabel("Identity name").fill(name);
   dummyAuth(page);
   await page.getByRole("button", { name: "Create Passkey" }).click();
-  await page.waitForURL(II_URL + "/manage");
+
+  if (onContinueScreen) {
+    // If we're coming from the continue screen (through identity switcher),
+    // we'll also need to explicitly select the primary account to continue.
+    await page.getByRole("button", { name: "Primary account" }).click();
+  }
 };
 
 /**
@@ -89,40 +110,7 @@ export const createIdentity = (
   dummyAuth: DummyAuthFn,
 ): Promise<string> =>
   authorize(page, async (authPage) => {
-    // Wait for page to load
-    await Promise.any([
-      authPage.getByRole("button", { name: "Continue with Passkey" }).waitFor(),
-      authPage.getByRole("button", { name: "Switch identity" }).waitFor(),
-    ]);
-
-    // Check if we're on the continue screen or not
-    const onContinueScreen = await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .isHidden();
-    if (onContinueScreen) {
-      // If we're on the continue screen, go through the identity switcher
-      await authPage.getByRole("button", { name: "Switch identity" }).click();
-      await authPage
-        .getByRole("button", { name: "Use another identity" })
-        .click();
-    }
-
-    // Create passkey identity
-    await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .click();
-    await authPage
-      .getByRole("button", { name: "Set up a new Passkey" })
-      .click();
-    await authPage.getByLabel("Identity name").fill(name);
-    dummyAuth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
-
-    if (onContinueScreen) {
-      // If we're coming from the continue screen (through identity switcher),
-      // we'll also need to explicitly select the primary account to continue.
-      await authPage.getByRole("button", { name: "Primary account" }).click();
-    }
+    await createNewIdentityInII(authPage, name, dummyAuth);
   });
 
 /**

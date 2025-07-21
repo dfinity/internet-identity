@@ -12,7 +12,9 @@ test("User can log in the dashboard and add a new passkey from the same device",
   page,
 }) => {
   const auth = dummyAuth();
+  await page.goto(II_URL);
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
+  await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
@@ -38,10 +40,12 @@ test("User can log in the dashboard and add a new passkey from the same device",
 
 test("User can log in the dashboard and add a new passkey from another device", async ({
   page,
-  context,
+  browser,
 }) => {
   const auth = dummyAuth();
+  await page.goto(II_URL);
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
+  await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
@@ -61,7 +65,8 @@ test("User can log in the dashboard and add a new passkey from another device", 
 
   const linkToPair = await page.getByLabel("Pairing link").innerText();
 
-  const linkPage = await context.newPage();
+  const newContext = await browser.newContext();
+  const linkPage = await newContext.newPage();
   await linkPage.goto(`https://${linkToPair}`);
 
   const authorizeNewDevicePromise = page
