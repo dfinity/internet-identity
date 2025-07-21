@@ -10,6 +10,7 @@ const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
 
 const ICP0_APP_ORIGIN: &str = "https://identity.ic0.app";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
+const ID_AI_ORIGIN: &str = "https://id.ai";
 const OTHER_ORIGIN: &str = "https://example.com";
 
 /// Tests that daily active anchors are counted correctly.
@@ -20,6 +21,7 @@ fn should_report_daily_active_anchors() -> Result<(), CallError> {
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
     let internetcomputer_org_device =
         device_with_origin(Some(INTERNETCOMPUTER_ORG_ORIGIN.to_string()));
+    let id_ai_device = device_with_origin(Some(ID_AI_ORIGIN.to_string()));
     let other_origin_device = device_with_origin(Some(OTHER_ORIGIN.to_string()));
     let no_origin_device = device_with_origin(None);
 
@@ -52,6 +54,8 @@ fn should_report_daily_active_anchors() -> Result<(), CallError> {
     }
     flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
     flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
+    flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
+    flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
     flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
     flows::register_anchor_with_device(&env, canister_id, &no_origin_device);
 
@@ -78,6 +82,11 @@ fn should_report_daily_active_anchors() -> Result<(), CallError> {
         );
     assert_metric(
         &metrics,
+        "internet_identity_daily_active_anchors_by_domain{domain=\"id.ai\"}",
+        2f64,
+    );
+    assert_metric(
+        &metrics,
         "internet_identity_daily_active_anchors_by_domain{domain=\"both_ii_domains\"}",
         1f64,
     );
@@ -92,6 +101,7 @@ fn should_report_monthly_active_anchors() -> Result<(), CallError> {
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
     let internetcomputer_org_device =
         device_with_origin(Some(INTERNETCOMPUTER_ORG_ORIGIN.to_string()));
+    let id_ai_device = device_with_origin(Some(ID_AI_ORIGIN.to_string()));
     let other_origin_device = device_with_origin(Some(OTHER_ORIGIN.to_string()));
     let no_origin_device = device_with_origin(None);
 
@@ -123,6 +133,8 @@ fn should_report_monthly_active_anchors() -> Result<(), CallError> {
     flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
     flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
     flows::register_anchor_with_device(&env, canister_id, &internetcomputer_org_device);
+    flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
+    flows::register_anchor_with_device(&env, canister_id, &id_ai_device);
     flows::register_anchor_with_device(&env, canister_id, &other_origin_device);
     flows::register_anchor_with_device(&env, canister_id, &no_origin_device);
 
@@ -151,6 +163,11 @@ fn should_report_monthly_active_anchors() -> Result<(), CallError> {
         &metrics,
         "internet_identity_monthly_active_anchors_by_domain{domain=\"both_ii_domains\"}",
         1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_monthly_active_anchors_by_domain{domain=\"id.ai\"}",
+        2f64,
     );
     Ok(())
 }
