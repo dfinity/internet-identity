@@ -101,6 +101,14 @@
       handleError(error);
     }
   };
+
+  const isCurrentAccessMethod = (accessMethod: AuthnMethodData) => {
+    return (
+      nonNullish(lastUsedAccessMethod) &&
+      isWebAuthnMetaData(lastUsedAccessMethod) &&
+      authnMethodEqual(accessMethod, lastUsedAccessMethod)
+    );
+  };
 </script>
 
 <Panel>
@@ -140,16 +148,14 @@
         </div>
         <AccessMethod
           accessMethod={authnMethod}
-          isCurrent={nonNullish(lastUsedAccessMethod) &&
-            isWebAuthnMetaData(lastUsedAccessMethod) &&
-            authnMethodEqual(authnMethod, lastUsedAccessMethod)}
+          isCurrent={isCurrentAccessMethod(authnMethod)}
         />
         <div class="flex items-center justify-end gap-2 px-4">
           <Button
             onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
             variant="tertiary"
             iconOnly
-            aria-label="Rename Passkey"
+            aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "Current" : ""} Passkey`}
           >
             <EditIcon size="1.25rem" />
           </Button>
@@ -158,6 +164,7 @@
               onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
               variant="tertiary"
               iconOnly
+              aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "Current" : ""} Passkey`}
               class="!text-fg-error-secondary"
             >
               <Trash2Icon size="1.25rem" />

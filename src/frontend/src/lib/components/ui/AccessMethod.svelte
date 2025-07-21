@@ -69,7 +69,7 @@
       <div class="flex min-w-32 items-center pr-3">
         {getAuthnMethodAlias(accessMethod)}
         {#if isCurrent}
-          <span class="ml-2">
+          <span class="ml-2" aria-label="Current Passkey">
             <PulsatingCircleIcon />
           </span>
         {/if}

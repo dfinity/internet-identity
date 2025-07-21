@@ -4,6 +4,7 @@ import {
   createNewIdentityInII,
   dummyAuth,
   II_URL,
+  renamePasskey,
 } from "../utils";
 
 const TEST_USER_NAME = "Test User";
@@ -26,7 +27,7 @@ test("User can rename the current passkey used for authentication", async ({
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Click the rename button for the passkey
-  await page.getByLabel("Rename Passkey").click();
+  await page.getByLabel("Rename Current Passkey").click();
 
   // Verify the rename dialog opens
   await expect(
@@ -82,28 +83,8 @@ test("User can rename a newly added passkey from the same device", async ({
   // Verify that we now have two passkeys
   await expect(page.getByText("Chrome")).toHaveCount(2);
 
-  // Click the rename button for the second passkey (newly added one)
-  // We need to get all rename buttons and click the second one
-  const renameButtons = page.getByLabel("Rename Passkey");
-  await expect(renameButtons).toHaveCount(2);
-  await renameButtons.nth(1).click();
-
-  // Verify the rename dialog opens
-  await expect(
-    page.getByRole("heading", { name: "Rename passkey" }),
-  ).toBeVisible();
-
-  // Verify the input is pre-filled with current name
-  const input = page.getByRole("textbox");
-  await expect(input).toHaveValue("Chrome");
-
-  // Change the name
-  await input.clear();
   const passkeyName = "Secondary Passkey";
-  await input.fill(passkeyName);
-
-  // Save the changes
-  await page.getByRole("button", { name: "Save" }).click();
+  await renamePasskey(page, passkeyName);
 
   // Verify the dialog closes and we now have both passkeys with different names
   await expect(
@@ -131,7 +112,7 @@ test("User cannot rename passkey to an empty name nor it's renamed on cancel", a
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Click the rename button for the passkey
-  await page.getByLabel("Rename Passkey").click();
+  await page.getByLabel("Rename Current Passkey").click();
 
   // Verify the rename dialog opens
   await expect(
