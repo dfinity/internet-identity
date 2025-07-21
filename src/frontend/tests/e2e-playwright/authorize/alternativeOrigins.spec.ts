@@ -180,7 +180,10 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
   });
 
   await page.locator("#newAlternativeOrigins").fill(redirectOrigins);
-  await page.locator("#redirect").click(); // Use redirect mode instead of certified
+  // Enable redirect mode to configure the test app to simulate a scenario where
+  // alternative origins return a redirect. This is necessary to verify that the
+  // system does not follow unverified redirects, ensuring security.
+  await page.locator("#redirect").click();
   await page.locator("#updateNewAlternativeOrigins").click();
 
   // Wait for alternative origins to update
