@@ -64,6 +64,7 @@ test("User can log into the dashboard and add a new passkey from the same device
       .locator("..")
       .getByLabel("Current Passkey"),
   ).toHaveCount(1);
+  await newPage.close();
 });
 
 test("User can log in the dashboard and add a new passkey from another device", async ({
