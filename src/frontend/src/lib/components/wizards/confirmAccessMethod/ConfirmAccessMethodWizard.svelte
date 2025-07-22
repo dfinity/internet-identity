@@ -22,7 +22,6 @@
     try {
       await confirmAccessMethodFlow.enterRegistrationMode(registrationId);
     } catch (error) {
-      console.log("a", error);
       onError(error);
     }
   };
@@ -38,7 +37,6 @@
         // Handle this error in child view instead
         throw error;
       }
-      console.log("b", error);
       onError(error);
     }
   };
