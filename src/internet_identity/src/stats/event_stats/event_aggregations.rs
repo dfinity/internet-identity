@@ -41,7 +41,7 @@ pub fn all_aggregations_top_n(limit: usize) -> HashMap<String, Vec<(String, u64)
     let mut aggregations = HashMap::new();
     for aggregation in &AGGREGATIONS {
         for window in &[Day, Month] {
-            for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
+            for domain in &[None, Some(IdAi), Some(Ic0App), Some(InternetComputerOrg)] {
                 let tuples: Vec<_> =
                     retrieve_aggregation(*aggregation, window.clone(), domain.clone())
                         .into_iter()
