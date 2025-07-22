@@ -4,6 +4,7 @@
     createDirectionalImpulse,
     createImpulse,
     createRotationalImpulse,
+    createXYNodeMotions,
     createXYSprings,
     getImpulseLocation,
     getVignetteConfig,
@@ -15,6 +16,7 @@
   import { quadOut } from "svelte/easing";
   import { Spring, Tween } from "svelte/motion";
   import type { FlairBoxProps } from "./FlairBox";
+  import { NodeMotion } from "./FlairCanvas";
 
   let {
     bgType = "dots",
@@ -146,10 +148,7 @@
     innerHeight !== undefined ? (innerHeight - gridHeight) / 2 : 0,
   );
 
-  let springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][] = $state([[]]);
+  let springs: NodeMotion[][] = $state([[]]);
 
   let vignetteConfig = $derived(
     getVignetteConfig(vignette, innerHeight, innerWidth),
@@ -240,7 +239,7 @@
   };
 
   const createSpringsLocal = (xCount: number, yCount: number) => {
-    springs = createXYSprings(
+    springs = createXYNodeMotions(
       xCount,
       yCount,
       springOrTween === "spring" ? Spring : Tween,

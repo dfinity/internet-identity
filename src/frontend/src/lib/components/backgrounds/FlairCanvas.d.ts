@@ -1,4 +1,4 @@
-import type { EasingFunction } from "svelte/transition";
+import * as easingFunctions from "svelte/easing";
 
 export interface FlairAnimationOptions {
   location:
@@ -28,14 +28,14 @@ export interface FlairAnimationOptions {
   intensity: "light" | "medium" | "strong" | number;
   size: "large" | "medium" | "small" | number;
   nImpulses: "single" | "double";
-  impulseEasing?: EasingFunction;
+  impulseEasing?: keyof typeof easingFunctions;
 }
 
 export interface FlairCanvasProps {
   bgType?: "dots" | "grid" | "noisedots";
   spacing?: "large" | "medium" | "small" | number;
   aspect?: "square" | "wide" | "ultrawide" | number;
-  visibility?: "always" | "animation";
+  visibility?: "always" | "moving";
   dotSize?: "large" | "medium" | "small" | number;
   vignette?: "center" | "top" | "left" | "right" | "bottom" | "none";
   hoverAction?: "intense" | "minimal" | "none";
@@ -48,10 +48,15 @@ export interface FlairCanvasProps {
     | {
         type: "tween";
         duration: "short" | "medium" | "long" | number;
-        easing: EasingFunction;
+        easing: keyof typeof easingFunctions;
       };
-  colorScheme: undefined | "dark" | "light";
   backgroundClasses?: string;
   foregroundClasses?: string;
   triggerAnimation?: (opts: FlairAnimationOptions) => void;
+}
+
+export interface NodeMotion {
+  motion: Spring<{ x: number; y: number }> | Tween<{ x: number; y: number }>;
+  prev: { x: number; y: number };
+  speed: number;
 }

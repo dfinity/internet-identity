@@ -2,9 +2,11 @@ import type {
   FlairAnimationOptions,
   FlairBoxProps,
 } from "$lib/components/backgrounds/FlairBox.d.ts";
-import { cubicIn, cubicOut, quadInOut } from "svelte/easing";
+import { quadInOut } from "svelte/easing";
 import { Spring, Tween } from "svelte/motion";
 import { EasingFunction } from "svelte/transition";
+import { PerlinNoise3D } from "./perlinNoise3d";
+import { NodeMotion } from "$lib/components/backgrounds/FlairCanvas";
 
 ////// ANIMATION //////
 export function createXYSprings(
@@ -32,6 +34,39 @@ export function createXYSprings(
   }
 }
 
+export function createXYNodeMotions(
+  xCount: number,
+  yCount: number,
+  SpringCtor: typeof Spring | typeof Tween,
+  stiffness: number,
+  damping: number,
+): NodeMotion[][] {
+  if (SpringCtor instanceof Spring) {
+    return Array.from({ length: xCount }, (_, x) =>
+      Array.from({ length: yCount }, () => {
+        return {
+          motion: new SpringCtor({ x: 0, y: 0 }, { stiffness, damping }),
+          prev: { x: 0, y: 0 },
+          speed: 0,
+        };
+      }),
+    );
+  } else {
+    return Array.from({ length: xCount }, (_, x) =>
+      Array.from({ length: yCount }, () => {
+        return {
+          motion: new SpringCtor(
+            { x: 0, y: 0 },
+            { duration: 200, easing: quadInOut },
+          ),
+          prev: { x: 0, y: 0 },
+          speed: 0,
+        };
+      }),
+    );
+  }
+}
+
 export function createScalarSprings(
   xCount: number,
   yCount: number,
@@ -48,13 +83,7 @@ export function leftPos(
   xIndex: number,
   yIndex: number,
   offsetX: number,
-  springs:
-    | (
-        | Spring<{ x: number; y: number }>
-        | Tween<{ x: number; y: number }>
-        | undefined
-      )[][]
-    | undefined,
+  springs: NodeMotion[][] | undefined,
 ) {
   if (
     springs === undefined ||
@@ -62,7 +91,7 @@ export function leftPos(
     springs[xIndex][yIndex] === undefined
   )
     return xPos + offsetX;
-  return xPos + offsetX + springs[xIndex][yIndex].current.x;
+  return xPos + offsetX + springs[xIndex][yIndex].motion.current.x;
 }
 
 export function topPos(
@@ -70,13 +99,7 @@ export function topPos(
   xIndex: number,
   yIndex: number,
   offsetY: number,
-  springs:
-    | (
-        | Spring<{ x: number; y: number }>
-        | Tween<{ x: number; y: number }>
-        | undefined
-      )[][]
-    | undefined,
+  springs: NodeMotion[][] | undefined,
 ) {
   if (
     springs === undefined ||
@@ -84,7 +107,7 @@ export function topPos(
     springs[xIndex][yIndex] === undefined
   )
     return yPos + offsetY;
-  return yPos + offsetY + springs[xIndex][yIndex].current.y;
+  return yPos + offsetY + springs[xIndex][yIndex].motion.current.y;
 }
 
 export function waveScale(
@@ -109,10 +132,7 @@ export function createContinuousWave(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][],
+  springs: NodeMotion[][],
   xSpacing: number,
   ySpacing: number,
   mouseRadius: number,
@@ -157,15 +177,15 @@ export function createContinuousWave(
             let yVal = (dy / dist) * strength;
             if (axis === "x") yVal = 0;
             if (axis === "y") xVal = 0;
-            springs[xIndex][yIndex].target = { x: xVal, y: yVal };
+            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
 
             setTimeout(() => {
-              springs[xIndex][yIndex].target = { x: 0, y: 0 };
+              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
             }, impulseDuration);
           }
         }, delay);
       } else {
-        springs[xIndex][yIndex].target = { x: 0, y: 0 };
+        springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
       }
     }
   }
@@ -238,10 +258,7 @@ export function createImpulse(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][],
+  springs: NodeMotion[][],
   clickRadius: number,
   impulseScalar: number,
   waveSpeed: number,
@@ -273,9 +290,72 @@ export function createImpulse(
           let yVal = (dy / dist) * strength;
           if (direction === "x") yVal = 0;
           if (direction === "y") xVal = 0;
-          springs[xIndex][yIndex].target = { x: xVal, y: yVal };
+          springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
           setTimeout(() => {
-            springs[xIndex][yIndex].target = { x: 0, y: 0 };
+            springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
+          }, impulseDuration);
+        }
+      }, delay);
+    }
+  }
+}
+
+export function createPerlinImpulse(
+  x: number,
+  y: number,
+  xPositions: number[],
+  yPositions: number[],
+  offsetX: number,
+  offsetY: number,
+  springs: NodeMotion[][],
+  clickRadius: number,
+  impulseScalar: number,
+  waveSpeed: number,
+  impulseDuration: number,
+  direction: "omni" | "x" | "y",
+  perlin: PerlinNoise3D,
+  perlinScale: number = 0.01, // scale for perlin input, tweak as needed
+  perlinZ: number = 0, // optional z value for animation
+  impulseEasing?: EasingFunction,
+) {
+  for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
+    for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
+      const nodeX = xPositions[xIndex] + offsetX;
+      const nodeY = yPositions[yIndex] + offsetY;
+      const dx = nodeX - x;
+      const dy = nodeY - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < 1e-6) continue;
+
+      const falloff = Math.max(0, 1 - dist / clickRadius);
+      const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
+
+      // Perlin noise value for this node's position
+      const perlinValue = perlin.get(
+        nodeX * perlinScale,
+        nodeY * perlinScale,
+        perlinZ,
+      );
+      // Map perlin [0,1] to [-1,1]
+      const perlinMapped = perlinValue - 0.5;
+
+      // Easing for the delay
+      const t = Math.min(dist / clickRadius, 1);
+      const eased = impulseEasing ? impulseEasing(t) : t;
+      const delay = eased * clickRadius * waveSpeed;
+
+      setTimeout(() => {
+        // Only apply if strength is significant
+        if (Math.abs(strength * perlinMapped) > 0.01) {
+          // Outward if perlinMapped > 0, inward if < 0
+          let xVal = (dx / dist) * strength * perlinMapped * 30;
+          let yVal = (dy / dist) * strength * perlinMapped * 30;
+          if (direction === "x") yVal = 0;
+          if (direction === "y") xVal = 0;
+          springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+          setTimeout(() => {
+            springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
           }, impulseDuration);
         }
       }, delay);
@@ -290,10 +370,7 @@ export function createRotationalImpulse(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][],
+  springs: NodeMotion[][],
   clickRadius: number,
   impulseScalar: number,
   waveSpeed: number,
@@ -327,12 +404,12 @@ export function createRotationalImpulse(
             perpX = -dy / dist;
             perpY = dx / dist;
           }
-          springs[xIndex][yIndex].target = {
+          springs[xIndex][yIndex].motion.target = {
             x: perpX * strength,
             y: perpY * strength,
           };
           setTimeout(() => {
-            springs[xIndex][yIndex].target = { x: 0, y: 0 };
+            springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
           }, impulseDuration);
         }
       }, delay);
@@ -347,10 +424,7 @@ export function createDirectionalImpulse(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][],
+  springs: NodeMotion[][],
   clickRadius: number,
   impulseScalar: number,
   waveSpeed: number,
@@ -400,9 +474,9 @@ export function createDirectionalImpulse(
             let yVal = (dy / dist) * strength;
             if (axis === "x") yVal = 0;
             if (axis === "y") xVal = 0;
-            springs[xIndex][yIndex].target = { x: xVal, y: yVal };
+            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
             setTimeout(() => {
-              springs[xIndex][yIndex].target = { x: 0, y: 0 };
+              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
             }, impulseDuration);
           }
         }, delay);
@@ -448,15 +522,10 @@ export function createScalarImpulse(
   }
 }
 
-export function resetNodes(
-  springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][],
-) {
+export function resetNodes(springs: NodeMotion[][]) {
   for (let x = 0; x < springs.length; x++) {
     for (let y = 0; y < springs[x].length; y++) {
-      springs[x][y].target = { x: 0, y: 0 };
+      springs[x][y].motion.target = { x: 0, y: 0 };
     }
   }
 }
@@ -577,11 +646,9 @@ export function drawNodes(
   yPositions: number[],
   offsetX: number,
   offsetY: number,
-  springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][],
+  springs: NodeMotion[][],
   radius: number,
+  visibility: "always" | "moving",
   ctx: CanvasRenderingContext2D,
 ) {
   const body = document.querySelector("body");
@@ -601,6 +668,11 @@ export function drawNodes(
         false,
       );
       ctx.fillStyle = color;
+
+      if (visibility === "moving") {
+        const speed = springs[xIndex][yIndex].speed;
+        ctx.fillStyle = hexToRgba(color, speed !== undefined ? speed : 0);
+      }
       ctx.fill();
       ctx.closePath();
     });
@@ -645,4 +717,21 @@ export function drawVignetteMask(
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
   ctx.restore();
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  // Remove leading #
+  hex = hex.replace(/^#/, "");
+  // Handle shorthand hex (#abc)
+  if (hex.length === 3) {
+    hex = hex
+      .split("")
+      .map((x) => x + x)
+      .join("");
+  }
+  const num = parseInt(hex, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }

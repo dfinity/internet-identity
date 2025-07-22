@@ -21,13 +21,13 @@
     if (animTrig)
       animTrig({
         ...(animOptions as FlairAnimationOptions),
-        impulseEasing: customImpulseEasingFunction,
+        impulseEasing: customImpulseEasing,
       });
     interval = setInterval(() => {
       if (animTrig)
         animTrig({
           ...(animOptions as FlairAnimationOptions),
-          impulseEasing: customImpulseEasingFunction,
+          impulseEasing: customImpulseEasing,
         });
     }, 3000);
   });
@@ -103,9 +103,8 @@
     bgType: "dots",
     springOrTween: { type: "spring", stiffness: "medium", dampening: "medium" },
     visibility: undefined,
-    hoverAction: undefined,
+    hoverAction: "none",
     display: "behindBox",
-    colorScheme: undefined,
     backgroundClasses: "",
     foregroundClasses: "",
   });
@@ -125,13 +124,7 @@
   let customSize = $state<number>(1);
   let customLocation = $state<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
   let springOrTweenType = $state<"spring" | "tween">("spring");
-  let customImpulseEasing = $state<string>("linear");
-
-  let customImpulseEasingFunction = $derived(
-    (easingFunctions as Record<string, (t: number) => number>)[
-      customImpulseEasing
-    ] || easingFunctions.linear,
-  );
+  let customImpulseEasing = $state<keyof typeof easingFunctions>("linear");
 
   // Helper for multi-select
   function toggleTarget(val: "motion" | "scale" | "opacity") {
@@ -188,7 +181,7 @@
         Visibility:
         <select bind:value={flairBoxProps.visibility}>
           <option value="always">always</option>
-          <option value="animation">animation</option>
+          <option value="moving">moving</option>
         </select>
       </label>
       <label>
@@ -207,13 +200,7 @@
           <option value="insideBox">insideBox</option>
         </select>
       </label>
-      <label>
-        Color Scheme:
-        <select bind:value={flairBoxProps.colorScheme}>
-          <option value="dark">dark</option>
-          <option value="light">light</option>
-        </select>
-      </label>
+
       <label>
         Background Classes:
         <input
@@ -576,8 +563,9 @@
       | "center"
       | "top"
       | "bottom"}
+    hoverAction={flairBoxProps.hoverAction}
+    visibility={flairBoxProps.visibility}
     bgType={flairBoxProps.bgType as "dots" | "grid" | "noisedots"}
-    colorScheme={flairBoxProps.colorScheme as "dark" | "light" | undefined}
     springOrTween={flairBoxProps.springOrTween?.type === "spring"
       ? {
           type: "spring",
@@ -597,10 +585,8 @@
               flairBoxProps.springOrTween.duration === "custom"
                 ? customTweenDuration
                 : flairBoxProps.springOrTween.duration,
-            easing:
-              (easingFunctions as Record<string, (t: number) => number>)[
-                flairBoxProps.springOrTween.easing
-              ] || easingFunctions.linear,
+            easing: flairBoxProps.springOrTween
+              .easing as keyof typeof easingFunctions,
           }
         : undefined}
     bind:triggerAnimation={animTrig}

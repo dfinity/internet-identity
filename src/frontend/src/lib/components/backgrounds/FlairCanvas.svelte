@@ -4,7 +4,9 @@
     createContinuousWave,
     createDirectionalImpulse,
     createImpulse,
+    createPerlinImpulse,
     createRotationalImpulse,
+    createXYNodeMotions,
     createXYSprings,
     drawNodes,
     drawVignetteMask,
@@ -17,14 +19,15 @@
   } from "$lib/utils/UI/backgrounds/waveBackground";
   import { quadOut } from "svelte/easing";
   import { Spring, Tween } from "svelte/motion";
-  import type { FlairCanvasProps } from "./FlairCanvas";
+  import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
   import { onMount } from "svelte";
+  import * as easingFunctions from "svelte/easing";
 
   let {
     bgType = "dots",
     spacing = "medium",
     aspect = "wide",
-    hoverAction = "minimal",
+    hoverAction = "none",
     visibility = "always",
     dotSize = "medium",
     vignette = "center",
@@ -42,6 +45,9 @@
   let canvasRef = $state<HTMLCanvasElement>();
   let ctx = $state<CanvasRenderingContext2D | null>(null);
   let dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
+  let canvasGlobalOpacity = new Tween(100); // Workaround for ugly resize behavior
+  let resizeTimeout = $state<ReturnType<typeof setTimeout>>();
+  let observer = $state<ResizeObserver>();
 
   let pointerX = $state<number>(0);
   let pointerY = $state<number>(0);
@@ -60,15 +66,6 @@
 
   let noiseScale = $state<number>(0.2);
   let timeScale = $state<number>(1500);
-
-  type Ripple = {
-    tween: Tween<number>;
-    x: number;
-    y: number;
-    id: number;
-  };
-
-  let ripples = $state<Ripple[]>([]);
 
   // --- Animation state ---
   let time = $state<number>(0);
@@ -166,10 +163,7 @@
     clientHeight !== undefined ? (clientHeight - gridHeight) / 2 : 0,
   );
 
-  let springs: (
-    | Spring<{ x: number; y: number }>
-    | Tween<{ x: number; y: number }>
-  )[][] = $state([[]]);
+  let springs: NodeMotion[][] = $state([[]]);
 
   let vignetteConfig = $derived(
     getVignetteConfig(vignette, clientHeight, clientWidth),
@@ -186,6 +180,10 @@
       nImpulses,
       impulseEasing,
     } = opts;
+
+    let easingFunction = impulseEasing
+      ? easingFunctions[impulseEasing]
+      : undefined;
 
     if (target.includes("motion") && clientWidth && clientHeight) {
       const { x, y } = getImpulseLocation(location, clientWidth, clientHeight);
@@ -209,36 +207,38 @@
           impulseDuration *
             (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
-          impulseEasing,
+          easingFunction,
         );
-        createRipple(x, y);
+
         if (nImpulses === "double") {
-          setTimeout(() => {
-            createRotationalImpulse(
-              x,
-              y,
-              xPositions,
-              yPositions,
-              offsetX,
-              offsetY,
-              springs,
-              rippleRadius *
-                1.2 *
-                (typeof size === "number" ? size : rippleSizeTable[size]),
-              impulseScalar *
-                0.6 *
-                (typeof intensity === "number"
-                  ? intensity
-                  : intensityTable[intensity]),
-              waveSpeed *
-                (typeof speed === "number" ? speed : speedTable[speed]),
-              impulseDuration *
-                (typeof speed === "number" ? speed : speedTable[speed]),
-              motionType === "cw" ? "ccw" : "cw",
-              impulseEasing,
-            );
-            createRipple(x, y);
-          }, 250);
+          setTimeout(
+            () => {
+              createRotationalImpulse(
+                x,
+                y,
+                xPositions,
+                yPositions,
+                offsetX,
+                offsetY,
+                springs,
+                rippleRadius *
+                  1.2 *
+                  (typeof size === "number" ? size : rippleSizeTable[size]),
+                impulseScalar *
+                  0.6 *
+                  (typeof intensity === "number"
+                    ? intensity
+                    : intensityTable[intensity]),
+                waveSpeed *
+                  (typeof speed === "number" ? speed : speedTable[speed]),
+                impulseDuration *
+                  (typeof speed === "number" ? speed : speedTable[speed]),
+                motionType === "cw" ? "ccw" : "cw",
+                easingFunction,
+              );
+            },
+            250 * (typeof speed === "number" ? speed : speedTable[speed]),
+          );
         }
         return;
       }
@@ -267,39 +267,102 @@
             (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
           "xy",
-          impulseEasing,
+          easingFunction,
         );
-        createRipple(x, y);
+
         if (nImpulses === "double") {
-          setTimeout(() => {
-            createDirectionalImpulse(
-              x,
-              y,
-              xPositions,
-              yPositions,
-              offsetX,
-              offsetY,
-              springs,
-              rippleRadius *
-                1.2 *
-                (typeof size === "number" ? size : rippleSizeTable[size]),
-              impulseScalar *
-                0.6 *
-                (typeof intensity === "number"
-                  ? intensity
-                  : intensityTable[intensity]),
-              (waveSpeed / 2) *
-                (typeof speed === "number" ? speed : speedTable[speed]),
-              impulseDuration *
-                (typeof speed === "number" ? speed : speedTable[speed]),
-              motionType,
-              "xy",
-              impulseEasing,
-            );
-            createRipple(x, y);
-          }, 250);
+          setTimeout(
+            () => {
+              createDirectionalImpulse(
+                x,
+                y,
+                xPositions,
+                yPositions,
+                offsetX,
+                offsetY,
+                springs,
+                rippleRadius *
+                  1.2 *
+                  (typeof size === "number" ? size : rippleSizeTable[size]),
+                impulseScalar *
+                  0.6 *
+                  (typeof intensity === "number"
+                    ? intensity
+                    : intensityTable[intensity]),
+                (waveSpeed / 2) *
+                  (typeof speed === "number" ? speed : speedTable[speed]),
+                impulseDuration *
+                  (typeof speed === "number" ? speed : speedTable[speed]),
+                motionType,
+                "xy",
+                easingFunction,
+              );
+            },
+            250 * (typeof speed === "number" ? speed : speedTable[speed]),
+          );
         }
         return;
+      }
+
+      if (motionType === "perlin") {
+        createPerlinImpulse(
+          x,
+          y,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          rippleRadius *
+            (typeof size === "number" ? size : rippleSizeTable[size]),
+          impulseScalar *
+            (typeof intensity === "number"
+              ? intensity
+              : intensityTable[intensity]),
+          waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
+          impulseDuration *
+            3 *
+            (typeof speed === "number" ? speed : speedTable[speed]),
+          "x",
+          noise,
+          10,
+          0.5,
+          easingFunction,
+        );
+
+        if (nImpulses === "double") {
+          setTimeout(
+            () => {
+              createPerlinImpulse(
+                x,
+                y,
+                xPositions,
+                yPositions,
+                offsetX,
+                offsetY,
+                springs,
+                rippleRadius *
+                  1.2 *
+                  (typeof size === "number" ? size : rippleSizeTable[size]),
+                impulseScalar *
+                  0.6 *
+                  (typeof intensity === "number"
+                    ? intensity
+                    : intensityTable[intensity]),
+                (waveSpeed / 2) *
+                  (typeof speed === "number" ? speed : speedTable[speed]),
+                impulseDuration *
+                  (typeof speed === "number" ? speed : speedTable[speed]),
+                "omni",
+                noise,
+                0.01,
+                1,
+                easingFunction,
+              );
+            },
+            250 * (typeof speed === "number" ? speed : speedTable[speed]),
+          );
+        }
       }
 
       createImpulse(
@@ -320,9 +383,8 @@
         impulseDuration *
           (typeof speed === "number" ? speed : speedTable[speed]),
         motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
-        impulseEasing,
+        easingFunction,
       );
-      createRipple(x, y);
 
       if (nImpulses === "double") {
         setTimeout(
@@ -348,9 +410,8 @@
               impulseDuration *
                 (typeof speed === "number" ? speed : speedTable[speed]),
               motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
-              impulseEasing,
+              easingFunction,
             );
-            createRipple(x, y);
           },
           250 * (typeof speed === "number" ? speed : speedTable[speed]),
         );
@@ -359,7 +420,7 @@
   };
 
   const createSpringsLocal = (xCount: number, yCount: number) => {
-    springs = createXYSprings(
+    springs = createXYNodeMotions(
       xCount,
       yCount,
       springOrTween.type === "spring" ? Spring : Tween,
@@ -396,51 +457,51 @@
     }
 
     if (now - prevTime > 60 && hoverAction !== "none") {
-      createContinuousWave(
-        pointerX,
-        pointerY,
-        xPositions,
-        yPositions,
-        offsetX,
-        offsetY,
-        springs,
-        xSpacing,
-        ySpacing,
-        rippleRadius / 2,
-        hoverAction === "intense" ? 0.4 : 0.1,
-        waveSpeed,
-        impulseDuration,
-        "xy",
-      );
+      if (hoverAction === "minimal") {
+        createContinuousWave(
+          pointerX,
+          pointerY,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          xSpacing,
+          ySpacing,
+          rippleRadius * 0.618,
+          0.06,
+          waveSpeed * 3,
+          impulseDuration,
+          "xy",
+        );
+      } else if (hoverAction === "intense") {
+        createContinuousWave(
+          pointerX,
+          pointerY,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          xSpacing,
+          ySpacing,
+          rippleRadius * 0.618,
+          0.3,
+          waveSpeed * 3,
+          impulseDuration,
+          "xy",
+        );
+      }
     }
-  };
-
-  const createRipple = (x: number, y: number) => {
-    const id = Date.now();
-    const newRipple: Ripple = {
-      tween: new Tween(0, {
-        duration: impulseDuration,
-        easing: quadOut,
-      }),
-      x,
-      y,
-      id,
-    };
-
-    newRipple.tween.target = 1;
-
-    ripples.push(newRipple);
-    setTimeout(() => {
-      ripples = ripples.filter((ripple) => ripple.id !== id);
-    }, impulseDuration);
   };
 
   let lastRenderTime = 0; // Add this at the top-level script
 
   const render = (now: number) => {
     const FRAME_DURATION = 1000 / 60; // ~16.67ms for 60fps
+    const deltaTime = now - lastRenderTime;
 
-    if (now - lastRenderTime < FRAME_DURATION) {
+    if (deltaTime < FRAME_DURATION) {
       requestAnimationFrame(render);
       return;
     }
@@ -449,6 +510,17 @@
     if (!ctx || !canvasRef) {
       requestAnimationFrame(render);
       return;
+    }
+
+    for (let i = 0; i < springs.length; i++) {
+      for (let j = 0; j < springs[i].length; j++) {
+        const node = springs[i][j];
+        const { x, y } = node.motion.current;
+        const dx = x - node.prev.x;
+        const dy = y - node.prev.y;
+        node.speed = Math.sqrt(dx * dx + dy * dy) / deltaTime;
+        node.prev = { x, y };
+      }
     }
 
     // Clear the canvas
@@ -460,6 +532,7 @@
       offsetY,
       springs,
       typeof dotSize === "number" ? dotSize : dotSizeTable[dotSize],
+      visibility,
       ctx,
     );
 
@@ -473,6 +546,34 @@
 
     requestAnimationFrame(render);
   };
+
+  const handleGlobalPointerMove = (e: PointerEvent) => {
+    if (!backgroundRef) return;
+    const rect = backgroundRef.getBoundingClientRect();
+    if (
+      e.clientX >= rect.left &&
+      e.clientX <= rect.right &&
+      e.clientY >= rect.top &&
+      e.clientY <= rect.bottom
+    ) {
+      handlePointerMove(e);
+    }
+  };
+
+  const handleResize = () => {
+    clearTimeout(resizeTimeout);
+    canvasGlobalOpacity.set(0, { duration: 0 });
+    resizeTimeout = setTimeout(() => {
+      canvasGlobalOpacity.set(100, { duration: 1000 });
+    }, 10);
+  };
+
+  onMount(() => {
+    observer = new ResizeObserver(handleResize);
+    if (backgroundRef) {
+      observer.observe(backgroundRef);
+    }
+  });
 
   onMount(() => {
     if (canvasRef) {
@@ -520,5 +621,8 @@
     bind:this={canvasRef}
     height={clientHeight}
     width={clientWidth}
+    style={`opacity: ${canvasGlobalOpacity.current}%`}
   ></canvas>
 </div>
+
+<svelte:window onpointermove={handleGlobalPointerMove} />
