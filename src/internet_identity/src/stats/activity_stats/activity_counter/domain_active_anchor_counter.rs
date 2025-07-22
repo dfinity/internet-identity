@@ -82,6 +82,8 @@ impl ActivityCounter for DomainActiveAnchorCounter {
                     .current_domain
                     .is_same_domain(&previous_domain_activity)
                 {
+                    // the anchor switched from being active on only one II domain to being active on both
+                    // --> total active remains the same, but the anchor switches to the both domains bucket
                     self.decrement_counter_for_domain(&IIDomain::Ic0App);
                     self.both_ii_domains_counter += 1;
                 }
