@@ -119,6 +119,18 @@
     large: 2,
   };
 
+  const stiffnessTable = {
+    light: 0.1,
+    medium: 0.5,
+    strong: 1,
+  };
+
+  const dampeningTable = {
+    light: 0.1,
+    medium: 0.5,
+    strong: 1,
+  };
+
   let xSpacing = $derived(
     typeof spacing === "number" ? spacing : spacingTable[spacing],
   );
