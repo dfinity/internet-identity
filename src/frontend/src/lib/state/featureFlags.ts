@@ -76,7 +76,7 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
 
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
-  true,
+  false,
 );
 
 export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
