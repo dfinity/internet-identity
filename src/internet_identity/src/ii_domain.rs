@@ -38,7 +38,9 @@ impl TryFrom<&DomainActivity> for IIDomain {
             DomainActivity::InternetComputerOrg => Ok(IIDomain::InternetComputerOrg),
             DomainActivity::IdAi => Ok(IIDomain::IdAi),
             // These variants cannot be converted to a specific IIDomain
-            DomainActivity::None | DomainActivity::NonIIDomain | DomainActivity::BothIIDomains => Err(()),
+            DomainActivity::None | DomainActivity::NonIIDomain | DomainActivity::BothIIDomains => {
+                Err(())
+            }
         }
     }
 }
