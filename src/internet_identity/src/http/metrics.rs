@@ -316,7 +316,7 @@ fn persistent_state_metrics(
                 &[("domain", INTERNETCOMPUTER_ORG_DOMAIN)],
                 counter.internetcomputer_org_counter as f64,
             )?
-            .value(&[("domain", ID_AI_DOMAIN)], counter.id_ai_counter as f64)?
+            .value(&[("domain", ID_AI_DOMAIN)], counter.id_ai_counter.unwrap_or(0) as f64)?
             .value(
                 &[("domain", BOTH_DOMAINS)],
                 counter.both_ii_domains_counter as f64,
