@@ -56,11 +56,18 @@
       onError(error);
     }
   };
+  const handleOtherDeviceRegistered = async () => {
+    onOtherDeviceRegistered();
+    onClose();
+  };
 </script>
 
 <Dialog {onClose}>
   {#if isContinueOnAnotherDeviceVisible}
-    <ConfirmAccessMethodWizard onConfirm={onOtherDeviceRegistered} {onError} />
+    <ConfirmAccessMethodWizard
+      onConfirm={handleOtherDeviceRegistered}
+      {onError}
+    />
   {:else if addAccessMethodFlow.view === "chooseMethod"}
     <AddAccessMethod
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
