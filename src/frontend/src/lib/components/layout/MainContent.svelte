@@ -20,7 +20,7 @@
   <header class="col-start-2 col-end-5 row-start-1 row-end-2 pt-2 pr-0 md:pr-6">
     {@render header?.()}
   </header>
-  <footer class="col-start-1 col-end-5 row-start-5 row-end-6 px-4 py-4 md:px-6">
+  <footer class="col-start-1 col-end-5 row-start-5 row-end-6">
     {@render footer?.()}
   </footer>
 </div>

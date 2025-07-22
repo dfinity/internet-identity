@@ -18,6 +18,7 @@
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
+  import Footer from "$lib/components/layout/Footer.svelte";
 
   const { children } = $props();
 
@@ -257,12 +258,6 @@
     </div>
   {/snippet}
   {#snippet footer()}
-    <div class="flex">
-      <p class="text-text-primary">© Internet Identity</p>
-      <div class="flex-1"></div>
-      <ButtonOrAnchor class="text-text-primary hover:underline" href="/support"
-        >Support
-      </ButtonOrAnchor>
-    </div>
+    <Footer />
   {/snippet}
 </MainContent>
