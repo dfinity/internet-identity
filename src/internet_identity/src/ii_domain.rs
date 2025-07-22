@@ -27,12 +27,18 @@ impl IIDomain {
             IIDomain::IdAi => matches!(activity, DomainActivity::IdAi),
         }
     }
+}
 
-    pub fn other_ii_domain(&self) -> IIDomain {
-        match self {
-            IIDomain::Ic0App => IIDomain::InternetComputerOrg,
-            IIDomain::InternetComputerOrg => IIDomain::Ic0App,
-            IIDomain::IdAi => IIDomain::IdAi,
+impl TryFrom<&DomainActivity> for IIDomain {
+    type Error = ();
+
+    fn try_from(activity: &DomainActivity) -> Result<Self, Self::Error> {
+        match activity {
+            DomainActivity::Ic0App => Ok(IIDomain::Ic0App),
+            DomainActivity::InternetComputerOrg => Ok(IIDomain::InternetComputerOrg),
+            DomainActivity::IdAi => Ok(IIDomain::IdAi),
+            // These variants cannot be converted to a specific IIDomain
+            DomainActivity::None | DomainActivity::NonIIDomain | DomainActivity::BothIIDomains => Err(()),
         }
     }
 }

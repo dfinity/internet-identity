@@ -84,7 +84,9 @@ impl ActivityCounter for DomainActiveAnchorCounter {
                 {
                     // the anchor switched from being active on only one II domain to being active on both
                     // --> total active remains the same, but the anchor switches to the both domains bucket
-                    self.decrement_counter_for_domain(&context.current_domain.other_ii_domain());
+                    if let Ok(previous_domain) = IIDomain::try_from(&previous_domain_activity) {
+                        self.decrement_counter_for_domain(&previous_domain);
+                    }
                     self.both_ii_domains_counter += 1;
                 }
             }

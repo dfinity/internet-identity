@@ -498,7 +498,7 @@ pub enum DomainActivity {
     InternetComputerOrg,
     // only active on the id.ai domain
     IdAi,
-    // activity on all more than one II domain
+    // activity on more than one II domain
     BothIIDomains,
 }
 
