@@ -27,7 +27,7 @@ test("User can rename the current passkey used for authentication", async ({
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Click the rename button for the passkey
-  await page.getByLabel("Rename Current Passkey").click();
+  await page.getByLabel("Rename current Passkey").click();
 
   // Verify the rename dialog opens
   await expect(
@@ -112,7 +112,7 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Click the rename button for the passkey
-  await page.getByLabel("Rename Current Passkey").click();
+  await page.getByLabel("Rename current Passkey").click();
 
   // Verify the rename dialog opens
   await expect(

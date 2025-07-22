@@ -155,7 +155,7 @@
             onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
             variant="tertiary"
             iconOnly
-            aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "Current" : ""} Passkey`}
+            aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
           >
             <EditIcon size="1.25rem" />
           </Button>
@@ -164,7 +164,7 @@
               onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
               variant="tertiary"
               iconOnly
-              aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "Current" : ""} Passkey`}
+              aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
               class="!text-fg-error-secondary"
             >
               <Trash2Icon size="1.25rem" />

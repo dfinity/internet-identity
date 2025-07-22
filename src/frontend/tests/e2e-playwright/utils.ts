@@ -141,8 +141,8 @@ export const renamePasskey = async (
   page: Page,
   name: string,
 ): Promise<void> => {
-  await expect(page.getByLabel("Rename Passkey")).toHaveCount(1);
-  await page.getByLabel("Rename Passkey").click();
+  await expect(page.getByLabel("Rename passkey")).toHaveCount(1);
+  await page.getByLabel("Rename passkey").click();
 
   // Wait for the rename dialog to open
   await expect(

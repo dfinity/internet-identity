@@ -33,11 +33,11 @@ test("User can remove a passkey when they have multiple access methods", async (
   await expect(page.getByText("Chrome")).toHaveCount(2);
 
   // Wait for remove buttons to appear (they only show when there are multiple access methods)
-  await expect(page.getByLabel("Remove Passkey")).toBeVisible();
+  await expect(page.getByLabel("Remove passkey")).toBeVisible();
 
   // Click the remove button for the passkey (not the current one)
-  // Label for current one is "Remove Current Passkey"
-  const removeButtons = page.getByLabel("Remove Passkey");
+  // Label for current one is "Remove current passkey"
+  const removeButtons = page.getByLabel("Remove passkey");
   await expect(removeButtons).toHaveCount(1);
   await removeButtons.click();
 
@@ -100,10 +100,10 @@ test("User cannot remove passkey if they only have one access method", async ({
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Verify that the remove button is not visible when there's only one access method
-  await expect(page.getByLabel("Remove Current Passkey")).not.toBeVisible();
+  await expect(page.getByLabel("Remove current passkey")).not.toBeVisible();
 
   // Verify that the rename button is still visible (to ensure we're looking at the right area)
-  await expect(page.getByLabel("Rename Current Passkey")).toBeVisible();
+  await expect(page.getByLabel("Rename current passkey")).toBeVisible();
 });
 
 test("User is logged out after removing the passkey they used to authenticate", async ({
@@ -129,7 +129,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
   await expect(page.getByText("Chrome")).toHaveCount(2);
 
   // Click the remove button for the current passkey (the one used for authentication)
-  const removeButtons = page.getByLabel("Remove Current Passkey");
+  const removeButtons = page.getByLabel("Remove current passkey");
   await expect(removeButtons).toHaveCount(1);
   await removeButtons.click();
 
@@ -198,10 +198,10 @@ test("User can cancel passkey removal", async ({ page }) => {
   await expect(page.getByText("Chrome")).toHaveCount(2);
 
   // Wait for remove buttons to appear (they only show when there are multiple access methods)
-  await expect(page.getByLabel("Remove Passkey")).toBeVisible();
+  await expect(page.getByLabel("Remove passkey")).toBeVisible();
 
   // Click the remove button for the passkey
-  const removeButtons = page.getByLabel("Remove Passkey");
+  const removeButtons = page.getByLabel("Remove passkey");
   await expect(removeButtons).toHaveCount(1);
   await removeButtons.click();
 
