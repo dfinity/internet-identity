@@ -44,8 +44,8 @@
   };
 
   onMount(() => {
-    handleEnterRegistrationMode();
-    return () => confirmAccessMethodFlow.exitRegistrationMode();
+    void handleEnterRegistrationMode();
+    return () => void confirmAccessMethodFlow.exitRegistrationMode();
   });
 </script>
 
