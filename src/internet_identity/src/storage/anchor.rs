@@ -346,7 +346,12 @@ impl Anchor {
         // Activity on other domains is discarded if there is also activity on an II domain.
         // The reason is that II might not have complete information since domain information was
         // only introduced recently.
-        match (result.ic0_app, result.internet_computer_org, result.id_ai, result.non_ii) {
+        match (
+            result.ic0_app,
+            result.internet_computer_org,
+            result.id_ai,
+            result.non_ii,
+        ) {
             (true, true, _, _) => DomainActivity::BothIIDomains,
             (true, false, _, _) => DomainActivity::Ic0App,
             (false, true, _, _) => DomainActivity::InternetComputerOrg,
