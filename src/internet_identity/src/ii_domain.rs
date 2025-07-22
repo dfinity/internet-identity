@@ -29,22 +29,6 @@ impl IIDomain {
     }
 }
 
-impl TryFrom<&DomainActivity> for IIDomain {
-    type Error = ();
-
-    fn try_from(activity: &DomainActivity) -> Result<Self, Self::Error> {
-        match activity {
-            DomainActivity::Ic0App => Ok(IIDomain::Ic0App),
-            DomainActivity::InternetComputerOrg => Ok(IIDomain::InternetComputerOrg),
-            DomainActivity::IdAi => Ok(IIDomain::IdAi),
-            // These variants cannot be converted to a specific IIDomain
-            DomainActivity::None | DomainActivity::NonIIDomain | DomainActivity::BothIIDomains => {
-                Err(())
-            }
-        }
-    }
-}
-
 impl TryFrom<&str> for IIDomain {
     type Error = ();
 

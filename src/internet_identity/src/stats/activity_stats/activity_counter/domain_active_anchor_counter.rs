@@ -77,16 +77,34 @@ impl ActivityCounter for DomainActiveAnchorCounter {
             DomainActivity::None | DomainActivity::NonIIDomain => {
                 self.increment_counter_for_domain(&context.current_domain);
             }
-            DomainActivity::Ic0App | DomainActivity::InternetComputerOrg | DomainActivity::IdAi => {
+            DomainActivity::Ic0App => {
+                if !context
+                    .current_domain
+                    .is_same_domain(&previous_domain_activity)
+                {
+                    self.decrement_counter_for_domain(&IIDomain::Ic0App);
+                    self.both_ii_domains_counter += 1;
+                }
+            }
+            DomainActivity::InternetComputerOrg => {
                 if !context
                     .current_domain
                     .is_same_domain(&previous_domain_activity)
                 {
                     // the anchor switched from being active on only one II domain to being active on both
                     // --> total active remains the same, but the anchor switches to the both domains bucket
-                    if let Ok(previous_domain) = IIDomain::try_from(&previous_domain_activity) {
-                        self.decrement_counter_for_domain(&previous_domain);
-                    }
+                    self.decrement_counter_for_domain(&IIDomain::InternetComputerOrg);
+                    self.both_ii_domains_counter += 1;
+                }
+            }
+            DomainActivity::IdAi => {
+                if !context
+                    .current_domain
+                    .is_same_domain(&previous_domain_activity)
+                {
+                    // the anchor switched from being active on only one II domain to being active on both
+                    // --> total active remains the same, but the anchor switches to the both domains bucket
+                    self.decrement_counter_for_domain(&IIDomain::IdAi);
                     self.both_ii_domains_counter += 1;
                 }
             }
