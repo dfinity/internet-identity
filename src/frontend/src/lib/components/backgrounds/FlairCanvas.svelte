@@ -1,6 +1,7 @@
 <script lang="ts">
   import { PerlinNoise3D } from "$lib/utils/UI/backgrounds/perlinNoise3d";
   import {
+    createContinuousWave,
     createDirectionalImpulse,
     createImpulse,
     createRotationalImpulse,
@@ -175,7 +176,16 @@
   );
 
   triggerAnimation = (opts) => {
-    const { location, target, motionType, speed, intensity, size } = opts;
+    const {
+      location,
+      target,
+      motionType,
+      speed,
+      intensity,
+      size,
+      nImpulses,
+      impulseEasing,
+    } = opts;
 
     if (target.includes("motion") && clientWidth && clientHeight) {
       const { x, y } = getImpulseLocation(location, clientWidth, clientHeight);
@@ -199,8 +209,37 @@
           impulseDuration *
             (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
+          impulseEasing,
         );
         createRipple(x, y);
+        if (nImpulses === "double") {
+          setTimeout(() => {
+            createRotationalImpulse(
+              x,
+              y,
+              xPositions,
+              yPositions,
+              offsetX,
+              offsetY,
+              springs,
+              rippleRadius *
+                1.2 *
+                (typeof size === "number" ? size : rippleSizeTable[size]),
+              impulseScalar *
+                0.6 *
+                (typeof intensity === "number"
+                  ? intensity
+                  : intensityTable[intensity]),
+              waveSpeed *
+                (typeof speed === "number" ? speed : speedTable[speed]),
+              impulseDuration *
+                (typeof speed === "number" ? speed : speedTable[speed]),
+              motionType === "cw" ? "ccw" : "cw",
+              impulseEasing,
+            );
+            createRipple(x, y);
+          }, 250);
+        }
         return;
       }
       if (
@@ -227,8 +266,39 @@
           impulseDuration *
             (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
+          "xy",
+          impulseEasing,
         );
         createRipple(x, y);
+        if (nImpulses === "double") {
+          setTimeout(() => {
+            createDirectionalImpulse(
+              x,
+              y,
+              xPositions,
+              yPositions,
+              offsetX,
+              offsetY,
+              springs,
+              rippleRadius *
+                1.2 *
+                (typeof size === "number" ? size : rippleSizeTable[size]),
+              impulseScalar *
+                0.6 *
+                (typeof intensity === "number"
+                  ? intensity
+                  : intensityTable[intensity]),
+              (waveSpeed / 2) *
+                (typeof speed === "number" ? speed : speedTable[speed]),
+              impulseDuration *
+                (typeof speed === "number" ? speed : speedTable[speed]),
+              motionType,
+              "xy",
+              impulseEasing,
+            );
+            createRipple(x, y);
+          }, 250);
+        }
         return;
       }
 
@@ -250,37 +320,41 @@
         impulseDuration *
           (typeof speed === "number" ? speed : speedTable[speed]),
         motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
+        impulseEasing,
       );
       createRipple(x, y);
 
-      setTimeout(
-        () => {
-          createImpulse(
-            x,
-            y,
-            xPositions,
-            yPositions,
-            offsetX,
-            offsetY,
-            springs,
-            rippleRadius *
-              1.2 *
-              (typeof size === "number" ? size : rippleSizeTable[size]),
-            impulseScalar *
-              0.6 *
-              (typeof intensity === "number"
-                ? intensity
-                : intensityTable[intensity]),
-            (waveSpeed / 2) *
-              (typeof speed === "number" ? speed : speedTable[speed]),
-            impulseDuration *
-              (typeof speed === "number" ? speed : speedTable[speed]),
-            motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
-          );
-          createRipple(x, y);
-        },
-        250 * (typeof speed === "number" ? speed : speedTable[speed]),
-      );
+      if (nImpulses === "double") {
+        setTimeout(
+          () => {
+            createImpulse(
+              x,
+              y,
+              xPositions,
+              yPositions,
+              offsetX,
+              offsetY,
+              springs,
+              rippleRadius *
+                1.2 *
+                (typeof size === "number" ? size : rippleSizeTable[size]),
+              impulseScalar *
+                0.6 *
+                (typeof intensity === "number"
+                  ? intensity
+                  : intensityTable[intensity]),
+              (waveSpeed / 2) *
+                (typeof speed === "number" ? speed : speedTable[speed]),
+              impulseDuration *
+                (typeof speed === "number" ? speed : speedTable[speed]),
+              motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
+              impulseEasing,
+            );
+            createRipple(x, y);
+          },
+          250 * (typeof speed === "number" ? speed : speedTable[speed]),
+        );
+      }
     }
   };
 
@@ -319,6 +393,25 @@
       const dt = now - prevTime;
       const dist = Math.sqrt(dx * dx + dy * dy);
       pointerSpeed = dist / dt; // px per ms
+    }
+
+    if (now - prevTime > 60 && hoverAction !== "none") {
+      createContinuousWave(
+        pointerX,
+        pointerY,
+        xPositions,
+        yPositions,
+        offsetX,
+        offsetY,
+        springs,
+        xSpacing,
+        ySpacing,
+        rippleRadius / 2,
+        hoverAction === "intense" ? 0.4 : 0.1,
+        waveSpeed,
+        impulseDuration,
+        "xy",
+      );
     }
   };
 
@@ -414,15 +507,18 @@
 </script>
 
 <div
-  class="bg-bg-brand-primary absolute h-full w-full select-none"
+  class="absolute inset-0 h-full w-full select-none"
   aria-hidden="true"
   bind:this={backgroundRef}
   onpointerleave={handleReset}
-  style="pointer-events: auto;"
   bind:clientHeight
   bind:clientWidth
   onpointermove={handlePointerMove}
 >
-  <canvas bind:this={canvasRef} height={clientHeight} width={clientWidth}
+  <canvas
+    class="block h-full w-full"
+    bind:this={canvasRef}
+    height={clientHeight}
+    width={clientWidth}
   ></canvas>
 </div>

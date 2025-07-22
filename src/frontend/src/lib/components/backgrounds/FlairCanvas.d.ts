@@ -27,6 +27,8 @@ export interface FlairAnimationOptions {
   speed: "slow" | "medium" | "fast" | number;
   intensity: "light" | "medium" | "strong" | number;
   size: "large" | "medium" | "small" | number;
+  nImpulses: "single" | "double";
+  impulseEasing?: EasingFunction;
 }
 
 export interface FlairCanvasProps {

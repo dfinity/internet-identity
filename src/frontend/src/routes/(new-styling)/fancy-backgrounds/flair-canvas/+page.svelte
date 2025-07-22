@@ -10,6 +10,7 @@
   import Panel from "$lib/components/ui/Panel.svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Button from "$lib/components/ui/Button.svelte";
+  import Logo from "$lib/components/ui/Logo.svelte";
 
   let flairCanvasRef = $state();
   let animTrig = $state<(opts: FlairAnimationOptions) => void>();
@@ -17,9 +18,17 @@
   // Animation interval for demo purposes
   let interval = $state<ReturnType<typeof setInterval>>();
   onMount(() => {
-    if (animTrig) animTrig(animOptions as FlairAnimationOptions);
+    if (animTrig)
+      animTrig({
+        ...(animOptions as FlairAnimationOptions),
+        impulseEasing: customImpulseEasingFunction,
+      });
     interval = setInterval(() => {
-      if (animTrig) animTrig(animOptions as FlairAnimationOptions);
+      if (animTrig)
+        animTrig({
+          ...(animOptions as FlairAnimationOptions),
+          impulseEasing: customImpulseEasingFunction,
+        });
     }, 3000);
   });
   onDestroy(() => clearInterval(interval));
@@ -79,9 +88,10 @@
     location: "center",
     target: ["motion", "scale", "opacity"],
     motionType: "omni",
-    speed: "slow",
-    intensity: "light",
-    size: "medium",
+    speed: "medium",
+    intensity: "strong",
+    size: "large",
+    nImpulses: "double",
   });
 
   // FlairCanvas props state
@@ -94,7 +104,7 @@
     springOrTween: { type: "spring", stiffness: "medium", dampening: "medium" },
     visibility: undefined,
     hoverAction: undefined,
-    display: "insideBox",
+    display: "behindBox",
     colorScheme: undefined,
     backgroundClasses: "",
     foregroundClasses: "",
@@ -115,11 +125,13 @@
   let customSize = $state<number>(1);
   let customLocation = $state<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
   let springOrTweenType = $state<"spring" | "tween">("spring");
+  let customImpulseEasing = $state<string>("linear");
 
-  // Whenever animOptions change, trigger animation immediately
-  // $effect(() => {
-  //   if (animTrig) animTrig(animOptions);
-  // });
+  let customImpulseEasingFunction = $derived(
+    (easingFunctions as Record<string, (t: number) => number>)[
+      customImpulseEasing
+    ] || easingFunctions.linear,
+  );
 
   // Helper for multi-select
   function toggleTarget(val: "motion" | "scale" | "opacity") {
@@ -157,6 +169,7 @@
         min-width: 260px;
         font-size: 0.95rem;
       "
+    class="max-h-[85vh] overflow-scroll"
   >
     <div
       style="display: flex; justify-content: space-between; align-items: center;"
@@ -506,6 +519,21 @@
         {/if}
       </label>
       <label>
+        Number of impulses:
+        <select bind:value={animOptions.nImpulses}>
+          <option value="single">single</option>
+          <option value="double">double</option>
+        </select>
+      </label>
+      <label>
+        Impulse Easing:
+        <select bind:value={customImpulseEasing}>
+          {#each easingOptions as option}
+            <option value={option}>{option}</option>
+          {/each}
+        </select>
+      </label>
+      <label>
         Target (currently only motion is functional):
         <div style="display: flex; gap: 0.5em;">
           <label
@@ -599,18 +627,20 @@
   </div>
 {:else if flairBoxProps.display === "insideBox"}
   <div class="fixed flex h-screen w-screen items-center justify-center">
-    <Panel class="max-w-96">
+    <Panel class="relative min-h-44 max-w-96 overflow-hidden">
       {@render flair()}
-      <h1 class="text-text-brand-primary text-2xl">This is a Panel!</h1>
-      <p class="text-text-brand-secondary mb-4">
-        Lorem Ipsum is simply dummy text of the printing and typesetting
-        industry. Lorem Ipsum has been the industry's standard dummy text ever
-        since the 1500s, when an unknown printer took a galley of type and
-        scrambled it to make a type specimen book.
-      </p>
-      <Button class="mb-2 w-full">Cool</Button>
-      <Button class="mb-2 w-full" variant="secondary">Yes</Button>
-      <Button class="w-full" variant="tertiary">Omg</Button>
+      <div class="relative p-4">
+        <h1 class="text-text-brand-primary text-2xl">This is a Panel!</h1>
+        <p class="text-text-brand-secondary mb-4">
+          Lorem Ipsum is simply dummy text of the printing and typesetting
+          industry. Lorem Ipsum has been the industry's standard dummy text ever
+          since the 1500s, when an unknown printer took a galley of type and
+          scrambled it to make a type specimen book.
+        </p>
+        <Button class="mb-2 w-full">Cool</Button>
+        <Button class="mb-2 w-full" variant="secondary">Yes</Button>
+        <Button class="w-full" variant="tertiary">Omg</Button>
+      </div>
     </Panel>
   </div>
 {/if}

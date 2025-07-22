@@ -2,8 +2,9 @@ import type {
   FlairAnimationOptions,
   FlairBoxProps,
 } from "$lib/components/backgrounds/FlairBox.d.ts";
-import { quadInOut } from "svelte/easing";
+import { cubicIn, cubicOut, quadInOut } from "svelte/easing";
 import { Spring, Tween } from "svelte/motion";
+import { EasingFunction } from "svelte/transition";
 
 ////// ANIMATION //////
 export function createXYSprings(
@@ -246,6 +247,7 @@ export function createImpulse(
   waveSpeed: number,
   impulseDuration: number,
   direction: "omni" | "x" | "y",
+  impulseEasing?: EasingFunction,
 ) {
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
@@ -259,7 +261,11 @@ export function createImpulse(
 
       const falloff = Math.max(0, 1 - dist / clickRadius);
       const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
-      const delay = dist * waveSpeed;
+
+      // Easing for the delay
+      const t = Math.min(dist / clickRadius, 1); // normalized distance [0,1]
+      const eased = impulseEasing ? impulseEasing(t) : t; // or any easing function you prefer
+      const delay = eased * clickRadius * waveSpeed; // or: delay = eased * dist * waveSpeed;
 
       setTimeout(() => {
         if (strength > 0.01) {
@@ -293,6 +299,7 @@ export function createRotationalImpulse(
   waveSpeed: number,
   impulseDuration: number,
   direction: "cw" | "ccw" = "cw", // clockwise or counterclockwise
+  impulseEasing?: EasingFunction,
 ) {
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
@@ -304,7 +311,10 @@ export function createRotationalImpulse(
 
       const falloff = Math.max(0, 1 - dist / clickRadius);
       const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
-      const delay = dist * waveSpeed;
+      // Easing for the delay
+      const t = Math.min(dist / clickRadius, 1); // normalized distance [0,1]
+      const eased = impulseEasing ? impulseEasing(t) : t;
+      const delay = eased * clickRadius * waveSpeed;
 
       setTimeout(() => {
         if (strength > 0.01 && dist > 0.0001) {
@@ -347,6 +357,7 @@ export function createDirectionalImpulse(
   impulseDuration: number,
   direction: "up" | "down" | "left" | "right",
   axis: "xy" | "x" | "y" = "xy",
+  impulseEasing?: EasingFunction,
 ) {
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
@@ -378,7 +389,10 @@ export function createDirectionalImpulse(
         const falloff = Math.max(0, 1 - dist / clickRadius);
         const strength =
           Math.pow(falloff, 2) * impulseScalar * clickRadius * directionalScale;
-        const delay = dist * waveSpeed;
+        // Easing for the delay
+        const t = Math.min(dist / clickRadius, 1); // normalized distance [0,1]
+        const eased = impulseEasing ? impulseEasing(t) : t;
+        const delay = eased * clickRadius * waveSpeed;
 
         setTimeout(() => {
           if (strength > 0.01) {
@@ -511,7 +525,7 @@ export function getVignetteConfig(
   // Margin from the edge of the viewport
   const margin = 0;
   // How much smaller the vignette is compared to the viewport
-  const scale = 0.9;
+  const scale = 0.5;
 
   if (innerHeight === undefined || innerWidth === undefined) {
     return { cx: 0, cy: 0, rx: 0, ry: 0 };
@@ -567,6 +581,9 @@ export function drawNodes(
   radius: number,
   ctx: CanvasRenderingContext2D,
 ) {
+  const body = document.querySelector("body");
+  if (!body) return;
+  const color = getComputedStyle(body).getPropertyValue("--fg-tertiary").trim();
   xPositions.forEach((xPos, xIndex) => {
     yPositions.forEach((yPos, yIndex) => {
       ctx.beginPath();
@@ -580,7 +597,7 @@ export function drawNodes(
         360,
         false,
       );
-      ctx.fillStyle = "red";
+      ctx.fillStyle = color;
       ctx.fill();
       ctx.closePath();
     });
