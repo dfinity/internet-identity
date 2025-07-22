@@ -4,17 +4,12 @@
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { AddAccessMethodFlow } from "$lib/flows/addAccessMethodFlow.svelte.js";
   import type {
-    AuthnMethodConfirmationError,
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import AuthorizeNewDevice from "$lib/components/wizards/addAccessMethod/views/AuthorizeNewDevice.svelte";
-  import ContinueOnAnotherDevice from "$lib/components/wizards/addAccessMethod/views/ContinueOnAnotherDevice.svelte";
-  import ContinueOnNewDevice from "$lib/components/wizards/addAccessMethod/views/ContinueOnNewDevice.svelte";
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
-  import { isCanisterError } from "$lib/utils/utils";
-  import { nonNullish } from "@dfinity/utils";
+  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
 
   interface Props {
     onGoogleLinked: (credential: OpenIdCredential) => void;
@@ -43,6 +38,8 @@
     isMaxOpenIdCredentialsReached,
   });
 
+  let isContinueOnAnotherDeviceVisible = $state(false);
+
   const handleContinueWithGoogle = async () => {
     try {
       onGoogleLinked(await addAccessMethodFlow.linkGoogleAccount());
@@ -59,30 +56,12 @@
       onError(error);
     }
   };
-  const handleConfirmDevice = async (confirmationCode: string) => {
-    try {
-      await addAccessMethodFlow.confirmDevice(confirmationCode);
-      onOtherDeviceRegistered();
-      onClose();
-    } catch (error) {
-      if (
-        isCanisterError<AuthnMethodConfirmationError>(error) &&
-        error.type === "WrongCode"
-      ) {
-        // Handle this error in child view instead
-        throw error;
-      }
-      onError(error);
-    }
-  };
-  const handleClose = () => {
-    addAccessMethodFlow.exitRegistrationMode();
-    onClose();
-  };
 </script>
 
-<Dialog onClose={handleClose}>
-  {#if addAccessMethodFlow.view === "chooseMethod"}
+<Dialog {onClose}>
+  {#if isContinueOnAnotherDeviceVisible}
+    <ConfirmAccessMethodWizard onConfirm={onOtherDeviceRegistered} {onError} />
+  {:else if addAccessMethodFlow.view === "chooseMethod"}
     <AddAccessMethod
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
       linkGoogleAccount={handleContinueWithGoogle}
@@ -90,18 +69,9 @@
   {:else if addAccessMethodFlow.view === "addPasskey"}
     <AddPasskey
       createPasskey={handleCreatePasskey}
-      continueOnAnotherDevice={addAccessMethodFlow.continueOnAnotherDevice}
+      continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
       {isUsingPasskeys}
     />
-  {:else if addAccessMethodFlow.view === "continueOnAnotherDevice" && nonNullish(addAccessMethodFlow.newDeviceLink)}
-    <ContinueOnAnotherDevice url={addAccessMethodFlow.newDeviceLink} />
-  {:else if addAccessMethodFlow.view === "confirmationCode"}
-    <AuthorizeNewDevice
-      confirm={handleConfirmDevice}
-      restart={addAccessMethodFlow.continueOnAnotherDevice}
-    />
-  {:else if addAccessMethodFlow.view === "continueOnNewDevice"}
-    <ContinueOnNewDevice />
   {/if}
 
   <!-- Rendered within dialog to be on top of it -->

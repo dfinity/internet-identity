@@ -36,13 +36,7 @@
     arrow={false}
     manual
   >
-    <Button
-      onclick={handleCopyLink}
-      variant="secondary"
-      size="xl"
-      class="mt-6"
-      aria-label="Pairing link"
-    >
+    <Button onclick={handleCopyLink} variant="secondary" size="xl" class="mt-6">
       <span>
         {url.host + url.pathname + url.hash}
       </span>
