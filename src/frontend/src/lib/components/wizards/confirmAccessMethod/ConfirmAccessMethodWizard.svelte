@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ConfirmAccessMethodFlow } from "$lib/flows/confirmAccessMethodFlow.svelte.js";
+  import { ConfirmAccessMethodFlow } from "$lib/flows/confirmAccessMethodFlow";
   import { onMount } from "svelte";
   import WaitingForNewDevice from "$lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte";
   import { isCanisterError } from "$lib/utils/utils";
