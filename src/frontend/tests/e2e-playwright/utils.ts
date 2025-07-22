@@ -126,3 +126,36 @@ export const clearStorage = async (page: Page): Promise<void> => {
   await page.goto(II_URL);
   await page.evaluate(() => localStorage.clear());
 };
+
+export const addPasskeyCurrentDevice = async (
+  page: Page,
+  dummyAuth: DummyAuthFn,
+): Promise<void> => {
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  dummyAuth(page);
+  await page.getByRole("button", { name: "Create Passkey" }).click();
+};
+
+export const renamePasskey = async (
+  page: Page,
+  name: string,
+): Promise<void> => {
+  await expect(page.getByLabel("Rename passkey")).toHaveCount(1);
+  await page.getByLabel("Rename passkey").click();
+
+  // Wait for the rename dialog to open
+  await expect(
+    page.getByRole("heading", { name: "Rename passkey" }),
+  ).toBeVisible();
+
+  const input = page.getByRole("textbox");
+  await input.clear();
+  await input.fill(name);
+  await page.getByRole("button", { name: "Save" }).click();
+};
+
+export const signOut = async (page: Page): Promise<void> => {
+  await page.getByLabel("Switch identity").click();
+  await page.getByRole("button", { name: "Sign Out" }).click();
+};
