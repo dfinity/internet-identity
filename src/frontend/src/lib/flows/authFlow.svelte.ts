@@ -40,7 +40,6 @@ export class AuthFlow {
     solve: (solution: string) => void;
   }>();
   #systemOverlay = $state(false);
-  #confirmationCode = $state<string>();
 
   get view() {
     return this.#view;
@@ -52,10 +51,6 @@ export class AuthFlow {
 
   get systemOverlay() {
     return this.#systemOverlay;
-  }
-
-  get confirmationCode() {
-    return this.#confirmationCode;
   }
 
   constructor() {

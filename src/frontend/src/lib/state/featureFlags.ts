@@ -87,6 +87,10 @@ export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
   true,
 );
+export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
+  "CONTINUE_FROM_ANOTHER_DEVICE",
+  false,
+);
 
 export default {
   DOMAIN_COMPATIBILITY,
@@ -95,4 +99,5 @@ export default {
   DISCOVERABLE_PASSKEY_FLOW,
   ENABLE_MIGRATE_FLOW,
   ADD_ACCESS_METHOD,
+  CONTINUE_FROM_ANOTHER_DEVICE,
 } as Record<string, FeatureFlagStore>;

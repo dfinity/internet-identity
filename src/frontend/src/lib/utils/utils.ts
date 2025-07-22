@@ -407,6 +407,7 @@ export const throwCanisterError = <
   response: T,
 ): Promise<S> => {
   if ("Err" in response) {
+    console.log("response", response);
     if (isNullish(response.Err)) {
       throw new Error("Unexpected error occurred");
     }

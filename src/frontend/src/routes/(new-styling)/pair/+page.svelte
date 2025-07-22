@@ -2,36 +2,13 @@
   import Header from "$lib/components/layout/Header.svelte";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { RegisterAccessMethodFlow } from "$lib/flows/registerAccessMethodFlow.svelte.js";
   import { goto } from "$app/navigation";
-  import ConfirmYourSignIn from "$lib/components/views/ConfirmYourSignIn.svelte";
-  import ConfirmThisDevice from "$lib/components/views/ConfirmThisDevice.svelte";
-  import { onMount } from "svelte";
-  import { handleError } from "$lib/components/utils/error";
   import { CircleAlertIcon } from "@lucide/svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
 
-  const registerAccessMethodFlow = new RegisterAccessMethodFlow();
-
-  const handleCreatePasskey = async () => {
-    try {
-      await registerAccessMethodFlow.createPasskey();
-      await goto("/");
-    } catch (error) {
-      handleError(error);
-    }
-  };
-
-  onMount(async () => {
-    try {
-      await registerAccessMethodFlow.registerTempKey(
-        window.location.hash.slice(1),
-      );
-    } catch (error) {
-      handleError(error);
-    }
-  });
+  let isUnableToComplete = $state(false);
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
@@ -40,23 +17,18 @@
   <div class="flex flex-1 flex-col items-center justify-center">
     <AuthPanel class="sm:max-w-100">
       <div class="flex-1"></div>
-      {#if registerAccessMethodFlow.view === "confirmDevice"}
-        <ConfirmThisDevice
-          confirmationCode={registerAccessMethodFlow.confirmationCode}
-        />
-      {:else if registerAccessMethodFlow.view === "confirmSignIn"}
-        <ConfirmYourSignIn
-          name={registerAccessMethodFlow.identityName}
-          createPasskey={handleCreatePasskey}
-        />
-      {/if}
+      <RegisterAccessMethodWizard
+        registrationId={window.location.hash.slice(1)}
+        onRegistered={() => goto("/")}
+        onError={() => (isUnableToComplete = true)}
+      />
     </AuthPanel>
   </div>
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
 
-{#if registerAccessMethodFlow.isUnableToComplete}
+{#if isUnableToComplete}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
       <CircleAlertIcon size="1.5rem" />

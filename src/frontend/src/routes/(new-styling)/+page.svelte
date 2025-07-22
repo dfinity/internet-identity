@@ -18,11 +18,14 @@
   import { goto } from "$app/navigation";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import type { PageProps } from "./$types";
 
-  const gotoManage = () => goto("/manage", { replaceState: true });
+  const { data }: PageProps = $props();
+
+  const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
+    await gotoNext();
     isAuthDialogOpen = false;
   };
   const onSignUp = async (identityNumber: bigint) => {
@@ -31,7 +34,7 @@
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
+    await gotoNext();
     isAuthDialogOpen = false;
   };
   const authLastUsedFlow = new AuthLastUsedFlow();
@@ -111,6 +114,7 @@
               bind:isAuthenticating
               {onSignIn}
               {onSignUp}
+              onOtherDevice={() => (isAuthDialogOpen = false)}
               onError={(error) => {
                 isAuthDialogOpen = false;
                 handleError(error);

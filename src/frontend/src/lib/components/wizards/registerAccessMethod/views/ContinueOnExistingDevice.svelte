@@ -28,7 +28,7 @@
   </h1>
   <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
     Scan the above QR code with your
-    <b class="text-text-primary">new device</b> or enter the URL manually.
+    <b class="text-text-primary">existing device</b> or enter the URL manually.
   </p>
   <Tooltip
     label="Link copied to clipboard"

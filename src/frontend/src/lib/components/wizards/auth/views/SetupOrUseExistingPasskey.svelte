@@ -34,9 +34,9 @@
   </p>
 </div>
 <div class="flex flex-col gap-3">
-  <Button onclick={setupNew} size="lg" disabled={isAuthenticating}
-    >Set up a new Passkey</Button
-  >
+  <Button onclick={setupNew} size="lg" disabled={isAuthenticating}>
+    Set up a new Passkey
+  </Button>
   <Button
     onclick={handleUseExisting}
     variant="secondary"
