@@ -29,7 +29,7 @@ export interface FlairAnimationOptions {
   size: "large" | "medium" | "small" | number;
 }
 
-export interface FlairBoxProps {
+export interface FlairCanvasProps {
   bgType?: "dots" | "grid" | "noisedots";
   spacing?: "large" | "medium" | "small" | number;
   aspect?: "square" | "wide" | "ultrawide" | number;
@@ -48,7 +48,6 @@ export interface FlairBoxProps {
         duration: "short" | "medium" | "long" | number;
         easing: EasingFunction;
       };
-  display: "bgOnly" | "behindBox" | "insideBox";
   colorScheme: undefined | "dark" | "light";
   backgroundClasses?: string;
   foregroundClasses?: string;

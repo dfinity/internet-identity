@@ -5,6 +5,7 @@ import type {
 import { quadInOut } from "svelte/easing";
 import { Spring, Tween } from "svelte/motion";
 
+////// ANIMATION //////
 export function createXYSprings(
   xCount: number,
   yCount: number,
@@ -500,6 +501,8 @@ export function getImpulseLocation(
   }
 }
 
+////// SVG //////
+
 export function getVignetteConfig(
   vignette: FlairBoxProps["vignette"],
   innerHeight: number | undefined,
@@ -548,4 +551,78 @@ export function getVignetteConfig(
   }
 
   return { cx, cy, rx, ry };
+}
+
+///////// CANVAS ////////
+
+export function drawNodes(
+  xPositions: number[],
+  yPositions: number[],
+  offsetX: number,
+  offsetY: number,
+  springs: (
+    | Spring<{ x: number; y: number }>
+    | Tween<{ x: number; y: number }>
+  )[][],
+  radius: number,
+  ctx: CanvasRenderingContext2D,
+) {
+  xPositions.forEach((xPos, xIndex) => {
+    yPositions.forEach((yPos, yIndex) => {
+      ctx.beginPath();
+      ctx.ellipse(
+        leftPos(xPos, xIndex, yIndex, offsetX, springs),
+        topPos(yPos, xIndex, yIndex, offsetY, springs),
+        radius,
+        radius,
+        0,
+        0,
+        360,
+        false,
+      );
+      ctx.fillStyle = "red";
+      ctx.fill();
+      ctx.closePath();
+    });
+  });
+}
+
+export function drawVignetteMask(
+  width: number,
+  height: number,
+  vignetteConfig: { cx: number; cy: number; rx: number; ry: number },
+  ctx: CanvasRenderingContext2D,
+) {
+  // Create a radial gradient for the vignette
+  const { cx, cy, rx, ry } = vignetteConfig;
+
+  // Calculate center in pixels
+  const centerX = cx;
+  const centerY = cy;
+  // Use the larger of rx/ry for the gradient radius
+  const maxRadius = Math.max(rx, ry);
+
+  // Create a radial gradient
+  const gradient = ctx.createRadialGradient(
+    centerX,
+    centerY,
+    0, // inner circle (center, radius 0)
+    centerX,
+    centerY,
+    maxRadius, // outer circle (center, max radius)
+  );
+  gradient.addColorStop(0, "rgba(0,0,0,0)"); // fully transparent at center
+  gradient.addColorStop(0.5, "rgba(0,0,0,0)");
+  gradient.addColorStop(0.7, "rgba(0,0,0,0.2)");
+  gradient.addColorStop(1, "rgba(0,0,0,1)"); // mostly opaque at edge
+
+  // Optionally, blur the gradient by drawing to an offscreen canvas and using ctx.filter = 'blur(...)'
+  // For most use cases, the gradient alone is enough.
+
+  // Draw the gradient over the canvas
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
 }

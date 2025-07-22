@@ -5,6 +5,8 @@
     createImpulse,
     createRotationalImpulse,
     createXYSprings,
+    drawNodes,
+    drawVignetteMask,
     getImpulseLocation,
     getVignetteConfig,
     gridPath,
@@ -14,7 +16,8 @@
   } from "$lib/utils/UI/backgrounds/waveBackground";
   import { quadOut } from "svelte/easing";
   import { Spring, Tween } from "svelte/motion";
-  import type { FlairBoxProps } from "./FlairBox";
+  import type { FlairCanvasProps } from "./FlairCanvas";
+  import { onMount } from "svelte";
 
   let {
     bgType = "dots",
@@ -24,13 +27,20 @@
     visibility = "always",
     dotSize = "medium",
     vignette = "center",
-    springOrTween = "spring",
+    springOrTween = {
+      type: "spring",
+      stiffness: "medium",
+      dampening: "medium",
+    },
     backgroundClasses,
     foregroundClasses,
     triggerAnimation = $bindable(),
-  }: FlairBoxProps = $props();
+  }: FlairCanvasProps = $props();
 
   let backgroundRef = $state<HTMLDivElement>();
+  let canvasRef = $state<HTMLCanvasElement>();
+  let ctx = $state<CanvasRenderingContext2D | null>(null);
+  let dpr = typeof window !== "undefined" ? window.devicePixelRatio : 1;
 
   let pointerX = $state<number>(0);
   let pointerY = $state<number>(0);
@@ -69,8 +79,8 @@
     }
   }
 
-  let innerHeight = $state<number>();
-  let innerWidth = $state<number>();
+  let clientHeight = $state<number>();
+  let clientWidth = $state<number>();
 
   const noise = new PerlinNoise3D();
   noise.noiseSeed(0);
@@ -111,22 +121,31 @@
     large: 2,
   };
 
-  let xSpacing = $derived(spacingTable[spacing]);
-  let ySpacing = $derived(spacingTable[spacing] / aspectTable[aspect]);
+  let xSpacing = $derived(
+    typeof spacing === "number" ? spacing : spacingTable[spacing],
+  );
+  let ySpacing = $derived(
+    typeof spacing === "number"
+      ? spacing
+      : spacingTable[spacing] /
+          (typeof aspect === "number" ? aspect : aspectTable[aspect]),
+  );
 
   let xPositions = $derived<number[]>(
-    innerWidth
+    clientWidth
       ? Array.from(
-          { length: Math.max(1, Math.floor((innerWidth - 1) / xSpacing) + 2) }, // +2 instead of +1
+          { length: Math.max(1, Math.floor((clientWidth - 1) / xSpacing) + 2) }, // +2 instead of +1
           (_, i) => i * xSpacing,
         )
       : [0],
   );
 
   let yPositions = $derived<number[]>(
-    innerHeight
+    clientHeight
       ? Array.from(
-          { length: Math.max(1, Math.floor((innerHeight - 1) / ySpacing) + 2) }, // +2 instead of +1
+          {
+            length: Math.max(1, Math.floor((clientHeight - 1) / ySpacing) + 2),
+          }, // +2 instead of +1
           (_, i) => i * ySpacing,
         )
       : [0],
@@ -140,10 +159,10 @@
   );
 
   let offsetX = $derived<number>(
-    innerWidth !== undefined ? (innerWidth - gridWidth) / 2 : 0,
+    clientWidth !== undefined ? (clientWidth - gridWidth) / 2 : 0,
   );
   let offsetY = $derived<number>(
-    innerHeight !== undefined ? (innerHeight - gridHeight) / 2 : 0,
+    clientHeight !== undefined ? (clientHeight - gridHeight) / 2 : 0,
   );
 
   let springs: (
@@ -152,14 +171,14 @@
   )[][] = $state([[]]);
 
   let vignetteConfig = $derived(
-    getVignetteConfig(vignette, innerHeight, innerWidth),
+    getVignetteConfig(vignette, clientHeight, clientWidth),
   );
 
   triggerAnimation = (opts) => {
     const { location, target, motionType, speed, intensity, size } = opts;
 
-    if (target.includes("motion") && innerWidth && innerHeight) {
-      const { x, y } = getImpulseLocation(location, innerWidth, innerHeight);
+    if (target.includes("motion") && clientWidth && clientHeight) {
+      const { x, y } = getImpulseLocation(location, clientWidth, clientHeight);
 
       if (motionType === "cw" || motionType === "ccw") {
         createRotationalImpulse(
@@ -170,10 +189,15 @@
           offsetX,
           offsetY,
           springs,
-          rippleRadius * rippleSizeTable[size],
-          impulseScalar * intensityTable[intensity],
-          waveSpeed * speedTable[speed],
-          impulseDuration * speedTable[speed],
+          rippleRadius *
+            (typeof size === "number" ? size : rippleSizeTable[size]),
+          impulseScalar *
+            (typeof intensity === "number"
+              ? intensity
+              : intensityTable[intensity]),
+          waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
+          impulseDuration *
+            (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
         );
         createRipple(x, y);
@@ -193,10 +217,15 @@
           offsetX,
           offsetY,
           springs,
-          rippleRadius * rippleSizeTable[size],
-          impulseScalar * intensityTable[intensity],
-          waveSpeed * speedTable[speed],
-          impulseDuration * speedTable[speed],
+          rippleRadius *
+            (typeof size === "number" ? size : rippleSizeTable[size]),
+          impulseScalar *
+            (typeof intensity === "number"
+              ? intensity
+              : intensityTable[intensity]),
+          waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
+          impulseDuration *
+            (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
         );
         createRipple(x, y);
@@ -211,31 +240,47 @@
         offsetX,
         offsetY,
         springs,
-        rippleRadius * rippleSizeTable[size],
-        impulseScalar * intensityTable[intensity],
-        waveSpeed * speedTable[speed],
-        impulseDuration * speedTable[speed],
+        rippleRadius *
+          (typeof size === "number" ? size : rippleSizeTable[size]),
+        impulseScalar *
+          (typeof intensity === "number"
+            ? intensity
+            : intensityTable[intensity]),
+        waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
+        impulseDuration *
+          (typeof speed === "number" ? speed : speedTable[speed]),
         motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
       );
       createRipple(x, y);
 
-      setTimeout(() => {
-        createImpulse(
-          x,
-          y,
-          xPositions,
-          yPositions,
-          offsetX,
-          offsetY,
-          springs,
-          rippleRadius * 1.2 * rippleSizeTable[size],
-          impulseScalar * 0.6 * intensityTable[intensity],
-          (waveSpeed / 2) * speedTable[speed],
-          impulseDuration * speedTable[speed],
-          motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
-        );
-        createRipple(x, y);
-      }, 250 * speedTable[speed]);
+      setTimeout(
+        () => {
+          createImpulse(
+            x,
+            y,
+            xPositions,
+            yPositions,
+            offsetX,
+            offsetY,
+            springs,
+            rippleRadius *
+              1.2 *
+              (typeof size === "number" ? size : rippleSizeTable[size]),
+            impulseScalar *
+              0.6 *
+              (typeof intensity === "number"
+                ? intensity
+                : intensityTable[intensity]),
+            (waveSpeed / 2) *
+              (typeof speed === "number" ? speed : speedTable[speed]),
+            impulseDuration *
+              (typeof speed === "number" ? speed : speedTable[speed]),
+            motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
+          );
+          createRipple(x, y);
+        },
+        250 * (typeof speed === "number" ? speed : speedTable[speed]),
+      );
     }
   };
 
@@ -243,7 +288,7 @@
     springs = createXYSprings(
       xCount,
       yCount,
-      springOrTween === "spring" ? Spring : Tween,
+      springOrTween.type === "spring" ? Spring : Tween,
       stiffness,
       damping,
     );
@@ -297,6 +342,52 @@
     }, impulseDuration);
   };
 
+  let lastRenderTime = 0; // Add this at the top-level script
+
+  const render = (now: number) => {
+    const FRAME_DURATION = 1000 / 60; // ~16.67ms for 60fps
+
+    if (now - lastRenderTime < FRAME_DURATION) {
+      requestAnimationFrame(render);
+      return;
+    }
+    lastRenderTime = now;
+
+    if (!ctx || !canvasRef) {
+      requestAnimationFrame(render);
+      return;
+    }
+
+    // Clear the canvas
+    ctx.clearRect(0, 0, canvasRef.width, canvasRef.height);
+    drawNodes(
+      xPositions,
+      yPositions,
+      offsetX,
+      offsetY,
+      springs,
+      typeof dotSize === "number" ? dotSize : dotSizeTable[dotSize],
+      ctx,
+    );
+
+    if (
+      vignette !== "none" &&
+      clientHeight !== undefined &&
+      clientWidth !== undefined
+    ) {
+      drawVignetteMask(clientWidth, clientHeight, vignetteConfig, ctx);
+    }
+
+    requestAnimationFrame(render);
+  };
+
+  onMount(() => {
+    if (canvasRef) {
+      ctx = canvasRef.getContext("2d");
+    }
+    requestAnimationFrame(render);
+  });
+
   $effect(() => {
     if (xPositions.length > 0 && yPositions.length > 0) {
       createSpringsLocal(xPositions.length, yPositions.length);
@@ -308,130 +399,30 @@
       requestAnimationFrame(animateNoise);
     }
   });
+
+  $effect(() => {
+    if (canvasRef && ctx && clientWidth && clientHeight) {
+      dpr = window.devicePixelRatio || 1;
+      canvasRef.width = clientWidth * dpr;
+      canvasRef.height = clientHeight * dpr;
+      canvasRef.style.width = clientWidth + "px";
+      canvasRef.style.height = clientHeight + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transforms
+      ctx.scale(dpr, dpr);
+    }
+  });
 </script>
 
 <div
-  class="bg-bg-brand-primary fixed h-screen w-screen select-none"
+  class="bg-bg-brand-primary absolute h-full w-full select-none"
   aria-hidden="true"
   bind:this={backgroundRef}
   onpointerleave={handleReset}
   style="pointer-events: auto;"
->
-  <svg
-    width={innerWidth}
-    height={innerHeight}
-    style="display: block; width: 100vw; height: 100vh; pointer-events: none; position: absolute; top: 0; left: 0;"
-  >
-    <defs>
-      <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="40" />
-      </filter>
-      {#if vignette !== "none"}
-        <mask id="vignette-mask">
-          <rect width="100%" height="100%" fill="black" />
-          <ellipse
-            cx={vignetteConfig.cx}
-            cy={vignetteConfig.cy}
-            rx={vignetteConfig.rx}
-            ry={vignetteConfig.ry}
-            fill="white"
-            filter="url(#blur)"
-          />
-        </mask>
-      {/if}
-      {#if visibility === "animation"}
-        <mask id="wave-mask">
-          {#each ripples as ripple}
-            <circle
-              cx={ripple.x}
-              cy={ripple.y}
-              r={ripple.tween.current * 700}
-              stroke-width={40 + 200 * ripple.tween.current}
-              stroke={`hsla(0,0%,100%,${100 - ripple.tween.current * 100}%)`}
-              filter="url(#blur)"
-            />
-          {/each}
-        </mask>
-      {/if}
-    </defs>
-    <g mask={vignette !== "none" ? "url(#vignette-mask)" : undefined}>
-      <g mask={visibility === "animation" ? "url(#wave-mask)" : undefined}>
-        {#if bgType === "dots"}
-          {#each xPositions as xPos, xIndex}
-            {#each yPositions as yPos, yIndex}
-              <circle
-                cx={leftPos(xPos, xIndex, yIndex, offsetX, springs)}
-                cy={topPos(yPos, xIndex, yIndex, offsetY, springs)}
-                r={dotSizeTable[dotSize]}
-                fill={"var(--fg-brand-primary, #fff)"}
-              />
-            {/each}
-          {/each}
-        {:else if bgType === "noisedots"}
-          {#each xPositions as xPos, xIndex}
-            {#each yPositions as yPos, yIndex}
-              <circle
-                cx={leftPos(xPos, xIndex, yIndex, offsetX, springs)}
-                cy={topPos(yPos, xIndex, yIndex, offsetY, springs)}
-                r={`${dotSizeTable[dotSize] * noise.get(xPos * noiseScale, yPos * noiseScale, time)}`}
-                fill={`hsla(70,100%,50%,${noise.get(xPos * noiseScale, yPos * noiseScale, time) * 150}%)`}
-              />
-            {/each}
-          {/each}
-        {:else if bgType === "grid"}
-          <!-- Horizontal curves -->
-          {#each yPositions as yPos, yIndex}
-            {#each xPositions.slice(0, -1) as xPos, xIndex}
-              <path
-                d={gridPath(
-                  leftPos(xPos, xIndex, yIndex, offsetX, springs),
-                  topPos(yPos, xIndex, yIndex, offsetY, springs),
-                  leftPos(
-                    xPositions[xIndex + 1],
-                    xIndex + 1,
-                    yIndex,
-                    offsetX,
-                    springs,
-                  ),
-                  topPos(yPos, xIndex + 1, yIndex, offsetY, springs),
-                )}
-                stroke="var(--fg-brand-primary, #fff)"
-                stroke-width={dotSizeTable[dotSize]}
-                fill="none"
-              />
-            {/each}
-          {/each}
-
-          <!-- Vertical curves -->
-          {#each xPositions as xPos, xIndex}
-            {#each yPositions.slice(0, -1) as yPos, yIndex}
-              <path
-                d={gridPath(
-                  leftPos(xPos, xIndex, yIndex, offsetX, springs),
-                  topPos(yPos, xIndex, yIndex, offsetY, springs),
-                  leftPos(xPos, xIndex, yIndex + 1, offsetX, springs),
-                  topPos(
-                    yPositions[yIndex + 1],
-                    xIndex,
-                    yIndex + 1,
-                    offsetY,
-                    springs,
-                  ),
-                )}
-                stroke="var(--fg-brand-primary, #fff)"
-                stroke-width={dotSizeTable[dotSize]}
-                fill="none"
-              />
-            {/each}
-          {/each}
-        {/if}
-      </g>
-    </g>
-  </svg>
-</div>
-
-<svelte:window
-  bind:innerHeight
-  bind:innerWidth
+  bind:clientHeight
+  bind:clientWidth
   onpointermove={handlePointerMove}
-/>
+>
+  <canvas bind:this={canvasRef} height={clientHeight} width={clientWidth}
+  ></canvas>
+</div>
