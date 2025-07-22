@@ -535,8 +535,8 @@ export function getVignetteConfig(
     vignette === "top" || vignette === "bottom" ? innerWidth * 2 : innerWidth;
   const h =
     vignette === "left" || vignette === "right" ? innerHeight * 2 : innerHeight;
-  const rx = (w * scale) / 2;
-  const ry = (h * scale) / 2;
+  let rx = (w * scale) / 2;
+  let ry = (h * scale) / 2;
 
   let cx = innerWidth / 2;
   let cy = innerHeight / 2;
@@ -559,6 +559,9 @@ export function getVignetteConfig(
 
       break;
     case "center":
+      rx = w * scale;
+      ry = h * scale;
+      break;
     default:
       // already centered
       break;
