@@ -353,8 +353,10 @@ impl Anchor {
             result.non_ii,
         ) {
             (true, true, _, _) => DomainActivity::BothIIDomains,
-            (true, false, _, _) => DomainActivity::Ic0App,
-            (false, true, _, _) => DomainActivity::InternetComputerOrg,
+            (_, true, true, _) => DomainActivity::BothIIDomains,
+            (true, _, true, _) => DomainActivity::BothIIDomains,
+            (true, false, false, _) => DomainActivity::Ic0App,
+            (false, true, false, _) => DomainActivity::InternetComputerOrg,
             (false, false, true, _) => DomainActivity::IdAi,
             (false, false, false, true) => DomainActivity::NonIIDomain,
             (false, false, false, false) => DomainActivity::None,
@@ -496,7 +498,7 @@ pub enum DomainActivity {
     InternetComputerOrg,
     // only active on the id.ai domain
     IdAi,
-    // activity on both identity.ic0.app and identity.internetcomputer.org
+    // activity on all more than one II domain
     BothIIDomains,
 }
 
