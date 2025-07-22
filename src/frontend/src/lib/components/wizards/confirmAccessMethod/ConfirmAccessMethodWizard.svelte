@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { ConfirmAccessMethodFlow } from "$lib/flows/confirmAccessMethodFlow";
   import { onMount } from "svelte";
   import WaitingForNewDevice from "$lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte";
   import { isCanisterError } from "$lib/utils/utils";
@@ -7,6 +6,7 @@
   import ContinueOnNewDevice from "$lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte";
   import EnterConfirmationCode from "$lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte";
   import FinishOnNewDevice from "$lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte";
+  import { ConfirmAccessMethodFlow } from "$lib/flows/confirmAccessMethodFlow.svelte";
 
   interface Props {
     registrationId?: string;
