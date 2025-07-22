@@ -46,10 +46,6 @@
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
     <span>to continue with</span>
-    {#if nonNullish(dapp?.name)}
-      <span><b>{dapp.name}</b></span>
-    {:else}
-      <span>this app</span>
-    {/if}
+    <span><b>Squawker</b></span>
   </p>
 </AuthWizard>

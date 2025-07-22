@@ -101,11 +101,7 @@
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
     <span>for</span>
-    {#if nonNullish(dapp?.name)}
-      <span><b>{dapp.name}</b></span>
-    {:else}
-      <span>this app</span>
-    {/if}
+    <span><b>Squawker</b></span>
   </p>
   <div class="flex flex-col items-stretch gap-1.5 self-stretch">
     <ul class="contents">
