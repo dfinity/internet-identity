@@ -288,10 +288,10 @@ impl AggregationKey {
     fn upper_bound(&self) -> Bound<Self> {
         let empty_data = ByteBuf::from(vec![]);
         let next_ii_domain = match self.ii_domain {
-            None => Some(IdAi),
-            Some(IdAi) => Some(Ic0App),
+            None => Some(Ic0App),
             Some(Ic0App) => Some(InternetComputerOrg),
-            Some(InternetComputerOrg) => None,
+            Some(InternetComputerOrg) => Some(IdAi),
+            Some(IdAi) => None,
         };
         if next_ii_domain.is_some() {
             let end_bound = Bound::Excluded(AggregationKey {
