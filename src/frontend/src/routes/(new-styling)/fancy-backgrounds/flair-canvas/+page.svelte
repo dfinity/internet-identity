@@ -201,7 +201,7 @@
         </select>
       </label>
 
-      <label>
+      <!-- <label>
         Background Classes:
         <input
           type="text"
@@ -216,7 +216,7 @@
           bind:value={flairBoxProps.foregroundClasses}
           placeholder="(optional)"
         />
-      </label>
+      </label> -->
 
       <!-- Enum-or-number fields with custom option -->
       <label>
@@ -309,7 +309,7 @@
         </select>
         {#if flairBoxProps.springOrTween?.type === "spring"}
           <div style="margin-left:1em;">
-            <label>
+            <!-- <label>
               Stiffness:
               <select bind:value={flairBoxProps.springOrTween.stiffness}>
                 <option value="low">low</option>
@@ -358,7 +358,7 @@
                   min="1"
                 />
               {/if}
-            </label>
+            </label> -->
           </div>
         {:else if flairBoxProps.springOrTween?.type === "tween"}
           <div style="margin-left:1em;">
@@ -398,6 +398,7 @@
         {/if}
       </label>
       <strong>Animation Controls</strong>
+      <hr />
       <!-- Animation Options: allow custom numbers and custom location -->
       <label>
         Location:
@@ -520,7 +521,7 @@
           {/each}
         </select>
       </label>
-      <label>
+      <!-- <label>
         Target (currently only motion is functional):
         <div style="display: flex; gap: 0.5em;">
           <label
@@ -545,7 +546,7 @@
             /> opacity</label
           >
         </div>
-      </label>
+      </label> -->
     </div>
   </div>
 {/if}
