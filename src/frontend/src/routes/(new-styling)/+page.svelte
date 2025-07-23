@@ -19,12 +19,17 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
+  import { preloadCode, preloadData } from "$app/navigation";
 
   const { data }: PageProps = $props();
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
+  const preloadNext = () => {
+    void preloadCode(data.next ?? "/manage");
+    void preloadData(data.next ?? "/manage");
+  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     if (triggerAnimation) {
@@ -41,6 +46,7 @@
       });
     }
     isAuthDialogOpen = false;
+    preloadNext();
     setTimeout(async () => {
       await gotoNext();
     }, 700);
@@ -65,6 +71,7 @@
       });
     }
     isAuthDialogOpen = false;
+    preloadNext();
     setTimeout(async () => {
       await gotoNext();
     }, 700);
