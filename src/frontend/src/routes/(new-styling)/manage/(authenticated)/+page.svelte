@@ -19,7 +19,6 @@
 
   // Remove registration id from URL bar after assigning it to state
   afterNavigate(() => {
-    page.url.searchParams;
     if (page.url.searchParams.has("activate")) {
       replaceState("/manage", {});
     }
