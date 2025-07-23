@@ -24,12 +24,29 @@
   import Footer from "$lib/components/layout/Footer.svelte";
   import { goto } from "$app/navigation";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
+  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
 
   const gotoManage = () => goto("/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     isAuthDialogOpen = false;
+    setTimeout(async () => {
+      await gotoManage();
+    }, 700);
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -52,16 +69,38 @@
   let isAuthDialogOpen = $state(false);
 
   const handleContinueAs = async (identity: LastUsedIdentity) => {
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     await authLastUsedFlow.authenticate(identity).catch(handleError);
     await onSignIn(identity.identityNumber);
   };
+
+  let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
+  <FlairCanvas
+    spacing="medium"
+    aspect="ultrawide"
+    dotSize={1.1}
+    vignette="center"
+    bind:triggerAnimation
+  />
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">
-    <AuthPanel class="sm:max-w-100">
+    <AuthPanel class="z-10 sm:max-w-100">
       <div class="flex-1"></div>
       {#if nonNullish(authFlow.captcha)}
         <SolveCaptcha {...authFlow.captcha} />

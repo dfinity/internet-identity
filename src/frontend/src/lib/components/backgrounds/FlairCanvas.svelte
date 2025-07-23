@@ -247,7 +247,7 @@
     getVignetteConfig(vignette, clientHeight, clientWidth),
   );
 
-  triggerAnimation = (opts) => {
+  triggerAnimation = async (opts) => {
     const {
       location,
       target,
