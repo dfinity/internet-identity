@@ -355,7 +355,7 @@ jobs:
           path: .
       - name: Install PocketIC
         run: |
-          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/9.0.3/pocket-ic-x86_64-${{ matrix.os == 'macos-latest' && 'darwin' || 'linux' }}.gz
+          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/5.0.0/pocket-ic-x86_64-${{ matrix.os == 'macos-latest' && 'darwin' || 'linux' }}.gz
           gzip -d pocket-ic.gz
           chmod +x pocket-ic
 
