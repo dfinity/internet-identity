@@ -63,6 +63,8 @@ export interface FlairCanvasProps {
   maskWaveMinValue?: number;
   backgroundClasses?: string;
   foregroundClasses?: string;
+  customColor?: string;
+  customColorMode?: "all" | "moving";
   triggerAnimation?: (opts: FlairAnimationOptions) => void;
 }
 

@@ -50,6 +50,8 @@
     maskWaveThickness,
     maskWaveRampIn,
     maskWaveRampOut,
+    customColor,
+    customColorMode,
     backgroundClasses,
     foregroundClasses,
     triggerAnimation = $bindable(),
@@ -626,7 +628,8 @@
       typeof dotSize === "number" ? dotSize : dotSizeTable[dotSize],
       visibility,
       ctx,
-      "",
+      customColor,
+      customColorMode,
       enableRandomOpacity
         ? {
             noise: opacityNoise,

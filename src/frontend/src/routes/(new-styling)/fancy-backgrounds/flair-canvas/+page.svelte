@@ -299,7 +299,8 @@
           type="number"
           bind:value={flairBoxProps.maskWaveRampIn}
           min="0"
-          step="any"
+          max="1"
+          step="0.01"
           placeholder="(optional)"
         />
       </label>
@@ -309,7 +310,8 @@
           type="number"
           bind:value={flairBoxProps.maskWaveRampOut}
           min="0"
-          step="any"
+          max="1"
+          step="0.01"
           placeholder="(optional)"
         />
       </label>
@@ -326,7 +328,8 @@
             type="number"
             bind:value={flairBoxProps.maskWaveThickness}
             min="0"
-            step="any"
+            max="1"
+            step="0.1"
           />
         {/if}
       </label>
@@ -336,7 +339,8 @@
           type="number"
           bind:value={flairBoxProps.maskWaveMinValue}
           min="0"
-          step="any"
+          max="1"
+          step="0.01"
           placeholder="(optional)"
         />
       </label>
@@ -547,6 +551,19 @@
           </div>
         {/if}
       </label>
+      <label>
+        Custom Color:
+        <input
+          type="text"
+          bind:value={flairBoxProps.customColor}
+          placeholder="hex color"
+        />
+        Custom Color Mode:
+        <select bind:value={flairBoxProps.customColorMode}>
+          <option value="all">all</option>
+          <option value="moving">moving</option>
+        </select>
+      </label>
       <strong>Animation Controls</strong>
       <hr />
       <!-- Animation Options: allow custom numbers and custom location -->
@@ -751,6 +768,8 @@
     maskWaveRampOut={flairBoxProps.maskWaveRampOut}
     maskWaveThickness={flairBoxProps.maskWaveThickness}
     maskWaveMinValue={flairBoxProps.maskWaveMinValue}
+    customColor={flairBoxProps.customColor}
+    customColorMode={flairBoxProps.customColorMode}
     bind:triggerAnimation={animTrig}
   />
 {/snippet}

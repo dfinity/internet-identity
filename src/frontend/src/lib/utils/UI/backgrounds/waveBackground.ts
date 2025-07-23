@@ -654,7 +654,8 @@ export function drawNodes(
   radius: number,
   visibility: FlairCanvasProps["visibility"],
   ctx: CanvasRenderingContext2D,
-  hexColor?: string,
+  customHexColor?: string,
+  customColorMode?: "all" | "moving",
   opacityNoise?: {
     noise: PerlinNoise3D;
     noiseScale: number;
@@ -671,8 +672,10 @@ export function drawNodes(
   const body = document.querySelector("body");
   if (!body) return;
   const color =
-    nonNullish(hexColor) && hexColor.length > 0
-      ? hexColor
+    nonNullish(customHexColor) &&
+    customHexColor.length > 0 &&
+    customColorMode === "all"
+      ? customHexColor
       : getComputedStyle(body).getPropertyValue("--fg-tertiary").trim();
   xPositions.forEach((xPos, xIndex) => {
     yPositions.forEach((yPos, yIndex) => {
@@ -711,6 +714,14 @@ export function drawNodes(
         ctx.fillStyle = hexToRgba(
           ctx.fillStyle,
           speed !== undefined ? speed : 0,
+        );
+      }
+      if (customColorMode === "moving") {
+        const speed = springs[xIndex][yIndex].speed ?? 0;
+        ctx.fillStyle = interpolateColor(
+          color,
+          customHexColor ?? "#000000",
+          Math.min(speed, 1),
         );
       }
       if (opacityNoise) {
@@ -883,4 +894,70 @@ function hexToRgba(hex: string, alpha: number): string {
 
 export function getHypotenuse(x: number, y: number) {
   return Math.sqrt((x / 2) ** 2 + (y / 2) ** 2);
+}
+
+function interpolateColor(
+  color1: string,
+  color2: string,
+  factor: number,
+): string {
+  // Parse both colors to RGB
+  const rgb1 = parseColor(color1);
+  const rgb2 = parseColor(color2);
+  // Interpolate each channel
+  const r = Math.round(rgb1.r + (rgb2.r - rgb1.r) * factor);
+  const g = Math.round(rgb1.g + (rgb2.g - rgb1.g) * factor);
+  const b = Math.round(rgb1.b + (rgb2.b - rgb1.b) * factor);
+  const a = rgb1.a + (rgb2.a - rgb1.a) * factor;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Helper to parse hex or rgba color strings
+function parseColor(color: string): {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+} {
+  color = color.trim();
+  if (color.startsWith("#")) {
+    // Hex to RGBA
+    let hex = color.slice(1);
+    if (hex.length === 3)
+      hex = hex
+        .split("")
+        .map((x) => x + x)
+        .join("");
+    const num = parseInt(hex, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+      a: 1,
+    };
+  } else if (color.startsWith("rgba")) {
+    const match = color.match(
+      /rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\s*\)/,
+    );
+    if (match) {
+      return {
+        r: parseInt(match[1]),
+        g: parseInt(match[2]),
+        b: parseInt(match[3]),
+        a: parseFloat(match[4]),
+      };
+    }
+  } else if (color.startsWith("rgb")) {
+    const match = color.match(/rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)/);
+    if (match) {
+      return {
+        r: parseInt(match[1]),
+        g: parseInt(match[2]),
+        b: parseInt(match[3]),
+        a: 1,
+      };
+    }
+  }
+  // Fallback: black
+  return { r: 0, g: 0, b: 0, a: 1 };
 }
