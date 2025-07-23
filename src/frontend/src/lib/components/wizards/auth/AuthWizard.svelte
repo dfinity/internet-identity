@@ -9,11 +9,13 @@
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
+  import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
 
   interface Props {
     isAuthenticating?: boolean;
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
+    onOtherDevice?: () => void; // TODO: Remove once we can sign in directly
     onError: (error: unknown) => void;
     withinDialog?: boolean;
     children?: Snippet;
@@ -23,6 +25,7 @@
     isAuthenticating = $bindable(),
     onSignIn,
     onSignUp,
+    onOtherDevice = () => {},
     onError,
     withinDialog = false,
     children,
@@ -30,6 +33,8 @@
 
   const authFlow = new AuthFlow();
   const authLastUsedFlow = new AuthLastUsedFlow();
+
+  let isContinueFromAnotherDeviceVisible = $state(false);
 
   const handleContinueWithExistingPasskey = async () => {
     isAuthenticating = true;
@@ -75,7 +80,9 @@
   {/if}
 {/snippet}
 
-{#if nonNullish(authFlow.captcha)}
+{#if isContinueFromAnotherDeviceVisible}
+  <RegisterAccessMethodWizard onRegistered={onOtherDevice} {onError} />
+{:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
 {:else}
   {#if authFlow.view === "chooseMethod" || !withinDialog}
@@ -83,6 +90,8 @@
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
       continueWithGoogle={handleContinueWithGoogle}
+      continueFromAnotherDevice={() =>
+        (isContinueFromAnotherDeviceVisible = true)}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}

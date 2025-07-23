@@ -6,22 +6,28 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
+  import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
+    continueFromAnotherDevice: () => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithGoogle,
+    continueFromAnotherDevice,
+  }: Props = $props();
 
-  let authenticating = $state(false);
+  let isAuthenticating = $state(false);
 
   const handleContinueWithGoogle = async () => {
-    authenticating = true;
+    isAuthenticating = true;
     try {
       await continueWithGoogle();
     } finally {
-      authenticating = false;
+      isAuthenticating = false;
     }
   };
 
@@ -40,7 +46,7 @@
   <div class="flex flex-col items-stretch gap-3">
     <Button
       onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || authenticating}
+      disabled={!supportsPasskeys || isAuthenticating}
       size="xl"
     >
       <PasskeyIcon />
@@ -50,16 +56,26 @@
       <Button
         onclick={handleContinueWithGoogle}
         variant="secondary"
-        disabled={authenticating}
+        disabled={isAuthenticating}
         size="xl"
       >
-        {#if authenticating}
+        {#if isAuthenticating}
           <ProgressRing />
           <span>Authenticating with Google...</span>
         {:else}
           <GoogleIcon />
           <span>Continue with Google</span>
         {/if}
+      </Button>
+    {/if}
+    {#if $CONTINUE_FROM_ANOTHER_DEVICE}
+      <Button
+        onclick={continueFromAnotherDevice}
+        variant="tertiary"
+        disabled={isAuthenticating}
+        size="xl"
+      >
+        Continue from another device
       </Button>
     {/if}
   </div>

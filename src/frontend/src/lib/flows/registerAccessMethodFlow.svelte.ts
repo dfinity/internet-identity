@@ -20,8 +20,8 @@ const POLL_INTERVAL = 3000; // Should be frequent enough
 
 export class RegisterAccessMethodFlow {
   #view = $state<
-    "continueOnExistingDevice" | "confirmDevice" | "confirmSignIn"
-  >("continueOnExistingDevice");
+    "continueFromExistingDevice" | "confirmDevice" | "confirmSignIn"
+  >("continueFromExistingDevice");
   #confirmationCode = $state<string>();
   #identityName = $state<string>();
   #existingDeviceLink = $state<URL>();
@@ -50,7 +50,7 @@ export class RegisterAccessMethodFlow {
         window.location.origin,
       );
     }
-    this.#view = "continueOnExistingDevice";
+    this.#view = "continueFromExistingDevice";
 
     const expiration = new Date(Date.now() + 300000).getTime(); // 5 min
     while (Date.now() < expiration) {
