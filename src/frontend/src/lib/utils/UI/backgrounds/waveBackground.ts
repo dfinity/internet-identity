@@ -19,14 +19,14 @@ export function createXYSprings(
   damping: number,
 ) {
   if (SpringCtor instanceof Spring) {
-    return Array.from({ length: xCount }, (_, x) =>
+    return Array.from({ length: xCount }, (_) =>
       Array.from(
         { length: yCount },
         () => new SpringCtor({ x: 0, y: 0 }, { stiffness, damping }),
       ),
     );
   } else {
-    return Array.from({ length: xCount }, (_, x) =>
+    return Array.from({ length: xCount }, (_) =>
       Array.from(
         { length: yCount },
         () =>
@@ -44,7 +44,7 @@ export function createXYNodeMotions(
   damping: number,
 ): NodeMotion[][] {
   if (SpringCtor instanceof Spring) {
-    return Array.from({ length: xCount }, (_, x) =>
+    return Array.from({ length: xCount }, (_) =>
       Array.from({ length: yCount }, () => {
         return {
           motion: new SpringCtor({ x: 0, y: 0 }, { stiffness, damping }),
@@ -54,7 +54,7 @@ export function createXYNodeMotions(
       }),
     );
   } else {
-    return Array.from({ length: xCount }, (_, x) =>
+    return Array.from({ length: xCount }, (_) =>
       Array.from({ length: yCount }, () => {
         return {
           motion: new SpringCtor(
@@ -75,7 +75,7 @@ export function createScalarSprings(
   stiffness: number,
   damping: number,
 ) {
-  return Array.from({ length: xCount }, (_, x) =>
+  return Array.from({ length: xCount }, (_) =>
     Array.from({ length: yCount }, () => new Spring(0, { stiffness, damping })),
   );
 }
