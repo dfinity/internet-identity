@@ -58,6 +58,9 @@ fn should_retrieve_aggregations() {
     );
     assert_eq!(results, vec![]);
 
+    let results = retrieve_aggregation_internal(PD_SESS_SEC, Day, Some(IIDomain::IdAi), &storage);
+    assert_eq!(results, vec![]);
+
     let results = retrieve_aggregation_internal(PD_SESS_SEC, Day, None, &storage);
     assert_eq!(results, vec![]);
 
@@ -67,6 +70,9 @@ fn should_retrieve_aggregations() {
         Some(IIDomain::InternetComputerOrg),
         &storage,
     );
+    assert_eq!(results, vec![]);
+
+    let results = retrieve_aggregation_internal(PD_SESS_SEC, Month, Some(IIDomain::IdAi), &storage);
     assert_eq!(results, vec![]);
 
     let results = retrieve_aggregation_internal(PD_SESS_SEC, Month, None, &storage);
@@ -119,9 +125,11 @@ fn should_retrieve_aggregations_by_domain() {
     const SESSION_LENGTH_1: u64 = 10;
     const SESSION_LENGTH_2: u64 = 20;
     const SESSION_LENGTH_3: u64 = 30;
+    const SESSION_LENGTH_4: u64 = 40;
     let fe1 = "https://example1.com".to_string();
     let fe2 = "https://example2.com".to_string();
     let fe3 = "https://example3.com".to_string();
+    let fe4 = "https://example4.com".to_string();
     let mut storage = test_storage();
 
     let event = EventData {
@@ -138,6 +146,15 @@ fn should_retrieve_aggregations_by_domain() {
             ii_domain: Some(IIDomain::InternetComputerOrg),
             frontend: fe2.clone(),
             session_duration_ns: Duration::from_secs(SESSION_LENGTH_2).as_nanos() as u64,
+        }),
+    };
+    update_events_internal(event.clone(), TIMESTAMP, &mut storage);
+
+    let event = EventData {
+        event: Event::PrepareDelegation(PrepareDelegationEvent {
+            ii_domain: Some(IIDomain::IdAi),
+            frontend: fe4.clone(),
+            session_duration_ns: Duration::from_secs(SESSION_LENGTH_4).as_nanos() as u64,
         }),
     };
     update_events_internal(event.clone(), TIMESTAMP, &mut storage);
@@ -168,6 +185,12 @@ fn should_retrieve_aggregations_by_domain() {
         &storage,
     );
     assert_eq!(results, vec![(fe2.clone(), SESSION_LENGTH_2)]);
+
+    let results = retrieve_aggregation_internal(PD_COUNT, Day, Some(IIDomain::IdAi), &storage);
+    assert_eq!(results, vec![(fe4.clone(), 1)]);
+
+    let results = retrieve_aggregation_internal(PD_SESS_SEC, Day, Some(IIDomain::IdAi), &storage);
+    assert_eq!(results, vec![(fe4.clone(), SESSION_LENGTH_4)]);
 
     let results = retrieve_aggregation_internal(PD_COUNT, Month, None, &storage);
     assert_eq!(results, vec![(fe3.clone(), 1)]);

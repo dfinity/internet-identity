@@ -2,7 +2,7 @@ use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
-use crate::{IC0_APP_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
+use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
@@ -315,6 +315,7 @@ impl Anchor {
         struct Accumulator {
             ic0_app: bool,
             internet_computer_org: bool,
+            id_ai: bool,
             non_ii: bool,
         }
 
@@ -336,6 +337,7 @@ impl Anchor {
                 match origin.as_str() {
                     IC0_APP_ORIGIN => acc.ic0_app = true,
                     INTERNETCOMPUTER_ORG_ORIGIN => acc.internet_computer_org = true,
+                    ID_AI_ORIGIN => acc.id_ai = true,
                     _ => acc.non_ii = true,
                 };
                 acc
@@ -344,12 +346,20 @@ impl Anchor {
         // Activity on other domains is discarded if there is also activity on an II domain.
         // The reason is that II might not have complete information since domain information was
         // only introduced recently.
-        match (result.ic0_app, result.internet_computer_org, result.non_ii) {
-            (true, true, _) => DomainActivity::BothIIDomains,
-            (true, false, _) => DomainActivity::Ic0App,
-            (false, true, _) => DomainActivity::InternetComputerOrg,
-            (false, false, true) => DomainActivity::NonIIDomain,
-            (false, false, false) => DomainActivity::None,
+        match (
+            result.ic0_app,
+            result.internet_computer_org,
+            result.id_ai,
+            result.non_ii,
+        ) {
+            (true, true, _, _) => DomainActivity::BothIIDomains,
+            (_, true, true, _) => DomainActivity::BothIIDomains,
+            (true, _, true, _) => DomainActivity::BothIIDomains,
+            (true, false, false, _) => DomainActivity::Ic0App,
+            (false, true, false, _) => DomainActivity::InternetComputerOrg,
+            (false, false, true, _) => DomainActivity::IdAi,
+            (false, false, false, true) => DomainActivity::NonIIDomain,
+            (false, false, false, false) => DomainActivity::None,
         }
     }
 
@@ -486,7 +496,9 @@ pub enum DomainActivity {
     Ic0App,
     // only active on the identity.internetcomputer.org domain
     InternetComputerOrg,
-    // activity on both identity.ic0.app and identity.internetcomputer.org
+    // only active on the id.ai domain
+    IdAi,
+    // activity on more than one II domain
     BothIIDomains,
 }
 

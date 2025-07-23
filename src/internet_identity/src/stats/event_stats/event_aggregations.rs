@@ -1,4 +1,4 @@
-use crate::ii_domain::IIDomain::{Ic0App, InternetComputerOrg};
+use crate::ii_domain::IIDomain::{Ic0App, IdAi, InternetComputerOrg};
 use crate::ii_domain::{maybe_domain_to_label, IIDomain};
 use crate::state::storage_borrow;
 use crate::stats::event_stats::event_aggregations::AggregationWindow::{Day, Month};
@@ -41,7 +41,7 @@ pub fn all_aggregations_top_n(limit: usize) -> HashMap<String, Vec<(String, u64)
     let mut aggregations = HashMap::new();
     for aggregation in &AGGREGATIONS {
         for window in &[Day, Month] {
-            for domain in &[None, Some(Ic0App), Some(InternetComputerOrg)] {
+            for domain in &[None, Some(IdAi), Some(Ic0App), Some(InternetComputerOrg)] {
                 let tuples: Vec<_> =
                     retrieve_aggregation(*aggregation, window.clone(), domain.clone())
                         .into_iter()
@@ -290,7 +290,8 @@ impl AggregationKey {
         let next_ii_domain = match self.ii_domain {
             None => Some(Ic0App),
             Some(Ic0App) => Some(InternetComputerOrg),
-            Some(InternetComputerOrg) => None,
+            Some(InternetComputerOrg) => Some(IdAi),
+            Some(IdAi) => None,
         };
         if next_ii_domain.is_some() {
             let end_bound = Bound::Excluded(AggregationKey {
