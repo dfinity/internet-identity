@@ -84,19 +84,6 @@
   let isAuthDialogOpen = $state(false);
 
   const handleContinueAs = async (identity: LastUsedIdentity) => {
-    if (triggerAnimation) {
-      triggerAnimation({
-        location: "center",
-        target: ["motion"],
-
-        motionType: "omni",
-        intensity: "light",
-        speed: 5,
-        nImpulses: "single",
-        size: "large",
-        impulseEasing: "cubicIn",
-      });
-    }
     await authLastUsedFlow.authenticate(identity).catch(handleError);
     await onSignIn(identity.identityNumber);
   };
