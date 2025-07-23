@@ -316,23 +316,6 @@ pub fn lookup_by_registration_mode_id(
     .map(|(x,)| x)
 }
 
-pub fn authn_method_lookup_by_registration_mode_id(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    sender: Principal,
-    id: String,
-) -> Result<Result<Option<IdentityNumber>, LookupByRegistrationIdError>, CallError> {
-    call_candid_as(
-        env,
-        canister_id,
-        RawEffectivePrincipal::None,
-        sender,
-        "authn_method_lookup_by_registration_mode_id",
-        (id,),
-    )
-    .map(|(x,)| x)
-}
-
 pub fn create_account(
     env: &PocketIc,
     canister_id: CanisterId,
