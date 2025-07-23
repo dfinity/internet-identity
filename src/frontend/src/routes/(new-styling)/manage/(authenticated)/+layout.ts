@@ -15,7 +15,8 @@ export const load: LayoutLoad = ({ url }) => {
     isNullish(selectedIdentity) ||
     authentication.identityNumber !== selectedIdentity.identityNumber
   ) {
-    // Add original target URL as next search param
+    // Add original target URL as next search param,
+    // if it's not the default target URL (/manage).
     const next = url.pathname + url.search;
     const location = new URL("/", url.origin);
     if (next !== "/manage") {
