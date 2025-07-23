@@ -57,6 +57,10 @@ export interface FlairCanvasProps {
   enableRandomPointSize?: boolean;
   pointSizeNoiseScale?: "large" | "medium" | "small" | number;
   pointSizeNoiseMultiplier?: "large" | "medium" | "small" | number;
+  maskWaveRampIn?: number;
+  maskWaveRampOut?: number;
+  maskWaveThickness?: "large" | "medium" | "small" | number;
+  maskWaveMinValue?: number;
   backgroundClasses?: string;
   foregroundClasses?: string;
   triggerAnimation?: (opts: FlairAnimationOptions) => void;

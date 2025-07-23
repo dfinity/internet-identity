@@ -292,6 +292,54 @@
           <option value="bottom">bottom</option>
         </select>
       </label>
+      <!-- MaskWave controls -->
+      <label>
+        Mask Wave Ramp In:
+        <input
+          type="number"
+          bind:value={flairBoxProps.maskWaveRampIn}
+          min="0"
+          step="any"
+          placeholder="(optional)"
+        />
+      </label>
+      <label>
+        Mask Wave Ramp Out:
+        <input
+          type="number"
+          bind:value={flairBoxProps.maskWaveRampOut}
+          min="0"
+          step="any"
+          placeholder="(optional)"
+        />
+      </label>
+      <label>
+        Mask Wave Thickness:
+        <select bind:value={flairBoxProps.maskWaveThickness}>
+          <option value="large">Large</option>
+          <option value="medium">Medium</option>
+          <option value="small">Small</option>
+          <option value={0}>Custom</option>
+        </select>
+        {#if typeof flairBoxProps.maskWaveThickness === "number"}
+          <input
+            type="number"
+            bind:value={flairBoxProps.maskWaveThickness}
+            min="0"
+            step="any"
+          />
+        {/if}
+      </label>
+      <label>
+        Mask Wave Min Value:
+        <input
+          type="number"
+          bind:value={flairBoxProps.maskWaveMinValue}
+          min="0"
+          step="any"
+          placeholder="(optional)"
+        />
+      </label>
       <!-- Randomization control -->
       <label>
         <input
@@ -699,6 +747,10 @@
               .easing as keyof typeof easingFunctions,
           }
         : undefined}
+    maskWaveRampIn={flairBoxProps.maskWaveRampIn}
+    maskWaveRampOut={flairBoxProps.maskWaveRampOut}
+    maskWaveThickness={flairBoxProps.maskWaveThickness}
+    maskWaveMinValue={flairBoxProps.maskWaveMinValue}
     bind:triggerAnimation={animTrig}
   />
 {/snippet}

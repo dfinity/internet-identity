@@ -46,6 +46,10 @@
     enableRandomPointSize = false,
     pointSizeNoiseScale = 0.01,
     pointSizeNoiseMultiplier = 1,
+    maskWaveMinValue,
+    maskWaveThickness,
+    maskWaveRampIn,
+    maskWaveRampOut,
     backgroundClasses,
     foregroundClasses,
     triggerAnimation = $bindable(),
@@ -183,6 +187,12 @@
     large: 5,
     medium: 1.5,
     small: 1.1,
+  };
+
+  const maskWaveThicknessTable = {
+    large: 0.8,
+    medium: 0.4,
+    small: 0.2,
   };
 
   let xSpacing = $derived(
@@ -655,15 +665,24 @@
       drawVignetteMask(clientWidth, clientHeight, vignetteConfig, ctx);
     }
 
-    if (visibility === "maskwave" && !!clientWidth && !!clientHeight) {
+    if (
+      visibility === "maskwave" &&
+      !!clientWidth &&
+      !!clientHeight &&
+      maskWaveThickness !== undefined
+    ) {
       drawMovingRingMask(
         clientWidth,
         clientHeight,
         opacityWaveMotion.current,
-        getHypotenuse(clientHeight, clientWidth) * 0.8,
+        getHypotenuse(clientHeight, clientWidth) *
+          (typeof maskWaveThickness === "number"
+            ? maskWaveThickness
+            : maskWaveThicknessTable[maskWaveThickness]),
         ctx,
-        0.32,
-        1,
+        maskWaveRampIn,
+        maskWaveRampOut,
+        maskWaveMinValue,
       );
     }
 
