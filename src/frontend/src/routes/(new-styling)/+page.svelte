@@ -54,8 +54,23 @@
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     isAuthDialogOpen = false;
+    setTimeout(async () => {
+      await gotoManage();
+    }, 700);
   };
   const authFlow = new AuthFlow({ onSignIn, onSignUp });
   const authLastUsedFlow = new AuthLastUsedFlow();
