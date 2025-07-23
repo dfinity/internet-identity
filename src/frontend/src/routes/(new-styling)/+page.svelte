@@ -27,10 +27,22 @@
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoNext();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     isAuthDialogOpen = false;
     setTimeout(async () => {
-      await gotoManage();
+      await gotoNext();
     }, 700);
   };
   const onSignUp = async (identityNumber: bigint) => {
@@ -39,10 +51,22 @@
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoNext();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     isAuthDialogOpen = false;
     setTimeout(async () => {
-      await gotoManage();
+      await gotoNext();
     }, 700);
   };
   const authLastUsedFlow = new AuthLastUsedFlow();

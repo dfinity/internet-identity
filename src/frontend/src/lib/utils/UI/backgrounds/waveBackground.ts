@@ -1,14 +1,12 @@
-import type {
-  FlairAnimationOptions,
-  FlairBoxProps,
-} from "$lib/components/backgrounds/FlairBox.d.ts";
+import type {} from "$lib/components/backgrounds/FlairCanvas.d.ts";
 import { quadInOut } from "svelte/easing";
 import { Spring, Tween } from "svelte/motion";
 import { EasingFunction } from "svelte/transition";
 import { PerlinNoise3D } from "./perlinNoise3d";
 import {
-  FlairCanvasProps,
+  type FlairCanvasProps,
   NodeMotion,
+  type FlairAnimationOptions,
 } from "$lib/components/backgrounds/FlairCanvas";
 import { nonNullish } from "@dfinity/utils";
 
@@ -591,7 +589,7 @@ export function getImpulseLocation(
 ////// SVG //////
 
 export function getVignetteConfig(
-  vignette: FlairBoxProps["vignette"],
+  vignette: FlairCanvasProps["vignette"],
   innerHeight: number | undefined,
   innerWidth: number | undefined,
 ) {
