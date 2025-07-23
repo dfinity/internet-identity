@@ -35,7 +35,7 @@ export interface FlairCanvasProps {
   bgType?: "dots" | "grid" | "noisedots";
   spacing?: "large" | "medium" | "small" | number;
   aspect?: "square" | "wide" | "ultrawide" | number;
-  visibility?: "always" | "moving";
+  visibility?: "always" | "moving" | "maskwave";
   dotSize?: "large" | "medium" | "small" | number;
   vignette?: "center" | "top" | "left" | "right" | "bottom" | "none";
   hoverAction?: "intense" | "minimal" | "none";

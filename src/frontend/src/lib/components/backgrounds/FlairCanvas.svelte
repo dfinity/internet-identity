@@ -4,12 +4,15 @@
     createContinuousWave,
     createDirectionalImpulse,
     createImpulse,
+    createOpacityWave,
     createPerlinImpulse,
     createRotationalImpulse,
     createXYNodeMotions,
     createXYSprings,
+    drawMovingRingMask,
     drawNodes,
     drawVignetteMask,
+    getHypotenuse,
     getImpulseLocation,
     getVignetteConfig,
     gridPath,
@@ -64,7 +67,17 @@
   let waveSpeed = $state(1.5);
   let impulseDuration = $state(80);
 
-  let noiseScale = $state<number>(0.2);
+  let opacityWaveDuration = $state(500);
+
+  let opacityWaveMotion = new Tween(0, {
+    easing: easingFunctions.linear,
+    duration: opacityWaveDuration,
+  });
+
+  let motionNoiseScale = $state<number>(0.01);
+  let opacityNoiseScale = $state<number>(0.01);
+  let pointSizeNoiseScale = $state<number>(0.01);
+
   let timeScale = $state<number>(1500);
 
   // --- Animation state ---
@@ -80,8 +93,14 @@
   let clientHeight = $state<number>();
   let clientWidth = $state<number>();
 
-  const noise = new PerlinNoise3D();
-  noise.noiseSeed(0);
+  const motionNoise = new PerlinNoise3D();
+  motionNoise.noiseSeed(0);
+
+  const opacityNoise = new PerlinNoise3D();
+  opacityNoise.noiseSeed(1);
+
+  const dotSizeNoise = new PerlinNoise3D();
+  dotSizeNoise.noiseSeed(2);
 
   const spacingTable = {
     large: 100,
@@ -116,7 +135,7 @@
   const rippleSizeTable = {
     small: 0.3,
     medium: 1,
-    large: 2,
+    large: 3,
   };
 
   const stiffnessTable = {
@@ -331,14 +350,15 @@
             (typeof intensity === "number"
               ? intensity
               : intensityTable[intensity]),
-          waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
-          impulseDuration *
-            3 *
+          waveSpeed *
+            0.75 *
             (typeof speed === "number" ? speed : speedTable[speed]),
-          "x",
-          noise,
-          10,
-          0.5,
+          impulseDuration *
+            (typeof speed === "number" ? speed : speedTable[speed]),
+          "omni",
+          motionNoise,
+          0.01,
+          1,
           easingFunction,
         );
 
@@ -366,7 +386,7 @@
                 impulseDuration *
                   (typeof speed === "number" ? speed : speedTable[speed]),
                 "omni",
-                noise,
+                motionNoise,
                 0.01,
                 1,
                 easingFunction,
@@ -426,6 +446,21 @@
             );
           },
           250 * (typeof speed === "number" ? speed : speedTable[speed]),
+        );
+      }
+
+      if (visibility === "maskwave") {
+        if (impulseEasing) {
+          opacityWaveMotion = new Tween(0, {
+            easing: easingFunctions[impulseEasing],
+          });
+        }
+        createOpacityWave(
+          opacityWaveMotion,
+          rippleRadius *
+            waveSpeed *
+            (typeof speed === "number" ? speed : speedTable[speed]),
+          0,
         );
       }
     }
@@ -554,6 +589,18 @@
       clientWidth !== undefined
     ) {
       drawVignetteMask(clientWidth, clientHeight, vignetteConfig, ctx);
+    }
+
+    if (visibility === "maskwave" && !!clientWidth && !!clientHeight) {
+      drawMovingRingMask(
+        clientWidth,
+        clientHeight,
+        opacityWaveMotion.current,
+        getHypotenuse(clientHeight, clientWidth) * 0.8,
+        ctx,
+        0.32,
+        1,
+      );
     }
 
     requestAnimationFrame(render);

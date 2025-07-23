@@ -6,7 +6,10 @@ import { quadInOut } from "svelte/easing";
 import { Spring, Tween } from "svelte/motion";
 import { EasingFunction } from "svelte/transition";
 import { PerlinNoise3D } from "./perlinNoise3d";
-import { NodeMotion } from "$lib/components/backgrounds/FlairCanvas";
+import {
+  FlairCanvasProps,
+  NodeMotion,
+} from "$lib/components/backgrounds/FlairCanvas";
 
 ////// ANIMATION //////
 export function createXYSprings(
@@ -648,7 +651,7 @@ export function drawNodes(
   offsetY: number,
   springs: NodeMotion[][],
   radius: number,
-  visibility: "always" | "moving",
+  visibility: FlairCanvasProps["visibility"],
   ctx: CanvasRenderingContext2D,
 ) {
   const body = document.querySelector("body");
@@ -719,6 +722,84 @@ export function drawVignetteMask(
   ctx.restore();
 }
 
+export function createOpacityWave(
+  motionController: Tween<number>,
+  duration: number,
+  from = 0,
+) {
+  void motionController.set(from, { duration: 0 }).then(() => {
+    void motionController.set(1, { duration });
+  });
+}
+
+export function drawMovingRingMask(
+  width: number,
+  height: number,
+  progress: number, // 0..1
+  thickness: number,
+  ctx: CanvasRenderingContext2D,
+  rampIn: number = 0.1, // e.g. 0.1 means ramp up over first 10% of progress
+  rampOut: number = 0.9, // e.g. 0.9 means ramp down over last 10% of progress
+  minValue: number = 0, // so we don't start in dead center
+) {
+  // Clamp rampIn and rampOut
+  rampIn = Math.max(minValue, Math.min(1, rampIn));
+  rampOut = Math.max(0, Math.min(1, rampOut));
+  if (rampOut < rampIn) rampOut = rampIn;
+
+  // Calculate overall opacity based on ramps
+  let opacity = 1;
+  if (progress < minValue + rampIn && minValue + rampIn > minValue) {
+    opacity = progress / (rampIn + minValue);
+  } else if (progress > rampOut && rampOut < 1) {
+    opacity = 1 - (progress - rampOut) / (1 - rampOut);
+  }
+  opacity = Math.max(0, Math.min(1, opacity));
+
+  // Center of the canvas
+  const cx = width / 2;
+  const cy = height / 2;
+  // Maximum possible radius (to the closest edge)
+  const maxRadius = getHypotenuse(width, height);
+
+  // Clamp progress to [0, 1]
+  const t = Math.max(0, Math.min(1, progress));
+
+  // The radius of the center of the ring
+  const ringRadius = t * maxRadius + minValue;
+
+  // The inner and outer radii of the ring
+  const innerRadius = Math.max(0, ringRadius);
+  const outerRadius = ringRadius + thickness;
+
+  // Create a radial gradient for the ring
+  const gradient = ctx.createRadialGradient(
+    cx,
+    cy,
+    innerRadius,
+    cx,
+    cy,
+    outerRadius,
+  );
+  // Transparent inside the inner radius
+  gradient.addColorStop(0, "rgba(0,0,0,1)");
+  // Start of the ring
+  gradient.addColorStop(innerRadius / outerRadius, "rgba(0,0,0,1)");
+  // Middle of the ring (opaque, with ramped opacity)
+  gradient.addColorStop(
+    (innerRadius + (outerRadius - innerRadius) * 0.5) / outerRadius,
+    `rgba(0,0,0,${1 - opacity})`,
+  );
+  // End of the ring (fade out)
+  gradient.addColorStop(1, "rgba(0,0,0,1)");
+
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   // Remove leading #
   hex = hex.replace(/^#/, "");
@@ -734,4 +815,8 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = (num >> 8) & 255;
   const b = num & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function getHypotenuse(x: number, y: number) {
+  return Math.sqrt((x / 2) ** 2 + (y / 2) ** 2);
 }

@@ -102,7 +102,7 @@
     vignette: "none",
     bgType: "dots",
     springOrTween: { type: "spring", stiffness: "medium", dampening: "medium" },
-    visibility: undefined,
+    visibility: "always",
     hoverAction: "none",
     display: "behindBox",
     backgroundClasses: "",
@@ -124,7 +124,7 @@
   let customSize = $state<number>(1);
   let customLocation = $state<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
   let springOrTweenType = $state<"spring" | "tween">("spring");
-  let customImpulseEasing = $state<keyof typeof easingFunctions>("linear");
+  let customImpulseEasing = $state<keyof typeof easingFunctions>("cubicIn");
 
   // Helper for multi-select
   function toggleTarget(val: "motion" | "scale" | "opacity") {
@@ -182,6 +182,7 @@
         <select bind:value={flairBoxProps.visibility}>
           <option value="always">always</option>
           <option value="moving">moving</option>
+          <option value="maskwave">maskwave</option>
         </select>
       </label>
       <label>

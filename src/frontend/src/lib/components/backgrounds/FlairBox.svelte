@@ -16,7 +16,7 @@
   import { quadOut } from "svelte/easing";
   import { Spring, Tween } from "svelte/motion";
   import type { FlairBoxProps } from "./FlairBox";
-  import { NodeMotion } from "./FlairCanvas";
+  import type { NodeMotion } from "./FlairCanvas";
 
   let {
     bgType = "dots",
