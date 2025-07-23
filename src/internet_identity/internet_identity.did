@@ -516,16 +516,14 @@ type AuthnMethodConfirmationError = variant {
 };
 
 type AuthnMethodRegistrationModeEnterError = variant { 
-    InvalidId : text;
-    AuthorizationFailure : text;
-};
-
-type CheckTentativeDeviceError = variant {
-    Unauthorized;
+    InvalidRegistrationId : text;
+    Unauthorized : principal;
+    AlreadyInProgress;
+    InternalError : text;
 };
 
 type LookupByRegistrationIdError = variant {
-    InvalidId : text;
+    InvalidRegistrationId : text;
 };
 
 type IdentityAuthnInfo = record {
@@ -870,9 +868,7 @@ service : (opt InternetIdentityInit) -> {
     // Requires authentication.
     authn_method_confirm : (IdentityNumber, confirmation_code : text) -> (variant { Ok; Err : AuthnMethodConfirmationError });
 
-    authn_method_check_tentative_device : (IdentityNumber) -> (variant { Ok : bool; Err: CheckTentativeDeviceError }) query;
-
-    authn_method_lookup_by_registration_mode_id : (RegistrationId) -> (variant { Ok : opt IdentityNumber; Err : LookupByRegistrationIdError }) query;
+    lookup_by_registration_mode_id : (RegistrationId) -> (opt IdentityNumber) query;
 
     // Authentication protocol
     // =======================

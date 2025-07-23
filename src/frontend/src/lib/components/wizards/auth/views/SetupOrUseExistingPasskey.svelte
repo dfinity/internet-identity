@@ -3,26 +3,22 @@
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { handleError } from "$lib/components/utils/error";
 
   interface Props {
     setupNew: () => void;
     useExisting: () => Promise<void>;
-    onError?: (error: unknown) => void;
   }
 
-  const { setupNew, useExisting, onError = handleError }: Props = $props();
+  const { setupNew, useExisting }: Props = $props();
 
-  let loading = $state(false);
+  let isAuthenticating = $state(false);
 
   const handleUseExisting = async () => {
-    loading = true;
+    isAuthenticating = true;
     try {
       await useExisting();
-    } catch (error) {
-      onError(error);
     } finally {
-      loading = false;
+      isAuthenticating = false;
     }
   };
 </script>
@@ -38,16 +34,16 @@
   </p>
 </div>
 <div class="flex flex-col gap-3">
-  <Button onclick={setupNew} size="lg" disabled={loading}
+  <Button onclick={setupNew} size="lg" disabled={isAuthenticating}
     >Set up a new Passkey</Button
   >
   <Button
     onclick={handleUseExisting}
     variant="secondary"
     size="lg"
-    disabled={loading}
+    disabled={isAuthenticating}
   >
-    {#if loading}
+    {#if isAuthenticating}
       <ProgressRing />
       <span>Authenticating...</span>
     {:else}

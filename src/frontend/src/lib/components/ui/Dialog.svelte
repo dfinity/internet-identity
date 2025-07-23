@@ -17,8 +17,8 @@
     children,
     onClose,
     class: className,
-    closeOnOutsideClick = true,
-    showCloseButton = true,
+    closeOnOutsideClick = nonNullish(onClose),
+    showCloseButton = nonNullish(onClose),
     backdrop = true,
     ...props
   }: Props = $props();

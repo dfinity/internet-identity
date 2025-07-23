@@ -8,23 +8,18 @@
   import { fade } from "svelte/transition";
   import PlaceHolder from "./PlaceHolder.svelte";
   import Ellipsis from "../utils/Ellipsis.svelte";
+  import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
+  import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
 
   let {
     accessMethod,
     class: classes,
+    isCurrent,
   }: {
     accessMethod: AuthnMethodData | OpenIdCredential | null;
     class?: string;
+    isCurrent?: boolean;
   } = $props();
-
-  const getAuthnMethodAlias = (authnMethod: AuthnMethodData) => {
-    const metadataAlias = authnMethod.metadata.find(
-      ([key, _val]) => key === "alias",
-    )?.[1]!;
-    if (metadataAlias && "String" in metadataAlias) {
-      return metadataAlias.String;
-    }
-  };
 
   const getOpenIdCredentialName = (credential: OpenIdCredential | null) => {
     if (!credential) return null;
@@ -73,9 +68,22 @@
     >
       <div class="flex min-w-32 items-center pr-3">
         {getAuthnMethodAlias(accessMethod)}
+        {#if isCurrent}
+          <span class="ml-2" aria-label="Current Passkey">
+            <PulsatingCircleIcon />
+          </span>
+        {/if}
       </div>
-      {#if nonNullish(accessMethod.last_authentication[0])}
-        <div class="text-text-tertiary flex items-center font-normal">
+      {#if isCurrent}
+        <div
+          class="text-text-tertiary flex items-center font-normal md:justify-end"
+        >
+          <span>Last used now</span>
+        </div>
+      {:else if nonNullish(accessMethod.last_authentication[0])}
+        <div
+          class="text-text-tertiary flex items-center font-normal md:justify-end"
+        >
           Last used {formatLastUsage(
             new Date(
               Number(accessMethod.last_authentication[0] / BigInt(1000000)),
@@ -96,23 +104,46 @@
     >
       {#if openIdHasName && openIdHasEmail}
         <div class="flex min-w-32 flex-col justify-center pr-3">
-          <div>{getOpenIdCredentialName(accessMethod)}</div>
+          <div class="flex items-center gap-2">
+            <span>
+              {getOpenIdCredentialName(accessMethod)}
+            </span>
+            {#if isCurrent}
+              <PulsatingCircleIcon />
+            {/if}
+          </div>
           <div class="text-text-tertiary font-extralight">
             <Ellipsis text={getOpenIdCredentialEmail(accessMethod)!}></Ellipsis>
           </div>
         </div>
       {:else if !openIdHasName && openIdHasEmail}
-        <div class="flex min-w-32 items-center pr-3">
+        <div class="flex min-w-32 items-center gap-2 pr-3">
           <Ellipsis text={getOpenIdCredentialEmail(accessMethod)!}></Ellipsis>
+          {#if isCurrent}
+            <PulsatingCircleIcon />
+          {/if}
         </div>
       {:else if openIdHasName && !openIdHasEmail}
-        <div class="min-w-32 pr-3">
-          {getOpenIdCredentialName(accessMethod)}
+        <div class="flex min-w-32 items-center gap-2 pr-3">
+          <span>
+            {getOpenIdCredentialName(accessMethod)}
+          </span>
+          {#if isCurrent}
+            <PulsatingCircleIcon />
+          {/if}
         </div>
       {/if}
 
-      {#if nonNullish(accessMethod.last_usage_timestamp[0])}
-        <div class="text-text-tertiary flex items-center font-normal">
+      {#if isCurrent}
+        <div
+          class="text-text-tertiary flex items-center font-normal md:justify-end"
+        >
+          Last used now
+        </div>
+      {:else if nonNullish(accessMethod.last_usage_timestamp[0])}
+        <div
+          class="text-text-tertiary flex items-center font-normal md:justify-end"
+        >
           Last used {formatLastUsage(
             new Date(
               Number(accessMethod.last_usage_timestamp[0] / BigInt(1000000)),

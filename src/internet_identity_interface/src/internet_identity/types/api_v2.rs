@@ -5,6 +5,7 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 pub type IdentityNumber = u64;
+pub type RegistrationId = String;
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum MetadataEntryV2 {
@@ -138,8 +139,10 @@ pub enum AuthnMethodRegisterError {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodRegistrationModeEnterError {
-    AuthorizationFailure(String),
-    InvalidId(String),
+    Unauthorized(Principal),
+    InternalError(String),
+    AlreadyInProgress,
+    InvalidRegistrationId(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -241,15 +244,7 @@ pub enum CreateIdentityData {
     OpenID(OpenIDRegFinishArg),
 }
 
-#[derive(CandidType, Clone, Eq, PartialEq, Hash)]
-pub struct RegistrationId(String);
-
-#[derive(CandidType, Deserialize, Debug)]
-pub enum CheckTentativeDeviceError {
-    Unauthorized,
-}
-
 #[derive(CandidType, Deserialize, Debug)]
 pub enum LookupByRegistrationIdError {
-    InvalidId(String),
+    InvalidRegistrationId(String),
 }

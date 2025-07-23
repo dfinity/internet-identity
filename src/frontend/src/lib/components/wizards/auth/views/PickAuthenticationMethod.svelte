@@ -6,30 +6,28 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import { handleError } from "$lib/components/utils/error";
+  import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
-    onError?: (error: unknown) => void;
+    continueFromAnotherDevice: () => void;
   }
 
   const {
     setupOrUseExistingPasskey,
     continueWithGoogle,
-    onError = handleError,
+    continueFromAnotherDevice,
   }: Props = $props();
 
-  let googleLoading = $state(false);
+  let isAuthenticating = $state(false);
 
   const handleContinueWithGoogle = async () => {
-    googleLoading = true;
+    isAuthenticating = true;
     try {
       await continueWithGoogle();
-    } catch (error) {
-      onError(error);
     } finally {
-      googleLoading = false;
+      isAuthenticating = false;
     }
   };
 
@@ -48,7 +46,7 @@
   <div class="flex flex-col items-stretch gap-3">
     <Button
       onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || googleLoading}
+      disabled={!supportsPasskeys || isAuthenticating}
       size="xl"
     >
       <PasskeyIcon />
@@ -58,16 +56,26 @@
       <Button
         onclick={handleContinueWithGoogle}
         variant="secondary"
-        disabled={googleLoading}
+        disabled={isAuthenticating}
         size="xl"
       >
-        {#if googleLoading}
+        {#if isAuthenticating}
           <ProgressRing />
           <span>Authenticating with Google...</span>
         {:else}
           <GoogleIcon />
           <span>Continue with Google</span>
         {/if}
+      </Button>
+    {/if}
+    {#if $CONTINUE_FROM_ANOTHER_DEVICE}
+      <Button
+        onclick={continueFromAnotherDevice}
+        variant="tertiary"
+        disabled={isAuthenticating}
+        size="xl"
+      >
+        Continue from another device
       </Button>
     {/if}
   </div>

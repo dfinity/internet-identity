@@ -4,6 +4,14 @@ import {
 } from "$lib/generated/internet_identity_types";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
+/**
+ * Check if a `AuthnMethodData` or `OpenIdCredential` is a WebAuthn method
+ */
+export const isWebAuthnMetaData = (
+  accessMethod: AuthnMethodData | OpenIdCredential,
+): accessMethod is AuthnMethodData =>
+  "authn_method" in accessMethod && "WebAuthn" in accessMethod.authn_method;
+
 export const getLastUsedAccessMethod = (
   authnMethods: AuthnMethodData[],
   openIdCredentials: OpenIdCredential[],

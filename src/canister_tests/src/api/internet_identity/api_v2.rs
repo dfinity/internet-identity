@@ -299,6 +299,23 @@ pub fn authn_method_confirm(
     .map(|(x,)| x)
 }
 
+pub fn lookup_by_registration_mode_id(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    id: String,
+) -> Result<Option<IdentityNumber>, CallError> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "lookup_by_registration_mode_id",
+        (id,),
+    )
+    .map(|(x,)| x)
+}
+
 pub fn authn_method_check_tentative_device(
     env: &PocketIc,
     canister_id: CanisterId,

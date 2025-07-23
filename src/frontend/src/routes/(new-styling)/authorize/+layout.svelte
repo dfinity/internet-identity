@@ -25,7 +25,8 @@
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
-  import AuthDialog from "$lib/components/views/AuthDialog.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import { AuthWizard } from "$lib/components/wizards/auth";
 
   const { children }: LayoutProps = $props();
 
@@ -41,6 +42,7 @@
   let identityButtonRef = $state<HTMLElement>();
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
+  let isAuthenticating = $state(false);
 
   const gotoAccounts = () =>
     goto("/authorize/account", {
@@ -108,13 +110,30 @@
         </Popover>
       {/if}
       {#if isAuthDialogOpen}
-        <AuthDialog
-          title="Use another identity"
-          subtitle="Choose method"
-          {onSignIn}
-          {onSignUp}
+        <Dialog
           onClose={() => (isAuthDialogOpen = false)}
-        />
+          showCloseButton={!isAuthenticating}
+          closeOnOutsideClick={!isAuthenticating}
+        >
+          <AuthWizard
+            bind:isAuthenticating
+            {onSignIn}
+            {onSignUp}
+            onOtherDevice={() => (isAuthDialogOpen = false)}
+            onError={(error) => {
+              isAuthDialogOpen = false;
+              handleError(error);
+            }}
+            withinDialog
+          >
+            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+              Use another identity
+            </h1>
+            <p class="text-text-secondary mb-6 self-start text-sm">
+              choose method
+            </p>
+          </AuthWizard>
+        </Dialog>
       {/if}
     {/if}
   </Header>

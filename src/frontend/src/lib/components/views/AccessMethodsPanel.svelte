@@ -1,7 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
+  import { EditIcon, Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
@@ -15,14 +15,26 @@
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
   import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
+  import RenamePasskeyDialog from "$lib/components/views/RenamePasskeyDialog.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
-  import AddAccessMethodWizard from "$lib/components/wizards/AddAccessMethodWizard.svelte";
+  import {
+    getLastUsedAccessMethod,
+    isWebAuthnMetaData,
+  } from "$lib/utils/accessMethods";
+  import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
+  import { authnMethodEqual, getAuthnMethodAlias } from "$lib/utils/webAuthn";
 
   const MAX_PASSKEYS = 8;
 
   let isAddAccessMethodWizardOpen = $state(false);
 
+  const lastUsedAccessMethod = $derived(
+    getLastUsedAccessMethod(
+      identityInfo.authnMethods,
+      identityInfo.openIdCredentials,
+    ),
+  );
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const authnMethods = $derived(identityInfo.authnMethods);
   const isMaxOpenIdCredentialsReached = $derived(
@@ -81,12 +93,24 @@
       handleError(error);
     }
   };
+
+  const handleRenamePasskey = async (newName: string) => {
+    try {
+      await identityInfo.renamePasskey(newName);
+    } catch (error) {
+      handleError(error);
+    }
+  };
+
+  const isCurrentAccessMethod = (accessMethod: AuthnMethodData) => {
+    return (
+      nonNullish(lastUsedAccessMethod) &&
+      isWebAuthnMetaData(lastUsedAccessMethod) &&
+      authnMethodEqual(accessMethod, lastUsedAccessMethod)
+    );
+  };
 </script>
 
-<h1 class="text-text-primary mb-4 text-3xl font-semibold">Security</h1>
-<p class="text-text-tertiary text-md mb-12">
-  Settings and recommendations to keep your identity secure
-</p>
 <Panel>
   <div class="flex flex-col justify-between gap-5 p-4 pb-5 md:flex-row">
     <div>
@@ -122,13 +146,25 @@
         >
           <PasskeyIcon />
         </div>
-        <AccessMethod accessMethod={authnMethod} />
-        <div class="flex items-center justify-center pr-4">
+        <AccessMethod
+          accessMethod={authnMethod}
+          isCurrent={isCurrentAccessMethod(authnMethod)}
+        />
+        <div class="flex items-center justify-end gap-2 px-4">
+          <Button
+            onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
+            variant="tertiary"
+            iconOnly
+            aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
+          >
+            <EditIcon size="1.25rem" />
+          </Button>
           {#if isRemoveAccessMethodVisible}
             <Button
               onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
               variant="tertiary"
               iconOnly
+              aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
               class="!text-fg-error-secondary"
             >
               <Trash2Icon size="1.25rem" />
@@ -147,9 +183,14 @@
           <GoogleIcon />
         </div>
 
-        <AccessMethod accessMethod={credential} />
+        <AccessMethod
+          accessMethod={credential}
+          isCurrent={nonNullish(lastUsedAccessMethod) &&
+            !isWebAuthnMetaData(lastUsedAccessMethod) &&
+            lastUsedAccessMethod.sub === credential.sub}
+        />
 
-        <div class="flex items-center justify-center pr-4">
+        <div class="flex items-center justify-end px-4">
           {#if isRemoveAccessMethodVisible}
             <Button
               onclick={() =>
@@ -180,6 +221,14 @@
     onRemove={handleRemovePasskey}
     onClose={() => (identityInfo.removableAuthnMethod = null)}
     isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
+  />
+{/if}
+
+{#if identityInfo.renamableAuthnMethod}
+  <RenamePasskeyDialog
+    currentName={getAuthnMethodAlias(identityInfo.renamableAuthnMethod)}
+    onRename={handleRenamePasskey}
+    onClose={() => (identityInfo.renamableAuthnMethod = null)}
   />
 {/if}
 

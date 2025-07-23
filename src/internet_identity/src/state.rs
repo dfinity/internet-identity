@@ -1,4 +1,4 @@
-use crate::anchor_management::tentative_device_registration::RegistrationId;
+use crate::anchor_management::tentative_device_registration::ValidatedRegistrationId;
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
@@ -46,7 +46,7 @@ thread_local! {
 pub struct TentativeDeviceRegistration {
     pub expiration: Timestamp,
     pub state: RegistrationState,
-    pub id: Option<RegistrationId>,
+    pub id: Option<ValidatedRegistrationId>,
 }
 
 impl TentativeDeviceRegistration {
@@ -221,7 +221,7 @@ struct State {
     // if an anchor number is present in this map then registration mode is active until expiration
     tentative_device_registrations: RefCell<HashMap<AnchorNumber, TentativeDeviceRegistration>>,
     // lookup table so we can easily return a user's active registrations in identity_info
-    lookup_tentative_device_registration: RefCell<HashMap<RegistrationId, AnchorNumber>>,
+    lookup_tentative_device_registration: RefCell<HashMap<ValidatedRegistrationId, AnchorNumber>>,
     // additional usage metrics, NOT persisted across updates (but probably should be in the future)
     usage_metrics: RefCell<UsageMetrics>,
     // State that is temporarily persisted in stable memory during upgrades using
@@ -346,13 +346,13 @@ pub fn tentative_device_registrations_mut<R>(
 }
 
 pub fn lookup_tentative_device_registration<R>(
-    f: impl FnOnce(&HashMap<RegistrationId, AnchorNumber>) -> R,
+    f: impl FnOnce(&HashMap<ValidatedRegistrationId, AnchorNumber>) -> R,
 ) -> R {
     STATE.with(|s| f(&s.lookup_tentative_device_registration.borrow()))
 }
 
 pub fn lookup_tentative_device_registration_mut<R>(
-    f: impl FnOnce(&mut HashMap<RegistrationId, AnchorNumber>) -> R,
+    f: impl FnOnce(&mut HashMap<ValidatedRegistrationId, AnchorNumber>) -> R,
 ) -> R {
     STATE.with(|s| f(&mut s.lookup_tentative_device_registration.borrow_mut()))
 }
@@ -363,17 +363,15 @@ pub fn get_tentative_device_registration_by_identity(
     tentative_device_registrations(|registrations| registrations.get(&identity_number).cloned())
 }
 
-pub fn get_identity_number_by_registration_id(id: &RegistrationId) -> Option<IdentityNumber> {
+pub fn get_identity_number_by_registration_id(
+    id: &ValidatedRegistrationId,
+) -> Option<IdentityNumber> {
     lookup_tentative_device_registration(|lookup| lookup.get(id).copied()).and_then(
         |identity_number| {
-            if let Some(TentativeDeviceRegistration { expiration, .. }) =
-                get_tentative_device_registration_by_identity(identity_number)
-            {
-                if expiration > time() {
-                    Some(identity_number)
-                } else {
-                    None
-                }
+            let TentativeDeviceRegistration { expiration, .. } =
+                get_tentative_device_registration_by_identity(identity_number)?;
+            if expiration > time() {
+                Some(identity_number)
             } else {
                 None
             }

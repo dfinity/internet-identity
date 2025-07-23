@@ -6,8 +6,7 @@ use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, install_ii_with_archive, time};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
-    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError, CheckTentativeDeviceError,
-    LookupByRegistrationIdError,
+    AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError,
 };
 use pocket_ic::CallError;
 use std::time::Duration;
@@ -50,13 +49,12 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
         Principal::anonymous(),
         identity_number,
         Some(registration_mode_id),
-    );
+    )
+    .expect("authn_method_registration_mode_enter failed");
 
     assert!(matches!(
-        result.unwrap(),
-        Err(AuthnMethodRegistrationModeEnterError::AuthorizationFailure(
-            _
-        ))
+        result,
+        Err(AuthnMethodRegistrationModeEnterError::Unauthorized(_))
     ))
 }
 
@@ -353,26 +351,22 @@ fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_false_when_no_tentative_device() -> Result<(), CallError> {
+fn should_return_no_registration_when_no_tentative_device() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
-    let result = api_v2::authn_method_check_tentative_device(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity_info failed");
 
-    assert!(!result);
+    assert!(identity_info.authn_method_registration.is_none());
     Ok(())
 }
 
 #[test]
-fn should_return_true_when_tentative_device_not_verified() -> Result<(), CallError> {
+fn should_return_registrations_when_tentative_device_not_verified() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -398,20 +392,16 @@ fn should_return_true_when_tentative_device_not_verified() -> Result<(), CallErr
     )?
     .expect("authn_method_register failed");
 
-    let result = api_v2::authn_method_check_tentative_device(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity_info failed");
 
-    assert!(result);
+    assert!(identity_info.authn_method_registration.is_some());
     Ok(())
 }
 
 #[test]
-fn should_return_false_when_tentative_device_verified() -> Result<(), CallError> {
+fn should_return_no_registrations_when_tentative_device_verified() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -447,20 +437,16 @@ fn should_return_false_when_tentative_device_verified() -> Result<(), CallError>
     )?
     .expect("authn_method_confirm failed");
 
-    let result = api_v2::authn_method_check_tentative_device(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity_info failed");
 
-    assert!(!result);
+    assert!(identity_info.authn_method_registration.is_none());
     Ok(())
 }
 
 #[test]
-fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
+fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -495,36 +481,12 @@ fn should_return_false_after_registration_mode_exit() -> Result<(), CallError> {
     )?
     .expect("authn_method_registration_mode_exit failed");
 
-    let result = api_v2::authn_method_check_tentative_device(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-    )?
-    .expect("check_tentative_device_verified failed");
+    let identity_info =
+        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
+            .expect("identity_info failed");
 
-    assert!(!result);
+    assert!(identity_info.authn_method_registration.is_none());
     Ok(())
-}
-
-#[test]
-fn should_require_authentication_to_check_tentative_device() {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method = test_authn_method();
-    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
-
-    let result = api_v2::authn_method_check_tentative_device(
-        &env,
-        canister_id,
-        Principal::anonymous(),
-        identity_number,
-    );
-
-    assert!(matches!(
-        result,
-        Ok(Err(CheckTentativeDeviceError::Unauthorized))
-    ));
 }
 
 #[test]
@@ -545,13 +507,12 @@ fn should_return_identity_number_for_existing_registration_id() -> Result<(), Ca
     )?
     .expect("authn_method_registration_mode_enter failed");
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result, Some(identity_number));
     Ok(())
@@ -584,13 +545,12 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
     )?
     .expect("authn_method_registration_mode_exit failed");
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
     assert!(result.is_none());
     Ok(())
 }
@@ -631,13 +591,12 @@ fn should_return_none_after_tentative_device_confirmation() -> Result<(), CallEr
     )?
     .expect("authn_method_confirm failed");
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert!(result.is_none());
     Ok(())
@@ -665,55 +624,65 @@ fn should_return_none_after_registration_mode_expiration() -> Result<(), CallErr
     // Advance time past expiration
     env.advance_time(REGISTRATION_MODE_EXPIRATION + std::time::Duration::from_secs(1));
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert!(result.is_none());
     Ok(())
 }
 
 #[test]
-fn should_reject_registration_id_too_short() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_too_short() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abc1".to_string(); // Too short
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         invalid_id,
     )?;
 
-    assert!(matches!(
-        result,
-        Err(LookupByRegistrationIdError::InvalidId(_))
-    ));
+    assert!(result.is_none());
     Ok(())
 }
 
 #[test]
-fn should_reject_registration_id_too_long() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_too_long() -> Result<(), CallError> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdef".to_string(); // Too long
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         invalid_id,
     )?;
 
-    assert!(matches!(
-        result,
-        Err(LookupByRegistrationIdError::InvalidId(_))
-    ));
+    assert!(result.is_none());
+    Ok(())
+}
+
+#[test]
+fn should_return_none_for_registration_id_invalid_chars() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let invalid_id = "abcdç".to_string(); // Invalid chars
+
+    let result = api_v2::lookup_by_registration_mode_id(
+        &env,
+        canister_id,
+        Principal::anonymous(),
+        invalid_id,
+    )?;
+
+    assert!(result.is_none());
     Ok(())
 }
 
@@ -751,21 +720,19 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
     .expect("authn_method_registration_mode_enter failed");
 
     // Verify both lookups work correctly
-    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result1 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id1,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
-    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id2,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result1, Some(identity_number1));
     assert_eq!(result2, Some(identity_number2));
@@ -815,21 +782,19 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     .expect("authn_method_registration_mode_enter failed");
 
     // Verify both lookups work correctly
-    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result1 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id1.clone(),
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
-    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id2.clone(),
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result1, None);
     assert_eq!(result2, Some(identity_number2));
@@ -844,21 +809,19 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
     .expect("authn_method_registration_mode_enter failed");
 
     // Verify both lookups work correctly
-    let result1 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result1 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id1,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
-    let result2 = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result2 = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         registration_mode_id2,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert_eq!(result1, None);
     assert_eq!(result2, None);
@@ -872,14 +835,80 @@ fn should_return_none_for_nonexistent_registration_id() -> Result<(), CallError>
     let canister_id = install_ii_with_archive(&env, None, None);
     let nonexistent_id = "abc12".to_string();
 
-    let result = api_v2::authn_method_lookup_by_registration_mode_id(
+    let result = api_v2::lookup_by_registration_mode_id(
         &env,
         canister_id,
         Principal::anonymous(),
         nonexistent_id,
-    )?
-    .expect("lookup_by_registration_mode_id failed");
+    )?;
 
     assert!(result.is_none());
+    Ok(())
+}
+
+#[test]
+fn should_reject_second_registration_with_different_id() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let authn_method = test_authn_method();
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let first_registration_id = "0fZr4".to_string();
+    let second_registration_id = "abc12".to_string();
+
+    // First call with the first registration ID should succeed
+    api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(first_registration_id),
+    )?
+    .expect("First authn_method_registration_mode_enter failed");
+
+    // Second call with a different registration ID should fail with InvalidRegistrationId
+    let result = api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(second_registration_id.clone()),
+    )?;
+
+    assert!(matches!(
+        result,
+        Err(AuthnMethodRegistrationModeEnterError::AlreadyInProgress)
+    ));
+    Ok(())
+}
+
+#[test]
+fn should_return_registration_with_same_id() -> Result<(), CallError> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let authn_method = test_authn_method();
+    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let first_registration_id = "0fZr4".to_string();
+
+    // First call with the first registration ID should succeed
+    let result_1 = api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(first_registration_id.clone()),
+    )?
+    .expect("First authn_method_registration_mode_enter failed");
+
+    // Second call with a different registration ID should fail with InvalidRegistrationId
+    let result_2 = api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method.principal(),
+        identity_number,
+        Some(first_registration_id.clone()),
+    )?
+    .expect("Second authn_method_registration_mode_enter failed");
+
+    assert_eq!(result_1, result_2);
     Ok(())
 }

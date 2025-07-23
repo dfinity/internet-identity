@@ -1,18 +1,8 @@
 <script lang="ts">
-  import SideBarElement from "$lib/components/ui/SideBarElement.svelte";
-  import SideBarOrTabs from "$lib/components/layout/SideBarOrTabs.svelte";
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
-  import {
-    ChevronDownIcon,
-    LucideHome,
-    Shield,
-    UserIcon,
-  } from "@lucide/svelte";
-  import SideBarElementGroup from "$lib/components/ui/SideBarElementGroup.svelte";
+  import { ChevronDownIcon } from "@lucide/svelte";
   import { fly } from "svelte/transition";
   import { page } from "$app/state";
-  import TabElement from "$lib/components/ui/TabElement.svelte";
-  import TabElementGroup from "$lib/components/ui/TabElementGroup.svelte";
   import { beforeNavigate, goto } from "$app/navigation";
   import { isDesktopViewport } from "$lib/utils/UI/deviceDetection";
   import { expoIn, expoOut } from "svelte/easing";
@@ -22,9 +12,13 @@
   import Button from "$lib/components/ui/Button.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
-  import AuthDialog from "$lib/components/views/AuthDialog.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import MainContent from "$lib/components/layout/MainContent.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
+  import Footer from "$lib/components/layout/Footer.svelte";
 
   const { children } = $props();
 
@@ -38,6 +32,7 @@
 
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
+  let isAuthenticating = $state(false);
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -150,31 +145,32 @@
   });
 </script>
 
-<SideBarOrTabs>
-  {#snippet sidebarElements()}
-    <SideBarElementGroup bind:bindableGroupRef={sideBarGroupRef}>
-      <SideBarElement href="/manage">
-        <LucideHome size="1rem" class="stroke-fg-quaternary" />
-        <h1>Home</h1>
-      </SideBarElement>
-      <SideBarElement class="text-text-primary" href="/manage/security">
-        <Shield size="1rem" class="stroke-fg-quaternary" />
-        <h1>Security</h1>
-      </SideBarElement>
-    </SideBarElementGroup>
-  {/snippet}
+<!-- TODO: Reenable with SideBarOrTabs once we support multiple dashboard pages -->
+<!-- {#snippet sidebarElements()}
+  <SideBarElementGroup bind:bindableGroupRef={sideBarGroupRef}>
+    <SideBarElement href="/manage">
+      <LucideHome size="1rem" class="stroke-fg-quaternary" />
+      <h1>Home</h1>
+    </SideBarElement>
+    <SideBarElement class="text-text-primary" href="/manage/security">
+      <Shield size="1rem" class="stroke-fg-quaternary" />
+      <h1>Security</h1>
+    </SideBarElement>
+  </SideBarElementGroup>
+{/snippet}
 
-  {#snippet tabElements()}
-    <TabElementGroup bind:bindableGroupRef={tabsGroupRef}>
-      <TabElement class="text-text-primary" href="/manage">
-        <h1>Home</h1>
-      </TabElement>
-      <TabElement class="text-text-primary" href="/manage/security">
-        <h1>Security</h1>
-      </TabElement>
-    </TabElementGroup>
-  {/snippet}
+{#snippet tabElements()}
+  <TabElementGroup bind:bindableGroupRef={tabsGroupRef}>
+    <TabElement class="text-text-primary" href="/manage">
+      <h1>Home</h1>
+    </TabElement>
+    <TabElement class="text-text-primary" href="/manage/security">
+      <h1>Security</h1>
+    </TabElement>
+  </TabElementGroup>
+{/snippet} -->
 
+<MainContent>
   {#snippet content()}
     {#key page.url.pathname}
       <div
@@ -235,23 +231,34 @@
         </Popover>
       {/if}
       {#if isAuthDialogOpen}
-        <AuthDialog
-          title="Use another identity"
-          subtitle="Choose method"
-          {onSignIn}
-          {onSignUp}
+        <Dialog
           onClose={() => (isAuthDialogOpen = false)}
-        />
+          showCloseButton={!isAuthenticating}
+          closeOnOutsideClick={!isAuthenticating}
+        >
+          <AuthWizard
+            bind:isAuthenticating
+            {onSignIn}
+            {onSignUp}
+            onOtherDevice={() => (isAuthDialogOpen = false)}
+            onError={(error) => {
+              isAuthDialogOpen = false;
+              handleError(error);
+            }}
+            withinDialog
+          >
+            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+              Use another identity
+            </h1>
+            <p class="text-text-secondary mb-6 self-start text-sm">
+              choose method
+            </p>
+          </AuthWizard>
+        </Dialog>
       {/if}
     </div>
   {/snippet}
   {#snippet footer()}
-    <div class="flex px-8 py-4">
-      <p class="text-text-primary">© Internet Identity</p>
-      <div class="flex-1"></div>
-      <ButtonOrAnchor class="text-text-primary hover:underline" href="/support"
-        >Support</ButtonOrAnchor
-      >
-    </div>
+    <Footer />
   {/snippet}
-</SideBarOrTabs>
+</MainContent>

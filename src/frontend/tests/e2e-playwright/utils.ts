@@ -1,8 +1,12 @@
 import { Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
+import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 
+const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
 export const TEST_APP_URL = "https://nice-name.com";
+export const NOT_TEST_APP_URL = "https://very-nice-name.com";
+export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
 export type DummyAuthFn = (page: Page) => void;
 
@@ -57,6 +61,48 @@ export const authorize = async (
 };
 
 /**
+ * Creates a new identity in II page assuming there is no stored identity
+ *
+ * @param page
+ * @param name
+ * @param dummyAuth
+ */
+export const createNewIdentityInII = async (
+  page: Page,
+  name: string,
+  dummyAuth: DummyAuthFn,
+): Promise<void> => {
+  // Wait for page to load
+  await Promise.any([
+    page.getByRole("button", { name: "Continue with Passkey" }).waitFor(),
+    page.getByRole("button", { name: "Switch identity" }).waitFor(),
+  ]);
+
+  // Check if we're on the continue screen or not
+  const onContinueScreen = await page
+    .getByRole("button", { name: "Continue with Passkey" })
+    .isHidden();
+  if (onContinueScreen) {
+    // If we're on the continue screen, go through the identity switcher
+    await page.getByRole("button", { name: "Switch identity" }).click();
+    await page.getByRole("button", { name: "Use another identity" }).click();
+  }
+
+  // Create passkey identity
+  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await page.getByLabel("Identity name").fill(name);
+  dummyAuth(page);
+  await page.getByRole("button", { name: "Create Passkey" }).click();
+
+  if (onContinueScreen) {
+    // If we're coming from the continue screen (through identity switcher),
+    // we'll also need to explicitly select the primary account to continue.
+    await page.getByRole("button", { name: "Primary account" }).click();
+  }
+};
+
+/**
  * Create passkey identity with dummy auth
  * @param page The authorization page (either initial or continue)
  * @param name The name that should be given to the identity
@@ -68,40 +114,7 @@ export const createIdentity = (
   dummyAuth: DummyAuthFn,
 ): Promise<string> =>
   authorize(page, async (authPage) => {
-    // Wait for page to load
-    await Promise.any([
-      authPage.getByRole("button", { name: "Continue with Passkey" }).waitFor(),
-      authPage.getByRole("button", { name: "Switch identity" }).waitFor(),
-    ]);
-
-    // Check if we're on the continue screen or not
-    const onContinueScreen = await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .isHidden();
-    if (onContinueScreen) {
-      // If we're on the continue screen, go through the identity switcher
-      await authPage.getByRole("button", { name: "Switch identity" }).click();
-      await authPage
-        .getByRole("button", { name: "Use another identity" })
-        .click();
-    }
-
-    // Create passkey identity
-    await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .click();
-    await authPage
-      .getByRole("button", { name: "Set up a new Passkey" })
-      .click();
-    await authPage.getByLabel("Identity name").fill(name);
-    dummyAuth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
-
-    if (onContinueScreen) {
-      // If we're coming from the continue screen (through identity switcher),
-      // we'll also need to explicitly select the primary account to continue.
-      await authPage.getByRole("button", { name: "Primary account" }).click();
-    }
+    await createNewIdentityInII(authPage, name, dummyAuth);
   });
 
 /**
@@ -112,4 +125,37 @@ export const createIdentity = (
 export const clearStorage = async (page: Page): Promise<void> => {
   await page.goto(II_URL);
   await page.evaluate(() => localStorage.clear());
+};
+
+export const addPasskeyCurrentDevice = async (
+  page: Page,
+  dummyAuth: DummyAuthFn,
+): Promise<void> => {
+  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  dummyAuth(page);
+  await page.getByRole("button", { name: "Create Passkey" }).click();
+};
+
+export const renamePasskey = async (
+  page: Page,
+  name: string,
+): Promise<void> => {
+  await expect(page.getByLabel("Rename passkey")).toHaveCount(1);
+  await page.getByLabel("Rename passkey").click();
+
+  // Wait for the rename dialog to open
+  await expect(
+    page.getByRole("heading", { name: "Rename passkey" }),
+  ).toBeVisible();
+
+  const input = page.getByRole("textbox");
+  await input.clear();
+  await input.fill(name);
+  await page.getByRole("button", { name: "Save" }).click();
+};
+
+export const signOut = async (page: Page): Promise<void> => {
+  await page.getByLabel("Switch identity").click();
+  await page.getByRole("button", { name: "Sign Out" }).click();
 };
