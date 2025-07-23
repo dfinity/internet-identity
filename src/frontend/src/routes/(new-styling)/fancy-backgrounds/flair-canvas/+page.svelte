@@ -105,6 +105,14 @@
     visibility: "always",
     hoverAction: "none",
     display: "behindBox",
+    noiseTimeScale: 1500,
+    enableRandomOpacity: false,
+    opacityNoiseScale: "medium",
+    opacityNoiseMultiplier: "medium",
+    enableRandomPointSize: false,
+    pointSizeNoiseMultiplier: "medium",
+    pointSizeNoiseScale: "medium",
+
     backgroundClasses: "",
     foregroundClasses: "",
   });
@@ -284,6 +292,99 @@
           <option value="bottom">bottom</option>
         </select>
       </label>
+      <!-- Randomization control -->
+      <label>
+        <input
+          type="checkbox"
+          bind:checked={flairBoxProps.enableRandomOpacity}
+        />
+        Enable Random Opacity
+      </label>
+      {#if flairBoxProps.enableRandomOpacity}
+        <div>
+          <label>
+            Opacity Noise Scale:
+            <select bind:value={flairBoxProps.opacityNoiseScale}>
+              <option value="large">Large</option>
+              <option value="medium">Medium</option>
+              <option value="small">Small</option>
+              <option value={0}>Custom</option>
+            </select>
+            {#if typeof flairBoxProps.opacityNoiseScale === "number"}
+              <input
+                type="number"
+                bind:value={flairBoxProps.opacityNoiseScale}
+                min="0"
+                step="any"
+              />
+            {/if}
+          </label>
+          <label>
+            Opacity Noise Multiplier:
+            <select bind:value={flairBoxProps.opacityNoiseMultiplier}>
+              <option value="large">Large</option>
+              <option value="medium">Medium</option>
+              <option value="small">Small</option>
+              <option value={0}>Custom</option>
+            </select>
+            {#if typeof flairBoxProps.opacityNoiseMultiplier === "number"}
+              <input
+                type="number"
+                bind:value={flairBoxProps.opacityNoiseMultiplier}
+                min="0"
+                step="any"
+              />
+            {/if}
+          </label>
+        </div>
+      {/if}
+
+      <label>
+        <input
+          type="checkbox"
+          bind:checked={flairBoxProps.enableRandomPointSize}
+        />
+        Enable Random Point Size
+      </label>
+      {#if flairBoxProps.enableRandomPointSize}
+        <div>
+          <label>
+            Point Size Noise Scale:
+            <select bind:value={flairBoxProps.pointSizeNoiseScale}>
+              <option value="large">Large</option>
+              <option value="medium">Medium</option>
+              <option value="small">Small</option>
+              <option value={0}>Custom</option>
+            </select>
+            {#if typeof flairBoxProps.pointSizeNoiseScale === "number"}
+              <input
+                type="number"
+                bind:value={flairBoxProps.pointSizeNoiseScale}
+                min="0"
+                step="any"
+              />
+            {/if}
+          </label>
+          <label>
+            Point Size Noise Multiplier:
+            <select bind:value={flairBoxProps.pointSizeNoiseMultiplier}>
+              <option value="large">Large</option>
+              <option value="medium">Medium</option>
+              <option value="small">Small</option>
+              <option value={0}>Custom</option>
+            </select>
+            {#if typeof flairBoxProps.pointSizeNoiseMultiplier === "number"}
+              <input
+                type="number"
+                bind:value={flairBoxProps.pointSizeNoiseMultiplier}
+                min="0"
+                step="any"
+              />
+            {/if}
+          </label>
+        </div>
+      {/if}
+
       <!-- springOrTween -->
       <label>
         Spring/Tween:
@@ -568,6 +669,13 @@
     hoverAction={flairBoxProps.hoverAction}
     visibility={flairBoxProps.visibility}
     bgType={flairBoxProps.bgType as "dots" | "grid" | "noisedots"}
+    noiseTimeScale={1500}
+    enableRandomOpacity={flairBoxProps.enableRandomOpacity}
+    enableRandomPointSize={flairBoxProps.enableRandomPointSize}
+    opacityNoiseScale={flairBoxProps.opacityNoiseScale}
+    opacityNoiseMultiplier={flairBoxProps.opacityNoiseMultiplier}
+    pointSizeNoiseScale={flairBoxProps.pointSizeNoiseScale}
+    pointSizeNoiseMultiplier={flairBoxProps.pointSizeNoiseMultiplier}
     springOrTween={flairBoxProps.springOrTween?.type === "spring"
       ? {
           type: "spring",

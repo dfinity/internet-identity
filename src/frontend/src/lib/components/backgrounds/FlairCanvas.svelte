@@ -39,6 +39,13 @@
       stiffness: "medium",
       dampening: "medium",
     },
+    noiseTimeScale = 1500,
+    enableRandomOpacity = false,
+    opacityNoiseScale = 0.01,
+    opacityNoiseMultiplier = 1,
+    enableRandomPointSize = false,
+    pointSizeNoiseScale = 0.01,
+    pointSizeNoiseMultiplier = 1,
     backgroundClasses,
     foregroundClasses,
     triggerAnimation = $bindable(),
@@ -75,19 +82,17 @@
   });
 
   let motionNoiseScale = $state<number>(0.01);
-  let opacityNoiseScale = $state<number>(0.01);
-  let pointSizeNoiseScale = $state<number>(0.01);
-
-  let timeScale = $state<number>(1500);
 
   // --- Animation state ---
   let time = $state<number>(0);
 
   function animateNoise(now: number) {
-    if (bgType === "noisedots") {
-      time = now / timeScale; // seconds
-      requestAnimationFrame(animateNoise);
-    }
+    time =
+      now /
+      (typeof noiseTimeScale === "number"
+        ? noiseTimeScale
+        : noiseTimeScaleTable[noiseTimeScale]); // seconds
+    // requestAnimationFrame(animateNoise);
   }
 
   let clientHeight = $state<number>();
@@ -99,8 +104,8 @@
   const opacityNoise = new PerlinNoise3D();
   opacityNoise.noiseSeed(1);
 
-  const dotSizeNoise = new PerlinNoise3D();
-  dotSizeNoise.noiseSeed(2);
+  const pointSizeNoise = new PerlinNoise3D();
+  pointSizeNoise.noiseSeed(2);
 
   const spacingTable = {
     large: 100,
@@ -148,6 +153,36 @@
     light: 0.1,
     medium: 0.5,
     strong: 1,
+  };
+
+  const noiseTimeScaleTable = {
+    fast: 1000,
+    medium: 1500,
+    slow: 2000,
+  };
+
+  const opacityNoiseScaleTable = {
+    large: 0.11,
+    medium: 0.01,
+    small: 0.005,
+  };
+
+  const opacityNoiseMultiplierTable = {
+    large: 1,
+    medium: 0.7,
+    small: 0.3,
+  };
+
+  const pointSizeNoiseScaleTable = {
+    large: 0.01,
+    medium: 0.005,
+    small: 0.001,
+  };
+
+  const pointSizeNoiseMultiplierTable = {
+    large: 5,
+    medium: 1.5,
+    small: 1.1,
   };
 
   let xSpacing = $derived(
@@ -581,6 +616,35 @@
       typeof dotSize === "number" ? dotSize : dotSizeTable[dotSize],
       visibility,
       ctx,
+      "",
+      enableRandomOpacity
+        ? {
+            noise: opacityNoise,
+            noiseScale:
+              typeof opacityNoiseScale === "number"
+                ? opacityNoiseScale
+                : opacityNoiseScaleTable[opacityNoiseScale],
+            multiplier:
+              typeof opacityNoiseMultiplier === "number"
+                ? opacityNoiseMultiplier
+                : opacityNoiseMultiplierTable[opacityNoiseMultiplier],
+            noiseTime: time,
+          }
+        : null,
+      enableRandomPointSize
+        ? {
+            noise: pointSizeNoise,
+            noiseScale:
+              typeof pointSizeNoiseScale === "number"
+                ? pointSizeNoiseScale
+                : pointSizeNoiseScaleTable[pointSizeNoiseScale],
+            multiplier:
+              typeof pointSizeNoiseMultiplier === "number"
+                ? pointSizeNoiseMultiplier
+                : pointSizeNoiseMultiplierTable[pointSizeNoiseMultiplier],
+            noiseTime: time,
+          }
+        : null,
     );
 
     if (
@@ -602,6 +666,8 @@
         1,
       );
     }
+
+    animateNoise(now);
 
     requestAnimationFrame(render);
   };
@@ -644,12 +710,6 @@
   $effect(() => {
     if (xPositions.length > 0 && yPositions.length > 0) {
       createSpringsLocal(xPositions.length, yPositions.length);
-    }
-  });
-
-  $effect(() => {
-    if (bgType === "noisedots") {
-      requestAnimationFrame(animateNoise);
     }
   });
 

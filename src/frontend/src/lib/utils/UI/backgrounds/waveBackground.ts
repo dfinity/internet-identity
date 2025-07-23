@@ -10,6 +10,7 @@ import {
   FlairCanvasProps,
   NodeMotion,
 } from "$lib/components/backgrounds/FlairCanvas";
+import { nonNullish } from "@dfinity/utils";
 
 ////// ANIMATION //////
 export function createXYSprings(
@@ -653,28 +654,91 @@ export function drawNodes(
   radius: number,
   visibility: FlairCanvasProps["visibility"],
   ctx: CanvasRenderingContext2D,
+  hexColor?: string,
+  opacityNoise?: {
+    noise: PerlinNoise3D;
+    noiseScale: number;
+    multiplier: number;
+    noiseTime: number;
+  } | null,
+  pointSizeNoise?: {
+    noise: PerlinNoise3D;
+    noiseScale: number;
+    multiplier: number;
+    noiseTime: number;
+  } | null,
 ) {
   const body = document.querySelector("body");
   if (!body) return;
-  const color = getComputedStyle(body).getPropertyValue("--fg-tertiary").trim();
+  const color =
+    nonNullish(hexColor) && hexColor.length > 0
+      ? hexColor
+      : getComputedStyle(body).getPropertyValue("--fg-tertiary").trim();
   xPositions.forEach((xPos, xIndex) => {
     yPositions.forEach((yPos, yIndex) => {
       ctx.beginPath();
-      ctx.ellipse(
-        leftPos(xPos, xIndex, yIndex, offsetX, springs),
-        topPos(yPos, xIndex, yIndex, offsetY, springs),
-        radius,
-        radius,
-        0,
-        0,
-        360,
-        false,
-      );
+      if (pointSizeNoise) {
+        const pointSizeScalar =
+          pointSizeNoise.noise.get(xPos, yPos, pointSizeNoise.noiseTime) *
+          pointSizeNoise.multiplier;
+
+        ctx.ellipse(
+          leftPos(xPos, xIndex, yIndex, offsetX, springs),
+          topPos(yPos, xIndex, yIndex, offsetY, springs),
+          radius * pointSizeScalar,
+          radius * pointSizeScalar,
+          0,
+          0,
+          360,
+          false,
+        );
+      } else {
+        ctx.ellipse(
+          leftPos(xPos, xIndex, yIndex, offsetX, springs),
+          topPos(yPos, xIndex, yIndex, offsetY, springs),
+          radius,
+          radius,
+          0,
+          0,
+          360,
+          false,
+        );
+      }
       ctx.fillStyle = color;
 
       if (visibility === "moving") {
         const speed = springs[xIndex][yIndex].speed;
-        ctx.fillStyle = hexToRgba(color, speed !== undefined ? speed : 0);
+        ctx.fillStyle = hexToRgba(
+          ctx.fillStyle,
+          speed !== undefined ? speed : 0,
+        );
+      }
+      if (opacityNoise) {
+        const opacityScalar =
+          opacityNoise.noise.get(
+            xPos * opacityNoise.noiseScale,
+            yPos * opacityNoise.noiseScale,
+            opacityNoise.noiseTime,
+          ) * opacityNoise.multiplier;
+        if (
+          typeof ctx.fillStyle === "string" &&
+          ctx.fillStyle.startsWith("rgba")
+        ) {
+          // Extract rgba values
+          const match = ctx.fillStyle.match(
+            /rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\s*\)/,
+          );
+          if (match) {
+            const [, r, g, b, a] = match;
+            const newAlpha = Math.max(
+              0,
+              Math.min(1, parseFloat(a) * opacityScalar),
+            );
+            ctx.fillStyle = `rgba(${r},${g},${b},${newAlpha})`;
+          }
+        } else {
+          ctx.fillStyle = hexToRgba(ctx.fillStyle as string, opacityScalar);
+        }
       }
       ctx.fill();
       ctx.closePath();

@@ -50,6 +50,13 @@ export interface FlairCanvasProps {
         duration: "short" | "medium" | "long" | number;
         easing: keyof typeof easingFunctions;
       };
+  noiseTimeScale?: "fast" | "medium" | "slow" | number;
+  enableRandomOpacity?: boolean;
+  opacityNoiseScale?: "large" | "medium" | "small" | number;
+  opacityNoiseMultiplier?: "large" | "medium" | "small" | number;
+  enableRandomPointSize?: boolean;
+  pointSizeNoiseScale?: "large" | "medium" | "small" | number;
+  pointSizeNoiseMultiplier?: "large" | "medium" | "small" | number;
   backgroundClasses?: string;
   foregroundClasses?: string;
   triggerAnimation?: (opts: FlairAnimationOptions) => void;
