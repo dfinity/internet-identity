@@ -24,7 +24,7 @@
 <div class="flex flex-col">
   <QrCode text={url.href} class="my-6 size-32 self-center" />
   <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-    Continue on another device
+    Continue from another device
   </h1>
   <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
     Scan the above QR code with your

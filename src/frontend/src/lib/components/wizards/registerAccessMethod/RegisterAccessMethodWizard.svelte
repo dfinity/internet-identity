@@ -3,7 +3,7 @@
   import ConfirmThisDevice from "$lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte";
   import ConfirmYourSignIn from "$lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte";
   import { onMount } from "svelte";
-  import ContinueOnExistingDevice from "$lib/components/wizards/registerAccessMethod/views/ContinueOnExistingDevice.svelte";
+  import ContinueFromExistingDevice from "$lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte";
   import WaitingForExistingDevice from "$lib/components/wizards/registerAccessMethod/views/WaitingForExistingDevice.svelte";
 
   interface Props {
@@ -34,9 +34,9 @@
   });
 </script>
 
-{#if registerAccessMethodFlow.view === "continueOnExistingDevice"}
+{#if registerAccessMethodFlow.view === "continueFromExistingDevice"}
   {#if registerAccessMethodFlow.existingDeviceLink}
-    <ContinueOnExistingDevice
+    <ContinueFromExistingDevice
       url={registerAccessMethodFlow.existingDeviceLink}
     />
   {:else}

@@ -25,7 +25,7 @@
     isAuthenticating = $bindable(),
     onSignIn,
     onSignUp,
-    onOtherDevice,
+    onOtherDevice = () => {},
     onError,
     withinDialog = false,
     children,
