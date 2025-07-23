@@ -114,6 +114,7 @@
               bind:isAuthenticating
               {onSignIn}
               {onSignUp}
+              onOtherDevice={() => (isAuthDialogOpen = false)}
               onError={(error) => {
                 isAuthDialogOpen = false;
                 handleError(error);

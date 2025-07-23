@@ -4,6 +4,26 @@
   import AccessMethods from "$lib/components/views/AccessMethodsPanel.svelte";
   import IdentityInfoPanel from "$lib/components/views/IdentityInfoPanel.svelte";
   import { fade } from "svelte/transition";
+  import type { PageProps } from "./$types";
+  import { afterNavigate, invalidateAll, replaceState } from "$app/navigation";
+  import { page } from "$app/state";
+  import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
+  import { nonNullish } from "@dfinity/utils";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
+  import { handleError } from "$lib/components/utils/error";
+
+  const { data }: PageProps = $props();
+
+  let pendingRegistrationId = $state(data.pendingRegistrationId);
+
+  // Remove registration id from URL bar after assigning it to state
+  afterNavigate(() => {
+    page.url.searchParams;
+    if (page.url.searchParams.has("activate")) {
+      replaceState("/manage", {});
+    }
+  });
 </script>
 
 <div>
@@ -29,3 +49,19 @@
     <AccessMethods />
   </div>
 </div>
+
+{#if $CONTINUE_FROM_ANOTHER_DEVICE && nonNullish(pendingRegistrationId)}
+  <Dialog onClose={() => (pendingRegistrationId = null)}>
+    <ConfirmAccessMethodWizard
+      registrationId={pendingRegistrationId}
+      onConfirm={() => {
+        invalidateAll();
+        pendingRegistrationId = null;
+      }}
+      onError={(error) => {
+        handleError(error);
+        pendingRegistrationId = null;
+      }}
+    />
+  </Dialog>
+{/if}
