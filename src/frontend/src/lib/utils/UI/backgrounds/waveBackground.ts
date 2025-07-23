@@ -716,7 +716,7 @@ export function drawNodes(
           speed !== undefined ? speed : 0,
         );
       }
-      if (customColorMode === "moving") {
+      if (customColorMode === "moving" && visibility !== "moving") {
         const speed = springs[xIndex][yIndex].speed ?? 0;
         ctx.fillStyle = interpolateColor(
           color,
