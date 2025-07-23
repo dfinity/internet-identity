@@ -106,7 +106,7 @@
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">
-    <AuthPanel class="z-10 sm:max-w-100">
+    <AuthPanel class="sm:max-w-100">
       <div class="flex-1"></div>
       {#if lastUsedIdentities.length > 0}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">

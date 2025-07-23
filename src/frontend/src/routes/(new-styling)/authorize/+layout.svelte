@@ -21,12 +21,14 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { goto } from "$app/navigation";
+  import { goto, preloadCode, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
 
   const { children }: LayoutProps = $props();
 
@@ -50,10 +52,28 @@
       invalidateAll: true,
       state: { disableNavigationAnimation: true },
     });
+  const preloadAccounts = () => {
+    void preloadCode("/authorize/account");
+    void preloadData("/authorize/account");
+  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoAccounts();
+    preloadAccounts();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     isAuthDialogOpen = false;
+    await gotoAccounts();
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -62,17 +82,63 @@
       closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    preloadAccounts();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
     await gotoAccounts();
     isAuthDialogOpen = false;
   };
 
+  let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
+
   onMount(() => {
     authorizationStore.init();
+  });
+
+  const animateAuthenticating = () => {
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "double",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
+    setTimeout(animateAuthenticating, 1200);
+  };
+
+  $effect(() => {
+    if (status === "authorizing") {
+      animateAuthenticating();
+    }
   });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
+  <FlairCanvas
+    spacing="medium"
+    aspect="ultrawide"
+    dotSize={1.1}
+    vignette="center"
+    bind:triggerAnimation
+  />
   <Header>
     {#if nonNullish(selectedIdentity)}
       <Button

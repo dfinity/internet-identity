@@ -1,7 +1,7 @@
 <script lang="ts">
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { goto } from "$app/navigation";
+  import { goto, preloadCode, preloadData } from "$app/navigation";
   import {
     authorizationStore,
     authorizationContextStore,
@@ -11,6 +11,8 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -19,9 +21,29 @@
     ),
   );
 
+  const preloadSignIn = () => {
+    void preloadCode("/authorize/account");
+    void preloadData("/authorize/account");
+  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await goto("/authorize/account");
+    preloadSignIn();
+    if (triggerAnimation) {
+      triggerAnimation({
+        location: "center",
+        target: ["motion"],
+
+        motionType: "omni",
+        intensity: "light",
+        speed: 5,
+        nImpulses: "single",
+        size: "large",
+        impulseEasing: "cubicIn",
+      });
+    }
+    setTimeout(async () => {
+      await goto("/authorize/account");
+    }, 700);
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -37,6 +59,7 @@
     });
     await authorizationStore.authorize(undefined, 4000);
   };
+  let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
 </script>
 
 <AuthWizard {onSignIn} {onSignUp} onError={handleError}>

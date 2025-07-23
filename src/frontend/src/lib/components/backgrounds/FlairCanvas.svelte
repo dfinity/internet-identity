@@ -749,7 +749,7 @@
 </script>
 
 <div
-  class="absolute inset-0 h-full w-full select-none"
+  class="absolute inset-0 -z-50 h-full w-full select-none"
   aria-hidden="true"
   bind:this={backgroundRef}
   onpointerleave={handleReset}
