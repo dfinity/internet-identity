@@ -71,7 +71,7 @@ test.describe("First visit", () => {
 
     // Switch to existing device and authenticate after visiting link
     await existingDevicePage.goto(linkToPair.href);
-    authExistingDevice(page);
+    authExistingDevice(existingDevicePage);
     await existingDevicePage
       .getByRole("button", { name: DEFAULT_USER_NAME })
       .click();
