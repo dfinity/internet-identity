@@ -50,6 +50,7 @@
     maskWaveThickness,
     maskWaveRampIn,
     maskWaveRampOut,
+    maskWaveSpeedMultiplier,
     customColor,
     customColorMode,
     backgroundClasses,
@@ -506,7 +507,10 @@
           opacityWaveMotion,
           rippleRadius *
             waveSpeed *
-            (typeof speed === "number" ? speed : speedTable[speed]),
+            (typeof speed === "number" ? speed : speedTable[speed]) *
+            (typeof maskWaveSpeedMultiplier === "number"
+              ? maskWaveSpeedMultiplier
+              : 1),
           0,
         );
       }

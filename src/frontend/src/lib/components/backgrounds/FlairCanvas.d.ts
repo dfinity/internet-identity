@@ -61,6 +61,7 @@ export interface FlairCanvasProps {
   maskWaveRampOut?: number;
   maskWaveThickness?: "large" | "medium" | "small" | number;
   maskWaveMinValue?: number;
+  maskWaveSpeedMultiplier?: number;
   backgroundClasses?: string;
   foregroundClasses?: string;
   customColor?: string;

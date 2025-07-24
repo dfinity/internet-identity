@@ -41,7 +41,15 @@
   interface FlairBoxPropsUI
     extends Omit<
       FlairBoxPropsBase,
-      "spacing" | "aspect" | "dotSize" | "springOrTween"
+      | "spacing"
+      | "aspect"
+      | "dotSize"
+      | "springOrTween"
+      | "maskWaveThickness"
+      | "opacityNoiseScale"
+      | "opacityNoiseMultiplier"
+      | "pointSizeNoiseScale"
+      | "pointSizeNoiseMultiplier"
     > {
     spacing?: CustomOr<"small" | "medium" | "large" | number>;
     aspect?: CustomOr<"square" | "wide" | "ultrawide" | number>;
@@ -58,6 +66,11 @@
           easing: string; // UI uses string, you can map to EasingFunction later
         };
     display: "bgOnly" | "behindBox" | "insideBox";
+    maskWaveThickness?: CustomOr<"small" | "medium" | "large" | number>;
+    opacityNoiseScale?: CustomOr<"small" | "medium" | "large" | number>;
+    opacityNoiseMultiplier?: CustomOr<"small" | "medium" | "large" | number>;
+    pointSizeNoiseScale?: CustomOr<"small" | "medium" | "large" | number>;
+    pointSizeNoiseMultiplier?: CustomOr<"small" | "medium" | "large" | number>;
   }
 
   // UI-extended FlairAnimationOptions
@@ -133,6 +146,11 @@
   let customLocation = $state<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
   let springOrTweenType = $state<"spring" | "tween">("spring");
   let customImpulseEasing = $state<keyof typeof easingFunctions>("cubicIn");
+  let customMaskWaveThickness = $state<number>(1);
+  let customOpacityNoiseScale = $state<number>(1);
+  let customOpacityNoiseMultiplier = $state<number>(1);
+  let customPointSizeNoiseScale = $state<number>(1);
+  let customPointSizeNoiseMultiplier = $state<number>(1);
 
   // Helper for multi-select
   function toggleTarget(val: "motion" | "scale" | "opacity") {
@@ -294,7 +312,7 @@
       </label>
       <!-- MaskWave controls -->
       <label>
-        Mask Wave Ramp In:
+        Mask Wave Ramp In (fades in wave, probably around 0.1):
         <input
           type="number"
           bind:value={flairBoxProps.maskWaveRampIn}
@@ -305,7 +323,7 @@
         />
       </label>
       <label>
-        Mask Wave Ramp Out:
+        Mask Wave Ramp Out (fades out wave, probably around 0.9):
         <input
           type="number"
           bind:value={flairBoxProps.maskWaveRampOut}
@@ -321,12 +339,12 @@
           <option value="large">Large</option>
           <option value="medium">Medium</option>
           <option value="small">Small</option>
-          <option value={0}>Custom</option>
+          <option value="custom">Custom</option>
         </select>
-        {#if typeof flairBoxProps.maskWaveThickness === "number"}
+        {#if flairBoxProps.maskWaveThickness === "custom"}
           <input
             type="number"
-            bind:value={flairBoxProps.maskWaveThickness}
+            bind:value={customMaskWaveThickness}
             min="0"
             max="1"
             step="0.1"
@@ -334,12 +352,23 @@
         {/if}
       </label>
       <label>
-        Mask Wave Min Value:
+        Mask Wave Min Value (wave starts at this value - probably should be 0):
         <input
           type="number"
           bind:value={flairBoxProps.maskWaveMinValue}
           min="0"
           max="1"
+          step="0.01"
+          placeholder="(optional)"
+        />
+      </label>
+      <label>
+        Mask Wave Speed Multiplier (higher is slower, 1 is middle):
+        <input
+          type="number"
+          bind:value={flairBoxProps.maskWaveSpeedMultiplier}
+          min="0"
+          max="2"
           step="0.01"
           placeholder="(optional)"
         />
@@ -360,12 +389,14 @@
               <option value="large">Large</option>
               <option value="medium">Medium</option>
               <option value="small">Small</option>
-              <option value={0}>Custom</option>
+              <option value="custom">Custom</option>
             </select>
-            {#if typeof flairBoxProps.opacityNoiseScale === "number"}
+            {#if flairBoxProps.opacityNoiseScale === "custom"}
               <input
                 type="number"
-                bind:value={flairBoxProps.opacityNoiseScale}
+                bind:value={customOpacityNoiseScale}
+                onchange={() =>
+                  (flairBoxProps.opacityNoiseScale = customOpacityNoiseScale)}
                 min="0"
                 step="any"
               />
@@ -377,12 +408,15 @@
               <option value="large">Large</option>
               <option value="medium">Medium</option>
               <option value="small">Small</option>
-              <option value={0}>Custom</option>
+              <option value="custom">Custom</option>
             </select>
-            {#if typeof flairBoxProps.opacityNoiseMultiplier === "number"}
+            {#if flairBoxProps.opacityNoiseMultiplier === "custom"}
               <input
                 type="number"
-                bind:value={flairBoxProps.opacityNoiseMultiplier}
+                bind:value={customOpacityNoiseMultiplier}
+                onchange={() =>
+                  (flairBoxProps.opacityNoiseMultiplier =
+                    customOpacityNoiseMultiplier)}
                 min="0"
                 step="any"
               />
@@ -406,12 +440,15 @@
               <option value="large">Large</option>
               <option value="medium">Medium</option>
               <option value="small">Small</option>
-              <option value={0}>Custom</option>
+              <option value="custom">Custom</option>
             </select>
-            {#if typeof flairBoxProps.pointSizeNoiseScale === "number"}
+            {#if flairBoxProps.pointSizeNoiseScale === "custom"}
               <input
                 type="number"
-                bind:value={flairBoxProps.pointSizeNoiseScale}
+                bind:value={customPointSizeNoiseScale}
+                onchange={() =>
+                  (flairBoxProps.pointSizeNoiseScale =
+                    customPointSizeNoiseScale)}
                 min="0"
                 step="any"
               />
@@ -423,12 +460,15 @@
               <option value="large">Large</option>
               <option value="medium">Medium</option>
               <option value="small">Small</option>
-              <option value={0}>Custom</option>
+              <option value="custom">Custom</option>
             </select>
-            {#if typeof flairBoxProps.pointSizeNoiseMultiplier === "number"}
+            {#if flairBoxProps.pointSizeNoiseMultiplier === "custom"}
               <input
                 type="number"
-                bind:value={flairBoxProps.pointSizeNoiseMultiplier}
+                bind:value={customPointSizeNoiseMultiplier}
+                onchange={() =>
+                  (flairBoxProps.pointSizeNoiseMultiplier =
+                    customPointSizeNoiseMultiplier)}
                 min="0"
                 step="any"
               />
@@ -721,9 +761,15 @@
 {#snippet flair()}
   <FlairCanvas
     bind:this={flairCanvasRef}
-    spacing={flairBoxProps.spacing as "small" | "medium" | "large"}
-    aspect={flairBoxProps.aspect as "square" | "wide" | "ultrawide"}
-    dotSize={flairBoxProps.dotSize as "small" | "medium" | "large"}
+    spacing={flairBoxProps.spacing === "custom"
+      ? customSpacing
+      : (flairBoxProps.spacing as "small" | "medium" | "large")}
+    aspect={flairBoxProps.aspect === "custom"
+      ? customAspect
+      : (flairBoxProps.aspect as "square" | "wide" | "ultrawide")}
+    dotSize={flairBoxProps.dotSize === "custom"
+      ? customDotSize
+      : (flairBoxProps.dotSize as "small" | "medium" | "large")}
     vignette={flairBoxProps.vignette as
       | "none"
       | "left"
@@ -737,10 +783,19 @@
     noiseTimeScale={1500}
     enableRandomOpacity={flairBoxProps.enableRandomOpacity}
     enableRandomPointSize={flairBoxProps.enableRandomPointSize}
-    opacityNoiseScale={flairBoxProps.opacityNoiseScale}
-    opacityNoiseMultiplier={flairBoxProps.opacityNoiseMultiplier}
-    pointSizeNoiseScale={flairBoxProps.pointSizeNoiseScale}
-    pointSizeNoiseMultiplier={flairBoxProps.pointSizeNoiseMultiplier}
+    opacityNoiseScale={flairBoxProps.opacityNoiseScale === "custom"
+      ? customOpacityNoiseScale
+      : flairBoxProps.opacityNoiseScale}
+    opacityNoiseMultiplier={flairBoxProps.opacityNoiseMultiplier === "custom"
+      ? customOpacityNoiseMultiplier
+      : flairBoxProps.opacityNoiseMultiplier}
+    pointSizeNoiseScale={flairBoxProps.pointSizeNoiseScale === "custom"
+      ? customPointSizeNoiseScale
+      : flairBoxProps.pointSizeNoiseScale}
+    pointSizeNoiseMultiplier={flairBoxProps.pointSizeNoiseMultiplier ===
+    "custom"
+      ? customPointSizeNoiseMultiplier
+      : flairBoxProps.pointSizeNoiseMultiplier}
     springOrTween={flairBoxProps.springOrTween?.type === "spring"
       ? {
           type: "spring",
@@ -766,8 +821,11 @@
         : undefined}
     maskWaveRampIn={flairBoxProps.maskWaveRampIn}
     maskWaveRampOut={flairBoxProps.maskWaveRampOut}
-    maskWaveThickness={flairBoxProps.maskWaveThickness}
+    maskWaveThickness={flairBoxProps.maskWaveThickness === "custom"
+      ? customMaskWaveThickness
+      : flairBoxProps.maskWaveThickness}
     maskWaveMinValue={flairBoxProps.maskWaveMinValue}
+    maskWaveSpeedMultiplier={flairBoxProps.maskWaveSpeedMultiplier}
     customColor={flairBoxProps.customColor}
     customColorMode={flairBoxProps.customColorMode}
     bind:triggerAnimation={animTrig}
