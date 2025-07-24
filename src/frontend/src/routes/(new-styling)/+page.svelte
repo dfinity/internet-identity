@@ -20,10 +20,12 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
   import { preloadCode, preloadData } from "$app/navigation";
+  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
+  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
 
   const { data }: PageProps = $props();
-  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
-  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  const WAVE_ANIMATION_DELAY_MILLIS = 1500;
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
   const preloadNext = () => {
@@ -33,23 +35,13 @@
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     if (triggerAnimation) {
-      triggerAnimation({
-        location: "center",
-        target: ["motion"],
-
-        motionType: "omni",
-        intensity: "light",
-        speed: 5,
-        nImpulses: "single",
-        size: "large",
-        impulseEasing: "cubicIn",
-      });
+      triggerAnimation(DROP_WAVE_ANIMATION);
     }
     isAuthDialogOpen = false;
     preloadNext();
     setTimeout(async () => {
       await gotoNext();
-    }, 700);
+    }, WAVE_ANIMATION_DELAY_MILLIS);
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -58,23 +50,13 @@
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     if (triggerAnimation) {
-      triggerAnimation({
-        location: "center",
-        target: ["motion"],
-
-        motionType: "omni",
-        intensity: "light",
-        speed: 5,
-        nImpulses: "single",
-        size: "large",
-        impulseEasing: "cubicIn",
-      });
+      triggerAnimation(DROP_WAVE_ANIMATION);
     }
     isAuthDialogOpen = false;
     preloadNext();
     setTimeout(async () => {
       await gotoNext();
-    }, 700);
+    }, WAVE_ANIMATION_DELAY_MILLIS);
   };
   const authLastUsedFlow = new AuthLastUsedFlow();
 
@@ -96,13 +78,7 @@
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
-  <FlairCanvas
-    spacing="medium"
-    aspect="ultrawide"
-    dotSize={1.1}
-    vignette="center"
-    bind:triggerAnimation
-  />
+  <WaveCanvas bind:triggerAnimation />
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">

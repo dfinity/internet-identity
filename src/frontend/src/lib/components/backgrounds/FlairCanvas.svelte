@@ -8,19 +8,14 @@
     createPerlinImpulse,
     createRotationalImpulse,
     createXYNodeMotions,
-    createXYSprings,
     drawMovingRingMask,
     drawNodes,
     drawVignetteMask,
     getHypotenuse,
     getImpulseLocation,
     getVignetteConfig,
-    gridPath,
-    leftPos,
     resetNodes,
-    topPos,
   } from "$lib/utils/UI/backgrounds/waveBackground";
-  import { quadOut } from "svelte/easing";
   import { Spring, Tween } from "svelte/motion";
   import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
   import { onMount } from "svelte";

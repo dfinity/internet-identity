@@ -674,7 +674,7 @@ export function drawNodes(
     customHexColor.length > 0 &&
     customColorMode === "all"
       ? customHexColor
-      : getComputedStyle(body).getPropertyValue("--fg-tertiary").trim();
+      : getComputedStyle(body).getPropertyValue("--fg-primary").trim();
   xPositions.forEach((xPos, xIndex) => {
     yPositions.forEach((yPos, yIndex) => {
       ctx.beginPath();
