@@ -159,3 +159,44 @@ export const signOut = async (page: Page): Promise<void> => {
   await page.getByLabel("Switch identity").click();
   await page.getByRole("button", { name: "Sign Out" }).click();
 };
+
+/**
+ * Opens test app and configures II URL
+ */
+export const openTestAppWithII = async (page: Page): Promise<void> => {
+  await page.goto(TEST_APP_URL);
+  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+};
+
+/**
+ * Opens II popup tab and returns the popup page
+ */
+export const openIiTab = async (page: Page): Promise<Page> => {
+  const pagePromise = page.context().waitForEvent("page");
+  await page.locator("#openIiWindowBtn").click();
+  return await pagePromise;
+};
+
+/**
+ * Waits for nth message to appear in test app
+ */
+export const waitForNthMessage = async (
+  page: Page,
+  messageNo: number,
+): Promise<void> => {
+  await page.locator(`div.postMessage:nth-child(${messageNo})`).waitFor();
+};
+
+/**
+ * Gets message text from nth message in test app
+ */
+export const getMessageText = async (
+  page: Page,
+  messageNo: number,
+): Promise<string> => {
+  return (
+    (await page
+      .locator(`div.postMessage:nth-child(${messageNo}) > div:nth-child(2)`)
+      .textContent()) ?? ""
+  );
+};
