@@ -1,11 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  authorize,
-  createIdentity,
-  dummyAuth,
-  II_URL,
-  TEST_APP_URL,
-} from "../utils";
+import { dummyAuth, II_URL, TEST_APP_URL } from "../utils";
 
 test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
   const auth = dummyAuth();
