@@ -65,9 +65,6 @@ test.describe("First visit", () => {
       `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`,
     );
     linkToPair.search = FEATURE_FLAG;
-    const authorizeNewDevicePromise = existingDevicePage
-      .getByRole("heading", { level: 1, name: "Authorize new device" })
-      .waitFor();
 
     // Switch to existing device and authenticate after visiting link
     await existingDevicePage.goto(linkToPair.href);
@@ -87,7 +84,9 @@ test.describe("First visit", () => {
     const confirmationCodeArray = confirmationCode.split("");
 
     // Switch to existing device and enter confirmation code
-    await authorizeNewDevicePromise;
+    await existingDevicePage
+      .getByRole("heading", { level: 1, name: "Authorize new device" })
+      .waitFor();
     for (let i = 0; i < confirmationCodeArray.length; i++) {
       const code = confirmationCodeArray[i];
       await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);
