@@ -77,10 +77,12 @@ test("Should show error after not receiving message for 10 seconds", async ({
   await openTestAppWithII(page);
   const iiPage = await openIiTab(page);
 
+  await new Promise((resolve) => setTimeout(resolve, 10_000));
+
   // Check for specific error message in II popup
   await expect(
     iiPage.getByRole("heading", { name: "Connection closed" }),
-  ).toBeVisible({ timeout: 15_000 });
+  ).toBeVisible();
 
   // Setup the listener because clicking closes the page immediately
   // and we might not add the listener on time.
