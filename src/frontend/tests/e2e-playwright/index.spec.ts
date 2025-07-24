@@ -54,7 +54,7 @@ test.describe("First visit", () => {
       authExistingDevice,
     );
 
-    // Start "continue from another device" flow from another device
+    // Switch to new device and start "Continue from another device" flow to get link
     const newContext = await browser.newContext();
     const newDevicePage = await newContext.newPage();
     await newDevicePage.goto(II_URL + FEATURE_FLAG);
@@ -69,7 +69,7 @@ test.describe("First visit", () => {
       .getByRole("heading", { level: 1, name: "Authorize new device" })
       .waitFor();
 
-    // Go to link from existing device and authenticate
+    // Switch to existing device and authenticate after visiting link
     await existingDevicePage.goto(linkToPair.href);
     authExistingDevice(page);
     await existingDevicePage
