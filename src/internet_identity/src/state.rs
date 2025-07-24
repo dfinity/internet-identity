@@ -65,8 +65,7 @@ impl TentativeDeviceRegistration {
             }),
             TentativeDeviceRegistration {
                 expiration,
-                state:
-                    SessionActive { .. },
+                state: SessionActive { .. },
                 ..
             } if *expiration > now => {
                 // For SessionActive, we don't expose the session key in the DeviceRegistrationInfo
@@ -74,7 +73,7 @@ impl TentativeDeviceRegistration {
                     expiration: *expiration,
                     tentative_device: None,
                 })
-            },
+            }
             TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
                 Some(DeviceRegistrationInfo {
                     expiration: *expiration,

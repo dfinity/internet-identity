@@ -119,7 +119,7 @@ pub fn exit_device_registration_mode_with_passkey_v2(
     passkey_data: DeviceData,
 ) -> Result<Operation, ExitWithPasskeyError> {
     let now = time();
-    
+
     // Check if there's an active session
     let session_active = state::tentative_device_registrations_mut(|registrations| {
         match registrations.get(&anchor_number) {
@@ -132,17 +132,17 @@ pub fn exit_device_registration_mode_with_passkey_v2(
             _ => false,
         }
     });
-    
+
     if !session_active {
         return Err(ExitWithPasskeyError::NoSessionActive);
     }
-    
+
     // Add the passkey to the anchor
     let operation = add_device(anchor, passkey_data);
-    
+
     // Remove the registration
     exit_device_registration_mode(anchor_number);
-    
+
     Ok(operation)
 }
 
@@ -289,64 +289,63 @@ fn get_verified_device(
             }
 
             // Check the state and prepare the response without keeping a mutable reference
-            let (should_remove, response) =
-                match &mut registrations.get_mut(&anchor_number).unwrap().state {
-                    DeviceRegistrationModeActive => {
-                        (false, Err(VerifyTentativeDeviceError::NoDeviceToVerify))
+            let (should_remove, response) = match &mut registrations
+                .get_mut(&anchor_number)
+                .unwrap()
+                .state
+            {
+                DeviceRegistrationModeActive => {
+                    (false, Err(VerifyTentativeDeviceError::NoDeviceToVerify))
+                }
+                DeviceTentativelyAdded {
+                    failed_attempts,
+                    verification_code,
+                    tentative_device,
+                } => {
+                    if user_verification_code == *verification_code {
+                        // Verification successful - we'll remove the registration
+                        (true, Ok(tentative_device.clone()))
+                    } else {
+                        // Increment failed attempts counter
+                        *failed_attempts += 1;
+
+                        // Check if max attempts reached
+                        let should_remove = *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS;
+
+                        (
+                            should_remove,
+                            Err(VerifyTentativeDeviceError::WrongCode {
+                                retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - *failed_attempts),
+                            }),
+                        )
                     }
-                    DeviceTentativelyAdded {
-                        failed_attempts,
-                        verification_code,
-                        tentative_device,
-                    } => {
-                        if user_verification_code == *verification_code {
-                            // Verification successful - we'll remove the registration
-                            (true, Ok(tentative_device.clone()))
-                        } else {
-                            // Increment failed attempts counter
-                            *failed_attempts += 1;
+                }
+                state::RegistrationState::SessionActive {
+                    failed_attempts,
+                    verification_code,
+                    session_key,
+                } => {
+                    if user_verification_code == *verification_code {
+                        // For sessions, we don't remove the registration yet
+                        // We'll keep the session active until the passkey is provided
+                        // via authn_method_registration_mode_exit
+                        (false, Ok(DeviceData::default()))
+                    } else {
+                        // Increment failed attempts counter
+                        *failed_attempts += 1;
 
-                            // Check if max attempts reached
-                            let should_remove =
-                                *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS;
+                        // Check if max attempts reached
+                        let should_remove = *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS;
 
-                            (
-                                should_remove,
-                                Err(VerifyTentativeDeviceError::WrongCode {
-                                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS
-                                        - *failed_attempts),
-                                }),
-                            )
-                        }
+                        (
+                            should_remove,
+                            Err(VerifyTentativeDeviceError::WrongCode {
+                                retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - *failed_attempts),
+                            }),
+                        )
                     }
-                    state::RegistrationState::SessionActive {
-                        failed_attempts,
-                        verification_code,
-                        session_key,
-                    } => {
-                        if user_verification_code == *verification_code {
-                            // For sessions, we don't remove the registration yet
-                            // We'll keep the session active until the passkey is provided
-                            // via authn_method_registration_mode_exit
-                            (false, Ok(DeviceData::default()))
-                        } else {
-                            // Increment failed attempts counter
-                            *failed_attempts += 1;
-
-                            // Check if max attempts reached
-                            let should_remove =
-                                *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS;
-
-                            (
-                                should_remove,
-                                Err(VerifyTentativeDeviceError::WrongCode {
-                                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS
-                                        - *failed_attempts),
-                                }),
-                            )
-                        }
-                    }
-                };
+                }
+            };
 
             // Now handle removal if needed, after we're done with the mutable borrow
             if should_remove {

@@ -896,7 +896,7 @@ mod v2_api {
         match passkey_data {
             Some(authn_method) => {
                 let device = DeviceWithUsage::try_from(authn_method).map_err(|_| ())?;
-                
+
                 anchor_operation_with_authz_check(identity_number, |anchor| {
                     tentative_device_registration::exit_device_registration_mode_with_passkey_v2(
                         anchor,
@@ -906,7 +906,7 @@ mod v2_api {
                     .map_err(|_| ())
                 })
                 .map_err(|_| ())?;
-                
+
                 Ok(())
             }
             None => {
