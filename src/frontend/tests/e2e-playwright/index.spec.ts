@@ -92,8 +92,10 @@ test.describe("First visit", () => {
       const code = confirmationCodeArray[i];
       await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);
     }
-    await page.getByRole("button", { name: "Confirm sign-in" }).click();
-    await page
+    await existingDevicePage
+      .getByRole("button", { name: "Confirm sign-in" })
+      .click();
+    await existingDevicePage
       .getByRole("heading", { level: 1, name: "Continue on your new device" })
       .waitFor();
 
