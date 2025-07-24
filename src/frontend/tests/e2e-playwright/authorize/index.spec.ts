@@ -1,5 +1,14 @@
-import { test } from "@playwright/test";
-import { authorize, clearStorage, createIdentity, dummyAuth } from "../utils";
+import { expect, test } from "@playwright/test";
+import {
+  authorize,
+  clearStorage,
+  createIdentity,
+  dummyAuth,
+  FEATURE_FLAGS,
+  II_URL,
+} from "../utils";
+
+const DEFAULT_USER_NAME = "John Doe";
 
 test("Authorize by registering a new passkey", async ({ page }) => {
   const auth = dummyAuth();
@@ -10,7 +19,7 @@ test("Authorize by registering a new passkey", async ({ page }) => {
     await authPage
       .getByRole("button", { name: "Set up a new Passkey" })
       .click();
-    await authPage.getByLabel("Identity name").fill("John Doe");
+    await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     auth(authPage);
     await authPage.getByRole("button", { name: "Create Passkey" }).click();
   });
@@ -18,7 +27,7 @@ test("Authorize by registering a new passkey", async ({ page }) => {
 
 test("Authorize by signing in with an existing passkey", async ({ page }) => {
   const auth = dummyAuth();
-  await createIdentity(page, "John Doe", auth);
+  await createIdentity(page, DEFAULT_USER_NAME, auth);
   await clearStorage(page);
   await authorize(page, async (authPage) => {
     await authPage
@@ -30,4 +39,84 @@ test("Authorize by signing in with an existing passkey", async ({ page }) => {
       .click();
     await authPage.getByRole("button", { name: "Primary account" }).click();
   });
+});
+
+test("Authorize by signing in from another device", async ({
+  browser,
+  page,
+}) => {
+  // Create identity on other device
+  const newContext = await browser.newContext();
+  const otherDevicePage = await newContext.newPage();
+  const authOtherDevice = dummyAuth();
+  const expectedPrincipal = await createIdentity(
+    otherDevicePage,
+    DEFAULT_USER_NAME,
+    authOtherDevice,
+  );
+
+  const principal = await authorize(page, async (authPage) => {
+    // Switch to current device and start "Continue from another device" flow to get link
+    await authPage
+      .getByRole("button", { name: "Continue from another device" })
+      .click();
+    const linkToPair = new URL(
+      `https://${await authPage.getByLabel("Pairing link").innerText()}`,
+    );
+    linkToPair.search = FEATURE_FLAGS;
+
+    // Switch to other device and authenticate after visiting link
+    await otherDevicePage.goto(linkToPair.href);
+    authOtherDevice(otherDevicePage);
+    await otherDevicePage
+      .getByRole("button", { name: DEFAULT_USER_NAME })
+      .click();
+
+    // Switch to current device and get confirmation code
+    await authPage.getByLabel("Confirmation Code").waitFor();
+    await authPage
+      .getByRole("button", { name: "Generating code..." })
+      .waitFor({ state: "hidden" });
+    const confirmationCode = await authPage
+      .getByLabel("Confirmation Code")
+      .innerText();
+    const confirmationCodeArray = confirmationCode.split("");
+
+    // Switch to other device and enter confirmation code
+    await otherDevicePage
+      .getByRole("heading", { level: 1, name: "Authorize new device" })
+      .waitFor();
+    for (let i = 0; i < confirmationCodeArray.length; i++) {
+      const code = confirmationCodeArray[i];
+      await otherDevicePage.getByLabel(`Code input ${i}`).fill(code);
+    }
+    await otherDevicePage
+      .getByRole("button", { name: "Confirm sign-in" })
+      .click();
+    await otherDevicePage
+      .getByRole("heading", { level: 1, name: "Continue on your new device" })
+      .waitFor();
+
+    // Switch to current device and register new passkey
+    await authPage
+      .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
+      .waitFor();
+    const authCurrentDevice = dummyAuth();
+    authCurrentDevice(authPage);
+    await authPage.getByRole("button", { name: "Create passkey" }).click();
+    await authPage
+      .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
+      .waitFor({ state: "hidden" });
+
+    // Switch to other device and verify we have two passkeys
+    await otherDevicePage
+      .getByRole("heading", { level: 1, name: "Continue on your new device" })
+      .waitFor({ state: "hidden" });
+    await expect(otherDevicePage.getByText("Chrome")).toHaveCount(2);
+
+    // Switch to current device and verify we can authorize
+    authCurrentDevice(authPage);
+    await authPage.getByRole("button", { name: "Primary account" }).click();
+  });
+  expect(principal).toBe(expectedPrincipal);
 });
