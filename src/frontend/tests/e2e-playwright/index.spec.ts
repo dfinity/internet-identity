@@ -46,7 +46,7 @@ test.describe("First visit", () => {
 
   test("Sign in from another device", async ({ browser, page }) => {
     // Create identity on existing device
-    const existingDevicePage = page;
+    const existingDevicePage = page; // Create alias variable for clarity
     const authExistingDevice = dummyAuth();
     await createIdentity(
       existingDevicePage,
