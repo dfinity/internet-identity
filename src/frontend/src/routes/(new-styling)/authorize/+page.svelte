@@ -37,9 +37,19 @@
     });
     await authorizationStore.authorize(undefined, 4000);
   };
+  // TODO: Remove this method once we have sessions
+  const onOtherDevice = async (identityNumber: bigint) => {
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    lastUsedIdentitiesStore.addLastUsedAccount({
+      origin: $authorizationContextStore.effectiveOrigin,
+      identityNumber,
+      accountNumber: undefined,
+    });
+    await goto("/authorize/continue");
+  };
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} onError={handleError}>
+<AuthWizard {onSignIn} {onSignUp} {onOtherDevice} onError={handleError}>
   <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     Choose method

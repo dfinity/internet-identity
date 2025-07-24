@@ -115,7 +115,7 @@ export class RegisterAccessMethodFlow {
     throw new Error("Registration not completed within time window");
   };
 
-  createPasskey = async (): Promise<void> => {
+  createPasskey = async (): Promise<bigint> => {
     const session = get(sessionStore);
     const { actor, identityNumber } = get(authenticatedStore);
     const name = this.#identityName ?? identityNumber.toString(10);
@@ -157,5 +157,6 @@ export class RegisterAccessMethodFlow {
         },
       },
     });
+    return identityNumber;
   };
 }

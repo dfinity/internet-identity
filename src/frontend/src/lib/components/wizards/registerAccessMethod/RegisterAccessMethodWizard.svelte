@@ -8,7 +8,7 @@
 
   interface Props {
     registrationId?: string;
-    onRegistered: () => void;
+    onRegistered: (identityNumber: bigint) => void;
     onError: (error: unknown) => void;
   }
 
@@ -18,8 +18,7 @@
 
   const handleCreatePasskey = async () => {
     try {
-      await registerAccessMethodFlow.createPasskey();
-      onRegistered();
+      onRegistered(await registerAccessMethodFlow.createPasskey());
     } catch (error) {
       onError(error);
     }

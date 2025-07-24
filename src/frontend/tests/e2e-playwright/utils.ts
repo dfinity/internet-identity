@@ -3,6 +3,7 @@ import { Principal } from "@dfinity/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
+export const FEATURE_FLAGS = "?feature_flag_continue_from_another_device=true";
 export const II_URL = "https://id.ai";
 export const TEST_APP_URL = "https://nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
@@ -39,7 +40,9 @@ export const authorize = async (
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(TEST_APP_URL);
-  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+  await page
+    .getByRole("textbox", { name: "Identity Provider" })
+    .fill(II_URL + FEATURE_FLAGS);
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
 

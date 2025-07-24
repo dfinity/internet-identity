@@ -15,7 +15,7 @@
     isAuthenticating?: boolean;
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
-    onOtherDevice?: () => void; // TODO: Remove once we can sign in directly
+    onOtherDevice?: (identityNumber: bigint) => void; // TODO: Remove once we can sign in directly
     onError: (error: unknown) => void;
     withinDialog?: boolean;
     children?: Snippet;
