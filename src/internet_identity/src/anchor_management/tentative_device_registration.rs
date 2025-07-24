@@ -99,6 +99,23 @@ pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     });
 }
 
+pub fn exit_device_registration_mode_v2(
+    anchor_number: AnchorNumber,
+    authn_method: AuthnMethodData,
+) {
+    state::tentative_device_registrations_mut(|registrations| {
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            if let Some(TentativeDeviceRegistration {
+                id: Some(reg_id), ..
+            }) = registrations.remove(&anchor_number)
+            {
+                lookup.remove(&reg_id);
+            }
+        });
+    });
+}
+
 pub struct TentativeRegistrationInfo {
     pub verification_code: DeviceVerificationCode,
     pub device_registration_timeout: Timestamp,

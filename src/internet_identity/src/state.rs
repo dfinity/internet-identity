@@ -12,7 +12,7 @@ use crate::storage::anchor::Anchor;
 use crate::storage::MAX_ENTRIES;
 use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Principal};
 use ic_canister_sig_creation::signature_map::SignatureMap;
 use ic_cdk::trap;
 use ic_stable_structures::DefaultMemoryImpl;
@@ -80,6 +80,11 @@ pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
         tentative_device: DeviceData,
+        verification_code: DeviceVerificationCode,
+        failed_attempts: FailedAttemptsCounter,
+    },
+    SessionTentativelyAdded {
+        tentative_session: Principal,
         verification_code: DeviceVerificationCode,
         failed_attempts: FailedAttemptsCounter,
     },
