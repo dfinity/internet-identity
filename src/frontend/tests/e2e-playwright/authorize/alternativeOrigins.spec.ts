@@ -203,3 +203,79 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
   // Verify error message is displayed in II (redirect should not be followed)
   await expect(authPage.getByText("Unverified origin")).toBeVisible();
 });
+
+test("Should issue the same principal to nice url and canonical url", async ({
+  page,
+}) => {
+  // Create a new identity using dummy auth
+  const auth = dummyAuth();
+
+  // First authentication: Test app configured with canonical URL as derivation origin
+  await page.goto(TEST_APP_URL);
+  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+  await page.locator("#hostUrl").fill("https://icp-api.io");
+
+  // Configure alternative origins to include the nice URL
+  const alternativeOrigins = JSON.stringify({
+    alternativeOrigins: [TEST_APP_URL],
+  });
+  await page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
+  await page.locator("#certified").click();
+  await page.locator("#updateNewAlternativeOrigins").click();
+
+  // Wait for alternative origins to update
+  await expect(page.locator("#alternativeOrigins")).toHaveText(
+    alternativeOrigins,
+    { timeout: 6000 },
+  );
+
+  // Set derivation origin to canonical URL
+  await page.locator("#derivationOrigin").fill(TEST_APP_CANONICAL_URL);
+
+  // Authenticate and get the first principal
+  const pagePromise1 = page.context().waitForEvent("page");
+  await page.getByRole("button", { name: "Sign In" }).click();
+  const authPage1 = await pagePromise1;
+
+  // Create identity in II
+  await authPage1
+    .getByRole("button", { name: "Continue with Passkey" })
+    .click();
+  await authPage1.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await authPage1.getByLabel("Identity name").fill("Test User");
+  auth(authPage1);
+  await authPage1.getByRole("button", { name: "Create Passkey" }).click();
+
+  // Wait for II window to close
+  await authPage1.waitForEvent("close");
+
+  // Get the first principal
+  const principal1 = await page.locator("#principal").textContent();
+  expect(principal1).toBeTruthy();
+
+  // Second authentication: Simulate nice URL scenario with same derivation origin
+  // Clear the current session by reloading the page
+  await page.reload();
+  await page.goto(TEST_APP_CANONICAL_URL);
+  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+  await page.locator("#hostUrl").fill("https://icp-api.io");
+
+  // Authenticate with the existing identity
+  const pagePromise2 = page.context().waitForEvent("page");
+  await page.getByRole("button", { name: "Sign In" }).click();
+  const authPage2 = await pagePromise2;
+
+  // Use existing passkey
+  auth(authPage2);
+  await authPage2.getByRole("button", { name: "Primary account" }).click();
+
+  // Wait for II window to close
+  await authPage2.waitForEvent("close");
+
+  // Get the second principal
+  const principal2 = await page.locator("#principal").textContent();
+  expect(principal2).toBeTruthy();
+
+  // Verify both principals are the same
+  expect(principal1).toEqual(principal2);
+});
