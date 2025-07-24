@@ -5,7 +5,6 @@ import {
   createIdentity,
   dummyAuth,
   FEATURE_FLAGS,
-  II_URL,
 } from "../utils";
 
 const DEFAULT_USER_NAME = "John Doe";
