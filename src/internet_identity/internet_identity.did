@@ -855,12 +855,17 @@ service : (opt InternetIdentityInit) -> {
     authn_method_registration_mode_enter : (IdentityNumber, opt RegistrationId) -> (variant { Ok : record { expiration : Timestamp }; Err : AuthnMethodRegistrationModeEnterError });
 
     // Exits the authentication method registration mode for the identity.
+    // If passkey_data is provided, it will be used to complete the registration.
     // Requires authentication.
-    authn_method_registration_mode_exit : (IdentityNumber) -> (variant { Ok; Err });
+    authn_method_registration_mode_exit_v2 : (IdentityNumber, opt AuthnMethodData) -> (variant { Ok; Err });
 
     // Registers a new authentication method to the identity.
     // This authentication method needs to be confirmed before it can be used for authentication on this identity.
     authn_method_register : (IdentityNumber, AuthnMethodData) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
+    
+    // Creates a session for the identity using ECDSA key data.
+    // Returns a confirmation code that needs to be confirmed on an existing device.
+    authn_method_session_v2 : (IdentityNumber, AuthnMethodData) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
 
     // Confirms a previously registered authentication method.
     // On successful confirmation, the authentication method is permanently added to the identity and can

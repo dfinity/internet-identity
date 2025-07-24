@@ -63,6 +63,18 @@ impl TentativeDeviceRegistration {
                 expiration: *expiration,
                 tentative_device: Some(tentative_device.clone()),
             }),
+            TentativeDeviceRegistration {
+                expiration,
+                state:
+                    SessionActive { .. },
+                ..
+            } if *expiration > now => {
+                // For SessionActive, we don't expose the session key in the DeviceRegistrationInfo
+                Some(DeviceRegistrationInfo {
+                    expiration: *expiration,
+                    tentative_device: None,
+                })
+            },
             TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
                 Some(DeviceRegistrationInfo {
                     expiration: *expiration,
@@ -80,6 +92,11 @@ pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
         tentative_device: DeviceData,
+        verification_code: DeviceVerificationCode,
+        failed_attempts: FailedAttemptsCounter,
+    },
+    SessionActive {
+        session_key: AuthnMethodData,
         verification_code: DeviceVerificationCode,
         failed_attempts: FailedAttemptsCounter,
     },

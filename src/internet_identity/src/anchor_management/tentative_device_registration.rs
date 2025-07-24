@@ -99,6 +99,53 @@ pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     });
 }
 
+pub enum ExitWithPasskeyError {
+    DeviceRegistrationModeOff,
+    NoSessionActive,
+    IdentityUpdateError(IdentityUpdateError),
+}
+
+impl From<IdentityUpdateError> for ExitWithPasskeyError {
+    fn from(err: IdentityUpdateError) -> Self {
+        ExitWithPasskeyError::IdentityUpdateError(err)
+    }
+}
+
+/// Exits device registration mode with a passkey, completing the registration process
+/// for a session that was previously verified.
+pub fn exit_device_registration_mode_with_passkey_v2(
+    anchor: &mut Anchor,
+    anchor_number: AnchorNumber,
+    passkey_data: DeviceData,
+) -> Result<Operation, ExitWithPasskeyError> {
+    let now = time();
+    
+    // Check if there's an active session
+    let session_active = state::tentative_device_registrations_mut(|registrations| {
+        match registrations.get(&anchor_number) {
+            None => false,
+            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => false,
+            Some(TentativeDeviceRegistration {
+                state: state::RegistrationState::SessionActive { .. },
+                ..
+            }) => true,
+            _ => false,
+        }
+    });
+    
+    if !session_active {
+        return Err(ExitWithPasskeyError::NoSessionActive);
+    }
+    
+    // Add the passkey to the anchor
+    let operation = add_device(anchor, passkey_data);
+    
+    // Remove the registration
+    exit_device_registration_mode(anchor_number);
+    
+    Ok(operation)
+}
+
 pub struct TentativeRegistrationInfo {
     pub verification_code: DeviceVerificationCode,
     pub device_registration_timeout: Timestamp,
@@ -136,9 +183,51 @@ pub async fn add_tentative_device(
                 state: DeviceTentativelyAdded { .. },
                 ..
             }) => Err(AnotherDeviceTentativelyAdded),
+            Some(TentativeDeviceRegistration {
+                state: state::RegistrationState::SessionActive { .. },
+                ..
+            }) => Err(AnotherDeviceTentativelyAdded),
             Some(registration) => {
                 registration.state = DeviceTentativelyAdded {
                     tentative_device: device_data,
+                    failed_attempts: 0,
+                    verification_code: verification_code.clone(),
+                };
+                Ok(TentativeRegistrationInfo {
+                    device_registration_timeout: registration.expiration,
+                    verification_code,
+                })
+            }
+        }
+    })
+}
+
+pub async fn create_session(
+    anchor_number: AnchorNumber,
+    session_key: AuthnMethodData,
+) -> Result<TentativeRegistrationInfo, TentativeDeviceRegistrationError> {
+    let verification_code = new_verification_code().await;
+    let now = time();
+
+    state::tentative_device_registrations_mut(|registrations| {
+        prune_expired_tentative_device_registrations(registrations);
+
+        match registrations.get_mut(&anchor_number) {
+            None => Err(DeviceRegistrationModeOff),
+            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
+                Err(DeviceRegistrationModeOff)
+            }
+            Some(TentativeDeviceRegistration {
+                state: DeviceTentativelyAdded { .. },
+                ..
+            }) => Err(AnotherDeviceTentativelyAdded),
+            Some(TentativeDeviceRegistration {
+                state: state::RegistrationState::SessionActive { .. },
+                ..
+            }) => Err(AnotherDeviceTentativelyAdded),
+            Some(registration) => {
+                registration.state = state::RegistrationState::SessionActive {
+                    session_key,
                     failed_attempts: 0,
                     verification_code: verification_code.clone(),
                 };
@@ -183,7 +272,7 @@ pub fn verify_tentative_device(
     }
 }
 
-/// Checks the device verification code for a tentative device.
+/// Checks the device verification code for a tentative device or session.
 /// If valid, returns the device to be added and exits device registration mode
 /// If invalid, returns the appropriate error to send to the client and increases failed attempts. Exits device registration mode if there are no retries left.
 fn get_verified_device(
@@ -213,6 +302,33 @@ fn get_verified_device(
                         if user_verification_code == *verification_code {
                             // Verification successful - we'll remove the registration
                             (true, Ok(tentative_device.clone()))
+                        } else {
+                            // Increment failed attempts counter
+                            *failed_attempts += 1;
+
+                            // Check if max attempts reached
+                            let should_remove =
+                                *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS;
+
+                            (
+                                should_remove,
+                                Err(VerifyTentativeDeviceError::WrongCode {
+                                    retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS
+                                        - *failed_attempts),
+                                }),
+                            )
+                        }
+                    }
+                    state::RegistrationState::SessionActive {
+                        failed_attempts,
+                        verification_code,
+                        session_key,
+                    } => {
+                        if user_verification_code == *verification_code {
+                            // For sessions, we don't remove the registration yet
+                            // We'll keep the session active until the passkey is provided
+                            // via authn_method_registration_mode_exit
+                            (false, Ok(DeviceData::default()))
                         } else {
                             // Increment failed attempts counter
                             *failed_attempts += 1;

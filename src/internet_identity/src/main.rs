@@ -889,9 +889,31 @@ mod v2_api {
     }
 
     #[update]
-    fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
-        exit_device_registration_mode(identity_number);
-        Ok(())
+    fn authn_method_registration_mode_exit_v2(
+        identity_number: IdentityNumber,
+        passkey_data: Option<AuthnMethodData>,
+    ) -> Result<(), ()> {
+        match passkey_data {
+            Some(authn_method) => {
+                let device = DeviceWithUsage::try_from(authn_method).map_err(|_| ())?;
+                
+                anchor_operation_with_authz_check(identity_number, |anchor| {
+                    tentative_device_registration::exit_device_registration_mode_with_passkey_v2(
+                        anchor,
+                        identity_number,
+                        DeviceData::from(device),
+                    )
+                    .map_err(|_| ())
+                })
+                .map_err(|_| ())?;
+                
+                Ok(())
+            }
+            None => {
+                exit_device_registration_mode(identity_number);
+                Ok(())
+            }
+        }
     }
 
     #[update]
@@ -915,6 +937,33 @@ mod v2_api {
             }
             AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded => {
                 Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress)
+            }
+        }
+    }
+
+    #[update]
+    async fn authn_method_session_v2(
+        identity_number: IdentityNumber,
+        authn_method: AuthnMethodData,
+    ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
+        let result =
+            tentative_device_registration::create_session(identity_number, authn_method).await;
+        match result {
+            Ok(TentativeRegistrationInfo {
+                device_registration_timeout,
+                verification_code,
+            }) => Ok(AuthnMethodConfirmationCode {
+                expiration: device_registration_timeout,
+                confirmation_code: verification_code,
+            }),
+            Err(TentativeDeviceRegistrationError::DeviceRegistrationModeOff) => {
+                Err(AuthnMethodRegisterError::RegistrationModeOff)
+            }
+            Err(TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded) => {
+                Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress)
+            }
+            Err(TentativeDeviceRegistrationError::IdentityUpdateError(err)) => {
+                trap(&format!("Failed to create session: {}", err));
             }
         }
     }
