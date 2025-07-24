@@ -8,9 +8,7 @@
     FlairCanvasProps as FlairBoxPropsBase,
   } from "$lib/components/backgrounds/FlairCanvas";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import Logo from "$lib/components/ui/Logo.svelte";
 
   let flairCanvasRef = $state();
   let animTrig = $state<(opts: FlairAnimationOptions) => void>();
