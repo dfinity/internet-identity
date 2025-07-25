@@ -27,8 +27,6 @@
       stiffness: "medium",
       dampening: "medium",
     }}
-    customColorMode="all"
-    customColor="#ECFF57"
     bind:triggerAnimation
   />
 {/if}
