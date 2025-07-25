@@ -505,6 +505,7 @@ type AuthnMethodRegisterError = variant {
 };
 
 type AuthnMethodConfirmationError = variant {
+    Unauthorized : principal;
     // Wrong confirmation code entered. Retry with correct code.
     WrongCode : record {
         retries_left : nat8;
