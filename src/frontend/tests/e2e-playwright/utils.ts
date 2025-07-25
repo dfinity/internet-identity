@@ -69,7 +69,10 @@ export const authorizeWithUrl = async (
   await authPage.waitForEvent("close");
 
   // Assert that the user is authenticated (valid principal)
-  await expect(page.locator("#principal")).not.toBeEmpty();
+  await expect(page.locator("#principal")).toBeVisible();
+  await expect(page.locator("#principal")).toHaveText(
+    /^([a-z0-9]{5}-){10}[a-z0-9]{3}$/i,
+  );
   const principal = (await page.locator("#principal").textContent()) ?? "";
   expect(principal).toEqual(Principal.fromText(principal).toText());
 
