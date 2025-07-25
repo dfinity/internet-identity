@@ -148,7 +148,6 @@ pub enum AuthnMethodRegistrationModeEnterError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodConfirmationError {
     Unauthorized(Principal),
-    InternalError(String),
     WrongCode { retries_left: u8 },
     RegistrationModeOff,
     NoAuthnMethodToConfirm,
