@@ -20,7 +20,7 @@
 <div {...props} class={["flex flex-1 flex-col", className]}>
   <div class="flex flex-1 flex-col items-center justify-center pt-5 pb-6">
     <div
-      aria-hidden="true"
+      aria-hidden={nonNullish(dapp?.logoSrc) ? "false" : "true"}
       class={[
         "mb-6 flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
         isNullish(dapp?.logoSrc) &&
@@ -28,7 +28,11 @@
       ]}
     >
       {#if nonNullish(dapp?.logoSrc)}
-        <img src={dapp?.logoSrc} alt="" class="h-16 max-w-24 object-contain" />
+        <img
+          src={dapp?.logoSrc}
+          alt={`${dapp?.name ?? origin} logo`}
+          class="h-16 max-w-24 object-contain"
+        />
       {:else}
         <div class="flex size-16 items-center justify-center">
           <GlobeIcon size="1.5rem" />
