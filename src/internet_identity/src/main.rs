@@ -77,7 +77,7 @@ fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
         // Legacy API traps instead of returning an error.
         .unwrap_or_else(|err| match err {
             AuthnMethodRegistrationModeEnterError::AlreadyInProgress => trap("Already in progress"),
-            AuthnMethodRegistrationModeEnterError::InternalError(message) => trap(&*message),
+            AuthnMethodRegistrationModeEnterError::InternalError(message) => trap(&message),
             AuthnMethodRegistrationModeEnterError::Unauthorized(_)
             | AuthnMethodRegistrationModeEnterError::InvalidRegistrationId(_) => {
                 trap("Unreachable error")
