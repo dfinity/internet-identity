@@ -93,6 +93,8 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   false,
 );
 
+export const FLAIR = createFeatureFlagStore("FLAIR", false);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
@@ -101,4 +103,5 @@ export default {
   ENABLE_MIGRATE_FLOW,
   ADD_ACCESS_METHOD,
   CONTINUE_FROM_ANOTHER_DEVICE,
+  FLAIR,
 } as Record<string, FeatureFlagStore>;

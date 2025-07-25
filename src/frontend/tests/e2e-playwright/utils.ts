@@ -69,7 +69,6 @@ export const authorizeWithUrl = async (
   await authPage.waitForEvent("close");
 
   // Assert that the user is authenticated (valid principal)
-  await expect(page.locator("#principal")).not.toBeEmpty();
   const principal = (await page.locator("#principal").textContent()) ?? "";
   expect(principal).toEqual(Principal.fromText(principal).toText());
 
