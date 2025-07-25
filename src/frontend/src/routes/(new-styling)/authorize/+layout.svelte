@@ -99,19 +99,6 @@
       }
     });
   });
-
-  const animateAuthenticating = () => {
-    if (triggerAnimation) {
-      triggerAnimation(DROP_WAVE_ANIMATION);
-    }
-    setTimeout(animateAuthenticating, 1200);
-  };
-
-  $effect(() => {
-    if (status === "authorizing") {
-      animateAuthenticating();
-    }
-  });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
