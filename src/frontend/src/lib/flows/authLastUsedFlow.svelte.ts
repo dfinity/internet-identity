@@ -23,7 +23,7 @@ export class AuthLastUsedFlow {
         const { identity, identityNumber } = await authenticateWithPasskey({
           canisterId,
           session: get(sessionStore),
-          credentialId: lastUsedIdentity.authMethod.passkey.credentialId,
+          credentialIds: [lastUsedIdentity.authMethod.passkey.credentialId],
         });
         authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);

@@ -183,17 +183,17 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   }
 
   static useExisting({
-    credentialId,
+    credentialIds,
     getPublicKey,
   }: {
-    credentialId?: Uint8Array;
+    credentialIds?: Uint8Array[];
     getPublicKey: (
       result: PublicKeyCredentialWithAttachment,
     ) => Promise<CosePublicKey>;
   }): DiscoverablePasskeyIdentity {
     return new DiscoverablePasskeyIdentity({
       getPublicKey,
-      credentialRequestOptions: requestOptions(credentialId),
+      credentialRequestOptions: requestOptions(credentialIds),
     });
   }
 
@@ -315,13 +315,14 @@ export const creationOptions = (
 });
 
 export const requestOptions = (
-  credentialId?: Uint8Array,
+  credentialIds?: Uint8Array[],
 ): CredentialRequestOptionsWithoutChallenge => ({
   publicKey: {
-    // Either use the specified credential id or let the user pick a passkey
-    allowCredentials: nonNullish(credentialId)
-      ? [{ id: credentialId, type: "public-key" }]
-      : undefined,
+    // Either use the specified credential ids or let the user pick a passkey
+    allowCredentials:
+      nonNullish(credentialIds) && credentialIds.length > 0
+        ? credentialIds.map((id) => ({ id, type: "public-key" as const }))
+        : undefined,
     // Require passkeys to verify the user e.g. TouchID
     userVerification: "required",
   },
