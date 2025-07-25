@@ -67,9 +67,8 @@
       triggerAnimation(DROP_WAVE_ANIMATION);
     }
     isAuthDialogOpen = false;
-    setTimeout(async () => {
-      await gotoAccounts();
-    }, WAVE_ANIMATION_DELAY_MILLIS);
+
+    await gotoAccounts();
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -82,9 +81,9 @@
     if (triggerAnimation) {
       triggerAnimation(DROP_WAVE_ANIMATION);
     }
-    setTimeout(async () => {
-      await gotoAccounts();
-    }, WAVE_ANIMATION_DELAY_MILLIS);
+
+    await gotoAccounts();
+
     isAuthDialogOpen = false;
   };
 
