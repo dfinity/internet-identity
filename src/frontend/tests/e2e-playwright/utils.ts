@@ -33,12 +33,27 @@ export const dummyAuth = (): DummyAuthFn => {
  * @param authenticate The method that will be called within authorize page
  * @returns Authenticated principal
  */
-export const authorize = async (
+export const authorize = (
   page: Page,
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
+  return authorizeWithUrl(page, TEST_APP_URL, authenticate);
+};
+
+/**
+ * Authorize with a custom app URL
+ * @param page The page that will load the test app
+ * @param appUrl The URL of the app to authorize with
+ * @param authenticate The method that will be called within authorize page
+ * @returns Authenticated principal
+ */
+export const authorizeWithUrl = async (
+  page: Page,
+  appUrl: string,
+  authenticate: (page: Page) => Promise<void>,
+): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
-  await page.goto(TEST_APP_URL);
+  await page.goto(appUrl);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
@@ -54,6 +69,7 @@ export const authorize = async (
   await authPage.waitForEvent("close");
 
   // Assert that the user is authenticated (valid principal)
+  await expect(page.locator("#principal")).not.toBeEmpty();
   const principal = (await page.locator("#principal").textContent()) ?? "";
   expect(principal).toEqual(Principal.fromText(principal).toText());
 
@@ -158,4 +174,45 @@ export const renamePasskey = async (
 export const signOut = async (page: Page): Promise<void> => {
   await page.getByLabel("Switch identity").click();
   await page.getByRole("button", { name: "Sign Out" }).click();
+};
+
+/**
+ * Opens test app and configures II URL
+ */
+export const openTestAppWithII = async (page: Page): Promise<void> => {
+  await page.goto(TEST_APP_URL);
+  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+};
+
+/**
+ * Opens II popup tab and returns the popup page
+ */
+export const openIiTab = async (page: Page): Promise<Page> => {
+  const pagePromise = page.context().waitForEvent("page");
+  await page.locator("#openIiWindowBtn").click();
+  return await pagePromise;
+};
+
+/**
+ * Waits for nth message to appear in test app
+ */
+export const waitForNthMessage = async (
+  page: Page,
+  messageNo: number,
+): Promise<void> => {
+  await page.locator(`div.postMessage:nth-child(${messageNo})`).waitFor();
+};
+
+/**
+ * Gets message text from nth message in test app
+ */
+export const getMessageText = async (
+  page: Page,
+  messageNo: number,
+): Promise<string> => {
+  return (
+    (await page
+      .locator(`div.postMessage:nth-child(${messageNo}) > div:nth-child(2)`)
+      .textContent()) ?? ""
+  );
 };

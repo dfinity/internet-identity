@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { authorize, createIdentity, dummyAuth } from "../utils";
+import {
+  authorize,
+  authorizeWithUrl,
+  createIdentity,
+  dummyAuth,
+  TEST_APP_URL,
+  TEST_APP_CANONICAL_URL,
+} from "../utils";
 
 test("Authorize with last used identity", async ({ page }) => {
   const auth = dummyAuth();
@@ -47,4 +54,27 @@ test("Authorize by signing in with a different passkey", async ({ page }) => {
   });
   expect(principal).toBe(expectedPrincipal);
   expect(principal).not.toBe(otherPrincipal);
+});
+
+test("App logo appears when app is known", async ({ page }) => {
+  const auth = dummyAuth();
+  await createIdentity(page, "John Doe", auth);
+  await authorizeWithUrl(page, TEST_APP_URL, async (authPage) => {
+    await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
+
+    auth(authPage);
+    await authPage.getByRole("button", { name: "Primary account" }).click();
+  });
+});
+
+test("App logo doesn't appear when app is not known", async ({ page }) => {
+  const auth = dummyAuth();
+  await createIdentity(page, "John Doe", auth);
+  await authorizeWithUrl(page, TEST_APP_CANONICAL_URL, async (authPage) => {
+    await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
+    await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
+
+    auth(authPage);
+    await authPage.getByRole("button", { name: "Primary account" }).click();
+  });
 });
