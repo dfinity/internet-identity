@@ -250,6 +250,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await authPage1.waitForEvent("close");
 
   // Get the first principal
+  await expect(page.locator("#principal")).not.toBeEmpty();
   const principal1 = await page.locator("#principal").textContent();
   expect(principal1).toBeTruthy();
 
@@ -273,6 +274,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await authPage2.waitForEvent("close");
 
   // Get the second principal
+  await expect(page.locator("#principal")).not.toBeEmpty();
   const principal2 = await page.locator("#principal").textContent();
   expect(principal2).toBeTruthy();
 
