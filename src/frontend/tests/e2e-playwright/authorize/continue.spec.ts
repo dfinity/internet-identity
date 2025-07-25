@@ -39,7 +39,7 @@ test("Authorize by signing in with a different passkey", async ({ page }) => {
   const expectedPrincipal = await createIdentity(page, "John Doe", auth1);
   const otherPrincipal = await createIdentity(page, "Jane Doe", auth2);
   const principal = await authorize(page, async (authPage) => {
-    await authPage.getByRole("button", { name: "Jane Doe" }).click();
+    await authPage.getByRole("button", { name: "Switch identity" }).click();
     await authPage
       .getByRole("button", { name: "Use another identity" })
       .click();
