@@ -27,6 +27,7 @@
   } from "$lib/components/backgrounds/constants";
   import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
   import { onMount } from "svelte";
+  import { FLAIR } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
 
@@ -42,9 +43,13 @@
     }
     isAuthDialogOpen = false;
     preloadNext();
-    setTimeout(async () => {
+    if ($FLAIR) {
+      setTimeout(async () => {
+        await gotoNext();
+      }, WAVE_ANIMATION_DELAY_MILLIS);
+    } else {
       await gotoNext();
-    }, WAVE_ANIMATION_DELAY_MILLIS);
+    }
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -57,9 +62,13 @@
     }
     isAuthDialogOpen = false;
     preloadNext();
-    setTimeout(async () => {
+    if ($FLAIR) {
+      setTimeout(async () => {
+        await gotoNext();
+      }, WAVE_ANIMATION_DELAY_MILLIS);
+    } else {
       await gotoNext();
-    }, WAVE_ANIMATION_DELAY_MILLIS);
+    }
   };
   const authLastUsedFlow = new AuthLastUsedFlow();
 

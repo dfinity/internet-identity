@@ -29,10 +29,7 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
   import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
-  import {
-    DROP_WAVE_ANIMATION,
-    WAVE_ANIMATION_DELAY_MILLIS,
-  } from "$lib/components/backgrounds/constants";
+  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
 
   const { children }: LayoutProps = $props();
 
