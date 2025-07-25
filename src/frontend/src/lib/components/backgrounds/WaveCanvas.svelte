@@ -1,11 +1,12 @@
 <script lang="ts">
   import FlairCanvas from "./FlairCanvas.svelte";
   import { FLAIR } from "$lib/state/featureFlags";
+  import { isMobile } from "$lib/state/UI/isMobile";
 
   let { triggerAnimation = $bindable() } = $props();
 </script>
 
-{#if $FLAIR}
+{#if $FLAIR && !$isMobile}
   <FlairCanvas
     spacing="medium"
     aspect="ultrawide"
