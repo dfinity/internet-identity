@@ -33,12 +33,27 @@ export const dummyAuth = (): DummyAuthFn => {
  * @param authenticate The method that will be called within authorize page
  * @returns Authenticated principal
  */
-export const authorize = async (
+export const authorize = (
   page: Page,
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
+  return authorizeWithUrl(page, TEST_APP_URL, authenticate);
+};
+
+/**
+ * Authorize with a custom app URL
+ * @param page The page that will load the test app
+ * @param appUrl The URL of the app to authorize with
+ * @param authenticate The method that will be called within authorize page
+ * @returns Authenticated principal
+ */
+export const authorizeWithUrl = async (
+  page: Page,
+  appUrl: string,
+  authenticate: (page: Page) => Promise<void>,
+): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
-  await page.goto(TEST_APP_URL);
+  await page.goto(appUrl);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
