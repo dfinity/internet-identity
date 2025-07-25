@@ -795,7 +795,7 @@ export function drawVignetteMask(
   ctx.restore();
 }
 
-export function createOpacityWave(
+export function createTweenedWave(
   motionController: Tween<number>,
   duration: number,
   from = 0,

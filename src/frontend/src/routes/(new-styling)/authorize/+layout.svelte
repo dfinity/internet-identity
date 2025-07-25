@@ -28,7 +28,11 @@
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
+  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
+  import {
+    DROP_WAVE_ANIMATION,
+    WAVE_ANIMATION_DELAY_MILLIS,
+  } from "$lib/components/backgrounds/constants";
 
   const { children }: LayoutProps = $props();
 
@@ -60,20 +64,12 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     preloadAccounts();
     if (triggerAnimation) {
-      triggerAnimation({
-        location: "center",
-        target: ["motion"],
-
-        motionType: "omni",
-        intensity: "light",
-        speed: 5,
-        nImpulses: "single",
-        size: "large",
-        impulseEasing: "cubicIn",
-      });
+      triggerAnimation(DROP_WAVE_ANIMATION);
     }
     isAuthDialogOpen = false;
-    await gotoAccounts();
+    setTimeout(async () => {
+      await gotoAccounts();
+    }, WAVE_ANIMATION_DELAY_MILLIS);
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -84,19 +80,11 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     preloadAccounts();
     if (triggerAnimation) {
-      triggerAnimation({
-        location: "center",
-        target: ["motion"],
-
-        motionType: "omni",
-        intensity: "light",
-        speed: 5,
-        nImpulses: "single",
-        size: "large",
-        impulseEasing: "cubicIn",
-      });
+      triggerAnimation(DROP_WAVE_ANIMATION);
     }
-    await gotoAccounts();
+    setTimeout(async () => {
+      await gotoAccounts();
+    }, WAVE_ANIMATION_DELAY_MILLIS);
     isAuthDialogOpen = false;
   };
 
@@ -104,21 +92,17 @@
 
   onMount(() => {
     authorizationStore.init();
+
+    setTimeout(() => {
+      if (triggerAnimation) {
+        triggerAnimation(DROP_WAVE_ANIMATION);
+      }
+    });
   });
 
   const animateAuthenticating = () => {
     if (triggerAnimation) {
-      triggerAnimation({
-        location: "center",
-        target: ["motion"],
-
-        motionType: "omni",
-        intensity: "light",
-        speed: 5,
-        nImpulses: "double",
-        size: "large",
-        impulseEasing: "cubicIn",
-      });
+      triggerAnimation(DROP_WAVE_ANIMATION);
     }
     setTimeout(animateAuthenticating, 1200);
   };
@@ -132,13 +116,7 @@
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <FlairCanvas
-    spacing="medium"
-    aspect="ultrawide"
-    dotSize={1.1}
-    vignette="center"
-    bind:triggerAnimation
-  />
+  <WaveCanvas bind:triggerAnimation />
   <Header>
     {#if nonNullish(selectedIdentity)}
       <Button

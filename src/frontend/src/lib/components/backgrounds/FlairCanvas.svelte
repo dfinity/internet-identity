@@ -4,7 +4,7 @@
     createContinuousWave,
     createDirectionalImpulse,
     createImpulse,
-    createOpacityWave,
+    createTweenedWave,
     createPerlinImpulse,
     createRotationalImpulse,
     createXYNodeMotions,
@@ -45,6 +45,7 @@
     maskWaveThickness,
     maskWaveRampIn,
     maskWaveRampOut,
+    maskWaveSpeedMultiplier = 1,
     customColor,
     customColorMode,
     backgroundClasses,
@@ -83,6 +84,9 @@
   });
 
   let motionNoiseScale = $state<number>(0.01);
+
+  let backgroundInitialized = $state(false);
+  let backgroundIsVisible = $state(true);
 
   // --- Animation state ---
   let time = $state<number>(0);
@@ -438,7 +442,6 @@
           );
         }
       }
-
       createImpulse(
         x,
         y,
@@ -497,11 +500,14 @@
             easing: easingFunctions[impulseEasing],
           });
         }
-        createOpacityWave(
+        createTweenedWave(
           opacityWaveMotion,
           rippleRadius *
             waveSpeed *
-            (typeof speed === "number" ? speed : speedTable[speed]),
+            (typeof speed === "number" ? speed : speedTable[speed]) *
+            (typeof maskWaveSpeedMultiplier === "number"
+              ? maskWaveSpeedMultiplier
+              : 1),
           0,
         );
       }
@@ -703,11 +709,17 @@
   };
 
   const handleResize = () => {
+    if (!backgroundInitialized) {
+      backgroundInitialized = true;
+      return;
+    }
     clearTimeout(resizeTimeout);
-    canvasGlobalOpacity.set(0, { duration: 0 });
-    resizeTimeout = setTimeout(() => {
-      canvasGlobalOpacity.set(100, { duration: 1000 });
-    }, 10);
+    if (backgroundIsVisible) {
+      canvasGlobalOpacity.set(0, { duration: 0 });
+      resizeTimeout = setTimeout(() => {
+        canvasGlobalOpacity.set(100, { duration: 1000 });
+      }, 10);
+    }
   };
 
   onMount(() => {

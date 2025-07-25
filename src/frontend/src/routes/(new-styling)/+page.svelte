@@ -21,11 +21,14 @@
   import type { PageProps } from "./$types";
   import { preloadCode, preloadData } from "$app/navigation";
   import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
+  import {
+    DROP_WAVE_ANIMATION,
+    WAVE_ANIMATION_DELAY_MILLIS,
+  } from "$lib/components/backgrounds/constants";
   import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
+  import { onMount } from "svelte";
 
   const { data }: PageProps = $props();
-  const WAVE_ANIMATION_DELAY_MILLIS = 1500;
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
   const preloadNext = () => {
@@ -73,6 +76,14 @@
     await authLastUsedFlow.authenticate(identity).catch(handleError);
     await onSignIn(identity.identityNumber);
   };
+
+  onMount(() => {
+    setTimeout(() => {
+      if (triggerAnimation) {
+        triggerAnimation(DROP_WAVE_ANIMATION);
+      }
+    });
+  });
 
   let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
 </script>

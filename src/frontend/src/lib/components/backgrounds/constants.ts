@@ -10,3 +10,5 @@ export const DROP_WAVE_ANIMATION: FlairAnimationOptions = {
   size: "large",
   impulseEasing: "cubicIn",
 };
+
+export const WAVE_ANIMATION_DELAY_MILLIS = 1500;
