@@ -1,7 +1,8 @@
-use crate::anchor_management::tentative_device_registration;
 use crate::anchor_management::tentative_device_registration::{
     TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
 };
+
+use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::state::persistent_state;
@@ -72,13 +73,22 @@ async fn init_salt() {
 #[update]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    tentative_device_registration::enter_device_registration_mode(anchor_number)
+    tentative_device_registration::enter_device_registration_mode(anchor_number, None)
+        // Legacy API traps instead of returning an error.
+        .unwrap_or_else(|err| match err {
+            AuthnMethodRegistrationModeEnterError::AlreadyInProgress => trap("Already in progress"),
+            AuthnMethodRegistrationModeEnterError::InternalError(message) => trap(&*message),
+            AuthnMethodRegistrationModeEnterError::Unauthorized(_)
+            | AuthnMethodRegistrationModeEnterError::InvalidRegistrationId(_) => {
+                trap("Unreachable error")
+            }
+        })
 }
 
 #[update]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    tentative_device_registration::exit_device_registration_mode(anchor_number)
+    tentative_device_registration::exit_device_registration_mode(anchor_number);
 }
 
 #[update]
@@ -114,17 +124,23 @@ async fn add_tentative_device(
 #[update]
 fn verify_tentative_device(
     anchor_number: AnchorNumber,
-    user_verification_code: DeviceVerificationCode,
+    user_confirmation_code: DeviceConfirmationCode,
 ) -> VerifyTentativeDeviceResponse {
-    let result = anchor_operation_with_authz_check(anchor_number, |anchor| {
-        tentative_device_registration::verify_tentative_device(
-            anchor,
-            anchor_number,
-            user_verification_code,
-        )
-    });
-    match result {
-        Ok(()) => VerifyTentativeDeviceResponse::Verified,
+    let (mut anchor, authorization_key) = check_authorization(anchor_number)
+        .unwrap_or_else(|err| trap(&format!("{} could not be authenticated.", err.principal)));
+    match tentative_device_registration::confirm_tentative_device(
+        anchor_number,
+        user_confirmation_code,
+    ) {
+        Ok(confirmed_device) => {
+            if let Some(device_data) = confirmed_device {
+                // Add device to anchor with bookkeeping if it has been confirmed
+                anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
+                let operation = anchor_management::add_device(&mut anchor, device_data);
+                anchor_management::post_operation_bookkeeping(anchor_number, operation);
+            }
+            VerifyTentativeDeviceResponse::Verified
+        }
         Err(err) => match err {
             VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
                 VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
@@ -134,10 +150,6 @@ fn verify_tentative_device(
             }
             VerifyTentativeDeviceError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
-            }
-            VerifyTentativeDeviceError::IdentityUpdateError(err) => {
-                // Legacy API traps instead of returning an error.
-                trap(String::from(err).as_str())
             }
         },
     }
@@ -659,12 +671,12 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
+    use super::*;
+    use crate::anchor_management::tentative_device_registration;
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
         state::get_identity_number_by_registration_id,
     };
-
-    use super::*;
 
     #[query]
     fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
@@ -869,23 +881,16 @@ mod v2_api {
     ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
         check_authz_and_record_activity(identity_number)
             .map_err(AuthnMethodRegistrationModeEnterError::from)?;
-        match id {
-            Some(reg_id) => {
-                let expiration = tentative_device_registration::enter_device_registration_mode_v2(
-                    identity_number,
-                    ValidatedRegistrationId::try_new(reg_id)
-                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
-                )?;
-                Ok(RegistrationModeInfo { expiration })
-            }
-            None => {
-                let timeout =
-                    tentative_device_registration::enter_device_registration_mode(identity_number);
-                Ok(RegistrationModeInfo {
-                    expiration: timeout,
-                })
-            }
-        }
+
+        let expiration = tentative_device_registration::enter_device_registration_mode(
+            identity_number,
+            id.map(|reg_id| {
+                ValidatedRegistrationId::try_new(reg_id)
+                    .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)
+            })
+            .transpose()?,
+        )?;
+        Ok(RegistrationModeInfo { expiration })
     }
 
     #[update]
@@ -924,27 +929,38 @@ mod v2_api {
         identity_number: IdentityNumber,
         confirmation_code: String,
     ) -> Result<(), AuthnMethodConfirmationError> {
-        let response = verify_tentative_device(identity_number, confirmation_code);
-        match response {
-            VerifyTentativeDeviceResponse::Verified => Ok(()),
-            VerifyTentativeDeviceResponse::WrongCode { retries_left } => {
-                Err(AuthnMethodConfirmationError::WrongCode { retries_left })
+        let (mut anchor, authorization_key) = check_authorization(identity_number)
+            .map_err(|err| AuthnMethodConfirmationError::Unauthorized(err.principal))?;
+
+        let confirmed_device = tentative_device_registration::confirm_tentative_device(
+            identity_number,
+            confirmation_code,
+        )
+        .map_err(|err| match err {
+            VerifyTentativeDeviceError::WrongCode { retries_left } => {
+                AuthnMethodConfirmationError::WrongCode { retries_left }
             }
-            VerifyTentativeDeviceResponse::DeviceRegistrationModeOff => {
-                Err(AuthnMethodConfirmationError::RegistrationModeOff)
+            VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
+                AuthnMethodConfirmationError::RegistrationModeOff
             }
-            VerifyTentativeDeviceResponse::NoDeviceToVerify => {
-                Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
+            VerifyTentativeDeviceError::NoDeviceToVerify => {
+                AuthnMethodConfirmationError::NoAuthnMethodToConfirm
             }
+        })?;
+
+        if let Some(device_data) = confirmed_device {
+            // Add device to anchor with bookkeeping if it has been confirmed
+            anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
+            let operation = anchor_management::add_device(&mut anchor, device_data);
+            anchor_management::post_operation_bookkeeping(identity_number, operation);
         }
+
+        Ok(())
     }
 
     #[query]
     fn lookup_by_registration_mode_id(id: String) -> Option<IdentityNumber> {
-        let validated_id = match ValidatedRegistrationId::try_new(id) {
-            Ok(id) => id,
-            Err(_) => return None,
-        };
+        let validated_id = ValidatedRegistrationId::try_new(id).ok()?;
         get_identity_number_by_registration_id(&validated_id)
     }
 }

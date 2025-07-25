@@ -13,7 +13,7 @@ pub type FrontendHostname = String;
 pub type ApplicationNumber = u64;
 pub type Timestamp = u64; // in nanos since epoch
 pub type Signature = ByteBuf;
-pub type DeviceVerificationCode = String;
+pub type DeviceConfirmationCode = String;
 pub type FailedAttemptsCounter = u8;
 pub type AccountNumber = u64;
 
@@ -146,7 +146,7 @@ pub enum GetDelegationResponse {
 pub enum AddTentativeDeviceResponse {
     #[serde(rename = "added_tentatively")]
     AddedTentatively {
-        verification_code: DeviceVerificationCode,
+        verification_code: DeviceConfirmationCode,
         device_registration_timeout: Timestamp,
     },
     #[serde(rename = "device_registration_mode_off")]

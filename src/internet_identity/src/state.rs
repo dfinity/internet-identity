@@ -80,13 +80,16 @@ pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
         tentative_device: DeviceData,
-        verification_code: DeviceVerificationCode,
+        confirmation_code: DeviceConfirmationCode,
         failed_attempts: FailedAttemptsCounter,
     },
     SessionTentativelyAdded {
         tentative_session: Principal,
-        verification_code: DeviceVerificationCode,
+        confirmation_code: DeviceConfirmationCode,
         failed_attempts: FailedAttemptsCounter,
+    },
+    SessionTentativelyConfirmed {
+        tentative_session: Principal,
     },
 }
 
