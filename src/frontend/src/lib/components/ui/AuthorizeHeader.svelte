@@ -20,7 +20,6 @@
 <div {...props} class={["flex flex-1 flex-col", className]}>
   <div class="flex flex-1 flex-col items-center justify-center pt-5 pb-6">
     <div
-      aria-hidden={nonNullish(dapp?.logoSrc) ? "false" : "true"}
       class={[
         "mb-6 flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
         isNullish(dapp?.logoSrc) &&
@@ -34,7 +33,10 @@
           class="h-16 max-w-24 object-contain"
         />
       {:else}
-        <div class="flex size-16 items-center justify-center">
+        <div
+          class="flex size-16 items-center justify-center"
+          aria-hidden="true"
+        >
           <GlobeIcon size="1.5rem" />
         </div>
       {/if}

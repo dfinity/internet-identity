@@ -43,7 +43,6 @@ test("Authorize by signing in with an existing passkey", async ({ page }) => {
 test("App logo appears when app is known", async ({ page }) => {
   const auth = dummyAuth();
   await authorizeWithUrl(page, TEST_APP_URL, async (authPage) => {
-    await expect(authPage.locator('[aria-hidden="false"]')).toBeVisible();
     await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
 
     await authPage
@@ -61,7 +60,7 @@ test("App logo appears when app is known", async ({ page }) => {
 test("App logo doesn't appear when app is not known", async ({ page }) => {
   const auth = dummyAuth();
   await authorizeWithUrl(page, TEST_APP_CANONICAL_URL, async (authPage) => {
-    await expect(authPage.locator('[aria-hidden="true"]')).toBeVisible();
+    await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
     await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
     await authPage
