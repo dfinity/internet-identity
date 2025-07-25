@@ -76,6 +76,7 @@ impl TentativeDeviceRegistration {
 
 /// Registration state of new devices added using the two step device add flow
 #[derive(Clone)]
+#[allow(dead_code)]
 pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {

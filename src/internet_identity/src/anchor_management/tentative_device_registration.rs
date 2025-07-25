@@ -128,6 +128,7 @@ pub async fn add_tentative_device(
     })
 }
 
+#[allow(dead_code)]
 pub async fn add_tentative_session(
     anchor_number: AnchorNumber,
     tentative_session: Principal,
