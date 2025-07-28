@@ -676,7 +676,6 @@ async fn random_salt() -> Salt {
 mod v2_api {
     use super::*;
     use crate::anchor_management::tentative_device_registration;
-    use crate::authz_utils::IdentityUpdateError;
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
         state::get_identity_number_by_registration_id,
