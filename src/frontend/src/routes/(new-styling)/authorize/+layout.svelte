@@ -4,6 +4,7 @@
   import {
     authorizationStore,
     authorizationStatusStore,
+    authorizationContextStore,
   } from "$lib/stores/authorization.store";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
@@ -79,6 +80,16 @@
 
     isAuthDialogOpen = false;
   };
+  const onOtherDevice = async (identityNumber: bigint) => {
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    lastUsedIdentitiesStore.addLastUsedAccount({
+      origin: $authorizationContextStore.effectiveOrigin,
+      identityNumber,
+      accountNumber: undefined,
+    });
+    await goto("/authorize/continue");
+    isAuthDialogOpen = false;
+  };
 
   onMount(() => {
     authorizationStore.init();
@@ -138,7 +149,7 @@
             bind:isAuthenticating
             {onSignIn}
             {onSignUp}
-            onOtherDevice={() => (isAuthDialogOpen = false)}
+            {onOtherDevice}
             onError={(error) => {
               isAuthDialogOpen = false;
               handleError(error);

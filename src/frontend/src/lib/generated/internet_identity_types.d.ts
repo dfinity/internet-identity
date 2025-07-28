@@ -79,9 +79,9 @@ export interface AuthnMethodRegistrationInfo {
 export type AuthnMethodRegistrationModeEnterError = {
     'InvalidRegistrationId' : string
   } |
+  { 'InternalCanisterError' : string } |
   { 'AlreadyInProgress' : null } |
-  { 'Unauthorized' : Principal } |
-  { 'InternalError' : string };
+  { 'Unauthorized' : Principal };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
