@@ -116,6 +116,12 @@
     </FeaturedIcon>
     <span>Use another identity</span>
   </ButtonCard>
+  <ButtonCard href="/migrate" class="flex sm:hidden">
+    <FeaturedIcon size="sm">
+      <MegaphoneIcon size="1.25rem" />
+    </FeaturedIcon>
+    <span>Upgrade your legacy identity</span>
+  </ButtonCard>
   {#if onLogout}
     <Button onclick={onLogout} variant="tertiary"
       ><LogOutIcon size="1.25rem" />Sign Out</Button
@@ -123,7 +129,7 @@
   {/if}
   {#if isNullish(onLogout)}
     <p
-      class="text-text-secondary mt-4 flex items-center justify-center gap-2 text-sm"
+      class="text-text-secondary mt-4 hidden items-center justify-center gap-2 text-sm sm:flex"
     >
       <MegaphoneIcon size="1rem" />
       <a href="/migrate">Upgrade your legacy identity</a>

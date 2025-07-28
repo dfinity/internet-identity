@@ -7,6 +7,8 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
   import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import { MegaphoneIcon } from "@lucide/svelte";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
@@ -68,6 +70,15 @@
         {/if}
       </Button>
     {/if}
+    <Button
+      href="/migrate"
+      variant="tertiary"
+      disabled={isAuthenticating}
+      size="xl"
+    >
+      <MegaphoneIcon size="1.25rem" />
+      <span>Upgrade your legacy identity</span>
+    </Button>
     {#if $CONTINUE_FROM_ANOTHER_DEVICE}
       <Button
         onclick={continueFromAnotherDevice}

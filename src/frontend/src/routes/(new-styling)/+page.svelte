@@ -147,6 +147,12 @@
             </FeaturedIcon>
             <span>Use another identity</span>
           </ButtonCard>
+          <ButtonCard href="/migrate" class="flex sm:hidden">
+            <FeaturedIcon size="sm">
+              <MegaphoneIcon size="1.25rem" />
+            </FeaturedIcon>
+            <span>Upgrade your legacy identity</span>
+          </ButtonCard>
         </div>
         {#if isAuthDialogOpen}
           <Dialog
@@ -187,7 +193,9 @@
         </AuthWizard>
       {/if}
     </AuthPanel>
-    <p class="text-text-secondary mt-4 flex items-center gap-2 text-sm">
+    <p
+      class="text-text-secondary mt-4 hidden items-center gap-2 text-sm sm:flex"
+    >
       <MegaphoneIcon size="1rem" />
       <a href="/migrate">Upgrade your legacy identity</a>
     </p>
