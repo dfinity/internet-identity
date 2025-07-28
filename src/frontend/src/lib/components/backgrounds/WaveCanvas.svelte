@@ -2,8 +2,15 @@
   import FlairCanvas from "./FlairCanvas.svelte";
   import { FLAIR } from "$lib/state/featureFlags";
   import { isMobile } from "$lib/state/UI/isMobile";
+  import { onMount } from "svelte";
 
   let { triggerAnimation = $bindable() } = $props();
+
+  onMount(() => {
+    if (window) {
+      (window as any).triggerFlairCanvas = triggerAnimation;
+    }
+  });
 </script>
 
 {#if $FLAIR && !$isMobile}
