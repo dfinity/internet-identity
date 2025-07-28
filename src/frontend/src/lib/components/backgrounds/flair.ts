@@ -3,10 +3,10 @@ import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCan
 
 declare global {
   interface Window {
-    triggerFlairCanvas?: (opts: FlairAnimationOptions) => void;
+    triggerWaveCanvas?: (opts: FlairAnimationOptions) => void;
   }
 }
 
 export async function dropWaveAnimation() {
-  await window.triggerFlairCanvas?.(DROP_WAVE_ANIMATION);
+  await window.triggerWaveCanvas?.(DROP_WAVE_ANIMATION);
 }

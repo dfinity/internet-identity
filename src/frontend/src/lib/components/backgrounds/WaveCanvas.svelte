@@ -8,7 +8,7 @@
 
   onMount(() => {
     if (window) {
-      (window as any).triggerFlairCanvas = triggerAnimation;
+      (window as any).triggerWaveCanvas = triggerAnimation;
     }
   });
 </script>
