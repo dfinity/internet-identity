@@ -132,11 +132,11 @@ fn verify_tentative_device(
         anchor_number,
         user_confirmation_code,
     ) {
-        Ok(confirmed_device) => {
-            if let Some(device_data) = confirmed_device {
+        Ok(maybe_confirmed_device) => {
+            if let Some(confirmed_device) = maybe_confirmed_device {
                 // Add device to anchor with bookkeeping if it has been confirmed
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-                let operation = anchor_management::add_device(&mut anchor, device_data);
+                let operation = anchor_management::add_device(&mut anchor, confirmed_device);
                 if let Err(err) = state::storage_borrow_mut(|storage| storage.update(anchor)) {
                     trap(&format!("{err}"));
                 }
@@ -936,7 +936,7 @@ mod v2_api {
         let (mut anchor, authorization_key) = check_authorization(identity_number)
             .map_err(|err| AuthnMethodConfirmationError::Unauthorized(err.principal))?;
 
-        let confirmed_device = tentative_device_registration::confirm_tentative_device(
+        let maybe_confirmed_device = tentative_device_registration::confirm_tentative_device(
             identity_number,
             confirmation_code,
         )
@@ -952,10 +952,10 @@ mod v2_api {
             }
         })?;
 
-        if let Some(device_data) = confirmed_device {
+        if let Some(confirmed_device) = maybe_confirmed_device {
             // Add device to anchor with bookkeeping if it has been confirmed
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-            let operation = anchor_management::add_device(&mut anchor, device_data);
+            let operation = anchor_management::add_device(&mut anchor, confirmed_device);
             state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
                 AuthnMethodConfirmationError::InternalCanisterError(err.to_string())
             })?;
