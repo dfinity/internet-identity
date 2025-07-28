@@ -162,9 +162,9 @@ export const idlFactory = ({ IDL }) => {
   const RegistrationId = IDL.Text;
   const AuthnMethodRegistrationModeEnterError = IDL.Variant({
     'InvalidRegistrationId' : IDL.Text,
+    'InternalCanisterError' : IDL.Text,
     'AlreadyInProgress' : IDL.Null,
     'Unauthorized' : IDL.Principal,
-    'InternalError' : IDL.Text,
   });
   const AuthnMethodReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
