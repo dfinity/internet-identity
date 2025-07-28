@@ -140,7 +140,7 @@ pub enum AuthnMethodRegisterError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodRegistrationModeEnterError {
     Unauthorized(Principal),
-    InternalError(String),
+    InternalCanisterError(String),
     AlreadyInProgress,
     InvalidRegistrationId(String),
 }
