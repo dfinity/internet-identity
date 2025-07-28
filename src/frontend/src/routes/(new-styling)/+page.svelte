@@ -19,14 +19,37 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
+  import { preloadCode, preloadData } from "$app/navigation";
+  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  import {
+    DROP_WAVE_ANIMATION,
+    WAVE_ANIMATION_DELAY_MILLIS,
+  } from "$lib/components/backgrounds/constants";
+  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
+  import { onMount } from "svelte";
+  import { FLAIR } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
+  const preloadNext = () => {
+    void preloadCode(data.next ?? "/manage");
+    void preloadData(data.next ?? "/manage");
+  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoNext();
+    if (triggerAnimation) {
+      triggerAnimation(DROP_WAVE_ANIMATION);
+    }
     isAuthDialogOpen = false;
+    preloadNext();
+    if ($FLAIR) {
+      setTimeout(async () => {
+        await gotoNext();
+      }, WAVE_ANIMATION_DELAY_MILLIS);
+    } else {
+      await gotoNext();
+    }
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -34,8 +57,18 @@
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoNext();
+    if (triggerAnimation) {
+      triggerAnimation(DROP_WAVE_ANIMATION);
+    }
     isAuthDialogOpen = false;
+    preloadNext();
+    if ($FLAIR) {
+      setTimeout(async () => {
+        await gotoNext();
+      }, WAVE_ANIMATION_DELAY_MILLIS);
+    } else {
+      await gotoNext();
+    }
   };
   const authLastUsedFlow = new AuthLastUsedFlow();
 
@@ -52,9 +85,20 @@
     await authLastUsedFlow.authenticate(identity).catch(handleError);
     await onSignIn(identity.identityNumber);
   };
+
+  onMount(() => {
+    setTimeout(() => {
+      if (triggerAnimation) {
+        triggerAnimation(DROP_WAVE_ANIMATION);
+      }
+    });
+  });
+
+  let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
+  <WaveCanvas bind:triggerAnimation />
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">

@@ -22,12 +22,15 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { goto } from "$app/navigation";
+  import { goto, preloadCode, preloadData } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
+  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
 
   const { children }: LayoutProps = $props();
 
@@ -51,10 +54,19 @@
       invalidateAll: true,
       state: { disableNavigationAnimation: true },
     });
+  const preloadAccounts = () => {
+    void preloadCode("/authorize/account");
+    void preloadData("/authorize/account");
+  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoAccounts();
+    preloadAccounts();
+    if (triggerAnimation) {
+      triggerAnimation(DROP_WAVE_ANIMATION);
+    }
     isAuthDialogOpen = false;
+
+    await gotoAccounts();
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -63,7 +75,13 @@
       closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    preloadAccounts();
+    if (triggerAnimation) {
+      triggerAnimation(DROP_WAVE_ANIMATION);
+    }
+
     await gotoAccounts();
+
     isAuthDialogOpen = false;
   };
   const onOtherDevice = async (identityNumber: bigint) => {
@@ -77,13 +95,22 @@
     isAuthDialogOpen = false;
   };
 
+  let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
+
   onMount(() => {
     authorizationStore.init();
+
+    setTimeout(() => {
+      if (triggerAnimation) {
+        triggerAnimation(DROP_WAVE_ANIMATION);
+      }
+    });
   });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
+  <WaveCanvas bind:triggerAnimation />
   <Header>
     {#if nonNullish(selectedIdentity)}
       <Button

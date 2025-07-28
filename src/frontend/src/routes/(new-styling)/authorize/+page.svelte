@@ -1,7 +1,7 @@
 <script lang="ts">
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { goto } from "$app/navigation";
+  import { goto, preloadCode, preloadData } from "$app/navigation";
   import {
     authorizationStore,
     authorizationContextStore,
@@ -21,7 +21,9 @@
 
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await goto("/authorize/account");
+    setTimeout(async () => {
+      await goto("/authorize/account");
+    }, 700);
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({

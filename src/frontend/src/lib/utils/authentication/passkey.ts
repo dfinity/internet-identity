@@ -25,12 +25,12 @@ export class IdentityNotMigratedError extends Error {
 export const authenticateWithPasskey = async ({
   canisterId,
   session,
-  credentialId,
+  credentialIds,
   expiration = 30 * 60 * 1000,
 }: {
   canisterId: Principal;
   session: Pick<Session, "identity" | "agent">;
-  credentialId?: Uint8Array;
+  credentialIds?: Uint8Array[];
   expiration?: number;
 }): Promise<{
   identity: DelegationIdentity;
@@ -47,7 +47,7 @@ export const authenticateWithPasskey = async ({
   const passkeyIdentity = dummyAuth
     ? DiscoverableDummyIdentity.useExisting()
     : DiscoverablePasskeyIdentity.useExisting({
-        credentialId,
+        credentialIds,
         getPublicKey: async (result) => {
           const lookupResult = (
             await actor.lookup_device_key(new Uint8Array(result.rawId))
