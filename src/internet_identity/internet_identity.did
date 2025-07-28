@@ -519,7 +519,7 @@ type AuthnMethodRegistrationModeEnterError = variant {
     InvalidRegistrationId : text;
     Unauthorized : principal;
     AlreadyInProgress;
-    InternalError : text;
+    InternalCanisterError : text;
 };
 
 type LookupByRegistrationIdError = variant {
