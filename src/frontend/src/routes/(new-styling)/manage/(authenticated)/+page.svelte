@@ -12,6 +12,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { handleError } from "$lib/components/utils/error";
+  import LegacyAccessMethodsPanel from "$lib/components/views/LegacyAccessMethodsPanel.svelte";
 
   const { data }: PageProps = $props();
 
@@ -46,6 +47,8 @@
     <IdentityInfoPanel />
 
     <AccessMethods />
+
+    <LegacyAccessMethodsPanel />
   </div>
 </div>
 

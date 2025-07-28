@@ -116,13 +116,21 @@ export class MigrationFlow {
     }
   };
 
-  createPasskey = async (name: string): Promise<void> => {
+  createPasskey = async (
+    name: string,
+    addNumberPasskey: boolean = false,
+  ): Promise<void> => {
     if (isNullish(this.identityNumber)) {
       // Cannot call createPasskey before authenticateWithIdentityNumber.
       throw new Error("Identity number is null");
     }
     // TODO: Create the passkey in id.ai
-    const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
+    // It will be easier for legacy users to identify their passkeys if we include the identity number in the name.
+    const passkeyName = addNumberPasskey
+      ? `${name} - ${this.identityNumber}`
+      : name;
+    const passkeyIdentity =
+      await DiscoverablePasskeyIdentity.createNew(passkeyName);
     const origin = window.location.origin;
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).

@@ -6,6 +6,8 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { handleError } from "$lib/components/utils/error";
+  import FeaturedIcon from "../ui/FeaturedIcon.svelte";
+  import { UserIcon } from "@lucide/svelte";
 
   const { onSuccess }: { onSuccess: () => void } = $props();
 
@@ -22,8 +24,12 @@
   };
 
   const handleCreate = async (name: string) => {
-    await migrationFlow.createPasskey(name);
-    onSuccess();
+    try {
+      await migrationFlow.createPasskey(name, true);
+      onSuccess();
+    } catch (error) {
+      handleError(error);
+    }
   };
 </script>
 
@@ -36,6 +42,9 @@
 {#snippet enterIdentityNumber()}
   <form class="flex flex-1 flex-col">
     <div class="mb-8 flex flex-col">
+      <FeaturedIcon size="lg" class="mb-4 self-start">
+        <UserIcon size="1.5rem" />
+      </FeaturedIcon>
       <h1 class="text-text-primary mb-3 text-2xl font-medium">
         Enter the identity number
       </h1>

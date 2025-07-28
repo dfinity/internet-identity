@@ -9,7 +9,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { PlusIcon, UserIcon } from "@lucide/svelte";
+  import { MegaphoneIcon, PlusIcon, UserIcon } from "@lucide/svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -187,6 +187,10 @@
         </AuthWizard>
       {/if}
     </AuthPanel>
+    <p class="text-text-secondary mt-4 flex items-center gap-2 text-sm">
+      <MegaphoneIcon size="1rem" />
+      <a href="/migrate">Upgrade your legacy identity</a>
+    </p>
   </div>
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>

@@ -8,6 +8,7 @@
     CodeSquareIcon,
     XIcon,
     LogOutIcon,
+    MegaphoneIcon,
   } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import type { HTMLAttributes } from "svelte/elements";
@@ -19,7 +20,7 @@
     SOURCE_CODE_URL,
     SUPPORT_URL,
   } from "$lib/config";
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
 
   type Props = HTMLAttributes<HTMLElement> & {
@@ -119,6 +120,14 @@
     <Button onclick={onLogout} variant="tertiary"
       ><LogOutIcon size="1.25rem" />Sign Out</Button
     >
+  {/if}
+  {#if isNullish(onLogout)}
+    <p
+      class="text-text-secondary mt-4 flex items-center justify-center gap-2 text-sm"
+    >
+      <MegaphoneIcon size="1rem" />
+      <a href="/migrate">Upgrade your legacy identity</a>
+    </p>
   {/if}
 </div>
 <hr class="border-t-border-tertiary mb-4" />

@@ -21,6 +21,7 @@ import {
 } from "./last-used-identities.store";
 import { bufEquals } from "@dfinity/agent";
 import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
+import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -39,6 +40,12 @@ class IdentityInfo {
   loaded = $state(false);
   name = $state("");
   authnMethods = $state<AuthnMethodData[]>([]);
+  newAuthnMethods = $derived(
+    this.authnMethods.filter(
+      (authnMethod) => !isLegacyAuthnMethod(authnMethod),
+    ),
+  );
+  legacyAuthnMethods = $derived(this.authnMethods.filter(isLegacyAuthnMethod));
   authnMethodRegistration = $state<AuthnMethodRegistrationInfo>();
 
   openIdCredentials = $state<OpenIdCredential[]>([]);

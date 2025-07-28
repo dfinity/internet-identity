@@ -10,11 +10,9 @@
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">
-    <div class="col-start-1 row-start-1 flex flex-col">
-      <AuthPanel>
-        <MigrationWizard onSuccess={() => goto("/manage")} />
-      </AuthPanel>
-    </div>
+    <AuthPanel class="sm:max-w-100">
+      <MigrationWizard onSuccess={() => goto("/manage")} />
+    </AuthPanel>
   </div>
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
