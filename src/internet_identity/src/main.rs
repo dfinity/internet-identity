@@ -72,13 +72,22 @@ async fn init_salt() {
 #[update]
 fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    tentative_device_registration::enter_device_registration_mode(anchor_number)
+    tentative_device_registration::enter_device_registration_mode(anchor_number, None)
+        // Legacy API traps instead of returning an error.
+        .unwrap_or_else(|err| match err {
+            AuthnMethodRegistrationModeEnterError::AlreadyInProgress => trap("Already in progress"),
+            AuthnMethodRegistrationModeEnterError::InternalCanisterError(message) => trap(&message),
+            AuthnMethodRegistrationModeEnterError::Unauthorized(_)
+            | AuthnMethodRegistrationModeEnterError::InvalidRegistrationId(_) => {
+                trap("Unreachable error")
+            }
+        })
 }
 
 #[update]
 fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    tentative_device_registration::exit_device_registration_mode(anchor_number)
+    tentative_device_registration::exit_device_registration_mode(anchor_number);
 }
 
 #[update]
@@ -869,23 +878,16 @@ mod v2_api {
     ) -> Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError> {
         check_authz_and_record_activity(identity_number)
             .map_err(AuthnMethodRegistrationModeEnterError::from)?;
-        match id {
-            Some(reg_id) => {
-                let expiration = tentative_device_registration::enter_device_registration_mode_v2(
-                    identity_number,
-                    ValidatedRegistrationId::try_new(reg_id)
-                        .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)?,
-                )?;
-                Ok(RegistrationModeInfo { expiration })
-            }
-            None => {
-                let timeout =
-                    tentative_device_registration::enter_device_registration_mode(identity_number);
-                Ok(RegistrationModeInfo {
-                    expiration: timeout,
-                })
-            }
-        }
+
+        let expiration = tentative_device_registration::enter_device_registration_mode(
+            identity_number,
+            id.map(|reg_id| {
+                ValidatedRegistrationId::try_new(reg_id)
+                    .map_err(AuthnMethodRegistrationModeEnterError::InvalidRegistrationId)
+            })
+            .transpose()?,
+        )?;
+        Ok(RegistrationModeInfo { expiration })
     }
 
     #[update]

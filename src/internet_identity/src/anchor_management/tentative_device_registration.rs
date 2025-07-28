@@ -9,7 +9,7 @@ use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::*;
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use TentativeDeviceRegistrationError::{AnotherDeviceTentativelyAdded, DeviceRegistrationModeOff};
 
 // 15 mins
@@ -20,67 +20,44 @@ const MAX_ANCHORS_IN_REGISTRATION_MODE: usize = 10_000;
 const MAX_DEVICE_REGISTRATION_ATTEMPTS: u8 = 3;
 
 /// Enables device registration mode for the given anchor and returns the expiration timestamp (when it will be disabled again).
-/// If the device registration mode is already active it will just return the expiration timestamp again.
-pub fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    state::tentative_device_registrations_mut(|registrations| {
-        prune_expired_tentative_device_registrations(registrations);
-        if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
-            trap("too many anchors in device registration mode");
-        }
-
-        match registrations.get(&anchor_number) {
-            Some(TentativeDeviceRegistration { expiration, .. }) => *expiration, // already enabled, just return the existing expiration
-            None => {
-                let expiration = time() + REGISTRATION_MODE_DURATION;
-                registrations.insert(
-                    anchor_number,
-                    TentativeDeviceRegistration {
-                        expiration,
-                        state: DeviceRegistrationModeActive,
-                        id: None,
-                    },
-                );
-                expiration
-            }
-        }
-    })
-}
-
-/// Enables device registration mode for the given anchor and returns the expiration timestamp (when it will be disabled again).
-/// If the device registration mode is already active it will just return the expiration timestamp again.
-pub fn enter_device_registration_mode_v2(
+/// If the device registration mode is already active for the given registration id it will just return the expiration timestamp again.
+pub fn enter_device_registration_mode(
     identity_number: IdentityNumber,
-    id: ValidatedRegistrationId,
+    reg_id: Option<ValidatedRegistrationId>,
 ) -> Result<Timestamp, AuthnMethodRegistrationModeEnterError> {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
-            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            prune_expired_tentative_device_registrations(registrations, lookup);
             if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
-                return Err(AuthnMethodRegistrationModeEnterError::InternalError(
-                    "too many anchors in device registration mode".to_string(),
-                ));
+                return Err(
+                    AuthnMethodRegistrationModeEnterError::InternalCanisterError(
+                        "too many anchors in device registration mode".to_string(),
+                    ),
+                );
             }
 
-            let registration = registrations.entry(identity_number).or_insert_with(|| {
-                let expiration = time() + REGISTRATION_MODE_DURATION;
-                lookup.insert(id.clone(), identity_number);
-                TentativeDeviceRegistration {
-                    expiration,
-                    state: DeviceRegistrationModeActive,
-                    id: Some(id.clone()),
-                }
-            });
-
-            if let TentativeDeviceRegistration {
-                id: Some(reg_id), ..
-            } = registration
-            {
-                if reg_id != &id {
-                    return Err(AuthnMethodRegistrationModeEnterError::AlreadyInProgress);
+            match registrations.entry(identity_number) {
+                hash_map::Entry::Occupied(in_progress) => match &in_progress.get() {
+                    // Return expiration if registration id matches (also true if both None)
+                    &TentativeDeviceRegistration { id, expiration, .. } if *id == reg_id => {
+                        Ok(*expiration)
+                    }
+                    // Return error otherwise
+                    _ => Err(AuthnMethodRegistrationModeEnterError::AlreadyInProgress),
+                },
+                hash_map::Entry::Vacant(entry) => {
+                    let expiration = time() + REGISTRATION_MODE_DURATION;
+                    if let Some(id) = &reg_id {
+                        lookup.insert(id.clone(), identity_number);
+                    }
+                    entry.insert(TentativeDeviceRegistration {
+                        expiration,
+                        state: DeviceRegistrationModeActive,
+                        id: reg_id.clone(),
+                    });
+                    Ok(expiration)
                 }
             }
-
-            Ok(registration.expiration)
         })
     })
 }
@@ -88,7 +65,7 @@ pub fn enter_device_registration_mode_v2(
 pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
-            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            prune_expired_tentative_device_registrations(registrations, lookup);
             if let Some(TentativeDeviceRegistration {
                 id: Some(reg_id), ..
             }) = registrations.remove(&anchor_number)
@@ -125,29 +102,31 @@ pub async fn add_tentative_device(
     let now = time();
 
     state::tentative_device_registrations_mut(|registrations| {
-        prune_expired_tentative_device_registrations(registrations);
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations(registrations, lookup);
 
-        match registrations.get_mut(&anchor_number) {
-            None => Err(DeviceRegistrationModeOff),
-            Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
-                Err(DeviceRegistrationModeOff)
+            match registrations.get_mut(&anchor_number) {
+                None => Err(DeviceRegistrationModeOff),
+                Some(TentativeDeviceRegistration { expiration, .. }) if *expiration <= now => {
+                    Err(DeviceRegistrationModeOff)
+                }
+                Some(TentativeDeviceRegistration {
+                    state: DeviceTentativelyAdded { .. },
+                    ..
+                }) => Err(AnotherDeviceTentativelyAdded),
+                Some(registration) => {
+                    registration.state = DeviceTentativelyAdded {
+                        tentative_device: device_data,
+                        failed_attempts: 0,
+                        verification_code: verification_code.clone(),
+                    };
+                    Ok(TentativeRegistrationInfo {
+                        device_registration_timeout: registration.expiration,
+                        verification_code,
+                    })
+                }
             }
-            Some(TentativeDeviceRegistration {
-                state: DeviceTentativelyAdded { .. },
-                ..
-            }) => Err(AnotherDeviceTentativelyAdded),
-            Some(registration) => {
-                registration.state = DeviceTentativelyAdded {
-                    tentative_device: device_data,
-                    failed_attempts: 0,
-                    verification_code: verification_code.clone(),
-                };
-                Ok(TentativeRegistrationInfo {
-                    device_registration_timeout: registration.expiration,
-                    verification_code,
-                })
-            }
-        }
+        })
     })
 }
 
@@ -192,7 +171,7 @@ fn get_verified_device(
 ) -> Result<DeviceData, VerifyTentativeDeviceError> {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
-            prune_expired_tentative_device_registrations_v2(registrations, lookup);
+            prune_expired_tentative_device_registrations(registrations, lookup);
 
             // Check if the registration exists
             if !registrations.contains_key(&anchor_number) {
@@ -268,29 +247,19 @@ async fn new_verification_code() -> DeviceVerificationCode {
 /// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
 fn prune_expired_tentative_device_registrations(
     registrations: &mut HashMap<AnchorNumber, TentativeDeviceRegistration>,
-) {
-    let now = time();
-
-    registrations.retain(|_, TentativeDeviceRegistration { expiration, .. }| *expiration > now)
-}
-
-/// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
-fn prune_expired_tentative_device_registrations_v2(
-    registrations: &mut HashMap<AnchorNumber, TentativeDeviceRegistration>,
     lookup: &mut HashMap<ValidatedRegistrationId, AnchorNumber>,
 ) {
     let now = time();
 
     registrations.retain(|_, TentativeDeviceRegistration { expiration, id, .. }| {
-        if *expiration > now {
-            true
-        } else {
+        let expired = now >= *expiration;
+        if expired {
             if let Some(id) = id {
                 lookup.remove(id);
             }
-            false
         }
-    })
+        !expired
+    });
 }
 
 #[derive(CandidType, Clone, Eq, PartialEq, Hash)]
@@ -320,7 +289,7 @@ impl From<IdentityUpdateError> for AuthnMethodRegistrationModeEnterError {
                 AuthnMethodRegistrationModeEnterError::Unauthorized(principal)
             }
             IdentityUpdateError::StorageError(identity_nr, storage_err) => {
-                AuthnMethodRegistrationModeEnterError::InternalError(format!(
+                AuthnMethodRegistrationModeEnterError::InternalCanisterError(format!(
                     "Storage error for identity {identity_nr}: {storage_err}"
                 ))
             }
