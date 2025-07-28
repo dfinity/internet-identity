@@ -140,7 +140,7 @@ pub enum AuthnMethodRegisterError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodRegistrationModeEnterError {
     Unauthorized(Principal),
-    InternalError(String),
+    InternalCanisterError(String),
     AlreadyInProgress,
     InvalidRegistrationId(String),
 }
@@ -151,6 +151,7 @@ pub enum AuthnMethodConfirmationError {
     WrongCode { retries_left: u8 },
     RegistrationModeOff,
     NoAuthnMethodToConfirm,
+    InternalCanisterError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

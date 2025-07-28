@@ -514,13 +514,15 @@ type AuthnMethodConfirmationError = variant {
     RegistrationModeOff;
     // There is no registered authentication method to be confirmed.
     NoAuthnMethodToConfirm;
+    // Internal canister error. See the error message for details.
+    InternalCanisterError : text;
 };
 
 type AuthnMethodRegistrationModeEnterError = variant { 
     InvalidRegistrationId : text;
     Unauthorized : principal;
     AlreadyInProgress;
-    InternalError : text;
+    InternalCanisterError : text;
 };
 
 type LookupByRegistrationIdError = variant {

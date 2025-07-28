@@ -29,9 +29,11 @@ pub fn enter_device_registration_mode(
         state::lookup_tentative_device_registration_mut(|lookup| {
             prune_expired_tentative_device_registrations(registrations, lookup);
             if registrations.len() >= MAX_ANCHORS_IN_REGISTRATION_MODE {
-                return Err(AuthnMethodRegistrationModeEnterError::InternalError(
-                    "too many anchors in device registration mode".to_string(),
-                ));
+                return Err(
+                    AuthnMethodRegistrationModeEnterError::InternalCanisterError(
+                        "too many anchors in device registration mode".to_string(),
+                    ),
+                );
             }
 
             match registrations.entry(identity_number) {
@@ -331,7 +333,7 @@ impl From<IdentityUpdateError> for AuthnMethodRegistrationModeEnterError {
                 AuthnMethodRegistrationModeEnterError::Unauthorized(principal)
             }
             IdentityUpdateError::StorageError(identity_nr, storage_err) => {
-                AuthnMethodRegistrationModeEnterError::InternalError(format!(
+                AuthnMethodRegistrationModeEnterError::InternalCanisterError(format!(
                     "Storage error for identity {identity_nr}: {storage_err}"
                 ))
             }

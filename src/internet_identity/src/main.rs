@@ -77,7 +77,7 @@ fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
         // Legacy API traps instead of returning an error.
         .unwrap_or_else(|err| match err {
             AuthnMethodRegistrationModeEnterError::AlreadyInProgress => trap("Already in progress"),
-            AuthnMethodRegistrationModeEnterError::InternalError(message) => trap(&message),
+            AuthnMethodRegistrationModeEnterError::InternalCanisterError(message) => trap(&message),
             AuthnMethodRegistrationModeEnterError::Unauthorized(_)
             | AuthnMethodRegistrationModeEnterError::InvalidRegistrationId(_) => {
                 trap("Unreachable error")
@@ -115,7 +115,7 @@ async fn add_tentative_device(
             }
             TentativeDeviceRegistrationError::IdentityUpdateError(err) => {
                 // Legacy API traps instead of returning an error.
-                trap(String::from(err).as_str())
+                trap(&format!("{err}"))
             }
         },
     }
@@ -137,6 +137,9 @@ fn verify_tentative_device(
                 // Add device to anchor with bookkeeping if it has been confirmed
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, device_data);
+                if let Err(err) = state::storage_borrow_mut(|storage| storage.update(anchor)) {
+                    trap(&format!("{err}"));
+                }
                 anchor_management::post_operation_bookkeeping(anchor_number, operation);
             }
             VerifyTentativeDeviceResponse::Verified
@@ -671,13 +674,13 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
+    use super::*;
     use crate::anchor_management::tentative_device_registration;
+    use crate::authz_utils::IdentityUpdateError;
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
         state::get_identity_number_by_registration_id,
     };
-
-    use super::*;
 
     #[query]
     fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
@@ -953,6 +956,9 @@ mod v2_api {
             // Add device to anchor with bookkeeping if it has been confirmed
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, device_data);
+            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+                AuthnMethodConfirmationError::InternalCanisterError(err.to_string())
+            })?;
             anchor_management::post_operation_bookkeeping(identity_number, operation);
         }
 
