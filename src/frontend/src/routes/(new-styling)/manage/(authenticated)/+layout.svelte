@@ -1,7 +1,7 @@
 <script lang="ts">
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
   import { ChevronDownIcon } from "@lucide/svelte";
-  import { fly } from "svelte/transition";
+  import { fade, fly } from "svelte/transition";
   import { page } from "$app/state";
   import { beforeNavigate, goto } from "$app/navigation";
   import { isDesktopViewport } from "$lib/utils/UI/deviceDetection";
@@ -19,13 +19,14 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
+  import { onMount } from "svelte";
 
   const { children } = $props();
 
   let divRef = $state<HTMLDivElement>();
 
-  let sideBarGroupRef = $state<HTMLDivElement>();
-  let tabsGroupRef = $state<HTMLDivElement>();
+  // let sideBarGroupRef = $state<HTMLDivElement>();
+  // let tabsGroupRef = $state<HTMLDivElement>();
   let identityButtonRef = $state<HTMLElement>();
 
   let animationDirection = $state<"up" | "down" | "left" | "right">("up");
@@ -104,45 +105,42 @@
         : undefined,
   );
 
-  beforeNavigate((nav) => {
-    const fromPathName = nav.from?.url.pathname;
-    const toPathName = nav.to?.url.pathname;
-
-    let anchors;
-    if (isDesktopViewport()) {
-      if (!sideBarGroupRef) return;
-      anchors = Array.from(sideBarGroupRef.querySelectorAll("a"));
-    } else {
-      if (!tabsGroupRef) return;
-      anchors = Array.from(tabsGroupRef.querySelectorAll("a"));
-    }
-
-    const fromElement = anchors.find(
-      (a) => a.getAttribute("href") === fromPathName,
-    );
-    if (!fromElement) return;
-    const fromPosition = anchors.indexOf(fromElement);
-
-    const toElement = anchors.find(
-      (a) => a.getAttribute("href") === toPathName,
-    );
-    if (!toElement) return;
-    const toPosition = anchors.indexOf(toElement);
-
-    if (fromPosition > toPosition) {
-      if (isDesktopViewport()) {
-        animationDirection = "up";
-      } else {
-        animationDirection = "left";
-      }
-    } else {
-      if (isDesktopViewport()) {
-        animationDirection = "down";
-      } else {
-        animationDirection = "right";
-      }
-    }
-  });
+  // Commented for now since we don't want up or left and right animations if we have only one page.
+  // beforeNavigate((nav) => {
+  // const fromPathName = nav.from?.url.pathname;
+  // const toPathName = nav.to?.url.pathname;
+  // let anchors;
+  // if (isDesktopViewport()) {
+  //   if (!sideBarGroupRef) return;
+  //   anchors = Array.from(sideBarGroupRef.querySelectorAll("a"));
+  // } else {
+  //   if (!tabsGroupRef) return;
+  //   anchors = Array.from(tabsGroupRef.querySelectorAll("a"));
+  // }
+  // const fromElement = anchors.find(
+  //   (a) => a.getAttribute("href") === fromPathName,
+  // );
+  // if (!fromElement) return;
+  // const fromPosition = anchors.indexOf(fromElement);
+  // const toElement = anchors.find(
+  //   (a) => a.getAttribute("href") === toPathName,
+  // );
+  // if (!toElement) return;
+  // const toPosition = anchors.indexOf(toElement);
+  // if (fromPosition > toPosition) {
+  //   if (isDesktopViewport()) {
+  //     animationDirection = "up";
+  //   } else {
+  //     animationDirection = "left";
+  //   }
+  // } else {
+  //   if (isDesktopViewport()) {
+  //     animationDirection = "down";
+  //   } else {
+  //     animationDirection = "right";
+  //   }
+  // }
+  // });
 </script>
 
 <!-- TODO: Reenable with SideBarOrTabs once we support multiple dashboard pages -->
@@ -172,28 +170,15 @@
 
 <MainContent>
   {#snippet content()}
-    {#key page.url.pathname}
-      <div
-        bind:this={divRef}
-        in:fly={{
-          y: flyInY,
-          x: flyInX,
-          duration: 160,
-          delay: 160,
-          easing: expoOut,
-        }}
-        out:fly={{
-          y: flyOutY,
-          x: flyOutX,
-          duration: 160,
-          easing: expoIn,
-        }}
-        onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
-        class="nth-2:hidden"
-      >
-        {@render children?.()}
-      </div>
-    {/key}
+    <div
+      bind:this={divRef}
+      in:fade={{ duration: 500 }}
+      out:fade={{ duration: 500 }}
+      onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
+      class="nth-2:hidden"
+    >
+      {@render children?.()}
+    </div>
   {/snippet}
 
   {#snippet header()}

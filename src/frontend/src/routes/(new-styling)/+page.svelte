@@ -36,11 +36,11 @@
     isAuthDialogOpen = false;
     preloadNext();
     if ($FLAIR) {
-      // TODO: Do not await dropWaveAnimation() to avoid blocking navigation
-      await dropWaveAnimation();
-      await gotoNext();
+      // Do not await dropWaveAnimation() to avoid blocking navigation
+      dropWaveAnimation();
+      gotoNext();
     } else {
-      await gotoNext();
+      gotoNext();
     }
   };
   const onSignUp = async (identityNumber: bigint) => {
@@ -52,10 +52,10 @@
     isAuthDialogOpen = false;
     preloadNext();
     if ($FLAIR) {
-      await dropWaveAnimation();
-      await gotoNext();
+      dropWaveAnimation();
+      gotoNext();
     } else {
-      await gotoNext();
+      gotoNext();
     }
   };
   const authLastUsedFlow = new AuthLastUsedFlow();

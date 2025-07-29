@@ -11,9 +11,7 @@
 </script>
 
 <div class="sidebar-layout">
-  <div
-    class="bg-bg-primary_alt col-start-1 col-end-4 row-start-1 row-end-6"
-  ></div>
+  <div class="col-start-1 col-end-4 row-start-1 row-end-6"></div>
   <div class="col-start-2 col-end-3 row-start-3 row-end-4 p-4">
     {@render content?.()}
   </div>
