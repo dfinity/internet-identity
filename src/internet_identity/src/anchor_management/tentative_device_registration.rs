@@ -154,7 +154,7 @@ pub enum VerifyTentativeDeviceError {
 /// [`Some(DeviceData)`] if a device (or [`None`] if a session) has been confirmed
 ///
 /// # Errors
-/// Returns an error if either there's no tentative device or session or the code is incorrect.
+/// Returns an error if either there's no tentative device (or session) or the code is incorrect.
 pub fn confirm_tentative_device_or_session(
     anchor_number: AnchorNumber,
     user_confirmation_code: DeviceConfirmationCode,
