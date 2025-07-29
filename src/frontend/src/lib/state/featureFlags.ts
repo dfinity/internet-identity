@@ -76,7 +76,7 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
 
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
-  false,
+  true,
 );
 
 export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
@@ -93,7 +93,7 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   false,
 );
 
-export const FLAIR = createFeatureFlagStore("FLAIR", false);
+export const FLAIR = createFeatureFlagStore("FLAIR", true);
 
 export default {
   DOMAIN_COMPATIBILITY,

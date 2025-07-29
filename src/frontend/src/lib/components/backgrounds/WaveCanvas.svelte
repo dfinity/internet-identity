@@ -2,14 +2,23 @@
   import FlairCanvas from "./FlairCanvas.svelte";
   import { FLAIR } from "$lib/state/featureFlags";
   import { isMobile } from "$lib/state/UI/isMobile";
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
+  import {
+    registerWaveAnimationTrigger,
+    unregisterWaveAnimationTrigger,
+  } from "$lib/utils/wave-animation";
 
   let { triggerAnimation = $bindable() } = $props();
 
   onMount(() => {
-    if (window) {
-      (window as any).triggerWaveCanvas = triggerAnimation;
+    if (triggerAnimation) {
+      registerWaveAnimationTrigger(triggerAnimation);
     }
+  });
+
+  onDestroy(() => {
+    console.log("Unregistering wave animation trigger");
+    unregisterWaveAnimationTrigger();
   });
 </script>
 

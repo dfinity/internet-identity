@@ -28,9 +28,7 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
-  import { dropWaveAnimation } from "$lib/components/backgrounds/flair";
+  import { dropWaveAnimation } from "$lib/utils/wave-animation";
 
   const { children }: LayoutProps = $props();
 

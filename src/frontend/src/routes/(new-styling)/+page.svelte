@@ -20,12 +20,9 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
   import { preloadCode, preloadData } from "$app/navigation";
-  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-
-  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
   import { onMount } from "svelte";
   import { FLAIR } from "$lib/state/featureFlags";
-  import { dropWaveAnimation } from "$lib/components/backgrounds/flair";
+  import { dropWaveAnimation } from "$lib/utils/wave-animation";
 
   const { data }: PageProps = $props();
 
@@ -39,9 +36,9 @@
     isAuthDialogOpen = false;
     preloadNext();
     if ($FLAIR) {
-      dropWaveAnimation().then(async () => {
-        await gotoNext();
-      });
+      // TODO: Do not await dropWaveAnimation() to avoid blocking navigation
+      await dropWaveAnimation();
+      await gotoNext();
     } else {
       await gotoNext();
     }
@@ -55,9 +52,8 @@
     isAuthDialogOpen = false;
     preloadNext();
     if ($FLAIR) {
-      dropWaveAnimation().then(async () => {
-        await gotoNext();
-      });
+      await dropWaveAnimation();
+      await gotoNext();
     } else {
       await gotoNext();
     }
