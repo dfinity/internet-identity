@@ -170,10 +170,10 @@ pub fn confirm_tentative_device_or_session(
                 }
                 DeviceTentativelyAdded {
                     failed_attempts,
-                    confirmation_code: verification_code,
+                    confirmation_code,
                     tentative_device,
                 } => {
-                    if user_confirmation_code == *verification_code {
+                    if user_confirmation_code == *confirmation_code {
                         // Verification successful - return device to be added and remove the registration
                         (true, Ok(Some(tentative_device.clone())))
                     } else {
@@ -191,10 +191,10 @@ pub fn confirm_tentative_device_or_session(
                 }
                 SessionTentativelyAdded {
                     failed_attempts,
-                    confirmation_code: verification_code,
+                    confirmation_code,
                     tentative_session,
                 } => {
-                    if user_confirmation_code == *verification_code {
+                    if user_confirmation_code == *confirmation_code {
                         let principal = *tentative_session;
 
                         // Verification successful - we'll confirm the session and keep the registration
