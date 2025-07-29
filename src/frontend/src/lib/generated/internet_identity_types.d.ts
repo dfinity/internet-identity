@@ -54,7 +54,11 @@ export interface AuthnMethodConfirmationCode {
   'confirmation_code' : string,
   'expiration' : Timestamp,
 }
-export type AuthnMethodConfirmationError = { 'RegistrationModeOff' : null } |
+export type AuthnMethodConfirmationError = {
+    'InternalCanisterError' : string
+  } |
+  { 'RegistrationModeOff' : null } |
+  { 'Unauthorized' : Principal } |
   { 'NoAuthnMethodToConfirm' : null } |
   { 'WrongCode' : { 'retries_left' : number } };
 export interface AuthnMethodData {
