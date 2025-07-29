@@ -74,8 +74,16 @@ impl TentativeDeviceRegistration {
     }
 }
 
-/// Registration state of new devices added using the two step device add flow
+/// Registration state of new devices added using either:
+/// - two-step device add flow
+///   1. `DeviceRegistrationModeActive`
+///   2. `DeviceTentativelyAdded`
+/// - three-step session add flow
+///   1. `DeviceRegistrationModeActive`
+///   2. `SessionTentativelyAdded`
+///   2. `SessionTentativelyConfirmed`
 #[derive(Clone)]
+#[allow(unused)] // TODO: Remove once used
 pub enum RegistrationState {
     DeviceRegistrationModeActive,
     DeviceTentativelyAdded {
