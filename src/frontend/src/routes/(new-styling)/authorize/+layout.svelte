@@ -102,7 +102,6 @@
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <WaveCanvas />
   <Header>
     {#if nonNullish(selectedIdentity)}
       <Button
