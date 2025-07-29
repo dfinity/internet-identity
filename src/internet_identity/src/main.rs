@@ -495,6 +495,8 @@ fn config() -> InternetIdentityInit {
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
+        feature_flag_continue_from_another_device: persistent_state
+            .feature_flag_continue_from_another_device,
     })
 }
 
@@ -611,6 +613,11 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(dummy_auth) = arg.dummy_auth {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.dummy_auth = dummy_auth;
+            })
+        }
+        if let Some(flag) = arg.feature_flag_continue_from_another_device {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.feature_flag_continue_from_another_device = Some(flag);
             })
         }
     }

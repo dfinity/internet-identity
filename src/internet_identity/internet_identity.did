@@ -287,6 +287,8 @@ type InternetIdentityInit = record {
     is_production : opt bool;
     // Configuration for dummy authentication used in e2e tests.
     dummy_auth : opt opt DummyAuthConfig;
+    // Feature flags
+    feature_flag_continue_from_another_device : opt opt bool;
 };
 
 type ChallengeKey = text;
