@@ -123,17 +123,26 @@ async fn add_tentative_device(
 #[update]
 fn verify_tentative_device(
     anchor_number: AnchorNumber,
-    user_verification_code: DeviceVerificationCode,
+    user_confirmation_code: DeviceConfirmationCode,
 ) -> VerifyTentativeDeviceResponse {
-    let result = anchor_operation_with_authz_check(anchor_number, |anchor| {
-        tentative_device_registration::verify_tentative_device(
-            anchor,
-            anchor_number,
-            user_verification_code,
-        )
-    });
-    match result {
-        Ok(()) => VerifyTentativeDeviceResponse::Verified,
+    let (mut anchor, authorization_key) = check_authorization(anchor_number)
+        .unwrap_or_else(|err| trap(&format!("{} could not be authenticated.", err.principal)));
+    match tentative_device_registration::confirm_tentative_device_or_session(
+        anchor_number,
+        user_confirmation_code,
+    ) {
+        Ok(maybe_confirmed_device) => {
+            if let Some(confirmed_device) = maybe_confirmed_device {
+                // Add device to anchor with bookkeeping if it has been confirmed
+                anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
+                let operation = anchor_management::add_device(&mut anchor, confirmed_device);
+                if let Err(err) = state::storage_borrow_mut(|storage| storage.update(anchor)) {
+                    trap(&format!("{err}"));
+                }
+                anchor_management::post_operation_bookkeeping(anchor_number, operation);
+            }
+            VerifyTentativeDeviceResponse::Verified
+        }
         Err(err) => match err {
             VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
                 VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
@@ -143,10 +152,6 @@ fn verify_tentative_device(
             }
             VerifyTentativeDeviceError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
-            }
-            VerifyTentativeDeviceError::IdentityUpdateError(err) => {
-                // Legacy API traps instead of returning an error.
-                trap(String::from(err).as_str())
             }
         },
     }
@@ -926,19 +931,37 @@ mod v2_api {
         identity_number: IdentityNumber,
         confirmation_code: String,
     ) -> Result<(), AuthnMethodConfirmationError> {
-        let response = verify_tentative_device(identity_number, confirmation_code);
-        match response {
-            VerifyTentativeDeviceResponse::Verified => Ok(()),
-            VerifyTentativeDeviceResponse::WrongCode { retries_left } => {
-                Err(AuthnMethodConfirmationError::WrongCode { retries_left })
-            }
-            VerifyTentativeDeviceResponse::DeviceRegistrationModeOff => {
-                Err(AuthnMethodConfirmationError::RegistrationModeOff)
-            }
-            VerifyTentativeDeviceResponse::NoDeviceToVerify => {
-                Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm)
-            }
+        let (mut anchor, authorization_key) = check_authorization(identity_number)
+            .map_err(|err| AuthnMethodConfirmationError::Unauthorized(err.principal))?;
+
+        let maybe_confirmed_device =
+            tentative_device_registration::confirm_tentative_device_or_session(
+                identity_number,
+                confirmation_code,
+            )
+            .map_err(|err| match err {
+                VerifyTentativeDeviceError::WrongCode { retries_left } => {
+                    AuthnMethodConfirmationError::WrongCode { retries_left }
+                }
+                VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
+                    AuthnMethodConfirmationError::RegistrationModeOff
+                }
+                VerifyTentativeDeviceError::NoDeviceToVerify => {
+                    AuthnMethodConfirmationError::NoAuthnMethodToConfirm
+                }
+            })?;
+
+        if let Some(confirmed_device) = maybe_confirmed_device {
+            // Add device to anchor with bookkeeping if it has been confirmed
+            anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
+            let operation = anchor_management::add_device(&mut anchor, confirmed_device);
+            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+                AuthnMethodConfirmationError::InternalCanisterError(err.to_string())
+            })?;
+            anchor_management::post_operation_bookkeeping(identity_number, operation);
         }
+
+        Ok(())
     }
 
     #[query]
