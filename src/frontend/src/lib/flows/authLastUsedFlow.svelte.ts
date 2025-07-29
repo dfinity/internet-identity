@@ -54,6 +54,7 @@ export class AuthLastUsedFlow {
         throw new Error("Unrecognized authentication method");
       }
     } finally {
+      this.systemOverlay = false;
       this.authenticatingIdentity = null;
     }
   };
