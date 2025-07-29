@@ -1,18 +1,14 @@
-use crate::anchor_management::add_device;
 use crate::authz_utils::IdentityUpdateError;
 use crate::state::RegistrationState::{
     DeviceRegistrationModeActive, DeviceTentativelyAdded, SessionTentativelyAdded,
     SessionTentativelyConfirmed,
 };
 use crate::state::TentativeDeviceRegistration;
-use crate::storage::anchor::Anchor;
 use crate::{secs_to_nanos, state};
 use candid::{CandidType, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
-use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::*;
-use std::collections::hash_map::Entry;
 use std::collections::{hash_map, HashMap};
 use TentativeDeviceRegistrationError::{AnotherDeviceTentativelyAdded, DeviceRegistrationModeOff};
 
