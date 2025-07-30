@@ -3,7 +3,7 @@ import {
   triggerDropWaveAnimation,
   registerAnimationTrigger,
   unregisterAnimationTrigger,
-} from "./animation-controller";
+} from "./animation-dispatcher";
 import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
 import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
 

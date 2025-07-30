@@ -28,7 +28,7 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-controller";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
 
   const { children }: LayoutProps = $props();
 

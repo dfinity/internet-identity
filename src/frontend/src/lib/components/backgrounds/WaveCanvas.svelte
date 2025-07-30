@@ -6,7 +6,7 @@
   import {
     registerAnimationTrigger,
     unregisterAnimationTrigger,
-  } from "$lib/utils/animation-controller";
+  } from "$lib/utils/animation-dispatcher";
 
   let { triggerAnimation = $bindable() } = $props();
 

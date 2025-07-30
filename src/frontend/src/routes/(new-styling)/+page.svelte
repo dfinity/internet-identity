@@ -22,7 +22,7 @@
   import { preloadCode, preloadData } from "$app/navigation";
   import { onMount } from "svelte";
   import { FLAIR } from "$lib/state/featureFlags";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-controller";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
 
   const { data }: PageProps = $props();
 
