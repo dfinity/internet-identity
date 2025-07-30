@@ -1,7 +1,4 @@
 use crate::anchor_management::tentative_device_registration;
-use crate::anchor_management::tentative_device_registration::{
-    TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
-};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::state::persistent_state;
@@ -98,23 +95,24 @@ async fn add_tentative_device(
     let result =
         tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
     match result {
-        Ok(TentativeRegistrationInfo {
-            verification_code,
-            device_registration_timeout,
+        Ok(AuthnMethodConfirmationCode {
+            confirmation_code,
+            expiration,
         }) => AddTentativeDeviceResponse::AddedTentatively {
-            verification_code,
-            device_registration_timeout,
+            verification_code: confirmation_code,
+            device_registration_timeout: expiration,
         },
         Err(err) => match err {
-            TentativeDeviceRegistrationError::DeviceRegistrationModeOff => {
+            AuthnMethodRegisterError::RegistrationModeOff => {
                 AddTentativeDeviceResponse::DeviceRegistrationModeOff
             }
-            TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded => {
+            AuthnMethodRegisterError::RegistrationAlreadyInProgress => {
                 AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
             }
-            TentativeDeviceRegistrationError::IdentityUpdateError(err) => {
-                // Legacy API traps instead of returning an error.
-                trap(String::from(err).as_str())
+            AuthnMethodRegisterError::InvalidMetadata(_) => {
+                // Not reachable since we don't convert from `AuthnMethodData` to `DeviceWithUsage`
+                // in this legacy method in comparison to the newer `authn_method_register` method.
+                AddTentativeDeviceResponse::DeviceRegistrationModeOff
             }
         },
     }
@@ -144,14 +142,21 @@ fn verify_tentative_device(
             VerifyTentativeDeviceResponse::Verified
         }
         Err(err) => match err {
-            VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
+            AuthnMethodConfirmationError::RegistrationModeOff => {
                 VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
             }
-            VerifyTentativeDeviceError::NoDeviceToVerify => {
+            AuthnMethodConfirmationError::NoAuthnMethodToConfirm => {
                 VerifyTentativeDeviceResponse::NoDeviceToVerify
             }
-            VerifyTentativeDeviceError::WrongCode { retries_left } => {
+            AuthnMethodConfirmationError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
+            }
+            // Unreachable since these two errors already result in a trap in this legacy method.
+            AuthnMethodConfirmationError::Unauthorized(principal) => {
+                trap(&format!("{principal} could not be authenticated."))
+            }
+            AuthnMethodConfirmationError::InternalCanisterError(err) => {
+                trap(&err.to_string());
             }
         },
     }
@@ -945,18 +950,7 @@ mod v2_api {
             tentative_device_registration::confirm_tentative_device_or_session(
                 identity_number,
                 confirmation_code,
-            )
-            .map_err(|err| match err {
-                VerifyTentativeDeviceError::WrongCode { retries_left } => {
-                    AuthnMethodConfirmationError::WrongCode { retries_left }
-                }
-                VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
-                    AuthnMethodConfirmationError::RegistrationModeOff
-                }
-                VerifyTentativeDeviceError::NoDeviceToVerify => {
-                    AuthnMethodConfirmationError::NoAuthnMethodToConfirm
-                }
-            })?;
+            )?;
 
         if let Some(confirmed_device) = maybe_confirmed_device {
             // Add device to anchor with bookkeeping if it has been confirmed
