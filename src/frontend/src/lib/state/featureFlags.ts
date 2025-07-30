@@ -1,6 +1,7 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
+import { canisterConfig } from "$lib/globals";
 
 declare global {
   interface Window {
@@ -10,6 +11,7 @@ declare global {
 
 type FeatureFlagStore = Writable<boolean> & {
   getFeatureFlag: () => FeatureFlag | undefined;
+  initialize: () => void;
 };
 
 const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
@@ -17,6 +19,7 @@ const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
 const createFeatureFlagStore = (
   name: string,
   defaultValue: boolean,
+  getInitValue?: () => boolean | undefined,
 ): FeatureFlagStore => {
   const { subscribe, set, update } = writable(defaultValue);
 
@@ -27,12 +30,12 @@ const createFeatureFlagStore = (
       set,
       update,
       getFeatureFlag: () => undefined,
+      initialize: () => undefined,
     };
   }
 
   // Initialize feature flag object with value from localstorage
-
-  const initializedFeatureFlag: FeatureFlag = new FeatureFlag(
+  const initializedFeatureFlag = new FeatureFlag(
     window.localStorage,
     LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
     defaultValue,
@@ -50,12 +53,18 @@ const createFeatureFlagStore = (
   const getFeatureFlag = () => {
     return initializedFeatureFlag;
   };
+  const initialize = (): void => {
+    if (nonNullish(getInitValue)) {
+      initializedFeatureFlag.set(getInitValue() ?? defaultValue);
+    }
+  };
 
   return {
     subscribe,
     set,
     update,
     getFeatureFlag,
+    initialize,
   };
 };
 
@@ -91,6 +100,7 @@ export const ADD_ACCESS_METHOD = createFeatureFlagStore(
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   "CONTINUE_FROM_ANOTHER_DEVICE",
   false,
+  () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 
 export const FLAIR = createFeatureFlagStore("FLAIR", false);

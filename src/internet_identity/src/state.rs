@@ -166,6 +166,8 @@ pub struct PersistentState {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
+    // Feature flags
+    pub feature_flag_continue_from_another_device: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -188,6 +190,7 @@ impl Default for PersistentState {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
+            feature_flag_continue_from_another_device: None,
         }
     }
 }

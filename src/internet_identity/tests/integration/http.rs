@@ -97,6 +97,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        feature_flag_continue_from_another_device: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
 
@@ -165,6 +166,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        feature_flag_continue_from_another_device: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
@@ -209,6 +211,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        feature_flag_continue_from_another_device: None,
     };
 
     let _ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_2));
@@ -613,6 +616,7 @@ fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        feature_flag_continue_from_another_device: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 

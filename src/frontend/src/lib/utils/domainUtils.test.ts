@@ -20,6 +20,7 @@ describe("isOfficialOrigin", () => {
     is_production: [],
     new_flow_origins: [],
     dummy_auth: [],
+    feature_flag_continue_from_another_device: [],
   });
 
   // Default related origins for most tests

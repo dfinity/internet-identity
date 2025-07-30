@@ -63,8 +63,10 @@ const maybeSetDiscoverablePasskeyFlowFlag = () => {
 };
 
 export const init: ClientInit = async () => {
-  overrideFeatureFlags();
   initGlobals();
+  // Initialize them after globals so canister config can be used for defaults
+  Object.values(featureFlags).forEach((flag) => flag.initialize());
+  overrideFeatureFlags();
   maybeSetDiscoverablePasskeyFlowFlag();
   await sessionStore.init({ canisterId, agentOptions });
   authenticationStore.init({ canisterId, agentOptions });

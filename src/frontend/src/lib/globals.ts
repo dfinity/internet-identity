@@ -1,6 +1,6 @@
 import { Principal } from "@dfinity/principal";
-import {
-  type _SERVICE,
+import type {
+  _SERVICE,
   InternetIdentityInit,
 } from "$lib/generated/internet_identity_types";
 import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
