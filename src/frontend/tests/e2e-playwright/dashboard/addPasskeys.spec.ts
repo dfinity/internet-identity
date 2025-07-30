@@ -179,9 +179,9 @@ test("User can add a new passkey and use it with cached identity without clearin
   await newPage.goto(II_URL);
 
   // Click on the cached identity button directly
-  await newPage.getByRole("button", { name: TEST_USER_NAME }).click();
   // But use the new passkey to authenticate
   auth2(newPage);
+  await newPage.getByRole("button", { name: TEST_USER_NAME }).click();
 
   // Verify we're logged in with the new passkey
   await newPage.waitForURL(II_URL + "/manage");
