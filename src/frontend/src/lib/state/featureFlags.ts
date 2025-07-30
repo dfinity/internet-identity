@@ -1,6 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { canisterConfig } from "$lib/globals";
 
 declare global {
@@ -35,26 +35,28 @@ const createFeatureFlagStore = (
   }
 
   // Initialize feature flag object with value from localstorage
-  let initializedFeatureFlag: FeatureFlag;
-  const initialize = (): void => {
-    initializedFeatureFlag = new FeatureFlag(
-      window.localStorage,
-      LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
-      getInitValue?.() ?? defaultValue,
-      { subscribe, set, update },
-    );
+  const initializedFeatureFlag = new FeatureFlag(
+    window.localStorage,
+    LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
+    defaultValue,
+    { subscribe, set, update },
+  );
 
-    // Make feature flags configurable from browser console
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    if (typeof window.__featureFlags === "undefined") {
-      window.__featureFlags = {};
-    }
-    window.__featureFlags[name] = initializedFeatureFlag;
-  };
+  // Make feature flags configurable from browser console
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  if (typeof window.__featureFlags === "undefined") {
+    window.__featureFlags = {};
+  }
+  window.__featureFlags[name] = initializedFeatureFlag;
 
   const getFeatureFlag = () => {
     return initializedFeatureFlag;
+  };
+  const initialize = (): void => {
+    if (nonNullish(getInitValue)) {
+      initializedFeatureFlag.set(getInitValue() ?? defaultValue);
+    }
   };
 
   return {
