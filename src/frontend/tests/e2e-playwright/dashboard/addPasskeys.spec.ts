@@ -11,7 +11,7 @@ import {
 
 const TEST_USER_NAME = "Test User";
 
-test("User can log into the dashboard and add a new passkey from the same device and log in with it", async ({
+test("User can log into the dashboard and add a new passkey from the same device and log in with it after clearing storage", async ({
   page,
   context,
 }) => {
@@ -143,4 +143,53 @@ test("User can log in the dashboard and add a new passkey from another device", 
 
   // Verify that we now have two passkeys
   await expect(page.getByText("Chrome")).toHaveCount(2);
+});
+
+test("User can add a new passkey and use it with cached identity without clearing storage", async ({
+  page,
+  context,
+}) => {
+  const auth = dummyAuth();
+  await page.goto(II_URL);
+  await createNewIdentityInII(page, TEST_USER_NAME, auth);
+  await page.waitForURL(II_URL + "/manage");
+
+  // Verify we're at the dashboard and have one passkey
+  await expect(page.getByText("Chrome")).toHaveCount(1);
+
+  // Start the "add passkey" flow
+  const auth2 = dummyAuth();
+  await addPasskeyCurrentDevice(page, auth2);
+  await expect(page.getByText("Chrome")).toHaveCount(2);
+  await renamePasskey(page, "New Passkey");
+
+  // Verify that the new passkey is not the current one
+  await expect(
+    page.getByText("Chrome").locator("..").getByLabel("Current Passkey"),
+  ).toHaveCount(1);
+  await expect(
+    page.getByText("New Passkey").locator("..").getByLabel("Current Passkey"),
+  ).toHaveCount(0);
+
+  await signOut(page);
+
+  // Log in again with new passkey WITHOUT clearing storage (key difference)
+  // This should use the cached identity
+  const newPage = await context.newPage();
+  await newPage.goto(II_URL);
+
+  // Click on the cached identity button directly
+  await newPage.getByRole("button", { name: TEST_USER_NAME }).click();
+  // But use the new passkey to authenticate
+  auth2(newPage);
+
+  // Verify we're logged in with the new passkey
+  await newPage.waitForURL(II_URL + "/manage");
+  await expect(
+    newPage.getByRole("heading", {
+      name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
+    }),
+  ).toBeVisible();
+
+  await newPage.close();
 });
