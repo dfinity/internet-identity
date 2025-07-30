@@ -14,6 +14,34 @@ import { sessionStore } from "$lib/stores/session.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { convertToValidCredentialData } from "$lib/utils/credential-devices";
 
+const fetchIdentityCredentials = async (
+  identityNumber: bigint,
+): Promise<Uint8Array[] | undefined> => {
+  try {
+    const identityCredentials =
+      await get(sessionStore).actor.lookup(identityNumber);
+    const validCredentials = identityCredentials
+      .filter((device) => "authentication" in device.purpose)
+      .filter(({ key_type }) => !("browser_storage_key" in key_type))
+      .map(convertToValidCredentialData)
+      .filter(nonNullish);
+
+    if (validCredentials.length > 0) {
+      return validCredentials.map(
+        (credential) => new Uint8Array(credential.credentialId),
+      );
+    }
+
+    return undefined;
+  } catch (error) {
+    console.warn(
+      `Error looking up identity ${identityNumber} credentials:`,
+      error,
+    );
+    return undefined;
+  }
+};
+
 export class AuthLastUsedFlow {
   systemOverlay = $state(false);
   authenticatingIdentity = $state<bigint | null>(null);
@@ -22,25 +50,9 @@ export class AuthLastUsedFlow {
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
         // If there is a problem looking up the credentials, we fallback to the credentialId provided by the lastUsedIdentity
-        let credentialIds = [lastUsedIdentity.authMethod.passkey.credentialId];
-        try {
-          const identityCredentials = await get(sessionStore).actor.lookup(
-            lastUsedIdentity.identityNumber,
-          );
-          const validCredentials = identityCredentials
-            .filter((device) => "authentication" in device.purpose)
-            .filter(({ key_type }) => !("browser_storage_key" in key_type))
-            .map(convertToValidCredentialData)
-            .filter(nonNullish);
-
-          if (validCredentials.length > 0) {
-            credentialIds = validCredentials.map(
-              (credential) => new Uint8Array(credential.credentialId),
-            );
-          }
-        } catch (error) {
-          console.warn("Error looking up identity credentials:", error);
-        }
+        const credentialIds = (await fetchIdentityCredentials(
+          lastUsedIdentity.identityNumber,
+        )) ?? [lastUsedIdentity.authMethod.passkey.credentialId];
         const { identity, identityNumber } = await authenticateWithPasskey({
           canisterId,
           session: get(sessionStore),
