@@ -12,17 +12,25 @@ import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
 import { isNullish } from "@dfinity/utils";
+import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
 
 export class AuthLastUsedFlow {
   systemOverlay = $state(false);
   authenticatingIdentity = $state<bigint | null>(null);
+  #identityCredentials: Map<bigint, Uint8Array[] | undefined> = new Map();
+  init(identities: bigint[]) {
+    identities.forEach(async (identityNumber) => {
+      const credentials = await fetchIdentityCredentials(identityNumber);
+      this.#identityCredentials.set(identityNumber, credentials);
+    });
+  }
   authenticate = async (lastUsedIdentity: LastUsedIdentity): Promise<void> => {
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
-        const credentialIds = lastUsedIdentity.credentialIds ?? [
-          lastUsedIdentity.authMethod.passkey.credentialId,
-        ];
+        const credentialIds = this.#identityCredentials.get(
+          lastUsedIdentity.identityNumber,
+        ) ?? [lastUsedIdentity.authMethod.passkey.credentialId];
         const { identity, identityNumber } = await authenticateWithPasskey({
           canisterId,
           session: get(sessionStore),
