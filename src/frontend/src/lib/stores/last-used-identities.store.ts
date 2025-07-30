@@ -22,8 +22,6 @@ export type LastUsedIdentity = {
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
     | { openid: { iss: string; sub: string } };
-  // Field populated on store initialization
-  credentialIds?: Uint8Array[];
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
 };
