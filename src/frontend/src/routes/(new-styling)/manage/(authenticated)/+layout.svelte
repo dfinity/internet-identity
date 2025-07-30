@@ -61,8 +61,14 @@
     isAuthDialogOpen = false;
   };
 
+  const authLastUsedFlow = new AuthLastUsedFlow();
+  $effect(() =>
+    authLastUsedFlow.init(
+      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
+    ),
+  );
+
   const handleSwitchIdentity = async (identityNumber: bigint) => {
-    const authLastUsedFlow = new AuthLastUsedFlow();
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[Number(identityNumber)];
     await authLastUsedFlow.authenticate(chosenIdentity);

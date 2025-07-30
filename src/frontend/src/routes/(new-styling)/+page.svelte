@@ -58,12 +58,18 @@
       gotoNext();
     }
   };
-  const authLastUsedFlow = new AuthLastUsedFlow();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
       .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
       .slice(0, 3),
+  );
+  const authLastUsedFlow = new AuthLastUsedFlow();
+  // Initialize the flow every time the last used identities change
+  $effect(() =>
+    authLastUsedFlow.init(
+      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
+    ),
   );
 
   let isAuthDialogOpen = $state(false);

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { nonNullish } from "@dfinity/utils";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import type { Snippet } from "svelte";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
@@ -32,7 +31,6 @@
   }: Props = $props();
 
   const authFlow = new AuthFlow();
-  const authLastUsedFlow = new AuthLastUsedFlow();
 
   let isContinueFromAnotherDeviceVisible = $state(false);
 
@@ -109,6 +107,6 @@
   {/if}
 {/if}
 
-{#if authFlow.systemOverlay || authLastUsedFlow.systemOverlay}
+{#if authFlow.systemOverlay}
   <SystemOverlayBackdrop />
 {/if}

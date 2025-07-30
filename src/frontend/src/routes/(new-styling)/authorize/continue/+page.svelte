@@ -56,6 +56,12 @@
     return accounts;
   });
   const authLastUsedFlow = new AuthLastUsedFlow();
+  // Initialize the flow every time the last used identities change
+  $effect(() =>
+    authLastUsedFlow.init(
+      lastUsedAccounts.map(({ identityNumber }) => identityNumber),
+    ),
+  );
   let loading = $state(false);
 
   const handleContinueAs = async (account: LastUsedAccount) => {
