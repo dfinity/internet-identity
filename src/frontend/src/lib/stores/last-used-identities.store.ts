@@ -3,6 +3,35 @@ import { derived, get, Readable, writable } from "svelte/store";
 import { writableStored } from "./writable.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { AccountInfo } from "$lib/generated/internet_identity_types";
+import { anonymousActor } from "$lib/globals";
+import { convertToValidCredentialData } from "$lib/utils/credential-devices";
+
+const fetchIdentityCredentials = async (
+  identityNumber: bigint,
+): Promise<Uint8Array[] | undefined> => {
+  try {
+    const identityCredentials = await anonymousActor.lookup(identityNumber);
+    const validCredentials = identityCredentials
+      .filter((device) => "authentication" in device.purpose)
+      .filter(({ key_type }) => !("browser_storage_key" in key_type))
+      .map(convertToValidCredentialData)
+      .filter(nonNullish);
+
+    if (validCredentials.length > 0) {
+      return validCredentials.map(
+        (credential) => new Uint8Array(credential.credentialId),
+      );
+    }
+
+    return undefined;
+  } catch (error) {
+    console.warn(
+      `Error looking up identity ${identityNumber} credentials:`,
+      error,
+    );
+    return undefined;
+  }
+};
 
 export type LastUsedAccount = {
   identityNumber: bigint;
@@ -19,11 +48,11 @@ export type LastUsedAccounts = {
 export type LastUsedIdentity = {
   identityNumber: bigint;
   name?: string;
-  // We only use the cached `credentialId` as a fallback.
-  // We look up the authenticators to pass all credential ids.
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
     | { openid: { iss: string; sub: string } };
+  // Field populated on store initialization
+  credentialIds?: Uint8Array[];
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
 };
@@ -74,6 +103,20 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         : undefined,
     }),
   );
+
+  // Fetch credentials for all passkey identities
+  Object.values(get(lastUsedStore)).forEach(async (identity) => {
+    // Only fetch if the identity was used with passkey
+    if ("passkey" in identity.authMethod) {
+      const identityNumber = identity.identityNumber;
+      const credentials = await fetchIdentityCredentials(identityNumber);
+      lastUsedStore.update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[identityNumber.toString()];
+        identity.credentialIds = credentials;
+        return lastUsedIdentities;
+      });
+    }
+  });
 
   return {
     subscribe,
