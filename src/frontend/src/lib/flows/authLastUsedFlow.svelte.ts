@@ -2,7 +2,7 @@ import {
   authenticateWithJWT,
   authenticateWithPasskey,
 } from "$lib/utils/authentication";
-import { canisterConfig, canisterId } from "$lib/globals";
+import { anonymousActor, canisterConfig, canisterId } from "$lib/globals";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   lastUsedIdentitiesStore,
@@ -18,8 +18,7 @@ const fetchIdentityCredentials = async (
   identityNumber: bigint,
 ): Promise<Uint8Array[] | undefined> => {
   try {
-    const identityCredentials =
-      await get(sessionStore).actor.lookup(identityNumber);
+    const identityCredentials = await anonymousActor.lookup(identityNumber);
     const validCredentials = identityCredentials
       .filter((device) => "authentication" in device.purpose)
       .filter(({ key_type }) => !("browser_storage_key" in key_type))
