@@ -3,14 +3,9 @@
   import style from "$lib/app.css?url";
   import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
   import Toaster from "$lib/components/utils/Toaster.svelte";
-  import { onDestroy } from "svelte";
   import type { LayoutProps } from "./$types";
 
   const { children }: LayoutProps = $props();
-
-  onDestroy(() => {
-    console.log("destroying main layout");
-  });
 </script>
 
 <svelte:head>
