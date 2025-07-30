@@ -929,6 +929,22 @@ mod v2_api {
     }
 
     #[update]
+    async fn authn_method_session(
+        identity_number: IdentityNumber,
+    ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
+        // Adding a session is behind a feature flag
+        if !persistent_state(|state| {
+            state
+                .feature_flag_continue_from_another_device
+                .unwrap_or(false)
+        }) {
+            trap("'feature_flag_continue_from_another_device' is disabled");
+        }
+
+        tentative_device_registration::add_tentative_session(identity_number, caller()).await
+    }
+
+    #[update]
     fn authn_method_confirm(
         identity_number: IdentityNumber,
         confirmation_code: String,
