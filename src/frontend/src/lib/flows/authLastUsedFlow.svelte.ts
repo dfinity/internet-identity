@@ -13,18 +13,31 @@ import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
 import { isNullish } from "@dfinity/utils";
 import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
+import { toaster } from "$lib/components/utils/toaster";
 
 export class AuthLastUsedFlow {
   systemOverlay = $state(false);
   authenticatingIdentity = $state<bigint | null>(null);
   #identityCredentials: Map<bigint, Uint8Array[] | undefined> = new Map();
-  init(identities: bigint[]) {
-    identities.forEach(async (identityNumber) => {
-      const credentials = await fetchIdentityCredentials(identityNumber);
-      this.#identityCredentials.set(identityNumber, credentials);
-    });
-  }
+  #loadingIdentities = $state(false);
+  init = async (identities: bigint[]) => {
+    this.#loadingIdentities = true;
+    await Promise.all(
+      identities.map(async (identityNumber) => {
+        const credentials = await fetchIdentityCredentials(identityNumber);
+        this.#identityCredentials.set(identityNumber, credentials);
+      }),
+    );
+    this.#loadingIdentities = false;
+  };
   authenticate = async (lastUsedIdentity: LastUsedIdentity): Promise<void> => {
+    if (this.#loadingIdentities) {
+      toaster.error({
+        title: "Credentials not loaded",
+        description: "Please, wait a minute and try again.",
+      });
+      return;
+    }
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
