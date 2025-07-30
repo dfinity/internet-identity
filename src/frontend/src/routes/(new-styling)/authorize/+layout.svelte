@@ -28,9 +28,7 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { type FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
-  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
 
   const { children }: LayoutProps = $props();
 
@@ -61,9 +59,7 @@
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     preloadAccounts();
-    if (triggerAnimation) {
-      triggerAnimation(DROP_WAVE_ANIMATION);
-    }
+    triggerDropWaveAnimation();
     isAuthDialogOpen = false;
 
     await gotoAccounts();
@@ -76,9 +72,7 @@
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     preloadAccounts();
-    if (triggerAnimation) {
-      triggerAnimation(DROP_WAVE_ANIMATION);
-    }
+    triggerDropWaveAnimation();
 
     await gotoAccounts();
 
@@ -95,22 +89,17 @@
     isAuthDialogOpen = false;
   };
 
-  let triggerAnimation = $state<(opts: FlairAnimationOptions) => void>();
-
   onMount(() => {
     authorizationStore.init();
 
     setTimeout(() => {
-      if (triggerAnimation) {
-        triggerAnimation(DROP_WAVE_ANIMATION);
-      }
+      triggerDropWaveAnimation();
     });
   });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <WaveCanvas bind:triggerAnimation />
   <Header>
     {#if nonNullish(selectedIdentity)}
       <Button

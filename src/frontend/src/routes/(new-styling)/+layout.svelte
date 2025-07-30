@@ -1,6 +1,7 @@
 <script lang="ts">
   // Enable new styles only in the new layout pages.
   import style from "$lib/app.css?url";
+  import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
   import Toaster from "$lib/components/utils/Toaster.svelte";
   import type { LayoutProps } from "./$types";
 
@@ -12,4 +13,5 @@
 </svelte:head>
 
 {@render children()}
+<WaveCanvas />
 <Toaster />

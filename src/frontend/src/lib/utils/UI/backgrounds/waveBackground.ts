@@ -253,7 +253,7 @@ export function createContinuousScalarWave(
   }
 }
 
-export function createImpulse(
+export async function createImpulse(
   x: number,
   y: number,
   xPositions: number[],
@@ -267,7 +267,9 @@ export function createImpulse(
   impulseDuration: number,
   direction: "omni" | "x" | "y",
   impulseEasing?: EasingFunction,
-) {
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
       const nodeX = xPositions[xIndex] + offsetX;
@@ -286,23 +288,34 @@ export function createImpulse(
       const eased = impulseEasing ? impulseEasing(t) : t; // or any easing function you prefer
       const delay = eased * clickRadius * waveSpeed; // or: delay = eased * dist * waveSpeed;
 
-      setTimeout(() => {
-        if (strength > 0.01) {
-          let xVal = (dx / dist) * strength;
-          let yVal = (dy / dist) * strength;
-          if (direction === "x") yVal = 0;
-          if (direction === "y") xVal = 0;
-          springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
-          setTimeout(() => {
-            springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
-          }, impulseDuration);
-        }
-      }, delay);
+      const promise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (strength > 0.01) {
+            let xVal = (dx / dist) * strength;
+            let yVal = (dy / dist) * strength;
+            if (direction === "x") yVal = 0;
+            if (direction === "y") xVal = 0;
+            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+
+            setTimeout(() => {
+              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
+              resolve();
+            }, impulseDuration);
+          } else {
+            resolve();
+          }
+        }, delay);
+      });
+
+      promises.push(promise);
     }
   }
+
+  // Wait for all animations to complete
+  await Promise.all(promises);
 }
 
-export function createPerlinImpulse(
+export async function createPerlinImpulse(
   x: number,
   y: number,
   xPositions: number[],
@@ -319,7 +332,9 @@ export function createPerlinImpulse(
   perlinScale: number = 0.01, // scale for perlin input, tweak as needed
   perlinZ: number = 0, // optional z value for animation
   impulseEasing?: EasingFunction,
-) {
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
       const nodeX = xPositions[xIndex] + offsetX;
@@ -347,25 +362,35 @@ export function createPerlinImpulse(
       const eased = impulseEasing ? impulseEasing(t) : t;
       const delay = eased * clickRadius * waveSpeed;
 
-      setTimeout(() => {
-        // Only apply if strength is significant
-        if (Math.abs(strength * perlinMapped) > 0.01) {
-          // Outward if perlinMapped > 0, inward if < 0
-          let xVal = (dx / dist) * strength * perlinMapped * 30;
-          let yVal = (dy / dist) * strength * perlinMapped * 30;
-          if (direction === "x") yVal = 0;
-          if (direction === "y") xVal = 0;
-          springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
-          setTimeout(() => {
-            springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
-          }, impulseDuration);
-        }
-      }, delay);
+      const promise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          // Only apply if strength is significant
+          if (Math.abs(strength * perlinMapped) > 0.01) {
+            // Outward if perlinMapped > 0, inward if < 0
+            let xVal = (dx / dist) * strength * perlinMapped * 30;
+            let yVal = (dy / dist) * strength * perlinMapped * 30;
+            if (direction === "x") yVal = 0;
+            if (direction === "y") xVal = 0;
+            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+            setTimeout(() => {
+              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
+              resolve();
+            }, impulseDuration);
+          } else {
+            resolve();
+          }
+        }, delay);
+      });
+
+      promises.push(promise);
     }
   }
+
+  // Wait for all animations to complete
+  await Promise.all(promises);
 }
 
-export function createRotationalImpulse(
+export async function createRotationalImpulse(
   x: number,
   y: number,
   xPositions: number[],
@@ -379,7 +404,9 @@ export function createRotationalImpulse(
   impulseDuration: number,
   direction: "cw" | "ccw" = "cw", // clockwise or counterclockwise
   impulseEasing?: EasingFunction,
-) {
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
       const nodeX = xPositions[xIndex] + offsetX;
@@ -395,31 +422,41 @@ export function createRotationalImpulse(
       const eased = impulseEasing ? impulseEasing(t) : t;
       const delay = eased * clickRadius * waveSpeed;
 
-      setTimeout(() => {
-        if (strength > 0.01 && dist > 0.0001) {
-          // Perpendicular vector: (-dy, dx) for ccw, (dy, -dx) for cw
-          let perpX, perpY;
-          if (direction === "cw") {
-            perpX = dy / dist;
-            perpY = -dx / dist;
+      const promise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (strength > 0.01 && dist > 0.0001) {
+            // Perpendicular vector: (-dy, dx) for ccw, (dy, -dx) for cw
+            let perpX, perpY;
+            if (direction === "cw") {
+              perpX = dy / dist;
+              perpY = -dx / dist;
+            } else {
+              perpX = -dy / dist;
+              perpY = dx / dist;
+            }
+            springs[xIndex][yIndex].motion.target = {
+              x: perpX * strength,
+              y: perpY * strength,
+            };
+            setTimeout(() => {
+              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
+              resolve();
+            }, impulseDuration);
           } else {
-            perpX = -dy / dist;
-            perpY = dx / dist;
+            resolve();
           }
-          springs[xIndex][yIndex].motion.target = {
-            x: perpX * strength,
-            y: perpY * strength,
-          };
-          setTimeout(() => {
-            springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
-          }, impulseDuration);
-        }
-      }, delay);
+        }, delay);
+      });
+
+      promises.push(promise);
     }
   }
+
+  // Wait for all animations to complete
+  await Promise.all(promises);
 }
 
-export function createDirectionalImpulse(
+export async function createDirectionalImpulse(
   mouseX: number,
   mouseY: number,
   xPositions: number[],
@@ -434,7 +471,9 @@ export function createDirectionalImpulse(
   direction: "up" | "down" | "left" | "right",
   axis: "xy" | "x" | "y" = "xy",
   impulseEasing?: EasingFunction,
-) {
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
   for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
     for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
       const nodeX = xPositions[xIndex] + offsetX;
@@ -470,21 +509,31 @@ export function createDirectionalImpulse(
         const eased = impulseEasing ? impulseEasing(t) : t;
         const delay = eased * clickRadius * waveSpeed;
 
-        setTimeout(() => {
-          if (strength > 0.01) {
-            let xVal = (dx / dist) * strength;
-            let yVal = (dy / dist) * strength;
-            if (axis === "x") yVal = 0;
-            if (axis === "y") xVal = 0;
-            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
-            setTimeout(() => {
-              springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
-            }, impulseDuration);
-          }
-        }, delay);
+        const promise = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            if (strength > 0.01) {
+              let xVal = (dx / dist) * strength;
+              let yVal = (dy / dist) * strength;
+              if (axis === "x") yVal = 0;
+              if (axis === "y") xVal = 0;
+              springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+              setTimeout(() => {
+                springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
+                resolve();
+              }, impulseDuration);
+            } else {
+              resolve();
+            }
+          }, delay);
+        });
+
+        promises.push(promise);
       }
     }
   }
+
+  // Wait for all animations to complete
+  await Promise.all(promises);
 }
 
 export function createScalarImpulse(
@@ -795,14 +844,14 @@ export function drawVignetteMask(
   ctx.restore();
 }
 
-export function createTweenedWave(
+export async function createTweenedWave(
   motionController: Tween<number>,
   duration: number,
   from = 0,
-) {
-  void motionController.set(from, { duration: 0 }).then(() => {
-    void motionController.set(1, { duration });
-  });
+): Promise<void> {
+  await motionController.set(from, { duration: 0 });
+
+  await motionController.set(1, { duration });
 }
 
 export function drawMovingRingMask(

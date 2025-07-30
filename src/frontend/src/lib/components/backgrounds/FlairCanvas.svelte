@@ -48,8 +48,6 @@
     maskWaveSpeedMultiplier = 1,
     customColor,
     customColorMode,
-    backgroundClasses,
-    foregroundClasses,
     triggerAnimation = $bindable(),
   }: FlairCanvasProps = $props();
 
@@ -264,9 +262,10 @@
 
     if (target.includes("motion") && clientWidth && clientHeight) {
       const { x, y } = getImpulseLocation(location, clientWidth, clientHeight);
+      const promises: Promise<void>[] = [];
 
       if (motionType === "cw" || motionType === "ccw") {
-        createRotationalImpulse(
+        const firstImpulse = createRotationalImpulse(
           x,
           y,
           xPositions,
@@ -286,11 +285,14 @@
           motionType,
           easingFunction,
         );
+        promises.push(firstImpulse);
 
         if (nImpulses === "double") {
-          setTimeout(
-            () => {
-              createRotationalImpulse(
+          const delay =
+            250 * (typeof speed === "number" ? speed : speedTable[speed]);
+          const secondImpulse = new Promise<void>((resolve) => {
+            setTimeout(async () => {
+              await createRotationalImpulse(
                 x,
                 y,
                 xPositions,
@@ -313,19 +315,22 @@
                 motionType === "cw" ? "ccw" : "cw",
                 easingFunction,
               );
-            },
-            250 * (typeof speed === "number" ? speed : speedTable[speed]),
-          );
+              resolve();
+            }, delay);
+          });
+          promises.push(secondImpulse);
         }
+        await Promise.all(promises);
         return;
       }
+
       if (
         motionType === "down" ||
         motionType === "up" ||
         motionType === "left" ||
         motionType === "right"
       ) {
-        createDirectionalImpulse(
+        const firstImpulse = createDirectionalImpulse(
           x,
           y,
           xPositions,
@@ -346,11 +351,14 @@
           "xy",
           easingFunction,
         );
+        promises.push(firstImpulse);
 
         if (nImpulses === "double") {
-          setTimeout(
-            () => {
-              createDirectionalImpulse(
+          const delay =
+            250 * (typeof speed === "number" ? speed : speedTable[speed]);
+          const secondImpulse = new Promise<void>((resolve) => {
+            setTimeout(async () => {
+              await createDirectionalImpulse(
                 x,
                 y,
                 xPositions,
@@ -374,15 +382,17 @@
                 "xy",
                 easingFunction,
               );
-            },
-            250 * (typeof speed === "number" ? speed : speedTable[speed]),
-          );
+              resolve();
+            }, delay);
+          });
+          promises.push(secondImpulse);
         }
+        await Promise.all(promises);
         return;
       }
 
       if (motionType === "perlin") {
-        createPerlinImpulse(
+        const firstImpulse = createPerlinImpulse(
           x,
           y,
           xPositions,
@@ -407,11 +417,14 @@
           1,
           easingFunction,
         );
+        promises.push(firstImpulse);
 
         if (nImpulses === "double") {
-          setTimeout(
-            () => {
-              createPerlinImpulse(
+          const delay =
+            250 * (typeof speed === "number" ? speed : speedTable[speed]);
+          const secondImpulse = new Promise<void>((resolve) => {
+            setTimeout(async () => {
+              await createPerlinImpulse(
                 x,
                 y,
                 xPositions,
@@ -437,12 +450,16 @@
                 1,
                 easingFunction,
               );
-            },
-            250 * (typeof speed === "number" ? speed : speedTable[speed]),
-          );
+              resolve();
+            }, delay);
+          });
+          promises.push(secondImpulse);
         }
+        await Promise.all(promises);
+        return;
       }
-      createImpulse(
+
+      const firstImpulse = createImpulse(
         x,
         y,
         xPositions,
@@ -462,11 +479,14 @@
         motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
         easingFunction,
       );
+      promises.push(firstImpulse);
 
       if (nImpulses === "double") {
-        setTimeout(
-          () => {
-            createImpulse(
+        const delay =
+          250 * (typeof speed === "number" ? speed : speedTable[speed]);
+        const secondImpulse = new Promise<void>((resolve) => {
+          setTimeout(async () => {
+            await createImpulse(
               x,
               y,
               xPositions,
@@ -489,9 +509,10 @@
               motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
               easingFunction,
             );
-          },
-          250 * (typeof speed === "number" ? speed : speedTable[speed]),
-        );
+            resolve();
+          }, delay);
+        });
+        promises.push(secondImpulse);
       }
 
       if (visibility === "maskwave") {
@@ -500,7 +521,7 @@
             easing: easingFunctions[impulseEasing],
           });
         }
-        createTweenedWave(
+        const maskWave = createTweenedWave(
           opacityWaveMotion,
           rippleRadius *
             waveSpeed *
@@ -510,7 +531,10 @@
               : 1),
           0,
         );
+        promises.push(maskWave);
       }
+
+      await Promise.all(promises);
     }
   };
 

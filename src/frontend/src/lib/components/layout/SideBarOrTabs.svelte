@@ -22,9 +22,7 @@
     <SideBar class="col-start-1 col-end-2 row-start-1 row-end-6">
       {@render sidebarElements?.()}
     </SideBar>
-    <div
-      class="bg-bg-primary_alt col-start-2 col-end-5 row-start-1 row-end-6"
-    ></div>
+    <div class="col-start-2 col-end-5 row-start-1 row-end-6"></div>
     <div class="col-start-3 col-end-4 row-start-3 row-end-4 p-4">
       {@render content?.()}
     </div>
@@ -36,17 +34,17 @@
     </footer>
   </div>
 {:else}
-  <div class="bg-bg-primary_alt flex min-h-screen flex-col">
-    <header class="bg-bg-primary_alt absolute top-0 right-0 mt-1">
+  <div class="flex min-h-screen flex-col">
+    <header class="absolute top-0 right-0 mt-1">
       {@render header?.()}
     </header>
     <Tabs>
       {@render tabElements?.()}
     </Tabs>
-    <div class="bg-bg-primary_alt flex-1 px-4">
+    <div class="flex-1 px-4">
       {@render content?.()}
     </div>
-    <footer class="bg-bg-primary_alt">
+    <footer>
       {@render footer?.()}
     </footer>
   </div>

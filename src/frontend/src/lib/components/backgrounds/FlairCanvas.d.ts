@@ -62,11 +62,9 @@ export interface FlairCanvasProps {
   maskWaveThickness?: "large" | "medium" | "small" | number;
   maskWaveMinValue?: number;
   maskWaveSpeedMultiplier?: number;
-  backgroundClasses?: string;
-  foregroundClasses?: string;
   customColor?: string;
   customColorMode?: "all" | "moving";
-  triggerAnimation?: (opts: FlairAnimationOptions) => void;
+  triggerAnimation?: (opts: FlairAnimationOptions) => Promise<void>;
 }
 
 export interface NodeMotion {
