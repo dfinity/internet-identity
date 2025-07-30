@@ -19,6 +19,8 @@ export type LastUsedAccounts = {
 export type LastUsedIdentity = {
   identityNumber: bigint;
   name?: string;
+  // We only use the cached `credentialId` as a fallback.
+  // We look up the authenticators to pass all credential ids.
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
     | { openid: { iss: string; sub: string } };

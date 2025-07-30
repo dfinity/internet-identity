@@ -11,7 +11,8 @@ import {
 import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
+import { convertToValidCredentialData } from "$lib/utils/credential-devices";
 
 export class AuthLastUsedFlow {
   systemOverlay = $state(false);
@@ -20,10 +21,30 @@ export class AuthLastUsedFlow {
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
+        // If there is a problem looking up the credentials, we fallback to the credentialId provided by the lastUsedIdentity
+        let credentialIds = [lastUsedIdentity.authMethod.passkey.credentialId];
+        try {
+          const identityCredentials = await get(sessionStore).actor.lookup(
+            lastUsedIdentity.identityNumber,
+          );
+          const validCredentials = identityCredentials
+            .filter((device) => "authentication" in device.purpose)
+            .filter(({ key_type }) => !("browser_storage_key" in key_type))
+            .map(convertToValidCredentialData)
+            .filter(nonNullish);
+
+          if (validCredentials.length > 0) {
+            credentialIds = validCredentials.map(
+              (credential) => new Uint8Array(credential.credentialId),
+            );
+          }
+        } catch (error) {
+          console.warn("Error looking up identity credentials:", error);
+        }
         const { identity, identityNumber } = await authenticateWithPasskey({
           canisterId,
           session: get(sessionStore),
-          credentialIds: [lastUsedIdentity.authMethod.passkey.credentialId],
+          credentialIds,
         });
         authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
