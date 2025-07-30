@@ -5,6 +5,8 @@ type TriggerFunction = (opts: FlairAnimationOptions) => Promise<void>;
 
 class AnimationDispatcher {
   #triggerFunction: TriggerFunction | null = null;
+  #animationQueue: Array<() => Promise<void>> = [];
+  #isAnimating: boolean = false;
 
   /**
    * Register a trigger function from a WaveCanvas component
@@ -19,17 +21,59 @@ class AnimationDispatcher {
    */
   unregisterTrigger(): void {
     this.#triggerFunction = null;
+    // Execute any pending animations to resolve their promises (graceful degradation)
+    const pendingAnimations = [...this.#animationQueue];
+    this.#animationQueue = [];
+    this.#isAnimating = false;
+
+    // Resolve all pending animations immediately
+    pendingAnimations.forEach((animation) => {
+      void animation();
+    });
+  }
+
+  /**
+   * Process the animation queue sequentially
+   */
+  async #processQueue(): Promise<void> {
+    if (this.#isAnimating || this.#animationQueue.length === 0) {
+      return;
+    }
+
+    this.#isAnimating = true;
+    while (this.#animationQueue.length > 0) {
+      const animation = this.#animationQueue.shift()!;
+      try {
+        await animation();
+      } catch (error) {
+        // Continue processing queue even if one animation fails
+        console.warn("Animation failed:", error);
+      }
+    }
+    this.#isAnimating = false;
   }
 
   /**
    * Trigger the drop wave animation
    * @returns Promise that resolves when the animation completes
    */
-  async dropWaveAnimation(): Promise<void> {
-    if (this.#triggerFunction) {
-      await this.#triggerFunction(DROP_WAVE_ANIMATION);
-    }
-    // If no trigger function is registered, resolve immediately (graceful degradation)
+  dropWaveAnimation(): Promise<void> {
+    return new Promise((resolve) => {
+      this.#animationQueue.push(async () => {
+        try {
+          if (this.#triggerFunction) {
+            await this.#triggerFunction(DROP_WAVE_ANIMATION);
+          }
+          // If no trigger function is registered, resolve immediately (graceful degradation)
+        } catch (error) {
+          // Even if the trigger function fails, we should still resolve the promise
+          console.warn("Animation failed:", error);
+        } finally {
+          resolve();
+        }
+      });
+      void this.#processQueue();
+    });
   }
 }
 
