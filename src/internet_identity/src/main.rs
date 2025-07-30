@@ -110,9 +110,9 @@ async fn add_tentative_device(
                 AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
             }
             AuthnMethodRegisterError::InvalidMetadata(_) => {
-                // Not reachable since we don't convert from `AuthnMethodData` to `DeviceWithUsage`
+                // Unreachable since we don't convert from `AuthnMethodData` to `DeviceWithUsage`
                 // in this legacy method in comparison to the newer `authn_method_register` method.
-                AddTentativeDeviceResponse::DeviceRegistrationModeOff
+                trap("Unreachable error");
             }
         },
     }
