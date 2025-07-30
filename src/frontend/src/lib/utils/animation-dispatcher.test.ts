@@ -214,7 +214,7 @@ describe("AnimationDispatcher", () => {
   });
 
   describe("Edge Cases", () => {
-    it.only("should clear queue when unregistering trigger", async () => {
+    it("should clear queue when unregistering trigger", async () => {
       vi.useFakeTimers();
 
       // Create a longer-running mock to test queue clearing
