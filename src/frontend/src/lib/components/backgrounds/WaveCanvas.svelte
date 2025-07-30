@@ -4,21 +4,20 @@
   import { isMobile } from "$lib/state/UI/isMobile";
   import { onMount, onDestroy } from "svelte";
   import {
-    registerWaveAnimationTrigger,
-    unregisterWaveAnimationTrigger,
-  } from "$lib/utils/wave-animation";
+    registerAnimationTrigger,
+    unregisterAnimationTrigger,
+  } from "$lib/utils/animation-controller";
 
   let { triggerAnimation = $bindable() } = $props();
 
   onMount(() => {
     if (triggerAnimation) {
-      registerWaveAnimationTrigger(triggerAnimation);
+      registerAnimationTrigger(triggerAnimation);
     }
   });
 
   onDestroy(() => {
-    console.log("Unregistering wave animation trigger");
-    unregisterWaveAnimationTrigger();
+    unregisterAnimationTrigger();
   });
 </script>
 

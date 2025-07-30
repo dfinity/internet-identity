@@ -22,7 +22,7 @@
   import { preloadCode, preloadData } from "$app/navigation";
   import { onMount } from "svelte";
   import { FLAIR } from "$lib/state/featureFlags";
-  import { dropWaveAnimation } from "$lib/utils/wave-animation";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-controller";
 
   const { data }: PageProps = $props();
 
@@ -37,7 +37,7 @@
     preloadNext();
     if ($FLAIR) {
       // Do not await dropWaveAnimation() to avoid blocking navigation
-      dropWaveAnimation();
+      triggerDropWaveAnimation();
       gotoNext();
     } else {
       gotoNext();
@@ -52,7 +52,7 @@
     isAuthDialogOpen = false;
     preloadNext();
     if ($FLAIR) {
-      dropWaveAnimation();
+      triggerDropWaveAnimation();
       gotoNext();
     } else {
       gotoNext();
@@ -76,7 +76,7 @@
 
   onMount(() => {
     setTimeout(() => {
-      dropWaveAnimation();
+      triggerDropWaveAnimation();
     });
   });
 </script>

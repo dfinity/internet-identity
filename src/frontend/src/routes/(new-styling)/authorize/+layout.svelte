@@ -28,7 +28,7 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { dropWaveAnimation } from "$lib/utils/wave-animation";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-controller";
 
   const { children }: LayoutProps = $props();
 
@@ -59,7 +59,7 @@
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     preloadAccounts();
-    dropWaveAnimation();
+    triggerDropWaveAnimation();
     isAuthDialogOpen = false;
 
     await gotoAccounts();
@@ -72,7 +72,7 @@
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     preloadAccounts();
-    dropWaveAnimation();
+    triggerDropWaveAnimation();
 
     await gotoAccounts();
 
@@ -93,7 +93,7 @@
     authorizationStore.init();
 
     setTimeout(() => {
-      dropWaveAnimation();
+      triggerDropWaveAnimation();
     });
   });
 </script>

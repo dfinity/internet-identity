@@ -3,22 +3,22 @@ import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCan
 
 type TriggerFunction = (opts: FlairAnimationOptions) => Promise<void>;
 
-class WaveAnimationStore {
-  private triggerFunction: TriggerFunction | null = null;
+class AnimationDispatcher {
+  #triggerFunction: TriggerFunction | null = null;
 
   /**
    * Register a trigger function from a WaveCanvas component
    * @param triggerFn The trigger function that handles wave animations
    */
   registerTrigger(triggerFn: TriggerFunction): void {
-    this.triggerFunction = triggerFn;
+    this.#triggerFunction = triggerFn;
   }
 
   /**
    * Unregister the trigger function when component unmounts
    */
   unregisterTrigger(): void {
-    this.triggerFunction = null;
+    this.#triggerFunction = null;
   }
 
   /**
@@ -26,23 +26,21 @@ class WaveAnimationStore {
    * @returns Promise that resolves when the animation completes
    */
   async dropWaveAnimation(): Promise<void> {
-    if (this.triggerFunction) {
-      console.log("Triggering drop wave animation");
-      await this.triggerFunction(DROP_WAVE_ANIMATION);
-      console.log("Drop wave animation completed");
+    if (this.#triggerFunction) {
+      await this.#triggerFunction(DROP_WAVE_ANIMATION);
     }
     // If no trigger function is registered, resolve immediately (graceful degradation)
   }
 }
 
-const waveAnimationStore = new WaveAnimationStore();
+const animationDispatcher = new AnimationDispatcher();
 
-export const dropWaveAnimation = (): Promise<void> =>
-  waveAnimationStore.dropWaveAnimation();
+// Public API
+export const triggerDropWaveAnimation = (): Promise<void> =>
+  animationDispatcher.dropWaveAnimation();
 
-export const registerWaveAnimationTrigger = (
-  triggerFn: TriggerFunction,
-): void => waveAnimationStore.registerTrigger(triggerFn);
+export const registerAnimationTrigger = (triggerFn: TriggerFunction): void =>
+  animationDispatcher.registerTrigger(triggerFn);
 
-export const unregisterWaveAnimationTrigger = (): void =>
-  waveAnimationStore.unregisterTrigger();
+export const unregisterAnimationTrigger = (): void =>
+  animationDispatcher.unregisterTrigger();
