@@ -20,7 +20,6 @@ export class AuthLastUsedFlow {
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
       if ("passkey" in lastUsedIdentity.authMethod) {
-        // If there is a problem looking up the credentials, we fallback to the credentialId provided by the lastUsedIdentity
         const credentialIds = lastUsedIdentity.credentialIds ?? [
           lastUsedIdentity.authMethod.passkey.credentialId,
         ];
