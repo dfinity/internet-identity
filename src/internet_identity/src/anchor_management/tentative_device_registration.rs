@@ -180,7 +180,7 @@ pub fn get_tentative_confirmed_session(anchor_number: AnchorNumber) -> Option<Pr
                                 tentative_session, ..
                             },
                         ..
-                    } => Some(tentative_session.clone()),
+                    } => Some(*tentative_session),
                     // Else return None
                     _ => None,
                 })
