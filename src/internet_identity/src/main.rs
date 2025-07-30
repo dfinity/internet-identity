@@ -920,22 +920,12 @@ mod v2_api {
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
         let device = DeviceWithUsage::try_from(authn_method)
             .map_err(|err| AuthnMethodRegisterError::InvalidMetadata(err.to_string()))?;
-        let result = add_tentative_device(identity_number, DeviceData::from(device)).await;
-        match result {
-            AddTentativeDeviceResponse::AddedTentatively {
-                device_registration_timeout,
-                verification_code,
-            } => Ok(AuthnMethodConfirmationCode {
-                expiration: device_registration_timeout,
-                confirmation_code: verification_code,
-            }),
-            AddTentativeDeviceResponse::DeviceRegistrationModeOff => {
-                Err(AuthnMethodRegisterError::RegistrationModeOff)
-            }
-            AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded => {
-                Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress)
-            }
-        }
+
+        tentative_device_registration::add_tentative_device(
+            identity_number,
+            DeviceData::from(device),
+        )
+        .await
     }
 
     #[update]
