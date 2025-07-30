@@ -18,9 +18,10 @@ const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
 
 const createFeatureFlagStore = (
   name: string,
-  getDefaultValue: () => boolean,
+  defaultValue: boolean,
+  getInitValue?: () => boolean | undefined,
 ): FeatureFlagStore => {
-  const { subscribe, set, update } = writable(false);
+  const { subscribe, set, update } = writable(defaultValue);
 
   // We cannot use browser because this is also imported in our showcase
   if (isNullish(globalThis.window)) {
@@ -39,7 +40,7 @@ const createFeatureFlagStore = (
     initializedFeatureFlag = new FeatureFlag(
       window.localStorage,
       LOCALSTORAGE_FEATURE_FLAGS_PREFIX + name,
-      getDefaultValue(),
+      getInitValue?.() ?? defaultValue,
       { subscribe, set, update },
     );
 
@@ -67,39 +68,40 @@ const createFeatureFlagStore = (
 
 export const DOMAIN_COMPATIBILITY = createFeatureFlagStore(
   "DOMAIN_COMPATIBILITY",
-  () => true,
+  true,
 );
 
 export const OPENID_AUTHENTICATION = createFeatureFlagStore(
   "OPENID_AUTHENTICATION",
-  () => false,
+  false,
 );
 
 export const HARDWARE_KEY_TEST = createFeatureFlagStore(
   "HARDWARE_KEY_TEST",
-  () => false,
+  false,
 );
 
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
-  () => false,
+  false,
 );
 
 export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
   "ENABLE_MIGRATE_FLOW",
-  () => false,
+  false,
 );
 export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
-  () => true,
+  true,
 );
 
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   "CONTINUE_FROM_ANOTHER_DEVICE",
-  () => canisterConfig.feature_flag_continue_from_another_device[0] ?? false,
+  false,
+  () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 
-export const FLAIR = createFeatureFlagStore("FLAIR", () => false);
+export const FLAIR = createFeatureFlagStore("FLAIR", false);
 
 export default {
   DOMAIN_COMPATIBILITY,
