@@ -938,7 +938,7 @@ mod v2_api {
                 .feature_flag_continue_from_another_device
                 .unwrap_or(false)
         }) {
-            trap("'feature_flag_continue_from_another_device' is disabled");
+            trap("feature_flag_continue_from_another_device is disabled");
         }
 
         tentative_device_registration::add_tentative_session(identity_number, caller()).await
