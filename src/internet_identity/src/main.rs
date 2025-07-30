@@ -1,7 +1,4 @@
 use crate::anchor_management::tentative_device_registration;
-use crate::anchor_management::tentative_device_registration::{
-    TentativeDeviceRegistrationError, TentativeRegistrationInfo, VerifyTentativeDeviceError,
-};
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
 use crate::state::persistent_state;
@@ -98,23 +95,24 @@ async fn add_tentative_device(
     let result =
         tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
     match result {
-        Ok(TentativeRegistrationInfo {
-            verification_code,
-            device_registration_timeout,
+        Ok(AuthnMethodConfirmationCode {
+            confirmation_code,
+            expiration,
         }) => AddTentativeDeviceResponse::AddedTentatively {
-            verification_code,
-            device_registration_timeout,
+            verification_code: confirmation_code,
+            device_registration_timeout: expiration,
         },
         Err(err) => match err {
-            TentativeDeviceRegistrationError::DeviceRegistrationModeOff => {
+            AuthnMethodRegisterError::RegistrationModeOff => {
                 AddTentativeDeviceResponse::DeviceRegistrationModeOff
             }
-            TentativeDeviceRegistrationError::AnotherDeviceTentativelyAdded => {
+            AuthnMethodRegisterError::RegistrationAlreadyInProgress => {
                 AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
             }
-            TentativeDeviceRegistrationError::IdentityUpdateError(err) => {
-                // Legacy API traps instead of returning an error.
-                trap(String::from(err).as_str())
+            AuthnMethodRegisterError::InvalidMetadata(_) => {
+                // Not reachable since we don't convert from `AuthnMethodData` to `DeviceWithUsage`
+                // in this legacy method in comparison to the newer `authn_method_register` method.
+                AddTentativeDeviceResponse::DeviceRegistrationModeOff
             }
         },
     }
@@ -144,14 +142,21 @@ fn verify_tentative_device(
             VerifyTentativeDeviceResponse::Verified
         }
         Err(err) => match err {
-            VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
+            AuthnMethodConfirmationError::RegistrationModeOff => {
                 VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
             }
-            VerifyTentativeDeviceError::NoDeviceToVerify => {
+            AuthnMethodConfirmationError::NoAuthnMethodToConfirm => {
                 VerifyTentativeDeviceResponse::NoDeviceToVerify
             }
-            VerifyTentativeDeviceError::WrongCode { retries_left } => {
+            AuthnMethodConfirmationError::WrongCode { retries_left } => {
                 VerifyTentativeDeviceResponse::WrongCode { retries_left }
+            }
+            // Unreachable since these two errors already result in a trap in this legacy method.
+            AuthnMethodConfirmationError::Unauthorized(principal) => {
+                trap(&format!("{principal} could not be authenticated."))
+            }
+            AuthnMethodConfirmationError::InternalCanisterError(err) => {
+                trap(&err.to_string());
             }
         },
     }
@@ -680,12 +685,14 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
+    use super::*;
+    use crate::anchor_management::tentative_device_registration::get_tentative_confirmed_session;
+    use crate::authz_utils::IdentityUpdateError;
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
         state::get_identity_number_by_registration_id,
     };
-
-    use super::*;
+    use tentative_device_registration::add_tentative_session;
 
     #[query]
     fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
@@ -903,8 +910,61 @@ mod v2_api {
     }
 
     #[update]
-    fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
-        exit_device_registration_mode(identity_number);
+    fn authn_method_registration_mode_exit(
+        identity_number: IdentityNumber,
+        authn_method: Option<AuthnMethodData>,
+    ) -> Result<(), AuthnMethodRegistrationModeExitError> {
+        let caller = caller();
+
+        // Registering session is behind a feature flag
+        if authn_method.is_some()
+            && !persistent_state(|state| {
+                state
+                    .feature_flag_continue_from_another_device
+                    .unwrap_or(false)
+            })
+        {
+            return Err(AuthnMethodRegistrationModeExitError::RegistrationModeOff);
+        }
+
+        // Get authn method and tentative confirmed session
+        let tentative_session = get_tentative_confirmed_session(identity_number);
+        if let (Some(authn_method), Some(tentative_session)) = (authn_method, tentative_session) {
+            // Verify that caller matches tentative confirmed session
+            if tentative_session != caller {
+                return Err(AuthnMethodRegistrationModeExitError::Unauthorized(caller));
+            }
+            // Register authn method and temp key for session
+            DeviceWithUsage::try_from(authn_method.clone())
+                .map(|device| add(identity_number, DeviceData::from(device)))
+                .map_err(|err| {
+                    AuthnMethodRegistrationModeExitError::InvalidMetadata(err.to_string())
+                })?;
+            state::with_temp_keys_mut(|temp_keys| {
+                temp_keys.add_temp_key(
+                    &authn_method.public_key(),
+                    identity_number,
+                    tentative_session,
+                );
+            });
+        }
+
+        // This authorization should pass when either:
+        // - the call is made by a registered authn method
+        // - the call is made by a tentative confirmed session, which has been move to a temp key
+        check_authz_and_record_activity(identity_number).map_err(|err| match err {
+            IdentityUpdateError::Unauthorized(principal) => {
+                AuthnMethodRegistrationModeExitError::Unauthorized(principal)
+            }
+            IdentityUpdateError::StorageError(identity_number, storage_err) => {
+                AuthnMethodRegistrationModeExitError::InternalCanisterError(format!(
+                    "Storage error for identity {identity_number}: {storage_err}"
+                ))
+            }
+        })?;
+
+        // Exit registration mode and return
+        tentative_device_registration::exit_device_registration_mode(identity_number);
         Ok(())
     }
 
@@ -915,22 +975,30 @@ mod v2_api {
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
         let device = DeviceWithUsage::try_from(authn_method)
             .map_err(|err| AuthnMethodRegisterError::InvalidMetadata(err.to_string()))?;
-        let result = add_tentative_device(identity_number, DeviceData::from(device)).await;
-        match result {
-            AddTentativeDeviceResponse::AddedTentatively {
-                device_registration_timeout,
-                verification_code,
-            } => Ok(AuthnMethodConfirmationCode {
-                expiration: device_registration_timeout,
-                confirmation_code: verification_code,
-            }),
-            AddTentativeDeviceResponse::DeviceRegistrationModeOff => {
-                Err(AuthnMethodRegisterError::RegistrationModeOff)
-            }
-            AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded => {
-                Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress)
-            }
+
+        tentative_device_registration::add_tentative_device(
+            identity_number,
+            DeviceData::from(device),
+        )
+        .await
+    }
+
+    #[update]
+    async fn authn_method_session(
+        identity_number: IdentityNumber,
+    ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
+        let tentative_session = caller();
+
+        // Registering session is behind a feature flag
+        if !persistent_state(|state| {
+            state
+                .feature_flag_continue_from_another_device
+                .unwrap_or(false)
+        }) {
+            return Err(AuthnMethodRegisterError::RegistrationModeOff);
         }
+
+        add_tentative_session(identity_number, tentative_session).await
     }
 
     #[update]
@@ -945,18 +1013,7 @@ mod v2_api {
             tentative_device_registration::confirm_tentative_device_or_session(
                 identity_number,
                 confirmation_code,
-            )
-            .map_err(|err| match err {
-                VerifyTentativeDeviceError::WrongCode { retries_left } => {
-                    AuthnMethodConfirmationError::WrongCode { retries_left }
-                }
-                VerifyTentativeDeviceError::DeviceRegistrationModeOff => {
-                    AuthnMethodConfirmationError::RegistrationModeOff
-                }
-                VerifyTentativeDeviceError::NoDeviceToVerify => {
-                    AuthnMethodConfirmationError::NoAuthnMethodToConfirm
-                }
-            })?;
+            )?;
 
         if let Some(confirmed_device) = maybe_confirmed_device {
             // Add device to anchor with bookkeeping if it has been confirmed

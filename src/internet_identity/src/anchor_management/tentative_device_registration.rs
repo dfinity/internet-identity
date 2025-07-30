@@ -10,7 +10,6 @@ use ic_cdk::api::time;
 use ic_cdk::{call, trap};
 use internet_identity_interface::internet_identity::types::*;
 use std::collections::{hash_map, HashMap};
-use TentativeDeviceRegistrationError::{AnotherDeviceTentativelyAdded, DeviceRegistrationModeOff};
 
 // 15 mins
 const REGISTRATION_MODE_DURATION: u64 = secs_to_nanos(900);
@@ -76,28 +75,10 @@ pub fn exit_device_registration_mode(anchor_number: AnchorNumber) {
     });
 }
 
-pub struct TentativeRegistrationInfo {
-    pub verification_code: DeviceConfirmationCode,
-    pub device_registration_timeout: Timestamp,
-}
-
-#[derive(Debug)]
-pub enum TentativeDeviceRegistrationError {
-    DeviceRegistrationModeOff,
-    AnotherDeviceTentativelyAdded,
-    IdentityUpdateError(IdentityUpdateError),
-}
-
-impl From<IdentityUpdateError> for TentativeDeviceRegistrationError {
-    fn from(err: IdentityUpdateError) -> Self {
-        TentativeDeviceRegistrationError::IdentityUpdateError(err)
-    }
-}
-
 pub async fn add_tentative_device(
     anchor_number: AnchorNumber,
     tentative_device: DeviceData,
-) -> Result<TentativeRegistrationInfo, TentativeDeviceRegistrationError> {
+) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
     let confirmation_code = new_confirmation_code().await;
     let now = time();
 
@@ -108,14 +89,14 @@ pub async fn add_tentative_device(
             // Get registration else throw error
             let registration = registrations
                 .get_mut(&anchor_number)
-                .ok_or(DeviceRegistrationModeOff)?;
+                .ok_or(AuthnMethodRegisterError::RegistrationModeOff)?;
 
             match registration {
                 // Make sure registration isn't expired
                 TentativeDeviceRegistration { expiration, .. } if *expiration <= now => {
-                    Err(DeviceRegistrationModeOff)
+                    Err(AuthnMethodRegisterError::RegistrationModeOff)
                 }
-                // Add tentative session if registration mode is active
+                // Add tentative device if registration mode is active
                 TentativeDeviceRegistration {
                     state: DeviceRegistrationModeActive,
                     ..
@@ -125,23 +106,86 @@ pub async fn add_tentative_device(
                         failed_attempts: 0,
                         confirmation_code: confirmation_code.clone(),
                     };
-                    Ok(TentativeRegistrationInfo {
-                        device_registration_timeout: registration.expiration,
-                        verification_code: confirmation_code,
+                    Ok(AuthnMethodConfirmationCode {
+                        expiration: registration.expiration,
+                        confirmation_code,
                     })
                 }
                 // Else return error
-                _ => Err(AnotherDeviceTentativelyAdded),
+                _ => Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress),
             }
         })
     })
 }
 
-#[derive(Debug)]
-pub enum VerifyTentativeDeviceError {
-    WrongCode { retries_left: u8 },
-    DeviceRegistrationModeOff,
-    NoDeviceToVerify,
+pub async fn add_tentative_session(
+    anchor_number: AnchorNumber,
+    tentative_session: Principal,
+) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
+    let confirmation_code = new_confirmation_code().await;
+    let now = time();
+
+    state::tentative_device_registrations_mut(|registrations| {
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations(registrations, lookup);
+
+            // Get registration else throw error
+            let registration = registrations
+                .get_mut(&anchor_number)
+                .ok_or(AuthnMethodRegisterError::RegistrationModeOff)?;
+
+            match registration {
+                // Make sure registration isn't expired
+                TentativeDeviceRegistration { expiration, .. } if *expiration <= now => {
+                    Err(AuthnMethodRegisterError::RegistrationModeOff)
+                }
+                // Add tentative session if registration mode is active
+                TentativeDeviceRegistration {
+                    state: DeviceRegistrationModeActive,
+                    ..
+                } => {
+                    registration.state = SessionTentativelyAdded {
+                        tentative_session,
+                        failed_attempts: 0,
+                        confirmation_code: confirmation_code.clone(),
+                    };
+                    Ok(AuthnMethodConfirmationCode {
+                        expiration: registration.expiration,
+                        confirmation_code,
+                    })
+                }
+                // Else return error
+                _ => Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress),
+            }
+        })
+    })
+}
+
+pub fn get_tentative_confirmed_session(anchor_number: AnchorNumber) -> Option<Principal> {
+    let now = time();
+
+    state::tentative_device_registrations_mut(|registrations| {
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations(registrations, lookup);
+
+            registrations
+                .get(&anchor_number)
+                .and_then(|registration| match registration {
+                    // Make sure registration isn't expired
+                    TentativeDeviceRegistration { expiration, .. } if *expiration <= now => None,
+                    // Return confirmed session
+                    TentativeDeviceRegistration {
+                        state:
+                            SessionTentativelyConfirmed {
+                                tentative_session, ..
+                            },
+                        ..
+                    } => Some(tentative_session.clone()),
+                    // Else return None
+                    _ => None,
+                })
+        })
+    })
 }
 
 /// Confirm the tentative device or session using the submitted `user_confirmation_code`.
@@ -154,7 +198,7 @@ pub enum VerifyTentativeDeviceError {
 pub fn confirm_tentative_device_or_session(
     anchor_number: AnchorNumber,
     user_confirmation_code: DeviceConfirmationCode,
-) -> Result<Option<DeviceData>, VerifyTentativeDeviceError> {
+) -> Result<Option<DeviceData>, AuthnMethodConfirmationError> {
     state::tentative_device_registrations_mut(|registrations| {
         state::lookup_tentative_device_registration_mut(|lookup| {
             prune_expired_tentative_device_registrations(registrations, lookup);
@@ -162,12 +206,13 @@ pub fn confirm_tentative_device_or_session(
             // Get registration else throw error
             let registration = registrations
                 .get_mut(&anchor_number)
-                .ok_or(VerifyTentativeDeviceError::DeviceRegistrationModeOff)?;
+                .ok_or(AuthnMethodConfirmationError::RegistrationModeOff)?;
 
             let (should_remove, response) = match &mut registration.state {
-                DeviceRegistrationModeActive | SessionTentativelyConfirmed { .. } => {
-                    (false, Err(VerifyTentativeDeviceError::NoDeviceToVerify))
-                }
+                DeviceRegistrationModeActive | SessionTentativelyConfirmed { .. } => (
+                    false,
+                    Err(AuthnMethodConfirmationError::NoAuthnMethodToConfirm),
+                ),
                 DeviceTentativelyAdded {
                     failed_attempts,
                     confirmation_code,
@@ -183,7 +228,7 @@ pub fn confirm_tentative_device_or_session(
                         // Remove registration if max attempts reached
                         (
                             *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS,
-                            Err(VerifyTentativeDeviceError::WrongCode {
+                            Err(AuthnMethodConfirmationError::WrongCode {
                                 retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - *failed_attempts),
                             }),
                         )
@@ -209,7 +254,7 @@ pub fn confirm_tentative_device_or_session(
                         // Remove registration if max attempts reached
                         (
                             *failed_attempts >= MAX_DEVICE_REGISTRATION_ATTEMPTS,
-                            Err(VerifyTentativeDeviceError::WrongCode {
+                            Err(AuthnMethodConfirmationError::WrongCode {
                                 retries_left: (MAX_DEVICE_REGISTRATION_ATTEMPTS - *failed_attempts),
                             }),
                         )
