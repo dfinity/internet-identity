@@ -551,6 +551,16 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
+    'authn_method_session' : IDL.Func(
+        [IdentityNumber],
+        [
+          IDL.Variant({
+            'Ok' : AuthnMethodConfirmationCode,
+            'Err' : AuthnMethodRegisterError,
+          }),
+        ],
+        [],
+      ),
     'check_captcha' : IDL.Func(
         [CheckCaptchaArg],
         [
