@@ -103,7 +103,7 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 
-export const FLAIR = createFeatureFlagStore("FLAIR", false);
+export const FLAIR = createFeatureFlagStore("FLAIR", true);
 
 export default {
   DOMAIN_COMPATIBILITY,
