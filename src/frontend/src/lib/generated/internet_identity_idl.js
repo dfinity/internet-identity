@@ -169,6 +169,12 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'Unauthorized' : IDL.Principal,
   });
+  const AuthnMethodRegistrationModeExitError = IDL.Variant({
+    'InternalCanisterError' : IDL.Text,
+    'RegistrationModeOff' : IDL.Null,
+    'Unauthorized' : IDL.Principal,
+    'InvalidMetadata' : IDL.Text,
+  });
   const AuthnMethodReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
@@ -528,7 +534,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'authn_method_registration_mode_exit' : IDL.Func(
         [IdentityNumber],
-        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Null })],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Null,
+            'Err' : AuthnMethodRegistrationModeExitError,
+          }),
+        ],
         [],
       ),
     'authn_method_remove' : IDL.Func(

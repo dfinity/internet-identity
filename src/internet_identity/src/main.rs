@@ -685,6 +685,7 @@ async fn random_salt() -> Salt {
 ///    input.
 /// 4. Add additional features to the API v2, that were not possible with the old API.
 mod v2_api {
+    use crate::authz_utils::IdentityUpdateError;
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
         state::get_identity_number_by_registration_id,
@@ -908,8 +909,59 @@ mod v2_api {
     }
 
     #[update]
-    fn authn_method_registration_mode_exit(identity_number: IdentityNumber) -> Result<(), ()> {
-        exit_device_registration_mode(identity_number);
+    fn authn_method_registration_mode_exit(
+        identity_number: IdentityNumber,
+        authn_method: Option<AuthnMethodData>,
+    ) -> Result<(), AuthnMethodRegistrationModeExitError> {
+        if let (Some(authn_method), Some(confirmed_session)) = (
+            authn_method,
+            tentative_device_registration::get_confirmed_session(identity_number),
+        ) {
+            // Exiting registration mode with a session is behind a feature flag
+            if !persistent_state(|state| {
+                state
+                    .feature_flag_continue_from_another_device
+                    .unwrap_or(false)
+            }) {
+                trap("feature_flag_continue_from_another_device is disabled");
+            }
+            // Verify that caller matches confirmed session
+            if confirmed_session != caller() {
+                return Err(AuthnMethodRegistrationModeExitError::Unauthorized(caller()));
+            }
+            // Map authn method to device
+            let device_data = DeviceWithUsage::try_from(authn_method.clone())
+                .map(DeviceData::from)
+                .map_err(|err| {
+                    AuthnMethodRegistrationModeExitError::InvalidMetadata(err.to_string())
+                })?;
+            // Add device to anchor with bookkeeping
+            let mut anchor = state::anchor(identity_number);
+            let operation = anchor_management::add_device(&mut anchor, device_data.clone());
+            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+                AuthnMethodRegistrationModeExitError::InternalCanisterError(err.to_string())
+            })?;
+            anchor_management::post_operation_bookkeeping(identity_number, operation);
+            // Add temp key for device
+            state::with_temp_keys_mut(|temp_keys| {
+                temp_keys.add_temp_key(&device_data.pubkey, identity_number, confirmed_session);
+            });
+        } else {
+            // Else if there's no confirmed session, verify that caller is authenticated
+            check_authz_and_record_activity(identity_number).map_err(|err| match err {
+                IdentityUpdateError::Unauthorized(principal) => {
+                    AuthnMethodRegistrationModeExitError::Unauthorized(principal)
+                }
+                IdentityUpdateError::StorageError(identity_number, storage_err) => {
+                    AuthnMethodRegistrationModeExitError::InternalCanisterError(format!(
+                        "Storage error for identity {identity_number}: {storage_err}"
+                    ))
+                }
+            })?;
+        }
+
+        // Exit registration mode and return
+        tentative_device_registration::exit_device_registration_mode(identity_number);
         Ok(())
     }
 
