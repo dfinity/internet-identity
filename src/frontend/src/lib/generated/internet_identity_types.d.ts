@@ -461,6 +461,11 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodSecuritySettingsReplaceError }
   >,
+  'authn_method_session' : ActorMethod<
+    [IdentityNumber],
+    { 'Ok' : AuthnMethodConfirmationCode } |
+      { 'Err' : AuthnMethodRegisterError }
+  >,
   'check_captcha' : ActorMethod<
     [CheckCaptchaArg],
     { 'Ok' : IdRegNextStepResult } |

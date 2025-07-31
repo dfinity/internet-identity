@@ -96,13 +96,56 @@ pub async fn add_tentative_device(
                 TentativeDeviceRegistration { expiration, .. } if *expiration <= now => {
                     Err(AuthnMethodRegisterError::RegistrationModeOff)
                 }
-                // Add tentative session if registration mode is active
+                // Add tentative device if registration mode is active
                 TentativeDeviceRegistration {
                     state: DeviceRegistrationModeActive,
                     ..
                 } => {
                     registration.state = DeviceTentativelyAdded {
                         tentative_device,
+                        failed_attempts: 0,
+                        confirmation_code: confirmation_code.clone(),
+                    };
+                    Ok(AuthnMethodConfirmationCode {
+                        expiration: registration.expiration,
+                        confirmation_code,
+                    })
+                }
+                // Else return error
+                _ => Err(AuthnMethodRegisterError::RegistrationAlreadyInProgress),
+            }
+        })
+    })
+}
+
+pub async fn add_tentative_session(
+    anchor_number: AnchorNumber,
+    tentative_session: Principal,
+) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
+    let confirmation_code = new_confirmation_code().await;
+    let now = time();
+
+    state::tentative_device_registrations_mut(|registrations| {
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations(registrations, lookup);
+
+            // Get registration else throw error
+            let registration = registrations
+                .get_mut(&anchor_number)
+                .ok_or(AuthnMethodRegisterError::RegistrationModeOff)?;
+
+            match registration {
+                // Make sure registration isn't expired
+                TentativeDeviceRegistration { expiration, .. } if *expiration <= now => {
+                    Err(AuthnMethodRegisterError::RegistrationModeOff)
+                }
+                // Add tentative session if registration mode is active
+                TentativeDeviceRegistration {
+                    state: DeviceRegistrationModeActive,
+                    ..
+                } => {
+                    registration.state = SessionTentativelyAdded {
+                        tentative_session,
                         failed_attempts: 0,
                         confirmation_code: confirmation_code.clone(),
                     };
