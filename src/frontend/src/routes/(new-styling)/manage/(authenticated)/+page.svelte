@@ -7,7 +7,6 @@
   import type { PageProps } from "./$types";
   import { afterNavigate, invalidateAll, replaceState } from "$app/navigation";
   import { page } from "$app/state";
-  import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
   import { nonNullish } from "@dfinity/utils";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
