@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
+import {
+  clearStorage,
+  createIdentity,
+  dummyAuth,
+  FEATURE_FLAGS,
+  II_URL,
+} from "./utils";
 
 const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";
-const FEATURE_FLAG = "?feature_flag_continue_from_another_device=true";
 
 test.describe("First visit", () => {
   test("Sign up with a new passkey", async ({ page }) => {
@@ -57,17 +62,14 @@ test.describe("First visit", () => {
     // Switch to new device and start "Continue from another device" flow to get link
     const newContext = await browser.newContext();
     const newDevicePage = await newContext.newPage();
-    await newDevicePage.goto(II_URL + FEATURE_FLAG);
+    await newDevicePage.goto(II_URL + FEATURE_FLAGS);
     await newDevicePage
       .getByRole("button", { name: "Continue from another device" })
       .click();
-    const linkToPair = new URL(
-      `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`,
-    );
-    linkToPair.search = FEATURE_FLAG;
+    const linkToPair = `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`;
 
     // Switch to existing device and authenticate after visiting link
-    await existingDevicePage.goto(linkToPair.href);
+    await existingDevicePage.goto(linkToPair);
     authExistingDevice(existingDevicePage);
     await existingDevicePage
       .getByRole("button", { name: DEFAULT_USER_NAME })
