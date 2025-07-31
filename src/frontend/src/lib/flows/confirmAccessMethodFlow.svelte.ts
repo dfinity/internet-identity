@@ -112,6 +112,6 @@ export class ConfirmAccessMethodFlow {
 
   exitRegistrationMode = async (): Promise<void> => {
     const { actor, identityNumber } = get(authenticatedStore);
-    await actor.authn_method_registration_mode_exit(identityNumber);
+    await actor.authn_method_registration_mode_exit(identityNumber, []);
   };
 }

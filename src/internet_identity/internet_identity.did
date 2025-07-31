@@ -867,7 +867,7 @@ service : (opt InternetIdentityInit) -> {
 
     // Exits the authentication method registration mode for the identity.
     // Requires authentication.
-    authn_method_registration_mode_exit : (IdentityNumber) -> (variant { Ok; Err : AuthnMethodRegistrationModeExitError });
+    authn_method_registration_mode_exit : (IdentityNumber, opt AuthnMethodData) -> (variant { Ok; Err : AuthnMethodRegistrationModeExitError });
 
     // Registers a new authentication method to the identity.
     // This authentication method needs to be confirmed before it can be used for authentication on this identity.

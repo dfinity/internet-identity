@@ -448,7 +448,7 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegistrationModeEnterError }
   >,
   'authn_method_registration_mode_exit' : ActorMethod<
-    [IdentityNumber],
+    [IdentityNumber, [] | [AuthnMethodData]],
     { 'Ok' : null } |
       { 'Err' : AuthnMethodRegistrationModeExitError }
   >,

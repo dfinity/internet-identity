@@ -533,7 +533,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'authn_method_registration_mode_exit' : IDL.Func(
-        [IdentityNumber],
+        [IdentityNumber, IDL.Opt(AuthnMethodData)],
         [
           IDL.Variant({
             'Ok' : IDL.Null,
