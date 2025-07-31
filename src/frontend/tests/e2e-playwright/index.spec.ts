@@ -61,13 +61,10 @@ test.describe("First visit", () => {
     await newDevicePage
       .getByRole("button", { name: "Continue from another device" })
       .click();
-    const linkToPair = new URL(
-      `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`,
-    );
-    linkToPair.search = FEATURE_FLAG;
+    const linkToPair = `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`;
 
     // Switch to existing device and authenticate after visiting link
-    await existingDevicePage.goto(linkToPair.href);
+    await existingDevicePage.goto(linkToPair);
     authExistingDevice(existingDevicePage);
     await existingDevicePage
       .getByRole("button", { name: DEFAULT_USER_NAME })

@@ -62,13 +62,10 @@ test("Authorize by signing in from another device", async ({
     await authPage
       .getByRole("button", { name: "Continue from another device" })
       .click();
-    const linkToPair = new URL(
-      `https://${await authPage.getByLabel("Pairing link").innerText()}`,
-    );
-    linkToPair.search = FEATURE_FLAGS;
+    const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
 
     // Switch to other device and authenticate after visiting link
-    await otherDevicePage.goto(linkToPair.href);
+    await otherDevicePage.goto(linkToPair);
     authOtherDevice(otherDevicePage);
     await otherDevicePage
       .getByRole("button", { name: DEFAULT_USER_NAME })
