@@ -942,7 +942,9 @@ mod v2_api {
                 AuthnMethodRegistrationModeExitError::InternalCanisterError(err.to_string())
             })?;
             anchor_management::post_operation_bookkeeping(identity_number, operation);
-            // Add temp key for device
+            // Add temp key for device as a workaround for WebAuthn needing two users interactions:
+            // one for "create" and one for "sign". So instead we only "create" and instead
+            // authenticate with a temporary key for their first visit from their new device.
             state::with_temp_keys_mut(|temp_keys| {
                 temp_keys.add_temp_key(&device_data.pubkey, identity_number, confirmed_session);
             });
