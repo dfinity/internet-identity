@@ -86,6 +86,12 @@ export type AuthnMethodRegistrationModeEnterError = {
   { 'InternalCanisterError' : string } |
   { 'AlreadyInProgress' : null } |
   { 'Unauthorized' : Principal };
+export type AuthnMethodRegistrationModeExitError = {
+    'InternalCanisterError' : string
+  } |
+  { 'RegistrationModeOff' : null } |
+  { 'Unauthorized' : Principal } |
+  { 'InvalidMetadata' : string };
 export type AuthnMethodReplaceError = { 'AuthnMethodNotFound' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodSecuritySettings {
@@ -442,9 +448,9 @@ export interface _SERVICE {
       { 'Err' : AuthnMethodRegistrationModeEnterError }
   >,
   'authn_method_registration_mode_exit' : ActorMethod<
-    [IdentityNumber],
+    [IdentityNumber, [] | [AuthnMethodData]],
     { 'Ok' : null } |
-      { 'Err' : null }
+      { 'Err' : AuthnMethodRegistrationModeExitError }
   >,
   'authn_method_remove' : ActorMethod<
     [IdentityNumber, PublicKey],

@@ -266,6 +266,33 @@ async fn new_confirmation_code() -> DeviceConfirmationCode {
     format!("{:06}", (rand % 1_000_000))
 }
 
+pub fn get_confirmed_session(anchor_number: AnchorNumber) -> Option<Principal> {
+    let now = time();
+
+    state::tentative_device_registrations_mut(|registrations| {
+        state::lookup_tentative_device_registration_mut(|lookup| {
+            prune_expired_tentative_device_registrations(registrations, lookup);
+
+            registrations
+                .get(&anchor_number)
+                .and_then(|registration| match registration {
+                    // Make sure registration isn't expired
+                    TentativeDeviceRegistration { expiration, .. } if *expiration <= now => None,
+                    // Return confirmed session
+                    TentativeDeviceRegistration {
+                        state:
+                            SessionTentativelyConfirmed {
+                                tentative_session, ..
+                            },
+                        ..
+                    } => Some(*tentative_session),
+                    // Else return None
+                    _ => None,
+                })
+        })
+    })
+}
+
 /// Removes __all__ expired device registrations -> there is no need to check expiration immediately after pruning.
 fn prune_expired_tentative_device_registrations(
     registrations: &mut HashMap<AnchorNumber, TentativeDeviceRegistration>,
@@ -312,6 +339,21 @@ impl From<IdentityUpdateError> for AuthnMethodRegistrationModeEnterError {
             }
             IdentityUpdateError::StorageError(identity_nr, storage_err) => {
                 AuthnMethodRegistrationModeEnterError::InternalCanisterError(format!(
+                    "Storage error for identity {identity_nr}: {storage_err}"
+                ))
+            }
+        }
+    }
+}
+
+impl From<IdentityUpdateError> for AuthnMethodRegistrationModeExitError {
+    fn from(err: IdentityUpdateError) -> Self {
+        match err {
+            IdentityUpdateError::Unauthorized(principal) => {
+                AuthnMethodRegistrationModeExitError::Unauthorized(principal)
+            }
+            IdentityUpdateError::StorageError(identity_nr, storage_err) => {
+                AuthnMethodRegistrationModeExitError::InternalCanisterError(format!(
                     "Storage error for identity {identity_nr}: {storage_err}"
                 ))
             }

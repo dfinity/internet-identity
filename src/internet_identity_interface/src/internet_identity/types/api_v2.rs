@@ -146,6 +146,14 @@ pub enum AuthnMethodRegistrationModeEnterError {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub enum AuthnMethodRegistrationModeExitError {
+    Unauthorized(Principal),
+    InternalCanisterError(String),
+    RegistrationModeOff,
+    InvalidMetadata(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodConfirmationError {
     Unauthorized(Principal),
     InternalCanisterError(String),
