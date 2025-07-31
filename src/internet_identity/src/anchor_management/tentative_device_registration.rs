@@ -302,3 +302,18 @@ impl From<IdentityUpdateError> for AuthnMethodRegistrationModeEnterError {
         }
     }
 }
+
+impl From<IdentityUpdateError> for AuthnMethodRegistrationModeExitError {
+    fn from(err: IdentityUpdateError) -> Self {
+        match err {
+            IdentityUpdateError::Unauthorized(principal) => {
+                AuthnMethodRegistrationModeExitError::Unauthorized(principal)
+            }
+            IdentityUpdateError::StorageError(identity_nr, storage_err) => {
+                AuthnMethodRegistrationModeExitError::InternalCanisterError(format!(
+                    "Storage error for identity {identity_nr}: {storage_err}"
+                ))
+            }
+        }
+    }
+}

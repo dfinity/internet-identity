@@ -948,16 +948,8 @@ mod v2_api {
             });
         } else {
             // Else if there's no confirmed session, verify that caller is authenticated
-            check_authz_and_record_activity(identity_number).map_err(|err| match err {
-                IdentityUpdateError::Unauthorized(principal) => {
-                    AuthnMethodRegistrationModeExitError::Unauthorized(principal)
-                }
-                IdentityUpdateError::StorageError(identity_number, storage_err) => {
-                    AuthnMethodRegistrationModeExitError::InternalCanisterError(format!(
-                        "Storage error for identity {identity_number}: {storage_err}"
-                    ))
-                }
-            })?;
+            check_authz_and_record_activity(identity_number)
+                .map_err(AuthnMethodRegistrationModeExitError::from)?;
         }
 
         // Exit registration mode and return
