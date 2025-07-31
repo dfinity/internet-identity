@@ -25,7 +25,7 @@
   <FlairCanvas
     spacing="medium"
     aspect="ultrawide"
-    dotSize={1.2}
+    dotSize={0.8}
     vignette="none"
     visibility="maskwave"
     maskWaveRampIn={0.001}
