@@ -5,7 +5,6 @@ import {
   clearStorage,
   createIdentity,
   dummyAuth,
-  FEATURE_FLAGS,
   TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
 } from "../utils";

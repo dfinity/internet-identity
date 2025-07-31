@@ -1,9 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
+import {
+  clearStorage,
+  createIdentity,
+  dummyAuth,
+  FEATURE_FLAGS,
+  II_URL,
+} from "./utils";
 
 const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";
-const FEATURE_FLAG = "?feature_flag_continue_from_another_device=true";
 
 test.describe("First visit", () => {
   test("Sign up with a new passkey", async ({ page }) => {
@@ -57,7 +62,7 @@ test.describe("First visit", () => {
     // Switch to new device and start "Continue from another device" flow to get link
     const newContext = await browser.newContext();
     const newDevicePage = await newContext.newPage();
-    await newDevicePage.goto(II_URL + FEATURE_FLAG);
+    await newDevicePage.goto(II_URL + FEATURE_FLAGS);
     await newDevicePage
       .getByRole("button", { name: "Continue from another device" })
       .click();
