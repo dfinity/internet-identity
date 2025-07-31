@@ -49,7 +49,7 @@
   </div>
 </div>
 
-{#if $CONTINUE_FROM_ANOTHER_DEVICE && nonNullish(pendingRegistrationId)}
+{#if nonNullish(pendingRegistrationId)}
   <Dialog onClose={() => (pendingRegistrationId = null)}>
     <ConfirmAccessMethodWizard
       registrationId={pendingRegistrationId}
