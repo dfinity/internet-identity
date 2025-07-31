@@ -718,19 +718,19 @@ export function drawNodes(
 ) {
   const body = document.querySelector("body");
   if (!body) return;
-  const color =
-    nonNullish(customHexColor) &&
-    customHexColor.length > 0 &&
-    customColorMode === "all"
-      ? customHexColor
-      : getComputedStyle(body).getPropertyValue("--fg-primary").trim();
+  const color = "rgba(255,255,255,.2)";
+  // nonNullish(customHexColor) &&
+  // customHexColor.length > 0 &&
+  // customColorMode === "all"
+  //   ? customHexColor
+  //   : getComputedStyle(body).getPropertyValue("--fg-primary").trim();
   xPositions.forEach((xPos, xIndex) => {
     yPositions.forEach((yPos, yIndex) => {
       ctx.beginPath();
       if (pointSizeNoise) {
         const pointSizeScalar =
           pointSizeNoise.noise.get(xPos, yPos, pointSizeNoise.noiseTime) *
-          pointSizeNoise.multiplier;
+          pointSizeNoise.multiplier * window.devicePixelRatio;
 
         ctx.ellipse(
           leftPos(xPos, xIndex, yIndex, offsetX, springs),

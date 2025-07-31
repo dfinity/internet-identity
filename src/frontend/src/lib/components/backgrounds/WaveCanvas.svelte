@@ -25,7 +25,7 @@
   <FlairCanvas
     spacing="medium"
     aspect="ultrawide"
-    dotSize={1.2}
+    dotSize={3}
     vignette="none"
     visibility="maskwave"
     maskWaveRampIn={0.001}
@@ -33,7 +33,7 @@
     maskWaveThickness="large"
     maskWaveMinValue={0}
     maskWaveSpeedMultiplier={4}
-    enableRandomPointSize
+    enableRandomPointSize={false}
     enableRandomOpacity={false}
     pointSizeNoiseScale="medium"
     pointSizeNoiseMultiplier="medium"

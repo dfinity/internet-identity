@@ -14,7 +14,7 @@
     getHypotenuse,
     getImpulseLocation,
     getVignetteConfig,
-    resetNodes,
+    resetNodes
   } from "$lib/utils/UI/backgrounds/waveBackground";
   import { Spring, Tween } from "svelte/motion";
   import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
@@ -24,7 +24,7 @@
   let {
     bgType = "dots",
     spacing = "medium",
-    aspect = "wide",
+    aspect = "square",
     hoverAction = "none",
     visibility = "always",
     dotSize = "medium",
@@ -32,7 +32,7 @@
     springOrTween = {
       type: "spring",
       stiffness: "medium",
-      dampening: "medium",
+      dampening: "medium"
     },
     noiseTimeScale = 1500,
     enableRandomOpacity = false,
@@ -48,7 +48,7 @@
     maskWaveSpeedMultiplier = 1,
     customColor,
     customColorMode,
-    triggerAnimation = $bindable(),
+    triggerAnimation = $bindable()
   }: FlairCanvasProps = $props();
 
   let backgroundRef = $state<HTMLDivElement>();
@@ -78,7 +78,7 @@
 
   let opacityWaveMotion = new Tween(0, {
     easing: easingFunctions.linear,
-    duration: opacityWaveDuration,
+    duration: opacityWaveDuration
   });
 
   let motionNoiseScale = $state<number>(0.01);
@@ -111,137 +111,137 @@
   pointSizeNoise.noiseSeed(2);
 
   const spacingTable = {
-    large: 100,
-    medium: 50,
-    small: 25,
+    large: 100 * window.devicePixelRatio,
+    medium: 24 * window.devicePixelRatio,
+    small: 25 * window.devicePixelRatio
   };
 
   const aspectTable = {
     square: 1,
-    wide: 1.6,
-    ultrawide: 2.8,
+    wide: 1,
+    ultrawide: 2.8
   };
 
   const dotSizeTable = {
-    large: 3,
-    medium: 2,
-    small: 1,
+    large: 3 * window.devicePixelRatio,
+    medium: 2 * window.devicePixelRatio,
+    small: 1 * window.devicePixelRatio
   };
 
   const speedTable = {
     fast: 0.3,
     medium: 1,
-    slow: 2,
+    slow: 2
   };
 
   const intensityTable = {
     light: 0.3,
     medium: 1,
-    strong: 2,
+    strong: 2
   };
 
   const rippleSizeTable = {
-    small: 0.3,
-    medium: 1,
-    large: 3,
+    small: 0.3 * window.devicePixelRatio,
+    medium: 1 * window.devicePixelRatio,
+    large: 3 * window.devicePixelRatio
   };
 
   const stiffnessTable = {
     light: 0.1,
     medium: 0.5,
-    strong: 1,
+    strong: 1
   };
 
   const dampeningTable = {
     light: 0.1,
     medium: 0.5,
-    strong: 1,
+    strong: 1
   };
 
   const noiseTimeScaleTable = {
     fast: 1000,
     medium: 1500,
-    slow: 2000,
+    slow: 2000
   };
 
   const opacityNoiseScaleTable = {
     large: 0.11,
     medium: 0.01,
-    small: 0.005,
+    small: 0.005
   };
 
   const opacityNoiseMultiplierTable = {
     large: 1,
     medium: 0.7,
-    small: 0.3,
+    small: 0.3
   };
 
   const pointSizeNoiseScaleTable = {
     large: 0.01,
     medium: 0.005,
-    small: 0.001,
+    small: 0.001
   };
 
   const pointSizeNoiseMultiplierTable = {
     large: 5,
     medium: 1.5,
-    small: 1.1,
+    small: 1.1
   };
 
   const maskWaveThicknessTable = {
     large: 0.8,
     medium: 0.4,
-    small: 0.2,
+    small: 0.2
   };
 
   let xSpacing = $derived(
-    typeof spacing === "number" ? spacing : spacingTable[spacing],
+    typeof spacing === "number" ? spacing : spacingTable[spacing]
   );
   let ySpacing = $derived(
     typeof spacing === "number"
       ? spacing
       : spacingTable[spacing] /
-          (typeof aspect === "number" ? aspect : aspectTable[aspect]),
+      (typeof aspect === "number" ? aspect : aspectTable[aspect])
   );
 
   let xPositions = $derived<number[]>(
-    clientWidth
+    clientWidth * window.devicePixelRatio
       ? Array.from(
-          { length: Math.max(1, Math.floor((clientWidth - 1) / xSpacing) + 2) }, // +2 instead of +1
-          (_, i) => i * xSpacing,
-        )
-      : [0],
+        { length: Math.max(1, Math.floor((clientWidth * window.devicePixelRatio - 1) / xSpacing) + 2) }, // +2 instead of +1
+        (_, i) => i * xSpacing
+      )
+      : [0]
   );
 
   let yPositions = $derived<number[]>(
-    clientHeight
+    clientHeight * window.devicePixelRatio
       ? Array.from(
-          {
-            length: Math.max(1, Math.floor((clientHeight - 1) / ySpacing) + 2),
-          }, // +2 instead of +1
-          (_, i) => i * ySpacing,
-        )
-      : [0],
+        {
+          length: Math.max(1, Math.floor((clientHeight * window.devicePixelRatio - 1) / ySpacing) + 2)
+        }, // +2 instead of +1
+        (_, i) => i * xSpacing
+      )
+      : [0]
   );
 
   let gridWidth = $derived<number>(
-    xPositions.length > 1 ? (xPositions.length - 1) * xSpacing : 0,
+    xPositions.length > 1 ? (xPositions.length - 1) * xSpacing : 0
   );
   let gridHeight = $derived<number>(
-    yPositions.length > 1 ? (yPositions.length - 1) * ySpacing : 0,
+    yPositions.length > 1 ? (yPositions.length - 1) * ySpacing : 0
   );
 
   let offsetX = $derived<number>(
-    clientWidth !== undefined ? (clientWidth - gridWidth) / 2 : 0,
+    clientWidth !== undefined ? (clientWidth * window.devicePixelRatio - gridWidth) / 2 : 0
   );
   let offsetY = $derived<number>(
-    clientHeight !== undefined ? (clientHeight - gridHeight) / 2 : 0,
+    clientHeight !== undefined ? (clientHeight * window.devicePixelRatio - gridHeight) / 2 : 0
   );
 
   let springs: NodeMotion[][] = $state([[]]);
 
   let vignetteConfig = $derived(
-    getVignetteConfig(vignette, clientHeight, clientWidth),
+    getVignetteConfig(vignette, clientHeight * window.devicePixelRatio, clientWidth * window.devicePixelRatio)
   );
 
   triggerAnimation = async (opts) => {
@@ -253,7 +253,7 @@
       intensity,
       size,
       nImpulses,
-      impulseEasing,
+      impulseEasing
     } = opts;
 
     let easingFunction = impulseEasing
@@ -261,7 +261,10 @@
       : undefined;
 
     if (target.includes("motion") && clientWidth && clientHeight) {
-      const { x, y } = getImpulseLocation(location, clientWidth, clientHeight);
+      const {
+        x,
+        y
+      } = getImpulseLocation(location, clientWidth * window.devicePixelRatio, clientHeight * window.devicePixelRatio);
       const promises: Promise<void>[] = [];
 
       if (motionType === "cw" || motionType === "ccw") {
@@ -274,16 +277,16 @@
           offsetY,
           springs,
           rippleRadius *
-            (typeof size === "number" ? size : rippleSizeTable[size]),
+          (typeof size === "number" ? size : rippleSizeTable[size]),
           impulseScalar *
-            (typeof intensity === "number"
-              ? intensity
-              : intensityTable[intensity]),
+          (typeof intensity === "number"
+            ? intensity
+            : intensityTable[intensity]),
           waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
           impulseDuration *
-            (typeof speed === "number" ? speed : speedTable[speed]),
+          (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
-          easingFunction,
+          easingFunction
         );
         promises.push(firstImpulse);
 
@@ -301,19 +304,19 @@
                 offsetY,
                 springs,
                 rippleRadius *
-                  1.2 *
-                  (typeof size === "number" ? size : rippleSizeTable[size]),
+                1.2 *
+                (typeof size === "number" ? size : rippleSizeTable[size]),
                 impulseScalar *
-                  0.6 *
-                  (typeof intensity === "number"
-                    ? intensity
-                    : intensityTable[intensity]),
+                0.6 *
+                (typeof intensity === "number"
+                  ? intensity
+                  : intensityTable[intensity]),
                 waveSpeed *
-                  (typeof speed === "number" ? speed : speedTable[speed]),
+                (typeof speed === "number" ? speed : speedTable[speed]),
                 impulseDuration *
-                  (typeof speed === "number" ? speed : speedTable[speed]),
+                (typeof speed === "number" ? speed : speedTable[speed]),
                 motionType === "cw" ? "ccw" : "cw",
-                easingFunction,
+                easingFunction
               );
               resolve();
             }, delay);
@@ -339,17 +342,17 @@
           offsetY,
           springs,
           rippleRadius *
-            (typeof size === "number" ? size : rippleSizeTable[size]),
+          (typeof size === "number" ? size : rippleSizeTable[size]),
           impulseScalar *
-            (typeof intensity === "number"
-              ? intensity
-              : intensityTable[intensity]),
+          (typeof intensity === "number"
+            ? intensity
+            : intensityTable[intensity]),
           waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
           impulseDuration *
-            (typeof speed === "number" ? speed : speedTable[speed]),
+          (typeof speed === "number" ? speed : speedTable[speed]),
           motionType,
           "xy",
-          easingFunction,
+          easingFunction
         );
         promises.push(firstImpulse);
 
@@ -367,20 +370,20 @@
                 offsetY,
                 springs,
                 rippleRadius *
-                  1.2 *
-                  (typeof size === "number" ? size : rippleSizeTable[size]),
+                1.2 *
+                (typeof size === "number" ? size : rippleSizeTable[size]),
                 impulseScalar *
-                  0.6 *
-                  (typeof intensity === "number"
-                    ? intensity
-                    : intensityTable[intensity]),
+                0.6 *
+                (typeof intensity === "number"
+                  ? intensity
+                  : intensityTable[intensity]),
                 (waveSpeed / 2) *
-                  (typeof speed === "number" ? speed : speedTable[speed]),
+                (typeof speed === "number" ? speed : speedTable[speed]),
                 impulseDuration *
-                  (typeof speed === "number" ? speed : speedTable[speed]),
+                (typeof speed === "number" ? speed : speedTable[speed]),
                 motionType,
                 "xy",
-                easingFunction,
+                easingFunction
               );
               resolve();
             }, delay);
@@ -401,21 +404,21 @@
           offsetY,
           springs,
           rippleRadius *
-            (typeof size === "number" ? size : rippleSizeTable[size]),
+          (typeof size === "number" ? size : rippleSizeTable[size]),
           impulseScalar *
-            (typeof intensity === "number"
-              ? intensity
-              : intensityTable[intensity]),
+          (typeof intensity === "number"
+            ? intensity
+            : intensityTable[intensity]),
           waveSpeed *
-            0.75 *
-            (typeof speed === "number" ? speed : speedTable[speed]),
+          0.75 *
+          (typeof speed === "number" ? speed : speedTable[speed]),
           impulseDuration *
-            (typeof speed === "number" ? speed : speedTable[speed]),
+          (typeof speed === "number" ? speed : speedTable[speed]),
           "omni",
           motionNoise,
           0.01,
           1,
-          easingFunction,
+          easingFunction
         );
         promises.push(firstImpulse);
 
@@ -433,22 +436,22 @@
                 offsetY,
                 springs,
                 rippleRadius *
-                  1.2 *
-                  (typeof size === "number" ? size : rippleSizeTable[size]),
+                1.2 *
+                (typeof size === "number" ? size : rippleSizeTable[size]),
                 impulseScalar *
-                  0.6 *
-                  (typeof intensity === "number"
-                    ? intensity
-                    : intensityTable[intensity]),
+                0.6 *
+                (typeof intensity === "number"
+                  ? intensity
+                  : intensityTable[intensity]),
                 (waveSpeed / 2) *
-                  (typeof speed === "number" ? speed : speedTable[speed]),
+                (typeof speed === "number" ? speed : speedTable[speed]),
                 impulseDuration *
-                  (typeof speed === "number" ? speed : speedTable[speed]),
+                (typeof speed === "number" ? speed : speedTable[speed]),
                 "omni",
                 motionNoise,
                 0.01,
                 1,
-                easingFunction,
+                easingFunction
               );
               resolve();
             }, delay);
@@ -468,16 +471,16 @@
         offsetY,
         springs,
         rippleRadius *
-          (typeof size === "number" ? size : rippleSizeTable[size]),
+        (typeof size === "number" ? size : rippleSizeTable[size]),
         impulseScalar *
-          (typeof intensity === "number"
-            ? intensity
-            : intensityTable[intensity]),
+        (typeof intensity === "number"
+          ? intensity
+          : intensityTable[intensity]),
         waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
         impulseDuration *
-          (typeof speed === "number" ? speed : speedTable[speed]),
+        (typeof speed === "number" ? speed : speedTable[speed]),
         motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
-        easingFunction,
+        easingFunction
       );
       promises.push(firstImpulse);
 
@@ -495,19 +498,19 @@
               offsetY,
               springs,
               rippleRadius *
-                1.2 *
-                (typeof size === "number" ? size : rippleSizeTable[size]),
+              1.2 *
+              (typeof size === "number" ? size : rippleSizeTable[size]),
               impulseScalar *
-                0.6 *
-                (typeof intensity === "number"
-                  ? intensity
-                  : intensityTable[intensity]),
+              0.6 *
+              (typeof intensity === "number"
+                ? intensity
+                : intensityTable[intensity]),
               (waveSpeed / 2) *
-                (typeof speed === "number" ? speed : speedTable[speed]),
+              (typeof speed === "number" ? speed : speedTable[speed]),
               impulseDuration *
-                (typeof speed === "number" ? speed : speedTable[speed]),
+              (typeof speed === "number" ? speed : speedTable[speed]),
               motionType === "omni" ? "omni" : motionType === "xy" ? "y" : "x",
-              easingFunction,
+              easingFunction
             );
             resolve();
           }, delay);
@@ -518,18 +521,18 @@
       if (visibility === "maskwave") {
         if (impulseEasing) {
           opacityWaveMotion = new Tween(0, {
-            easing: easingFunctions[impulseEasing],
+            easing: easingFunctions[impulseEasing]
           });
         }
         const maskWave = createTweenedWave(
           opacityWaveMotion,
           rippleRadius *
-            waveSpeed *
-            (typeof speed === "number" ? speed : speedTable[speed]) *
-            (typeof maskWaveSpeedMultiplier === "number"
-              ? maskWaveSpeedMultiplier
-              : 1),
-          0,
+          waveSpeed *
+          (typeof speed === "number" ? speed : speedTable[speed]) *
+          (typeof maskWaveSpeedMultiplier === "number"
+            ? maskWaveSpeedMultiplier
+            : 1),
+          0
         );
         promises.push(maskWave);
       }
@@ -544,7 +547,7 @@
       yCount,
       springOrTween.type === "spring" ? Spring : Tween,
       stiffness,
-      damping,
+      damping
     );
   };
 
@@ -591,7 +594,7 @@
           0.06,
           waveSpeed * 3,
           impulseDuration,
-          "xy",
+          "xy"
         );
       } else if (hoverAction === "intense") {
         createContinuousWave(
@@ -608,7 +611,7 @@
           0.3,
           waveSpeed * 3,
           impulseDuration,
-          "xy",
+          "xy"
         );
       }
     }
@@ -657,32 +660,32 @@
       customColorMode,
       enableRandomOpacity
         ? {
-            noise: opacityNoise,
-            noiseScale:
-              typeof opacityNoiseScale === "number"
-                ? opacityNoiseScale
-                : opacityNoiseScaleTable[opacityNoiseScale],
-            multiplier:
-              typeof opacityNoiseMultiplier === "number"
-                ? opacityNoiseMultiplier
-                : opacityNoiseMultiplierTable[opacityNoiseMultiplier],
-            noiseTime: time,
-          }
+          noise: opacityNoise,
+          noiseScale:
+            typeof opacityNoiseScale === "number"
+              ? opacityNoiseScale
+              : opacityNoiseScaleTable[opacityNoiseScale],
+          multiplier:
+            typeof opacityNoiseMultiplier === "number"
+              ? opacityNoiseMultiplier
+              : opacityNoiseMultiplierTable[opacityNoiseMultiplier],
+          noiseTime: time
+        }
         : null,
       enableRandomPointSize
         ? {
-            noise: pointSizeNoise,
-            noiseScale:
-              typeof pointSizeNoiseScale === "number"
-                ? pointSizeNoiseScale
-                : pointSizeNoiseScaleTable[pointSizeNoiseScale],
-            multiplier:
-              typeof pointSizeNoiseMultiplier === "number"
-                ? pointSizeNoiseMultiplier
-                : pointSizeNoiseMultiplierTable[pointSizeNoiseMultiplier],
-            noiseTime: time,
-          }
-        : null,
+          noise: pointSizeNoise,
+          noiseScale:
+            typeof pointSizeNoiseScale === "number"
+              ? pointSizeNoiseScale
+              : pointSizeNoiseScaleTable[pointSizeNoiseScale],
+          multiplier:
+            typeof pointSizeNoiseMultiplier === "number"
+              ? pointSizeNoiseMultiplier
+              : pointSizeNoiseMultiplierTable[pointSizeNoiseMultiplier],
+          noiseTime: time
+        }
+        : null
     );
 
     if (
@@ -690,7 +693,7 @@
       clientHeight !== undefined &&
       clientWidth !== undefined
     ) {
-      drawVignetteMask(clientWidth, clientHeight, vignetteConfig, ctx);
+      drawVignetteMask(clientWidth * window.devicePixelRatio, clientHeight * window.devicePixelRatio, vignetteConfig, ctx);
     }
 
     if (
@@ -700,17 +703,17 @@
       maskWaveThickness !== undefined
     ) {
       drawMovingRingMask(
-        clientWidth,
-        clientHeight,
+        clientWidth * window.devicePixelRatio,
+        clientHeight * window.devicePixelRatio,
         opacityWaveMotion.current,
-        getHypotenuse(clientHeight, clientWidth) *
-          (typeof maskWaveThickness === "number"
-            ? maskWaveThickness
-            : maskWaveThicknessTable[maskWaveThickness]),
+        getHypotenuse(clientHeight * window.devicePixelRatio, clientWidth * window.devicePixelRatio) *
+        (typeof maskWaveThickness === "number"
+          ? maskWaveThickness
+          : maskWaveThicknessTable[maskWaveThickness]),
         ctx,
         maskWaveRampIn,
         maskWaveRampOut,
-        maskWaveMinValue,
+        maskWaveMinValue
       );
     }
 
@@ -769,12 +772,12 @@
   $effect(() => {
     if (canvasRef && ctx && clientWidth && clientHeight) {
       dpr = window.devicePixelRatio || 1;
-      canvasRef.width = clientWidth * dpr;
-      canvasRef.height = clientHeight * dpr;
-      canvasRef.style.width = clientWidth + "px";
-      canvasRef.style.height = clientHeight + "px";
-      ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transforms
-      ctx.scale(dpr, dpr);
+      // canvasRef.width = clientWidth * dpr;
+      // canvasRef.height = clientHeight * dpr;
+      // canvasRef.style.width = clientWidth + "px";
+      // canvasRef.style.height = clientHeight + "px";
+      // ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transforms
+      // ctx.scale(dpr, dpr);
     }
   });
 </script>
@@ -791,8 +794,8 @@
   <canvas
     class="block h-full w-full"
     bind:this={canvasRef}
-    height={clientHeight}
-    width={clientWidth}
+    height={clientHeight * window.devicePixelRatio}
+    width={clientWidth * window.devicePixelRatio}
     style={`opacity: ${canvasGlobalOpacity.current}%`}
   ></canvas>
 </div>
