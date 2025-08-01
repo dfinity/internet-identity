@@ -258,3 +258,8 @@ pub enum CreateIdentityData {
 pub enum LookupByRegistrationIdError {
     InvalidRegistrationId(String),
 }
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AuthnMethodSessionInfo {
+    pub name: Option<String>,
+}

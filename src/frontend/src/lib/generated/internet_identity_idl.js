@@ -182,6 +182,7 @@ export const idlFactory = ({ IDL }) => {
   const AuthnMethodSecuritySettingsReplaceError = IDL.Variant({
     'AuthnMethodNotFound' : IDL.Null,
   });
+  const AuthnMethodSessionInfo = IDL.Record({ 'name' : IDL.Opt(IDL.Text) });
   const CheckCaptchaArg = IDL.Record({ 'solution' : IDL.Text });
   const RegistrationFlowNextStep = IDL.Variant({
     'CheckCaptcha' : IDL.Record({ 'captcha_png_base64' : IDL.Text }),
@@ -562,7 +563,12 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'authn_method_session' : IDL.Func(
+    'authn_method_session_info' : IDL.Func(
+        [IdentityNumber],
+        [IDL.Opt(AuthnMethodSessionInfo)],
+        ['query'],
+      ),
+    'authn_method_session_register' : IDL.Func(
         [IdentityNumber],
         [
           IDL.Variant({

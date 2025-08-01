@@ -974,7 +974,7 @@ mod v2_api {
     }
 
     #[update]
-    async fn authn_method_session(
+    async fn authn_method_session_register(
         identity_number: IdentityNumber,
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
         // Adding a session is behind a feature flag
@@ -987,6 +987,27 @@ mod v2_api {
         }
 
         tentative_device_registration::add_tentative_session(identity_number, caller()).await
+    }
+
+    #[query]
+    fn authn_method_session_info(
+        identity_number: IdentityNumber,
+    ) -> Option<AuthnMethodSessionInfo> {
+        // Requesting session info is behind a feature flag
+        if !persistent_state(|state| {
+            state
+                .feature_flag_continue_from_another_device
+                .unwrap_or(false)
+        }) {
+            trap("feature_flag_continue_from_another_device is disabled");
+        }
+
+        // Return session info if caller matches confirmed session
+        tentative_device_registration::get_confirmed_session(identity_number)
+            .is_some_and(|confirmed_session| confirmed_session == caller())
+            .then_some(AuthnMethodSessionInfo {
+                name: state::anchor(identity_number).name(),
+            })
     }
 
     #[update]
