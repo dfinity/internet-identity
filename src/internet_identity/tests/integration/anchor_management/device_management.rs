@@ -837,7 +837,16 @@ fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError
 
     // sort devices to not fail on different orderings, auth_test_device has a pubkey all 0s.
     devices.sort_by(|a, b| a.pubkey.cmp(&b.pubkey));
-    assert_eq!(devices, vec![device, device_data_1()]);
+    assert_eq!(
+        devices,
+        vec![
+            device,
+            DeviceData {
+                metadata: Some(HashMap::new()),
+                ..device_data_1()
+            }
+        ]
+    );
     Ok(())
 }
 
