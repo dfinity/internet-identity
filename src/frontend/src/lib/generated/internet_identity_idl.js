@@ -342,6 +342,7 @@ export const idlFactory = ({ IDL }) => {
   const IdentityAuthnInfo = IDL.Record({
     'authn_methods' : IDL.Vec(AuthnMethod),
     'recovery_authn_methods' : IDL.Vec(AuthnMethod),
+    'authn_method_session' : IDL.Opt(IDL.Principal),
   });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,

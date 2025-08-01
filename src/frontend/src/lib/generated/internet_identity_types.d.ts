@@ -232,6 +232,7 @@ export interface IdentityAnchorInfo {
 export interface IdentityAuthnInfo {
   'authn_methods' : Array<AuthnMethod>,
   'recovery_authn_methods' : Array<AuthnMethod>,
+  'authn_method_session' : [] | [Principal],
 }
 export interface IdentityInfo {
   'authn_methods' : Array<AuthnMethodData>,

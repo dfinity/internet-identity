@@ -540,6 +540,7 @@ type LookupByRegistrationIdError = variant {
 type IdentityAuthnInfo = record {
     authn_methods : vec AuthnMethod;
     recovery_authn_methods : vec AuthnMethod;
+    authn_method_session : opt principal;
 };
 
 type IdentityInfo = record {
@@ -805,7 +806,7 @@ service : (opt InternetIdentityInit) -> {
 
     // V2 Identity Management API
     // ==========================
-    // WARNING: The following methods are experimental and may ch 0ange in the future.
+    // WARNING: The following methods are experimental and may change in the future.
 
     // Starts the identity registration flow to create a new identity.
     identity_registration_start : () -> (variant { Ok : IdRegNextStepResult; Err : IdRegStartError });

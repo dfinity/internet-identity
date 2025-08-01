@@ -73,6 +73,7 @@ pub struct AuthnMethodRegistration {
 pub struct IdentityAuthnInfo {
     pub authn_methods: Vec<AuthnMethod>,
     pub recovery_authn_methods: Vec<AuthnMethod>,
+    pub authn_method_session: Option<Principal>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

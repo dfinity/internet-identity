@@ -693,18 +693,29 @@ mod v2_api {
     use super::*;
 
     #[query]
+    #[allow(clippy::unnecessary_wraps)]
     fn identity_authn_info(identity_number: IdentityNumber) -> Result<IdentityAuthnInfo, ()> {
         let Ok(anchor) = state::storage_borrow(|storage| storage.read(identity_number)) else {
             return Ok(IdentityAuthnInfo {
                 authn_methods: vec![],
                 recovery_authn_methods: vec![],
+                authn_method_session: None,
             });
         };
 
+        // Getting confirmed session is behind a feature flag
+        let authn_method_session = persistent_state(|state| {
+            state
+                .feature_flag_continue_from_another_device
+                .unwrap_or(false)
+        })
+        .then(|| tentative_device_registration::get_confirmed_session(identity_number))
+        .flatten();
         let authn_info = anchor.into_devices().into_iter().fold(
             IdentityAuthnInfo {
                 authn_methods: vec![],
                 recovery_authn_methods: vec![],
+                authn_method_session,
             },
             |mut authn_info, device| {
                 let purpose = device.purpose;
