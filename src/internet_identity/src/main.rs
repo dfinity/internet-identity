@@ -277,7 +277,30 @@ fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor>
 #[update] // this is an update call because queries are not (yet) certified
 fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    anchor_management::get_anchor_info(anchor_number)
+    let identity_info = anchor_management::get_anchor_info(anchor_number);
+
+    // Usage of `DeviceWithUsage::try_from` won't actually return an error here since we're
+    // converting back and forth `DeviceWithUsage` -> `AuthnMethodData` -> `DeviceWithUsage`.
+    IdentityAnchorInfo {
+        devices: identity_info
+            .authn_methods
+            .into_iter()
+            .map(DeviceWithUsage::try_from)
+            .filter_map(Result::ok)
+            .collect(),
+        device_registration: identity_info.authn_method_registration.map(|registration| {
+            DeviceRegistrationInfo {
+                expiration: registration.expiration,
+                tentative_device: registration
+                    .authn_method
+                    .map(DeviceWithUsage::try_from)
+                    .and_then(Result::ok)
+                    .map(DeviceData::from),
+            }
+        }),
+        openid_credentials: identity_info.openid_credentials,
+        name: identity_info.name,
+    }
 }
 
 #[query]
@@ -751,30 +774,7 @@ mod v2_api {
     #[update]
     fn identity_info(identity_number: IdentityNumber) -> Result<IdentityInfo, IdentityInfoError> {
         check_authz_and_record_activity(identity_number).map_err(IdentityInfoError::from)?;
-        let anchor_info = anchor_management::get_anchor_info(identity_number);
-
-        let metadata = state::anchor(identity_number)
-            .identity_metadata()
-            .clone()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(k, v)| (k, MetadataEntryV2::from(v)))
-            .collect();
-
-        let identity_info = IdentityInfo {
-            authn_methods: anchor_info
-                .devices
-                .into_iter()
-                .map(AuthnMethodData::from)
-                .collect(),
-            authn_method_registration: anchor_info
-                .device_registration
-                .map(AuthnMethodRegistration::from),
-            openid_credentials: anchor_info.openid_credentials,
-            metadata,
-            name: anchor_info.name,
-        };
-        Ok(identity_info)
+        Ok(anchor_management::get_anchor_info(identity_number))
     }
 
     #[update]

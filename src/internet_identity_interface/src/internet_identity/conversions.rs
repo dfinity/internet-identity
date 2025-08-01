@@ -185,15 +185,6 @@ impl From<DeviceWithUsage> for AuthnMethodData {
     }
 }
 
-impl From<DeviceRegistrationInfo> for AuthnMethodRegistration {
-    fn from(value: DeviceRegistrationInfo) -> Self {
-        AuthnMethodRegistration {
-            expiration: value.expiration,
-            authn_method: value.tentative_device.map(AuthnMethodData::from),
-        }
-    }
-}
-
 impl From<DeviceData> for AuthnMethodData {
     fn from(device_data: DeviceData) -> Self {
         let device_with_usage = DeviceWithUsage::from(device_data);

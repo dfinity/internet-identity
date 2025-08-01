@@ -7,8 +7,9 @@ use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
-    DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace, MetadataEntry,
+    AnchorNumber, AuthnMethodData, AuthorizationKey, CredentialId, DeviceData, DeviceKey,
+    DeviceKeyWithAnchor, DeviceWithUsage, IdentityInfo, IdentityPropertiesReplace, MetadataEntry,
+    MetadataEntryV2,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -16,13 +17,21 @@ use std::collections::HashMap;
 pub mod registration;
 pub mod tentative_device_registration;
 
-pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
+pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityInfo {
     let anchor = state::anchor(anchor_number);
-    let devices = anchor
+    let metadata = anchor
+        .identity_metadata()
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(k, v)| (k, MetadataEntryV2::from(v)))
+        .collect();
+    let authn_methods = anchor
         .devices()
         .clone()
         .into_iter()
         .map(DeviceWithUsage::from)
+        .map(AuthnMethodData::from)
         .collect();
     let openid_credentials = Some(
         anchor
@@ -34,14 +43,14 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     );
     let name = anchor.name();
     let now = time();
+    let authn_method_registration =
+        state::get_tentative_device_registration_by_identity(anchor_number)
+            .and_then(|reg| reg.to_registration_if_still_valid(now));
 
-    let tentative_device_registration =
-        state::get_tentative_device_registration_by_identity(anchor_number);
-
-    IdentityAnchorInfo {
-        devices,
-        device_registration: tentative_device_registration
-            .and_then(|reg| reg.to_info_if_still_valid(now)),
+    IdentityInfo {
+        metadata,
+        authn_methods,
+        authn_method_registration,
         openid_credentials,
         name,
     }

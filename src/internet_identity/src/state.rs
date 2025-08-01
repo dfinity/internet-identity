@@ -2,7 +2,7 @@ use crate::anchor_management::tentative_device_registration::ValidatedRegistrati
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
-use crate::state::RegistrationState::DeviceTentativelyAdded;
+use crate::state::RegistrationState::{DeviceTentativelyAdded, SessionTentativelyAdded};
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
@@ -50,8 +50,14 @@ pub struct TentativeDeviceRegistration {
 }
 
 impl TentativeDeviceRegistration {
-    pub fn to_info_if_still_valid(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
+    pub fn to_registration_if_still_valid(
+        &self,
+        now: Timestamp,
+    ) -> Option<AuthnMethodRegistration> {
         match self {
+            // Make sure registration isn't expired
+            TentativeDeviceRegistration { expiration, .. } if *expiration <= now => None,
+            // Return tentative device
             TentativeDeviceRegistration {
                 expiration,
                 state:
@@ -59,17 +65,30 @@ impl TentativeDeviceRegistration {
                         tentative_device, ..
                     },
                 ..
-            } if *expiration > now => Some(DeviceRegistrationInfo {
+            } => Some(AuthnMethodRegistration {
                 expiration: *expiration,
-                tentative_device: Some(tentative_device.clone()),
+                authn_method: Some(AuthnMethodData::from(tentative_device.clone())),
+                session: None,
             }),
-            TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
-                Some(DeviceRegistrationInfo {
-                    expiration: *expiration,
-                    tentative_device: None,
-                })
-            }
-            _ => None,
+            // Return tentative session
+            TentativeDeviceRegistration {
+                expiration,
+                state:
+                    SessionTentativelyAdded {
+                        tentative_session, ..
+                    },
+                ..
+            } => Some(AuthnMethodRegistration {
+                expiration: *expiration,
+                authn_method: None,
+                session: Some(*tentative_session),
+            }),
+            // Registration window is still open but no device or session has been registered yet
+            TentativeDeviceRegistration { expiration, .. } => Some(AuthnMethodRegistration {
+                expiration: *expiration,
+                authn_method: None,
+                session: None,
+            }),
         }
     }
 }
