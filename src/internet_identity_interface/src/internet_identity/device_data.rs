@@ -1,6 +1,7 @@
 use crate::internet_identity::types::{DeviceData, DeviceProtection, KeyType, Purpose};
 use candid::Principal;
 use serde_bytes::ByteBuf;
+use std::collections::HashMap;
 
 impl DeviceData {
     pub fn principal(&self) -> Principal {
@@ -17,7 +18,7 @@ impl DeviceData {
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
             origin: None,
-            metadata: None,
+            metadata: Some(HashMap::new()),
         }
     }
 }
