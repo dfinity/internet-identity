@@ -877,7 +877,7 @@ service : (opt InternetIdentityInit) -> {
     // This authentication method needs to be confirmed before it can be used for authentication on this identity.
     authn_method_register : (IdentityNumber, AuthnMethodData) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
 
-    // Registers a new session for an identity.
+    // Registers a new session for the identity.
     // This session needs to be confirmed before it can be used to register an authentication method on this identity.
     authn_method_session_register : (IdentityNumber) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
 
