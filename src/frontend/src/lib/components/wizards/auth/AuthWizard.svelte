@@ -9,6 +9,7 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
+  import { canisterConfig } from "$lib/globals.js";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -79,7 +80,13 @@
 {/snippet}
 
 {#if isContinueFromAnotherDeviceVisible}
-  <RegisterAccessMethodWizard onRegistered={onOtherDevice} {onError} />
+  <RegisterAccessMethodWizard
+    onRegistered={canisterConfig
+      .feature_flag_continue_from_another_device[0] === true
+      ? onSignIn
+      : onOtherDevice}
+    {onError}
+  />
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
 {:else}

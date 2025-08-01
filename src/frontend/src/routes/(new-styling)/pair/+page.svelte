@@ -7,8 +7,24 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
+  import { canisterConfig } from "$lib/globals";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { toaster } from "$lib/components/utils/toaster";
 
   let isUnableToComplete = $state(false);
+
+  const onRegistered = async (identityNumber: bigint) => {
+    toaster.success({
+      title: "You're all set. Your passkey has been registered.",
+    });
+
+    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
+      await goto("/manage");
+    } else {
+      await goto("/");
+    }
+  };
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
@@ -19,7 +35,7 @@
       <div class="flex-1"></div>
       <RegisterAccessMethodWizard
         registrationId={window.location.hash.slice(1)}
-        onRegistered={() => goto("/")}
+        {onRegistered}
         onError={() => (isUnableToComplete = true)}
       />
     </AuthPanel>

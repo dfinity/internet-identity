@@ -24,6 +24,7 @@ export class RegisterAccessMethodFlow {
   >("continueFromExistingDevice");
   #confirmationCode = $state<string>();
   #identityName = $state<string>();
+  #identityNumber = $state<bigint>();
   #existingDeviceLink = $state<URL>();
 
   get view() {
@@ -58,6 +59,12 @@ export class RegisterAccessMethodFlow {
         await anonymousActor.lookup_by_registration_mode_id(registrationId)
       )[0];
       if (nonNullish(identityNumber)) {
+        // Register session instead of temp key if feature flag is enabled
+        if (
+          canisterConfig.feature_flag_continue_from_another_device[0] === true
+        ) {
+          return this.#registerSession(identityNumber);
+        }
         return this.#registerTempKey(identityNumber);
       }
       // Wait before retrying
@@ -115,14 +122,55 @@ export class RegisterAccessMethodFlow {
     throw new Error("Registration not completed within time window");
   };
 
-  createPasskey = async (): Promise<bigint> => {
+  #registerSession = async (identityNumber: bigint): Promise<void> => {
     const session = get(sessionStore);
-    const { actor, identityNumber } = get(authenticatedStore);
-    const name = this.#identityName ?? identityNumber.toString(10);
+    const confirmation = await session.actor
+      .authn_method_session_register(identityNumber)
+      .then(throwCanisterError);
+    const expiration = confirmation.expiration;
+    this.#confirmationCode = confirmation.confirmation_code;
+    this.#view = "confirmDevice";
+
+    while (BigInt(Date.now()) * BigInt(1_000_000) < expiration) {
+      const [confirmed_session] =
+        await session.actor.authn_method_session_info(identityNumber);
+
+      // Show confirm sign-in view if session has been confirmed
+      if (nonNullish(confirmed_session)) {
+        // We can't authenticate yet if feature flag is enabled
+        if (
+          canisterConfig.feature_flag_continue_from_another_device[0] === true
+        ) {
+          const identity = await authenticateWithSession({ session });
+          authenticationStore.set({
+            identity,
+            identityNumber,
+          });
+        }
+        this.#identityName =
+          confirmed_session.name[0] ?? identityNumber.toString(10);
+        this.#identityNumber = identityNumber;
+        this.#view = "confirmSignIn";
+        return;
+      }
+      // Wait before retrying
+      await waitFor(POLL_INTERVAL);
+    }
+    throw new Error("Registration not completed within time window");
+  };
+
+  createPasskey = async (): Promise<bigint> => {
+    if (isNullish(this.#identityName)) {
+      throw new Error("Identity name is missing");
+    }
+    if (isNullish(this.#identityNumber)) {
+      throw new Error("Identity number is missing");
+    }
+    const session = get(sessionStore);
     const passkeyIdentity =
       features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
-        ? await DiscoverableDummyIdentity.createNew(name)
-        : await DiscoverablePasskeyIdentity.createNew(name);
+        ? await DiscoverableDummyIdentity.createNew(this.#identityName)
+        : await DiscoverablePasskeyIdentity.createNew(this.#identityName);
     const credentialId = passkeyIdentity.getCredentialId();
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is missing");
@@ -141,22 +189,37 @@ export class RegisterAccessMethodFlow {
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
-    await actor
-      .authn_method_replace(
-        identityNumber,
-        new Uint8Array(session.identity.getPublicKey().toDer()),
-        authnMethodData,
-      )
-      .then(throwCanisterError);
+    // Exit registration mode with authn method and authenticate with session
+    // if feature flag is enabled instead of replacing the temp key.
+    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+      await session.actor
+        .authn_method_registration_mode_exit(this.#identityNumber, [
+          authnMethodData,
+        ])
+        .then(throwCanisterError);
+      const identity = await authenticateWithSession({ session });
+      authenticationStore.set({
+        identity,
+        identityNumber: this.#identityNumber,
+      });
+    } else {
+      await get(authenticatedStore)
+        .actor.authn_method_replace(
+          this.#identityNumber,
+          new Uint8Array(session.identity.getPublicKey().toDer()),
+          authnMethodData,
+        )
+        .then(throwCanisterError);
+    }
     lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber,
-      name,
+      identityNumber: this.#identityNumber,
+      name: this.#identityName,
       authMethod: {
         passkey: {
           credentialId: new Uint8Array(credentialId),
         },
       },
     });
-    return identityNumber;
+    return this.#identityNumber;
   };
 }
