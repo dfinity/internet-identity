@@ -566,7 +566,7 @@ export const idlFactory = ({ IDL }) => {
     'authn_method_session_info' : IDL.Func(
         [IdentityNumber],
         [IDL.Opt(AuthnMethodSessionInfo)],
-        [],
+        ['query'],
       ),
     'authn_method_session_register' : IDL.Func(
         [IdentityNumber],

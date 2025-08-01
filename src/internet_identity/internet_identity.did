@@ -882,7 +882,7 @@ service : (opt InternetIdentityInit) -> {
     authn_method_session_register : (IdentityNumber) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
 
     // Returns session info when session is confirmed and caller matches session.
-    authn_method_session_info : (IdentityNumber) -> (opt AuthnMethodSessionInfo);
+    authn_method_session_info : (IdentityNumber) -> (opt AuthnMethodSessionInfo) query;
 
     // Confirms a previously registered authentication method.
     // On successful confirmation, the authentication method is permanently added to the identity and can
