@@ -18,7 +18,7 @@ impl DeviceData {
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
             origin: None,
-            metadata: Some(HashMap::new()),
+            metadata: None,
         }
     }
 }

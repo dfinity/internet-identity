@@ -826,6 +826,7 @@ fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError
 
     let device = DeviceData {
         key_type: KeyType::BrowserStorageKey,
+        metadata: Some(HashMap::new()),
         ..DeviceData::auth_test_device()
     };
 
