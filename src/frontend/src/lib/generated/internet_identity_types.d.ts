@@ -101,6 +101,7 @@ export interface AuthnMethodSecuritySettings {
 export type AuthnMethodSecuritySettingsReplaceError = {
     'AuthnMethodNotFound' : null
   };
+export interface AuthnMethodSessionInfo { 'name' : [] | [string] }
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -467,7 +468,11 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodSecuritySettingsReplaceError }
   >,
-  'authn_method_session' : ActorMethod<
+  'authn_method_session_info' : ActorMethod<
+    [IdentityNumber],
+    [] | [AuthnMethodSessionInfo]
+  >,
+  'authn_method_session_register' : ActorMethod<
     [IdentityNumber],
     { 'Ok' : AuthnMethodConfirmationCode } |
       { 'Err' : AuthnMethodRegisterError }

@@ -495,6 +495,10 @@ type AuthnMethodConfirmationCode = record {
     expiration : Timestamp;
 };
 
+type AuthnMethodSessionInfo = record {
+    name : opt text;
+};
+
 type RegistrationId = text;
 
 type AuthnMethodRegisterError = variant {
@@ -873,9 +877,12 @@ service : (opt InternetIdentityInit) -> {
     // This authentication method needs to be confirmed before it can be used for authentication on this identity.
     authn_method_register : (IdentityNumber, AuthnMethodData) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
 
-    // Registers a new session to the identity.
+    // Registers a new session for the identity.
     // This session needs to be confirmed before it can be used to register an authentication method on this identity.
-    authn_method_session : (IdentityNumber) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
+    authn_method_session_register : (IdentityNumber) -> (variant { Ok : AuthnMethodConfirmationCode; Err : AuthnMethodRegisterError });
+
+    // Returns session info when session is confirmed and caller matches session.
+    authn_method_session_info : (IdentityNumber) -> (opt AuthnMethodSessionInfo) query;
 
     // Confirms a previously registered authentication method.
     // On successful confirmation, the authentication method is permanently added to the identity and can
