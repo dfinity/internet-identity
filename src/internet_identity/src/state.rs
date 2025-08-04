@@ -49,31 +49,6 @@ pub struct TentativeDeviceRegistration {
     pub id: Option<ValidatedRegistrationId>,
 }
 
-impl TentativeDeviceRegistration {
-    pub fn to_info_if_still_valid(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
-        match self {
-            TentativeDeviceRegistration {
-                expiration,
-                state:
-                    DeviceTentativelyAdded {
-                        tentative_device, ..
-                    },
-                ..
-            } if *expiration > now => Some(DeviceRegistrationInfo {
-                expiration: *expiration,
-                tentative_device: Some(tentative_device.clone()),
-            }),
-            TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
-                Some(DeviceRegistrationInfo {
-                    expiration: *expiration,
-                    tentative_device: None,
-                })
-            }
-            _ => None,
-        }
-    }
-}
-
 /// Registration state of new devices added using either:
 /// - two-step device add flow
 ///   1. `DeviceRegistrationModeActive`

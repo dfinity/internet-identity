@@ -171,6 +171,7 @@ pub enum VerifyTentativeDeviceResponse {
 pub struct DeviceRegistrationInfo {
     pub expiration: Timestamp,
     pub tentative_device: Option<DeviceData>,
+    pub tentative_session: Option<Principal>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
