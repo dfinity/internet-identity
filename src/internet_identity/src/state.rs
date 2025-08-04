@@ -2,7 +2,6 @@ use crate::anchor_management::tentative_device_registration::ValidatedRegistrati
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
-use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
