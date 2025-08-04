@@ -78,6 +78,7 @@ export type AuthnMethodRegisterError = { 'RegistrationModeOff' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
+  'session' : [] | [Principal],
   'authn_method' : [] | [AuthnMethodData],
 }
 export type AuthnMethodRegistrationModeEnterError = {
@@ -162,6 +163,7 @@ export type DeviceProtection = { 'unprotected' : null } |
 export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
   'expiration' : Timestamp,
+  'tentative_session' : [] | [Principal],
 }
 export interface DeviceWithUsage {
   'alias' : string,

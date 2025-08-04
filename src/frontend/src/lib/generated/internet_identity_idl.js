@@ -277,6 +277,7 @@ export const idlFactory = ({ IDL }) => {
   const DeviceRegistrationInfo = IDL.Record({
     'tentative_device' : IDL.Opt(DeviceData),
     'expiration' : Timestamp,
+    'tentative_session' : IDL.Opt(IDL.Principal),
   });
   const IdentityAnchorInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
@@ -345,6 +346,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const AuthnMethodRegistrationInfo = IDL.Record({
     'expiration' : Timestamp,
+    'session' : IDL.Opt(IDL.Principal),
     'authn_method' : IDL.Opt(AuthnMethodData),
   });
   const IdentityInfo = IDL.Record({
