@@ -331,6 +331,14 @@ pub fn get_tentative_registration(anchor_number: AnchorNumber) -> Option<DeviceR
                         tentative_device: None,
                         tentative_session: Some(*tentative_session),
                     }),
+                    // Return expiration if no tentative registration exists yet in time window
+                    TentativeDeviceRegistration { expiration, .. } => {
+                        Some(DeviceRegistrationInfo {
+                            expiration: *expiration,
+                            tentative_device: None,
+                            tentative_session: None,
+                        })
+                    }
                     // Else return None
                     _ => None,
                 })
