@@ -174,10 +174,10 @@ fn identity_info_should_return_authn_method() -> Result<(), CallError> {
     assert!(matches!(
         identity_info.authn_method_registration,
         Some(AuthnMethodRegistration {
-            authn_method: Some(tenative_authn_method),
+            authn_method: Some(tentative_authn_method),
             expiration: tentative_authn_method_expiration,
             session: None
-        }) if tenative_authn_method == authn_method2 && tentative_authn_method_expiration == expiration
+        }) if tentative_authn_method == authn_method2 && tentative_authn_method_expiration == expiration
     ));
     Ok(())
 }
