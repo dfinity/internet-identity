@@ -339,8 +339,6 @@ pub fn get_tentative_registration(anchor_number: AnchorNumber) -> Option<DeviceR
                             tentative_session: None,
                         })
                     }
-                    // Else return None
-                    _ => None,
                 })
         })
     })
