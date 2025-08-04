@@ -67,6 +67,7 @@ pub struct AuthnMethodData {
 pub struct AuthnMethodRegistration {
     pub expiration: Timestamp,
     pub authn_method: Option<AuthnMethodData>,
+    pub session: Option<Principal>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

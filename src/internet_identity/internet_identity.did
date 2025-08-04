@@ -301,10 +301,12 @@ type CaptchaResult = ChallengeResult;
 
 // Extra information about registration status for new devices
 type DeviceRegistrationInfo = record {
-    // If present, the user has tentatively added a new device. This
-    // new device needs to be verified (see relevant endpoint) before
-    // 'expiration'.
+    // If present, the user has registered a new authentication method. This new authentication
+    // method needs to be confirmed before 'expiration' in order to be added to the identity.
     tentative_device : opt DeviceData;
+    // If present, the user has registered a new session. This new session needs to be confirmed before
+    // 'expiration' in order for it be authorized to register an authentication method to the identity.
+    tentative_session : opt principal;
     // The timestamp at which the anchor will turn off registration mode
     // (and the tentative device will be forgotten, if any, and if not verified)
     expiration : Timestamp;
@@ -481,10 +483,13 @@ type OpenIDRegFinishArg = record {
 
 // Extra information about registration status for new authentication methods
 type AuthnMethodRegistrationInfo = record {
-    // If present, the user has registered a new authentication method. This
-    // new authentication needs to be verified before 'expiration' in order to
-    // be added to the identity.
+
+    // If present, the user has registered a new authentication method. This new authentication
+    // method needs to be confirmed before 'expiration' in order to be added to the identity.
     authn_method : opt AuthnMethodData;
+    // If present, the user has registered a new session. This new session needs to be confirmed before
+    // 'expiration' in order for it be authorized to register an authentication method to the identity.
+    session : opt principal;
     // The timestamp at which the identity will turn off registration mode
     // (and the authentication method will be forgotten, if any, and if not verified)
     expiration : Timestamp;

@@ -2,7 +2,6 @@ use crate::anchor_management::tentative_device_registration::ValidatedRegistrati
 use crate::archive::{ArchiveData, ArchiveState, ArchiveStatusCache};
 use crate::state::flow_states::FlowStates;
 use crate::state::temp_keys::TempKeys;
-use crate::state::RegistrationState::DeviceTentativelyAdded;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::activity_counter::authn_method_counter::AuthnMethodCounter;
 use crate::stats::activity_stats::activity_counter::domain_active_anchor_counter::DomainActiveAnchorCounter;
@@ -47,31 +46,6 @@ pub struct TentativeDeviceRegistration {
     pub expiration: Timestamp,
     pub state: RegistrationState,
     pub id: Option<ValidatedRegistrationId>,
-}
-
-impl TentativeDeviceRegistration {
-    pub fn to_info_if_still_valid(&self, now: Timestamp) -> Option<DeviceRegistrationInfo> {
-        match self {
-            TentativeDeviceRegistration {
-                expiration,
-                state:
-                    DeviceTentativelyAdded {
-                        tentative_device, ..
-                    },
-                ..
-            } if *expiration > now => Some(DeviceRegistrationInfo {
-                expiration: *expiration,
-                tentative_device: Some(tentative_device.clone()),
-            }),
-            TentativeDeviceRegistration { expiration, .. } if *expiration > now => {
-                Some(DeviceRegistrationInfo {
-                    expiration: *expiration,
-                    tentative_device: None,
-                })
-            }
-            _ => None,
-        }
-    }
 }
 
 /// Registration state of new devices added using either:
