@@ -78,6 +78,7 @@ export type AuthnMethodRegisterError = { 'RegistrationModeOff' : null } |
   { 'InvalidMetadata' : string };
 export interface AuthnMethodRegistrationInfo {
   'expiration' : Timestamp,
+  'session' : [] | [Principal],
   'authn_method' : [] | [AuthnMethodData],
 }
 export type AuthnMethodRegistrationModeEnterError = {
@@ -101,6 +102,7 @@ export interface AuthnMethodSecuritySettings {
 export type AuthnMethodSecuritySettingsReplaceError = {
     'AuthnMethodNotFound' : null
   };
+export interface AuthnMethodSessionInfo { 'name' : [] | [string] }
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
@@ -162,6 +164,7 @@ export type DeviceProtection = { 'unprotected' : null } |
 export interface DeviceRegistrationInfo {
   'tentative_device' : [] | [DeviceData],
   'expiration' : Timestamp,
+  'tentative_session' : [] | [Principal],
 }
 export interface DeviceWithUsage {
   'alias' : string,
@@ -467,7 +470,11 @@ export interface _SERVICE {
     { 'Ok' : null } |
       { 'Err' : AuthnMethodSecuritySettingsReplaceError }
   >,
-  'authn_method_session' : ActorMethod<
+  'authn_method_session_info' : ActorMethod<
+    [IdentityNumber],
+    [] | [AuthnMethodSessionInfo]
+  >,
+  'authn_method_session_register' : ActorMethod<
     [IdentityNumber],
     { 'Ok' : AuthnMethodConfirmationCode } |
       { 'Err' : AuthnMethodRegisterError }

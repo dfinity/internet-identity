@@ -24,6 +24,7 @@
   } from "$lib/utils/accessMethods";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { authnMethodEqual, getAuthnMethodAlias } from "$lib/utils/webAuthn";
+  import { toaster } from "$lib/components/utils/toaster";
 
   const MAX_PASSKEYS = 8;
 
@@ -77,6 +78,12 @@
   };
   const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
     authnMethods.push(authnMethod);
+    invalidateAll();
+  };
+  const handleOtherDeviceRegistered = () => {
+    toaster.success({
+      title: "Passkey has been registered from another device.",
+    });
     invalidateAll();
   };
   const handleRemoveOpenIdCredential = async () => {
@@ -237,7 +244,7 @@
     <AddAccessMethodWizard
       onGoogleLinked={handleGoogleLinked}
       onPasskeyRegistered={handlePasskeyRegistered}
-      onOtherDeviceRegistered={invalidateAll}
+      onOtherDeviceRegistered={handleOtherDeviceRegistered}
       onClose={() => (isAddAccessMethodWizardOpen = false)}
       {isMaxOpenIdCredentialsReached}
       {isUsingPasskeys}

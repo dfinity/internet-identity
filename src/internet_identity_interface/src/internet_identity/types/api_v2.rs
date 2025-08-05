@@ -67,6 +67,7 @@ pub struct AuthnMethodData {
 pub struct AuthnMethodRegistration {
     pub expiration: Timestamp,
     pub authn_method: Option<AuthnMethodData>,
+    pub session: Option<Principal>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -257,4 +258,9 @@ pub enum CreateIdentityData {
 #[derive(CandidType, Deserialize, Debug)]
 pub enum LookupByRegistrationIdError {
     InvalidRegistrationId(String),
+}
+
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct AuthnMethodSessionInfo {
+    pub name: Option<String>,
 }

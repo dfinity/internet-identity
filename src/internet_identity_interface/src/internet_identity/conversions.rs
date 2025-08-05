@@ -190,6 +190,7 @@ impl From<DeviceRegistrationInfo> for AuthnMethodRegistration {
         AuthnMethodRegistration {
             expiration: value.expiration,
             authn_method: value.tentative_device.map(AuthnMethodData::from),
+            session: value.tentative_session,
         }
     }
 }

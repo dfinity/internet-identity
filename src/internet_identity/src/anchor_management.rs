@@ -33,15 +33,13 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
             .collect(),
     );
     let name = anchor.name();
-    let now = time();
 
-    let tentative_device_registration =
-        state::get_tentative_device_registration_by_identity(anchor_number);
+    let device_registration =
+        tentative_device_registration::get_tentative_registration(anchor_number);
 
     IdentityAnchorInfo {
         devices,
-        device_registration: tentative_device_registration
-            .and_then(|reg| reg.to_info_if_still_valid(now)),
+        device_registration,
         openid_credentials,
         name,
     }
