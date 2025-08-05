@@ -11,10 +11,18 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { handleError } from "$lib/components/utils/error";
+  import { toaster } from "$lib/components/utils/toaster";
 
   const { data }: PageProps = $props();
 
   let pendingRegistrationId = $state(data.pendingRegistrationId);
+
+  const handleConfirm = () => {
+    toaster.success({
+      title: "Passkey has been registered from another device.",
+    });
+    invalidateAll();
+  };
 
   // Remove registration id from URL bar after assigning it to state
   afterNavigate(() => {
@@ -53,7 +61,7 @@
     <ConfirmAccessMethodWizard
       registrationId={pendingRegistrationId}
       onConfirm={() => {
-        invalidateAll();
+        handleConfirm();
         pendingRegistrationId = null;
       }}
       onError={(error) => {

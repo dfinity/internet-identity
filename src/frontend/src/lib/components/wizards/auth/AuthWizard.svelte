@@ -9,6 +9,7 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
+  import { canisterConfig } from "$lib/globals";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -65,6 +66,13 @@
       isAuthenticating = false;
     }
   };
+  const handleRegistered = async (identityNumber: bigint) => {
+    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+      onSignIn(identityNumber);
+    } else {
+      onOtherDevice(identityNumber);
+    }
+  };
 </script>
 
 {#snippet dialogContent()}
@@ -79,7 +87,7 @@
 {/snippet}
 
 {#if isContinueFromAnotherDeviceVisible}
-  <RegisterAccessMethodWizard onRegistered={onOtherDevice} {onError} />
+  <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
 {:else}
