@@ -388,10 +388,7 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
         Ok(_) => panic!("expected error, got {result:?}"),
         Err(RejectResponse { reject_message, error_code, .. }) => {
             if error_code != expected_error_code {
-                panic!(
-                    "expected error code {:?}, got {:?}",
-                    expected_error_code, error_code
-                );
+                panic!("expected error code {expected_error_code:?}, got {error_code:?}");
             }
             if !message_pattern.is_match(&reject_message.to_string()) {
                 panic!("expected #{message_pattern:?}, got {reject_message}");
