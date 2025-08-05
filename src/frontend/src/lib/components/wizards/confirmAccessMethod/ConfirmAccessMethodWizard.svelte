@@ -7,6 +7,7 @@
   import EnterConfirmationCode from "$lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte";
   import FinishOnNewDevice from "$lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte";
   import { ConfirmAccessMethodFlow } from "$lib/flows/confirmAccessMethodFlow.svelte";
+  import { canisterConfig } from "$lib/globals";
 
   interface Props {
     registrationId?: string;
@@ -16,7 +17,9 @@
 
   const { registrationId, onConfirm, onError }: Props = $props();
 
-  const confirmAccessMethodFlow = new ConfirmAccessMethodFlow();
+  const confirmAccessMethodFlow = new ConfirmAccessMethodFlow(
+    canisterConfig.feature_flag_continue_from_another_device[0] === true,
+  );
 
   const handleEnterRegistrationMode = async () => {
     try {
