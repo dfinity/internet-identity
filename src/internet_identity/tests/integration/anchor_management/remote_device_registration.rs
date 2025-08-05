@@ -12,8 +12,8 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::RejectResponse;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use std::time::Duration;
 

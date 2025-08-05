@@ -10,7 +10,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, IdentityNumber, MetadataEntryV2,
 };
-use pocket_ic::{RejectResponse, PocketIc};
+use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -214,7 +214,10 @@ fn should_prune_at_most_100_entries_30d() -> Result<(), RejectResponse> {
 #[test]
 fn should_keep_aggregations_across_upgrades() -> Result<(), RejectResponse> {
     const II_ORIGIN: &str = "ic0.app";
-    fn assert_expected_state(env: &PocketIc, canister_id: CanisterId) -> Result<(), RejectResponse> {
+    fn assert_expected_state(
+        env: &PocketIc,
+        canister_id: CanisterId,
+    ) -> Result<(), RejectResponse> {
         let aggregations = api::stats(env, canister_id)?.event_aggregations;
         assert_expected_aggregation(
             &aggregations,

@@ -11,7 +11,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Challenge, ChallengeAttempt, DeviceData, RegisterResponse,
 };
-use pocket_ic::{RejectResponse, ErrorCode, PocketIc};
+use pocket_ic::{ErrorCode, PocketIc, RejectResponse};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::Duration;

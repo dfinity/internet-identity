@@ -3,7 +3,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, RejectResponse, PocketIc};
+use pocket_ic::{call_candid, call_candid_as, query_candid, PocketIc, RejectResponse};
 
 pub fn add_entry(
     env: &PocketIc,

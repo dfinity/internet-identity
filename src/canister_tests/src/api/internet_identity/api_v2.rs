@@ -2,7 +2,9 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, RejectResponse, PocketIc};
+use pocket_ic::{
+    call_candid, call_candid_as, query_candid, query_candid_as, PocketIc, RejectResponse,
+};
 use std::collections::HashMap;
 
 pub fn identity_registration_start(

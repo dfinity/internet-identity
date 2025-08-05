@@ -19,7 +19,7 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt, FrontendHostname,
     InternetIdentityInit, MetadataEntryV2,
 };
-use pocket_ic::{RejectResponse, PocketIc};
+use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use std::collections::HashMap;

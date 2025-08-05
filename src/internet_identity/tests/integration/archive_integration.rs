@@ -11,7 +11,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
-use pocket_ic::{RejectResponse, PocketIc};
+use pocket_ic::{PocketIc, RejectResponse};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;

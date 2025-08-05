@@ -1,6 +1,6 @@
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
-use pocket_ic::{query_candid, RejectResponse, PocketIc};
+use pocket_ic::{query_candid, PocketIc, RejectResponse};
 
 pub mod archive;
 pub mod internet_identity;

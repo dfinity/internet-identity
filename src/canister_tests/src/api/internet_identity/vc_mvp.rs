@@ -5,7 +5,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     PrepareIdAliasRequest, PreparedIdAlias,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid_as, query_candid_as, RejectResponse, PocketIc};
+use pocket_ic::{call_candid_as, query_candid_as, PocketIc, RejectResponse};
 
 pub fn prepare_id_alias(
     env: &PocketIc,

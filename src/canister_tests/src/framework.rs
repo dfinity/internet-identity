@@ -134,9 +134,11 @@ pub fn env() -> PocketIc {
     let port_file = path::PathBuf::from("..").join("..").join("pocket-ic-port");
     if port_file.exists() {
         let port = std::fs::read_to_string(port_file).expect("failed to read port file");
-        return PocketIcBuilder::new_with_config(
-            config,
-        ).with_server_url(Url::try_from(format!("http://127.0.0.1:{port}").as_str()).expect("Invalid URL")).build();
+        return PocketIcBuilder::new_with_config(config)
+            .with_server_url(
+                Url::try_from(format!("http://127.0.0.1:{port}").as_str()).expect("Invalid URL"),
+            )
+            .build();
     }
 
     let pocket_ic_path = path::PathBuf::from(POCKET_IC);
@@ -386,7 +388,11 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
 ) {
     match result {
         Ok(_) => panic!("expected error, got {result:?}"),
-        Err(RejectResponse { reject_message, error_code, .. }) => {
+        Err(RejectResponse {
+            reject_message,
+            error_code,
+            ..
+        }) => {
             if error_code != expected_error_code {
                 panic!("expected error code {expected_error_code:?}, got {error_code:?}");
             }

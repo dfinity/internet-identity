@@ -8,8 +8,8 @@ use canister_tests::framework::{env, expect_user_error_with_message, install_ii_
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodReplaceError, MetadataEntryV2,
 };
-use pocket_ic::RejectResponse;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;

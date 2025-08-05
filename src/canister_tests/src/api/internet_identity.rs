@@ -6,7 +6,9 @@ use internet_identity_interface::internet_identity::types::{
     self, CredentialId, DeviceKeyWithAnchor, IdentityNumber, OpenIdCredentialKey,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, RejectResponse, PocketIc};
+use pocket_ic::{
+    call_candid, call_candid_as, query_candid, query_candid_as, PocketIc, RejectResponse,
+};
 
 /// The experimental v2 API
 pub mod api_v2;
@@ -370,8 +372,10 @@ pub fn openid_prepare_delegation(
     jwt: &str,
     salt: &[u8; 32],
     session_key: &types::SessionKey,
-) -> Result<Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>, RejectResponse>
-{
+) -> Result<
+    Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
     call_candid_as(
         env,
         canister_id,
