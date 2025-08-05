@@ -1,4 +1,4 @@
-import { anonymousActor, canisterConfig } from "$lib/globals";
+import { anonymousActor } from "$lib/globals";
 import { get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { authenticatedStore } from "$lib/stores/authentication.store";
