@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import ContinueFromExistingDevice from "$lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte";
   import WaitingForExistingDevice from "$lib/components/wizards/registerAccessMethod/views/WaitingForExistingDevice.svelte";
+  import { canisterConfig } from "$lib/globals";
 
   interface Props {
     registrationId?: string;
@@ -14,7 +15,9 @@
 
   let { registrationId, onRegistered, onError }: Props = $props();
 
-  const registerAccessMethodFlow = new RegisterAccessMethodFlow();
+  const registerAccessMethodFlow = new RegisterAccessMethodFlow(
+    canisterConfig.feature_flag_continue_from_another_device[0] === true,
+  );
 
   const handleCreatePasskey = async () => {
     try {

@@ -15,6 +15,11 @@ export class ConfirmAccessMethodFlow {
   #waitingForDevice?: AuthnMethodData;
   #newDeviceLink = $state<URL>();
   #sessionExpiration = $state<bigint>();
+  readonly #sessionAvailable: boolean;
+
+  constructor(sessionAvailable: boolean) {
+    this.#sessionAvailable = sessionAvailable;
+  }
 
   get view() {
     return this.#view;
@@ -51,9 +56,7 @@ export class ConfirmAccessMethodFlow {
         if (isNullish(info.authn_method_registration[0])) {
           break;
         }
-        if (
-          canisterConfig.feature_flag_continue_from_another_device[0] === true
-        ) {
+        if (this.#sessionAvailable) {
           // Show confirmation code view if we got a pending session
           if (nonNullish(info.authn_method_registration[0]?.session[0])) {
             this.#sessionExpiration =
@@ -87,7 +90,7 @@ export class ConfirmAccessMethodFlow {
       .then(throwCanisterError);
     this.#view = "finishOnNewDevice";
 
-    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+    if (this.#sessionAvailable) {
       if (isNullish(this.#sessionExpiration)) {
         throw new Error("Session expiration is missing");
       }

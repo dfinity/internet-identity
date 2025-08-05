@@ -26,6 +26,11 @@ export class RegisterAccessMethodFlow {
   #identityName = $state<string>();
   #identityNumber = $state<bigint>();
   #existingDeviceLink = $state<URL>();
+  readonly #sessionAvailable: boolean;
+
+  constructor(sessionAvailable: boolean) {
+    this.#sessionAvailable = sessionAvailable;
+  }
 
   get view() {
     return this.#view;
@@ -60,9 +65,7 @@ export class RegisterAccessMethodFlow {
       )[0];
       if (nonNullish(identityNumber)) {
         this.#identityNumber = identityNumber;
-        if (
-          canisterConfig.feature_flag_continue_from_another_device[0] === true
-        ) {
+        if (this.#sessionAvailable) {
           return this.#registerSession(identityNumber);
         }
         return this.#registerTempKey(identityNumber);
@@ -136,9 +139,7 @@ export class RegisterAccessMethodFlow {
         await session.actor.authn_method_session_info(identityNumber);
       // Show confirm sign-in view if session has been confirmed
       if (nonNullish(info)) {
-        if (
-          canisterConfig.feature_flag_continue_from_another_device[0] !== true
-        ) {
+        if (!this.#sessionAvailable) {
           const identity = await authenticateWithSession({ session });
           authenticationStore.set({
             identity,
@@ -183,7 +184,7 @@ export class RegisterAccessMethodFlow {
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
-    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+    if (this.#sessionAvailable) {
       await session.actor
         .authn_method_registration_mode_exit(this.#identityNumber, [
           authnMethodData,
