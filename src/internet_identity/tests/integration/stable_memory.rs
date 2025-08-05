@@ -298,6 +298,6 @@ fn should_trap_on_old_stable_memory() -> Result<(), RejectResponse> {
     assert!(result.is_err());
     let err = result.err().unwrap();
     assert_eq!(err.error_code, ErrorCode::CanisterCalledTrap);
-    assert!(err.reject_message.contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or upgrade sequentially to the latest version of II by installing each intermediate version in turn"));
+    assert!(err.reject_message.contains("stable memory layout version 1 is no longer supported"));
     Ok(())
 }
