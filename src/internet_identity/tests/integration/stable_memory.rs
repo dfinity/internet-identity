@@ -298,6 +298,8 @@ fn should_trap_on_old_stable_memory() -> Result<(), RejectResponse> {
     assert!(result.is_err());
     let err = result.err().unwrap();
     assert_eq!(err.error_code, ErrorCode::CanisterCalledTrap);
-    assert!(err.reject_message.contains("stable memory layout version 1 is no longer supported"));
+    assert!(err
+        .reject_message
+        .contains("stable memory layout version 1 is no longer supported"));
     Ok(())
 }
