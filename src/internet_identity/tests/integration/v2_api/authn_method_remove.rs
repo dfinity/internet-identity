@@ -4,12 +4,12 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 
 #[test]
-fn should_remove_authn_method() -> Result<(), CallError> {
+fn should_remove_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);
@@ -43,7 +43,7 @@ fn should_remove_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_remove_authn_method() -> Result<(), CallError> {
+fn should_require_authentication_to_remove_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = sample_pubkey_authn_method(1);
@@ -68,7 +68,7 @@ fn should_require_authentication_to_remove_authn_method() -> Result<(), CallErro
 /// Verifies that the even last authn_method can be removed.
 /// This behaviour should be changed because it makes anchors unusable, see GIX-745.
 #[test]
-fn should_remove_last_authn_method() -> Result<(), CallError> {
+fn should_remove_last_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = sample_pubkey_authn_method(1);

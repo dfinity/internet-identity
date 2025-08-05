@@ -6,14 +6,14 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 
 /// Basic upgrade test.
 #[test]
-fn ii_upgrade_works() -> Result<(), CallError> {
+fn ii_upgrade_works() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     env.upgrade_canister(
@@ -41,7 +41,7 @@ fn ii_upgrade_retains_anchors() {
 
 /// Test to verify that anchor numbers are unchanged by changing the user range.
 #[test]
-fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
+fn should_retain_anchor_on_user_range_change() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
     let user_number = flows::register_anchor(&env, canister_id);
@@ -61,7 +61,7 @@ fn should_retain_anchor_on_user_range_change() -> Result<(), CallError> {
 
 /// Test to verify that anchors number range can be changed on upgrade.
 #[test]
-fn should_allow_change_of_user_range_on_upgrade() -> Result<(), CallError> {
+fn should_allow_change_of_user_range_on_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -189,7 +189,7 @@ fn upgrade_and_rollback_keeps_anchor_intact() {
 /// Verifies that an anchor that was created with the new version of II can still be used when
 /// II is rolled back to the previous version.
 #[test]
-fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
+fn should_keep_new_anchor_across_rollback() -> Result<(), RejectResponse> {
     let frontend_hostname = "frontend.com";
     let env = env();
 

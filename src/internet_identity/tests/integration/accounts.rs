@@ -18,12 +18,12 @@ use internet_identity_interface::internet_identity::types::{
     AccountDelegationError, AccountInfo, AccountUpdate, GetDelegationResponse,
     PrepareAccountDelegation,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 
 /// Verifies that one account can be created
 #[test]
-fn should_create_account() -> Result<(), CallError> {
+fn should_create_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -55,7 +55,7 @@ fn should_create_account() -> Result<(), CallError> {
 
 /// Verifies that multiple accounts can be created and read
 #[test]
-fn should_list_accounts() -> Result<(), CallError> {
+fn should_list_accounts() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -142,7 +142,7 @@ fn should_list_accounts() -> Result<(), CallError> {
 
 /// Verifies that a default account is returned even if no account is created
 #[test]
-fn should_list_default_account() -> Result<(), CallError> {
+fn should_list_default_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -173,7 +173,7 @@ fn should_list_default_account() -> Result<(), CallError> {
 
 /// Verifies that only owned accounts can be read
 #[test]
-fn should_list_only_own_accounts() -> Result<(), CallError> {
+fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -285,7 +285,7 @@ fn should_list_only_own_accounts() -> Result<(), CallError> {
 
 /// Verifies that a created account can be updated
 #[test]
-fn should_update_account() -> Result<(), CallError> {
+fn should_update_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -373,7 +373,7 @@ fn should_not_update_numberless_account_twice() {
 
 /// Verifies that a default account can be updated
 #[test]
-fn should_update_default_account() -> Result<(), CallError> {
+fn should_update_default_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -509,7 +509,7 @@ fn should_only_update_owned_account() {
 
 /// Verifies that valid account delegations are issued.
 #[test]
-fn should_get_valid_account_delegation() -> Result<(), CallError> {
+fn should_get_valid_account_delegation() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -549,7 +549,7 @@ fn should_get_valid_account_delegation() -> Result<(), CallError> {
 
 /// Verifies that default account delegation principals are identical to regular delegation principals.
 #[test]
-fn should_get_matching_principals() -> Result<(), CallError> {
+fn should_get_matching_principals() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -632,7 +632,7 @@ fn should_get_matching_principals() -> Result<(), CallError> {
 
 /// Verifies that valid account delegations are issued with custom expiration.
 #[test]
-fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), CallError> {
+fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -674,7 +674,7 @@ fn should_get_valid_account_delegation_with_custom_expiration() -> Result<(), Ca
 
 /// Verifies that account delegations are valid at most for 30 days.
 #[test]
-fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), CallError> {
+fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -720,7 +720,7 @@ fn should_shorten_account_delegation_expiration_greater_max_ttl() -> Result<(), 
 
 /// Verifies that account delegations can be requested in parallel.
 #[test]
-fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
+fn should_get_multiple_valid_account_delegations() -> Result<(), RejectResponse> {
     let env = env();
     let root_key = env.root_key().unwrap();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -804,7 +804,7 @@ fn should_get_multiple_valid_account_delegations() -> Result<(), CallError> {
 
 /// Verifies that different front-ends yield different principals for account delegations.
 #[test]
-fn should_issue_different_principals_for_account_delegations() -> Result<(), CallError> {
+fn should_issue_different_principals_for_account_delegations() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -852,7 +852,7 @@ fn should_issue_different_principals_for_account_delegations() -> Result<(), Cal
 
 /// Verifies that prepare_account_delegation can only be called by the matching user.
 #[test]
-fn can_not_prepare_account_delegation_for_different_user() -> Result<(), CallError> {
+fn can_not_prepare_account_delegation_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -880,7 +880,7 @@ fn can_not_prepare_account_delegation_for_different_user() -> Result<(), CallErr
 
 /// Verifies that get_account_delegation can only be called by the matching user.
 #[test]
-fn can_not_get_account_delegation_for_different_user() -> Result<(), CallError> {
+fn can_not_get_account_delegation_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -921,7 +921,7 @@ fn can_not_get_account_delegation_for_different_user() -> Result<(), CallError> 
 
 /// Verifies that there is a graceful failure if get_account_delegation is called after the expiration.
 #[test]
-fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError> {
+fn should_not_get_account_delegation_after_expiration() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -958,7 +958,7 @@ fn should_not_get_account_delegation_after_expiration() -> Result<(), CallError>
 
 /// Verifies that different accounts on the same origin yield different principals.
 #[test]
-fn should_issue_different_principals_for_different_accounts() -> Result<(), CallError> {
+fn should_issue_different_principals_for_different_accounts() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);

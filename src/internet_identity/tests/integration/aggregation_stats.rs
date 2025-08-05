@@ -10,7 +10,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, IdentityNumber, MetadataEntryV2,
 };
-use pocket_ic::{CallError, PocketIc};
+use pocket_ic::{RejectResponse, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -20,7 +20,7 @@ const PD_COUNT: &str = "prepare_delegation_count";
 const PD_SESS_SEC: &str = "prepare_delegation_session_seconds";
 
 #[test]
-fn should_report_expected_aggregations() -> Result<(), CallError> {
+fn should_report_expected_aggregations() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     for ii_origin in ["internetcomputer.org", "ic0.app", "other"] {
@@ -55,7 +55,7 @@ fn should_report_expected_aggregations() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_not_report_empty_aggregations() -> Result<(), CallError> {
+fn should_not_report_empty_aggregations() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
@@ -101,7 +101,7 @@ fn should_not_report_empty_aggregations() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_report_at_most_100_entries() -> Result<(), CallError> {
+fn should_report_at_most_100_entries() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
@@ -128,7 +128,7 @@ fn should_report_at_most_100_entries() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_remove_at_most_100_entries_24h() -> Result<(), CallError> {
+fn should_remove_at_most_100_entries_24h() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
@@ -170,7 +170,7 @@ fn should_remove_at_most_100_entries_24h() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_prune_at_most_100_entries_30d() -> Result<(), CallError> {
+fn should_prune_at_most_100_entries_30d() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
@@ -212,9 +212,9 @@ fn should_prune_at_most_100_entries_30d() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
+fn should_keep_aggregations_across_upgrades() -> Result<(), RejectResponse> {
     const II_ORIGIN: &str = "ic0.app";
-    fn assert_expected_state(env: &PocketIc, canister_id: CanisterId) -> Result<(), CallError> {
+    fn assert_expected_state(env: &PocketIc, canister_id: CanisterId) -> Result<(), RejectResponse> {
         let aggregations = api::stats(env, canister_id)?.event_aggregations;
         assert_expected_aggregation(
             &aggregations,
@@ -265,7 +265,7 @@ fn should_keep_aggregations_across_upgrades() -> Result<(), CallError> {
 }
 
 #[test]
-fn crash_mem_backup() -> Result<(), CallError> {
+fn crash_mem_backup() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
     restore_compressed_stable_memory(
@@ -314,7 +314,7 @@ fn delegation_for_origin(
     canister_id: CanisterId,
     identity_nr: IdentityNumber,
     frontend_hostname: &str,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     api::prepare_delegation(
         env,
         canister_id,

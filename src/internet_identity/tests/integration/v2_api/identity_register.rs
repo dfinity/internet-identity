@@ -16,7 +16,7 @@ use internet_identity_interface::internet_identity::types::{
     InternetIdentityInit, MetadataEntryV2, RateLimitConfig, RegistrationFlowNextStep,
     StaticCaptchaTrigger,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
@@ -248,7 +248,7 @@ fn should_fail_on_invalid_metadata() {
 }
 
 #[test]
-fn should_trigger_rate_limit_on_too_many_flows() -> Result<(), CallError> {
+fn should_trigger_rate_limit_on_too_many_flows() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,

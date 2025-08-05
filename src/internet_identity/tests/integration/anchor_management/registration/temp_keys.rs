@@ -11,14 +11,14 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Challenge, ChallengeAttempt, DeviceData, RegisterResponse,
 };
-use pocket_ic::{CallError, ErrorCode, PocketIc};
+use pocket_ic::{RejectResponse, ErrorCode, PocketIc};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 /// Tests successful registration with a temporary key.
 #[test]
-fn should_register_anchor_with_temp_key() -> Result<(), CallError> {
+fn should_register_anchor_with_temp_key() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let temp_key = test_principal(1);
@@ -32,7 +32,7 @@ fn should_register_anchor_with_temp_key() -> Result<(), CallError> {
 
 /// Tests that the temporary key is removed on device deletion.
 #[test]
-fn should_remove_temp_key_on_device_deletion() -> Result<(), CallError> {
+fn should_remove_temp_key_on_device_deletion() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let temp_key = test_principal(1);
@@ -53,7 +53,7 @@ fn should_remove_temp_key_on_device_deletion() -> Result<(), CallError> {
 
 /// Tests that the temporary key is removed on device replacement.
 #[test]
-fn should_remove_temp_key_on_device_replacement() -> Result<(), CallError> {
+fn should_remove_temp_key_on_device_replacement() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let temp_key = test_principal(1);
@@ -81,7 +81,7 @@ fn should_remove_temp_key_on_device_replacement() -> Result<(), CallError> {
 
 /// Tests that the temp key expires after 10 minutes.
 #[test]
-fn should_expire_temp_key() -> Result<(), CallError> {
+fn should_expire_temp_key() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let temp_key = test_principal(1);
@@ -102,7 +102,7 @@ fn should_expire_temp_key() -> Result<(), CallError> {
 
 /// Tests that the temp key must be different than the device key.
 #[test]
-fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), CallError> {
+fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let device = device_data_1();
@@ -127,7 +127,7 @@ fn should_not_allow_temp_key_to_equal_device_key() -> Result<(), CallError> {
 
 /// Tests that the temp key is bound to a specific anchor even if the same device is used on multiple anchors.
 #[test]
-fn should_not_allow_temp_key_for_different_anchor() -> Result<(), CallError> {
+fn should_not_allow_temp_key_for_different_anchor() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let device = device_data_1();
@@ -148,7 +148,7 @@ fn should_not_allow_temp_key_for_different_anchor() -> Result<(), CallError> {
 /// Tests that the same device can be used for multiple anchor registrations with different temp keys
 /// and that the temp keys are bound to their respective anchors.
 #[test]
-fn should_separate_temp_keys_by_anchor_for_same_device() -> Result<(), CallError> {
+fn should_separate_temp_keys_by_anchor_for_same_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let device = device_data_1();
@@ -178,7 +178,7 @@ fn should_separate_temp_keys_by_anchor_for_same_device() -> Result<(), CallError
 
 /// Tests that the number of temp keys is exposed as a metric.
 #[test]
-fn should_provide_temp_keys_metric() -> Result<(), CallError> {
+fn should_provide_temp_keys_metric() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 

@@ -8,14 +8,14 @@ use canister_tests::framework::{env, expect_user_error_with_message, install_ii_
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodReplaceError, MetadataEntryV2,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 #[test]
-fn should_replace_authn_method() -> Result<(), CallError> {
+fn should_replace_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);
@@ -46,7 +46,7 @@ fn should_replace_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_replace_authn_method() -> Result<(), CallError> {
+fn should_require_authentication_to_replace_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);
@@ -81,7 +81,7 @@ fn should_require_authentication_to_replace_authn_method() -> Result<(), CallErr
 }
 
 #[test]
-fn should_validate_metadata_of_new_authn_method() -> Result<(), CallError> {
+fn should_validate_metadata_of_new_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);

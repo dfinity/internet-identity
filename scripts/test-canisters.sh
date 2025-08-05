@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-POCKET_IC_SERVER_VERSION=6.0.0
+POCKET_IC_SERVER_VERSION=9.0.3
 POCKET_IC_SERVER_PATH="pocket-ic"
 PREVIOUS_II_WASM_PATH="internet_identity_previous.wasm.gz"
 PREVIOUS_ARCHIVE_WASM_PATH="archive_previous.wasm.gz"

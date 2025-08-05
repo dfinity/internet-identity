@@ -29,7 +29,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use pocket_ic::{call_candid, call_candid_as};
-use pocket_ic::{query_candid_as, CallError, PocketIc};
+use pocket_ic::{query_candid_as, RejectResponse, PocketIc};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -115,7 +115,7 @@ mod api {
         env: &PocketIc,
         canister_id: CanisterId,
         config: &IssuerInit,
-    ) -> Result<(), CallError> {
+    ) -> Result<(), RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -130,7 +130,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         consent_message_request: &Icrc21VcConsentMessageRequest,
-    ) -> Result<Result<Icrc21ConsentInfo, Icrc21Error>, CallError> {
+    ) -> Result<Result<Icrc21ConsentInfo, Icrc21Error>, RejectResponse> {
         call_candid_as(
             env,
             canister_id,
@@ -146,7 +146,7 @@ mod api {
         env: &PocketIc,
         canister_id: CanisterId,
         derivation_origin_req: &DerivationOriginRequest,
-    ) -> Result<Result<DerivationOriginData, DerivationOriginError>, CallError> {
+    ) -> Result<Result<DerivationOriginData, DerivationOriginError>, RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -162,7 +162,7 @@ mod api {
         canister_id: CanisterId,
         frontend_hostname: &str,
         derivation_origin: &str,
-    ) -> Result<(), CallError> {
+    ) -> Result<(), RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -176,7 +176,7 @@ mod api {
         env: &PocketIc,
         canister_id: CanisterId,
         alternative_origins: &str,
-    ) -> Result<(), CallError> {
+    ) -> Result<(), RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -190,7 +190,7 @@ mod api {
         env: &PocketIc,
         canister_id: CanisterId,
         employee_id: Principal,
-    ) -> Result<String, CallError> {
+    ) -> Result<String, RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -205,7 +205,7 @@ mod api {
         env: &PocketIc,
         canister_id: CanisterId,
         graduate_id: Principal,
-    ) -> Result<String, CallError> {
+    ) -> Result<String, RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -220,7 +220,7 @@ mod api {
         env: &PocketIc,
         canister_id: CanisterId,
         adult_id: Principal,
-    ) -> Result<String, CallError> {
+    ) -> Result<String, RejectResponse> {
         call_candid(
             env,
             canister_id,
@@ -236,7 +236,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         prepare_credential_request: &PrepareCredentialRequest,
-    ) -> Result<Result<PreparedCredentialData, IssueCredentialError>, CallError> {
+    ) -> Result<Result<PreparedCredentialData, IssueCredentialError>, RejectResponse> {
         call_candid_as(
             env,
             canister_id,
@@ -253,7 +253,7 @@ mod api {
         canister_id: CanisterId,
         sender: Principal,
         get_credential_request: &GetCredentialRequest,
-    ) -> Result<Result<IssuedCredentialData, IssueCredentialError>, CallError> {
+    ) -> Result<Result<IssuedCredentialData, IssueCredentialError>, RejectResponse> {
         query_candid_as(
             env,
             canister_id,
@@ -684,7 +684,7 @@ fn should_prepare_degree_credential_for_authorized_principal() {
 
 /// Verifies that different credentials are being created including II interactions.
 #[test]
-fn should_issue_credential_e2e() -> Result<(), CallError> {
+fn should_issue_credential_e2e() -> Result<(), RejectResponse> {
     let env = env();
     let ii_id = install_canister(&env, II_WASM.clone());
     let root_key = env.root_key().unwrap();
@@ -832,7 +832,7 @@ fn should_set_alternative_origins() {
 
 /// Verifies that the expected assets is delivered and certified.
 #[test]
-fn issuer_canister_serves_http_assets() -> Result<(), CallError> {
+fn issuer_canister_serves_http_assets() -> Result<(), RejectResponse> {
     fn verify_response_certification(
         env: &PocketIc,
         canister_id: CanisterId,

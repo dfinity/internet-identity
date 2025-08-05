@@ -12,14 +12,14 @@ use internet_identity_interface::internet_identity::types::{
     OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
-use pocket_ic::{CallError, PocketIc};
+use pocket_ic::{PocketIc, RejectResponse};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 /// Verifies that Google Accounts can be added
 #[test]
-fn can_link_google_account() -> Result<(), CallError> {
+fn can_link_google_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_test_data();
@@ -41,8 +41,7 @@ fn can_link_google_account() -> Result<(), CallError> {
         identity_number,
         &jwt,
         &salt,
-    )?
-    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
+    )?;
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -54,7 +53,7 @@ fn can_link_google_account() -> Result<(), CallError> {
 
 /// Verifies that Google Accounts can be removed
 #[test]
-fn can_remove_google_account() -> Result<(), CallError> {
+fn can_remove_google_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
     let (jwt, salt, claims, test_time, test_principal, test_authn_method) = openid_test_data();
@@ -76,8 +75,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
         identity_number,
         &jwt,
         &salt,
-    )?
-    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
+    )?;
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -90,8 +88,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
         test_principal,
         identity_number,
         &claims.key(),
-    )?
-    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
+    )?;
 
     // Try to get delegation based on credential, should fail now
     // Create session key
@@ -121,7 +118,7 @@ fn can_remove_google_account() -> Result<(), CallError> {
 
 /// Verifies that valid JWT delegations are issued based on added credential.
 #[test]
-fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
+fn can_get_valid_jwt_delegation() -> Result<(), RejectResponse> {
     let env = env();
 
     let canister_id = setup_canister(&env);
@@ -142,8 +139,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
         identity_number,
         &jwt,
         &salt,
-    )?
-    .map_err(|e| CallError::Reject(format!("{e:?}")))?;
+    )?;
 
     // Create session key
     let pub_session_key = ByteBuf::from("session public key");
@@ -199,7 +195,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), CallError> {
 
 /// Verifies that you can register with google
 #[test]
-fn can_register_with_google() -> Result<(), CallError> {
+fn can_register_with_google() -> Result<(), RejectResponse> {
     let env = env();
 
     let canister_id = setup_canister(&env);
@@ -248,7 +244,7 @@ fn cannot_register_with_faulty_jwt() {
 
 /// Verifies that JWT cannot be maliciously gotten by reassociating the credential and anchors between the prepare and get calls.
 #[test]
-fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError> {
+fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectResponse> {
     let env = env();
 
     let canister_id = setup_canister(&env);
@@ -281,8 +277,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         identity_number,
         &jwt,
         &salt,
-    )?
-    .map_err(|e| CallError::Reject(format!("Error at first add: {e:?}")))?;
+    )?;
 
     // Create session key
     let pub_session_key = ByteBuf::from("session public key");
@@ -311,8 +306,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         test_principal,
         identity_number,
         &claims.key(),
-    )?
-    .map_err(|e| CallError::Reject(format!("Error at remove: {e:?}")))?;
+    )?;
 
     env.advance_time(second_time_to_advance);
 
@@ -326,8 +320,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         second_identity_number,
         &second_jwt,
         &second_salt,
-    )?
-    .map_err(|e| CallError::Reject(format!("Error at second add: {e:?}")))?;
+    )?;
 
     // Get the delegation
     match api::openid_get_delegation(
@@ -339,9 +332,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), CallError
         &pub_session_key, // Note that this only works if we have access to the original session key
         &prepare_response.expiration,
     )? {
-        Ok(_) => Err(CallError::Reject(
-            "We shouldn't be able to get this delegation!".to_string(),
-        )),
+        Ok(_) => panic!("Should not have been able to get delegation"),
         Err(_) => Ok(()),
     }
 }
@@ -565,12 +556,10 @@ fn number_of_openid_credentials(
     canister_id: Principal,
     sender: Principal,
     identity_number: u64,
-) -> Result<usize, CallError> {
-    let openid_credentials = api::get_anchor_info(env, canister_id, sender, identity_number)
-        .map_err(|err| CallError::Reject(format!("{err:?}")))?
+) -> Result<usize, RejectResponse> {
+    let openid_credentials = api::get_anchor_info(env, canister_id, sender, identity_number)?
         .openid_credentials
-        .ok_or("Could not fetch credentials!")
-        .map_err(|err| CallError::Reject(format!("{err:?}")))?;
+        .expect("Could not fetch credentials!");
 
     Ok(openid_credentials.len())
 }

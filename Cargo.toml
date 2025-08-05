@@ -35,7 +35,7 @@ ic-response-verification = "2.6"
 ic-stable-structures = "0.6"
 ic-verifiable-credentials = { git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "b74c746ea5361af3da207a2c957be4a951f7a72c" }
 ic-canister-sig-creation = "1.1"
-pocket-ic = "5.0"
+pocket-ic = "9.0.2"
 base64 = "0.22"
 hex = "0.4"
 include_dir = "0.7"

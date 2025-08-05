@@ -7,11 +7,11 @@ use canister_tests::framework::{env, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{
     IdentityMetadataReplaceError, MetadataEntryV2,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use std::collections::HashMap;
 
 #[test]
-fn should_write_metadata() -> Result<(), CallError> {
+fn should_write_metadata() -> Result<(), RejectResponse> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -46,7 +46,7 @@ fn should_write_metadata() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_replace_identity_metadata() -> Result<(), CallError> {
+fn should_require_authentication_to_replace_identity_metadata() -> Result<(), RejectResponse> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -74,7 +74,7 @@ fn should_require_authentication_to_replace_identity_metadata() -> Result<(), Ca
 }
 
 #[test]
-fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
+fn should_not_write_too_large_identity_metadata_map() -> Result<(), RejectResponse> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();

@@ -5,7 +5,7 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::GetDelegationResponse;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use regex::Regex;
 use serde_bytes::ByteBuf;
@@ -13,7 +13,7 @@ use std::time::Duration;
 
 /// Verifies that valid delegations are issued.
 #[test]
-fn should_get_valid_delegation() -> Result<(), CallError> {
+fn should_get_valid_delegation() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -60,7 +60,7 @@ fn should_get_valid_delegation() -> Result<(), CallError> {
 
 /// Verifies that non-default expirations are respected.
 #[test]
-fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError> {
+fn should_get_valid_delegation_with_custom_expiration() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -107,7 +107,7 @@ fn should_get_valid_delegation_with_custom_expiration() -> Result<(), CallError>
 
 /// Verifies that the delegations are valid at most for 30 days.
 #[test]
-fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
+fn should_shorten_expiration_greater_max_ttl() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -155,7 +155,7 @@ fn should_shorten_expiration_greater_max_ttl() -> Result<(), CallError> {
 
 /// Verifies that delegations can be requested in parallel.
 #[test]
-fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
+fn should_get_multiple_valid_delegations() -> Result<(), RejectResponse> {
     let env = env();
     let root_key = env.root_key().unwrap();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -235,7 +235,7 @@ fn should_get_multiple_valid_delegations() -> Result<(), CallError> {
 
 /// Verifies that an anchor that was registered using II_WASM_PREVIOUS gets valid delegations after upgrading to the current version.
 #[test]
-fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), CallError> {
+fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(
         &env,
@@ -288,7 +288,7 @@ fn should_get_valid_delegation_for_old_anchor_after_ii_upgrade() -> Result<(), C
 
 /// Verifies that different front-ends yield different principals.
 #[test]
-fn should_issue_different_principals() -> Result<(), CallError> {
+fn should_issue_different_principals() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -321,7 +321,7 @@ fn should_issue_different_principals() -> Result<(), CallError> {
 
 /// Verifies that there is a graceful failure if II gets upgraded between prepare_delegation and get_delegation.
 #[test]
-fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError> {
+fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -358,7 +358,7 @@ fn should_not_get_prepared_delegation_after_ii_upgrade() -> Result<(), CallError
 
 /// Verifies that there is a graceful failure if get_delegation is called after the expiration of the delegation.
 #[test]
-fn should_not_get_delegation_after_expiration() -> Result<(), CallError> {
+fn should_not_get_delegation_after_expiration() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -429,7 +429,7 @@ fn can_not_prepare_delegation_for_different_user() {
 
 /// Verifies that get_delegation can only be called by the matching user.
 #[test]
-fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
+fn can_not_get_delegation_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -465,7 +465,7 @@ fn can_not_get_delegation_for_different_user() -> Result<(), CallError> {
 
 /// Verifies that get_principal and prepare_delegation return the same principal.
 #[test]
-fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
+fn get_principal_should_match_prepare_delegation() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -495,7 +495,7 @@ fn get_principal_should_match_prepare_delegation() -> Result<(), CallError> {
 
 /// Verifies that get_principal returns different principals for different front end host names.
 #[test]
-fn should_return_different_principals_for_different_frontends() -> Result<(), CallError> {
+fn should_return_different_principals_for_different_frontends() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
@@ -525,7 +525,7 @@ fn should_return_different_principals_for_different_frontends() -> Result<(), Ca
 
 /// Verifies that get_principal returns different principals for different anchors.
 #[test]
-fn should_return_different_principals_for_different_users() -> Result<(), CallError> {
+fn should_return_different_principals_for_different_users() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
