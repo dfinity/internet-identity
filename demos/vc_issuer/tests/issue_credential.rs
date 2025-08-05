@@ -29,7 +29,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use lazy_static::lazy_static;
 use pocket_ic::{call_candid, call_candid_as};
-use pocket_ic::{query_candid_as, RejectResponse, PocketIc};
+use pocket_ic::{query_candid_as, PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::path::PathBuf;
