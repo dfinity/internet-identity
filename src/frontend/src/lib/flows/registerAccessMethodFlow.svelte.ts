@@ -139,13 +139,6 @@ export class RegisterAccessMethodFlow {
         await session.actor.authn_method_session_info(identityNumber);
       // Show confirm sign-in view if session has been confirmed
       if (nonNullish(info)) {
-        if (!this.#sessionAvailable) {
-          const identity = await authenticateWithSession({ session });
-          authenticationStore.set({
-            identity,
-            identityNumber,
-          });
-        }
         this.#identityName = info.name[0] ?? identityNumber.toString(10);
         this.#view = "confirmSignIn";
         return;
