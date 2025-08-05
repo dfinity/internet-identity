@@ -1,4 +1,4 @@
-import { anonymousActor } from "$lib/globals";
+import { anonymousActor, canisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { authenticatedStore } from "$lib/stores/authentication.store";
@@ -14,6 +14,7 @@ export class ConfirmAccessMethodFlow {
   >("continueOnNewDevice");
   #waitingForDevice?: AuthnMethodData;
   #newDeviceLink = $state<URL>();
+  #sessionExpiration = $state<bigint>();
 
   get view() {
     return this.#view;
@@ -50,12 +51,24 @@ export class ConfirmAccessMethodFlow {
         if (isNullish(info.authn_method_registration[0])) {
           break;
         }
-        // Show confirmation code view if we got a pending authn method
-        if (nonNullish(info.authn_method_registration[0]?.authn_method[0])) {
-          this.#waitingForDevice =
-            info.authn_method_registration[0]?.authn_method[0];
-          this.#view = "enterConfirmationCode";
-          break;
+        if (
+          canisterConfig.feature_flag_continue_from_another_device[0] === true
+        ) {
+          // Show confirmation code view if we got a pending session
+          if (nonNullish(info.authn_method_registration[0]?.session[0])) {
+            this.#sessionExpiration =
+              info.authn_method_registration[0].expiration;
+            this.#view = "enterConfirmationCode";
+            break;
+          }
+        } else {
+          // Show confirmation code view if we got a pending authn method
+          if (nonNullish(info.authn_method_registration[0]?.authn_method[0])) {
+            this.#waitingForDevice =
+              info.authn_method_registration[0]?.authn_method[0];
+            this.#view = "enterConfirmationCode";
+            break;
+          }
         }
         // Wait before retrying
         await waitFor(POLL_INTERVAL);
@@ -73,6 +86,24 @@ export class ConfirmAccessMethodFlow {
       .authn_method_confirm(identityNumber, confirmationCode)
       .then(throwCanisterError);
     this.#view = "finishOnNewDevice";
+
+    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+      if (isNullish(this.#sessionExpiration)) {
+        throw new Error("Session expiration is missing");
+      }
+      while (BigInt(Date.now()) * BigInt(1_000_000) < this.#sessionExpiration) {
+        const info = await actor
+          .identity_info(identityNumber)
+          .then(throwCanisterError);
+        // Return when registration window is closed
+        if (isNullish(info.authn_method_registration[0])) {
+          return;
+        }
+        // Wait before retrying
+        await waitFor(POLL_INTERVAL);
+      }
+      throw new Error("Registration not completed within time window");
+    }
 
     if (
       isNullish(this.#waitingForDevice) ||

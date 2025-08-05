@@ -24,6 +24,7 @@ export class RegisterAccessMethodFlow {
   >("continueFromExistingDevice");
   #confirmationCode = $state<string>();
   #identityName = $state<string>();
+  #identityNumber = $state<bigint>();
   #existingDeviceLink = $state<URL>();
 
   get view() {
@@ -58,6 +59,12 @@ export class RegisterAccessMethodFlow {
         await anonymousActor.lookup_by_registration_mode_id(registrationId)
       )[0];
       if (nonNullish(identityNumber)) {
+        this.#identityNumber = identityNumber;
+        if (
+          canisterConfig.feature_flag_continue_from_another_device[0] === true
+        ) {
+          return this.#registerSession(identityNumber);
+        }
         return this.#registerTempKey(identityNumber);
       }
       // Wait before retrying
@@ -115,10 +122,45 @@ export class RegisterAccessMethodFlow {
     throw new Error("Registration not completed within time window");
   };
 
+  #registerSession = async (identityNumber: bigint): Promise<void> => {
+    const session = get(sessionStore);
+    const confirmation = await session.actor
+      .authn_method_session_register(identityNumber)
+      .then(throwCanisterError);
+    const expiration = confirmation.expiration;
+    this.#confirmationCode = confirmation.confirmation_code;
+    this.#view = "confirmDevice";
+
+    while (BigInt(Date.now()) * BigInt(1_000_000) < expiration) {
+      const [info] =
+        await session.actor.authn_method_session_info(identityNumber);
+      // Show confirm sign-in view if session has been confirmed
+      if (nonNullish(info)) {
+        if (
+          canisterConfig.feature_flag_continue_from_another_device[0] !== true
+        ) {
+          const identity = await authenticateWithSession({ session });
+          authenticationStore.set({
+            identity,
+            identityNumber,
+          });
+        }
+        this.#identityName = info.name[0] ?? identityNumber.toString(10);
+        this.#view = "confirmSignIn";
+        return;
+      }
+      // Wait before retrying
+      await waitFor(POLL_INTERVAL);
+    }
+    throw new Error("Registration not completed within time window");
+  };
+
   createPasskey = async (): Promise<bigint> => {
     const session = get(sessionStore);
-    const { actor, identityNumber } = get(authenticatedStore);
-    const name = this.#identityName ?? identityNumber.toString(10);
+    if (isNullish(this.#identityNumber)) {
+      throw new Error("Identity number is missing");
+    }
+    const name = this.#identityName ?? this.#identityNumber.toString(10);
     const passkeyIdentity =
       features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
         ? await DiscoverableDummyIdentity.createNew(name)
@@ -141,15 +183,28 @@ export class RegisterAccessMethodFlow {
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
-    await actor
-      .authn_method_replace(
-        identityNumber,
-        new Uint8Array(session.identity.getPublicKey().toDer()),
-        authnMethodData,
-      )
-      .then(throwCanisterError);
+    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
+      await session.actor
+        .authn_method_registration_mode_exit(this.#identityNumber, [
+          authnMethodData,
+        ])
+        .then(throwCanisterError);
+      const identity = await authenticateWithSession({ session });
+      authenticationStore.set({
+        identity,
+        identityNumber: this.#identityNumber,
+      });
+    } else {
+      await get(authenticatedStore)
+        .actor.authn_method_replace(
+          this.#identityNumber,
+          new Uint8Array(session.identity.getPublicKey().toDer()),
+          authnMethodData,
+        )
+        .then(throwCanisterError);
+    }
     lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber,
+      identityNumber: this.#identityNumber,
       name,
       authMethod: {
         passkey: {
@@ -157,6 +212,6 @@ export class RegisterAccessMethodFlow {
         },
       },
     });
-    return identityNumber;
+    return this.#identityNumber;
   };
 }
