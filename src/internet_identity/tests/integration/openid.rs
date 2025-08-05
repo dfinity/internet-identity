@@ -34,7 +34,7 @@ fn can_link_google_account() -> Result<(), RejectResponse> {
         0
     );
 
-    api::openid_credential_add(
+    let _ = api::openid_credential_add(
         &env,
         canister_id,
         test_principal,
@@ -68,7 +68,7 @@ fn can_remove_google_account() -> Result<(), RejectResponse> {
         0
     );
 
-    api::openid_credential_add(
+    let _ = api::openid_credential_add(
         &env,
         canister_id,
         test_principal,
@@ -82,7 +82,7 @@ fn can_remove_google_account() -> Result<(), RejectResponse> {
         1
     );
 
-    api::openid_credential_remove(
+    let _ = api::openid_credential_remove(
         &env,
         canister_id,
         test_principal,
@@ -132,7 +132,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), RejectResponse> {
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
 
-    api::openid_credential_add(
+    let _ = api::openid_credential_add(
         &env,
         canister_id,
         test_principal,
@@ -270,7 +270,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
 
     env.advance_time(time_to_advance);
 
-    api::openid_credential_add(
+    let _ = api::openid_credential_add(
         &env,
         canister_id,
         test_principal,
@@ -300,7 +300,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
         time(&env) + Duration::from_secs(30 * 60).as_nanos() as u64 // default expiration: 30 minutes
     );
 
-    api::openid_credential_remove(
+    let _ = api::openid_credential_remove(
         &env,
         canister_id,
         test_principal,
@@ -313,7 +313,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
     let second_identity_number =
         create_identity_with_authn_method(&env, canister_id, &second_test_authn_method_data);
 
-    api::openid_credential_add(
+    let _ = api::openid_credential_add(
         &env,
         canister_id,
         second_test_principal,
