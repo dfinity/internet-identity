@@ -246,7 +246,7 @@ jobs:
           path: .
       - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
       - name: Install PocketIC server
-        uses: dfinity/pocketic@e780686713925d231d9bba75b29149b29482c743
+        uses: dfinity/pocketic@main
         with:
           pocket-ic-server-version: "9.0.3"
       - name: "Run VC issuer canister tests"
@@ -353,7 +353,7 @@ jobs:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
       - name: Install PocketIC server
-        uses: dfinity/pocketic@e780686713925d231d9bba75b29149b29482c743
+        uses: dfinity/pocketic@main
         with:
           pocket-ic-server-version: "9.0.3"
 
@@ -370,7 +370,8 @@ jobs:
           path: .
 
       - name: Run PocketIc
-        run: "${POCKET_IC_BIN}" --port-file pocket-ic-port &
+        run: |
+          "${POCKET_IC_BIN}" --port-file pocket-ic-port &
 
       - name: Run Tests
         run: |
