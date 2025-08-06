@@ -27,10 +27,6 @@
   ]}
 >
   <div class="text-text-tertiary text-xs font-medium">© Internet Identity</div>
-  <!-- TODO: Remove once we have the proper UX for triggering the migration -->
-  {#if $ENABLE_MIGRATE_FLOW}
-    <Button variant="primary" onclick={triggerMigration}>Migrate</Button>
-  {/if}
   <nav class="text-text-primary flex gap-4 text-xs font-semibold">
     <a
       href={SUPPORT_URL}

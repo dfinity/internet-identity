@@ -6,7 +6,10 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
+  import {
+    CONTINUE_FROM_ANOTHER_DEVICE,
+    ENABLE_MIGRATE_FLOW,
+  } from "$lib/state/featureFlags";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
@@ -79,4 +82,12 @@
       </Button>
     {/if}
   </div>
+  {#if $ENABLE_MIGRATE_FLOW}
+    <div
+      class="text-text-primary text-md flex flex-row items-center justify-between"
+    >
+      <p>Still have an identity number?</p>
+      <a href="/migrate" class="font-bold">Upgrade</a>
+    </div>
+  {/if}
 </div>
