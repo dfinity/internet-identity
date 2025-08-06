@@ -83,7 +83,9 @@
     {/if}
   </div>
   {#if $ENABLE_MIGRATE_FLOW}
-    <div class="text-text-primary flex flex-row items-center justify-between">
+    <div
+      class="text-text-primary text-md flex flex-row items-center justify-between"
+    >
       <p>Still have an identity number?</p>
       <a href="/migrate" class="font-bold">Upgrade</a>
     </div>
