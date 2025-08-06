@@ -292,6 +292,7 @@ deploy_release_candidate() {
   echo "Deploying II release candidate with same arguments as prod"
   dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install jqajs-xiaaa-aaaad-aab5q-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
   dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install fgte5-ciaaa-aaaad-aaatq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
+  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install y2aaj-miaaa-aaaad-aacxq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
 }
 
 test_release_candidate() {
