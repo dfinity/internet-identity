@@ -113,7 +113,6 @@ test("Authorize by signing in from another device", async ({
     await expect(otherDevicePage.getByText("Chrome")).toHaveCount(2);
 
     // Switch to current device and verify we can authorize
-    authCurrentDevice(authPage);
     await authPage.getByRole("button", { name: "Primary account" }).click();
   });
   expect(principal).toBe(expectedPrincipal);

@@ -117,11 +117,7 @@ test.describe("First visit", () => {
       .waitFor({ state: "hidden" });
     await expect(existingDevicePage.getByText("Chrome")).toHaveCount(2);
 
-    // Switch to new device and verify we can sign in
-    authNewDevice(newDevicePage);
-    await newDevicePage
-      .getByRole("button", { name: DEFAULT_USER_NAME })
-      .click();
+    // Switch to new device and verify we are signed in
     await newDevicePage.waitForURL(II_URL + "/manage");
     await expect(
       newDevicePage.getByRole("heading", {
