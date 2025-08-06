@@ -3,7 +3,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, CallError, PocketIc};
+use pocket_ic::{call_candid, call_candid_as, query_candid, PocketIc, RejectResponse};
 
 pub fn add_entry(
     env: &PocketIc,
@@ -12,7 +12,7 @@ pub fn add_entry(
     anchor: AnchorNumber,
     timestamp: Timestamp,
     entry: Vec<u8>,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -28,7 +28,7 @@ pub fn get_entries(
     canister_id: CanisterId,
     idx: Option<u64>,
     limit: Option<u16>,
-) -> Result<Entries, CallError> {
+) -> Result<Entries, RejectResponse> {
     query_candid(env, canister_id, "get_entries", (idx, limit)).map(|(x,)| x)
 }
 
@@ -38,7 +38,7 @@ pub fn get_anchor_entries(
     anchor: AnchorNumber,
     cursor: Option<Cursor>,
     limit: Option<u16>,
-) -> Result<AnchorEntries, CallError> {
+) -> Result<AnchorEntries, RejectResponse> {
     query_candid(
         env,
         canister_id,
@@ -48,7 +48,7 @@ pub fn get_anchor_entries(
     .map(|(x,)| x)
 }
 
-pub fn status(env: &PocketIc, canister_id: CanisterId) -> Result<ArchiveStatus, CallError> {
+pub fn status(env: &PocketIc, canister_id: CanisterId) -> Result<ArchiveStatus, RejectResponse> {
     call_candid(env, canister_id, RawEffectivePrincipal::None, "status", ()).map(|(x,)| x)
 }
 

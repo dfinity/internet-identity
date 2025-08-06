@@ -9,14 +9,14 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use std::time::Duration;
 
 /// Tests user registration with cross checks for get_anchor_credentials, get_anchor_info and get_principal.
 #[test]
-fn should_register_new_anchor() -> Result<(), CallError> {
+fn should_register_new_anchor() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
@@ -56,7 +56,7 @@ fn should_allow_multiple_registrations() {
 
 /// Tests that the user numbers start at the beginning of the init range and are capped at the end (exclusive).
 #[test]
-fn should_assign_correct_user_numbers() -> Result<(), CallError> {
+fn should_assign_correct_user_numbers() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id =
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((127, 129)));
@@ -86,7 +86,7 @@ fn should_assign_correct_user_numbers() -> Result<(), CallError> {
 /// Tests that the call to register needs to be signed by the device that is being registered.
 /// This is to make sure that the initial public key belongs to a private key that can be used to sign requests.
 #[test]
-fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
+fn registration_with_mismatched_sender_fails() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let challenge = api::create_challenge(&env, canister_id)?;
@@ -112,7 +112,7 @@ fn registration_with_mismatched_sender_fails() -> Result<(), CallError> {
 
 /// Verifies that non-recovery devices cannot be registered as protected.
 #[test]
-fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallError> {
+fn should_not_register_non_recovery_device_as_protected() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let mut device1 = device_data_1();
@@ -141,7 +141,7 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), CallErro
 
 /// Tests that the solution to the captcha needs to be correct.
 #[test]
-fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
+fn should_not_allow_wrong_captcha() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
 
@@ -164,7 +164,7 @@ fn should_not_allow_wrong_captcha() -> Result<(), CallError> {
 
 /// Tests that there is a time limit for captchas.
 #[test]
-fn should_not_allow_expired_captcha() -> Result<(), CallError> {
+fn should_not_allow_expired_captcha() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
 
@@ -189,7 +189,7 @@ fn should_not_allow_expired_captcha() -> Result<(), CallError> {
 
 /// Tests that there is a maximum number of captchas that can be created in a given timeframe.
 #[test]
-fn should_limit_captcha_creation() -> Result<(), CallError> {
+fn should_limit_captcha_creation() -> Result<(), RejectResponse> {
     let env = env();
     let init_arg = InternetIdentityInit {
         captcha_config: Some(CaptchaConfig {
@@ -216,7 +216,7 @@ fn should_limit_captcha_creation() -> Result<(), CallError> {
 /// Tests that the `register` call will hit the rate limit on too many calls and that the limit
 /// will allow new calls after some time.
 #[test]
-fn should_rate_limit_register_calls() -> Result<(), CallError> {
+fn should_rate_limit_register_calls() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,
@@ -272,7 +272,7 @@ fn should_rate_limit_register_calls() -> Result<(), CallError> {
 
 /// Tests that the `register` rate limit does not replenish tokens to more than max_tokens.
 #[test]
-fn should_not_allow_more_than_max_tokens_calls_on_rate_limit() -> Result<(), CallError> {
+fn should_not_allow_more_than_max_tokens_calls_on_rate_limit() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,
@@ -309,7 +309,7 @@ fn should_not_allow_more_than_max_tokens_calls_on_rate_limit() -> Result<(), Cal
 
 /// Tests that the II correctly reports the max tokens metric.
 #[test]
-fn should_report_max_rate_limit_tokens() -> Result<(), CallError> {
+fn should_report_max_rate_limit_tokens() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,
@@ -330,7 +330,7 @@ fn should_report_max_rate_limit_tokens() -> Result<(), CallError> {
 
 /// Tests that the II correctly reports the max tokens metric.
 #[test]
-fn should_report_time_per_rate_limit_token() -> Result<(), CallError> {
+fn should_report_time_per_rate_limit_token() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,

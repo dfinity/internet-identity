@@ -3,7 +3,7 @@
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use std::time::Duration;
 
 const DAY_SECONDS: u64 = 24 * 60 * 60;
@@ -11,7 +11,7 @@ const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
 
 /// Tests that daily active anchors are counted correctly.
 #[test]
-fn should_report_daily_active_anchors() -> Result<(), CallError> {
+fn should_report_daily_active_anchors() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -39,7 +39,7 @@ fn should_report_daily_active_anchors() -> Result<(), CallError> {
 
 /// Tests that monthly active anchors are counted correctly.
 #[test]
-fn should_report_monthly_active_anchors() -> Result<(), CallError> {
+fn should_report_monthly_active_anchors() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -67,7 +67,7 @@ fn should_report_monthly_active_anchors() -> Result<(), CallError> {
 
 /// Tests that monthly active anchors are updated every 24h.
 #[test]
-fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
+fn should_update_monthly_active_anchors_every_day() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -111,7 +111,7 @@ fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
 
 /// Tests that active anchor stats are kept across upgrades from the previous and the same release.
 #[test]
-fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
+fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
@@ -141,7 +141,7 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
 
 /// Tests that the stats are updated correctly even with long periods of no activity at all.
 #[test]
-fn should_have_correct_stats_after_long_inactivity() -> Result<(), CallError> {
+fn should_have_correct_stats_after_long_inactivity() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 

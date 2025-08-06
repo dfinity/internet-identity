@@ -5,13 +5,13 @@ use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntryV2};
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 
 #[test]
-fn should_add_authn_method() -> Result<(), CallError> {
+fn should_add_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);
@@ -40,7 +40,7 @@ fn should_add_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> {
+fn should_require_authentication_to_add_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = sample_pubkey_authn_method(1);
@@ -63,7 +63,7 @@ fn should_require_authentication_to_add_authn_method() -> Result<(), CallError> 
 }
 
 #[test]
-fn should_report_error_on_failed_conversion() -> Result<(), CallError> {
+fn should_report_error_on_failed_conversion() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method_1 = sample_pubkey_authn_method(1);

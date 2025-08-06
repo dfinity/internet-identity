@@ -8,14 +8,14 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodMetadataReplaceError, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, MetadataEntryV2,
 };
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 #[test]
-fn should_write_authn_method_metadata() -> Result<(), CallError> {
+fn should_write_authn_method_metadata() -> Result<(), RejectResponse> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -61,7 +61,7 @@ fn should_write_authn_method_metadata() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_replace_authn_method_metadata() -> Result<(), CallError> {
+fn should_replace_authn_method_metadata() -> Result<(), RejectResponse> {
     const METADATA_KEY: &str = "some-key";
 
     let env = env();
@@ -156,7 +156,7 @@ fn should_require_authentication_to_replace_identity_metadata() {
 }
 
 #[test]
-fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
+fn should_not_write_too_large_identity_metadata_map() -> Result<(), RejectResponse> {
     const METADATA_KEY: &str = "some-key";
     // Variable fields limit as it is enforced by the II canister.
     // This limit ensures that users cannot spend all their allocated space on just metadata.
@@ -200,7 +200,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
+fn should_not_allow_reserved_metadata_keys() -> Result<(), RejectResponse> {
     const RESERVED_KEYS: &[&str] = &[
         "pubkey",
         "credential_id",
@@ -243,7 +243,7 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_enforce_string_type_for_legacy_keys() -> Result<(), CallError> {
+fn should_enforce_string_type_for_legacy_keys() -> Result<(), RejectResponse> {
     const RESERVED_KEYS: &[&str] = &["alias", "usage", "authenticator_attachment", "origin"];
 
     let env = env();

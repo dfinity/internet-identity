@@ -37,6 +37,6 @@ include_dir = "0.7"
 assert_matches = "1.5"
 candid_parser = "0.1"
 ic-http-certification = "2.6"
-pocket-ic = "5.0"
+pocket-ic = "9.0.2"
 ic-response-verification = "2.6"
 canister_tests = { path = "../../src/canister_tests" }

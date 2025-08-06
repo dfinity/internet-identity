@@ -4,13 +4,13 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 /// Tests that get_anchor_info updates the last usage on the added device.
 #[test]
-fn should_set_last_usage_on_get_anchor_info() -> Result<(), CallError> {
+fn should_set_last_usage_on_get_anchor_info() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -24,7 +24,7 @@ fn should_set_last_usage_on_get_anchor_info() -> Result<(), CallError> {
 
 /// Tests that add only updates last usage on the device used to authenticate the call (not the newly added one).
 #[test]
-fn should_set_last_usage_on_add() -> Result<(), CallError> {
+fn should_set_last_usage_on_add() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -64,7 +64,7 @@ fn should_set_last_usage_on_add() -> Result<(), CallError> {
 
 /// Tests that remove updates last usage on the device used to authenticate the call.
 #[test]
-fn should_set_last_usage_on_remove() -> Result<(), CallError> {
+fn should_set_last_usage_on_remove() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -107,7 +107,7 @@ fn should_set_last_usage_on_remove() -> Result<(), CallError> {
 
 /// Tests that update only updates last usage on the device used to authenticate the call (not the updated one).
 #[test]
-fn should_set_last_usage_on_update() -> Result<(), CallError> {
+fn should_set_last_usage_on_update() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -170,7 +170,7 @@ fn should_set_last_usage_on_update() -> Result<(), CallError> {
 
 /// Tests that replace only updates last usage on the device used to authenticate the call (not the replacement device).
 #[test]
-fn should_set_last_usage_on_replace() -> Result<(), CallError> {
+fn should_set_last_usage_on_replace() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -218,7 +218,7 @@ fn should_set_last_usage_on_replace() -> Result<(), CallError> {
 
 /// Tests that prepare_delegation updates the last usage timestamp.
 #[test]
-fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
+fn should_set_last_usage_on_prepare_delegation() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     // initialize the salt otherwise prepare_delegation will take two execution rounds
@@ -259,7 +259,7 @@ fn should_set_last_usage_on_prepare_delegation() -> Result<(), CallError> {
 
 /// Tests that calls related to tentative device registration update the last usage timestamp.
 #[test]
-fn should_update_last_usage_on_tentative_device_registration() -> Result<(), CallError> {
+fn should_update_last_usage_on_tentative_device_registration() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -312,7 +312,7 @@ fn should_update_last_usage_on_tentative_device_registration() -> Result<(), Cal
 
 /// Tests that exit_device_registration_mode updates the last usage timestamp.
 #[test]
-fn should_update_last_usage_on_exit_device_registration_mode() -> Result<(), CallError> {
+fn should_update_last_usage_on_exit_device_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);

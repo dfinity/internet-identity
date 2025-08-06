@@ -11,7 +11,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
-use pocket_ic::{CallError, PocketIc};
+use pocket_ic::{PocketIc, RejectResponse};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -177,7 +177,7 @@ mod pull_entries_tests {
     use super::*;
 
     #[test]
-    fn should_record_anchor_operations() -> Result<(), CallError> {
+    fn should_record_anchor_operations() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -215,7 +215,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_restore_archive_buffer_from_stable_memory_backup() -> Result<(), CallError> {
+    fn should_restore_archive_buffer_from_stable_memory_backup() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = install_ii_canister(&env, EMPTY_WASM.clone());
         // re-create the archive canister with II as the controller and the canister id matching the restored backup
@@ -261,7 +261,7 @@ mod pull_entries_tests {
         assert_expected_entries(timestamp, entries)
     }
 
-    fn assert_expected_entries(timestamp: u64, entries: Entries) -> Result<(), CallError> {
+    fn assert_expected_entries(timestamp: u64, entries: Entries) -> Result<(), RejectResponse> {
         let anchor = 10_000;
         let pubkey = device_data_2().pubkey.clone();
         assert_eq!(entries.entries.len(), 5);
@@ -374,7 +374,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_metadata_for_new_device() -> Result<(), CallError> {
+    fn should_record_metadata_for_new_device() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         const METADATA_KEY: &str = "key";
@@ -415,7 +415,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_metadata_change() -> Result<(), CallError> {
+    fn should_record_metadata_change() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         const METADATA_KEY: &str = "key";
@@ -475,7 +475,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_record_identity_metadata_replace() -> Result<(), CallError> {
+    fn should_record_identity_metadata_replace() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         const METADATA_KEY: &str = "some-metadata-key";
@@ -526,7 +526,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_fetch_multiple_times() -> Result<(), CallError> {
+    fn should_fetch_multiple_times() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -556,7 +556,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_succeed_on_empty_fetch_result() -> Result<(), CallError> {
+    fn should_succeed_on_empty_fetch_result() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -581,7 +581,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_correct_number_of_fetched_entries() -> Result<(), CallError> {
+    fn should_report_correct_number_of_fetched_entries() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -729,7 +729,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_report_call_errors() -> Result<(), CallError> {
+    fn should_report_call_errors() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -772,7 +772,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_recover_after_error() -> Result<(), CallError> {
+    fn should_recover_after_error() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);
@@ -803,7 +803,7 @@ mod pull_entries_tests {
     }
 
     #[test]
-    fn should_return_entries_ordered() -> Result<(), CallError> {
+    fn should_return_entries_ordered() -> Result<(), RejectResponse> {
         let env = env();
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let archive_canister = deploy_archive_via_ii(&env, ii_canister);

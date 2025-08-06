@@ -2,15 +2,15 @@ use canister_tests::api::archive as api;
 use canister_tests::framework::*;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
 /// Verifies that the canister can be installed successfully.
 #[test]
-fn should_install() -> Result<(), CallError> {
+fn should_install() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let logs = api::get_entries(&env, canister_id, None, None)?;
@@ -20,7 +20,7 @@ fn should_install() -> Result<(), CallError> {
 
 /// Verifies that log entries are not lost when upgrading.
 #[test]
-fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
+fn should_keep_entries_across_upgrades() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -46,7 +46,7 @@ fn should_keep_entries_across_upgrades() -> Result<(), CallError> {
 
 /// Should expose status to anonymous callers.
 #[test]
-fn should_expose_status() -> Result<(), CallError> {
+fn should_expose_status() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
     let status = api::status(&env, canister_id)?;
@@ -61,7 +61,7 @@ mod rollback_tests {
 
     /// Verifies that the archive can be rolled back
     #[test]
-    fn should_rollback() -> Result<(), CallError> {
+    fn should_rollback() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM_PREVIOUS.clone());
 
@@ -92,7 +92,7 @@ mod rollback_tests {
 
     /// Verifies that the archive keeps entries made with the newer version when doing a rollback.
     #[test]
-    fn should_keep_entries_across_rollback() -> Result<(), CallError> {
+    fn should_keep_entries_across_rollback() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -140,7 +140,7 @@ mod write_tests {
     /// Verifies that log entries can be written to the canister.
     /// The canister does intentionally not check the payload on write so that it will never reject a log entry for compatibility reasons.
     #[test]
-    fn should_write_entry() -> Result<(), CallError> {
+    fn should_write_entry() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -201,7 +201,7 @@ mod read_tests {
 
     /// Verifies that a previously written entry can be read again.
     #[test]
-    fn should_read_previously_written_entry() -> Result<(), CallError> {
+    fn should_read_previously_written_entry() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -224,7 +224,7 @@ mod read_tests {
 
     /// Verifies that entries can be retrieved by user_number.
     #[test]
-    fn should_return_logs_per_user() -> Result<(), CallError> {
+    fn should_return_logs_per_user() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -270,7 +270,7 @@ mod read_tests {
 
     /// Verifies that additional entries can be retrieved by supplying next_idx.
     #[test]
-    fn should_return_only_limit_many_entries() -> Result<(), CallError> {
+    fn should_return_only_limit_many_entries() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -292,7 +292,7 @@ mod read_tests {
 
     /// Verifies that additional user specific entries can be retrieved by supplying the cursor.
     #[test]
-    fn should_return_user_cursor() -> Result<(), CallError> {
+    fn should_return_user_cursor() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -333,7 +333,7 @@ mod read_tests {
 
     /// Verifies that only entries belonging to the same anchor are returned (even if there are less than limit many).
     #[test]
-    fn should_only_return_entries_belonging_to_anchor() -> Result<(), CallError> {
+    fn should_only_return_entries_belonging_to_anchor() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -363,7 +363,7 @@ mod read_tests {
 
     /// Verifies that entries can be retrieved filtered by timestamp.
     #[test]
-    fn should_filter_by_timestamp() -> Result<(), CallError> {
+    fn should_filter_by_timestamp() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -416,7 +416,7 @@ mod read_tests {
 
     /// Verifies that entries retrieved by anchor are correctly ordered by timestamp.
     #[test]
-    fn should_order_by_timestamp() -> Result<(), CallError> {
+    fn should_order_by_timestamp() -> Result<(), RejectResponse> {
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
 
@@ -459,7 +459,7 @@ mod read_tests {
 
     /// Verifies that entries retrieved by anchor are correctly ordered by index.
     #[test]
-    fn should_order_by_index() -> Result<(), CallError> {
+    fn should_order_by_index() -> Result<(), RejectResponse> {
         let env = env();
         // use high max_entries_per_call so that we get all the entries in one go
         let config = candid::encode_one(ArchiveInit {
@@ -510,7 +510,7 @@ mod metrics_tests {
 
     /// Verifies that all metrics are present and have the correct timestamp.
     #[test]
-    fn should_return_metrics() -> Result<(), CallError> {
+    fn should_return_metrics() -> Result<(), RejectResponse> {
         let metrics = vec![
             "ii_archive_last_upgrade_timestamp_seconds",
             "ii_archive_entries_count{source=\"log\"}",
@@ -549,7 +549,7 @@ mod metrics_tests {
 
     /// Verifies that the last upgrade timestamp is updated correctly.
     #[test]
-    fn should_update_upgrade_timestamp() -> Result<(), CallError> {
+    fn should_update_upgrade_timestamp() -> Result<(), RejectResponse> {
         let env = env();
         env.advance_time(Duration::from_secs(300));
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());
@@ -572,7 +572,7 @@ mod metrics_tests {
 
     /// Verifies that the log entries count is updated correctly.
     #[test]
-    fn should_update_log_entries_count() -> Result<(), CallError> {
+    fn should_update_log_entries_count() -> Result<(), RejectResponse> {
         let metrics = vec![
             "ii_archive_entries_count{source=\"log\"}",
             "ii_archive_entries_count{source=\"anchor_index\"}",
@@ -601,7 +601,7 @@ mod metrics_tests {
 
     /// Verifies that the log sizes are updated correctly.
     #[test]
-    fn should_update_log_size_metrics() -> Result<(), CallError> {
+    fn should_update_log_size_metrics() -> Result<(), RejectResponse> {
         const INDEX_OVERHEAD: f64 = 40f64;
         const DATA_OVERHEAD: f64 = 32f64;
 
@@ -647,7 +647,7 @@ mod metrics_tests {
     /// Update is only tested for the ii_archive_log_data_virtual_memory_size metric due to high
     /// pre-allocation factor and the number of entries required to make the index grow.
     #[test]
-    fn should_show_memory_metrics() -> Result<(), CallError> {
+    fn should_show_memory_metrics() -> Result<(), RejectResponse> {
         const WASM_PAGE_SIZE: usize = 65536;
         let env = env();
         let canister_id = install_archive_canister(&env, ARCHIVE_WASM.clone());

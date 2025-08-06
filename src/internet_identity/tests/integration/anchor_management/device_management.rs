@@ -5,15 +5,15 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 /// Tests that lookup is consistent with get anchor info, but without alias.
 #[test]
-fn should_lookup() -> Result<(), CallError> {
+fn should_lookup() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
@@ -57,7 +57,7 @@ fn should_lookup() -> Result<(), CallError> {
 
 /// Verifies that a new device can be added.
 #[test]
-fn should_add_additional_device() -> Result<(), CallError> {
+fn should_add_additional_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -89,7 +89,7 @@ fn should_add_additional_device() -> Result<(), CallError> {
 
 /// Verifies that the same device cannot be added twice.
 #[test]
-fn should_not_add_existing_device() -> Result<(), CallError> {
+fn should_not_add_existing_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -112,7 +112,7 @@ fn should_not_add_existing_device() -> Result<(), CallError> {
 
 /// Verifies that a second recovery phrase cannot be added.
 #[test]
-fn should_not_add_second_recovery_phrase() -> Result<(), CallError> {
+fn should_not_add_second_recovery_phrase() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -166,7 +166,7 @@ fn should_not_add_device_for_different_user() {
 
 /// Verifies that a new device can be added to anchors that were registered using the previous II release.
 #[test]
-fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
+fn should_add_additional_device_after_ii_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(
         &env,
@@ -195,7 +195,7 @@ fn should_add_additional_device_after_ii_upgrade() -> Result<(), CallError> {
 
 /// Verifies that the total size of all devices stays under the variable length fields limit.
 #[test]
-fn should_respect_total_size_limit() -> Result<(), CallError> {
+fn should_respect_total_size_limit() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -227,7 +227,7 @@ fn should_respect_total_size_limit() -> Result<(), CallError> {
 
 /// Verifies that a device can be updated
 #[test]
-fn should_update_device() -> Result<(), CallError> {
+fn should_update_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let principal = principal_1();
@@ -257,7 +257,7 @@ fn should_update_device() -> Result<(), CallError> {
 
 /// Verifies that a protected device can be updated
 #[test]
-fn should_update_protected_device() -> Result<(), CallError> {
+fn should_update_protected_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let principal = principal_1();
@@ -412,7 +412,7 @@ fn should_not_update_non_recovery_device_to_be_protected() {
 
 /// Verifies that get_anchor_credentials returns the expected credentials.
 #[test]
-fn should_get_credentials() -> Result<(), CallError> {
+fn should_get_credentials() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -479,7 +479,7 @@ fn should_get_credentials() -> Result<(), CallError> {
 
 /// Verifies that get_anchor_credentials returns an empty list of credentials for invalid anchor numbers.
 #[test]
-fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), CallError> {
+fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
 
@@ -491,7 +491,7 @@ fn should_return_empty_credentials_on_invalid_anchor_number() -> Result<(), Call
 
 /// Verifies that get_anchor_credentials returns the expected credentials (i.e. no recovery credentials if there are none).
 #[test]
-fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallError> {
+fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -513,7 +513,7 @@ fn should_not_get_recovery_credentials_if_there_are_none() -> Result<(), CallErr
 
 /// Verifies that a device can be removed.
 #[test]
-fn should_remove_device() -> Result<(), CallError> {
+fn should_remove_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -551,7 +551,7 @@ fn should_remove_device() -> Result<(), CallError> {
 
 /// Verifies that a protected device can be removed.
 #[test]
-fn should_remove_protected_device() -> Result<(), CallError> {
+fn should_remove_protected_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -593,7 +593,7 @@ fn should_remove_protected_device() -> Result<(), CallError> {
 /// Verifies that the even last device can be removed.
 /// This behaviour should be changed because it makes anchors unusable, see L2-745.
 #[test]
-fn should_remove_last_device() -> Result<(), CallError> {
+fn should_remove_last_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -675,7 +675,7 @@ fn should_not_remove_protected_with_different_device() {
 
 /// Verifies that a device can be removed if it has been added using the previous II release.
 #[test]
-fn should_remove_device_after_ii_upgrade() -> Result<(), CallError> {
+fn should_remove_device_after_ii_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(
         &env,
@@ -730,7 +730,7 @@ fn should_not_allow_get_anchor_info_for_different_user() {
 
 /// Verifies that a device can be replaced with another device.
 #[test]
-fn should_replace_device() -> Result<(), CallError> {
+fn should_replace_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -754,7 +754,7 @@ fn should_replace_device() -> Result<(), CallError> {
 
 /// Verifies that metadata is stored.
 #[test]
-fn should_keep_metadata() -> Result<(), CallError> {
+fn should_keep_metadata() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let device = DeviceData {
@@ -775,7 +775,7 @@ fn should_keep_metadata() -> Result<(), CallError> {
 
 /// Verifies that reserved metadata keys are rejected.
 #[test]
-fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
+fn should_not_allow_reserved_metadata_keys() -> Result<(), RejectResponse> {
     const RESERVED_KEYS: &[&str] = &[
         "pubkey",
         "alias",
@@ -819,7 +819,7 @@ fn should_not_allow_reserved_metadata_keys() -> Result<(), CallError> {
 
 /// Verifies that a device with key type BrowserStorageKey can be added.
 #[test]
-fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError> {
+fn should_add_device_with_key_type_browser_storage_key() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -842,7 +842,7 @@ fn should_add_device_with_key_type_browser_storage_key() -> Result<(), CallError
 
 /// Verifies that a device key can be looked up with credential id
 #[test]
-fn should_lookup_device_key_with_credential_id() -> Result<(), CallError> {
+fn should_lookup_device_key_with_credential_id() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);

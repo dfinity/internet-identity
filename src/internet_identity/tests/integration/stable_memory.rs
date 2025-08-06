@@ -6,8 +6,8 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::BlobCompression::NoCompression;
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::{ErrorCode, RejectResponse};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
@@ -65,7 +65,7 @@ fn known_devices() -> [DeviceData; 6] {
 
 /// Tests that II will issue the same principals after stable memory restore.
 #[test]
-fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError> {
+fn should_issue_same_principal_after_restoring_backup() -> Result<(), RejectResponse> {
     const PUBLIC_KEY: &str = "305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387";
     const DELEGATION_PRINCIPAL: &str = "303c300c060a2b0601040183b8430102032c000a000000000000000001013a8926914dd1c836ec67ba66ac6425c21dffd3ca5c5968855f87780a1ec57985";
     let principal = Principal::self_authenticating(hex::decode(PUBLIC_KEY).unwrap());
@@ -108,7 +108,7 @@ fn should_issue_same_principal_after_restoring_backup() -> Result<(), CallError>
 
 /// Tests that anchors can still be modified after stable memory restore.
 #[test]
-fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
+fn should_modify_devices_after_restoring_backup() -> Result<(), RejectResponse> {
     let [_, _, _, _, device5, device6] = known_devices();
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
@@ -141,7 +141,7 @@ fn should_modify_devices_after_restoring_backup() -> Result<(), CallError> {
 /// Verifies that an anchor with two recovery phrases can still use both.
 /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
 #[test]
-fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallError> {
+fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
     let frontend_hostname = "frontend_hostname";
@@ -178,7 +178,7 @@ fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), CallErro
 /// Verifies that an existing account with two recovery phrases can only make changes after deleting one.
 /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
 #[test]
-fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), CallError> {
+fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -226,7 +226,7 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
 }
 
 #[test]
-fn should_read_persistent_state_without_archive() -> Result<(), CallError> {
+fn should_read_persistent_state_without_archive() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -250,7 +250,7 @@ fn should_read_persistent_state_without_archive() -> Result<(), CallError> {
 
 /// Verifies that a stable memory backup with persistent state containing archive information is restored correctly.
 #[test]
-fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
+fn should_read_persistent_state_with_archive() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -287,7 +287,7 @@ fn should_read_persistent_state_with_archive() -> Result<(), CallError> {
 
 /// Tests that II will refuse to install on a stable memory layout that is no longer supported.
 #[test]
-fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
+fn should_trap_on_old_stable_memory() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
 
@@ -297,12 +297,9 @@ fn should_trap_on_old_stable_memory() -> Result<(), CallError> {
     let result = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), None);
     assert!(result.is_err());
     let err = result.err().unwrap();
-    match err {
-        CallError::Reject(err) => panic!("unexpected error {err}"),
-        CallError::UserError(err) => {
-            assert_eq!(err.code, CanisterCalledTrap);
-            assert!(err.description.contains("stable memory layout version 1 is no longer supported:\nEither reinstall (wiping stable memory) or upgrade sequentially to the latest version of II by installing each intermediate version in turn"));
-        }
-    }
+    assert_eq!(err.error_code, ErrorCode::CanisterCalledTrap);
+    assert!(err
+        .reject_message
+        .contains("stable memory layout version 1 is no longer supported"));
     Ok(())
 }

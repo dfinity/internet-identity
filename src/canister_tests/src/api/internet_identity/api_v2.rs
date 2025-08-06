@@ -2,14 +2,16 @@ use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
+use pocket_ic::{
+    call_candid, call_candid_as, query_candid, query_candid_as, PocketIc, RejectResponse,
+};
 use std::collections::HashMap;
 
 pub fn identity_registration_start(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-) -> Result<Result<IdRegNextStepResult, IdRegStartError>, CallError> {
+) -> Result<Result<IdRegNextStepResult, IdRegStartError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -26,7 +28,7 @@ pub fn check_captcha(
     canister_id: CanisterId,
     sender: Principal,
     solution: String,
-) -> Result<Result<IdRegNextStepResult, CheckCaptchaError>, CallError> {
+) -> Result<Result<IdRegNextStepResult, CheckCaptchaError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -44,7 +46,7 @@ pub fn identity_registration_finish(
     sender: Principal,
     authn_method: &AuthnMethodData,
     name: Option<String>,
-) -> Result<Result<IdRegFinishResult, IdRegFinishError>, CallError> {
+) -> Result<Result<IdRegFinishResult, IdRegFinishError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -64,7 +66,7 @@ pub fn openid_identity_registration_finish(
     canister_id: CanisterId,
     sender: Principal,
     openid_arg: &OpenIDRegFinishArg,
-) -> Result<Result<IdRegFinishResult, IdRegFinishError>, CallError> {
+) -> Result<Result<IdRegFinishResult, IdRegFinishError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -80,7 +82,7 @@ pub fn identity_authn_info(
     env: &PocketIc,
     canister_id: CanisterId,
     identity_number: IdentityNumber,
-) -> Result<Result<IdentityAuthnInfo, ()>, CallError> {
+) -> Result<Result<IdentityAuthnInfo, ()>, RejectResponse> {
     query_candid(env, canister_id, "identity_authn_info", (identity_number,)).map(|(x,)| x)
 }
 
@@ -89,7 +91,7 @@ pub fn identity_info(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<IdentityInfo, IdentityInfoError>, CallError> {
+) -> Result<Result<IdentityInfo, IdentityInfoError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -107,7 +109,7 @@ pub fn identity_metadata_replace(
     sender: Principal,
     identity_number: IdentityNumber,
     metadata: &HashMap<String, MetadataEntryV2>,
-) -> Result<Result<(), IdentityMetadataReplaceError>, CallError> {
+) -> Result<Result<(), IdentityMetadataReplaceError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -125,7 +127,7 @@ pub fn identity_properties_replace(
     sender: Principal,
     identity_number: IdentityNumber,
     properties: &IdentityPropertiesReplace,
-) -> Result<Result<(), IdentityPropertiesReplaceError>, CallError> {
+) -> Result<Result<(), IdentityPropertiesReplaceError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -143,7 +145,7 @@ pub fn authn_method_add(
     sender: Principal,
     identity_number: IdentityNumber,
     authn_method: &AuthnMethodData,
-) -> Result<Result<(), AuthnMethodAddError>, CallError> {
+) -> Result<Result<(), AuthnMethodAddError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -162,7 +164,7 @@ pub fn authn_method_replace(
     identity_number: IdentityNumber,
     public_key: &PublicKey,
     authn_method: &AuthnMethodData,
-) -> Result<Result<(), AuthnMethodReplaceError>, CallError> {
+) -> Result<Result<(), AuthnMethodReplaceError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -181,7 +183,7 @@ pub fn authn_method_metadata_replace(
     identity_number: IdentityNumber,
     public_key: &PublicKey,
     metadata: &HashMap<String, MetadataEntryV2>,
-) -> Result<Result<(), AuthnMethodMetadataReplaceError>, CallError> {
+) -> Result<Result<(), AuthnMethodMetadataReplaceError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -200,7 +202,7 @@ pub fn authn_method_security_settings_replace(
     identity_number: IdentityNumber,
     public_key: &PublicKey,
     security_settings: &AuthnMethodSecuritySettings,
-) -> Result<Result<(), AuthnMethodSecuritySettingsReplaceError>, CallError> {
+) -> Result<Result<(), AuthnMethodSecuritySettingsReplaceError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -218,7 +220,7 @@ pub fn authn_method_remove(
     sender: Principal,
     identity_number: IdentityNumber,
     public_key: &PublicKey,
-) -> Result<Result<(), ()>, CallError> {
+) -> Result<Result<(), ()>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -236,7 +238,7 @@ pub fn authn_method_registration_mode_enter(
     sender: Principal,
     identity_number: IdentityNumber,
     id: Option<String>,
-) -> Result<Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError>, CallError> {
+) -> Result<Result<RegistrationModeInfo, AuthnMethodRegistrationModeEnterError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -253,7 +255,7 @@ pub fn authn_method_registration_mode_exit(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<(), ()>, CallError> {
+) -> Result<Result<(), ()>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -270,7 +272,7 @@ pub fn authn_method_register(
     canister_id: CanisterId,
     identity_number: IdentityNumber,
     authn_method: &AuthnMethodData,
-) -> Result<Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError>, CallError> {
+) -> Result<Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError>, RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -287,7 +289,7 @@ pub fn authn_method_confirm(
     sender: Principal,
     identity_number: IdentityNumber,
     confirmation_code: &str,
-) -> Result<Result<(), AuthnMethodConfirmationError>, CallError> {
+) -> Result<Result<(), AuthnMethodConfirmationError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -304,7 +306,7 @@ pub fn lookup_by_registration_mode_id(
     canister_id: CanisterId,
     sender: Principal,
     id: String,
-) -> Result<Option<IdentityNumber>, CallError> {
+) -> Result<Option<IdentityNumber>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -323,7 +325,7 @@ pub fn create_account(
     identity_number: IdentityNumber,
     origin: FrontendHostname,
     name: String,
-) -> Result<Result<AccountInfo, CreateAccountError>, CallError> {
+) -> Result<Result<AccountInfo, CreateAccountError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -341,7 +343,7 @@ pub fn get_accounts(
     sender: Principal,
     identity_number: IdentityNumber,
     origin: FrontendHostname,
-) -> Result<Result<Vec<AccountInfo>, GetAccountsError>, CallError> {
+) -> Result<Result<Vec<AccountInfo>, GetAccountsError>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
@@ -360,7 +362,7 @@ pub fn update_account(
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
     update: AccountUpdate,
-) -> Result<Result<AccountInfo, UpdateAccountError>, CallError> {
+) -> Result<Result<AccountInfo, UpdateAccountError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -408,7 +410,7 @@ impl<'a> AccountDelegationParams<'a> {
 pub fn prepare_account_delegation(
     params: &AccountDelegationParams,
     max_ttl: Option<u64>,
-) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, CallError> {
+) -> Result<Result<PrepareAccountDelegation, AccountDelegationError>, RejectResponse> {
     call_candid_as(
         params.env,
         params.canister_id,
@@ -429,7 +431,7 @@ pub fn prepare_account_delegation(
 pub fn get_account_delegation(
     params: &AccountDelegationParams,
     expiration: u64,
-) -> Result<Result<SignedDelegation, AccountDelegationError>, CallError> {
+) -> Result<Result<SignedDelegation, AccountDelegationError>, RejectResponse> {
     query_candid_as(
         params.env,
         params.canister_id,

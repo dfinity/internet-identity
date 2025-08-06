@@ -6,7 +6,9 @@ use internet_identity_interface::internet_identity::types::{
     self, CredentialId, DeviceKeyWithAnchor, IdentityNumber, OpenIdCredentialKey,
 };
 use pocket_ic::common::rest::RawEffectivePrincipal;
-use pocket_ic::{call_candid, call_candid_as, query_candid, query_candid_as, CallError, PocketIc};
+use pocket_ic::{
+    call_candid, call_candid_as, query_candid, query_candid_as, PocketIc, RejectResponse,
+};
 
 /// The experimental v2 API
 pub mod api_v2;
@@ -32,7 +34,7 @@ pub fn health_check(env: &PocketIc, canister_id: CanisterId) {
 pub fn create_challenge(
     env: &PocketIc,
     canister_id: CanisterId,
-) -> Result<types::Challenge, CallError> {
+) -> Result<types::Challenge, RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -50,7 +52,7 @@ pub fn register(
     device_data: &types::DeviceData,
     challenge_attempt: &types::ChallengeAttempt,
     temp_key: Option<Principal>,
-) -> Result<types::RegisterResponse, CallError> {
+) -> Result<types::RegisterResponse, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -70,7 +72,7 @@ pub fn prepare_delegation(
     frontend_hostname: &str,
     session_key: &types::SessionKey,
     max_time_to_live: Option<u64>,
-) -> Result<(types::UserKey, types::Timestamp), CallError> {
+) -> Result<(types::UserKey, types::Timestamp), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -86,7 +88,7 @@ pub fn prepare_delegation(
     )
 }
 
-pub fn init_salt(env: &PocketIc, canister_id: CanisterId) -> Result<(), CallError> {
+pub fn init_salt(env: &PocketIc, canister_id: CanisterId) -> Result<(), RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -104,7 +106,7 @@ pub fn get_delegation(
     frontend_hostname: &str,
     session_key: &types::SessionKey,
     timestamp: u64,
-) -> Result<types::GetDelegationResponse, CallError> {
+) -> Result<types::GetDelegationResponse, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
@@ -121,7 +123,7 @@ pub fn get_principal(
     sender: Principal,
     anchor_number: types::AnchorNumber,
     frontend_hostname: &str,
-) -> Result<Principal, CallError> {
+) -> Result<Principal, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
@@ -136,7 +138,7 @@ pub fn lookup(
     env: &PocketIc,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
-) -> Result<Vec<types::DeviceData>, CallError> {
+) -> Result<Vec<types::DeviceData>, RejectResponse> {
     query_candid(env, canister_id, "lookup", (anchor_number,)).map(|(x,)| x)
 }
 
@@ -144,7 +146,7 @@ pub fn get_anchor_credentials(
     env: &PocketIc,
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
-) -> Result<types::AnchorCredentials, CallError> {
+) -> Result<types::AnchorCredentials, RejectResponse> {
     query_candid(env, canister_id, "get_anchor_credentials", (anchor_number,)).map(|(x,)| x)
 }
 
@@ -154,7 +156,7 @@ pub fn add(
     sender: Principal,
     anchor_number: types::AnchorNumber,
     device_data: &types::DeviceData,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -172,7 +174,7 @@ pub fn update(
     anchor_number: types::AnchorNumber,
     device_key: &types::PublicKey,
     device_data: &types::DeviceData,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -190,7 +192,7 @@ pub fn replace(
     anchor_number: types::AnchorNumber,
     device_key: &types::PublicKey,
     device_data: &types::DeviceData,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -207,7 +209,7 @@ pub fn remove(
     sender: Principal,
     anchor_number: types::AnchorNumber,
     device_key: &types::PublicKey,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -223,7 +225,7 @@ pub fn get_anchor_info(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-) -> Result<types::IdentityAnchorInfo, CallError> {
+) -> Result<types::IdentityAnchorInfo, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -240,7 +242,7 @@ pub fn enter_device_registration_mode(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-) -> Result<types::Timestamp, CallError> {
+) -> Result<types::Timestamp, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -257,7 +259,7 @@ pub fn exit_device_registration_mode(
     canister_id: CanisterId,
     sender: Principal,
     anchor_number: types::AnchorNumber,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -273,7 +275,7 @@ pub fn add_tentative_device(
     canister_id: CanisterId,
     anchor_number: types::AnchorNumber,
     device_data: &types::DeviceData,
-) -> Result<types::AddTentativeDeviceResponse, CallError> {
+) -> Result<types::AddTentativeDeviceResponse, RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -290,7 +292,7 @@ pub fn verify_tentative_device(
     sender: Principal,
     anchor_number: types::AnchorNumber,
     verification_code: &str,
-) -> Result<types::VerifyTentativeDeviceResponse, CallError> {
+) -> Result<types::VerifyTentativeDeviceResponse, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -306,7 +308,7 @@ pub fn deploy_archive(
     env: &PocketIc,
     canister_id: CanisterId,
     wasm: &Vec<u8>,
-) -> Result<types::DeployArchiveResult, CallError> {
+) -> Result<types::DeployArchiveResult, RejectResponse> {
     call_candid(
         env,
         canister_id,
@@ -320,7 +322,7 @@ pub fn deploy_archive(
 pub fn stats(
     env: &PocketIc,
     canister_id: CanisterId,
-) -> Result<types::InternetIdentityStats, CallError> {
+) -> Result<types::InternetIdentityStats, RejectResponse> {
     query_candid(env, canister_id, "stats", ()).map(|(x,)| x)
 }
 
@@ -328,7 +330,7 @@ pub fn fetch_entries(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
-) -> Result<Vec<BufferedEntry>, CallError> {
+) -> Result<Vec<BufferedEntry>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -345,7 +347,7 @@ pub fn acknowledge_entries(
     canister_id: CanisterId,
     sender: Principal,
     sequence_number: u64,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -359,7 +361,7 @@ pub fn acknowledge_entries(
 pub fn config(
     env: &PocketIc,
     canister_id: CanisterId,
-) -> Result<types::InternetIdentityInit, CallError> {
+) -> Result<types::InternetIdentityInit, RejectResponse> {
     call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ()).map(|(x,)| x)
 }
 
@@ -370,8 +372,10 @@ pub fn openid_prepare_delegation(
     jwt: &str,
     salt: &[u8; 32],
     session_key: &types::SessionKey,
-) -> Result<Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>, CallError>
-{
+) -> Result<
+    Result<types::OpenIdPrepareDelegationResponse, types::OpenIdDelegationError>,
+    RejectResponse,
+> {
     call_candid_as(
         env,
         canister_id,
@@ -391,7 +395,7 @@ pub fn openid_get_delegation(
     salt: &[u8; 32],
     session_key: &types::SessionKey,
     expiration: &types::Timestamp,
-) -> Result<Result<types::SignedDelegation, types::OpenIdDelegationError>, CallError> {
+) -> Result<Result<types::SignedDelegation, types::OpenIdDelegationError>, RejectResponse> {
     query_candid_as(
         env,
         canister_id,
@@ -409,7 +413,7 @@ pub fn openid_credential_add(
     identity_number: IdentityNumber,
     jwt: &str,
     salt: &[u8; 32],
-) -> Result<Result<(), types::OpenIdCredentialAddError>, CallError> {
+) -> Result<Result<(), types::OpenIdCredentialAddError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -427,7 +431,7 @@ pub fn openid_credential_remove(
     sender: Principal,
     identity_number: IdentityNumber,
     openid_credential_key: &OpenIdCredentialKey,
-) -> Result<Result<(), types::OpenIdCredentialRemoveError>, CallError> {
+) -> Result<Result<(), types::OpenIdCredentialRemoveError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
@@ -443,7 +447,7 @@ pub fn lookup_device_key(
     canister_id: CanisterId,
     sender: Principal,
     credential_id: &CredentialId,
-) -> Result<Option<DeviceKeyWithAnchor>, CallError> {
+) -> Result<Option<DeviceKeyWithAnchor>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,

@@ -19,7 +19,7 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt, FrontendHostname,
     InternetIdentityInit, MetadataEntryV2,
 };
-use pocket_ic::{CallError, PocketIc};
+use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ use std::time::Duration;
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
 #[test]
-fn ii_canister_serves_http_assets() -> Result<(), CallError> {
+fn ii_canister_serves_http_assets() -> Result<(), RejectResponse> {
     let assets: Vec<(&str, Option<&str>)> = vec![("/", None), ("/.well-known/ic-domains", None)];
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -76,7 +76,7 @@ fn ii_canister_serves_http_assets() -> Result<(), CallError> {
 
 /// Verifies that `.well-known/webauthn` assets are delivered, certified and have security headers if present in the config.
 #[test]
-fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
+fn ii_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
     let env = env();
     let related_origins: Vec<String> = [
         "https://identity.internetcomputer.org".to_string(),
@@ -145,7 +145,7 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), CallError> {
 }
 
 #[test]
-fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
+fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let related_origins: Vec<String> = [
         "https://identity.internetcomputer.org".to_string(),
@@ -228,7 +228,7 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), CallError> {
 
 /// Verifies that clients that do not indicate any certification version will get a v1 certificate.
 #[test]
-fn should_fallback_to_v1_certification() -> Result<(), CallError> {
+fn should_fallback_to_v1_certification() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 1;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -259,7 +259,7 @@ fn should_fallback_to_v1_certification() -> Result<(), CallError> {
 /// Verifies that the cache-control header is set for fonts.
 // #[test] TODO: There's no CSS file directly referenced in the HTML file anymore since the SvelteKit migration
 #[allow(dead_code)]
-fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
+fn should_set_cache_control_for_fonts() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -362,7 +362,7 @@ fn should_set_cache_control_for_fonts() -> Result<(), CallError> {
 /// Verifies that the cache-control header is set for the SPA file.
 // #[test] TODO: There's no spa file anymore since the SvelteKit migration
 #[allow(dead_code)]
-fn should_set_cache_control_for_spa() -> Result<(), CallError> {
+fn should_set_cache_control_for_spa() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -425,7 +425,7 @@ fn should_set_cache_control_for_spa() -> Result<(), CallError> {
 /// Verifies that the cache-control header is set for the icons.
 // #[test] TODO: There's no spa file referencing the icons anymore since the SvelteKit migration
 #[allow(dead_code)]
-fn should_set_cache_control_for_icons() -> Result<(), CallError> {
+fn should_set_cache_control_for_icons() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -554,7 +554,7 @@ fn should_set_cache_control_for_icons() -> Result<(), CallError> {
 }
 
 #[test]
-fn must_not_cache_well_known_ic_domains() -> Result<(), CallError> {
+fn must_not_cache_well_known_ic_domains() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
@@ -594,7 +594,7 @@ fn must_not_cache_well_known_ic_domains() -> Result<(), CallError> {
 }
 
 #[test]
-fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
+fn must_not_cache_well_known_webauthn() -> Result<(), RejectResponse> {
     const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let related_origins: Vec<String> = [
@@ -656,7 +656,7 @@ fn must_not_cache_well_known_webauthn() -> Result<(), CallError> {
 
 /// Verifies that expected metrics are available via the HTTP endpoint.
 #[test]
-fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
+fn ii_canister_serves_http_metrics() -> Result<(), RejectResponse> {
     let metrics = vec![
         "internet_identity_user_count",
         "internet_identity_min_user_number",
@@ -697,7 +697,7 @@ fn ii_canister_serves_http_metrics() -> Result<(), CallError> {
 
 /// Verifies that the metrics list the expected user range as configured.
 #[test]
-fn metrics_should_list_configured_user_range() -> Result<(), CallError> {
+fn metrics_should_list_configured_user_range() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,
@@ -716,7 +716,7 @@ fn metrics_should_list_configured_user_range() -> Result<(), CallError> {
 
 /// Verifies that the metrics list the default user range if none is configured.
 #[test]
-fn metrics_should_list_default_user_range() -> Result<(), CallError> {
+fn metrics_should_list_default_user_range() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -731,7 +731,7 @@ fn metrics_should_list_default_user_range() -> Result<(), CallError> {
 
 /// Verifies that the user count metric is updated correctly.
 #[test]
-fn metrics_user_count_should_increase_after_register() -> Result<(), CallError> {
+fn metrics_user_count_should_increase_after_register() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -753,7 +753,7 @@ fn metrics_user_count_should_increase_after_register() -> Result<(), CallError> 
 
 /// Verifies that the signature count metric is updated correctly.
 #[test]
-fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
+fn metrics_signature_and_delegation_count() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let frontend_hostname = "https://some-dapp.com";
@@ -815,7 +815,7 @@ fn metrics_signature_and_delegation_count() -> Result<(), CallError> {
 
 /// Verifies that the stable memory pages count metric is updated correctly.
 #[test]
-fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), CallError> {
+fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -834,7 +834,7 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), C
 
 /// Verifies that the last II wasm upgrade timestamp is updated correctly.
 #[test]
-fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), CallError> {
+fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     // immediately upgrade because installing the canister does not set the metric
@@ -859,7 +859,7 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Ca
 
 /// Verifies that the inflight challenges metric is updated correctly.
 #[test]
-fn metrics_inflight_challenges() -> Result<(), CallError> {
+fn metrics_inflight_challenges() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -905,7 +905,7 @@ fn metrics_inflight_challenges() -> Result<(), CallError> {
 
 /// Verifies that the users in registration mode metric is updated correctly.
 #[test]
-fn metrics_device_registration_mode() -> Result<(), CallError> {
+fn metrics_device_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let user_number_1 = flows::register_anchor(&env, canister_id);
@@ -946,7 +946,7 @@ fn metrics_device_registration_mode() -> Result<(), CallError> {
 
 /// Verifies that the anchor operation count metric is updated correctly.
 #[test]
-fn metrics_anchor_operations() -> Result<(), CallError> {
+fn metrics_anchor_operations() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -1009,7 +1009,7 @@ fn metrics_anchor_operations() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
+fn should_list_virtual_memory_metrics() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -1074,7 +1074,7 @@ fn should_list_virtual_memory_metrics() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<(), CallError> {
+fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<(), RejectResponse> {
     let pub_session_key = ByteBuf::from("session public key");
     let authn_method_ic0 = AuthnMethodData {
         metadata: HashMap::from([(
@@ -1242,7 +1242,7 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
 }
 
 #[test]
-fn should_list_prepare_id_alias_counter() -> Result<(), CallError> {
+fn should_list_prepare_id_alias_counter() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -1272,7 +1272,7 @@ fn should_list_prepare_id_alias_counter() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_report_registration_rates() -> Result<(), CallError> {
+fn should_report_registration_rates() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister_with_arg(
         &env,
@@ -1340,7 +1340,7 @@ fn should_report_registration_rates() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_report_total_account_metrics() -> Result<(), CallError> {
+fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let identity_number = flows::register_anchor(&env, canister_id);

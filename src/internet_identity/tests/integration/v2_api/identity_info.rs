@@ -11,13 +11,13 @@ use canister_tests::framework::{env, install_ii_with_archive, time};
 use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, DeviceData, DeviceWithUsage, IdentityInfoError, MetadataEntry,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
 
 #[test]
-fn should_get_identity_info() -> Result<(), CallError> {
+fn should_get_identity_info() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_methods = sample_authn_methods();
@@ -45,7 +45,7 @@ fn should_get_identity_info() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
+fn should_require_authentication_for_identity_info() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_methods = sample_authn_methods();
@@ -57,7 +57,7 @@ fn should_require_authentication_for_identity_info() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_provide_authn_registration() -> Result<(), CallError> {
+fn should_provide_authn_registration() -> Result<(), RejectResponse> {
     const AUTHN_METHOD_REGISTRATION_TIMEOUT: u64 = Duration::from_secs(900).as_nanos() as u64; // 15 minutes
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);

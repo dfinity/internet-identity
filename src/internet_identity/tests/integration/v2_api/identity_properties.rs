@@ -7,10 +7,10 @@ use canister_tests::framework::{env, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{
     IdentityPropertiesReplace, IdentityPropertiesReplaceError,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 
 #[test]
-fn should_set_name() -> Result<(), CallError> {
+fn should_set_name() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -42,7 +42,7 @@ fn should_set_name() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_clear_name() -> Result<(), CallError> {
+fn should_clear_name() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -89,7 +89,7 @@ fn should_clear_name() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_replace_identity_properties() -> Result<(), CallError> {
+fn should_require_authentication_to_replace_identity_properties() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -114,7 +114,7 @@ fn should_require_authentication_to_replace_identity_properties() -> Result<(), 
 }
 
 #[test]
-fn should_not_set_too_long_name() -> Result<(), CallError> {
+fn should_not_set_too_long_name() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();

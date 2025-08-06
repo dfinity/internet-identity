@@ -6,7 +6,7 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::DeviceData;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 
 /// Tests simple upgrade and downgrade.
@@ -53,7 +53,7 @@ fn upgrade_and_rollback_keeps_anchor_intact() {
 /// Verifies that an anchor that was created with the new version of II can still be used when
 /// II is rolled back to the previous version.
 #[test]
-fn should_keep_new_anchor_across_rollback() -> Result<(), CallError> {
+fn should_keep_new_anchor_across_rollback() -> Result<(), RejectResponse> {
     let frontend_hostname = "frontend.com";
     let env = env();
 

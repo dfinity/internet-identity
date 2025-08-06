@@ -11,7 +11,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
     GetIdAliasError, GetIdAliasRequest, PrepareIdAliasError, PrepareIdAliasRequest,
 };
 use internet_identity_interface::internet_identity::types::FrontendHostname;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use std::ops::Deref;
 
 fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
@@ -29,7 +29,7 @@ fn verify_canister_sig_pk(credential_jws: &str, canister_sig_pk_der: &[u8]) {
 
 // Verifies that a valid id_alias is created.
 #[test]
-fn should_get_valid_id_alias() -> Result<(), CallError> {
+fn should_get_valid_id_alias() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -112,7 +112,7 @@ fn should_get_valid_id_alias() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> {
+fn should_get_different_id_alias_for_different_users() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number_1 = flows::register_anchor(&env, canister_id);
@@ -235,7 +235,7 @@ fn should_get_different_id_alias_for_different_users() -> Result<(), CallError> 
 }
 
 #[test]
-fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), CallError> {
+fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -362,7 +362,7 @@ fn should_get_different_id_alias_for_different_relying_parties() -> Result<(), C
 }
 
 #[test]
-fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError> {
+fn should_get_different_id_alias_for_different_issuers() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -489,7 +489,7 @@ fn should_get_different_id_alias_for_different_issuers() -> Result<(), CallError
 }
 
 #[test]
-fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> {
+fn should_get_different_id_alias_for_different_flows() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -606,7 +606,7 @@ fn should_get_different_id_alias_for_different_flows() -> Result<(), CallError> 
 }
 
 #[test]
-fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
+fn should_not_prepare_id_alias_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -628,7 +628,7 @@ fn should_not_prepare_id_alias_for_different_user() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
+fn should_not_get_id_alias_for_different_user() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);
@@ -665,7 +665,7 @@ fn should_not_get_id_alias_for_different_user() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
+fn should_not_get_id_alias_if_not_prepared() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     api::init_salt(&env, canister_id)?;
@@ -696,7 +696,7 @@ fn should_not_get_id_alias_if_not_prepared() -> Result<(), CallError> {
 /// Verifies that there is a graceful failure if II gets upgraded between prepare_id_alias
 /// and get_id_alias.
 #[test]
-fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), CallError> {
+fn should_not_get_prepared_id_alias_after_ii_upgrade() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let identity_number = flows::register_anchor(&env, canister_id);

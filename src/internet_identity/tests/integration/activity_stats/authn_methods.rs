@@ -13,7 +13,7 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -32,7 +32,7 @@ const AUTHN_METHOD_TYPES: [&str; 5] = [
 
 /// Tests that daily active authn_methods are counted correctly.
 #[test]
-fn should_report_daily_active_authn_methods() -> Result<(), CallError> {
+fn should_report_daily_active_authn_methods() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -87,7 +87,7 @@ fn should_report_daily_active_authn_methods() -> Result<(), CallError> {
 
 /// Tests that monthly active authn_methods are counted correctly.
 #[test]
-fn should_report_monthly_active_authn_methods() -> Result<(), CallError> {
+fn should_report_monthly_active_authn_methods() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -142,7 +142,7 @@ fn should_report_monthly_active_authn_methods() -> Result<(), CallError> {
 
 /// Tests that only authn methods bound to an II domain are counted.
 #[test]
-fn should_only_count_ii_domain_authn_methods() -> Result<(), CallError> {
+fn should_only_count_ii_domain_authn_methods() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
@@ -203,7 +203,7 @@ fn should_only_count_ii_domain_authn_methods() -> Result<(), CallError> {
 
 /// Tests that active authn method stats are kept across upgrades from the same release.
 #[test]
-fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
+fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = AuthnMethodData {

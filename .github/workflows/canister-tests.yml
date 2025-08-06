@@ -223,7 +223,7 @@ jobs:
 
   vc-issuer-test:
     runs-on: ubuntu-latest
-    needs: [ docker-build-ii, vc_demo_issuer-build ]
+    needs: [docker-build-ii, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -245,11 +245,10 @@ jobs:
           name: internet_identity_test.wasm.gz
           path: .
       - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
-      - name: Install PocketIC
-        run: |
-          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/6.0.0/pocket-ic-x86_64-linux.gz
-          gzip -d pocket-ic.gz
-          chmod +x pocket-ic
+      - name: Install PocketIC server
+        uses: dfinity/pocketic@main
+        with:
+          pocket-ic-server-version: "9.0.3"
       - name: "Run VC issuer canister tests"
         working-directory: demos/vc_issuer
         run: |
@@ -269,7 +268,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -335,11 +334,11 @@ jobs:
 
   canister-tests-run:
     runs-on: ${{ matrix.os }}
-    needs: [ canister-tests-build, cached-build, docker-build-archive ]
+    needs: [canister-tests-build, cached-build, docker-build-archive]
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-        partition: [ "1/3", "2/3", "3/3" ]
+        os: [ubuntu-latest, macos-latest]
+        partition: ["1/3", "2/3", "3/3"]
     steps:
       - uses: actions/checkout@v4
 
@@ -353,11 +352,10 @@ jobs:
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
-      - name: Install PocketIC
-        run: |
-          curl -sL -o pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/6.0.0/pocket-ic-x86_64-${{ matrix.os == 'macos-latest' && 'darwin' || 'linux' }}.gz
-          gzip -d pocket-ic.gz
-          chmod +x pocket-ic
+      - name: Install PocketIC server
+        uses: dfinity/pocketic@main
+        with:
+          pocket-ic-server-version: "9.0.3"
 
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
@@ -372,7 +370,8 @@ jobs:
           path: .
 
       - name: Run PocketIc
-        run: ./pocket-ic --port-file pocket-ic-port &
+        run: |
+          "${POCKET_IC_BIN}" --port-file pocket-ic-port &
 
       - name: Run Tests
         run: |
@@ -391,7 +390,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [ cached-build, docker-build-archive ]
+    needs: [cached-build, docker-build-archive]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -444,10 +443,10 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [ cached-build, test-app-build, vc_demo_issuer-build ]
+    needs: [cached-build, test-app-build, vc_demo_issuer-build]
     strategy:
       matrix:
-        device: [ "desktop", "mobile" ]
+        device: ["desktop", "mobile"]
         # We run the integration tests on both the official and legacy domains, to make sure
         # the webapp (routes, csp, etc) works on both. Captchas are statically enabled on one
         # domain and disabled on the other.
@@ -466,7 +465,7 @@ jobs:
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
         # version here (with underscore).
-        shard: [ "1_6", "2_6", "3_6", "4_6", "5_6", "6_6" ]
+        shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -576,14 +575,14 @@ jobs:
           name: e2e-test-failures-${{ env.artifact_suffix }}
           path: test-failures/*
           if-no-files-found: ignore
-  
+
   e2e-playwright:
     runs-on: ubuntu-latest
-    needs: [ cached-build, test-app-build ]
+    needs: [cached-build, test-app-build]
     strategy:
       matrix:
-        device: [ "desktop", "mobile" ]
-        shard: [ "1_3", "2_3", "3_3" ]
+        device: ["desktop", "mobile"]
+        shard: ["1_3", "2_3", "3_3"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -672,7 +671,7 @@ jobs:
   # Aggregate all e2e matrix jobs, used in branch protection
   e2e-all:
     runs-on: ubuntu-latest
-    needs: [ e2e, e2e-playwright ]
+    needs: [e2e, e2e-playwright]
     steps:
       - run: echo e2e ok
 
@@ -823,7 +822,7 @@ jobs:
   # On release tags, a new release is created and the assets are uploaded.
   release:
     runs-on: ubuntu-latest
-    needs: [ docker-build-ii, docker-build-archive, vc_demo_issuer-build ]
+    needs: [docker-build-ii, docker-build-archive, vc_demo_issuer-build]
 
     steps:
       - uses: actions/checkout@v4
@@ -1044,7 +1043,7 @@ jobs:
   # Make sure that the asset we're testing is the same as that produced by the (slower) docker builds
   cached-build-check:
     runs-on: ubuntu-latest
-    needs: [ docker-build-ii, cached-build ]
+    needs: [docker-build-ii, cached-build]
     steps:
       - uses: actions/checkout@v4
       - name: "Download docker build"
@@ -1094,7 +1093,7 @@ jobs:
           path: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
 
   verify-clean-build-hash:
-    needs: [ "clean-build", "docker-build-ii" ]
+    needs: ["clean-build", "docker-build-ii"]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

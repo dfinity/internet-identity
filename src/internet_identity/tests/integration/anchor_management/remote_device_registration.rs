@@ -12,14 +12,14 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use std::time::Duration;
 
 /// Test entering registration mode including returned expiration time.
 #[test]
-fn can_enter_device_registration_mode() -> Result<(), CallError> {
+fn can_enter_device_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -52,7 +52,7 @@ fn can_not_enter_device_registration_mode_for_other_user() {
 
 /// Tests that the device registration flow can be completed successfully.
 #[test]
-fn can_register_remote_device() -> Result<(), CallError> {
+fn can_register_remote_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -82,7 +82,7 @@ fn can_register_remote_device() -> Result<(), CallError> {
 
 /// Tests that the device registration flow can be completed successfully after submitting an invalid code.
 #[test]
-fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
+fn can_verify_remote_device_after_failed_attempt() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -125,7 +125,7 @@ fn can_verify_remote_device_after_failed_attempt() -> Result<(), CallError> {
 /// Tests that the anchor info call returns information about tentative devices.
 /// This enables the front-end to continue an in progress flow (e.g. after a refresh of the page).
 #[test]
-fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
+fn anchor_info_should_return_tentative_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -147,7 +147,7 @@ fn anchor_info_should_return_tentative_device() -> Result<(), CallError> {
 
 /// Tests that devices cannot be registered tentatively if the registration mode is not enabled.
 #[test]
-fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError> {
+fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -165,7 +165,7 @@ fn reject_tentative_device_if_not_in_registration_mode() -> Result<(), CallError
 
 /// Tests device registration mode expiration.
 #[test]
-fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallError> {
+fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), RejectResponse> {
     const REGISTRATION_MODE_EXPIRATION: Duration = Duration::from_secs(900);
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -185,7 +185,7 @@ fn reject_tentative_device_if_registration_mode_is_expired() -> Result<(), CallE
 /// Tests that an appropriate result is returned when a verification code is submitted without a
 /// corresponding tentative device.
 #[test]
-fn reject_verification_without_tentative_device() -> Result<(), CallError> {
+fn reject_verification_without_tentative_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -203,7 +203,7 @@ fn reject_verification_without_tentative_device() -> Result<(), CallError> {
 
 /// Tests that the flow is aborted after the expected number of failed verification attempts.
 #[test]
-fn reject_verification_with_wrong_code() -> Result<(), CallError> {
+fn reject_verification_with_wrong_code() -> Result<(), RejectResponse> {
     const MAX_RETRIES: u8 = 3;
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);

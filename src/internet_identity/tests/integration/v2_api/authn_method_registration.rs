@@ -8,11 +8,11 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationCode, AuthnMethodConfirmationError, AuthnMethodRegisterError,
     AuthnMethodRegistration, AuthnMethodRegistrationModeEnterError,
 };
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use std::time::Duration;
 
 #[test]
-fn should_enter_authn_method_registration_mode() -> Result<(), CallError> {
+fn should_enter_authn_method_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -59,7 +59,7 @@ fn should_require_authentication_to_enter_authn_method_registration_mode() {
 }
 
 #[test]
-fn should_register_authn_method() -> Result<(), CallError> {
+fn should_register_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -96,7 +96,7 @@ fn should_register_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_verify_authn_method_after_failed_attempt() -> Result<(), CallError> {
+fn should_verify_authn_method_after_failed_attempt() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -146,7 +146,7 @@ fn should_verify_authn_method_after_failed_attempt() -> Result<(), CallError> {
 }
 
 #[test]
-fn identity_info_should_return_authn_method() -> Result<(), CallError> {
+fn identity_info_should_return_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -183,7 +183,7 @@ fn identity_info_should_return_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallError> {
+fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -233,7 +233,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), CallEr
 }
 
 #[test]
-fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), CallError> {
+fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), RejectResponse> {
     const REGISTRATION_MODE_EXPIRATION: Duration = Duration::from_secs(900);
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -267,7 +267,7 @@ fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), Ca
 }
 
 #[test]
-fn should_reject_confirmation_without_authn_method() -> Result<(), CallError> {
+fn should_reject_confirmation_without_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -299,7 +299,7 @@ fn should_reject_confirmation_without_authn_method() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
+fn should_reject_confirmation_with_wrong_code() -> Result<(), RejectResponse> {
     const MAX_RETRIES: u8 = 3;
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -353,7 +353,7 @@ fn should_reject_confirmation_with_wrong_code() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_no_registration_when_no_tentative_device() -> Result<(), CallError> {
+fn should_return_no_registration_when_no_tentative_device() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -368,7 +368,7 @@ fn should_return_no_registration_when_no_tentative_device() -> Result<(), CallEr
 }
 
 #[test]
-fn should_return_registrations_when_tentative_device_not_verified() -> Result<(), CallError> {
+fn should_return_registrations_when_tentative_device_not_verified() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -403,7 +403,7 @@ fn should_return_registrations_when_tentative_device_not_verified() -> Result<()
 }
 
 #[test]
-fn should_return_no_registrations_when_tentative_device_verified() -> Result<(), CallError> {
+fn should_return_no_registrations_when_tentative_device_verified() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -448,7 +448,7 @@ fn should_return_no_registrations_when_tentative_device_verified() -> Result<(),
 }
 
 #[test]
-fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), CallError> {
+fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -492,7 +492,7 @@ fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), C
 }
 
 #[test]
-fn should_return_identity_number_for_existing_registration_id() -> Result<(), CallError> {
+fn should_return_identity_number_for_existing_registration_id() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -521,7 +521,7 @@ fn should_return_identity_number_for_existing_registration_id() -> Result<(), Ca
 }
 
 #[test]
-fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
+fn should_return_none_after_registration_mode_exit() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -558,7 +558,7 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_none_after_tentative_device_confirmation() -> Result<(), CallError> {
+fn should_return_none_after_tentative_device_confirmation() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -605,7 +605,7 @@ fn should_return_none_after_tentative_device_confirmation() -> Result<(), CallEr
 }
 
 #[test]
-fn should_return_none_after_registration_mode_expiration() -> Result<(), CallError> {
+fn should_return_none_after_registration_mode_expiration() -> Result<(), RejectResponse> {
     const REGISTRATION_MODE_EXPIRATION: std::time::Duration = std::time::Duration::from_secs(900);
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
@@ -638,7 +638,7 @@ fn should_return_none_after_registration_mode_expiration() -> Result<(), CallErr
 }
 
 #[test]
-fn should_return_none_for_registration_id_too_short() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_too_short() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abc1".to_string(); // Too short
@@ -655,7 +655,7 @@ fn should_return_none_for_registration_id_too_short() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_none_for_registration_id_too_long() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_too_long() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdef".to_string(); // Too long
@@ -672,7 +672,7 @@ fn should_return_none_for_registration_id_too_long() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_none_for_registration_id_invalid_chars() -> Result<(), CallError> {
+fn should_return_none_for_registration_id_invalid_chars() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let invalid_id = "abcdç".to_string(); // Invalid chars
@@ -689,7 +689,7 @@ fn should_return_none_for_registration_id_invalid_chars() -> Result<(), CallErro
 }
 
 #[test]
-fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
+fn should_handle_multiple_registration_ids() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method1 = test_authn_method();
@@ -742,7 +742,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_exit_registrations_separately() -> Result<(), CallError> {
+fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method1 = test_authn_method();
@@ -832,7 +832,7 @@ fn should_exit_registrations_separately() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_return_none_for_nonexistent_registration_id() -> Result<(), CallError> {
+fn should_return_none_for_nonexistent_registration_id() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let nonexistent_id = "abc12".to_string();
@@ -849,7 +849,7 @@ fn should_return_none_for_nonexistent_registration_id() -> Result<(), CallError>
 }
 
 #[test]
-fn should_reject_second_registration_with_different_id() -> Result<(), CallError> {
+fn should_reject_second_registration_with_different_id() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();
@@ -884,7 +884,7 @@ fn should_reject_second_registration_with_different_id() -> Result<(), CallError
 }
 
 #[test]
-fn should_return_registration_with_same_id() -> Result<(), CallError> {
+fn should_return_registration_with_same_id() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = test_authn_method();

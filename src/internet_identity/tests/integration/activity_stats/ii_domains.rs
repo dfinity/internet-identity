@@ -2,7 +2,7 @@
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use pocket_ic::CallError;
+use pocket_ic::RejectResponse;
 use std::time::Duration;
 
 const DAY_SECONDS: u64 = 24 * 60 * 60;
@@ -15,7 +15,7 @@ const OTHER_ORIGIN: &str = "https://example.com";
 
 /// Tests that daily active anchors are counted correctly.
 #[test]
-fn should_report_daily_active_anchors() -> Result<(), CallError> {
+fn should_report_daily_active_anchors() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
@@ -95,7 +95,7 @@ fn should_report_daily_active_anchors() -> Result<(), CallError> {
 
 /// Tests that monthly active anchors are counted correctly.
 #[test]
-fn should_report_monthly_active_anchors() -> Result<(), CallError> {
+fn should_report_monthly_active_anchors() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
@@ -174,7 +174,7 @@ fn should_report_monthly_active_anchors() -> Result<(), CallError> {
 
 /// Tests that active anchors are only counted once in a collection period.
 #[test]
-fn should_not_count_repeated_activity_in_same_collection_period() -> Result<(), CallError> {
+fn should_not_count_repeated_activity_in_same_collection_period() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
@@ -228,7 +228,7 @@ fn should_not_count_repeated_activity_in_same_collection_period() -> Result<(), 
 
 /// Tests that monthly active anchors are updated every 24h.
 #[test]
-fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
+fn should_update_monthly_active_anchors_every_day() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
@@ -269,7 +269,7 @@ fn should_update_monthly_active_anchors_every_day() -> Result<(), CallError> {
 
 /// Tests that active anchor stats are kept across upgrades from the previous and the same release.
 #[test]
-fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
+fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
@@ -300,7 +300,7 @@ fn should_keep_stats_across_upgrades() -> Result<(), CallError> {
 
 /// Tests that the stats are updated correctly even with long periods of no activity at all.
 #[test]
-fn should_have_correct_stats_after_long_inactivity() -> Result<(), CallError> {
+fn should_have_correct_stats_after_long_inactivity() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ic0_app_device = device_with_origin(Some(ICP0_APP_ORIGIN.to_string()));
@@ -340,7 +340,7 @@ fn should_have_correct_stats_after_long_inactivity() -> Result<(), CallError> {
 
 /// Tests that activity on other domain and an II domain is attributed to the II domain.
 #[test]
-fn should_count_activity_on_other_and_ii_domain() -> Result<(), CallError> {
+fn should_count_activity_on_other_and_ii_domain() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let internetcomputer_org_device =

@@ -8,14 +8,14 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, AuthnMethodSecuritySettings,
     AuthnMethodSecuritySettingsReplaceError, MetadataEntryV2,
 };
-use pocket_ic::CallError;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
+use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 #[test]
-fn should_replace_authn_method_security_settings() -> Result<(), CallError> {
+fn should_replace_authn_method_security_settings() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = recovery_phrase_authn_method();
@@ -59,7 +59,7 @@ fn should_replace_authn_method_security_settings() -> Result<(), CallError> {
 }
 
 #[test]
-fn should_require_authentication_to_replace_security_settings() -> Result<(), CallError> {
+fn should_require_authentication_to_replace_security_settings() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = recovery_phrase_authn_method();
@@ -98,7 +98,7 @@ fn should_require_authentication_to_replace_security_settings() -> Result<(), Ca
 }
 
 #[test]
-fn should_check_authn_method_exists() -> Result<(), CallError> {
+fn should_check_authn_method_exists() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = recovery_phrase_authn_method();

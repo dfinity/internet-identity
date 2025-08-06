@@ -11,7 +11,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
 use pocket_ic::common::rest::{BlobCompression, ExtendedSubnetConfigSet, SubnetSpec};
-use pocket_ic::{CallError, ErrorCode, PocketIc};
+use pocket_ic::{ErrorCode, PocketIc, PocketIcBuilder, RejectResponse};
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
@@ -21,7 +21,7 @@ use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use url::Url;
 /* The first few lines deal with actually getting the Wasm module(s) to test */
 
@@ -134,10 +134,11 @@ pub fn env() -> PocketIc {
     let port_file = path::PathBuf::from("..").join("..").join("pocket-ic-port");
     if port_file.exists() {
         let port = std::fs::read_to_string(port_file).expect("failed to read port file");
-        return PocketIc::from_config_and_server_url(
-            config,
-            Url::try_from(format!("http://127.0.0.1:{port}").as_str()).expect("Invalid URL"),
-        );
+        return PocketIcBuilder::new_with_config(config)
+            .with_server_url(
+                Url::try_from(format!("http://127.0.0.1:{port}").as_str()).expect("Invalid URL"),
+            )
+            .build();
     }
 
     let pocket_ic_path = path::PathBuf::from(POCKET_IC);
@@ -148,7 +149,7 @@ pub fn env() -> PocketIc {
         &pocket_ic_path);
     }
     env::set_var("POCKET_IC_BIN", POCKET_IC);
-    PocketIc::from_config(config)
+    PocketIcBuilder::new_with_config(config).build()
 }
 
 pub fn install_ii_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
@@ -260,7 +261,7 @@ pub fn upgrade_ii_canister_with_arg(
     canister_id: CanisterId,
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
-) -> Result<(), CallError> {
+) -> Result<(), RejectResponse> {
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
     env.upgrade_canister(canister_id, wasm, byts, None)
 }
@@ -381,22 +382,22 @@ pub fn principal(device: &DeviceData) -> Principal {
 }
 
 pub fn expect_user_error_with_message<T: std::fmt::Debug>(
-    result: Result<T, CallError>,
-    error_code: ErrorCode,
+    result: Result<T, RejectResponse>,
+    expected_error_code: ErrorCode,
     message_pattern: Regex,
 ) {
     match result {
         Ok(_) => panic!("expected error, got {result:?}"),
-        Err(CallError::Reject(_)) => panic!("expected user error, got {result:?}"),
-        Err(CallError::UserError(ref user_error)) => {
-            if user_error.code != error_code {
-                panic!(
-                    "expected error code {:?}, got {:?}",
-                    error_code, user_error.code
-                );
+        Err(RejectResponse {
+            reject_message,
+            error_code,
+            ..
+        }) => {
+            if error_code != expected_error_code {
+                panic!("expected error code {expected_error_code:?}, got {error_code:?}");
             }
-            if !message_pattern.is_match(&user_error.to_string()) {
-                panic!("expected #{message_pattern:?}, got {user_error}");
+            if !message_pattern.is_match(&reject_message.to_string()) {
+                panic!("expected #{message_pattern:?}, got {reject_message}");
             }
         }
     }
@@ -584,10 +585,7 @@ pub fn assert_device_last_used(
 }
 
 pub fn time(env: &PocketIc) -> u64 {
-    env.get_time()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64
+    env.get_time().as_nanos_since_unix_epoch()
 }
 
 pub fn verify_delegation(
