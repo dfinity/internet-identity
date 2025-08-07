@@ -74,7 +74,7 @@ fn should_register_authn_method_through_session() -> Result<(), RejectResponse> 
         identity_number,
         Some(new_authn_method.clone()),
     )?
-    .expect("authn_method_confirm failed");
+    .expect("authn_method_registration_mode_exit failed");
 
     // Assert that we can authenticate with new authn method
     let updated_identity_info = api_v2::identity_info(
