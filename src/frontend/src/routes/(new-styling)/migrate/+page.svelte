@@ -3,7 +3,7 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import Header from "$lib/components/layout/Header.svelte";
-  import MigrationWizard from "$lib/components/wizards/MigrationWizard.svelte";
+  import { MigrationWizard } from "$lib/components/wizards/migration";
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="migration-view">

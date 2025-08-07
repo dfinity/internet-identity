@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MigrationWizard from "$lib/components/wizards/MigrationWizard.svelte";
+  import { MigrationWizard } from "$lib/components/wizards/migration";
   import { authorizationStore } from "$lib/stores/authorization.store";
 </script>
 
