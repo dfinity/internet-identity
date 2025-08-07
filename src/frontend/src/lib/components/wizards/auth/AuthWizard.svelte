@@ -10,7 +10,7 @@
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
-  import MigrationWizard from "../MigrationWizard.svelte";
+  import { MigrationWizard } from "$lib/components/wizards/migration";
 
   interface Props {
     isAuthenticating?: boolean;

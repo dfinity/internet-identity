@@ -1,0 +1,75 @@
+<script lang="ts">
+  import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
+  import Button from "$lib/components/ui/Button.svelte";
+  import Input from "$lib/components/ui/Input.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { nonNullish } from "@dfinity/utils";
+
+  interface Props {
+    onSubmit: (identityNumber: bigint) => void;
+    isAuthenticating?: boolean;
+  }
+
+  let { onSubmit, isAuthenticating }: Props = $props();
+
+  let identityNumber = $state<string | undefined>(undefined);
+
+  const handleSubmit = async () => {
+    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
+    if (nonNullish(identityNumber)) {
+      onSubmit(BigInt(identityNumber));
+    }
+  };
+</script>
+
+<form class="flex flex-1 flex-col">
+  <div class="mb-8 flex flex-col">
+    <MigrationIllustration class="text-fg-primary h-32" />
+    <div>
+      <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
+        Let's get started
+      </h1>
+      <p
+        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+      >
+        Upgrade your existing identity to the new experience in a few steps.
+      </p>
+    </div>
+  </div>
+  <div class="flex flex-col items-stretch gap-4">
+    <Input
+      bind:value={identityNumber}
+      inputmode="numeric"
+      placeholder="Internet Identity number"
+      type="number"
+      size="md"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+      aria-label="Identity number"
+    />
+    <Button
+      onclick={handleSubmit}
+      variant="primary"
+      size="lg"
+      type="submit"
+      disabled={isAuthenticating}
+    >
+      {#if isAuthenticating}
+        <ProgressRing />
+        <span>Authenticating...</span>
+      {:else}
+        <span>Continue</span>
+      {/if}
+    </Button>
+    <Button
+      href="https://identitysupport.dfinity.org/hc/en-us"
+      target="_blank"
+      rel="noopener noreferrer"
+      variant="tertiary"
+      size="lg"
+    >
+      Help & FAQ
+    </Button>
+  </div>
+</form>
