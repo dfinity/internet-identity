@@ -86,6 +86,8 @@
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
+      continueFromAnotherDevice={() =>
+        (isContinueFromAnotherDeviceVisible = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
@@ -110,8 +112,6 @@
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
       continueWithGoogle={handleContinueWithGoogle}
-      continueFromAnotherDevice={() =>
-        (isContinueFromAnotherDeviceVisible = true)}
       migrate={() => (isMigrating = true)}
     />
   {/if}

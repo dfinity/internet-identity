@@ -6,24 +6,16 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import {
-    CONTINUE_FROM_ANOTHER_DEVICE,
-    ENABLE_MIGRATE_FLOW,
-  } from "$lib/state/featureFlags";
+  import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
-    continueFromAnotherDevice: () => void;
     migrate: () => void;
   }
 
-  const {
-    setupOrUseExistingPasskey,
-    continueWithGoogle,
-    continueFromAnotherDevice,
-    migrate,
-  }: Props = $props();
+  const { setupOrUseExistingPasskey, continueWithGoogle, migrate }: Props =
+    $props();
 
   let isAuthenticating = $state(false);
 
@@ -73,23 +65,16 @@
         {/if}
       </Button>
     {/if}
-    {#if $CONTINUE_FROM_ANOTHER_DEVICE}
-      <Button
-        onclick={continueFromAnotherDevice}
-        variant="tertiary"
-        disabled={isAuthenticating}
-        size="xl"
-      >
-        Continue from another device
-      </Button>
-    {/if}
   </div>
   {#if $ENABLE_MIGRATE_FLOW}
-    <div
-      class="text-text-primary text-md flex flex-row items-center justify-between"
-    >
-      <p>Still have an identity number?</p>
-      <button onclick={migrate} class="font-bold">Upgrade</button>
+    <div class="flex flex-row items-center justify-between">
+      <p class="text-md text-text-secondary">Still have an identity number?</p>
+      <button
+        onclick={migrate}
+        class="text-md text-text-primary font-semibold outline-0 focus-visible:underline"
+      >
+        Upgrade
+      </button>
     </div>
   {/if}
 </div>

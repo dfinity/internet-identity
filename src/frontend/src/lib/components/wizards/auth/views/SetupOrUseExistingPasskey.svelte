@@ -3,13 +3,15 @@
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
 
   interface Props {
     setupNew: () => void;
     useExisting: () => Promise<void>;
+    continueFromAnotherDevice: () => void;
   }
 
-  const { setupNew, useExisting }: Props = $props();
+  const { setupNew, useExisting, continueFromAnotherDevice }: Props = $props();
 
   let isAuthenticating = $state(false);
 
@@ -50,4 +52,14 @@
       <span>Use an existing Passkey</span>
     {/if}
   </Button>
+  {#if $CONTINUE_FROM_ANOTHER_DEVICE}
+    <Button
+      onclick={continueFromAnotherDevice}
+      variant="tertiary"
+      disabled={isAuthenticating}
+      size="lg"
+    >
+      Continue from another device
+    </Button>
+  {/if}
 </div>

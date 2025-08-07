@@ -99,7 +99,7 @@ export const ADD_ACCESS_METHOD = createFeatureFlagStore(
 
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   "CONTINUE_FROM_ANOTHER_DEVICE",
-  false,
+  true, // Enable temp key flow (until backend changes can be enabled)
   () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 

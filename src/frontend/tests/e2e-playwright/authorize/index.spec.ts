@@ -59,6 +59,9 @@ test("Authorize by signing in from another device", async ({
   const principal = await authorize(page, async (authPage) => {
     // Switch to current device and start "Continue from another device" flow to get link
     await authPage
+      .getByRole("button", { name: "Continue with Passkey" })
+      .click();
+    await authPage
       .getByRole("button", { name: "Continue from another device" })
       .click();
     const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
