@@ -11,9 +11,10 @@
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
+    migrate: () => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
+  const { setupOrUseExistingPasskey, continueWithGoogle, migrate }: Props = $props();
 
   let isAuthenticating = $state(false);
 
@@ -69,7 +70,7 @@
       class="text-text-primary text-md flex flex-row items-center justify-between"
     >
       <p>Still have an identity number?</p>
-      <a href="/migrate" class="font-bold">Upgrade</a>
+      <button onclick={migrate} class="font-bold">Upgrade</button>
     </div>
   {/if}
 </div>
