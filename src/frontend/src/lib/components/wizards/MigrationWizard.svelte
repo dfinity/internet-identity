@@ -7,7 +7,8 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { handleError } from "$lib/components/utils/error";
 
-  const { onSuccess }: { onSuccess: () => void } = $props();
+  const { onSuccess }: { onSuccess: (identityNumber: bigint) => void } =
+    $props();
 
   let identityNumber: number | undefined = $state(undefined);
   const migrationFlow = new MigrationFlow();
@@ -23,7 +24,10 @@
 
   const handleCreate = async (name: string) => {
     await migrationFlow.createPasskey(name);
-    onSuccess();
+    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
+    if (nonNullish(migrationFlow.identityNumber)) {
+      onSuccess(migrationFlow.identityNumber);
+    }
   };
 </script>
 

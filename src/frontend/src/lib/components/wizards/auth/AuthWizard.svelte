@@ -10,6 +10,7 @@
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
+  import MigrationWizard from "../MigrationWizard.svelte";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -73,6 +74,10 @@
       onOtherDevice(identityNumber);
     }
   };
+
+  const handleMigrationSuccess = (identityNumber: bigint) => {
+    onSignIn(identityNumber);
+  };
 </script>
 
 {#snippet dialogContent()}
@@ -83,6 +88,8 @@
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
+  {:else if authFlow.view === "migrate"}
+    <MigrationWizard onSuccess={handleMigrationSuccess} />
   {/if}
 {/snippet}
 
@@ -98,6 +105,7 @@
       continueWithGoogle={handleContinueWithGoogle}
       continueFromAnotherDevice={() =>
         (isContinueFromAnotherDeviceVisible = true)}
+      migrate={authFlow.migrate}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}
