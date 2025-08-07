@@ -10,6 +10,7 @@
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
+  import MigrationWizard from "../MigrationWizard.svelte";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -34,6 +35,7 @@
   const authFlow = new AuthFlow();
 
   let isContinueFromAnotherDeviceVisible = $state(false);
+  let isMigrating = $state(false);
 
   const handleContinueWithExistingPasskey = async () => {
     isAuthenticating = true;
@@ -73,6 +75,10 @@
       onOtherDevice(identityNumber);
     }
   };
+
+  const handleMigrationSuccess = (identityNumber: bigint) => {
+    onSignIn(identityNumber);
+  };
 </script>
 
 {#snippet dialogContent()}
@@ -88,6 +94,14 @@
 
 {#if isContinueFromAnotherDeviceVisible}
   <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
+{:else if isMigrating}
+  {#if !withinDialog}
+    <Dialog onClose={() => (isMigrating = false)}>
+      <MigrationWizard onSuccess={handleMigrationSuccess} />
+    </Dialog>
+  {:else}
+    <MigrationWizard onSuccess={handleMigrationSuccess} />
+  {/if}
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
 {:else}
@@ -98,6 +112,7 @@
       continueWithGoogle={handleContinueWithGoogle}
       continueFromAnotherDevice={() =>
         (isContinueFromAnotherDeviceVisible = true)}
+      migrate={() => (isMigrating = true)}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}
