@@ -6,22 +6,14 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import {
-    CONTINUE_FROM_ANOTHER_DEVICE,
-    ENABLE_MIGRATE_FLOW,
-  } from "$lib/state/featureFlags";
+  import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void>;
-    continueFromAnotherDevice: () => void;
   }
 
-  const {
-    setupOrUseExistingPasskey,
-    continueWithGoogle,
-    continueFromAnotherDevice,
-  }: Props = $props();
+  const { setupOrUseExistingPasskey, continueWithGoogle }: Props = $props();
 
   let isAuthenticating = $state(false);
 
@@ -69,16 +61,6 @@
           <GoogleIcon />
           <span>Continue with Google</span>
         {/if}
-      </Button>
-    {/if}
-    {#if $CONTINUE_FROM_ANOTHER_DEVICE}
-      <Button
-        onclick={continueFromAnotherDevice}
-        variant="tertiary"
-        disabled={isAuthenticating}
-        size="xl"
-      >
-        Continue from another device
       </Button>
     {/if}
   </div>
