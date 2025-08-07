@@ -32,7 +32,7 @@ import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 
 export class AuthFlow {
   #view = $state<
-    "chooseMethod" | "setupOrUseExistingPasskey" | "setupNewPasskey" | "migrate"
+    "chooseMethod" | "setupOrUseExistingPasskey" | "setupNewPasskey"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -65,10 +65,6 @@ export class AuthFlow {
   chooseMethod = (): void => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
     this.#view = "chooseMethod";
-  };
-
-  migrate = (): void => {
-    this.#view = "migrate";
   };
 
   setupOrUseExistingPasskey = (): void => {

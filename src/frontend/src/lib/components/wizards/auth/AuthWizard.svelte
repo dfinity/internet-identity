@@ -35,6 +35,7 @@
   const authFlow = new AuthFlow();
 
   let isContinueFromAnotherDeviceVisible = $state(false);
+  let isMigrating = $state(false);
 
   const handleContinueWithExistingPasskey = async () => {
     isAuthenticating = true;
@@ -88,13 +89,19 @@
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
-  {:else if authFlow.view === "migrate"}
-    <MigrationWizard onSuccess={handleMigrationSuccess} />
   {/if}
 {/snippet}
 
 {#if isContinueFromAnotherDeviceVisible}
   <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
+{:else if isMigrating}
+  {#if !withinDialog}
+    <Dialog onClose={() => (isMigrating = false)}>
+      <MigrationWizard onSuccess={handleMigrationSuccess} />
+    </Dialog>
+  {:else}
+    <MigrationWizard onSuccess={handleMigrationSuccess} />
+  {/if}
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
 {:else}
@@ -105,7 +112,7 @@
       continueWithGoogle={handleContinueWithGoogle}
       continueFromAnotherDevice={() =>
         (isContinueFromAnotherDeviceVisible = true)}
-      migrate={authFlow.migrate}
+      migrate={() => (isMigrating = true)}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}
