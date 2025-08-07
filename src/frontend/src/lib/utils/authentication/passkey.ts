@@ -13,13 +13,14 @@ import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { canisterConfig } from "$lib/globals";
 
-export class IdentityNotMigratedError extends Error {
+export class CredentialNotFound extends Error {
   constructor() {
     super();
-    Object.setPrototypeOf(this, IdentityNotMigratedError.prototype);
+    Object.setPrototypeOf(this, CredentialNotFound.prototype);
   }
 
-  message = "Identity has not been migrated.";
+  message =
+    "Credential not found. Either you removed the passkey from the identity or this identity needs to be migrated.";
 }
 
 export const authenticateWithPasskey = async ({
@@ -53,7 +54,7 @@ export const authenticateWithPasskey = async ({
             await actor.lookup_device_key(new Uint8Array(result.rawId))
           )[0];
           if (isNullish(lookupResult)) {
-            throw new IdentityNotMigratedError();
+            throw new CredentialNotFound();
           }
           identityNumber = lookupResult.anchor_number;
           return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
