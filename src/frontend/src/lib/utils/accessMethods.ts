@@ -3,6 +3,8 @@ import {
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { isNullish, nonNullish } from "@dfinity/utils";
+import { isSameOrigin } from "./urlUtils";
+import { canisterConfig } from "$lib/globals";
 
 /**
  * Check if a `AuthnMethodData` or `OpenIdCredential` is a WebAuthn method
@@ -49,4 +51,38 @@ export const getLastUsedAccessMethod = (
       return 0;
     }
   })[0];
+};
+
+const hasOrigin = (
+  accessMethod: AuthnMethodData,
+  origin: string[],
+): boolean => {
+  const metadataEntry = accessMethod.metadata.find(([key]) => key === "origin");
+  const metadataValue = metadataEntry?.[1];
+  if (nonNullish(metadataValue) && "String" in metadataValue) {
+    return (
+      origin.filter((o) => isSameOrigin(o, metadataValue.String)).length > 0
+    );
+  }
+  return false;
+};
+
+/**
+ * Filters the access methods to only include the legacy ones.
+ *
+ * An access method is considered legacy if:
+ * - It is a recovery method (not supported yet in new flow).
+ * - It wasn't registered in the new flow's origin.
+ *
+ * TODO: Do not use new_flow_origins when old domains move to new flow.
+ * TODO: Remove recovery once they are supported in new flow.
+ *
+ * @param accessMethod
+ * @returns {boolean}
+ */
+export const isLegacyAuthnMethod = (accessMethod: AuthnMethodData): boolean => {
+  return (
+    !hasOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
+    "Recovery" in accessMethod.security_settings.purpose
+  );
 };

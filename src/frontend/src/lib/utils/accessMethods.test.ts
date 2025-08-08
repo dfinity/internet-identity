@@ -1,9 +1,22 @@
 // ... existing code ...
-import { getLastUsedAccessMethod } from "./accessMethods";
+import { getLastUsedAccessMethod, isLegacyAuthnMethod } from "./accessMethods";
 import type {
   AuthnMethodData,
   OpenIdCredential,
+  AuthnMethodPurpose,
+  AuthnMethodProtection,
+  MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
+import { vi } from "vitest";
+
+// Mock the canisterConfig
+vi.mock("$lib/globals", () => ({
+  canisterConfig: {
+    new_flow_origins: [
+      ["https://id.ai", "https://rdmx6-jaaaa-aaaah-qdrqq-cai.ic0.app"],
+    ],
+  },
+}));
 
 describe("getLastUsedAccessMethod", () => {
   const makeAuthnMethod = (id: string, last_auth: number[] = []) =>
@@ -68,5 +81,111 @@ describe("getLastUsedAccessMethod", () => {
     const cred = makeOpenIdCredential("oidc", [999]);
     const result = getLastUsedAccessMethod([method1], [cred]);
     expect(result).toMatchObject({ id: "oidc", last_authentication: [999] });
+  });
+});
+
+describe("isLegacyAuthnMethod", () => {
+  const makeAuthnMethodForLegacyTest = ({
+    purpose = { Authentication: null },
+    origin,
+    protection = { Unprotected: null },
+  }: {
+    purpose?: AuthnMethodPurpose;
+    origin?: string;
+    protection?: AuthnMethodProtection;
+  }): AuthnMethodData => {
+    const metadata: MetadataMapV2 =
+      origin !== undefined && origin !== null && origin !== ""
+        ? [["origin", { String: origin }]]
+        : [];
+
+    return {
+      id: "test-id",
+      last_authentication: [],
+      security_settings: {
+        purpose,
+        protection,
+      },
+      metadata,
+      authn_method: {
+        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+      },
+    } as AuthnMethodData;
+  };
+
+  describe("Recovery method tests", () => {
+    it("returns true for access method with Recovery purpose", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Recovery: null },
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
+
+    it("returns true for access method with Recovery purpose and matching origin", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Recovery: null },
+        origin: "https://id.ai",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
+  });
+
+  describe("Origin scenarios", () => {
+    it("returns true for access method with legacy origin", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Authentication: null },
+        origin: "https://identity.ic0.app",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
+
+    it("returns false for access method with origin matching new_flow_origins", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Authentication: null },
+        origin: "https://id.ai",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(false);
+    });
+
+    it("returns false for access method with origin matching second new_flow_origin", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Authentication: null },
+        origin: "https://rdmx6-jaaaa-aaaah-qdrqq-cai.ic0.app",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(false);
+    });
+
+    it("returns true for access method with origin NOT matching new_flow_origins", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Authentication: null },
+        origin: "https://different-origin.com",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
+
+    it("returns true for access method with no origin metadata", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Authentication: null },
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
+  });
+
+  describe("Combined scenarios", () => {
+    it("returns true for access method with both Recovery purpose AND legacy origin", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Recovery: null },
+        origin: "https://identity.ic0.app",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
+
+    it("returns true for access method with Authentication purpose and non-matching origin", () => {
+      const method = makeAuthnMethodForLegacyTest({
+        purpose: { Authentication: null },
+        origin: "https://different-origin.com",
+      });
+      expect(isLegacyAuthnMethod(method)).toBe(true);
+    });
   });
 });
