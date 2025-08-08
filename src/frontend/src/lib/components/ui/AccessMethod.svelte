@@ -10,15 +10,18 @@
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
+  import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
 
   let {
     accessMethod,
     class: classes,
     isCurrent,
+    isDisabled,
   }: {
     accessMethod: AuthnMethodData | OpenIdCredential | null;
     class?: string;
     isCurrent?: boolean;
+    isDisabled?: boolean;
   } = $props();
 
   const getOpenIdCredentialName = (credential: OpenIdCredential | null) => {
@@ -60,7 +63,7 @@
     <!-- Passkey -->
     <div
       class={[
-        "text-text-primary foldable-subgrid text-sm font-semibold nth-[2]:hidden",
+        `${isDisabled ? "text-text-disabled" : "text-text-primary"} foldable-subgrid text-sm font-semibold nth-[2]:hidden`,
         classes,
       ]}
       in:fade={{ delay: 30, duration: 30 }}
