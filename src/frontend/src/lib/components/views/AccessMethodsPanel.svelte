@@ -178,7 +178,6 @@
                 iconOnly
                 aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
                 class="!text-fg-error-secondary"
-                disabled={isLegacyAuthnMethod(authnMethod)}
               >
                 <Trash2Icon size="1.25rem" />
               </Button>
