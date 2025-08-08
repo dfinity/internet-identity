@@ -85,12 +85,12 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
 
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
-  true,
+  false,
 );
 
 export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
   "ENABLE_MIGRATE_FLOW",
-  true,
+  false,
 );
 export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
