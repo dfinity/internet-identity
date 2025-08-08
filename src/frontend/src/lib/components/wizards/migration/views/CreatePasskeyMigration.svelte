@@ -27,7 +27,9 @@
 
 <form class="flex flex-1 flex-col">
   <div class="mb-8 flex flex-col">
-    <SmileyWritingIllustration class="text-text-primary h-32" />
+    <div class="text-text-primary flex h-32 items-center justify-center py-5">
+      <SmileyWritingIllustration />
+    </div>
     <div>
       <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
         Name your identity
@@ -44,8 +46,10 @@
       bind:value={passkeyName}
       inputmode="text"
       placeholder="Identity name"
+      hint="Pick something recognizable, like your name."
       type="text"
       size="md"
+      autofocus
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
