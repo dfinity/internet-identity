@@ -167,7 +167,6 @@
               variant="tertiary"
               iconOnly
               aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
-              disabled={isLegacyAuthnMethod(authnMethod)}
             >
               <EditIcon size="1.25rem" />
             </Button>
