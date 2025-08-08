@@ -28,7 +28,7 @@
 <form class="flex flex-1 flex-col">
   <div class="mb-8 flex flex-col">
     <div
-      class="h32 text-text-primary flex h-32 items-center justify-center py-5"
+      class="text-text-primary flex h-32 items-center justify-center py-5"
     >
       <SmileyWritingIllustration />
     </div>
