@@ -4,6 +4,7 @@ mod authn_method_registration;
 mod authn_method_remove;
 mod authn_method_replace;
 mod authn_method_security_settings;
+mod authn_method_session_registration;
 pub mod authn_method_test_helpers;
 mod identity_authn_info;
 mod identity_info;

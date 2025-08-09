@@ -215,6 +215,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), Reject
         canister_id,
         authn_method.principal(),
         identity_number,
+        None,
     )?
     .expect("authn_method_registration_mode_exit failed");
 
@@ -480,6 +481,7 @@ fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), R
         canister_id,
         authn_method.principal(),
         identity_number,
+        None,
     )?
     .expect("authn_method_registration_mode_exit failed");
 
@@ -544,6 +546,7 @@ fn should_return_none_after_registration_mode_exit() -> Result<(), RejectRespons
         canister_id,
         authn_method.principal(),
         identity_number,
+        None,
     )?
     .expect("authn_method_registration_mode_exit failed");
 
@@ -780,6 +783,7 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
         canister_id,
         authn_method1.principal(),
         identity_number1,
+        None,
     )?
     .expect("authn_method_registration_mode_enter failed");
 
@@ -807,6 +811,7 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
         canister_id,
         authn_method2.principal(),
         identity_number2,
+        None,
     )?
     .expect("authn_method_registration_mode_enter failed");
 

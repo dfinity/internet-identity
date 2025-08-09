@@ -255,14 +255,15 @@ pub fn authn_method_registration_mode_exit(
     canister_id: CanisterId,
     sender: Principal,
     identity_number: IdentityNumber,
-) -> Result<Result<(), ()>, RejectResponse> {
+    authn_method: Option<AuthnMethodData>,
+) -> Result<Result<(), AuthnMethodRegistrationModeExitError>, RejectResponse> {
     call_candid_as(
         env,
         canister_id,
         RawEffectivePrincipal::None,
         sender,
         "authn_method_registration_mode_exit",
-        (identity_number,),
+        (identity_number, authn_method),
     )
     .map(|(x,)| x)
 }
@@ -279,6 +280,23 @@ pub fn authn_method_register(
         RawEffectivePrincipal::None,
         "authn_method_register",
         (identity_number, authn_method),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn authn_method_session_register(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    identity_number: IdentityNumber,
+) -> Result<Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError>, RejectResponse> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "authn_method_session_register",
+        (identity_number,),
     )
     .map(|(x,)| x)
 }
