@@ -20,6 +20,7 @@
   import { handleError } from "$lib/components/utils/error";
   import {
     getLastUsedAccessMethod,
+    isLegacyAuthnMethod,
     isWebAuthnMetaData,
   } from "$lib/utils/accessMethods";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
@@ -149,35 +150,49 @@
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
         <div
-          class="text-text-primary flex min-w-8 items-center justify-center px-4 pr-4"
+          class={[
+            "flex min-w-8 items-center justify-center px-4 pr-4",
+            isLegacyAuthnMethod(authnMethod)
+              ? "text-text-disabled"
+              : "text-text-primary",
+          ]}
         >
           <PasskeyIcon />
         </div>
+        <!-- TODO: Create Design's ListItem -->
         <AccessMethod
           accessMethod={authnMethod}
+          isDisabled={isLegacyAuthnMethod(authnMethod)}
           isCurrent={isCurrentAccessMethod(authnMethod)}
         />
-        <div class="flex items-center justify-end gap-2 px-4">
-          <Button
-            onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
-            variant="tertiary"
-            iconOnly
-            aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
-          >
-            <EditIcon size="1.25rem" />
-          </Button>
-          {#if isRemoveAccessMethodVisible}
+        {#if !isLegacyAuthnMethod(authnMethod)}
+          <div class="flex items-center justify-end gap-2 px-4">
             <Button
-              onclick={() => (identityInfo.removableAuthnMethod = authnMethod)}
+              onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
               variant="tertiary"
               iconOnly
-              aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
-              class="!text-fg-error-secondary"
+              aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
             >
-              <Trash2Icon size="1.25rem" />
+              <EditIcon size="1.25rem" />
             </Button>
-          {/if}
-        </div>
+            {#if isRemoveAccessMethodVisible}
+              <Button
+                onclick={() =>
+                  (identityInfo.removableAuthnMethod = authnMethod)}
+                variant="tertiary"
+                iconOnly
+                aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
+                class="!text-fg-error-secondary"
+              >
+                <Trash2Icon size="1.25rem" />
+              </Button>
+            {/if}
+          </div>
+        {:else}
+          <!-- Necessary to keep the same height as iconOnly buttons -->
+          <!-- TODO: Align with design what should set the height? -->
+          <div class="size-10"></div>
+        {/if}
       </div>
     {/each}
     {#each openIdCredentials as credential}
