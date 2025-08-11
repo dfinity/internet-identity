@@ -11,13 +11,13 @@ use std::borrow::Cow;
 pub struct StorableOpenIdCredentialKey(#[n(0)] pub Iss, #[n(1)] pub Sub);
 
 impl Storable for StorableOpenIdCredentialKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
         minicbor::encode(self, &mut buffer).expect("failed to encode StorableOpenIdCredentialKey");
         Cow::Owned(buffer)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         minicbor::decode(&bytes).expect("failed to decode StorableOpenIdCredentialKey")
     }
 

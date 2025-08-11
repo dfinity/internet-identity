@@ -92,10 +92,10 @@ struct IssuerConfig {
 }
 
 impl Storable for IssuerConfig {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(candid::encode_one(self).expect("failed to encode IssuerConfig"))
     }
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         candid::decode_one(&bytes).expect("failed to decode IssuerConfig")
     }
     const BOUND: Bound = Bound::Unbounded;

@@ -11,13 +11,13 @@ pub struct StorableDiscrepancyCounter {
 }
 
 impl Storable for StorableDiscrepancyCounter {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
         minicbor::encode(self, &mut buffer).expect("failed to encode StorableDiscrepancyCounter");
         Cow::Owned(buffer)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         minicbor::decode(&bytes).expect("failed to decode StorableDiscrepancyCounter")
     }
 

@@ -330,11 +330,11 @@ impl AggregationKey {
 }
 
 impl Storable for AggregationKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_cbor::to_vec(&self).unwrap())
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         serde_cbor::from_slice(&bytes).unwrap()
     }
 

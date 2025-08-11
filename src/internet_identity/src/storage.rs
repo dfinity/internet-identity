@@ -219,11 +219,11 @@ type ManagedMemory<M> = VirtualMemory<RestrictedMemory<M>>;
 struct BufferedEntryWrapper(BufferedEntry);
 
 impl Storable for BufferedEntryWrapper {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(candid::encode_one(&self.0).expect("failed to serialize archive entry"))
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         BufferedEntryWrapper(
             candid::decode_one(&bytes).expect("failed to deserialize archive entry"),
         )

@@ -11,11 +11,11 @@ use std::borrow::Cow;
 pub struct StorableCredentialId(Vec<u8>);
 
 impl Storable for StorableCredentialId {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         self.0.to_bytes()
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         StorableCredentialId(bytes.to_vec())
     }
 

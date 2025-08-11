@@ -13,7 +13,7 @@ pub struct StorableFixedAnchor {
 }
 
 impl Storable for StorableFixedAnchor {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut candid =
             candid::encode_one(self).expect("Failed to serialize StorableAnchor to candid");
         let mut buf = (candid.len() as u16).to_le_bytes().to_vec(); // 2 bytes for length
@@ -21,7 +21,7 @@ impl Storable for StorableFixedAnchor {
         Cow::Owned(buf)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         let length = u16::from_le_bytes(bytes[..2].try_into().unwrap()) as usize;
 
         candid::decode_one(&bytes[2..length + 2])
