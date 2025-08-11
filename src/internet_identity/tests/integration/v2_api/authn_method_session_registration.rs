@@ -562,7 +562,7 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
         identity_number1,
     )?
     .expect("authn_method_session_register failed for identity 1");
-    let add_response2 = api_v2::authn_method_session_register(
+    api_v2::authn_method_session_register(
         &env,
         canister_id,
         session2.principal(),
