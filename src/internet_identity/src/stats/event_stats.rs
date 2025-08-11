@@ -144,14 +144,14 @@ pub struct PrepareDelegationEvent {
 const EVENT_KEY_SIZE: usize = 10;
 
 impl Storable for EventKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buf = Vec::with_capacity(EVENT_KEY_SIZE);
         buf.extend(self.time.to_be_bytes());
         buf.extend(self.counter.to_be_bytes());
         Cow::Owned(buf)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         Self {
             time: u64::from_be_bytes(
                 TryFrom::try_from(&bytes[0..8]).expect("failed to read event key timestamp"),
@@ -169,11 +169,11 @@ impl Storable for EventKey {
 }
 
 impl Storable for EventData {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(serde_cbor::to_vec(&self).unwrap())
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         serde_cbor::from_slice(&bytes).unwrap()
     }
 

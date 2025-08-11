@@ -47,11 +47,11 @@ pub struct StorablePersistentState {
 }
 
 impl Storable for StorablePersistentState {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(candid::encode_one(self).expect("failed to serialize persistent state"))
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         candid::decode_one(&bytes).expect("failed to deserialize persistent state")
     }
 

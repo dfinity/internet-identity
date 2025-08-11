@@ -171,7 +171,7 @@ struct ArchiveConfig {
 }
 
 impl Storable for ConfigState {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         match &self {
             ConfigState::Uninitialized => Cow::Borrowed(&[]),
             ConfigState::Initialized(config) => {
@@ -181,7 +181,7 @@ impl Storable for ConfigState {
         }
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         if bytes.is_empty() {
             return ConfigState::Uninitialized;
         }
@@ -207,7 +207,7 @@ struct AnchorIndexKey {
 /// Note: byte ordering is very important as the keys are sorted on a byte level (lower to higher index)
 /// --> use big endian to ensure that the most significant bytes are compared first
 impl Storable for AnchorIndexKey {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buf = Vec::with_capacity(std::mem::size_of::<AnchorIndexKey>());
         buf.extend(self.anchor.to_be_bytes());
         buf.extend(self.timestamp.to_be_bytes());
@@ -215,7 +215,7 @@ impl Storable for AnchorIndexKey {
         Cow::Owned(buf)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         AnchorIndexKey {
             anchor: u64::from_be_bytes(
                 TryFrom::try_from(&bytes[0..8]).expect("failed to read anchor"),

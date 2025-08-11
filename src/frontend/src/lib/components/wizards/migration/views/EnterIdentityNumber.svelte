@@ -3,7 +3,9 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { SUPPORT_URL } from "$lib/config";
   import { nonNullish } from "@dfinity/utils";
+  import { onMount } from "svelte";
 
   interface Props {
     onSubmit: (identityNumber: bigint) => void;
@@ -12,7 +14,12 @@
 
   let { onSubmit, isAuthenticating }: Props = $props();
 
-  let identityNumber = $state<string | undefined>(undefined);
+  let identityNumber = $state<string>("");
+  let inputElement = $state<HTMLInputElement>();
+
+  onMount(() => {
+    inputElement?.focus();
+  });
 
   const handleSubmit = async () => {
     // Button is disabled if identityNumber is null or undefined so no need to manage that case.
@@ -24,7 +31,9 @@
 
 <form class="flex flex-1 flex-col">
   <div class="mb-8 flex flex-col">
-    <MigrationIllustration class="text-fg-primary h-32" />
+    <div class="text-text-primary flex h-32 items-center justify-center py-5">
+      <MigrationIllustration />
+    </div>
     <div>
       <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
         Let's get started
@@ -38,11 +47,14 @@
   </div>
   <div class="flex flex-col items-stretch gap-4">
     <Input
-      bind:value={identityNumber}
+      bind:value={
+        () => identityNumber ?? "",
+        (value) => (identityNumber = value.replace(/\D/g, ""))
+      }
       inputmode="numeric"
       placeholder="Internet Identity number"
-      type="number"
       size="md"
+      bind:element={inputElement}
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
@@ -53,7 +65,7 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={isAuthenticating}
+      disabled={isAuthenticating || identityNumber.length === 0}
     >
       {#if isAuthenticating}
         <ProgressRing />
@@ -63,7 +75,7 @@
       {/if}
     </Button>
     <Button
-      href="https://identitysupport.dfinity.org/hc/en-us"
+      href={SUPPORT_URL}
       target="_blank"
       rel="noopener noreferrer"
       variant="tertiary"
