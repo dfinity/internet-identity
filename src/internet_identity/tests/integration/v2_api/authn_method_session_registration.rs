@@ -7,6 +7,7 @@ use internet_identity_interface::internet_identity::types::{
     AuthnMethodConfirmationError, AuthnMethodRegisterError, AuthnMethodRegistration,
 };
 use pocket_ic::RejectResponse;
+use std::array;
 use std::time::Duration;
 
 #[test]
@@ -334,6 +335,193 @@ fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), R
         api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
             .expect("identity_info failed");
     assert_eq!(identity_info.authn_method_registration, None);
+
+    Ok(())
+}
+
+#[test]
+fn should_register_authn_methods_in_parallel() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let [authn_method1, authn_method2, session1, session2, new_authn_method1, new_authn_method2] =
+        array::from_fn(|i| sample_webauthn_authn_method(i.try_into().unwrap()));
+    let identity_number1 = create_identity_with_authn_method(&env, canister_id, &authn_method1);
+    let identity_number2 = create_identity_with_authn_method(&env, canister_id, &authn_method2);
+    let [registration_mode_id1, registration_mode_id2] = ["abc12".to_string(), "def34".to_string()];
+
+    // Enter registration mode for both identities
+    api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method1.principal(),
+        identity_number1,
+        Some(registration_mode_id1.clone()),
+    )?
+    .expect("authn_method_registration_mode_enter failed for identity 1");
+    api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method2.principal(),
+        identity_number2,
+        Some(registration_mode_id2.clone()),
+    )?
+    .expect("authn_method_registration_mode_enter failed for identity 2");
+
+    // Register and then confirm tentative session for identity 1
+    let add_response1 = api_v2::authn_method_session_register(
+        &env,
+        canister_id,
+        session1.principal(),
+        identity_number1,
+    )?
+    .expect("authn_method_session_register failed for identity 1");
+    api_v2::authn_method_confirm(
+        &env,
+        canister_id,
+        authn_method1.principal(),
+        identity_number1,
+        &add_response1.confirmation_code,
+    )?
+    .expect("authn_method_confirm failed for identity 1");
+
+    // Register and then confirm tentative session for identity 2
+    let add_response2 = api_v2::authn_method_session_register(
+        &env,
+        canister_id,
+        session1.principal(),
+        identity_number2,
+    )?
+    .expect("authn_method_session_register failed for identity 2");
+    api_v2::authn_method_confirm(
+        &env,
+        canister_id,
+        authn_method2.principal(),
+        identity_number2,
+        &add_response2.confirmation_code,
+    )?
+    .expect("authn_method_confirm failed for identity 2");
+
+    // Exit registration mode with authn method for identity 1 and then identity 2
+    api_v2::authn_method_registration_mode_exit(
+        &env,
+        canister_id,
+        session1.principal(),
+        identity_number1,
+        Some(new_authn_method1.clone()),
+    )?
+    .expect("authn_method_registration_mode_exit failed for identity 1");
+    api_v2::authn_method_registration_mode_exit(
+        &env,
+        canister_id,
+        session2.principal(),
+        identity_number2,
+        Some(new_authn_method2.clone()),
+    )?
+    .expect("authn_method_registration_mode_exit failed for identity 2");
+
+    // Assert that we can authenticate with new authn methods
+    let updated_identity_info1 = api_v2::identity_info(
+        &env,
+        canister_id,
+        new_authn_method1.principal(),
+        identity_number1,
+    )?
+    .expect("Unable to authenticate with new authn method on identity 1");
+    let updated_identity_info2 = api_v2::identity_info(
+        &env,
+        canister_id,
+        new_authn_method1.principal(),
+        identity_number1,
+    )?
+    .expect("Unable to authenticate with new authn method on identity 2");
+
+    // Assert new authn methods are listed
+    assert!(updated_identity_info1
+        .authn_methods
+        .into_iter()
+        .map(|data| data.authn_method)
+        .collect::<Vec<_>>()
+        .contains(&new_authn_method1.authn_method));
+    assert!(updated_identity_info2
+        .authn_methods
+        .into_iter()
+        .map(|data| data.authn_method)
+        .collect::<Vec<_>>()
+        .contains(&new_authn_method2.authn_method));
+
+    assert_eq!(updated_identity_info1.authn_method_registration, None);
+    assert_eq!(updated_identity_info2.authn_method_registration, None);
+
+    Ok(())
+}
+
+#[test]
+fn should_reject_code_from_another_registration() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let [authn_method1, authn_method2, session1, session2, new_authn_method1, new_authn_method2] =
+        array::from_fn(|i| sample_webauthn_authn_method(i.try_into().unwrap()));
+    let identity_number1 = create_identity_with_authn_method(&env, canister_id, &authn_method1);
+    let identity_number2 = create_identity_with_authn_method(&env, canister_id, &authn_method2);
+    let [registration_mode_id1, registration_mode_id2] = ["abc12".to_string(), "def34".to_string()];
+
+    // Enter registration mode for both identities
+    api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method1.principal(),
+        identity_number1,
+        Some(registration_mode_id1.clone()),
+    )?
+    .expect("authn_method_registration_mode_enter failed for identity 1");
+    api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        authn_method2.principal(),
+        identity_number2,
+        Some(registration_mode_id2.clone()),
+    )?
+    .expect("authn_method_registration_mode_enter failed for identity 2");
+
+    // Register tentative sessions for identity 1 and 2
+    let add_response1 = api_v2::authn_method_session_register(
+        &env,
+        canister_id,
+        session1.principal(),
+        identity_number1,
+    )?
+    .expect("authn_method_session_register failed for identity 1");
+    let add_response2 = api_v2::authn_method_session_register(
+        &env,
+        canister_id,
+        session2.principal(),
+        identity_number2,
+    )?
+    .expect("authn_method_session_register failed for identity 2");
+
+    // Confirmation code from identity 1 with identity 2 and vice versa should be rejected
+    let result1 = api_v2::authn_method_confirm(
+        &env,
+        canister_id,
+        authn_method1.principal(),
+        identity_number1,
+        &add_response2.confirmation_code,
+    )?;
+    let result2 = api_v2::authn_method_confirm(
+        &env,
+        canister_id,
+        authn_method2.principal(),
+        identity_number2,
+        &add_response1.confirmation_code,
+    )?;
+    assert_eq!(
+        result1,
+        Err(AuthnMethodConfirmationError::WrongCode { retries_left: 2 })
+    );
+    assert_eq!(
+        result2,
+        Err(AuthnMethodConfirmationError::WrongCode { retries_left: 2 })
+    );
 
     Ok(())
 }
