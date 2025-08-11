@@ -61,6 +61,11 @@
     isAuthDialogOpen = false;
   };
 
+  const onMigration = async () => {
+    await gotoManage();
+    isAuthDialogOpen = false;
+  };
+
   const authLastUsedFlow = new AuthLastUsedFlow();
   $effect(() =>
     authLastUsedFlow.init(
@@ -231,6 +236,7 @@
             bind:isAuthenticating
             {onSignIn}
             {onSignUp}
+            {onMigration}
             onOtherDevice={() => (isAuthDialogOpen = false)}
             onError={(error) => {
               isAuthDialogOpen = false;

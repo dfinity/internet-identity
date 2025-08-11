@@ -49,9 +49,18 @@
     });
     await goto("/authorize/continue");
   };
+  const onMigration = async () => {
+    await goto("/authorize/upgrade-success");
+  };
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} {onOtherDevice} onError={handleError}>
+<AuthWizard
+  {onSignIn}
+  {onSignUp}
+  {onOtherDevice}
+  {onMigration}
+  onError={handleError}
+>
   <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     Choose method

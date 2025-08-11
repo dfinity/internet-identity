@@ -31,6 +31,11 @@
     void preloadCode(data.next ?? "/manage");
     void preloadData(data.next ?? "/manage");
   };
+
+  const onMigration = async () => {
+    isAuthDialogOpen = false;
+    await goto("/manage");
+  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
@@ -147,6 +152,7 @@
               bind:isAuthenticating
               {onSignIn}
               {onSignUp}
+              {onMigration}
               onOtherDevice={() => (isAuthDialogOpen = false)}
               onError={(error) => {
                 isAuthDialogOpen = false;
@@ -166,7 +172,7 @@
           </Dialog>
         {/if}
       {:else}
-        <AuthWizard {onSignIn} {onSignUp} onError={handleError}>
+        <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
           <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
             Manage your Internet&nbsp;Identity
           </h1>
