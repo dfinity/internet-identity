@@ -16,13 +16,13 @@ pub struct StorableApplication {
 }
 
 impl Storable for StorableApplication {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
         minicbor::encode(self, &mut buffer).expect("failed to encode StorableApplication");
         Cow::Owned(buffer)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         minicbor::decode(&bytes).expect("failed to decode StorableApplication")
     }
 
@@ -50,11 +50,11 @@ impl StorableOriginHash {
 }
 
 impl Storable for StorableOriginHash {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         Cow::Owned(self.hash.to_vec())
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         Self {
             hash: bytes.as_ref().try_into().unwrap(),
         }

@@ -17,13 +17,13 @@ pub enum StorableMetadataEntryV2 {
 }
 
 impl Storable for StorableMetadataEntryV2 {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
         minicbor::encode(self, &mut buffer).expect("failed to encode StorableMetadataEntryV2");
         Cow::Owned(buffer)
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
         minicbor::decode(&bytes).expect("failed to decode StorableMetadataEntryV2")
     }
 
