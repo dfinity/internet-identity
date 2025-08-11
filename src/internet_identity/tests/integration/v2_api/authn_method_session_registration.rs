@@ -574,19 +574,19 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
     api_v2::authn_method_registration_mode_exit(
         &env,
         canister_id,
-        authn_method1.principal(),
-        identity_number1,
+        authn_method2.principal(),
+        identity_number2,
         None,
     )?
-    .expect("authn_method_registration_mode_exit failed for identity 1");
+    .expect("authn_method_registration_mode_exit failed for identity 2");
     api_v2::authn_method_confirm(
         &env,
         canister_id,
-        authn_method2.principal(),
-        identity_number2,
+        authn_method1.principal(),
+        identity_number1,
         &add_response1.confirmation_code,
     )?
-    .expect("authn_method_confirm failed for identity 2");
+    .expect("authn_method_confirm failed for identity 1");
 
     // Assert that registration mode has been closed for identity 1 and is still open for identity 2
     let updated_identity_info1 = api_v2::identity_info(
@@ -603,15 +603,15 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
         identity_number2,
     )?
     .expect("identity_info failed for identity 2");
-    assert_eq!(updated_identity_info1.authn_method_registration, None);
     assert_eq!(
-        updated_identity_info2.authn_method_registration,
+        updated_identity_info1.authn_method_registration,
         Some(AuthnMethodRegistration {
-            expiration: add_response2.expiration,
-            session: Some(session2.principal()),
+            expiration: add_response1.expiration,
+            session: Some(session1.principal()),
             authn_method: None,
         })
     );
+    assert_eq!(updated_identity_info2.authn_method_registration, None);
 
     Ok(())
 }
