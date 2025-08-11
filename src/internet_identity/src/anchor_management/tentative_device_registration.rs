@@ -318,11 +318,14 @@ pub fn get_tentative_registration(anchor_number: AnchorNumber) -> Option<DeviceR
                         tentative_device: Some(tentative_device.clone()),
                         tentative_session: None,
                     }),
-                    // Return tentative session
+                    // Return tentative (confirmed) session
                     TentativeDeviceRegistration {
                         expiration,
                         state:
                             SessionTentativelyAdded {
+                                tentative_session, ..
+                            }
+                            | SessionTentativelyConfirmed {
                                 tentative_session, ..
                             },
                         ..

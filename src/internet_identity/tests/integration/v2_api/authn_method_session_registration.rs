@@ -41,7 +41,7 @@ fn should_register_authn_method_through_session() -> Result<(), RejectResponse> 
     .expect("authn_method_session_register failed");
 
     // Assert that correct session has been tentatively registered
-    let identity_info = api_v2::identity_info(
+    let registered_identity_info = api_v2::identity_info(
         &env,
         canister_id,
         existing_authn_method.principal(),
@@ -49,7 +49,7 @@ fn should_register_authn_method_through_session() -> Result<(), RejectResponse> 
     )?
     .expect("identity_info failed");
     assert_eq!(
-        identity_info.authn_method_registration,
+        registered_identity_info.authn_method_registration,
         Some(AuthnMethodRegistration {
             expiration: add_response.expiration,
             session: Some(session.principal()),
@@ -66,6 +66,23 @@ fn should_register_authn_method_through_session() -> Result<(), RejectResponse> 
         &add_response.confirmation_code,
     )?
     .expect("authn_method_confirm failed");
+
+    // Assert that correct session has been tentatively confirmed
+    let confirmed_identity_info = api_v2::identity_info(
+        &env,
+        canister_id,
+        existing_authn_method.principal(),
+        identity_number,
+    )?
+    .expect("identity_info failed");
+    assert_eq!(
+        confirmed_identity_info.authn_method_registration,
+        Some(AuthnMethodRegistration {
+            expiration: add_response.expiration,
+            session: Some(session.principal()),
+            authn_method: None,
+        })
+    );
 
     // Exit registration mode with authn method
     api_v2::authn_method_registration_mode_exit(
