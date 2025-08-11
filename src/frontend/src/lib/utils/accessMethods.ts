@@ -60,9 +60,7 @@ const hasOrigin = (
   const metadataEntry = accessMethod.metadata.find(([key]) => key === "origin");
   const metadataValue = metadataEntry?.[1];
   if (nonNullish(metadataValue) && "String" in metadataValue) {
-    return (
-      origin.filter((o) => isSameOrigin(o, metadataValue.String)).length > 0
-    );
+    return origin.some((o) => isSameOrigin(o, metadataValue.String));
   }
   return false;
 };

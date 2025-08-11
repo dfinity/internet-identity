@@ -63,7 +63,8 @@
     <!-- Passkey -->
     <div
       class={[
-        `${isDisabled ? "text-text-disabled" : "text-text-primary"} foldable-subgrid text-sm font-semibold nth-[2]:hidden`,
+        "foldable-subgrid text-sm font-semibold nth-[2]:hidden",
+        isDisabled ? "text-text-disabled" : "text-text-primary",
         classes,
       ]}
       in:fade={{ delay: 30, duration: 30 }}

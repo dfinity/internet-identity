@@ -150,7 +150,12 @@
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
         <div
-          class={`${isLegacyAuthnMethod(authnMethod) ? "text-text-disabled" : "text-text-primary"} flex min-w-8 items-center justify-center px-4 pr-4`}
+          class={[
+            "flex min-w-8 items-center justify-center px-4 pr-4",
+            isLegacyAuthnMethod(authnMethod)
+              ? "text-text-disabled"
+              : "text-text-primary",
+          ]}
         >
           <PasskeyIcon />
         </div>
