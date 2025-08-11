@@ -25,6 +25,7 @@
   />
   <path
     vector-effect="non-scaling-stroke"
+    shape-rendering="crispEdges"
     d="M77.6 47.4 45.5 79.5v11h11l32.76-32.76.6-.63a7.8 7.8 0 0 0-.28-10.7 7.8 7.8 0 0 0-10.73-.24c-.43.39-1.24 1.22-1.24 1.22z"
   />
 </svg>
