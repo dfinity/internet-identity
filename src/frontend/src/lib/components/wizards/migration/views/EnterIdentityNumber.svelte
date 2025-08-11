@@ -14,7 +14,7 @@
 
   let { onSubmit, isAuthenticating }: Props = $props();
 
-  let identityNumber = $state<string | undefined>(undefined);
+  let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
 
   onMount(() => {
@@ -49,8 +49,7 @@
     <Input
       bind:value={
         () => identityNumber ?? "",
-        (value: string | undefined) =>
-          (identityNumber = value?.replace(/\D/g, ""))
+        (value) => (identityNumber = value.replace(/\D/g, ""))
       }
       inputmode="numeric"
       placeholder="Internet Identity number"
@@ -66,7 +65,7 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={isAuthenticating}
+      disabled={isAuthenticating || identityNumber.length === 0}
     >
       {#if isAuthenticating}
         <ProgressRing />
