@@ -17,6 +17,7 @@
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
     onOtherDevice?: (identityNumber: bigint) => void; // TODO: Remove once we can sign in directly
+    onMigration?: () => void;
     onError: (error: unknown) => void;
     withinDialog?: boolean;
     children?: Snippet;
@@ -27,6 +28,7 @@
     onSignIn,
     onSignUp,
     onOtherDevice = () => {},
+    onMigration = () => {},
     onError,
     withinDialog = false,
     children,
@@ -76,8 +78,8 @@
     }
   };
 
-  const handleMigrationSuccess = (identityNumber: bigint) => {
-    onSignIn(identityNumber);
+  const handleMigrationSuccess = () => {
+    onMigration();
   };
 </script>
 

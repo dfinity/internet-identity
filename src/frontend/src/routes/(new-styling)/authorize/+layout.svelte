@@ -88,6 +88,10 @@
     await goto("/authorize/continue");
     isAuthDialogOpen = false;
   };
+  const onMigration = async () => {
+    await goto("/authorize/upgrade-success");
+    isAuthDialogOpen = false;
+  };
 
   onMount(() => {
     authorizationStore.init();
@@ -147,6 +151,7 @@
             {onSignIn}
             {onSignUp}
             {onOtherDevice}
+            {onMigration}
             onError={(error) => {
               isAuthDialogOpen = false;
               handleError(error);
