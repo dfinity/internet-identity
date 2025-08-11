@@ -1,11 +1,11 @@
 <script lang="ts">
-  import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
+  import { onMount } from "svelte";
 
   interface Props {
     onSubmit: (passkeyName: string) => void;
@@ -16,6 +16,11 @@
   let { onSubmit, isAuthenticating, identityNumber }: Props = $props();
 
   let passkeyName = $state<string | undefined>(undefined);
+  let inputElement = $state<HTMLInputElement>();
+
+  onMount(() => {
+    inputElement?.focus();
+  });
 
   const handleSubmit = async () => {
     // Button is disabled if identityNumber is null or undefined so no need to manage that case.
@@ -26,10 +31,10 @@
 </script>
 
 <form class="flex flex-1 flex-col">
-  <div class="mb-8 flex flex-col">
-    <SmileyWritingIllustration class="text-text-primary h-32" />
+  <div class="text-text-primary mb-8 flex flex-col items-center justify-center">
+    <SmileyWritingIllustration class="my-5 h-32" />
     <div>
-      <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
+      <h1 class="mb-3 text-2xl font-medium sm:text-center">
         Name your identity
       </h1>
       <p
@@ -44,8 +49,10 @@
       bind:value={passkeyName}
       inputmode="text"
       placeholder="Identity name"
+      hint="Pick something recognizable, like your name."
       type="text"
       size="md"
+      bind:element={inputElement}
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
