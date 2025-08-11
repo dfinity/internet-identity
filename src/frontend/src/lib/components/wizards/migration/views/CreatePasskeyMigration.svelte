@@ -1,11 +1,11 @@
 <script lang="ts">
-  import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
+  import { onMount } from "svelte";
 
   interface Props {
     onSubmit: (passkeyName: string) => void;
@@ -16,6 +16,11 @@
   let { onSubmit, isAuthenticating, identityNumber }: Props = $props();
 
   let passkeyName = $state<string | undefined>(undefined);
+  let inputElement = $state<HTMLInputElement>();
+
+  onMount(() => {
+    inputElement?.focus();
+  });
 
   const handleSubmit = async () => {
     // Button is disabled if identityNumber is null or undefined so no need to manage that case.
@@ -47,7 +52,7 @@
       hint="Pick something recognizable, like your name."
       type="text"
       size="md"
-      autofocus
+      bind:element={inputElement}
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"

@@ -5,6 +5,7 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { SUPPORT_URL } from "$lib/config";
   import { nonNullish } from "@dfinity/utils";
+  import { onMount } from "svelte";
 
   interface Props {
     onSubmit: (identityNumber: bigint) => void;
@@ -14,6 +15,11 @@
   let { onSubmit, isAuthenticating }: Props = $props();
 
   let identityNumber = $state<string | undefined>(undefined);
+  let inputElement = $state<HTMLInputElement>();
+
+  onMount(() => {
+    inputElement?.focus();
+  });
 
   const handleSubmit = async () => {
     // Button is disabled if identityNumber is null or undefined so no need to manage that case.
@@ -49,7 +55,7 @@
       inputmode="numeric"
       placeholder="Internet Identity number"
       size="md"
-      autofocus
+      bind:element={inputElement}
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
