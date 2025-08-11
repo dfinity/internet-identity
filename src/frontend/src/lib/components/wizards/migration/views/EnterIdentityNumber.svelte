@@ -15,42 +15,6 @@
 
   let identityNumber = $state<string | undefined>(undefined);
 
-  const handleKeyDown = (event: KeyboardEvent) => {
-    // Allow numeric keys (0-9)
-    if (event.key >= "0" && event.key <= "9") {
-      return;
-    }
-
-    // Allow essential navigation and editing keys
-    const allowedKeys = [
-      "Backspace",
-      "Delete",
-      "Tab",
-      "ArrowLeft",
-      "ArrowRight",
-      "ArrowUp",
-      "ArrowDown",
-      "Home",
-      "End",
-      "Enter",
-    ];
-
-    if (allowedKeys.includes(event.key)) {
-      return;
-    }
-
-    // Allow copy/paste/select all shortcuts
-    if (event.ctrlKey || event.metaKey) {
-      const shortcuts = ["a", "c", "v", "x", "z"];
-      if (shortcuts.includes(event.key.toLowerCase())) {
-        return;
-      }
-    }
-
-    // Prevent all other keys
-    event.preventDefault();
-  };
-
   const handleSubmit = async () => {
     // Button is disabled if identityNumber is null or undefined so no need to manage that case.
     if (nonNullish(identityNumber)) {
@@ -77,8 +41,11 @@
   </div>
   <div class="flex flex-col items-stretch gap-4">
     <Input
-      bind:value={identityNumber}
-      onkeydown={handleKeyDown}
+      bind:value={
+        () => identityNumber ?? "",
+        (value: string | undefined) =>
+          (identityNumber = value?.replace(/\D/g, ""))
+      }
       inputmode="numeric"
       placeholder="Internet Identity number"
       size="md"
