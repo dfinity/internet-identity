@@ -588,7 +588,7 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
     )?
     .expect("authn_method_confirm failed for identity 1");
 
-    // Assert that registration mode has been closed for identity 2 and is still open for identity 1
+    // Assert that registration mode is still open for identity 1 and closed for identity 2
     let updated_identity_info1 = api_v2::identity_info(
         &env,
         canister_id,
