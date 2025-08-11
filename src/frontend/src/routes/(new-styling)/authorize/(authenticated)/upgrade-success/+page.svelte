@@ -3,7 +3,7 @@
   import { authorizationStore } from "$lib/stores/authorization.store";
 
   const handleRedirect = () => {
-    authorizationStore.authorize(undefined, 0);
+    authorizationStore.authorize(undefined);
   };
 </script>
 
