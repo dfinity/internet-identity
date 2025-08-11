@@ -459,7 +459,7 @@ fn should_register_authn_methods_in_parallel() -> Result<(), RejectResponse> {
 fn should_reject_code_from_another_registration() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    let [authn_method1, authn_method2, session1, session2, new_authn_method1, new_authn_method2] =
+    let [authn_method1, authn_method2, session1, session2] =
         array::from_fn(|i| sample_webauthn_authn_method(i.try_into().unwrap()));
     let identity_number1 = create_identity_with_authn_method(&env, canister_id, &authn_method1);
     let identity_number2 = create_identity_with_authn_method(&env, canister_id, &authn_method2);
@@ -530,7 +530,7 @@ fn should_reject_code_from_another_registration() -> Result<(), RejectResponse> 
 fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    let [authn_method1, authn_method2, session1, session2, new_authn_method1, new_authn_method2] =
+    let [authn_method1, authn_method2, session1, session2] =
         array::from_fn(|i| sample_webauthn_authn_method(i.try_into().unwrap()));
     let identity_number1 = create_identity_with_authn_method(&env, canister_id, &authn_method1);
     let identity_number2 = create_identity_with_authn_method(&env, canister_id, &authn_method2);
