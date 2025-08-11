@@ -8,8 +8,7 @@
 
 <svg
   {...props}
-  class={["h-full fill-none stroke-current", className]}
-  fill="none"
+  class={["fill-none stroke-current", className]}
   viewBox="0 0 93 93"
 >
   <path
@@ -17,8 +16,8 @@
     stroke-linecap="round"
     d="M85.14 37.5A42.5 42.5 0 0 0 .51 42.98a42.5 42.5 0 0 0 39.02 42.25"
   />
-  <circle cx="29" cy="33" r="4.5" />
-  <circle cx="54" cy="33" r="4.5" />
+  <circle cx="29" cy="33" r="4.5" vector-effect="non-scaling-stroke" />
+  <circle cx="54" cy="33" r="4.5" vector-effect="non-scaling-stroke" />
   <path
     vector-effect="non-scaling-stroke"
     stroke-linecap="round"

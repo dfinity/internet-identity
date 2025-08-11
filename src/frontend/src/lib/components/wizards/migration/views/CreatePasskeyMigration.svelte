@@ -26,12 +26,10 @@
 </script>
 
 <form class="flex flex-1 flex-col">
-  <div class="mb-8 flex flex-col">
-    <div class="text-text-primary flex h-32 items-center justify-center py-5">
-      <SmileyWritingIllustration />
-    </div>
+  <div class="text-text-primary mb-8 flex flex-col items-center justify-center">
+    <SmileyWritingIllustration class="h-32 py-5" />
     <div>
-      <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
+      <h1 class="mb-3 text-2xl font-medium sm:text-center">
         Name your identity
       </h1>
       <p
