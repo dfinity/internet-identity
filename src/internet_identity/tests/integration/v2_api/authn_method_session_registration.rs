@@ -388,7 +388,7 @@ fn should_register_authn_methods_in_parallel() -> Result<(), RejectResponse> {
     let add_response2 = api_v2::authn_method_session_register(
         &env,
         canister_id,
-        session1.principal(),
+        session2.principal(),
         identity_number2,
     )?
     .expect("authn_method_session_register failed for identity 2");
@@ -430,8 +430,8 @@ fn should_register_authn_methods_in_parallel() -> Result<(), RejectResponse> {
     let updated_identity_info2 = api_v2::identity_info(
         &env,
         canister_id,
-        new_authn_method1.principal(),
-        identity_number1,
+        new_authn_method2.principal(),
+        identity_number2,
     )?
     .expect("Unable to authenticate with new authn method on identity 2");
 
@@ -589,23 +589,23 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
     .expect("authn_method_confirm failed for identity 2");
 
     // Assert that registration mode has been closed for identity 1 and is still open for identity 2
-    let identity_info1 = api_v2::identity_info(
+    let updated_identity_info1 = api_v2::identity_info(
         &env,
         canister_id,
         authn_method1.principal(),
         identity_number1,
     )?
     .expect("identity_info failed for identity 1");
-    let identity_info2 = api_v2::identity_info(
+    let updated_identity_info2 = api_v2::identity_info(
         &env,
         canister_id,
         authn_method2.principal(),
         identity_number2,
     )?
     .expect("identity_info failed for identity 2");
-    assert_eq!(identity_info1.authn_method_registration, None);
+    assert_eq!(updated_identity_info1.authn_method_registration, None);
     assert_eq!(
-        identity_info2.authn_method_registration,
+        updated_identity_info2.authn_method_registration,
         Some(AuthnMethodRegistration {
             expiration: add_response2.expiration,
             session: Some(session2.principal()),
