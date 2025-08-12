@@ -32,10 +32,9 @@
   });
 </script>
 
-<form class="flex flex-1 flex-col">
+<form class="flex flex-1 flex-col" in:fly={{ duration: 200, x: 10 }}>
   <div
     class="text-text-primary mb-8 flex w-full flex-col items-center justify-center"
-    in:fly={{ duration: 200, x: 10 }}
   >
     <SmileyWritingIllustration class="my-5 h-22" />
     <div>
