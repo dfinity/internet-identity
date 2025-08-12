@@ -14,10 +14,11 @@
   </div>
   <div class="mb-8 flex flex-col gap-2">
     <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
-      You're all set!
+      Identity upgraded!
     </h1>
     <p class="text-md text-text-tertiary text-center font-medium text-balance">
-      Your identity has been successfully migrated to the new experience.
+      You no longer need to remember your identity number and can use your
+      fingerprint, face or screen lock instead.
     </p>
   </div>
   <Button variant="primary" onclick={handleRedirect}>Go to app</Button>
