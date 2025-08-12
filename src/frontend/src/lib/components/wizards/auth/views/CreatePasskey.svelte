@@ -79,11 +79,9 @@
       {/if}
     </Button>
     {#if identityNumber !== undefined}
-      <p
-        class="text-text-primary flex items-center justify-center gap-2 text-xs"
-      >
-        <span>You are upgrading ID</span>
-        <Badge size="sm">{identityNumber}</Badge>
+      <p class="text-text-primary text-center text-xs">
+        You are upgrading ID
+        <Badge class="ml-2" size="sm">{identityNumber}</Badge>
       </p>
     {/if}
   </div>

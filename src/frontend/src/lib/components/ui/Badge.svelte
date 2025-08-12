@@ -21,7 +21,7 @@
 <span
   {...props}
   class={[
-    "rounded-full border font-medium",
+    "inline-block rounded-full border font-medium",
     {
       surface: "border-border-tertiary text-text-secondary bg-bg-primary",
     }[color],
