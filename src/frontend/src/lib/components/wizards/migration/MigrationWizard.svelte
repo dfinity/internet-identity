@@ -4,7 +4,6 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import { handleError } from "$lib/components/utils/error";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
-  import CreatePasskeyMigration from "./views/CreatePasskeyMigration.svelte";
 
   const { onSuccess }: { onSuccess: (identityNumber: bigint) => void } =
     $props();
@@ -33,9 +32,8 @@
   />
   <!-- User can't move to this step if identityNumber is null or undefined so no need to manage that case. -->
 {:else if migrationFlow.view === "enterName" && nonNullish(migrationFlow.identityNumber)}
-  <CreatePasskeyMigration
-    onSubmit={handleCreate}
-    isAuthenticating={migrationFlow.authenticating}
+  <CreatePasskey
+    create={handleCreate}
     identityNumber={migrationFlow.identityNumber}
   />
 {/if}
