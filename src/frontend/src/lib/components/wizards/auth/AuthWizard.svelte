@@ -17,7 +17,7 @@
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
     onOtherDevice?: (identityNumber: bigint) => void; // TODO: Remove once we can sign in directly
-    onMigration?: () => void;
+    onMigration?: (identityNumber: bigint) => void;
     onError: (error: unknown) => void;
     withinDialog?: boolean;
     children?: Snippet;
@@ -77,10 +77,6 @@
       onOtherDevice(identityNumber);
     }
   };
-
-  const handleMigrationSuccess = () => {
-    onMigration();
-  };
 </script>
 
 {#snippet dialogContent()}
@@ -101,10 +97,10 @@
 {:else if isMigrating}
   {#if !withinDialog}
     <Dialog onClose={() => (isMigrating = false)}>
-      <MigrationWizard onSuccess={handleMigrationSuccess} />
+      <MigrationWizard onSuccess={onMigration} />
     </Dialog>
   {:else}
-    <MigrationWizard onSuccess={handleMigrationSuccess} />
+    <MigrationWizard onSuccess={onMigration} />
   {/if}
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
