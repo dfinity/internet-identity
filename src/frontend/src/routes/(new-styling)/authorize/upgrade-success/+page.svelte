@@ -18,7 +18,6 @@
 
   onMount(() => {
     intervalId = window.setInterval(() => {
-      if (redirected) return;
       countdown -= 1;
       if (countdown <= 0) handleRedirect();
     }, 1000);
