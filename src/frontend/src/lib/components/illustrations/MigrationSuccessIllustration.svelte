@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import FingerprintIllustration from "./FingerprintIllustration.svelte";
   import PasscodeIllustration from "./PasscodeIllustration.svelte";
   import SquareSmileyIllustration from "./SquareSmileyIllustration.svelte";
