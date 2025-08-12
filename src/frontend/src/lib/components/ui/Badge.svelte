@@ -4,7 +4,7 @@
   type Color = "surface";
   type Size = "sm" | "md" | "lg";
 
-  type Props = HTMLAttributes<HTMLDivElement> & {
+  type Props = HTMLAttributes<HTMLSpanElement> & {
     color?: Color;
     size?: Size;
   };
@@ -18,10 +18,10 @@
   }: Props = $props();
 </script>
 
-<div
+<span
   {...props}
   class={[
-    "rounded-full border font-medium",
+    "inline-block rounded-full border font-medium",
     {
       surface: "border-border-tertiary text-text-secondary bg-bg-primary",
     }[color],
@@ -34,4 +34,4 @@
   ]}
 >
   {@render children?.()}
-</div>
+</span>
