@@ -2,34 +2,30 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { authorizationStore } from "$lib/stores/authorization.store";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
 
-  let countdown = 5;
-  let intervalId: ReturnType<typeof setInterval> | undefined;
-  let redirected = false;
+  const COUNTDOWN_SECONDS = 5;
+  let countdown = $state(COUNTDOWN_SECONDS);
+  let intervalId: number | undefined;
+  let redirected = $state(false);
 
   const handleRedirect = () => {
     if (redirected) return;
     redirected = true;
-    if (intervalId) clearInterval(intervalId);
+    if (intervalId) window.clearInterval(intervalId);
     authorizationStore.authorize(undefined);
   };
 
   onMount(() => {
-    intervalId = setInterval(() => {
-      if (redirected) {
-        if (intervalId) clearInterval(intervalId);
-        return;
-      }
+    intervalId = window.setInterval(() => {
+      if (redirected) return;
       countdown -= 1;
-      if (countdown <= 0) {
-        handleRedirect();
-      }
+      if (countdown <= 0) handleRedirect();
     }, 1000);
-  });
 
-  onDestroy(() => {
-    if (intervalId) clearInterval(intervalId);
+    return () => {
+      if (intervalId) window.clearInterval(intervalId);
+    };
   });
 </script>
 
