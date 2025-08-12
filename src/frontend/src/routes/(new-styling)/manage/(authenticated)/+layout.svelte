@@ -61,9 +61,14 @@
     isAuthDialogOpen = false;
   };
 
-  const onMigration = async () => {
-    await gotoManage();
+  const onMigration = async (identityNumber: bigint) => {
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    toaster.success({
+      title: "Migration completed successfully",
+      duration: 4000,
+    });
     isAuthDialogOpen = false;
+    await gotoManage();
   };
 
   const authLastUsedFlow = new AuthLastUsedFlow();
