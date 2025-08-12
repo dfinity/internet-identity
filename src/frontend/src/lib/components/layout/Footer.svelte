@@ -1,22 +1,10 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import Button from "$lib/components/ui/Button.svelte";
-  import { goto } from "$app/navigation";
-  import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
-  import { page } from "$app/state";
 
   type Props = HTMLAttributes<HTMLElement>;
 
   const { children, class: className, ...props }: Props = $props();
-
-  // TODO: Remove once we have the proper UX for triggering the migration
-  const triggerMigration = () => {
-    const migrationPath = page.route.id?.includes("authorize")
-      ? "/authorize/migrate"
-      : "/migrate";
-    goto(migrationPath);
-  };
 </script>
 
 <footer
