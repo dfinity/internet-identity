@@ -111,8 +111,6 @@ export class MigrationFlow {
         }
       }
 
-      console.error(e);
-
       throw new Error(
         "Failed to authenticate using passkey. Please try again and contact support if the issue persists.",
       );
