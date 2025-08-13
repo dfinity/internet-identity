@@ -10,18 +10,20 @@
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
-  import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
+  import { getOrigin } from "$lib/utils/accessMethods";
 
   let {
     accessMethod,
     class: classes,
     isCurrent,
     isDisabled,
+    showOrigin,
   }: {
     accessMethod: AuthnMethodData | OpenIdCredential | null;
     class?: string;
     isCurrent?: boolean;
     isDisabled?: boolean;
+    showOrigin?: boolean;
   } = $props();
 
   const getOpenIdCredentialName = (credential: OpenIdCredential | null) => {
@@ -70,12 +72,28 @@
       in:fade={{ delay: 30, duration: 30 }}
       out:fade={{ duration: 30 }}
     >
-      <div class="flex min-w-32 items-center pr-3">
-        {getAuthnMethodAlias(accessMethod)}
-        {#if isCurrent}
-          <span class="ml-2" aria-label="Current Passkey">
-            <PulsatingCircleIcon />
-          </span>
+      <div class="flex min-w-32 pr-3">
+        {#if showOrigin && getOrigin(accessMethod)}
+          <div class="flex flex-col justify-center">
+            <div class="flex items-center gap-2">
+              <span>{getAuthnMethodAlias(accessMethod)}</span>
+              {#if isCurrent}
+                <PulsatingCircleIcon />
+              {/if}
+            </div>
+            <div class="text-text-tertiary text-xs font-extralight">
+              {getOrigin(accessMethod)}
+            </div>
+          </div>
+        {:else}
+          <div class="flex items-center">
+            {getAuthnMethodAlias(accessMethod)}
+            {#if isCurrent}
+              <span class="ml-2" aria-label="Current Passkey">
+                <PulsatingCircleIcon />
+              </span>
+            {/if}
+          </div>
         {/if}
       </div>
       {#if isCurrent}

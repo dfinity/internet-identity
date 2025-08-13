@@ -53,16 +53,52 @@ export const getLastUsedAccessMethod = (
   })[0];
 };
 
-const hasOrigin = (
+/**
+ * Extract the origin from an AuthnMethodData's metadata
+ */
+export const getOrigin = (
   accessMethod: AuthnMethodData,
-  origin: string[],
-): boolean => {
+): string | undefined => {
   const metadataEntry = accessMethod.metadata.find(([key]) => key === "origin");
   const metadataValue = metadataEntry?.[1];
   if (nonNullish(metadataValue) && "String" in metadataValue) {
-    return origin.some((o) => isSameOrigin(o, metadataValue.String));
+    return metadataValue.String;
+  }
+  return undefined;
+};
+
+const hasOrigin = (
+  accessMethod: AuthnMethodData,
+  origins: string[],
+): boolean => {
+  const accessMethodOrigin = getOrigin(accessMethod);
+  if (nonNullish(accessMethodOrigin)) {
+    return origins.some((o) => isSameOrigin(o, accessMethodOrigin));
   }
   return false;
+};
+
+/**
+ * Get all unique origins from a list of authentication methods
+ */
+export const getUniqueOrigins = (authnMethods: AuthnMethodData[]): string[] => {
+  const origins = new Set<string>();
+  for (const method of authnMethods) {
+    const origin = getOrigin(method);
+    if (origin) {
+      origins.add(origin);
+    }
+  }
+  return Array.from(origins);
+};
+
+/**
+ * Check if there are multiple unique origins across authentication methods
+ */
+export const hasMultipleOrigins = (
+  authnMethods: AuthnMethodData[],
+): boolean => {
+  return getUniqueOrigins(authnMethods).length > 1;
 };
 
 /**
