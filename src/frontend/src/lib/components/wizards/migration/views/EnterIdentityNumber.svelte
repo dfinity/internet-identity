@@ -8,7 +8,7 @@
   import { onMount } from "svelte";
 
   interface Props {
-    onSubmit: (identityNumber: bigint) => void;
+    onSubmit: (identityNumber: bigint, attachElement?: HTMLElement) => void;
     isAuthenticating?: boolean;
   }
 
@@ -16,6 +16,7 @@
 
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
+  let attachElement = $state<HTMLElement>();
 
   onMount(() => {
     inputElement?.focus();
@@ -24,12 +25,12 @@
   const handleSubmit = async () => {
     // Button is disabled if identityNumber is null or undefined so no need to manage that case.
     if (nonNullish(identityNumber)) {
-      onSubmit(BigInt(identityNumber));
+      onSubmit(BigInt(identityNumber), attachElement);
     }
   };
 </script>
 
-<form class="flex flex-1 flex-col">
+<form class="flex flex-1 flex-col" bind:this={attachElement}>
   <div class="mb-8 flex flex-col">
     <div class="text-text-primary flex h-32 items-center justify-center py-5">
       <MigrationIllustration />
