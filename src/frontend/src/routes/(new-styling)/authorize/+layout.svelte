@@ -6,9 +6,7 @@
     authorizationStatusStore,
     authorizationContextStore,
   } from "$lib/stores/authorization.store";
-  import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { fly, scale } from "svelte/transition";
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -40,7 +38,6 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
   const status = $derived($authorizationStatusStore);
 
-  let animationWrapperRef = $state<HTMLElement>();
   let identityButtonRef = $state<HTMLElement>();
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
@@ -171,32 +168,7 @@
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
     {#if status === "authenticating"}
-      <div
-        class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100"
-      >
-        {#if nonNullish(selectedIdentity)}
-          {#key selectedIdentity.identityNumber}
-            <div
-              bind:this={animationWrapperRef}
-              class="col-start-1 row-start-1 flex flex-col"
-              in:fly={{ duration: 300, y: 60, delay: 200 }}
-              out:scale={{ duration: 500, start: 0.9 }}
-              onoutrostart={() =>
-                animationWrapperRef?.setAttribute("aria-hidden", "true")}
-            >
-              <AuthPanel>
-                {@render children()}
-              </AuthPanel>
-            </div>
-          {/key}
-        {:else}
-          <div class="col-start-1 row-start-1 flex flex-col">
-            <AuthPanel>
-              {@render children()}
-            </AuthPanel>
-          </div>
-        {/if}
-      </div>
+      {@render children()}
     {:else if status === "authorizing"}
       <!-- Spinner is not shown for other statuses to avoid flicker -->
       <div class="flex flex-col items-center justify-center gap-4">
