@@ -2,10 +2,30 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { authorizationStore } from "$lib/stores/authorization.store";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
+  import { onMount } from "svelte";
+
+  const COUNTDOWN_SECONDS = 5;
+  let countdown = $state(COUNTDOWN_SECONDS);
+  let intervalId: number | undefined;
+  let redirected = $state(false);
 
   const handleRedirect = () => {
+    if (redirected) return;
+    redirected = true;
+    if (intervalId) window.clearInterval(intervalId);
     authorizationStore.authorize(undefined);
   };
+
+  onMount(() => {
+    intervalId = window.setInterval(() => {
+      countdown -= 1;
+      if (countdown <= 0) handleRedirect();
+    }, 1000);
+
+    return () => {
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  });
 </script>
 
 <div class="flex flex-1 flex-col items-center justify-center p-4 sm:max-w-100">
@@ -21,5 +41,8 @@
       fingerprint, face or screen lock instead.
     </p>
   </div>
-  <Button variant="primary" onclick={handleRedirect}>Go to app</Button>
+  <Button variant="primary" onclick={handleRedirect}>
+    Go to the app {#if countdown >= 0}
+      - (<span class="tabular-nums">{countdown}</span>){/if}
+  </Button>
 </div>
