@@ -36,7 +36,6 @@ export class WrongDomainError extends Error {
 export class MigrationFlow {
   view = $state<"enterNumber" | "enterName">("enterNumber");
   identityNumber: UserNumber | undefined;
-  authenticating = $state(false);
   #webAuthFlows: { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
 
   constructor() {
@@ -47,7 +46,6 @@ export class MigrationFlow {
     identityNumber: UserNumber,
     attachElement?: HTMLElement,
   ): Promise<void> => {
-    this.authenticating = true;
     this.identityNumber = identityNumber;
     const devices = await this.#lookupAuthenticators(identityNumber);
 
@@ -117,8 +115,6 @@ export class MigrationFlow {
         throw new WrongDomainError();
       }
       throw error;
-    } finally {
-      this.authenticating = false;
     }
   };
 

@@ -14,11 +14,14 @@
 
   const migrationFlow = new MigrationFlow();
 
-  const handleSubmit = async (identityNumber: bigint, attachElement?: HTMLElement) => {
+  const handleSubmit = async (
+    identityNumber: bigint,
+    attachElement?: HTMLElement,
+  ) => {
     try {
       await migrationFlow.authenticateWithIdentityNumber(
         BigInt(identityNumber),
-        attachElement
+        attachElement,
       );
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
@@ -48,10 +51,7 @@
 </script>
 
 {#if migrationFlow.view === "enterNumber"}
-  <EnterIdentityNumber
-    onSubmit={handleSubmit}
-    isAuthenticating={migrationFlow.authenticating}
-  />
+  <EnterIdentityNumber onSubmit={handleSubmit} />
   <!-- User can't move to this step if identityNumber is null or undefined so no need to manage that case. -->
 {:else if migrationFlow.view === "enterName" && nonNullish(migrationFlow.identityNumber)}
   <CreatePasskey

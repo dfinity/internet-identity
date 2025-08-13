@@ -4,28 +4,42 @@
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { SUPPORT_URL } from "$lib/config";
-  import { nonNullish } from "@dfinity/utils";
   import { onMount } from "svelte";
+  import { waitFor } from "$lib/utils/utils";
+  import { WrongDomainError } from "$lib/flows/migrationFlow.svelte";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { isNullish } from "@dfinity/utils";
 
   interface Props {
-    onSubmit: (identityNumber: bigint, attachElement?: HTMLElement) => void;
-    isAuthenticating?: boolean;
+    onSubmit: (
+      identityNumber: bigint,
+      attachElement?: HTMLElement,
+    ) => Promise<void>;
   }
 
-  let { onSubmit, isAuthenticating }: Props = $props();
+  let { onSubmit }: Props = $props();
 
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
   let attachElement = $state<HTMLElement>();
-  let isCancelled = $state(false);
-  let isWrongDomain = $state(false);
+  let isAuthenticating = $state(false);
+  let authenticationError = $state<"cancelled" | "domain">();
 
   onMount(() => {
     inputElement?.focus();
   });
 
   const handleSubmit = async () => {
-    onSubmit(BigInt(identityNumber), attachElement);
+    try {
+      isAuthenticating = true;
+      await onSubmit(BigInt(identityNumber), attachElement);
+    } catch (error) {
+      isAuthenticating = false;
+      authenticationError =
+        error instanceof WrongDomainError ? "domain" : "cancelled";
+      await waitFor(1000);
+      authenticationError = undefined;
+    }
   };
 </script>
 
@@ -60,20 +74,28 @@
       spellcheck="false"
       aria-label="Identity number"
     />
-    <Button
-      onclick={handleSubmit}
-      variant="primary"
-      size="lg"
-      type="submit"
-      disabled={isAuthenticating || identityNumber.length === 0}
+    <Tooltip
+      label={authenticationError === "domain"
+        ? "Wrong domain was set. Please try again."
+        : "Interaction canceled. Please try again."}
+      hidden={isNullish(authenticationError)}
+      manual
     >
-      {#if isAuthenticating}
-        <ProgressRing />
-        <span>Authenticating...</span>
-      {:else}
-        <span>Continue</span>
-      {/if}
-    </Button>
+      <Button
+        onclick={handleSubmit}
+        variant="primary"
+        size="lg"
+        type="submit"
+        disabled={isAuthenticating || identityNumber.length === 0}
+      >
+        {#if isAuthenticating}
+          <ProgressRing />
+          <span>Authenticating...</span>
+        {:else}
+          <span>Continue</span>
+        {/if}
+      </Button>
+    </Tooltip>
     <Button
       href={SUPPORT_URL}
       target="_blank"
