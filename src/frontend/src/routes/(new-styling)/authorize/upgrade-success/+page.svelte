@@ -42,7 +42,7 @@
     </p>
   </div>
   <Button variant="primary" onclick={handleRedirect}>
-    Go to the app {#if countdown > 0}
-      - ({countdown}){/if}
+    Go to the app {#if countdown >= 0}
+      - (<span class="tabular-nums">{countdown}</span>){/if}
   </Button>
 </div>
