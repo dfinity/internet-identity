@@ -7,6 +7,9 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
+  import identityInfo from "$lib/stores/identity-info.state.svelte";
+  import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
+  import AlreadyMigrated from "./views/AlreadyMigrated.svelte";
 
   interface Props {
     onSuccess: (identityNumber: bigint) => void;
@@ -16,6 +19,12 @@
   const { onSuccess, onError }: Props = $props();
 
   const migrationFlow = new MigrationFlow();
+  const alreadyMigrated = $derived(
+    identityInfo.loaded &&
+      identityInfo.authnMethods.some(
+        (authnMethod) => !isLegacyAuthnMethod(authnMethod),
+      ),
+  );
 
   const handleSubmit = async (
     identityNumber: bigint,
@@ -26,6 +35,9 @@
         BigInt(identityNumber),
         attachElement,
       );
+      // Fetch the identity info to check whether it has already been migrated or not.
+      await identityInfo.fetch();
+      migrationFlow.view = "enterName";
     } catch (error) {
       if (error instanceof WrongDomainError) {
         return "wrongDomain";
@@ -56,7 +68,9 @@
   };
 </script>
 
-{#if migrationFlow.view === "enterNumber"}
+{#if alreadyMigrated}
+  <AlreadyMigrated name={identityInfo.name} />
+{:else if migrationFlow.view === "enterNumber"}
   <EnterIdentityNumber onSubmit={handleSubmit} />
   <!-- User can't move to this step if identityNumber is null or undefined so no need to manage that case. -->
 {:else if migrationFlow.view === "enterName" && nonNullish(migrationFlow.identityNumber)}

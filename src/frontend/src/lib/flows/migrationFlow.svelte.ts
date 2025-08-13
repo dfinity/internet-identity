@@ -99,8 +99,7 @@ export class MigrationFlow {
         delegation,
       );
       authenticationStore.set({ identity, identityNumber });
-      this.view = "enterName";
-    } catch (error: unknown) {
+    } catch (error) {
       // We only want to show a special error if the user might have to choose different web auth flow.
       if (
         isWebAuthnCancelError(error) &&

@@ -20,7 +20,7 @@
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
   let attachElement = $state<HTMLElement>();
-  let isAuthenticating = $state(false);
+  let isSubmitting = $state(false);
   let isCancelled = $state(false);
   let isWrongDomain = $state(false);
 
@@ -29,9 +29,9 @@
   });
 
   const handleSubmit = async () => {
-    isAuthenticating = true;
+    isSubmitting = true;
     const result = await onSubmit(BigInt(identityNumber), attachElement);
-    isAuthenticating = false;
+    isSubmitting = false;
 
     if (result === "cancelled") {
       isCancelled = true;
@@ -89,9 +89,9 @@
         variant="primary"
         size="lg"
         type="submit"
-        disabled={isAuthenticating || identityNumber.length === 0}
+        disabled={isSubmitting || identityNumber.length === 0}
       >
-        {#if isAuthenticating}
+        {#if isSubmitting}
           <ProgressRing />
           <span>Authenticating...</span>
         {:else}
