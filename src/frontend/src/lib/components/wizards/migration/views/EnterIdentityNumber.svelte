@@ -4,28 +4,32 @@
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { SUPPORT_URL } from "$lib/config";
-  import { nonNullish } from "@dfinity/utils";
   import { onMount } from "svelte";
 
   interface Props {
-    onSubmit: (identityNumber: bigint, attachElement?: HTMLElement) => void;
-    isAuthenticating?: boolean;
+    onSubmit: (
+      identityNumber: bigint,
+      attachElement?: HTMLElement,
+    ) => Promise<void>;
   }
 
-  let { onSubmit, isAuthenticating }: Props = $props();
+  let { onSubmit }: Props = $props();
 
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
   let attachElement = $state<HTMLElement>();
+  let submitting = $state(false);
 
   onMount(() => {
     inputElement?.focus();
   });
 
   const handleSubmit = async () => {
-    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
-    if (nonNullish(identityNumber)) {
-      onSubmit(BigInt(identityNumber), attachElement);
+    submitting = true;
+    try {
+      await onSubmit(BigInt(identityNumber), attachElement);
+    } finally {
+      submitting = false;
     }
   };
 </script>
@@ -66,9 +70,9 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={isAuthenticating || identityNumber.length === 0}
+      disabled={submitting || identityNumber.length === 0}
     >
-      {#if isAuthenticating}
+      {#if submitting}
         <ProgressRing />
         <span>Authenticating...</span>
       {:else}

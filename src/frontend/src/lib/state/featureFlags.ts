@@ -90,7 +90,7 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
 
 export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
   "ENABLE_MIGRATE_FLOW",
-  true,
+  false,
 );
 export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
