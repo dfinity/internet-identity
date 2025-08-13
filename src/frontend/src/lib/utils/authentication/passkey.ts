@@ -14,8 +14,8 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { canisterConfig } from "$lib/globals";
 
 export class CredentialNotFound extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor() {
+    super();
     Object.setPrototypeOf(this, CredentialNotFound.prototype);
   }
 
@@ -54,10 +54,9 @@ export const authenticateWithPasskey = async ({
             await actor.lookup_device_key(new Uint8Array(result.rawId))
           )[0];
           if (isNullish(lookupResult)) {
-            // To help debug, pass the credential id
-            throw new CredentialNotFound(
-              `Credential id ${toHex(result.rawId)} not found`,
-            );
+            // To help debug, log the credential id
+            console.error(`Credential id ${toHex(result.rawId)} not found`);
+            throw new CredentialNotFound();
           }
           identityNumber = lookupResult.anchor_number;
           return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));

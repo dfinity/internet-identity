@@ -1,17 +1,9 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import {
-    authenticateWithJWT,
-    authenticateWithPasskey,
-  } from "$lib/utils/authentication";
-  import {
     lastUsedIdentitiesStore,
     type LastUsedAccount,
   } from "$lib/stores/last-used-identities.store";
-  import { canisterConfig, canisterId } from "$lib/globals";
-  import { sessionStore } from "$lib/stores/session.store";
-  import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
-  import { authenticationStore } from "$lib/stores/authentication.store";
   import {
     authorizationStore,
     authorizationContextStore,
