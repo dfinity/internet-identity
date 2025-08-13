@@ -7,7 +7,10 @@
   import { onMount } from "svelte";
 
   interface Props {
-    onSubmit: (identityNumber: bigint, attachElement?: HTMLElement) => void;
+    onSubmit: (
+      identityNumber: bigint,
+      attachElement?: HTMLElement,
+    ) => Promise<void>;
   }
 
   let { onSubmit }: Props = $props();

@@ -13,9 +13,10 @@
 
   const migrationFlow = new MigrationFlow();
   const alreadyMigrated = $derived(
-    identityInfo.authnMethods.some(
-      (authnMethod) => !isLegacyAuthnMethod(authnMethod),
-    ),
+    identityInfo.loaded &&
+      identityInfo.authnMethods.some(
+        (authnMethod) => !isLegacyAuthnMethod(authnMethod),
+      ),
   );
 
   const handleSubmit = async (
