@@ -70,15 +70,8 @@ export const getOrigin = (
 /**
  * Check if there are multiple unique origins across authentication methods
  */
-export const haveMultipleOrigins = (
-  authnMethods: AuthnMethodData[],
-): boolean => {
-  const origins = new Set<string | undefined>();
-  for (const method of authnMethods) {
-    origins.add(getOrigin(method));
-  }
-  return origins.size > 1;
-};
+export const haveMultipleOrigins = (authnMethods: AuthnMethodData[]): boolean =>
+  new Set(authnMethods.map(getOrigin)).size > 1;
 
 const hasSomeOrigin = (
   accessMethod: AuthnMethodData,
