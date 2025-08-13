@@ -12,6 +12,7 @@ import type {
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import { vi } from "vitest";
+import { nonNullish } from "@dfinity/utils";
 
 // Mock the canisterConfig
 vi.mock("$lib/globals", () => ({
@@ -23,7 +24,7 @@ vi.mock("$lib/globals", () => ({
 }));
 
 const makeAuthnMethodWithOrigin = (origin?: string): AuthnMethodData => {
-  const metadata: MetadataMapV2 = origin
+  const metadata: MetadataMapV2 = nonNullish(origin)
     ? [["origin", { String: origin }]]
     : [];
 
