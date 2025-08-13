@@ -167,7 +167,7 @@
           accessMethod={authnMethod}
           isDisabled={isLegacyAuthnMethod(authnMethod)}
           isCurrent={isCurrentAccessMethod(authnMethod)}
-          showOrigin={showPasskeyOrigin || true}
+          showOrigin={showPasskeyOrigin}
         />
         {#if !isLegacyAuthnMethod(authnMethod)}
           <div class="flex items-center justify-end gap-2 px-4">
