@@ -1,5 +1,9 @@
-// ... existing code ...
-import { getLastUsedAccessMethod, isLegacyAuthnMethod } from "./accessMethods";
+import {
+  getLastUsedAccessMethod,
+  isLegacyAuthnMethod,
+  getOrigin,
+  haveMultipleOrigins,
+} from "./accessMethods";
 import type {
   AuthnMethodData,
   OpenIdCredential,
@@ -17,6 +21,25 @@ vi.mock("$lib/globals", () => ({
     ],
   },
 }));
+
+const makeAuthnMethodWithOrigin = (origin?: string): AuthnMethodData => {
+  const metadata: MetadataMapV2 = origin
+    ? [["origin", { String: origin }]]
+    : [];
+
+  return {
+    id: "test-id",
+    last_authentication: [],
+    security_settings: {
+      purpose: { Authentication: null },
+      protection: { Unprotected: null },
+    },
+    metadata,
+    authn_method: {
+      WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+    },
+  } as AuthnMethodData;
+};
 
 describe("getLastUsedAccessMethod", () => {
   const makeAuthnMethod = (id: string, last_auth: number[] = []) =>
@@ -81,6 +104,105 @@ describe("getLastUsedAccessMethod", () => {
     const cred = makeOpenIdCredential("oidc", [999]);
     const result = getLastUsedAccessMethod([method1], [cred]);
     expect(result).toMatchObject({ id: "oidc", last_authentication: [999] });
+  });
+});
+
+describe("getOrigin", () => {
+  it("returns the origin when present in metadata", () => {
+    const method = makeAuthnMethodWithOrigin("https://example.com");
+    expect(getOrigin(method)).toBe("https://example.com");
+  });
+
+  it("returns undefined when no origin in metadata", () => {
+    const method = makeAuthnMethodWithOrigin();
+    expect(getOrigin(method)).toBeUndefined();
+  });
+
+  it("returns undefined when metadata is empty", () => {
+    const method: AuthnMethodData = {
+      id: "test-id",
+      last_authentication: [],
+      security_settings: {
+        purpose: { Authentication: null },
+        protection: { Unprotected: null },
+      },
+      metadata: [],
+      authn_method: {
+        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+      },
+    } as AuthnMethodData;
+    expect(getOrigin(method)).toBeUndefined();
+  });
+
+  it("returns undefined when origin value is not a String type", () => {
+    const method: AuthnMethodData = {
+      id: "test-id",
+      last_authentication: [],
+      security_settings: {
+        purpose: { Authentication: null },
+        protection: { Unprotected: null },
+      },
+      metadata: [["origin", { Bytes: [1, 2, 3] }]],
+      authn_method: {
+        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+      },
+    } as AuthnMethodData;
+    expect(getOrigin(method)).toBeUndefined();
+  });
+});
+
+describe("haveMultipleOrigins", () => {
+  it("returns false when empty array", () => {
+    expect(haveMultipleOrigins([])).toBe(false);
+  });
+
+  it("returns false when single auth method", () => {
+    const methods = [makeAuthnMethodWithOrigin("https://example.com")];
+    expect(haveMultipleOrigins(methods)).toBe(false);
+  });
+
+  it("returns false when all methods have same origin", () => {
+    const methods = [
+      makeAuthnMethodWithOrigin("https://example.com"),
+      makeAuthnMethodWithOrigin("https://example.com"),
+      makeAuthnMethodWithOrigin("https://example.com"),
+    ];
+    expect(haveMultipleOrigins(methods)).toBe(false);
+  });
+
+  it("returns true when methods have different origins", () => {
+    const methods = [
+      makeAuthnMethodWithOrigin("https://example.com"),
+      makeAuthnMethodWithOrigin("https://different.com"),
+    ];
+    expect(haveMultipleOrigins(methods)).toBe(true);
+  });
+
+  it("returns true when only one method has origin", () => {
+    const methods = [
+      makeAuthnMethodWithOrigin("https://example.com"),
+      makeAuthnMethodWithOrigin(),
+      makeAuthnMethodWithOrigin(),
+    ];
+    expect(haveMultipleOrigins(methods)).toBe(true);
+  });
+
+  it("returns true when multiple methods have different origins mixed with no-origin methods", () => {
+    const methods = [
+      makeAuthnMethodWithOrigin("https://example.com"),
+      makeAuthnMethodWithOrigin(),
+      makeAuthnMethodWithOrigin("https://different.com"),
+    ];
+    expect(haveMultipleOrigins(methods)).toBe(true);
+  });
+
+  it("returns false when all methods have no origin", () => {
+    const methods = [
+      makeAuthnMethodWithOrigin(),
+      makeAuthnMethodWithOrigin(),
+      makeAuthnMethodWithOrigin(),
+    ];
+    expect(haveMultipleOrigins(methods)).toBe(false);
   });
 });
 

@@ -79,26 +79,16 @@ const hasOrigin = (
 };
 
 /**
- * Get all unique origins from a list of authentication methods
- */
-export const getUniqueOrigins = (authnMethods: AuthnMethodData[]): string[] => {
-  const origins = new Set<string>();
-  for (const method of authnMethods) {
-    const origin = getOrigin(method);
-    if (origin) {
-      origins.add(origin);
-    }
-  }
-  return Array.from(origins);
-};
-
-/**
  * Check if there are multiple unique origins across authentication methods
  */
-export const hasMultipleOrigins = (
+export const haveMultipleOrigins = (
   authnMethods: AuthnMethodData[],
 ): boolean => {
-  return getUniqueOrigins(authnMethods).length > 1;
+  const origins = new Set<string | undefined>();
+  for (const method of authnMethods) {
+    origins.add(getOrigin(method));
+  }
+  return origins.size > 1;
 };
 
 /**

@@ -22,7 +22,7 @@
     getLastUsedAccessMethod,
     isLegacyAuthnMethod,
     isWebAuthnMetaData,
-    hasMultipleOrigins,
+    haveMultipleOrigins,
   } from "$lib/utils/accessMethods";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { authnMethodEqual, getAuthnMethodAlias } from "$lib/utils/webAuthn";
@@ -119,7 +119,7 @@
     );
   };
 
-  const showOrigins = $derived(hasMultipleOrigins(authnMethods));
+  const showOrigins = $derived(haveMultipleOrigins(authnMethods));
 </script>
 
 <Panel>
