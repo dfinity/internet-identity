@@ -30,8 +30,15 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     rpId: string | undefined,
     iframe: boolean | undefined,
     userVerification: "discouraged" | "required" | "preferred" = "discouraged",
+    attachElement?: HTMLElement,
   ): MultiWebAuthnIdentity {
-    return new this(credentialData, rpId, iframe, userVerification);
+    return new this(
+      credentialData,
+      rpId,
+      iframe,
+      userVerification,
+      attachElement,
+    );
   }
 
   /* Set after the first `sign`, see `sign()` for more info. */
@@ -45,6 +52,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       | "discouraged"
       | "required"
       | "preferred" = "discouraged",
+    readonly attachElement?: HTMLElement,
   ) {
     super();
     this._actualIdentity = undefined;
@@ -89,7 +97,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     };
     const result = (
       this.iframe === true && nonNullish(this.rpId)
-        ? await webAuthnInIframe(options)
+        ? await webAuthnInIframe(options, this.attachElement)
         : await navigator.credentials.get(options)
     ) as PublicKeyCredential;
 

@@ -45,6 +45,7 @@ export class MigrationFlow {
 
   authenticateWithIdentityNumber = async (
     identityNumber: UserNumber,
+    attachElement?: HTMLElement,
   ): Promise<void> => {
     this.authenticating = true;
     this.identityNumber = identityNumber;
@@ -85,6 +86,7 @@ export class MigrationFlow {
       currentFlow?.useIframe ?? false,
       // Set user verification to preferred to ensure the user is verified during migration.
       "preferred",
+      attachElement,
     );
     try {
       const session = get(sessionStore);
@@ -93,6 +95,7 @@ export class MigrationFlow {
         session.identity.getPublicKey(),
         new Date(Date.now() + 30 * 60 * 1000),
       );
+
       const identity = DelegationIdentity.fromDelegation(
         session.identity,
         delegation,

@@ -8,7 +8,7 @@
   import { onMount } from "svelte";
 
   interface Props {
-    onSubmit: (identityNumber: bigint) => void;
+    onSubmit: (identityNumber: bigint, attachElement?: HTMLElement) => void;
     isAuthenticating?: boolean;
   }
 
@@ -16,6 +16,7 @@
 
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
+  let attachElement = $state<HTMLElement>();
   let isCancelled = $state(false);
   let isWrongDomain = $state(false);
 
@@ -24,11 +25,11 @@
   });
 
   const handleSubmit = async () => {
-    onSubmit(BigInt(identityNumber));
+    onSubmit(BigInt(identityNumber), attachElement);
   };
 </script>
 
-<form class="flex flex-1 flex-col">
+<form class="flex flex-1 flex-col" bind:this={attachElement}>
   <div class="mb-8 flex flex-col">
     <div class="text-text-primary flex h-32 items-center justify-center py-5">
       <MigrationIllustration />

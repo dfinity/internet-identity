@@ -164,14 +164,20 @@ export const webAuthnInIframeFlow = async (
 
 export const webAuthnInIframe = async (
   options: CredentialRequestOptions,
+  // This is necessary for Safari to have the iframe on focus, for example, when a dialog is open.
+  attachElement?: HTMLElement,
 ): Promise<Credential> => {
   if (isNullish(options.publicKey?.rpId)) {
     throw new Error("RP id is missing");
   }
   const targetOrigin = `https://${options.publicKey?.rpId}`;
 
-  // WebAuthn fails in Safari if the iframe does not remain focused.
-  const iframe = document.body.appendChild(document.createElement("iframe"));
+  const iframe = document.createElement("iframe");
+  // Attach iframe to provided element if available, otherwise try the first <dialog>,
+  // and finally fall back to document.body.
+  const dialog = document.getElementsByTagName("dialog")[0];
+  const host = (attachElement ?? dialog ?? document.body) as HTMLElement;
+  host.appendChild(iframe);
   iframe.style.position = "fixed";
   iframe.style.top = "0";
   iframe.style.left = "0";
@@ -182,6 +188,7 @@ export const webAuthnInIframe = async (
   iframe.style.zIndex = "9999";
   iframe.allow = "publickey-credentials-get";
   iframe.src = `${targetOrigin}${WEBAUTHN_IFRAME_PATH}`;
+  // WebAuthn fails in Safari if the iframe does not remain focused.
   iframe.focus();
 
   try {

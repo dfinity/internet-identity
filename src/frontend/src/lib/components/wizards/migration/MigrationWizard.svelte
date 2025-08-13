@@ -14,10 +14,11 @@
 
   const migrationFlow = new MigrationFlow();
 
-  const handleSubmit = async (identityNumber: bigint) => {
+  const handleSubmit = async (identityNumber: bigint, attachElement?: HTMLElement) => {
     try {
       await migrationFlow.authenticateWithIdentityNumber(
         BigInt(identityNumber),
+        attachElement
       );
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
