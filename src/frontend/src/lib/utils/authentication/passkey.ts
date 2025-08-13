@@ -1,5 +1,5 @@
 import { Principal } from "@dfinity/principal";
-import { Actor } from "@dfinity/agent";
+import { Actor, toHex } from "@dfinity/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
@@ -50,14 +50,21 @@ export const authenticateWithPasskey = async ({
     : DiscoverablePasskeyIdentity.useExisting({
         credentialIds,
         getPublicKey: async (result) => {
-          const lookupResult = (
-            await actor.lookup_device_key(new Uint8Array(result.rawId))
-          )[0];
-          if (isNullish(lookupResult)) {
-            throw new CredentialNotFound();
+          try {
+            const lookupResult = (
+              await actor.lookup_device_key(new Uint8Array(result.rawId))
+            )[0];
+            if (isNullish(lookupResult)) {
+              throw new CredentialNotFound();
+            }
+            identityNumber = lookupResult.anchor_number;
+            return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+          } catch (error: unknown) {
+            // To help debug, log the credential id
+            console.error(error);
+            console.error(`Error looking up device key ${toHex(result.rawId)}`);
+            throw error;
           }
-          identityNumber = lookupResult.anchor_number;
-          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
         },
       });
   if (dummyAuth) {
