@@ -6,6 +6,8 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { waitFor } from "$lib/utils/utils";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   interface Props {
     create: (name: string) => Promise<void>;
@@ -16,14 +18,19 @@
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
-  let creating = $state(false);
+  let isCreating = $state(false);
+  let isCancelled = $state(false);
 
   const handleCreate = async () => {
-    creating = true;
+    isCreating = true;
     try {
       await create(name.trim());
-    } finally {
-      creating = false;
+      isCreating = false;
+    } catch {
+      isCreating = false;
+      isCancelled = true;
+      await waitFor(1000);
+      isCancelled = false;
     }
   };
 
@@ -60,24 +67,30 @@
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
-      disabled={creating}
+      disabled={isCreating}
       error={name.length > 64 ? "Maximum length is 64 characters." : undefined}
       aria-label="Identity name"
     />
-    <Button
-      onclick={handleCreate}
-      variant="primary"
-      size="lg"
-      type="submit"
-      disabled={name.length === 0 || name.length > 64 || creating}
+    <Tooltip
+      label="Interaction canceled. Please try again."
+      hidden={!isCancelled}
+      manual
     >
-      {#if creating}
-        <ProgressRing />
-        <span>Creating Passkey...</span>
-      {:else}
-        <span>Create Passkey</span>
-      {/if}
-    </Button>
+      <Button
+        onclick={handleCreate}
+        variant="primary"
+        size="lg"
+        type="submit"
+        disabled={name.length === 0 || name.length > 64 || isCreating}
+      >
+        {#if isCreating}
+          <ProgressRing />
+          <span>Creating Passkey...</span>
+        {:else}
+          <span>Create Passkey</span>
+        {/if}
+      </Button>
+    </Tooltip>
     {#if identityNumber !== undefined}
       <p class="text-text-primary text-center text-xs">
         You are upgrading ID &nbsp;

@@ -1,26 +1,47 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
   import { MigrationFlow } from "$lib/flows/migrationFlow.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
-  import { handleError } from "$lib/components/utils/error";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
+  import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 
-  const { onSuccess }: { onSuccess: (identityNumber: bigint) => void } =
-    $props();
+  interface Props {
+    onSuccess: (identityNumber: bigint) => void;
+    onError: (error: unknown) => void;
+  }
+
+  const { onSuccess, onError }: Props = $props();
 
   const migrationFlow = new MigrationFlow();
 
   const handleSubmit = async (identityNumber: bigint) => {
-    await migrationFlow
-      .authenticateWithIdentityNumber(BigInt(identityNumber))
-      .catch(handleError);
+    try {
+      await migrationFlow.authenticateWithIdentityNumber(
+        BigInt(identityNumber),
+      );
+    } catch (error) {
+      if (isWebAuthnCancelError(error)) {
+        throw error; // Error is handled by child component
+      } else {
+        onError(error); // Propagate unhandled errors to parent component
+      }
+    }
   };
 
   const handleCreate = async (name: string) => {
-    await migrationFlow.createPasskey(name);
-    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
-    if (nonNullish(migrationFlow.identityNumber)) {
+    if (isNullish(migrationFlow.identityNumber)) {
+      // Button is disabled if identityNumber is null or undefined so no need to manage that case.
+      throw new Error("Identity number is undefined");
+    }
+    try {
+      await migrationFlow.createPasskey(name);
       onSuccess(migrationFlow.identityNumber);
+    } catch (error) {
+      if (isWebAuthnCancelError(error)) {
+        throw error; // Error is handled by child component
+      } else {
+        onError(error); // Propagate unhandled errors to parent component
+      }
     }
   };
 </script>

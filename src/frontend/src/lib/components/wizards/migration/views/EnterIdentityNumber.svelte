@@ -16,16 +16,15 @@
 
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
+  let isCancelled = $state(false);
+  let isWrongDomain = $state(false);
 
   onMount(() => {
     inputElement?.focus();
   });
 
   const handleSubmit = async () => {
-    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
-    if (nonNullish(identityNumber)) {
-      onSubmit(BigInt(identityNumber));
-    }
+    onSubmit(BigInt(identityNumber));
   };
 </script>
 

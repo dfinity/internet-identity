@@ -11,6 +11,8 @@
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
   import { MigrationWizard } from "$lib/components/wizards/migration";
+  import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
+  import { isOpenIdCancelError } from "$lib/utils/openID";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -44,7 +46,11 @@
     try {
       onSignIn(await authFlow.continueWithExistingPasskey());
     } catch (error) {
-      onError(error);
+      if (isWebAuthnCancelError(error)) {
+        throw error; // Error is handled by child component
+      } else {
+        onError(error); // Propagate unhandled errors to parent component
+      }
     } finally {
       isAuthenticating = false;
     }
@@ -54,7 +60,11 @@
     try {
       onSignUp(await authFlow.createPasskey(name));
     } catch (error) {
-      onError(error);
+      if (isWebAuthnCancelError(error)) {
+        throw error; // Error is handled by child component
+      } else {
+        onError(error); // Propagate unhandled errors to parent component
+      }
     } finally {
       isAuthenticating = false;
     }
@@ -65,7 +75,11 @@
       const { identityNumber, type } = await authFlow.continueWithGoogle();
       (type === "signUp" ? onSignUp : onSignIn)(identityNumber);
     } catch (error) {
-      onError(error);
+      if (isOpenIdCancelError(error)) {
+        throw error; // Error is handled by child component
+      } else {
+        onError(error); // Propagate unhandled errors to parent component
+      }
     } finally {
       isAuthenticating = false;
     }
@@ -97,10 +111,10 @@
 {:else if isMigrating}
   {#if !withinDialog}
     <Dialog onClose={() => (isMigrating = false)}>
-      <MigrationWizard onSuccess={onMigration} />
+      <MigrationWizard onSuccess={onMigration} {onError} />
     </Dialog>
   {:else}
-    <MigrationWizard onSuccess={onMigration} />
+    <MigrationWizard onSuccess={onMigration} {onError} />
   {/if}
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />

@@ -4,6 +4,8 @@
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { CONTINUE_FROM_ANOTHER_DEVICE } from "$lib/state/featureFlags";
+  import { waitFor } from "$lib/utils/utils";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   interface Props {
     setupNew: () => void;
@@ -14,13 +16,18 @@
   const { setupNew, useExisting, continueFromAnotherDevice }: Props = $props();
 
   let isAuthenticating = $state(false);
+  let isCancelled = $state(false);
 
   const handleUseExisting = async () => {
     isAuthenticating = true;
     try {
       await useExisting();
-    } finally {
       isAuthenticating = false;
+    } catch {
+      isAuthenticating = false;
+      isCancelled = true;
+      await waitFor(1000);
+      isCancelled = false;
     }
   };
 </script>
@@ -36,22 +43,28 @@
   </p>
 </div>
 <div class="flex flex-col gap-3">
-  <Button onclick={setupNew} size="lg" disabled={isAuthenticating}
-    >Set up a new Passkey</Button
-  >
-  <Button
-    onclick={handleUseExisting}
-    variant="secondary"
-    size="lg"
-    disabled={isAuthenticating}
-  >
-    {#if isAuthenticating}
-      <ProgressRing />
-      <span>Authenticating...</span>
-    {:else}
-      <span>Use an existing Passkey</span>
-    {/if}
+  <Button onclick={setupNew} size="lg" disabled={isAuthenticating}>
+    Set up a new Passkey
   </Button>
+  <Tooltip
+    label="Interaction canceled. Please try again."
+    hidden={!isCancelled}
+    manual
+  >
+    <Button
+      onclick={handleUseExisting}
+      variant="secondary"
+      size="lg"
+      disabled={isAuthenticating}
+    >
+      {#if isAuthenticating}
+        <ProgressRing />
+        <span>Authenticating...</span>
+      {:else}
+        <span>Use an existing Passkey</span>
+      {/if}
+    </Button>
+  </Tooltip>
   {#if $CONTINUE_FROM_ANOTHER_DEVICE}
     <Button
       onclick={continueFromAnotherDevice}

@@ -12,7 +12,6 @@
     align?: Align;
     distance?: string;
     hidden?: boolean;
-    arrow?: boolean;
     manual?: boolean; // Always render tooltip, even when not hovered
     anchor?: HTMLElement;
   };
@@ -26,7 +25,6 @@
     distance = "0.5rem",
     hidden = false,
     manual = false,
-    arrow = true,
     anchor,
     children,
     class: className,
@@ -135,7 +133,7 @@
     <!-- Tooltip inner container that animates -->
     <div
       class={[
-        "bg-fg-primary relative flex max-w-80 flex-col items-start rounded-lg p-3 drop-shadow-lg",
+        "bg-bg-tertiary border-border-secondary relative flex max-w-80 flex-col items-start rounded-lg border px-3 py-2 drop-shadow-lg",
         {
           up: {
             start: "origin-[1.6rem_100%]",
@@ -162,55 +160,13 @@
       ]}
     >
       <!-- Tooltip content -->
-      <span class="text-bg-primary text-start text-xs font-semibold"
-        >{label}</span
-      >
+      <span class="text-text-primary text-start text-xs font-semibold">
+        {label}
+      </span>
       {#if nonNullish(description)}
-        <span class="text-bg-tertiary mt-1 text-start text-xs font-medium">
+        <span class="text-text-tertiary mt-1 text-start text-xs font-medium">
           {description}
         </span>
-      {/if}
-      <!-- Tooltip arrow -->
-      {#if arrow}
-        <div
-          class={[
-            "absolute size-0",
-            {
-              up: {
-                start: "bottom-0 left-7",
-                center: "bottom-0 left-[50%]",
-                end: "right-7 bottom-0",
-              }[align],
-              right: {
-                start: "top-7 left-0",
-                center: "top-[50%] left-0",
-                end: "bottom-7 left-0",
-              }[align],
-              down: {
-                start: "top-0 left-7",
-                center: "top-0 left-[50%]",
-                end: "top-0 right-7",
-              }[align],
-              left: {
-                start: "top-7 right-0",
-                center: "top-[50%] right-0",
-                end: "right-0 bottom-7",
-              }[align],
-            }[direction],
-          ]}
-        >
-          <div
-            class={[
-              "bg-fg-primary size-2 origin-center -translate-1 rotate-45",
-              {
-                up: "rounded-br-xs",
-                right: "rounded-bl-xs",
-                down: "rounded-tl-xs",
-                left: "rounded-tr-xs",
-              }[direction],
-            ]}
-          ></div>
-        </div>
       {/if}
     </div>
   </div>

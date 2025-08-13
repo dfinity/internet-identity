@@ -7,6 +7,8 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
   import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
+  import { waitFor } from "$lib/utils/utils";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
@@ -18,13 +20,18 @@
     $props();
 
   let isAuthenticating = $state(false);
+  let isCancelled = $state(false);
 
   const handleContinueWithGoogle = async () => {
     isAuthenticating = true;
     try {
       await continueWithGoogle();
-    } finally {
       isAuthenticating = false;
+    } catch {
+      isAuthenticating = false;
+      isCancelled = true;
+      await waitFor(1000);
+      isCancelled = false;
     }
   };
 
@@ -50,20 +57,26 @@
       Continue with Passkey
     </Button>
     {#if showGoogleButton}
-      <Button
-        onclick={handleContinueWithGoogle}
-        variant="secondary"
-        disabled={isAuthenticating}
-        size="xl"
+      <Tooltip
+        label="Interaction canceled. Please try again."
+        hidden={!isCancelled}
+        manual
       >
-        {#if isAuthenticating}
-          <ProgressRing />
-          <span>Authenticating with Google...</span>
-        {:else}
-          <GoogleIcon />
-          <span>Continue with Google</span>
-        {/if}
-      </Button>
+        <Button
+          onclick={handleContinueWithGoogle}
+          variant="secondary"
+          disabled={isAuthenticating}
+          size="xl"
+        >
+          {#if isAuthenticating}
+            <ProgressRing />
+            <span>Authenticating with Google...</span>
+          {:else}
+            <GoogleIcon />
+            <span>Continue with Google</span>
+          {/if}
+        </Button>
+      </Tooltip>
     {/if}
   </div>
   {#if $ENABLE_MIGRATE_FLOW}

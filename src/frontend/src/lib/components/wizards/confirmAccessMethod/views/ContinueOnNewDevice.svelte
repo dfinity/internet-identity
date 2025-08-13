@@ -30,12 +30,7 @@
     Scan the above QR code with your
     <b class="text-text-primary">new device</b> or enter the URL manually.
   </p>
-  <Tooltip
-    label="Link copied to clipboard"
-    hidden={!copied}
-    arrow={false}
-    manual
-  >
+  <Tooltip label="Link copied to clipboard" hidden={!copied} manual>
     <Button
       onclick={handleCopyLink}
       variant="secondary"
