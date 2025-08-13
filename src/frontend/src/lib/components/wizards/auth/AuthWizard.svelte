@@ -50,9 +50,8 @@
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
-      } else {
-        onError(error); // Propagate unhandled errors to parent component
       }
+      onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
     }
@@ -66,9 +65,8 @@
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
-      } else {
-        onError(error); // Propagate unhandled errors to parent component
       }
+      onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
     }
@@ -81,9 +79,8 @@
     } catch (error) {
       if (isOpenIdCancelError(error)) {
         return "cancelled";
-      } else {
-        onError(error); // Propagate unhandled errors to parent component
       }
+      onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
     }

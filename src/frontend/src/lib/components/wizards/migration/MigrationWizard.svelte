@@ -45,12 +45,11 @@
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
       }
-
       onError(error); // Propagate unhandled errors to parent component
     }
   };
 
-  const handleCreate = async (name: string) => {
+  const handleCreate = async (name: string): Promise<void | "cancelled"> => {
     if (isNullish(migrationFlow.identityNumber)) {
       // Button is disabled if identityNumber is null or undefined so no need to manage that case.
       throw new Error("Identity number is undefined");
@@ -60,10 +59,9 @@
       onSuccess(migrationFlow.identityNumber);
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        throw error; // Error is handled by child component
-      } else {
-        onError(error); // Propagate unhandled errors to parent component
+        return "cancelled";
       }
+      onError(error); // Propagate unhandled errors to parent component
     }
   };
 </script>
