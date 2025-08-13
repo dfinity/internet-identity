@@ -10,9 +10,12 @@
 
   const migrationFlow = new MigrationFlow();
 
-  const handleSubmit = async (identityNumber: bigint) => {
+  const handleSubmit = async (
+    identityNumber: bigint,
+    attachElement?: HTMLElement,
+  ) => {
     await migrationFlow
-      .authenticateWithIdentityNumber(BigInt(identityNumber))
+      .authenticateWithIdentityNumber(BigInt(identityNumber), attachElement)
       .catch(handleError);
   };
 
