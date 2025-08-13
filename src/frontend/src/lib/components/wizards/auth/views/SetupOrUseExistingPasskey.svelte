@@ -9,7 +9,7 @@
 
   interface Props {
     setupNew: () => void;
-    useExisting: () => Promise<void>;
+    useExisting: () => Promise<void | "cancelled">;
     continueFromAnotherDevice: () => void;
   }
 
@@ -20,11 +20,10 @@
 
   const handleUseExisting = async () => {
     isAuthenticating = true;
-    try {
-      await useExisting();
-      isAuthenticating = false;
-    } catch {
-      isAuthenticating = false;
+    const result = await useExisting();
+    isAuthenticating = false;
+
+    if (result === "cancelled") {
       isCancelled = true;
       await waitFor(1000);
       isCancelled = false;

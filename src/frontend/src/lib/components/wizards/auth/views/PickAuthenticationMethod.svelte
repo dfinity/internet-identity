@@ -12,7 +12,7 @@
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
-    continueWithGoogle: () => Promise<void>;
+    continueWithGoogle: () => Promise<void | "cancelled">;
     migrate: () => void;
   }
 
@@ -24,11 +24,10 @@
 
   const handleContinueWithGoogle = async () => {
     isAuthenticating = true;
-    try {
-      await continueWithGoogle();
-      isAuthenticating = false;
-    } catch {
-      isAuthenticating = false;
+    const result = await continueWithGoogle();
+    isAuthenticating = false;
+
+    if (result === "cancelled") {
       isCancelled = true;
       await waitFor(1000);
       isCancelled = false;

@@ -1,6 +1,9 @@
 <script lang="ts">
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import { MigrationFlow } from "$lib/flows/migrationFlow.svelte";
+  import {
+    MigrationFlow,
+    WrongDomainError,
+  } from "$lib/flows/migrationFlow.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
@@ -17,18 +20,21 @@
   const handleSubmit = async (
     identityNumber: bigint,
     attachElement?: HTMLElement,
-  ) => {
+  ): Promise<void | "cancelled" | "wrongDomain"> => {
     try {
       await migrationFlow.authenticateWithIdentityNumber(
         BigInt(identityNumber),
         attachElement,
       );
     } catch (error) {
-      if (isWebAuthnCancelError(error)) {
-        throw error; // Error is handled by child component
-      } else {
-        onError(error); // Propagate unhandled errors to parent component
+      if (error instanceof WrongDomainError) {
+        return "wrongDomain";
       }
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+
+      onError(error); // Propagate unhandled errors to parent component
     }
   };
 

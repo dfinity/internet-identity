@@ -6,15 +6,13 @@
   import { SUPPORT_URL } from "$lib/config";
   import { onMount } from "svelte";
   import { waitFor } from "$lib/utils/utils";
-  import { WrongDomainError } from "$lib/flows/migrationFlow.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import { isNullish } from "@dfinity/utils";
 
   interface Props {
     onSubmit: (
       identityNumber: bigint,
       attachElement?: HTMLElement,
-    ) => Promise<void>;
+    ) => Promise<void | "cancelled" | "wrongDomain">;
   }
 
   let { onSubmit }: Props = $props();
@@ -23,22 +21,27 @@
   let inputElement = $state<HTMLInputElement>();
   let attachElement = $state<HTMLElement>();
   let isAuthenticating = $state(false);
-  let authenticationError = $state<"cancelled" | "domain">();
+  let isCancelled = $state(false);
+  let isWrongDomain = $state(false);
 
   onMount(() => {
     inputElement?.focus();
   });
 
   const handleSubmit = async () => {
-    try {
-      isAuthenticating = true;
-      await onSubmit(BigInt(identityNumber), attachElement);
-    } catch (error) {
-      isAuthenticating = false;
-      authenticationError =
-        error instanceof WrongDomainError ? "domain" : "cancelled";
+    isAuthenticating = true;
+    const result = await onSubmit(BigInt(identityNumber), attachElement);
+    isAuthenticating = false;
+
+    if (result === "cancelled") {
+      isCancelled = true;
       await waitFor(1000);
-      authenticationError = undefined;
+      isCancelled = false;
+    }
+    if (result === "wrongDomain") {
+      isWrongDomain = true;
+      await waitFor(2000); // We show this longer since it's unexpected
+      isWrongDomain = false;
     }
   };
 </script>
@@ -75,10 +78,10 @@
       aria-label="Identity number"
     />
     <Tooltip
-      label={authenticationError === "domain"
+      label={isWrongDomain
         ? "Wrong domain was set. Please try again."
         : "Interaction canceled. Please try again."}
-      hidden={isNullish(authenticationError)}
+      hidden={!isCancelled || !isWrongDomain}
       manual
     >
       <Button

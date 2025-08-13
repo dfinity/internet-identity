@@ -41,13 +41,15 @@
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isMigrating = $state(false);
 
-  const handleContinueWithExistingPasskey = async () => {
+  const handleContinueWithExistingPasskey = async (): Promise<
+    void | "cancelled"
+  > => {
     isAuthenticating = true;
     try {
       onSignIn(await authFlow.continueWithExistingPasskey());
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        throw error; // Error is handled by child component
+        return "cancelled";
       } else {
         onError(error); // Propagate unhandled errors to parent component
       }
@@ -55,13 +57,15 @@
       isAuthenticating = false;
     }
   };
-  const handleCreatePasskey = async (name: string) => {
+  const handleCreatePasskey = async (
+    name: string,
+  ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
       onSignUp(await authFlow.createPasskey(name));
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        throw error; // Error is handled by child component
+        return "cancelled";
       } else {
         onError(error); // Propagate unhandled errors to parent component
       }
@@ -69,14 +73,14 @@
       isAuthenticating = false;
     }
   };
-  const handleContinueWithGoogle = async () => {
+  const handleContinueWithGoogle = async (): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
       const { identityNumber, type } = await authFlow.continueWithGoogle();
       (type === "signUp" ? onSignUp : onSignIn)(identityNumber);
     } catch (error) {
       if (isOpenIdCancelError(error)) {
-        throw error; // Error is handled by child component
+        return "cancelled";
       } else {
         onError(error); // Propagate unhandled errors to parent component
       }

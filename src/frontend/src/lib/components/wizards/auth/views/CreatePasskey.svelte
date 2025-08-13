@@ -10,7 +10,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   interface Props {
-    create: (name: string) => Promise<void>;
+    create: (name: string) => Promise<void | "cancelled">;
     identityNumber?: bigint;
   }
 
@@ -23,11 +23,10 @@
 
   const handleCreate = async () => {
     isCreating = true;
-    try {
-      await create(name.trim());
-      isCreating = false;
-    } catch {
-      isCreating = false;
+    const result = await create(name.trim());
+    isCreating = false;
+
+    if (result === "cancelled") {
       isCancelled = true;
       await waitFor(1000);
       isCancelled = false;
