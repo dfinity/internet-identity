@@ -119,7 +119,7 @@
     );
   };
 
-  const showOrigins = $derived(haveMultipleOrigins(authnMethods));
+  const showPasskeyOrigin = $derived(haveMultipleOrigins(authnMethods));
 </script>
 
 <Panel>
@@ -167,7 +167,7 @@
           accessMethod={authnMethod}
           isDisabled={isLegacyAuthnMethod(authnMethod)}
           isCurrent={isCurrentAccessMethod(authnMethod)}
-          showOrigin={showOrigins}
+          showOrigin={showPasskeyOrigin}
         />
         {#if !isLegacyAuthnMethod(authnMethod)}
           <div class="flex items-center justify-end gap-2 px-4">
