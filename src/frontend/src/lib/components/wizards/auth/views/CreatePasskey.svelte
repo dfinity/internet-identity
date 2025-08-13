@@ -10,10 +10,9 @@
   interface Props {
     create: (name: string) => Promise<void>;
     identityNumber?: bigint;
-    disabled?: boolean;
   }
 
-  const { create, identityNumber, disabled }: Props = $props();
+  const { create, identityNumber }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
