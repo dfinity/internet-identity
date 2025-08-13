@@ -67,17 +67,6 @@ export const getOrigin = (
   return undefined;
 };
 
-const hasOrigin = (
-  accessMethod: AuthnMethodData,
-  origins: string[],
-): boolean => {
-  const accessMethodOrigin = getOrigin(accessMethod);
-  if (nonNullish(accessMethodOrigin)) {
-    return origins.some((o) => isSameOrigin(o, accessMethodOrigin));
-  }
-  return false;
-};
-
 /**
  * Check if there are multiple unique origins across authentication methods
  */
@@ -89,6 +78,17 @@ export const haveMultipleOrigins = (
     origins.add(getOrigin(method));
   }
   return origins.size > 1;
+};
+
+const hasSomeOrigin = (
+  accessMethod: AuthnMethodData,
+  origins: string[],
+): boolean => {
+  const accessMethodOrigin = getOrigin(accessMethod);
+  if (nonNullish(accessMethodOrigin)) {
+    return origins.some((o) => isSameOrigin(o, accessMethodOrigin));
+  }
+  return false;
 };
 
 /**
@@ -106,7 +106,7 @@ export const haveMultipleOrigins = (
  */
 export const isLegacyAuthnMethod = (accessMethod: AuthnMethodData): boolean => {
   return (
-    !hasOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
+    !hasSomeOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
     "Recovery" in accessMethod.security_settings.purpose
   );
 };
