@@ -1,5 +1,5 @@
 import { Principal } from "@dfinity/principal";
-import { Actor } from "@dfinity/agent";
+import { Actor, toHex } from "@dfinity/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
@@ -14,8 +14,8 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { canisterConfig } from "$lib/globals";
 
 export class CredentialNotFound extends Error {
-  constructor() {
-    super();
+  constructor(message: string) {
+    super(message);
     Object.setPrototypeOf(this, CredentialNotFound.prototype);
   }
 
@@ -54,7 +54,10 @@ export const authenticateWithPasskey = async ({
             await actor.lookup_device_key(new Uint8Array(result.rawId))
           )[0];
           if (isNullish(lookupResult)) {
-            throw new CredentialNotFound();
+            // To help debug, pass the credential id
+            throw new CredentialNotFound(
+              `Credential id ${toHex(result.rawId)} not found`,
+            );
           }
           identityNumber = lookupResult.anchor_number;
           return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
