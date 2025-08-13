@@ -81,7 +81,7 @@
       label={isWrongDomain
         ? "Wrong domain was set. Please try again."
         : "Interaction canceled. Please try again."}
-      hidden={!isCancelled || !isWrongDomain}
+      hidden={!isCancelled && !isWrongDomain}
       manual
     >
       <Button
