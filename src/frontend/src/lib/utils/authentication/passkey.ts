@@ -50,16 +50,21 @@ export const authenticateWithPasskey = async ({
     : DiscoverablePasskeyIdentity.useExisting({
         credentialIds,
         getPublicKey: async (result) => {
-          const lookupResult = (
-            await actor.lookup_device_key(new Uint8Array(result.rawId))
-          )[0];
-          if (isNullish(lookupResult)) {
+          try {
+            const lookupResult = (
+              await actor.lookup_device_key(new Uint8Array(result.rawId))
+            )[0];
+            if (isNullish(lookupResult)) {
+              throw new CredentialNotFound();
+            }
+            identityNumber = lookupResult.anchor_number;
+            return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
+          } catch (error: unknown) {
             // To help debug, log the credential id
-            console.error(`Credential id ${toHex(result.rawId)} not found`);
-            throw new CredentialNotFound();
+            console.error(error);
+            console.error(`Error looking up device key ${toHex(result.rawId)}`);
+            throw error;
           }
-          identityNumber = lookupResult.anchor_number;
-          return CosePublicKey.fromDer(new Uint8Array(lookupResult.pubkey));
         },
       });
   if (dummyAuth) {
