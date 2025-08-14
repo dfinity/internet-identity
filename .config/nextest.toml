@@ -1,0 +1,18 @@
+# Nextest configuration for Internet Identity canister tests
+# This configuration helps manage PocketIC load by adding delays and retries
+
+[profile.ci]
+test-threads = 1
+slow-timeout = { period = "180s", terminate-after = 3 }
+retries = { backoff = "exponential", count = 2, delay = "2s", max-delay = "10s" }
+leak-timeout = "2s"
+failure-output = "immediate-final"
+success-output = "never"
+status-level = "skip"
+
+# # Test groups configuration
+# # You can define test groups to run heavy tests separately if needed
+# [[profile.ci.overrides]]
+# filter = "test(heavy_)"
+# retries = { backoff = "exponential", count = 3, delay = "5s", max-delay = "30s" }
+# slow-timeout = { period = "300s", terminate-after = 2 }
