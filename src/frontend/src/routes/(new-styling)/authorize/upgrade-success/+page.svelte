@@ -28,8 +28,12 @@
   });
 </script>
 
-<div class="flex flex-1 flex-col items-center justify-center p-4 sm:max-w-100">
-  <div class="text-text-primary flex h-50 items-center justify-center">
+<div
+  class="flex flex-1 flex-col items-stretch justify-end p-4 sm:max-w-100 sm:items-center sm:justify-center"
+>
+  <div
+    class="text-text-primary flex h-50 flex-1 items-center justify-center sm:flex-none"
+  >
     <MigrationSuccessIllustration />
   </div>
   <div class="mb-8 flex flex-col gap-2">
