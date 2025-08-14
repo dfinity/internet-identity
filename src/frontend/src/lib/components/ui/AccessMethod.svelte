@@ -77,7 +77,9 @@
           <div class="flex items-center gap-2">
             <span>{getAuthnMethodAlias(accessMethod)}</span>
             {#if isCurrent}
-              <PulsatingCircleIcon />
+              <span aria-label="Current Passkey">
+                <PulsatingCircleIcon />
+              </span>
             {/if}
           </div>
           {#if showOrigin && getOrigin(accessMethod)}
