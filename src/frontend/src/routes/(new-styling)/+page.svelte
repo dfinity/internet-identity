@@ -19,19 +19,13 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
-  import { preloadCode, preloadData } from "$app/navigation";
   import { onMount } from "svelte";
-  import { FLAIR } from "$lib/state/featureFlags";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { authenticationV2Funnel } from "$lib/utils/analytics/authenticationV2Funnel";
 
   const { data }: PageProps = $props();
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
-  const preloadNext = () => {
-    void preloadCode(data.next ?? "/manage");
-    void preloadData(data.next ?? "/manage");
-  };
 
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -45,14 +39,8 @@
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
-    preloadNext();
-    if ($FLAIR) {
-      // Do not await dropWaveAnimation() to avoid blocking navigation
-      triggerDropWaveAnimation();
-      gotoNext();
-    } else {
-      gotoNext();
-    }
+    void triggerDropWaveAnimation();
+    await gotoNext();
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
@@ -61,13 +49,8 @@
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
-    preloadNext();
-    if ($FLAIR) {
-      triggerDropWaveAnimation();
-      gotoNext();
-    } else {
-      gotoNext();
-    }
+    void triggerDropWaveAnimation();
+    await gotoNext();
   };
 
   const lastUsedIdentities = $derived(
