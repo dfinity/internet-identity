@@ -77,16 +77,10 @@
         </Button>
       </Tooltip>
     {/if}
+    {#if $ENABLE_MIGRATE_FLOW}
+      <Button onclick={migrate} variant="tertiary" size="xl">
+        Upgrade from legacy identity
+      </Button>
+    {/if}
   </div>
-  {#if $ENABLE_MIGRATE_FLOW}
-    <div class="flex flex-row items-center justify-between">
-      <p class="text-md text-text-secondary">Still have an identity number?</p>
-      <button
-        onclick={migrate}
-        class="text-md text-text-primary font-semibold outline-0 focus-visible:underline"
-      >
-        Upgrade
-      </button>
-    </div>
-  {/if}
 </div>
