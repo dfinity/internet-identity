@@ -68,6 +68,21 @@ export const getOrigin = (
 };
 
 /**
+ * Extract the RP ID (origin without protocol) from an AuthnMethodData's metadata
+ */
+export const getRpId = (accessMethod: AuthnMethodData): string | undefined => {
+  const origin = getOrigin(accessMethod);
+  if (nonNullish(origin)) {
+    try {
+      return new URL(origin).hostname;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+};
+
+/**
  * Check if there are multiple unique origins across authentication methods
  */
 export const haveMultipleOrigins = (authnMethods: AuthnMethodData[]): boolean =>

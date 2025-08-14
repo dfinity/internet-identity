@@ -3,6 +3,7 @@ import {
   isLegacyAuthnMethod,
   getOrigin,
   haveMultipleOrigins,
+  getRpId,
 } from "./accessMethods";
 import type {
   AuthnMethodData,
@@ -310,5 +311,24 @@ describe("isLegacyAuthnMethod", () => {
       });
       expect(isLegacyAuthnMethod(method)).toBe(true);
     });
+  });
+});
+
+describe("getRpId", () => {
+  it("should return the hostname from the origin metadata", () => {
+    const accessMethod: AuthnMethodData = makeAuthnMethodWithOrigin(
+      "https://example.com",
+    );
+    expect(getRpId(accessMethod)).toBe("example.com");
+  });
+
+  it("should return undefined if origin metadata is not present", () => {
+    const accessMethod: AuthnMethodData = makeAuthnMethodWithOrigin();
+    expect(getRpId(accessMethod)).toBeUndefined();
+  });
+
+  it("should return undefined if origin metadata is not a string", () => {
+    const accessMethod: AuthnMethodData = makeAuthnMethodWithOrigin("foo");
+    expect(getRpId(accessMethod)).toBeUndefined();
   });
 });
