@@ -18,7 +18,7 @@
   let isLoading = $state(false);
   let inputElement = $state<HTMLInputElement>();
 
-  const handleSave = async (e: SubmitEvent) => {
+  const handleSave = async (e: Event) => {
     e.preventDefault();
     // Button is disabled so this shouldn't happen.
     if (inputValue.trim() === "") {
@@ -52,7 +52,7 @@
     Give your passkey a memorable name to help you identify it.
   </p>
 
-  <form onsubmit={handleSave} class="flex flex-col gap-6">
+  <form class="flex flex-col gap-6">
     <Input
       bind:element={inputElement}
       bind:value={inputValue}
@@ -65,6 +65,7 @@
       <Button
         type="submit"
         variant="primary"
+        onclick={handleSave}
         disabled={isLoading || inputValue.trim() === ""}
       >
         {isLoading ? "Saving..." : "Save"}
