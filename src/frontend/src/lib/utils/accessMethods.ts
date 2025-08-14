@@ -53,14 +53,33 @@ export const getLastUsedAccessMethod = (
   })[0];
 };
 
-const hasOrigin = (
+/**
+ * Extract the origin from an AuthnMethodData's metadata
+ */
+export const getOrigin = (
   accessMethod: AuthnMethodData,
-  origin: string[],
-): boolean => {
+): string | undefined => {
   const metadataEntry = accessMethod.metadata.find(([key]) => key === "origin");
   const metadataValue = metadataEntry?.[1];
   if (nonNullish(metadataValue) && "String" in metadataValue) {
-    return origin.some((o) => isSameOrigin(o, metadataValue.String));
+    return metadataValue.String;
+  }
+  return undefined;
+};
+
+/**
+ * Check if there are multiple unique origins across authentication methods
+ */
+export const haveMultipleOrigins = (authnMethods: AuthnMethodData[]): boolean =>
+  new Set(authnMethods.map(getOrigin)).size > 1;
+
+const hasSomeOrigin = (
+  accessMethod: AuthnMethodData,
+  origins: string[],
+): boolean => {
+  const accessMethodOrigin = getOrigin(accessMethod);
+  if (nonNullish(accessMethodOrigin)) {
+    return origins.some((o) => isSameOrigin(o, accessMethodOrigin));
   }
   return false;
 };
@@ -80,7 +99,7 @@ const hasOrigin = (
  */
 export const isLegacyAuthnMethod = (accessMethod: AuthnMethodData): boolean => {
   return (
-    !hasOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
+    !hasSomeOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
     "Recovery" in accessMethod.security_settings.purpose
   );
 };

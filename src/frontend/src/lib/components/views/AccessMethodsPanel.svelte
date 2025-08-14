@@ -22,6 +22,7 @@
     getLastUsedAccessMethod,
     isLegacyAuthnMethod,
     isWebAuthnMetaData,
+    haveMultipleOrigins,
   } from "$lib/utils/accessMethods";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { authnMethodEqual, getAuthnMethodAlias } from "$lib/utils/webAuthn";
@@ -117,6 +118,8 @@
       authnMethodEqual(accessMethod, lastUsedAccessMethod)
     );
   };
+
+  const showPasskeyOrigin = $derived(haveMultipleOrigins(authnMethods));
 </script>
 
 <Panel>
@@ -164,6 +167,7 @@
           accessMethod={authnMethod}
           isDisabled={isLegacyAuthnMethod(authnMethod)}
           isCurrent={isCurrentAccessMethod(authnMethod)}
+          showOrigin={showPasskeyOrigin}
         />
         {#if !isLegacyAuthnMethod(authnMethod)}
           <div class="flex items-center justify-end gap-2 px-4">
