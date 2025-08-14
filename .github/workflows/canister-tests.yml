@@ -389,9 +389,6 @@ jobs:
           ./cargo-nextest nextest run --profile ci --archive-file canister-tests-${{ matrix.os }}.tar.zst --partition hash:${{ matrix.partition }}
         env:
           RUST_BACKTRACE: 1
-          # Reduce PocketIC logging overhead
-          POCKET_IC_MUTE_LOGS: true
-          RUST_LOG: warn
 
   test-canisters-script:
     needs: [cached-build, docker-build-archive]
