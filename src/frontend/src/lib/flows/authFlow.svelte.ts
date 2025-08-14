@@ -98,20 +98,15 @@ export class AuthFlow {
   };
 
   createPasskey = async (name: string): Promise<bigint> => {
-    try {
-      authenticationV2Funnel.trigger(
-        AuthenticationV2Events.StartWebauthnCreation,
-      );
-      const passkeyIdentity =
-        features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
-          ? await DiscoverableDummyIdentity.createNew(name)
-          : await DiscoverablePasskeyIdentity.createNew(name);
-      await this.#startRegistration();
-      return this.#registerWithPasskey(passkeyIdentity);
-    } catch (error) {
-      this.#view = "chooseMethod";
-      throw error;
-    }
+    authenticationV2Funnel.trigger(
+      AuthenticationV2Events.StartWebauthnCreation,
+    );
+    const passkeyIdentity =
+      features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+        ? await DiscoverableDummyIdentity.createNew(name)
+        : await DiscoverablePasskeyIdentity.createNew(name);
+    await this.#startRegistration();
+    return this.#registerWithPasskey(passkeyIdentity);
   };
 
   continueWithGoogle = async (): Promise<{

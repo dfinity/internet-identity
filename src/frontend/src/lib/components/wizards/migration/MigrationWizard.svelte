@@ -1,15 +1,22 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
-  import { MigrationFlow } from "$lib/flows/migrationFlow.svelte";
+  import { isNullish, nonNullish } from "@dfinity/utils";
+  import {
+    MigrationFlow,
+    WrongDomainError,
+  } from "$lib/flows/migrationFlow.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
-  import { handleError } from "$lib/components/utils/error";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
+  import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
   import AlreadyMigrated from "./views/AlreadyMigrated.svelte";
 
-  const { onSuccess }: { onSuccess: (identityNumber: bigint) => void } =
-    $props();
+  interface Props {
+    onSuccess: (identityNumber: bigint) => void;
+    onError: (error: unknown) => void;
+  }
+
+  const { onSuccess, onError }: Props = $props();
 
   const migrationFlow = new MigrationFlow();
   const alreadyMigrated = $derived(
@@ -22,20 +29,39 @@
   const handleSubmit = async (
     identityNumber: bigint,
     attachElement?: HTMLElement,
-  ) => {
-    await migrationFlow
-      .authenticateWithIdentityNumber(BigInt(identityNumber), attachElement)
-      .catch(handleError);
-    // Fetch the identity info to check whether it has already been migrated or not.
-    await identityInfo.fetch();
-    migrationFlow.view = "enterName";
+  ): Promise<void | "cancelled" | "wrongDomain"> => {
+    try {
+      await migrationFlow.authenticateWithIdentityNumber(
+        BigInt(identityNumber),
+        attachElement,
+      );
+      // Fetch the identity info to check whether it has already been migrated or not.
+      await identityInfo.fetch();
+      migrationFlow.view = "enterName";
+    } catch (error) {
+      if (error instanceof WrongDomainError) {
+        return "wrongDomain";
+      }
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
+    }
   };
 
-  const handleCreate = async (name: string) => {
-    await migrationFlow.createPasskey(name);
-    // Button is disabled if identityNumber is null or undefined so no need to manage that case.
-    if (nonNullish(migrationFlow.identityNumber)) {
+  const handleCreate = async (name: string): Promise<void | "cancelled"> => {
+    if (isNullish(migrationFlow.identityNumber)) {
+      // Button is disabled if identityNumber is null or undefined so no need to manage that case.
+      throw new Error("Identity number is undefined");
+    }
+    try {
+      await migrationFlow.createPasskey(name);
       onSuccess(migrationFlow.identityNumber);
+    } catch (error) {
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
     }
   };
 </script>

@@ -37,7 +37,7 @@
   <b class="text-text-primary">existing device</b>.
 </p>
 
-<Tooltip label="Code copied to clipboard" hidden={!copied} arrow={false} manual>
+<Tooltip label="Code copied to clipboard" hidden={!copied} manual>
   <Button
     onclick={handleCopyCode}
     variant="secondary"

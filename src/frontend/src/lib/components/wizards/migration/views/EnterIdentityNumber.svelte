@@ -5,12 +5,14 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { SUPPORT_URL } from "$lib/config";
   import { onMount } from "svelte";
+  import { waitFor } from "$lib/utils/utils";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
 
   interface Props {
     onSubmit: (
       identityNumber: bigint,
       attachElement?: HTMLElement,
-    ) => Promise<void>;
+    ) => Promise<void | "cancelled" | "wrongDomain">;
   }
 
   let { onSubmit }: Props = $props();
@@ -18,18 +20,28 @@
   let identityNumber = $state<string>("");
   let inputElement = $state<HTMLInputElement>();
   let attachElement = $state<HTMLElement>();
-  let submitting = $state(false);
+  let isSubmitting = $state(false);
+  let isCancelled = $state(false);
+  let isWrongDomain = $state(false);
 
   onMount(() => {
     inputElement?.focus();
   });
 
   const handleSubmit = async () => {
-    submitting = true;
-    try {
-      await onSubmit(BigInt(identityNumber), attachElement);
-    } finally {
-      submitting = false;
+    isSubmitting = true;
+    const result = await onSubmit(BigInt(identityNumber), attachElement);
+    isSubmitting = false;
+
+    if (result === "cancelled") {
+      isCancelled = true;
+      await waitFor(1000);
+      isCancelled = false;
+    }
+    if (result === "wrongDomain") {
+      isWrongDomain = true;
+      await waitFor(2000); // We show this longer since it's unexpected
+      isWrongDomain = false;
     }
   };
 </script>
@@ -65,20 +77,28 @@
       spellcheck="false"
       aria-label="Identity number"
     />
-    <Button
-      onclick={handleSubmit}
-      variant="primary"
-      size="lg"
-      type="submit"
-      disabled={submitting || identityNumber.length === 0}
+    <Tooltip
+      label={isWrongDomain
+        ? "Wrong domain was set. Please try again."
+        : "Interaction canceled. Please try again."}
+      hidden={!isCancelled && !isWrongDomain}
+      manual
     >
-      {#if submitting}
-        <ProgressRing />
-        <span>Authenticating...</span>
-      {:else}
-        <span>Continue</span>
-      {/if}
-    </Button>
+      <Button
+        onclick={handleSubmit}
+        variant="primary"
+        size="lg"
+        type="submit"
+        disabled={isSubmitting || identityNumber.length === 0}
+      >
+        {#if isSubmitting}
+          <ProgressRing />
+          <span>Authenticating...</span>
+        {:else}
+          <span>Continue</span>
+        {/if}
+      </Button>
+    </Tooltip>
     <Button
       href={SUPPORT_URL}
       target="_blank"

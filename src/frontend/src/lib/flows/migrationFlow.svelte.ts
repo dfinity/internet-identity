@@ -18,16 +18,24 @@ import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdent
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { throwCanisterError } from "$lib/utils/utils";
-import { toaster } from "$lib/components/utils/toaster";
 import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
 import { supportsWebauthRoR } from "$lib/utils/userAgent";
 import { canisterConfig } from "$lib/globals";
 import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 
+export class WrongDomainError extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, WrongDomainError.prototype);
+  }
+
+  message =
+    "The wrong domain was set for the passkey and the browser couldn't find it.";
+}
+
 export class MigrationFlow {
   view = $state<"enterNumber" | "enterName">("enterNumber");
   identityNumber: UserNumber | undefined;
-  authenticating = $state(false);
   #webAuthFlows: { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
 
   constructor() {
@@ -38,7 +46,6 @@ export class MigrationFlow {
     identityNumber: UserNumber,
     attachElement?: HTMLElement,
   ): Promise<void> => {
-    this.authenticating = true;
     this.identityNumber = identityNumber;
     const devices = await this.#lookupAuthenticators(identityNumber);
 
@@ -92,29 +99,21 @@ export class MigrationFlow {
         delegation,
       );
       authenticationStore.set({ identity, identityNumber });
-    } catch (e: unknown) {
-      if (isWebAuthnCancelError(e)) {
-        // We only want to show a special error if the user might have to choose different web auth flow.
-        if (nonNullish(this.#webAuthFlows) && flowsLength > 1) {
-          // Increase the index to try the next flow.
-          this.#webAuthFlows = {
-            flows: this.#webAuthFlows.flows,
-            currentIndex: this.#webAuthFlows.currentIndex + 1,
-          };
-          toaster.info({
-            title: "Please try again",
-            description:
-              "The wrong domain was set for the passkey and the browser couldn't find it.",
-          });
-          return;
-        }
+    } catch (error) {
+      // We only want to show a special error if the user might have to choose different web auth flow.
+      if (
+        isWebAuthnCancelError(error) &&
+        nonNullish(this.#webAuthFlows) &&
+        flowsLength > 1
+      ) {
+        // Increase the index to try the next flow.
+        this.#webAuthFlows = {
+          flows: this.#webAuthFlows.flows,
+          currentIndex: this.#webAuthFlows.currentIndex + 1,
+        };
+        throw new WrongDomainError();
       }
-
-      throw new Error(
-        "Failed to authenticate using passkey. Please try again and contact support if the issue persists.",
-      );
-    } finally {
-      this.authenticating = false;
+      throw error;
     }
   };
 

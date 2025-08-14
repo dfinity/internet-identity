@@ -11,6 +11,8 @@
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
   import { MigrationWizard } from "$lib/components/wizards/migration";
+  import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
+  import { isOpenIdCancelError } from "$lib/utils/openID";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -39,33 +41,46 @@
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isMigrating = $state(false);
 
-  const handleContinueWithExistingPasskey = async () => {
+  const handleContinueWithExistingPasskey = async (): Promise<
+    void | "cancelled"
+  > => {
     isAuthenticating = true;
     try {
       onSignIn(await authFlow.continueWithExistingPasskey());
     } catch (error) {
-      onError(error);
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
     }
   };
-  const handleCreatePasskey = async (name: string) => {
+  const handleCreatePasskey = async (
+    name: string,
+  ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
       onSignUp(await authFlow.createPasskey(name));
     } catch (error) {
-      onError(error);
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
     }
   };
-  const handleContinueWithGoogle = async () => {
+  const handleContinueWithGoogle = async (): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
       const { identityNumber, type } = await authFlow.continueWithGoogle();
       (type === "signUp" ? onSignUp : onSignIn)(identityNumber);
     } catch (error) {
-      onError(error);
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
     }
@@ -97,10 +112,10 @@
 {:else if isMigrating}
   {#if !withinDialog}
     <Dialog onClose={() => (isMigrating = false)}>
-      <MigrationWizard onSuccess={onMigration} />
+      <MigrationWizard onSuccess={onMigration} {onError} />
     </Dialog>
   {:else}
-    <MigrationWizard onSuccess={onMigration} />
+    <MigrationWizard onSuccess={onMigration} {onError} />
   {/if}
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
