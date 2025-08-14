@@ -22,12 +22,12 @@
     </div>
     <div>
       <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-        Identity already migrated
+        Identity already upgraded
       </h1>
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        {`${name} is already migrated to the new experience.`}
+        {`${name} is already upgraded to the new experience.`}
       </p>
     </div>
   </div>

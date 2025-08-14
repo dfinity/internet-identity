@@ -10,7 +10,7 @@
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
-  import { getOrigin } from "$lib/utils/accessMethods";
+  import { getRpId } from "$lib/utils/accessMethods";
 
   let {
     accessMethod,
@@ -82,9 +82,9 @@
               </span>
             {/if}
           </div>
-          {#if showOrigin && getOrigin(accessMethod)}
+          {#if showOrigin && getRpId(accessMethod)}
             <div class="text-text-tertiary font-extralight">
-              <Ellipsis text={getOrigin(accessMethod)!}></Ellipsis>
+              <Ellipsis text={getRpId(accessMethod)!}></Ellipsis>
             </div>
           {/if}
         </div>

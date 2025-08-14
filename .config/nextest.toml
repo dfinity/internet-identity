@@ -1,0 +1,9 @@
+# Nextest configuration for Internet Identity canister tests
+# This configuration helps manage PocketIC load by adding delays and retries
+
+# https://nexte.st/docs/configuration/reference/
+[profile.ci]
+test-threads = 1
+slow-timeout = { period = "180s", terminate-after = 3 }
+retries = { backoff = "exponential", count = 2, delay = "2s", max-delay = "10s" }
+leak-timeout = "2s"
