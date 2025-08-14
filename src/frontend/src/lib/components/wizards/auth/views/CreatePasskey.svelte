@@ -8,6 +8,10 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import {
+    upgradeIdentityFunnel,
+    UpgradeIdentityEvents,
+  } from "$lib/utils/analytics/upgradeIdentityFunnel";
 
   interface Props {
     create: (name: string) => Promise<void | "cancelled">;
@@ -15,6 +19,10 @@
   }
 
   const { create, identityNumber }: Props = $props();
+
+  onMount(() => {
+    upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.CreatePasskeyScreen);
+  });
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");

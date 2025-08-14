@@ -2,8 +2,17 @@
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { SUPPORT_URL } from "$lib/config";
+  import { onMount } from "svelte";
+  import {
+    upgradeIdentityFunnel,
+    UpgradeIdentityEvents,
+  } from "$lib/utils/analytics/upgradeIdentityFunnel";
 
   let { name }: { name: string } = $props();
+
+  onMount(() => {
+    upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.AlreadyMigratedScreen);
+  });
 </script>
 
 <div class="flex flex-1 flex-col">

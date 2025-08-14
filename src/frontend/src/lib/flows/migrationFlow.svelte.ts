@@ -22,6 +22,10 @@ import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
 import { supportsWebauthRoR } from "$lib/utils/userAgent";
 import { canisterConfig } from "$lib/globals";
 import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
+import {
+  upgradeIdentityFunnel,
+  UpgradeIdentityEvents,
+} from "$lib/utils/analytics/upgradeIdentityFunnel";
 
 export class WrongDomainError extends Error {
   constructor() {
@@ -99,7 +103,18 @@ export class MigrationFlow {
         delegation,
       );
       authenticationStore.set({ identity, identityNumber });
+      upgradeIdentityFunnel.trigger(
+        UpgradeIdentityEvents.AuthenticationSuccessful,
+      );
     } catch (error) {
+      upgradeIdentityFunnel.trigger(
+        UpgradeIdentityEvents.AuthenticationFailure,
+      );
+      if (isWebAuthnCancelError(error)) {
+        upgradeIdentityFunnel.trigger(
+          UpgradeIdentityEvents.AuthenticationCancelled,
+        );
+      }
       // We only want to show a special error if the user might have to choose different web auth flow.
       if (
         isWebAuthnCancelError(error) &&
