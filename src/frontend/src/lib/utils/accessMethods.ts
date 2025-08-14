@@ -75,7 +75,7 @@ export const getRpId = (accessMethod: AuthnMethodData): string | undefined => {
   if (nonNullish(origin)) {
     try {
       return new URL(origin).hostname;
-    } catch (_) {
+    } catch {
       return undefined;
     }
   }
