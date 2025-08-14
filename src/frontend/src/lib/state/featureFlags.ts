@@ -103,8 +103,6 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 
-export const FLAIR = createFeatureFlagStore("FLAIR", true);
-
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
@@ -113,5 +111,4 @@ export default {
   ENABLE_MIGRATE_FLOW,
   ADD_ACCESS_METHOD,
   CONTINUE_FROM_ANOTHER_DEVICE,
-  FLAIR,
 } as Record<string, FeatureFlagStore>;

@@ -1,6 +1,5 @@
 <script lang="ts">
   import FlairCanvas from "./FlairCanvas.svelte";
-  import { FLAIR } from "$lib/state/featureFlags";
   import { isMobile } from "$lib/state/UI/isMobile";
   import { onMount, onDestroy } from "svelte";
   import {
@@ -21,7 +20,7 @@
   });
 </script>
 
-{#if $FLAIR && !$isMobile}
+{#if !$isMobile}
   <FlairCanvas
     spacing="medium"
     aspect="ultrawide"
