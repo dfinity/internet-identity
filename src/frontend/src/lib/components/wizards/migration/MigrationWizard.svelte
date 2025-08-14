@@ -10,6 +10,11 @@
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
   import AlreadyMigrated from "./views/AlreadyMigrated.svelte";
+  import { onMount } from "svelte";
+  import {
+    UpgradeIdentityEvents,
+    upgradeIdentityFunnel,
+  } from "$lib/utils/analytics/upgradeIdentityFunnel";
 
   interface Props {
     onSuccess: (identityNumber: bigint) => void;
@@ -17,6 +22,10 @@
   }
 
   const { onSuccess, onError }: Props = $props();
+
+  onMount(() => {
+    upgradeIdentityFunnel.init();
+  });
 
   const migrationFlow = new MigrationFlow();
   const alreadyMigrated = $derived(
@@ -56,8 +65,10 @@
     }
     try {
       await migrationFlow.createPasskey(name);
+      upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.UpgradeSuccessful);
       onSuccess(migrationFlow.identityNumber);
     } catch (error) {
+      upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.UpgradeFailure);
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
       }
