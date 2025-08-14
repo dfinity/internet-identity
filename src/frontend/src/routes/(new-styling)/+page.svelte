@@ -23,6 +23,7 @@
   import { onMount } from "svelte";
   import { FLAIR } from "$lib/state/featureFlags";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { authenticationV2Funnel } from "$lib/utils/analytics/authenticationV2Funnel";
 
   const { data }: PageProps = $props();
 
@@ -91,6 +92,7 @@
   };
 
   onMount(() => {
+    authenticationV2Funnel.init({ origin: window.location.origin });
     setTimeout(() => {
       triggerDropWaveAnimation();
     });
