@@ -73,7 +73,11 @@ export const getOrigin = (
 export const getRpId = (accessMethod: AuthnMethodData): string | undefined => {
   const origin = getOrigin(accessMethod);
   if (nonNullish(origin)) {
-    return new URL(origin).hostname;
+    try {
+      return new URL(origin).hostname;
+    } catch (e) {
+      return undefined;
+    }
   }
   return undefined;
 };
