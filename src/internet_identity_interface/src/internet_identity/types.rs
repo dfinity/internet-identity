@@ -212,6 +212,7 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_google: Option<Option<OpenIdConfig>>,
+    pub openid: Option<Vec<OpenIdConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
@@ -310,6 +311,9 @@ pub enum DeployArchiveResult {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
+    pub name: String,
+    pub logo: String,
+    pub configuration: String,
     pub client_id: String,
 }
 
