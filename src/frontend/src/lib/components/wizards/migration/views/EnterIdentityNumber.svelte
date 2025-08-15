@@ -3,7 +3,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { SUPPORT_URL } from "$lib/config";
+  import { UPGRADE_SUPPORT_URL } from "$lib/config";
   import { onMount } from "svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
@@ -100,7 +100,7 @@
       </Button>
     </Tooltip>
     <Button
-      href={SUPPORT_URL}
+      href={UPGRADE_SUPPORT_URL}
       target="_blank"
       rel="noopener noreferrer"
       variant="tertiary"
