@@ -36,7 +36,7 @@
 
     if (result === "cancelled") {
       isCancelled = true;
-      await waitFor(1000);
+      await waitFor(2000);
       isCancelled = false;
     }
   };
