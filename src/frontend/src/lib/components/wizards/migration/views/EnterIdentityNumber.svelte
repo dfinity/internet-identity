@@ -35,12 +35,12 @@
 
     if (result === "cancelled") {
       isCancelled = true;
-      await waitFor(2000);
+      await waitFor(4000);
       isCancelled = false;
     }
     if (result === "wrongDomain") {
       isWrongDomain = true;
-      await waitFor(3000); // We show this longer since it's unexpected
+      await waitFor(4000);
       isWrongDomain = false;
     }
   };
