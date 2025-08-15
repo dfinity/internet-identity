@@ -1,4 +1,5 @@
 use super::OpenIDJWTVerificationError;
+use crate::openid::generic::ProviderStatus::Pending;
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -83,7 +84,9 @@ struct Claims {
 
 #[derive(Serialize, Deserialize)]
 struct Configuration {
+    // To compare with iss claims
     issuer: String,
+    // To validate JWT signatures, the keys are periodically fetched (FETCH_CERTS_INTERVAL)
     jwks_uri: String,
     // To verify if the required response type (id_token) is supported
     response_types_supported: Vec<String>,
@@ -93,10 +96,22 @@ struct Configuration {
     claims_supported: Vec<String>,
 }
 
+pub enum ProviderStatus {
+    Pending,
+    Unsupported,
+    Ready {
+        client_id: String,
+        issuer: String,
+        certs: Vec<Jwk>,
+        last_certs_update: u64,
+    },
+}
+
 pub struct Provider {
     client_id: String,
     issuer: String,
     certs: Rc<RefCell<Vec<Jwk>>>,
+    status: ProviderStatus,
 }
 
 impl OpenIdProvider for Provider {
@@ -183,6 +198,7 @@ impl Provider {
         Provider {
             client_id: config.client_id,
             certs,
+            status: Pending,
         }
     }
 }
