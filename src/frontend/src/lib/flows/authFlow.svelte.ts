@@ -71,19 +71,24 @@ export class AuthFlow {
   }
 
   chooseMethod = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen, {
+      abTestGroup: this.abTestGroup,
+    });
     this.#view = "chooseMethod";
   };
 
   setupOrUseExistingPasskey = (): void => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.ContinueWithPasskeyScreen,
+      { abTestGroup: this.abTestGroup },
     );
     this.#view = "setupOrUseExistingPasskey";
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey, {
+      abTestGroup: this.abTestGroup,
+    });
     const { identity, identityNumber, credentialId } =
       await authenticateWithPasskey({
         canisterId,
@@ -101,7 +106,9 @@ export class AuthFlow {
   };
 
   setupNewPasskey = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen, {
+      abTestGroup: this.abTestGroup,
+    });
     this.#view = "setupNewPasskey";
   };
 
@@ -117,6 +124,7 @@ export class AuthFlow {
   createPasskey = async (): Promise<bigint> => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.StartWebauthnCreation,
+      { abTestGroup: this.abTestGroup },
     );
     if (isNullish(this.#name)) {
       throw new Error("Name is not set");
@@ -224,7 +232,9 @@ export class AuthFlow {
     passkeyIdentity: DiscoverablePasskeyIdentity,
     attempts = 0,
   ): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey, {
+      abTestGroup: this.abTestGroup,
+    });
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
@@ -249,6 +259,7 @@ export class AuthFlow {
         .then(throwCanisterError);
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulPasskeyRegistration,
+        { abTestGroup: this.abTestGroup },
       );
       const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
       const identity = await authenticateWithSession({
