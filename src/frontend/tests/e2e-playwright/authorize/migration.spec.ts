@@ -12,6 +12,7 @@ test.describe("Migration from an app", () => {
     const legacyPrincipal = await authorizeWithUrl(
       page,
       TEST_APP_URL,
+      LEGACY_II_URL,
       async (authPage) => {
         // Enable WebAuthn Virtual Authenticator
         const client = await authPage.context().newCDPSession(authPage);
@@ -47,11 +48,11 @@ test.describe("Migration from an app", () => {
           .getByRole("button", { name: "I saved it, continue" })
           .click();
       },
-      LEGACY_II_URL,
     );
     const migratedPrincipal = await authorizeWithUrl(
       page,
       TEST_APP_URL,
+      II_URL,
       async (authPage) => {
         if (!credential || !identityNumber) {
           throw new Error("Credential or identity number not found");
@@ -86,7 +87,6 @@ test.describe("Migration from an app", () => {
         await authPage.getByLabel("Identity name").fill(TEST_USER_NAME);
         await authPage.getByRole("button", { name: "Create Passkey" }).click();
       },
-      II_URL,
     );
     expect(legacyPrincipal).toEqual(migratedPrincipal);
   });

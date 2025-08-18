@@ -37,7 +37,7 @@ export const authorize = (
   page: Page,
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
-  return authorizeWithUrl(page, TEST_APP_URL, authenticate);
+  return authorizeWithUrl(page, TEST_APP_URL, II_URL, authenticate);
 };
 
 /**
@@ -50,8 +50,8 @@ export const authorize = (
 export const authorizeWithUrl = async (
   page: Page,
   appUrl: string,
+  iiURL: string,
   authenticate: (page: Page) => Promise<void>,
-  iiURL: string = II_URL,
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
