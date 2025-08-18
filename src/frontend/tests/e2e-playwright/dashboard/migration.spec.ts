@@ -1,26 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { dummyAuth, II_URL } from "../utils";
+import { addVirtualAuthenticator, II_URL, LEGACY_II_URL } from "../utils";
 
 const TEST_USER_NAME = "Test User";
-const LEGACY_II_URL = "https://identity.ic0.app";
 
 test.describe("Migration", () => {
-  test("User can migrate a legacy identity", async ({ page, context }) => {
+  test("User can migrate a legacy identity", async ({ page }) => {
     // Step 1: Create a legacy identity
     await page.goto(LEGACY_II_URL);
 
-    // Enable WebAuthn Virtual Authenticator
-    const client = await context.newCDPSession(page);
-    await client.send("WebAuthn.enable");
-    await client.send("WebAuthn.addVirtualAuthenticator", {
-      options: {
-        protocol: "ctap2",
-        transport: "usb",
-        hasResidentKey: true,
-        hasUserVerification: true,
-        isUserVerified: true,
-      },
-    });
+    await addVirtualAuthenticator(page);
 
     await page
       .getByRole("button", { name: "Create Internet Identity" })
