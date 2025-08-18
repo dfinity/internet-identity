@@ -2,6 +2,7 @@ import { Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
+import { isNullish } from "@dfinity/utils";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
@@ -219,14 +220,28 @@ export const getMessageText = async (
   );
 };
 
+// WebAuthn CDP client cache to reuse the same session per Page
+const webauthnClientCache = new WeakMap<Page, Promise<any>>();
+const getWebAuthnClient = async (page: Page) => {
+  let clientPromise = webauthnClientCache.get(page);
+  if (isNullish(clientPromise)) {
+    clientPromise = (async () => {
+      const client = await page.context().newCDPSession(page);
+      await client.send("WebAuthn.enable");
+      return client;
+    })();
+    webauthnClientCache.set(page, clientPromise);
+  }
+  return clientPromise;
+};
+
 /**
  * Adds a virtual authenticator to the browser
  * @param page The page to add the virtual authenticator to
  * @returns The authenticator ID
  */
 export const addVirtualAuthenticator = async (page: Page): Promise<string> => {
-  const client = await page.context().newCDPSession(page);
-  await client.send("WebAuthn.enable");
+  const client = await getWebAuthnClient(page);
   const { authenticatorId } = await client.send(
     "WebAuthn.addVirtualAuthenticator",
     {
@@ -252,8 +267,7 @@ export const getCredentialsFromVirtualAuthenticator = async (
   page: Page,
   authenticatorId: string,
 ): Promise<Protocol.WebAuthn.Credential[]> => {
-  const client = await page.context().newCDPSession(page);
-  await client.send("WebAuthn.enable");
+  const client = await getWebAuthnClient(page);
   const { credentials } = await client.send("WebAuthn.getCredentials", {
     authenticatorId,
   });
@@ -271,8 +285,7 @@ export const addCredentialToVirtualAuthenticator = async (
   authenticatorId: string,
   credential: Protocol.WebAuthn.Credential,
 ): Promise<void> => {
-  const client = await page.context().newCDPSession(page);
-  await client.send("WebAuthn.enable");
+  const client = await getWebAuthnClient(page);
   await client.send("WebAuthn.addCredential", {
     authenticatorId,
     credential,
