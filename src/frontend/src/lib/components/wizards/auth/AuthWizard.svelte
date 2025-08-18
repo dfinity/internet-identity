@@ -7,6 +7,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
+  import InfoPasskey from "$lib/components/wizards/auth/views/InfoPasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
@@ -36,7 +37,7 @@
     children,
   }: Props = $props();
 
-  const authFlow = new AuthFlow();
+  const authFlow = new AuthFlow(onSignUp);
 
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isMigrating = $state(false);
@@ -61,7 +62,21 @@
   ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
-      onSignUp(await authFlow.createPasskey(name));
+      await authFlow.submitNameAndContinue(name);
+    } catch (error) {
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
+  const handleContinueCreatePasskey = async (): Promise<void | "cancelled"> => {
+    isAuthenticating = true;
+    try {
+      onSignUp(await authFlow.createPasskey());
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
@@ -104,6 +119,8 @@
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
+  {:else if authFlow.view === "infoPasskey"}
+    <InfoPasskey create={handleContinueCreatePasskey} />
   {/if}
 {/snippet}
 

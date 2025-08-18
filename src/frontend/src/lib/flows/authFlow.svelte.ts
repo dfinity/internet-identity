@@ -32,7 +32,10 @@ import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 
 export class AuthFlow {
   #view = $state<
-    "chooseMethod" | "setupOrUseExistingPasskey" | "setupNewPasskey"
+    | "chooseMethod"
+    | "setupOrUseExistingPasskey"
+    | "setupNewPasskey"
+    | "infoPasskey"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -41,6 +44,8 @@ export class AuthFlow {
   }>();
   #systemOverlay = $state(false);
   #confirmationCode = $state<string>();
+  #name = $state<string>();
+  #abTestGroup: "infoPasskey" | "default";
 
   get view() {
     return this.#view;
@@ -58,8 +63,9 @@ export class AuthFlow {
     return this.#confirmationCode;
   }
 
-  constructor() {
+  constructor(private onSignUp: (identityNumber: bigint) => void) {
     this.chooseMethod();
+    this.#abTestGroup = Math.random() < 0.2 ? "infoPasskey" : "default";
   }
 
   chooseMethod = (): void => {
@@ -97,14 +103,26 @@ export class AuthFlow {
     this.#view = "setupNewPasskey";
   };
 
-  createPasskey = async (name: string): Promise<bigint> => {
+  submitNameAndContinue = async (name: string): Promise<void> => {
+    this.#name = name;
+    if (this.#abTestGroup === "infoPasskey") {
+      this.#view = "infoPasskey";
+    } else {
+      this.onSignUp(await this.createPasskey());
+    }
+  };
+
+  createPasskey = async (): Promise<bigint> => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.StartWebauthnCreation,
     );
+    if (isNullish(this.#name)) {
+      throw new Error("Name is not set");
+    }
     const passkeyIdentity =
       features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
-        ? await DiscoverableDummyIdentity.createNew(name)
-        : await DiscoverablePasskeyIdentity.createNew(name);
+        ? await DiscoverableDummyIdentity.createNew(this.#name)
+        : await DiscoverablePasskeyIdentity.createNew(this.#name);
     await this.#startRegistration();
     return this.#registerWithPasskey(passkeyIdentity);
   };
