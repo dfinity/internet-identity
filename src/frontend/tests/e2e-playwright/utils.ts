@@ -51,10 +51,11 @@ export const authorizeWithUrl = async (
   page: Page,
   appUrl: string,
   authenticate: (page: Page) => Promise<void>,
+  iiURL: string = II_URL,
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
-  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+  await page.getByRole("textbox", { name: "Identity Provider" }).fill(iiURL);
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
 
