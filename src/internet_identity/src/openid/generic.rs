@@ -64,6 +64,10 @@ const MAX_NAME_LENGTH: usize = 128;
 // send us a picture URL that is longer than needed. This is an additional sanity check.
 const MAX_PICTURE_URL_LENGTH: usize = 256;
 
+const REQUIRED_RESPONSE_TYPES: [&str; 1] = ["id_token"];
+const REQUIRED_SCOPES: [&str; 1] = ["openid"];
+const REQUIRED_CLAIMS: [&str; 6] = ["iss", "sub", "aud", "nonce", "iat", "exp"];
+
 #[derive(Serialize, Deserialize)]
 struct Certs {
     keys: Vec<Jwk>,
@@ -96,22 +100,32 @@ struct Configuration {
     claims_supported: Vec<String>,
 }
 
+struct UnsupportedProvider {
+    missing_response_types: Vec<String>,
+    missing_scopes: Vec<String>,
+    missing_claims: Vec<String>,
+}
+
+struct SupportedProvider {
+    issuer: String,
+}
+
+struct ReadyProvider {
+    issuer: String,
+    certs: Vec<Jwk>,
+    last_certs_update: u64,
+}
+
 pub enum ProviderStatus {
     Pending,
-    Unsupported,
-    Ready {
-        client_id: String,
-        issuer: String,
-        certs: Vec<Jwk>,
-        last_certs_update: u64,
-    },
+    Unsupported(UnsupportedProvider),
+    Supported(SupportedProvider),
+    Ready(ReadyProvider),
 }
 
 pub struct Provider {
     client_id: String,
-    issuer: String,
-    certs: Rc<RefCell<Vec<Jwk>>>,
-    status: ProviderStatus,
+    status: Rc<RefCell<ProviderStatus>>,
 }
 
 impl OpenIdProvider for Provider {
@@ -186,6 +200,12 @@ impl OpenIdProvider for Provider {
 
 impl Provider {
     pub fn create(config: OpenIdConfig) -> Provider {
+        let status = Rc::new(RefCell::new(Pending));
+        let provider = Provider {
+            client_id: config.client_id,
+            status: Rc::clone(&status),
+        };
+
         #[cfg(test)]
         let certs = Rc::new(RefCell::new(TEST_CERTS.take()));
 
@@ -193,18 +213,15 @@ impl Provider {
         let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
 
         #[cfg(not(test))]
-        schedule_fetch_certs(Rc::clone(&certs), None);
+        schedule_fetch_config(config.configuration, Rc::clone(&status), None);
+        schedule_fetch_certs(Rc::clone(&status), None);
 
-        Provider {
-            client_id: config.client_id,
-            certs,
-            status: Pending,
-        }
+        provider
     }
 }
 
 #[cfg(not(test))]
-fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u64>) {
+fn schedule_fetch_certs(certs_reference: Rc<RefCell<ProviderStatus>>, delay: Option<u64>) {
     use ic_cdk::spawn;
     use ic_cdk_timers::set_timer;
     use std::cmp::min;
@@ -214,6 +231,37 @@ fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u6
         spawn(async move {
             let new_delay = match fetch_certs().await {
                 Ok(google_certs) => {
+                    certs_reference.replace(google_certs);
+                    FETCH_CERTS_INTERVAL
+                }
+                // Try again earlier with backoff if fetch failed, the HTTP outcall responses
+                // aren't the same across nodes when we fetch at the moment of key rotation.
+                Err(_) => min(FETCH_CERTS_INTERVAL, delay.unwrap_or(60) * 2),
+            };
+            schedule_fetch_certs(certs_reference, Some(new_delay));
+        });
+    });
+}
+
+#[cfg(not(test))]
+fn schedule_fetch_config(
+    config_url: String,
+    status_reference: Rc<RefCell<ProviderStatus>>,
+    delay: Option<u64>,
+) {
+    use ic_cdk::spawn;
+    use ic_cdk_timers::set_timer;
+    use std::cmp::min;
+    use std::time::Duration;
+
+    set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
+        spawn(async move {
+            let new_delay = match fetch_configuration(config_url).await {
+                Ok(configuration) => {
+                    match verify_configuration(configuration) {
+                        Ok(supported) => {}
+                        Err(unsupported) => {}
+                    }
                     certs_reference.replace(google_certs);
                     FETCH_CERTS_INTERVAL
                 }
@@ -365,6 +413,59 @@ fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
         rsa::BigUint::from_bytes_be(&e),
     )
     .map_err(|_| "Unable to construct RSA public key".into())
+}
+
+fn verify_configuration(
+    configuration: Configuration,
+) -> Result<SupportedProvider, UnsupportedProvider> {
+    let missing_response_types: Vec<&str> = REQUIRED_RESPONSE_TYPES
+        .iter()
+        .filter(|required| {
+            !configuration
+                .response_types_supported
+                .iter()
+                .any(|supported| supported == *required)
+        })
+        .copied()
+        .collect();
+    let missing_scopes: Vec<&str> = REQUIRED_SCOPES
+        .iter()
+        .filter(|required| {
+            !configuration
+                .scopes_supported
+                .iter()
+                .any(|supported| supported == *required)
+        })
+        .copied()
+        .collect();
+    let missing_claims: Vec<&str> = REQUIRED_CLAIMS
+        .iter()
+        .filter(|required| {
+            !configuration
+                .claims_supported
+                .iter()
+                .any(|supported| supported == *required)
+        })
+        .copied()
+        .collect();
+
+    if !missing_response_types.is_empty()
+        || !missing_scopes.is_empty()
+        || !missing_claims.is_empty()
+    {
+        return Err(UnsupportedProvider {
+            missing_response_types: missing_response_types
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            missing_scopes: missing_scopes.into_iter().map(String::from).collect(),
+            missing_claims: missing_claims.into_iter().map(String::from).collect(),
+        });
+    }
+
+    Ok(SupportedProvider {
+        issuer: configuration.issuer,
+    })
 }
 
 /// Verifier implementation for `identity_jose` that verifies the signature of a JWT.
