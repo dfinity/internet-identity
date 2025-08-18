@@ -37,7 +37,7 @@
     children,
   }: Props = $props();
 
-  const authFlow = new AuthFlow(onSignUp);
+  const authFlow = new AuthFlow();
 
   let isContinueFromAnotherDeviceVisible = $state(false);
   let isMigrating = $state(false);
@@ -57,12 +57,16 @@
       isAuthenticating = false;
     }
   };
+
   const handleCreatePasskey = async (
     name: string,
   ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
-      await authFlow.submitNameAndContinue(name);
+      const result = await authFlow.submitNameAndContinue(name);
+      if (result?.type === "created") {
+        onSignUp(result.identityNumber);
+      }
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
@@ -86,6 +90,7 @@
       isAuthenticating = false;
     }
   };
+
   const handleContinueWithGoogle = async (): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {

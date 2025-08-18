@@ -63,9 +63,9 @@ export class AuthFlow {
     return this.#confirmationCode;
   }
 
-  constructor(private onSignUp: (identityNumber: bigint) => void) {
+  constructor() {
     this.chooseMethod();
-    const GROUP_INFO_PERCENTAGE = 1;
+    const GROUP_INFO_PERCENTAGE = 0.3;
     this.abTestGroup =
       Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
@@ -112,12 +112,15 @@ export class AuthFlow {
     this.#view = "setupNewPasskey";
   };
 
-  submitNameAndContinue = async (name: string): Promise<void> => {
+  submitNameAndContinue = async (
+    name: string,
+  ): Promise<undefined | { type: "created"; identityNumber: bigint }> => {
     this.#name = name;
     if (this.abTestGroup === "infoPasskey") {
       this.#view = "infoPasskey";
+      return;
     } else {
-      this.onSignUp(await this.createPasskey());
+      return { type: "created", identityNumber: await this.createPasskey() };
     }
   };
 
