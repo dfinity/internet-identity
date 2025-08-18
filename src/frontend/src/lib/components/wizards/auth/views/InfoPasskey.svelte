@@ -1,10 +1,10 @@
 <script lang="ts">
   import { fly } from "svelte/transition";
-  import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import FingerprintIllustration from "$lib/components/illustrations/FingerprintIllustration.svelte";
 
   interface Props {
     create: () => Promise<void | "cancelled">;
@@ -32,16 +32,14 @@
   <div
     class="text-text-primary mb-8 flex w-full flex-col items-center justify-center"
   >
-    <SmileyWritingIllustration class="my-5 h-22" />
+    <FingerprintIllustration class="my-5 h-22" />
     <div>
-      <h1 class="mb-3 text-2xl font-medium sm:text-center">
-        You are about to create a passkey
-      </h1>
+      <h1 class="mb-3 text-2xl font-medium sm:text-center">New Passkey</h1>
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        A new passkey will be created using your biometrics and stored in your
-        password manager.
+        You are about to create a passkey using your biometrics that will be
+        stored in your password manager.
       </p>
     </div>
   </div>

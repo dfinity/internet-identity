@@ -118,7 +118,12 @@
         (isContinueFromAnotherDeviceVisible = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
-    <CreatePasskey create={handleCreatePasskey} />
+    <CreatePasskey
+      create={handleCreatePasskey}
+      buttonLabel={authFlow.abTestGroup === "infoPasskey"
+        ? "Continue"
+        : "Create Passkey"}
+    />
   {:else if authFlow.view === "infoPasskey"}
     <InfoPasskey create={handleContinueCreatePasskey} />
   {/if}

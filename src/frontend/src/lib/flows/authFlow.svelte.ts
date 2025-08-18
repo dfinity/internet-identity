@@ -45,7 +45,7 @@ export class AuthFlow {
   #systemOverlay = $state(false);
   #confirmationCode = $state<string>();
   #name = $state<string>();
-  #abTestGroup: "infoPasskey" | "default";
+  abTestGroup: "infoPasskey" | "default";
 
   get view() {
     return this.#view;
@@ -65,7 +65,9 @@ export class AuthFlow {
 
   constructor(private onSignUp: (identityNumber: bigint) => void) {
     this.chooseMethod();
-    this.#abTestGroup = Math.random() < 0.2 ? "infoPasskey" : "default";
+    const GROUP_INFO_PERCENTAGE = 1;
+    this.abTestGroup =
+      Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
 
   chooseMethod = (): void => {
@@ -105,7 +107,7 @@ export class AuthFlow {
 
   submitNameAndContinue = async (name: string): Promise<void> => {
     this.#name = name;
-    if (this.#abTestGroup === "infoPasskey") {
+    if (this.abTestGroup === "infoPasskey") {
       this.#view = "infoPasskey";
     } else {
       this.onSignUp(await this.createPasskey());
