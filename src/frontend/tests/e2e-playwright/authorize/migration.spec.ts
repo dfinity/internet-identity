@@ -9,6 +9,7 @@ import {
   LEGACY_II_URL,
   TEST_APP_URL,
 } from "../utils";
+import { isNullish } from "@dfinity/utils";
 
 const TEST_USER_NAME = "Test User";
 
@@ -47,7 +48,7 @@ test.describe("Migration from an app", () => {
       TEST_APP_URL,
       II_URL,
       async (authPage) => {
-        if (!credential || !identityNumber) {
+        if (isNullish(credential) || isNullish(identityNumber)) {
           throw new Error("Credential or identity number not found");
         }
         // Step 3: Perform the migration
