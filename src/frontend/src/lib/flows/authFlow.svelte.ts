@@ -29,7 +29,6 @@ import {
   OpenIdDelegationError,
 } from "$lib/generated/internet_identity_types";
 import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
-import { isE2E } from "$lib/constants/environment.constants";
 
 export class AuthFlow {
   #view = $state<
@@ -66,8 +65,7 @@ export class AuthFlow {
 
   constructor() {
     this.chooseMethod();
-    // In E2E runs, disable the A/B test randomness to keep the UI deterministic for tests.
-    const GROUP_INFO_PERCENTAGE = isE2E ? 0 : 0.3;
+    const GROUP_INFO_PERCENTAGE = 0.2;
     this.abTestGroup =
       Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
