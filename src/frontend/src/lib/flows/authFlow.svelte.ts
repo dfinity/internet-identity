@@ -117,6 +117,9 @@ export class AuthFlow {
   ): Promise<undefined | { type: "created"; identityNumber: bigint }> => {
     this.#name = name;
     if (this.abTestGroup === "infoPasskey") {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.InfoPasskeyScreen, {
+        abTestGroup: this.abTestGroup,
+      });
       this.#view = "infoPasskey";
       return;
     } else {
