@@ -71,16 +71,11 @@ const lookupCanister = async ({
 }): Promise<{ ok: Principal } | "not_found"> => {
   const HEADER_NAME = "x-ic-canister-id";
   try {
-    const response = await fetch(
-      origin,
-      // fail on redirects
-      {
-        redirect: "error",
-        method: "HEAD",
-        // do not send cookies or other credentials
-        credentials: "omit",
-      },
-    );
+    const response = await fetch(origin, {
+      method: "HEAD",
+      // do not send cookies or other credentials
+      credentials: "omit",
+    });
 
     const headerValue = response.headers.get(HEADER_NAME);
     if (isNullish(headerValue)) {
