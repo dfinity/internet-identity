@@ -242,17 +242,13 @@ fn schedule_fetch_config_and_keys(
             ic_cdk::print("schedule_fetch_config_and_keys");
             match fetch_config(&config_url).await {
                 Ok(config) => {
-                    ic_cdk::print("schedule_fetch_config_and_keys -> ok");
                     let jwks_uri = config.jwks_uri.clone();
-                    ic_cdk::print("jwks_uri {jwks_uri}");
                     match validate_config(config) {
                         Ok(supported) => {
-                            ic_cdk::print("supported {jwks_uri}");
                             status_reference.replace(Supported(supported));
                             schedule_fetch_keys(jwks_uri, status_reference, None);
                         }
                         Err(unsupported) => {
-                            ic_cdk::print(format!("unsupported {jwks_uri} {unsupported:?}"));
                             status_reference.replace(Unsupported(unsupported));
                         }
                     }
