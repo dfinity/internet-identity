@@ -338,7 +338,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
 }
 
 static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
-static CONFIG_URI: &str = "ttps://accounts.google.com/.well-known/openid-configuration";
+static CONFIG_URI: &str = "https://accounts.google.com/.well-known/openid-configuration";
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
