@@ -17,7 +17,7 @@ use internet_identity_interface::internet_identity::types::{
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::{cell::RefCell, collections::HashMap, matches};
+use std::{cell::RefCell, collections::HashMap};
 
 mod generic;
 

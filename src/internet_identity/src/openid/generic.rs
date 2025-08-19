@@ -27,19 +27,14 @@ use std::collections::HashMap;
 use std::convert::Into;
 use std::rc::Rc;
 
-const ISSUER: &str = "https://accounts.google.com";
-
-#[cfg(not(test))]
-const CERTS_URL: &str = "https://www.googleapis.com/oauth2/v3/certs";
-
 // The amount of cycles needed to make the HTTP outcall with a large enough margin
 #[cfg(not(test))]
 const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 
 const HTTP_STATUS_OK: u8 = 200;
 
-// Fetch the Google certs every fifteen minutes, the responses are always
-// valid for at least 5 hours so that should be enough margin.
+// Fetch the JWT signing certs every fifteen minutes, responses tend to be valid
+// for at least 5 hours across OpenID providers so that should be enough margin.
 // Update 2025-08-09: We found error when verifying JWTs quite often. Moved from 1h to 15 min.
 #[cfg(not(test))]
 const FETCH_CERTS_INTERVAL: u64 = 60 * 15; // 15 minutes in seconds
@@ -60,12 +55,13 @@ const MAX_EMAIL_LENGTH: usize = 256;
 // validate the name on their end for a sane maximum length. This is an additional sanity check.
 const MAX_NAME_LENGTH: usize = 128;
 
-// Maximum length of the picture URL claim in the Google JWT, in practice we expect Google to not
-// send us a picture URL that is longer than needed. This is an additional sanity check.
-const MAX_PICTURE_URL_LENGTH: usize = 256;
-
+// The OpenID provider config is fetched directly after deployment,
+// but might needs to be attempted multiple times when fetching fails
+// due to e.g. temporary service outage of the OpenID provider.
+#[cfg(not(test))]
 const FETCH_CONFIG_INTERVAL: u64 = 60 * 15; // 15 minutes in seconds
 
+// The minimum required support that needs to be in the OpenID configuration
 const REQUIRED_RESPONSE_TYPES: [&str; 1] = ["id_token"];
 const REQUIRED_SCOPES: [&str; 1] = ["openid"];
 const REQUIRED_CLAIMS: [&str; 6] = ["iss", "sub", "aud", "nonce", "iat", "exp"];
@@ -102,19 +98,22 @@ struct Configuration {
     claims_supported: Vec<String>,
 }
 
-#[derive(Debug)]
-struct UnsupportedProvider {
+#[allow(clippy::struct_field_names)]
+#[allow(dead_code)]
+pub struct UnsupportedProvider {
     missing_response_types: Vec<String>,
     missing_scopes: Vec<String>,
     missing_claims: Vec<String>,
 }
 
-struct SupportedProvider {
+#[allow(dead_code)]
+pub struct SupportedProvider {
     issuer: String,
     keys: Vec<Jwk>,
     updated_at: u64,
 }
 
+#[allow(dead_code)]
 pub enum ProviderStatus {
     Pending,
     Unsupported(UnsupportedProvider),
