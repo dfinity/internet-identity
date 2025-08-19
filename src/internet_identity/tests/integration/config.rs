@@ -7,6 +7,6 @@ mod enable_dapps_explorer;
 mod fetch_root_key;
 mod is_production;
 mod new_flow_origins;
-mod openid_google;
+mod openid;
 mod register_rate_limit;
 mod related_origins;

@@ -142,7 +142,7 @@ impl OpenIdCredential {
 }
 
 pub trait OpenIdProvider {
-    fn is_issuer(&self, issuer: &str) -> bool;
+    fn issuer(&self) -> String;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -193,7 +193,7 @@ where
     PROVIDERS.with_borrow(|providers| {
         providers
             .iter()
-            .find(|provider| provider.is_issuer(&claims.iss))
+            .find(|provider| provider.issuer() == claims.iss)
             .ok_or_else(|| {
                 OpenIDJWTVerificationError::GenericError(format!(
                     "Unsupported issuer: {}",
@@ -255,8 +255,8 @@ struct ExampleProvider;
 
 #[cfg(test)]
 impl OpenIdProvider for ExampleProvider {
-    fn is_issuer(&self, issuer: &str) -> bool {
-        issuer == "https://example.com"
+    fn issuer(&self) -> String {
+        "https://example.com".into()
     }
 
     fn verify(

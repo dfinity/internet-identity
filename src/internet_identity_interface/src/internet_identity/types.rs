@@ -311,9 +311,10 @@ pub enum DeployArchiveResult {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
     pub name: String,
-    pub logo_uri: String,
-    pub config_uri: String,
+    pub logo: String,
+    pub issuer: String,
     pub client_id: String,
+    pub jwks_uri: String,
 }
 
 pub enum AuthorizationKey {

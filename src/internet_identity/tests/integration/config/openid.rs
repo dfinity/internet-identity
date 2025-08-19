@@ -22,9 +22,10 @@ fn should_init_config() {
         },
         InternetIdentityInit {
             openid_configs: Some(vec![OpenIdConfig {
-                name: "Example".to_string(),
-                logo_uri: "https://example.com/logo.png".to_string(),
-                config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
+                name: "Example".into(),
+                logo: String::new(),
+                issuer: "https://example.com/.well-known/openid-configuration".into(),
+                jwks_uri: "https://example.com/oauth2/v3/certs".into(),
                 client_id: "https://example.com".into(),
             }]),
             ..Default::default()
@@ -48,9 +49,10 @@ fn should_enable_config() {
         ..Default::default()
     };
     let enabled_value = Some(vec![OpenIdConfig {
-        name: "Example".to_string(),
-        logo_uri: "https://example.com/logo.png".to_string(),
-        config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
+        name: "Example".into(),
+        logo: String::new(),
+        issuer: "https://example.com/.well-known/openid-configuration".into(),
+        jwks_uri: "https://example.com/oauth2/v3/certs".into(),
         client_id: "https://example.com".into(),
     }]);
 
@@ -68,9 +70,10 @@ fn should_disable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
         openid_configs: Some(vec![OpenIdConfig {
-            name: "Example".to_string(),
-            logo_uri: "https://example.com/logo.png".to_string(),
-            config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
+            name: "Example".into(),
+            logo: String::new(),
+            issuer: "https://example.com/.well-known/openid-configuration".into(),
+            jwks_uri: "https://example.com/oauth2/v3/certs".into(),
             client_id: "https://example.com".into(),
         }]),
         ..Default::default()
@@ -91,17 +94,19 @@ fn should_update_config() {
     let env = env();
     let mut config = InternetIdentityInit {
         openid_configs: Some(vec![OpenIdConfig {
-            name: "Example".to_string(),
-            logo_uri: "https://example.com/logo.png".to_string(),
-            config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
+            name: "Example".into(),
+            logo: String::new(),
+            issuer: "https://example.com/.well-known/openid-configuration".into(),
+            jwks_uri: "https://example.com/oauth2/v3/certs".into(),
             client_id: "https://example.com".into(),
         }]),
         ..Default::default()
     };
     let updated_value = Some(vec![OpenIdConfig {
-        name: "Example2".to_string(),
-        logo_uri: "https://example2.com/logo.png".to_string(),
-        config_uri: "https://example2.com/.well-known/openid-configuration".to_string(),
+        name: "Example2".into(),
+        logo: String::new(),
+        issuer: "https://example2.com/.well-known/openid-configuration".into(),
+        jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
         client_id: "https://example2.com".into(),
     }]);
 
@@ -128,9 +133,10 @@ fn should_retain_config() {
         },
         InternetIdentityInit {
             openid_configs: Some(vec![OpenIdConfig {
-                name: "Example".to_string(),
-                logo_uri: "https://example.com/logo.png".to_string(),
-                config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
+                name: "Example".into(),
+                logo: String::new(),
+                issuer: "https://example.com/.well-known/openid-configuration".into(),
+                jwks_uri: "https://example.com/oauth2/v3/certs".into(),
                 client_id: "https://example.com".into(),
             }]),
             ..Default::default()

@@ -1,7 +1,4 @@
 use super::OpenIDJWTVerificationError;
-use crate::openid::generic::ProviderStatus::Supported;
-#[cfg(not(test))]
-use crate::openid::generic::ProviderStatus::{Pending, Unsupported};
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -57,20 +54,6 @@ const MAX_EMAIL_LENGTH: usize = 256;
 // validate the name on their end for a sane maximum length. This is an additional sanity check.
 const MAX_NAME_LENGTH: usize = 128;
 
-// The OpenID provider config is fetched directly after deployment,
-// but might needs to be attempted multiple times when fetching fails
-// due to e.g. temporary service outage of the OpenID provider.
-#[cfg(not(test))]
-const FETCH_CONFIG_INTERVAL: u64 = 60 * 15; // 15 minutes in seconds
-
-// The minimum required support that needs to be in the OpenID configuration
-#[cfg(not(test))]
-const REQUIRED_RESPONSE_TYPES: [&str; 1] = ["id_token"];
-#[cfg(not(test))]
-const REQUIRED_SCOPES: [&str; 1] = ["openid"];
-#[cfg(not(test))]
-const REQUIRED_CLAIMS: [&str; 5] = ["iss", "sub", "aud", "iat", "exp"];
-
 #[derive(Serialize, Deserialize)]
 struct Certs {
     keys: Vec<Jwk>,
@@ -89,51 +72,15 @@ struct Claims {
     name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
-struct Configuration {
-    // To compare with iss claims
-    issuer: String,
-    // To validate JWT signatures, the keys are periodically fetched (FETCH_CERTS_INTERVAL)
-    jwks_uri: String,
-    // To verify if the required response type (id_token) is supported
-    response_types_supported: Vec<String>,
-    // To verify if the required scopes (openid) are supported (email and profile are optional)
-    scopes_supported: Vec<String>,
-    // To verify if the required (iss, sub, aud, iat, exp) are supported (name and email are optional)
-    claims_supported: Vec<String>,
-}
-
-#[allow(clippy::struct_field_names)]
-#[allow(dead_code)]
-#[derive(Debug)]
-pub struct UnsupportedProvider {
-    missing_response_types: Vec<String>,
-    missing_scopes: Vec<String>,
-    missing_claims: Vec<String>,
-}
-
-#[allow(dead_code)]
-pub struct SupportedProvider {
-    issuer: String,
-    keys: Vec<Jwk>,
-    updated_at: u64,
-}
-
-#[allow(dead_code)]
-pub enum ProviderStatus {
-    Pending,
-    Unsupported(UnsupportedProvider),
-    Supported(SupportedProvider),
-}
-
 pub struct Provider {
     client_id: String,
-    status: Rc<RefCell<ProviderStatus>>,
+    issuer: String,
+    keys: Rc<RefCell<Vec<Jwk>>>,
 }
 
 impl OpenIdProvider for Provider {
-    fn is_issuer(&self, issuer: &str) -> bool {
-        matches!(&*self.status.borrow(), Supported(supported) if supported.issuer == issuer)
+    fn issuer(&self) -> String {
+        self.issuer.clone()
     }
 
     fn verify(
@@ -141,14 +88,6 @@ impl OpenIdProvider for Provider {
         jwt: &str,
         salt: &[u8; 32],
     ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
-        let status = &*self.status.borrow();
-        let SupportedProvider { issuer, keys, .. } = match status {
-            Supported(supported) if !supported.keys.is_empty() => Ok(supported),
-            _ => Err(OpenIDJWTVerificationError::GenericError(
-                "Pending or unsupported".into(),
-            )),
-        }?;
-
         // Decode JWT and verify claims
         let validation_item = Decoder::new()
             .decode_compact_serialization(jwt.as_bytes(), None)
@@ -160,7 +99,7 @@ impl OpenIdProvider for Provider {
                 "Unable to decode claims or expected claims are missing".to_string(),
             )
         })?;
-        verify_claims(issuer, &self.client_id, &claims, salt)?;
+        verify_claims(&self.issuer, &self.client_id, &claims, salt)?;
 
         // Verify JWT signature
         let kid = validation_item
@@ -168,14 +107,15 @@ impl OpenIdProvider for Provider {
             .ok_or(OpenIDJWTVerificationError::GenericError(
                 "JWT is missing kid".to_string(),
             ))?;
-        let cert = keys
+        let keys = self.keys.borrow();
+        let key = keys
             .iter()
             .find(|cert| cert.kid().is_some_and(|v| v == kid))
             .ok_or(OpenIDJWTVerificationError::GenericError(format!(
-                "Certificate not found for {kid}"
+                "Key not found for {kid}"
             )))?;
         validation_item
-            .verify(&JwsVerifierFn::from(verify_signature), cert)
+            .verify(&JwsVerifierFn::from(verify_signature), key)
             .map_err(|_| {
                 OpenIDJWTVerificationError::GenericError("Invalid signature".to_string())
             })?;
@@ -208,100 +148,25 @@ impl OpenIdProvider for Provider {
 impl Provider {
     pub fn create(config: OpenIdConfig) -> Provider {
         #[cfg(not(test))]
-        let status = Rc::new(RefCell::new(Pending));
+        let keys = Rc::new(RefCell::new(vec![]));
         #[cfg(test)]
-        let status = Rc::new(RefCell::new(Supported(SupportedProvider {
-            issuer: test_data().2.iss,
-            keys: TEST_KEYS.take(),
-            updated_at: time(),
-        })));
+        let keys = Rc::new(RefCell::new(TEST_KEYS.take()));
 
         #[cfg(not(test))]
-        schedule_fetch_config_and_keys(config.config_uri, Rc::clone(&status), None);
+        schedule_fetch_keys(config.jwks_uri, Rc::clone(&keys), None);
 
         Provider {
+            issuer: config.issuer,
             client_id: config.client_id,
-            status: Rc::clone(&status),
+            keys,
         }
     }
 }
 
 #[cfg(not(test))]
-fn schedule_fetch_config_and_keys(
-    config_url: String,
-    status_reference: Rc<RefCell<ProviderStatus>>,
-    delay: Option<u64>,
-) {
-    use ic_cdk::spawn;
-    use ic_cdk_timers::set_timer;
-    use std::cmp::min;
-    use std::time::Duration;
-
-    set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
-        spawn(async move {
-            ic_cdk::print("schedule_fetch_config_and_keys");
-            match fetch_config(&config_url).await {
-                Ok(config) => {
-                    let jwks_uri = config.jwks_uri.clone();
-                    match validate_config(config) {
-                        Ok(supported) => {
-                            status_reference.replace(Supported(supported));
-                            schedule_fetch_keys(jwks_uri, status_reference, None);
-                        }
-                        Err(unsupported) => {
-                            status_reference.replace(Unsupported(unsupported));
-                        }
-                    }
-                }
-                // Try again earlier with backoff if fetch failed, the OIDC configuration
-                // might not be available due to unknown reasons e.g. OIDC provider outage.
-                Err(_) => schedule_fetch_config_and_keys(
-                    config_url,
-                    status_reference,
-                    Some(min(FETCH_CONFIG_INTERVAL, delay.unwrap_or(60) * 2)),
-                ),
-            }
-        });
-    });
-}
-
-#[cfg(not(test))]
-async fn fetch_config(url: &str) -> Result<Configuration, String> {
-    use ic_cdk::api::management_canister::http_request::{
-        http_request_with_closure, CanisterHttpRequestArgument, HttpMethod,
-    };
-
-    let request = CanisterHttpRequestArgument {
-        url: url.into(),
-        method: HttpMethod::GET,
-        body: None,
-        max_response_bytes: None,
-        transform: None,
-        headers: vec![
-            HttpHeader {
-                name: "Accept".into(),
-                value: "application/json".into(),
-            },
-            HttpHeader {
-                name: "User-Agent".into(),
-                value: "internet_identity_canister".into(),
-            },
-        ],
-    };
-
-    let (response,) =
-        http_request_with_closure(request, CERTS_CALL_CYCLES, transform_configuration)
-            .await
-            .map_err(|(_, err)| err)?;
-
-    serde_json::from_slice::<Configuration>(response.body.as_slice())
-        .map_err(|_| "Invalid JSON".into())
-}
-
-#[cfg(not(test))]
 fn schedule_fetch_keys(
     jwks_uri: String,
-    status_reference: Rc<RefCell<ProviderStatus>>,
+    keys_reference: Rc<RefCell<Vec<Jwk>>>,
     delay: Option<u64>,
 ) {
     use ic_cdk::spawn;
@@ -313,24 +178,14 @@ fn schedule_fetch_keys(
         spawn(async move {
             let new_delay = match fetch_keys(&jwks_uri).await {
                 Ok(keys) => {
-                    let issuer = match &*status_reference.borrow() {
-                        Supported(supported) => Some(supported.issuer.clone()),
-                        _ => None,
-                    };
-                    if let Some(issuer) = issuer {
-                        status_reference.replace(Supported(SupportedProvider {
-                            issuer,
-                            keys,
-                            updated_at: time(),
-                        }));
-                    }
+                    keys_reference.replace(keys);
                     FETCH_CERTS_INTERVAL
                 }
                 // Try again earlier with backoff if fetch failed, the HTTP outcall responses
                 // aren't the same across nodes when we fetch at the moment of key rotation.
                 Err(_) => min(FETCH_CERTS_INTERVAL, delay.unwrap_or(60) * 2),
             };
-            schedule_fetch_keys(jwks_uri, status_reference, Some(new_delay));
+            schedule_fetch_keys(jwks_uri, keys_reference, Some(new_delay));
         });
     });
 }
@@ -396,29 +251,6 @@ fn transform_keys(response: HttpResponse) -> HttpResponse {
     }
 }
 
-#[cfg(not(test))]
-fn transform_configuration(response: HttpResponse) -> HttpResponse {
-    if response.status != HTTP_STATUS_OK {
-        trap("Invalid response status")
-    };
-
-    let mut configuration: Configuration =
-        serde_json::from_slice(response.body.as_slice()).unwrap_or_else(|_| trap("Invalid JSON"));
-
-    configuration.claims_supported.sort();
-    configuration.scopes_supported.sort();
-    configuration.response_types_supported.sort();
-
-    let body = serde_json::to_vec(&configuration).unwrap_or_else(|_| trap("Invalid JSON"));
-
-    // All headers are ignored including the Cache-Control header
-    HttpResponse {
-        status: Nat::from(HTTP_STATUS_OK),
-        headers: vec![],
-        body,
-    }
-}
-
 fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
     // Extract the RSA parameters (modulus 'n' and exponent 'e') from the JWK.
     let JwkParamsRsa { n, e, .. } = jwk
@@ -441,60 +273,6 @@ fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
         rsa::BigUint::from_bytes_be(&e),
     )
     .map_err(|_| "Unable to construct RSA public key".into())
-}
-
-#[cfg(not(test))]
-fn validate_config(configuration: Configuration) -> Result<SupportedProvider, UnsupportedProvider> {
-    let missing_response_types: Vec<&str> = REQUIRED_RESPONSE_TYPES
-        .iter()
-        .filter(|required| {
-            !configuration
-                .response_types_supported
-                .iter()
-                .any(|supported| supported == *required)
-        })
-        .copied()
-        .collect();
-    let missing_scopes: Vec<&str> = REQUIRED_SCOPES
-        .iter()
-        .filter(|required| {
-            !configuration
-                .scopes_supported
-                .iter()
-                .any(|supported| supported == *required)
-        })
-        .copied()
-        .collect();
-    let missing_claims: Vec<&str> = REQUIRED_CLAIMS
-        .iter()
-        .filter(|required| {
-            !configuration
-                .claims_supported
-                .iter()
-                .any(|supported| supported == *required)
-        })
-        .copied()
-        .collect();
-
-    if !missing_response_types.is_empty()
-        || !missing_scopes.is_empty()
-        || !missing_claims.is_empty()
-    {
-        return Err(UnsupportedProvider {
-            missing_response_types: missing_response_types
-                .into_iter()
-                .map(String::from)
-                .collect(),
-            missing_scopes: missing_scopes.into_iter().map(String::from).collect(),
-            missing_claims: missing_claims.into_iter().map(String::from).collect(),
-        });
-    }
-
-    Ok(SupportedProvider {
-        issuer: configuration.issuer,
-        keys: vec![],
-        updated_at: time(),
-    })
 }
 
 /// Verifier implementation for `identity_jose` that verifies the signature of a JWT.
@@ -655,8 +433,9 @@ fn test_data() -> (String, [u8; 32], Claims, OpenIdConfig) {
     let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
     let openid_config = OpenIdConfig {
         name: "Google".into(),
-        logo_uri: "".into(),
-        config_uri: "https://accounts.google.com/.well-known/openid-configuration".into(),
+        logo: String::new(),
+        issuer: "https://accounts.google.com".into(),
+        jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
         client_id: claims.aud.clone(),
     };
 
@@ -707,7 +486,7 @@ fn should_return_error_when_cert_missing() {
     assert_eq!(
         provider.verify(&jwt, &salt),
         Err(OpenIDJWTVerificationError::GenericError(
-            "Certificate not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into()
+            "Key not found for dd125d5f462fbc6014aedab81ddf3bcedab70847".into()
         ))
     );
 }

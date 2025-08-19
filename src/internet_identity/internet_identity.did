@@ -362,9 +362,10 @@ type Salt = blob;
 
 type OpenIdConfig = record {
     name : text;
-    logo_uri : text;
-    config_uri : text;
+    logo : text;
+    issuer : text;
     client_id : text;
+    jwks_uri : text;
 };
 
 type OpenIdCredentialKey = record { Iss; Sub };
