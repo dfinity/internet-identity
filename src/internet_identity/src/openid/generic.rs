@@ -1,5 +1,7 @@
 use super::OpenIDJWTVerificationError;
-use crate::openid::generic::ProviderStatus::{Pending, Supported, Unsupported};
+use crate::openid::generic::ProviderStatus::Supported;
+#[cfg(not(test))]
+use crate::openid::generic::ProviderStatus::{Pending, Unsupported};
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -62,8 +64,11 @@ const MAX_NAME_LENGTH: usize = 128;
 const FETCH_CONFIG_INTERVAL: u64 = 60 * 15; // 15 minutes in seconds
 
 // The minimum required support that needs to be in the OpenID configuration
+#[cfg(not(test))]
 const REQUIRED_RESPONSE_TYPES: [&str; 1] = ["id_token"];
+#[cfg(not(test))]
 const REQUIRED_SCOPES: [&str; 1] = ["openid"];
+#[cfg(not(test))]
 const REQUIRED_CLAIMS: [&str; 6] = ["iss", "sub", "aud", "nonce", "iat", "exp"];
 
 #[derive(Serialize, Deserialize)]
@@ -385,6 +390,7 @@ fn transform_keys(response: HttpResponse) -> HttpResponse {
     }
 }
 
+#[cfg(not(test))]
 fn transform_configuration(response: HttpResponse) -> HttpResponse {
     if response.status != HTTP_STATUS_OK {
         trap("Invalid response status")
@@ -431,6 +437,7 @@ fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
     .map_err(|_| "Unable to construct RSA public key".into())
 }
 
+#[cfg(not(test))]
 fn validate_config(configuration: Configuration) -> Result<SupportedProvider, UnsupportedProvider> {
     let missing_response_types: Vec<&str> = REQUIRED_RESPONSE_TYPES
         .iter()
@@ -833,7 +840,7 @@ fn should_return_error_when_email_too_long() {
 
 #[test]
 fn should_return_error_when_name_too_long() {
-    let (_, salt, mut claims, _) = test_data();
+    let (_, salt, claims, _) = test_data();
     let issuer = claims.iss.clone();
     let client_id = claims.aud.clone();
     let mut invalid_claims = claims;
