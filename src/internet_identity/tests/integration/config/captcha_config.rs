@@ -6,9 +6,7 @@ use internet_identity_interface::internet_identity::types::CaptchaTrigger::{Dyna
 use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::{
     CaptchaDisabled, CaptchaEnabled,
 };
-use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, InternetIdentityInit, OpenIdConfig,
-};
+use internet_identity_interface::internet_identity::types::{CaptchaConfig, InternetIdentityInit};
 
 #[test]
 fn should_init_default() {

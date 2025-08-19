@@ -7,9 +7,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::CaptchaTrigger::Static;
 use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::CaptchaDisabled;
-use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, InternetIdentityInit, OpenIdConfig,
-};
+use internet_identity_interface::internet_identity::types::{CaptchaConfig, InternetIdentityInit};
 
 #[test]
 fn should_init_default() {
