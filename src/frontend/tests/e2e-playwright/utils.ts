@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { CDPSession, Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
@@ -221,8 +221,8 @@ export const getMessageText = async (
 };
 
 // WebAuthn CDP client cache to reuse the same session per Page
-const webauthnClientCache = new WeakMap<Page, Promise<any>>();
-const getWebAuthnClient = async (page: Page) => {
+const webauthnClientCache = new WeakMap<Page, Promise<CDPSession>>();
+const getWebAuthnClient = (page: Page) => {
   let clientPromise = webauthnClientCache.get(page);
   if (isNullish(clientPromise)) {
     clientPromise = (async () => {
