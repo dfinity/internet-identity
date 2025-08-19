@@ -17,10 +17,9 @@ use internet_identity_interface::internet_identity::types::{
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, matches};
 
 mod generic;
-mod google;
 
 const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -143,7 +142,7 @@ impl OpenIdCredential {
 }
 
 pub trait OpenIdProvider {
-    fn issuer(&self) -> &'static str;
+    fn is_issuer(&self, issuer: &str) -> bool;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -177,11 +176,6 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
     });
 }
 
-pub fn setup_google(config: OpenIdConfig) {
-    PROVIDERS
-        .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
-}
-
 pub fn with_provider<F, R>(jwt: &str, callback: F) -> Result<R, OpenIDJWTVerificationError>
 where
     F: FnOnce(&dyn OpenIdProvider) -> Result<R, OpenIDJWTVerificationError>,
@@ -199,7 +193,7 @@ where
     PROVIDERS.with_borrow(|providers| {
         providers
             .iter()
-            .find(|provider| provider.issuer() == claims.iss)
+            .find(|provider| provider.is_issuer(&claims.iss))
             .ok_or_else(|| {
                 OpenIDJWTVerificationError::GenericError(format!(
                     "Unsupported issuer: {}",
@@ -261,8 +255,8 @@ struct ExampleProvider;
 
 #[cfg(test)]
 impl OpenIdProvider for ExampleProvider {
-    fn issuer(&self) -> &'static str {
-        "https://example.com"
+    fn is_issuer(&self, issuer: &str) -> bool {
+        issuer == "https://example.com"
     }
 
     fn verify(
@@ -282,7 +276,7 @@ impl OpenIdProvider for ExampleProvider {
 impl ExampleProvider {
     fn credential(&self) -> OpenIdCredential {
         OpenIdCredential {
-            iss: self.issuer().into(),
+            iss: "https://example.com".into(),
             sub: "example-sub".into(),
             aud: "example-aud".into(),
             last_usage_timestamp: None,

@@ -165,9 +165,7 @@ fn should_retain_config() {
             canister_id,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                openid_google: Some(Some(OpenIdConfig {
-                    client_id: "https://example.com".into(),
-                })),
+                openid_configs: Some(vec![]),
                 ..Default::default()
             }),
         )

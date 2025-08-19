@@ -494,7 +494,7 @@ fn config() -> InternetIdentityInit {
         captcha_config: Some(persistent_state.captcha_config.clone()),
         related_origins: persistent_state.related_origins.clone(),
         new_flow_origins: persistent_state.new_flow_origins.clone(),
-        openid_google: Some(persistent_state.openid_google.clone()),
+        openid_configs: persistent_state.openid_configs.clone(),
         analytics_config: Some(persistent_state.analytics_config.clone()),
         fetch_root_key: persistent_state.fetch_root_key,
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
@@ -550,10 +550,7 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     // Initiate assets and OpenID providers
     init_assets(&config);
     update_root_hash();
-    if let Some(Some(openid_config)) = config.openid_google {
-        openid::setup_google(openid_config);
-    }
-    if let Some(openid_configs) = config.openid {
+    if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
 }
@@ -593,9 +590,9 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.new_flow_origins = Some(new_flow_origins);
             })
         }
-        if let Some(openid_google) = arg.openid_google {
+        if let Some(openid_configs) = arg.openid_configs {
             state::persistent_state_mut(|persistent_state| {
-                persistent_state.openid_google = openid_google;
+                persistent_state.openid_configs = Some(openid_configs);
             })
         }
         if let Some(analytics_config) = arg.analytics_config {

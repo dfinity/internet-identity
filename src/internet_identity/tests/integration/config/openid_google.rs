@@ -9,10 +9,7 @@ fn should_init_default() {
     let env = env();
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
-    assert_eq!(
-        api::config(&env, canister_id).unwrap().openid_google,
-        Some(None)
-    );
+    assert_eq!(api::config(&env, canister_id).unwrap().openid_configs, None,);
 }
 
 #[test]
@@ -20,13 +17,16 @@ fn should_init_config() {
     let env = env();
     let configs = vec![
         InternetIdentityInit {
-            openid_google: Some(None),
+            openid_configs: Some(vec![]),
             ..Default::default()
         },
         InternetIdentityInit {
-            openid_google: Some(Some(OpenIdConfig {
+            openid_configs: Some(vec![OpenIdConfig {
+                name: "Example".to_string(),
+                logo_uri: "https://example.com/logo.png".to_string(),
+                config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
                 client_id: "https://example.com".into(),
-            })),
+            }]),
             ..Default::default()
         },
     ];
@@ -34,8 +34,8 @@ fn should_init_config() {
     for config in configs {
         let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
         assert_eq!(
-            api::config(&env, canister_id).unwrap().openid_google,
-            config.openid_google
+            api::config(&env, canister_id).unwrap().openid_configs,
+            config.openid_configs
         );
     }
 }
@@ -44,18 +44,21 @@ fn should_init_config() {
 fn should_enable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        openid_google: Some(None),
+        openid_configs: None,
         ..Default::default()
     };
-    let enabled_value = Some(Some(OpenIdConfig {
+    let enabled_value = Some(vec![OpenIdConfig {
+        name: "Example".to_string(),
+        logo_uri: "https://example.com/logo.png".to_string(),
+        config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
         client_id: "https://example.com".into(),
-    }));
+    }]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.openid_google = enabled_value.clone();
+    config.openid_configs = enabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().openid_google,
+        api::config(&env, canister_id).unwrap().openid_configs,
         enabled_value
     );
 }
@@ -64,18 +67,21 @@ fn should_enable_config() {
 fn should_disable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        openid_google: Some(Some(OpenIdConfig {
+        openid_configs: Some(vec![OpenIdConfig {
+            name: "Example".to_string(),
+            logo_uri: "https://example.com/logo.png".to_string(),
+            config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
             client_id: "https://example.com".into(),
-        })),
+        }]),
         ..Default::default()
     };
-    let disabled_value = Some(None);
+    let disabled_value = Some(vec![]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.openid_google = disabled_value.clone();
+    config.openid_configs = disabled_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().openid_google,
+        api::config(&env, canister_id).unwrap().openid_configs,
         disabled_value
     );
 }
@@ -84,20 +90,26 @@ fn should_disable_config() {
 fn should_update_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        openid_google: Some(Some(OpenIdConfig {
-            client_id: "https://example1.com".into(),
-        })),
+        openid_configs: Some(vec![OpenIdConfig {
+            name: "Example".to_string(),
+            logo_uri: "https://example.com/logo.png".to_string(),
+            config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
+            client_id: "https://example.com".into(),
+        }]),
         ..Default::default()
     };
-    let updated_value = Some(Some(OpenIdConfig {
+    let updated_value = Some(vec![OpenIdConfig {
+        name: "Example2".to_string(),
+        logo_uri: "https://example2.com/logo.png".to_string(),
+        config_uri: "https://example2.com/.well-known/openid-configuration".to_string(),
         client_id: "https://example2.com".into(),
-    }));
+    }]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
-    config.openid_google = updated_value.clone();
+    config.openid_configs = updated_value.clone();
     upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config.clone())).unwrap();
     assert_eq!(
-        api::config(&env, canister_id).unwrap().openid_google,
+        api::config(&env, canister_id).unwrap().openid_configs,
         updated_value
     );
 }
@@ -107,17 +119,20 @@ fn should_retain_config() {
     let env = env();
     let configs = vec![
         InternetIdentityInit {
-            openid_google: None,
+            openid_configs: None,
             ..Default::default()
         },
         InternetIdentityInit {
-            openid_google: Some(None),
+            openid_configs: Some(vec![]),
             ..Default::default()
         },
         InternetIdentityInit {
-            openid_google: Some(Some(OpenIdConfig {
+            openid_configs: Some(vec![OpenIdConfig {
+                name: "Example".to_string(),
+                logo_uri: "https://example.com/logo.png".to_string(),
+                config_uri: "https://example.com/.well-known/openid-configuration".to_string(),
                 client_id: "https://example.com".into(),
-            })),
+            }]),
             ..Default::default()
         },
     ];
@@ -138,8 +153,8 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id).unwrap().openid_google,
-            config.openid_google.or(Some(None))
+            api::config(&env, canister_id).unwrap().openid_configs,
+            config.openid_configs
         );
     }
 }
