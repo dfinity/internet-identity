@@ -7,9 +7,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::CaptchaTrigger::Static;
 use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::CaptchaDisabled;
-use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, InternetIdentityInit, OpenIdConfig,
-};
+use internet_identity_interface::internet_identity::types::{CaptchaConfig, InternetIdentityInit};
 
 #[test]
 fn should_init_default() {
@@ -93,9 +91,7 @@ fn should_retain_config() {
             canister_id,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                openid_google: Some(Some(OpenIdConfig {
-                    client_id: "https://example.com".into(),
-                })),
+                openid_configs: Some(vec![]),
                 ..Default::default()
             }),
         )

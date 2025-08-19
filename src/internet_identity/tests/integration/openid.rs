@@ -347,10 +347,10 @@ pub struct Claims {
     aud: String,
     nonce: String,
     iat: u64,
-    // Optional Google specific claims
+    exp: u64,
+    // Optional metadata claims
     email: Option<String>,
     name: Option<String>,
-    picture: Option<String>,
 }
 
 impl Claims {
@@ -360,15 +360,33 @@ impl Claims {
 }
 
 #[derive(Serialize, Deserialize)]
+struct Configuration {
+    // To compare with iss claims
+    issuer: String,
+    // To validate JWT signatures, the keys are periodically fetched (FETCH_CERTS_INTERVAL)
+    jwks_uri: String,
+    // To verify if the required response type (id_token) is supported
+    response_types_supported: Vec<String>,
+    // To verify if the required scopes (openid) are supported (email and profile are optional)
+    scopes_supported: Vec<String>,
+    // To verify if the required (iss, sub, aud, nonce, iat, exp) are supported (name and email are optional)
+    claims_supported: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct Certs {
     keys: Vec<Jwk>,
 }
 
 pub fn setup_canister(env: &PocketIc) -> Principal {
     let args = InternetIdentityInit {
-        openid_google: Some(Some(OpenIdConfig {
-            client_id: CLIENT_ID.to_string(),
-        })),
+        openid_configs: Some(vec![OpenIdConfig {
+            name: "Google".into(),
+            logo: String::new(),
+            issuer: "https://accounts.google.com".into(),
+            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+            client_id: CLIENT_ID.into(),
+        }]),
         archive_config: Some(ArchiveConfig {
             module_hash: archive_wasm_hash(&ARCHIVE_WASM),
             entries_buffer_limit: 10_000,

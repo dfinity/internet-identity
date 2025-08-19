@@ -19,7 +19,7 @@ use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
-mod google;
+mod generic;
 
 const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -142,7 +142,7 @@ impl OpenIdCredential {
 }
 
 pub trait OpenIdProvider {
-    fn issuer(&self) -> &'static str;
+    fn issuer(&self) -> String;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -168,9 +168,12 @@ thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
 }
 
-pub fn setup_google(config: OpenIdConfig) {
-    PROVIDERS
-        .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
+pub fn setup(configs: Vec<OpenIdConfig>) {
+    PROVIDERS.with_borrow_mut(|providers| {
+        for config in configs {
+            providers.push(Box::new(generic::Provider::create(config)));
+        }
+    });
 }
 
 pub fn with_provider<F, R>(jwt: &str, callback: F) -> Result<R, OpenIDJWTVerificationError>
@@ -252,8 +255,8 @@ struct ExampleProvider;
 
 #[cfg(test)]
 impl OpenIdProvider for ExampleProvider {
-    fn issuer(&self) -> &'static str {
-        "https://example.com"
+    fn issuer(&self) -> String {
+        "https://example.com".into()
     }
 
     fn verify(
@@ -273,7 +276,7 @@ impl OpenIdProvider for ExampleProvider {
 impl ExampleProvider {
     fn credential(&self) -> OpenIdCredential {
         OpenIdCredential {
-            iss: self.issuer().into(),
+            iss: "https://example.com".into(),
             sub: "example-sub".into(),
             aud: "example-aud".into(),
             last_usage_timestamp: None,
