@@ -361,6 +361,9 @@ type JWT = text;
 type Salt = blob;
 
 type OpenIdConfig = record {
+    name : text;
+    logo_uri : text;
+    config_uri : text;
     client_id : text;
 };
 
