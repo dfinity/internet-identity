@@ -338,6 +338,7 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
 }
 
 static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
+static CONFIG_URI: &str = "ttps://accounts.google.com/.well-known/openid-configuration";
 
 #[derive(Deserialize)]
 #[allow(dead_code)]
@@ -347,10 +348,10 @@ pub struct Claims {
     aud: String,
     nonce: String,
     iat: u64,
-    // Optional Google specific claims
+    exp: u64,
+    // Optional metadata claims
     email: Option<String>,
     name: Option<String>,
-    picture: Option<String>,
 }
 
 impl Claims {
@@ -360,15 +361,32 @@ impl Claims {
 }
 
 #[derive(Serialize, Deserialize)]
+struct Configuration {
+    // To compare with iss claims
+    issuer: String,
+    // To validate JWT signatures, the keys are periodically fetched (FETCH_CERTS_INTERVAL)
+    jwks_uri: String,
+    // To verify if the required response type (id_token) is supported
+    response_types_supported: Vec<String>,
+    // To verify if the required scopes (openid) are supported (email and profile are optional)
+    scopes_supported: Vec<String>,
+    // To verify if the required (iss, sub, aud, nonce, iat, exp) are supported (name and email are optional)
+    claims_supported: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
 struct Certs {
     keys: Vec<Jwk>,
 }
 
 pub fn setup_canister(env: &PocketIc) -> Principal {
     let args = InternetIdentityInit {
-        openid_google: Some(Some(OpenIdConfig {
-            client_id: CLIENT_ID.to_string(),
-        })),
+        openid_configs: Some(vec![OpenIdConfig {
+            name: "Google".into(),
+            logo_uri: String::new(),
+            config_uri: CONFIG_URI.into(),
+            client_id: CLIENT_ID.into(),
+        }]),
         archive_config: Some(ArchiveConfig {
             module_hash: archive_wasm_hash(&ARCHIVE_WASM),
             entries_buffer_limit: 10_000,
@@ -399,9 +417,48 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
     }
 
     // Mock google certs response
+    mock_google_config_response(env);
     mock_google_certs_response(env);
 
     canister_id
+}
+
+fn mock_google_config_response(env: &PocketIc) {
+    const MAX_ATTEMPTS: u32 = 10;
+    let mut attempts = 0;
+
+    loop {
+        env.tick();
+        attempts += 1;
+
+        let requests = env.get_canister_http();
+
+        if let Some(cert_request) = requests.iter().find(|req| req.url == CONFIG_URI) {
+            let mock_config = serde_json::from_str::<Configuration>(
+                r#"{"issuer": "https://accounts.google.com","authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth","device_authorization_endpoint": "https://oauth2.googleapis.com/device/code","token_endpoint": "https://oauth2.googleapis.com/token","userinfo_endpoint": "https://openidconnect.googleapis.com/v1/userinfo","revocation_endpoint": "https://oauth2.googleapis.com/revoke","jwks_uri": "https://www.googleapis.com/oauth2/v3/certs","response_types_supported": ["code","token","id_token","code token","code id_token","token id_token","code token id_token","none"],"subject_types_supported": ["public"],"id_token_signing_alg_values_supported": ["RS256"],"scopes_supported": ["openid","email","profile"],"token_endpoint_auth_methods_supported": ["client_secret_post","client_secret_basic"],"claims_supported": ["aud","email","email_verified","exp","family_name","given_name","iat","iss","name","picture","sub"],"code_challenge_methods_supported": ["plain","S256"],"grant_types_supported": ["authorization_code","refresh_token","urn:ietf:params:oauth:grant-type:device_code","urn:ietf:params:oauth:grant-type:jwt-bearer"]}"#,
+            ).unwrap();
+            let http_response = CanisterHttpResponse::CanisterHttpReply(CanisterHttpReply {
+                status: 200,
+                headers: vec![],
+                body: serde_json::to_vec(&mock_config).unwrap(),
+            });
+
+            let response = MockCanisterHttpResponse {
+                subnet_id: cert_request.subnet_id,
+                request_id: cert_request.request_id,
+                response: http_response,
+                additional_responses: vec![],
+            };
+
+            env.mock_canister_http_response(response);
+            env.tick();
+            return;
+        }
+
+        if attempts >= MAX_ATTEMPTS {
+            panic!("No Google config requests found after {MAX_ATTEMPTS} attempts");
+        }
+    }
 }
 
 fn mock_google_certs_response(env: &PocketIc) {
