@@ -69,7 +69,7 @@ const REQUIRED_RESPONSE_TYPES: [&str; 1] = ["id_token"];
 #[cfg(not(test))]
 const REQUIRED_SCOPES: [&str; 1] = ["openid"];
 #[cfg(not(test))]
-const REQUIRED_CLAIMS: [&str; 6] = ["iss", "sub", "aud", "nonce", "iat", "exp"];
+const REQUIRED_CLAIMS: [&str; 5] = ["iss", "sub", "aud", "iat", "exp"];
 
 #[derive(Serialize, Deserialize)]
 struct Certs {
@@ -99,12 +99,13 @@ struct Configuration {
     response_types_supported: Vec<String>,
     // To verify if the required scopes (openid) are supported (email and profile are optional)
     scopes_supported: Vec<String>,
-    // To verify if the required (iss, sub, aud, nonce, iat, exp) are supported (name and email are optional)
+    // To verify if the required (iss, sub, aud, iat, exp) are supported (name and email are optional)
     claims_supported: Vec<String>,
 }
 
 #[allow(clippy::struct_field_names)]
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct UnsupportedProvider {
     missing_response_types: Vec<String>,
     missing_scopes: Vec<String>,
@@ -238,15 +239,20 @@ fn schedule_fetch_config_and_keys(
 
     set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
         spawn(async move {
+            ic_cdk::print("schedule_fetch_config_and_keys");
             match fetch_config(&config_url).await {
                 Ok(config) => {
+                    ic_cdk::print("schedule_fetch_config_and_keys -> ok");
                     let jwks_uri = config.jwks_uri.clone();
+                    ic_cdk::print("jwks_uri {jwks_uri}");
                     match validate_config(config) {
                         Ok(supported) => {
+                            ic_cdk::print("supported {jwks_uri}");
                             status_reference.replace(Supported(supported));
                             schedule_fetch_keys(jwks_uri, status_reference, None);
                         }
                         Err(unsupported) => {
+                            ic_cdk::print(format!("unsupported {jwks_uri} {unsupported:?}"));
                             status_reference.replace(Unsupported(unsupported));
                         }
                     }
@@ -311,9 +317,13 @@ fn schedule_fetch_keys(
         spawn(async move {
             let new_delay = match fetch_keys(&jwks_uri).await {
                 Ok(keys) => {
-                    if let Supported(supported) = &*status_reference.borrow() {
+                    let issuer = match &*status_reference.borrow() {
+                        Supported(supported) => Some(supported.issuer.clone()),
+                        _ => None,
+                    };
+                    if let Some(issuer) = issuer {
                         status_reference.replace(Supported(SupportedProvider {
-                            issuer: supported.issuer.clone(),
+                            issuer,
                             keys,
                             updated_at: time(),
                         }));

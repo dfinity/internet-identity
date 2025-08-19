@@ -170,9 +170,9 @@ thread_local! {
 
 pub fn setup(configs: Vec<OpenIdConfig>) {
     PROVIDERS.with_borrow_mut(|providers| {
-        configs
-            .into_iter()
-            .for_each(|config| providers.push(Box::new(generic::Provider::create(config))))
+        for config in configs {
+            providers.push(Box::new(generic::Provider::create(config)));
+        }
     });
 }
 
