@@ -8,7 +8,7 @@ use canister_tests::{api::internet_identity as api, framework::*};
 use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
+    AuthnMethodSecuritySettings, DeployArchiveResult, GoogleOpenIdConfig, InternetIdentityInit,
     OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
@@ -366,7 +366,7 @@ struct Certs {
 
 pub fn setup_canister(env: &PocketIc) -> Principal {
     let args = InternetIdentityInit {
-        openid_google: Some(Some(OpenIdConfig {
+        openid_google: Some(Some(GoogleOpenIdConfig {
             client_id: CLIENT_ID.to_string(),
         })),
         archive_config: Some(ArchiveConfig {

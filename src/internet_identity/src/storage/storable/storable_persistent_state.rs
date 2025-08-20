@@ -9,8 +9,8 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OpenIdConfig,
-    RateLimitConfig, Timestamp,
+    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, GoogleOpenIdConfig,
+    OpenIdConfig, RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -35,7 +35,8 @@ pub struct StorablePersistentState {
     captcha_config: Option<CaptchaConfig>,
     related_origins: Option<Vec<String>>,
     new_flow_origins: Option<Vec<String>>,
-    openid_google: Option<OpenIdConfig>,
+    openid_google: Option<GoogleOpenIdConfig>,
+    openid_configs: Option<Vec<OpenIdConfig>>,
     analytics_config: Option<AnalyticsConfig>,
     fetch_root_key: Option<bool>,
     enable_dapps_explorer: Option<bool>,
@@ -84,6 +85,7 @@ impl From<PersistentState> for StorablePersistentState {
             related_origins: s.related_origins,
             new_flow_origins: s.new_flow_origins,
             openid_google: s.openid_google,
+            openid_configs: s.openid_configs,
             analytics_config: s.analytics_config,
             fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
@@ -107,6 +109,7 @@ impl From<StorablePersistentState> for PersistentState {
             related_origins: s.related_origins,
             new_flow_origins: s.new_flow_origins,
             openid_google: s.openid_google,
+            openid_configs: s.openid_configs,
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
             fetch_root_key: s.fetch_root_key,
@@ -160,6 +163,7 @@ mod tests {
             related_origins: None,
             new_flow_origins: None,
             openid_google: None,
+            openid_configs: None,
             analytics_config: None,
             fetch_root_key: None,
             enable_dapps_explorer: None,
@@ -187,6 +191,7 @@ mod tests {
             related_origins: None,
             new_flow_origins: None,
             openid_google: None,
+            openid_configs: None,
             event_stats_24h_start: None,
             analytics_config: None,
             fetch_root_key: None,

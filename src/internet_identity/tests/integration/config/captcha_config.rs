@@ -7,7 +7,7 @@ use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger:
     CaptchaDisabled, CaptchaEnabled,
 };
 use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, InternetIdentityInit, OpenIdConfig,
+    CaptchaConfig, GoogleOpenIdConfig, InternetIdentityInit,
 };
 
 #[test]
@@ -181,7 +181,7 @@ fn should_retain_config() {
             canister_id,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                openid_google: Some(Some(OpenIdConfig {
+                openid_google: Some(Some(GoogleOpenIdConfig {
                     client_id: "https://example.com".into(),
                 })),
                 ..Default::default()
