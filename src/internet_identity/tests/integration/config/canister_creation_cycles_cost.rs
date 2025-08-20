@@ -3,7 +3,7 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    GoogleOpenIdConfig, InternetIdentityInit,
+    OpenIdGoogleConfig, InternetIdentityInit,
 };
 
 #[test]
@@ -100,7 +100,7 @@ fn should_retain_config() {
             canister_id,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                openid_google: Some(Some(GoogleOpenIdConfig {
+                openid_google: Some(Some(OpenIdGoogleConfig {
                     client_id: "https://example.com".into(),
                 })),
                 ..Default::default()

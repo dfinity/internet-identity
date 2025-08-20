@@ -3,7 +3,7 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    GoogleOpenIdConfig, InternetIdentityInit,
+    OpenIdGoogleConfig, InternetIdentityInit,
 };
 
 #[test]
@@ -26,7 +26,7 @@ fn should_init_config() {
             ..Default::default()
         },
         InternetIdentityInit {
-            openid_google: Some(Some(GoogleOpenIdConfig {
+            openid_google: Some(Some(OpenIdGoogleConfig {
                 client_id: "https://example.com".into(),
             })),
             ..Default::default()
@@ -49,7 +49,7 @@ fn should_enable_config() {
         openid_google: Some(None),
         ..Default::default()
     };
-    let enabled_value = Some(Some(GoogleOpenIdConfig {
+    let enabled_value = Some(Some(OpenIdGoogleConfig {
         client_id: "https://example.com".into(),
     }));
 
@@ -66,7 +66,7 @@ fn should_enable_config() {
 fn should_disable_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        openid_google: Some(Some(GoogleOpenIdConfig {
+        openid_google: Some(Some(OpenIdGoogleConfig {
             client_id: "https://example.com".into(),
         })),
         ..Default::default()
@@ -86,12 +86,12 @@ fn should_disable_config() {
 fn should_update_config() {
     let env = env();
     let mut config = InternetIdentityInit {
-        openid_google: Some(Some(GoogleOpenIdConfig {
+        openid_google: Some(Some(OpenIdGoogleConfig {
             client_id: "https://example1.com".into(),
         })),
         ..Default::default()
     };
-    let updated_value = Some(Some(GoogleOpenIdConfig {
+    let updated_value = Some(Some(OpenIdGoogleConfig {
         client_id: "https://example2.com".into(),
     }));
 
@@ -117,7 +117,7 @@ fn should_retain_config() {
             ..Default::default()
         },
         InternetIdentityInit {
-            openid_google: Some(Some(GoogleOpenIdConfig {
+            openid_google: Some(Some(OpenIdGoogleConfig {
                 client_id: "https://example.com".into(),
             })),
             ..Default::default()

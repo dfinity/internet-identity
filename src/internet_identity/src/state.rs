@@ -128,7 +128,7 @@ pub struct PersistentState {
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
     // Configuration for OpenID Google client
-    pub openid_google: Option<GoogleOpenIdConfig>,
+    pub openid_google: Option<OpenIdGoogleConfig>,
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     // Configuration for Web Analytics tool

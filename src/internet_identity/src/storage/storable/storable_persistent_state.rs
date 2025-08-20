@@ -9,7 +9,7 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, GoogleOpenIdConfig,
+    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OpenIdGoogleConfig,
     OpenIdConfig, RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
@@ -35,7 +35,7 @@ pub struct StorablePersistentState {
     captcha_config: Option<CaptchaConfig>,
     related_origins: Option<Vec<String>>,
     new_flow_origins: Option<Vec<String>>,
-    openid_google: Option<GoogleOpenIdConfig>,
+    openid_google: Option<OpenIdGoogleConfig>,
     openid_configs: Option<Vec<OpenIdConfig>>,
     analytics_config: Option<AnalyticsConfig>,
     fetch_root_key: Option<bool>,
