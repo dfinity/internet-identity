@@ -7,7 +7,7 @@ use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger:
     CaptchaDisabled, CaptchaEnabled,
 };
 use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, OpenIdGoogleConfig, InternetIdentityInit,
+    CaptchaConfig, InternetIdentityInit, OpenIdGoogleConfig,
 };
 
 #[test]

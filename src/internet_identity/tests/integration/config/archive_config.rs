@@ -3,7 +3,7 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, OpenIdGoogleConfig, InternetIdentityInit,
+    ArchiveConfig, InternetIdentityInit, OpenIdGoogleConfig,
 };
 
 #[test]

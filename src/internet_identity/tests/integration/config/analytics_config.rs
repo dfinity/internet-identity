@@ -4,7 +4,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::AnalyticsConfig::Plausible;
 use internet_identity_interface::internet_identity::types::{
-    OpenIdGoogleConfig, InternetIdentityInit,
+    InternetIdentityInit, OpenIdGoogleConfig,
 };
 
 #[test]

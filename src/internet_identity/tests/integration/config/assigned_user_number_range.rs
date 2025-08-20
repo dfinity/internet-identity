@@ -8,7 +8,7 @@ use canister_tests::framework::{
 use internet_identity_interface::internet_identity::types::CaptchaTrigger::Static;
 use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::CaptchaDisabled;
 use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, OpenIdGoogleConfig, InternetIdentityInit,
+    CaptchaConfig, InternetIdentityInit, OpenIdGoogleConfig,
 };
 
 #[test]

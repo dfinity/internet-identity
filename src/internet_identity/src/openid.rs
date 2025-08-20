@@ -12,7 +12,7 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, OpenIdGoogleConfig, IdRegFinishError, MetadataEntryV2, PublicKey,
+    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdGoogleConfig, PublicKey,
     SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;

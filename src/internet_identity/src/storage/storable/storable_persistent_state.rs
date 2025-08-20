@@ -9,8 +9,8 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OpenIdGoogleConfig,
-    OpenIdConfig, RateLimitConfig, Timestamp,
+    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OpenIdConfig,
+    OpenIdGoogleConfig, RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
 use std::collections::HashMap;

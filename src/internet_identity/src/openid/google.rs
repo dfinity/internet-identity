@@ -15,7 +15,7 @@ use identity_jose::jws::{
     Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
     VerificationInput,
 };
-use internet_identity_interface::internet_identity::types::{OpenIdGoogleConfig, MetadataEntryV2};
+use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdGoogleConfig};
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
