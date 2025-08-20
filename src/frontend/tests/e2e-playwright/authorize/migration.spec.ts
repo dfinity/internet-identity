@@ -4,6 +4,7 @@ import {
   addCredentialToVirtualAuthenticator,
   addVirtualAuthenticator,
   authorizeWithUrl,
+  dummyAuth,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
   LEGACY_II_URL,
@@ -15,6 +16,7 @@ const TEST_USER_NAME = "Test User";
 
 test.describe("Migration from an app", () => {
   test("User can migrate a legacy identity", async ({ page }) => {
+    const auth = dummyAuth();
     let credential: Protocol.WebAuthn.Credential | undefined;
     let identityNumber: string | undefined = undefined;
     const legacyPrincipal = await authorizeWithUrl(
@@ -67,9 +69,24 @@ test.describe("Migration from an app", () => {
         await authPage.getByRole("button", { name: "Continue" }).click();
 
         await authPage.getByLabel("Identity name").fill(TEST_USER_NAME);
+        auth(authPage);
         await authPage.getByRole("button", { name: "Create Passkey" }).click();
       },
     );
     expect(legacyPrincipal).toEqual(migratedPrincipal);
+
+    const secondAuthPrincipal = await authorizeWithUrl(
+      page,
+      TEST_APP_URL,
+      II_URL,
+      async (authPage) => {
+        if (isNullish(credential) || isNullish(identityNumber)) {
+          throw new Error("Credential or identity number not found");
+        }
+        auth(authPage);
+        await authPage.getByRole("button", { name: "Primary account" }).click();
+      },
+    );
+    expect(legacyPrincipal).toEqual(secondAuthPrincipal);
   });
 });

@@ -26,6 +26,8 @@ import {
   upgradeIdentityFunnel,
   UpgradeIdentityEvents,
 } from "$lib/utils/analytics/upgradeIdentityFunnel";
+import { features } from "$lib/legacy/features";
+import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 
 export class WrongDomainError extends Error {
   constructor() {
@@ -138,7 +140,10 @@ export class MigrationFlow {
       throw new Error("Identity number is null");
     }
     // TODO: Create the passkey in id.ai
-    const passkeyIdentity = await DiscoverablePasskeyIdentity.createNew(name);
+    const passkeyIdentity =
+      features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+        ? await DiscoverableDummyIdentity.createNew(name)
+        : await DiscoverablePasskeyIdentity.createNew(name);
     const origin = window.location.origin;
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).

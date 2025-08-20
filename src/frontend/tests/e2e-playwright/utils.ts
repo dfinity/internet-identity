@@ -69,8 +69,9 @@ export const authorizeWithUrl = async (
   // Authenticate (with supplied argument fn)
   await authenticate(authPage);
 
-  // Wait for II window to close
-  await authPage.waitForEvent("close");
+  // Wait for II window to close.
+  // During the identity upgrade flow there is a delay of 5s
+  await authPage.waitForEvent("close", { timeout: 15_000 });
 
   // Assert that the user is authenticated (valid principal)
   const principal = (await page.locator("#principal").textContent()) ?? "";
