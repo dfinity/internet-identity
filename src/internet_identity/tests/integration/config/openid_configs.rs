@@ -31,7 +31,7 @@ fn should_init_config() {
                 issuer: "https://example.com".into(),
                 client_id: "app.example.com".into(),
                 jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-                auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+                auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                 fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
             }]),
             ..Default::default()
@@ -44,7 +44,7 @@ fn should_init_config() {
                     issuer: "https://example.com".into(),
                     client_id: "app.example.com".into(),
                     jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-                    auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+                    auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                     fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
                 },
                 OpenIdConfig {
@@ -53,7 +53,7 @@ fn should_init_config() {
                     issuer: "https://example2.com".into(),
                     client_id: "app.example2.com".into(),
                     jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
-                    auth_uri: Some("https://example2.com/o/oauth2/v2/auth".into()),
+                    auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
                     fedcm_uri: Some("https://example2.com/gsi/fedcm.json".into()),
                 },
             ]),
@@ -83,7 +83,7 @@ fn should_enable_config() {
         issuer: "https://example.com".into(),
         client_id: "app.example.com".into(),
         jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-        auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+        auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
         fedcm_uri: Some("https://example.com/fedcm.json".into()),
     }]);
 
@@ -106,7 +106,7 @@ fn should_disable_config() {
             issuer: "https://example.com".into(),
             client_id: "app.example.com".into(),
             jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-            auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+            auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
             fedcm_uri: Some("https://example.com/fedcm.json".into()),
         }]),
         ..Default::default()
@@ -132,7 +132,7 @@ fn should_update_config() {
             issuer: "https://example.com".into(),
             client_id: "app.example.com".into(),
             jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-            auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+            auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
             fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
         }]),
         ..Default::default()
@@ -143,7 +143,7 @@ fn should_update_config() {
         issuer: "https://example2.com".into(),
         client_id: "app.example2.com".into(),
         jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
-        auth_uri: Some("https://example2.com/o/oauth2/v2/auth".into()),
+        auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
         fedcm_uri: Some("https://example2.com/gsi/fedcm.json".into()),
     }]);
 
@@ -175,7 +175,7 @@ fn should_retain_config() {
                 issuer: "https://example.com".into(),
                 client_id: "app.example.com".into(),
                 jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-                auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+                auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                 fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
             }]),
             ..Default::default()
@@ -188,7 +188,7 @@ fn should_retain_config() {
                     issuer: "https://example.com".into(),
                     client_id: "app.example.com".into(),
                     jwks_uri: "https://example.com/oauth2/v3/certs".into(),
-                    auth_uri: Some("https://example.com/o/oauth2/v2/auth".into()),
+                    auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                     fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
                 },
                 OpenIdConfig {
@@ -197,7 +197,7 @@ fn should_retain_config() {
                     issuer: "https://example2.com".into(),
                     client_id: "app.example2.com".into(),
                     jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
-                    auth_uri: Some("https://example2.com/o/oauth2/v2/auth".into()),
+                    auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
                     fedcm_uri: Some("https://example2.com/gsi/fedcm.json".into()),
                 },
             ]),
