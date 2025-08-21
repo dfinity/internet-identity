@@ -2,9 +2,7 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
-use internet_identity_interface::internet_identity::types::{
-    InternetIdentityInit, OpenIdConfig, OpenIdGoogleConfig,
-};
+use internet_identity_interface::internet_identity::types::{InternetIdentityInit, OpenIdConfig};
 
 #[test]
 fn should_init_default() {
