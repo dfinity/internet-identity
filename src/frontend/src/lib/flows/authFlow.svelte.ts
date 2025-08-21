@@ -32,7 +32,10 @@ import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 
 export class AuthFlow {
   #view = $state<
-    "chooseMethod" | "setupOrUseExistingPasskey" | "setupNewPasskey"
+    | "chooseMethod"
+    | "setupOrUseExistingPasskey"
+    | "setupNewPasskey"
+    | "infoPasskey"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -41,6 +44,8 @@ export class AuthFlow {
   }>();
   #systemOverlay = $state(false);
   #confirmationCode = $state<string>();
+  #name = $state<string>();
+  abTestGroup: "infoPasskey" | "default";
 
   get view() {
     return this.#view;
@@ -60,22 +65,30 @@ export class AuthFlow {
 
   constructor() {
     this.chooseMethod();
+    const GROUP_INFO_PERCENTAGE = 0.2;
+    this.abTestGroup =
+      Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
 
   chooseMethod = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen, {
+      abTestGroup: this.abTestGroup,
+    });
     this.#view = "chooseMethod";
   };
 
   setupOrUseExistingPasskey = (): void => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.ContinueWithPasskeyScreen,
+      { abTestGroup: this.abTestGroup },
     );
     this.#view = "setupOrUseExistingPasskey";
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey, {
+      abTestGroup: this.abTestGroup,
+    });
     const { identity, identityNumber, credentialId } =
       await authenticateWithPasskey({
         canisterId,
@@ -93,18 +106,39 @@ export class AuthFlow {
   };
 
   setupNewPasskey = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen, {
+      abTestGroup: this.abTestGroup,
+    });
     this.#view = "setupNewPasskey";
   };
 
-  createPasskey = async (name: string): Promise<bigint> => {
+  submitNameAndContinue = async (
+    name: string,
+  ): Promise<undefined | { type: "created"; identityNumber: bigint }> => {
+    this.#name = name;
+    if (this.abTestGroup === "infoPasskey") {
+      authenticationV2Funnel.trigger(AuthenticationV2Events.InfoPasskeyScreen, {
+        abTestGroup: this.abTestGroup,
+      });
+      this.#view = "infoPasskey";
+      return;
+    } else {
+      return { type: "created", identityNumber: await this.createPasskey() };
+    }
+  };
+
+  createPasskey = async (): Promise<bigint> => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.StartWebauthnCreation,
+      { abTestGroup: this.abTestGroup },
     );
+    if (isNullish(this.#name)) {
+      throw new Error("Name is not set");
+    }
     const passkeyIdentity =
       features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
-        ? await DiscoverableDummyIdentity.createNew(name)
-        : await DiscoverablePasskeyIdentity.createNew(name);
+        ? await DiscoverableDummyIdentity.createNew(this.#name)
+        : await DiscoverablePasskeyIdentity.createNew(this.#name);
     await this.#startRegistration();
     return this.#registerWithPasskey(passkeyIdentity);
   };
@@ -204,7 +238,9 @@ export class AuthFlow {
     passkeyIdentity: DiscoverablePasskeyIdentity,
     attempts = 0,
   ): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey, {
+      abTestGroup: this.abTestGroup,
+    });
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
@@ -229,6 +265,7 @@ export class AuthFlow {
         .then(throwCanisterError);
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulPasskeyRegistration,
+        { abTestGroup: this.abTestGroup },
       );
       const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
       const identity = await authenticateWithSession({

@@ -15,10 +15,17 @@
 
   interface Props {
     create: (name: string) => Promise<void | "cancelled">;
+    buttonLabel?: string;
+    loadingLabel?: string;
     identityNumber?: bigint;
   }
 
-  const { create, identityNumber }: Props = $props();
+  const {
+    create,
+    buttonLabel = "Create Passkey",
+    loadingLabel = "Creating Passkey...",
+    identityNumber,
+  }: Props = $props();
 
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.CreatePasskeyScreen);
@@ -92,9 +99,9 @@
       >
         {#if isCreating}
           <ProgressRing />
-          <span>Creating Passkey...</span>
+          <span>{loadingLabel}</span>
         {:else}
-          <span>Create Passkey</span>
+          <span>{buttonLabel}</span>
         {/if}
       </Button>
     </Tooltip>

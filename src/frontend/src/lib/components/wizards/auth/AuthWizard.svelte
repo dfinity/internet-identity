@@ -7,6 +7,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import SetupOrUseExistingPasskey from "$lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte";
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
+  import InfoPasskey from "$lib/components/wizards/auth/views/InfoPasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { canisterConfig } from "$lib/globals";
@@ -56,12 +57,16 @@
       isAuthenticating = false;
     }
   };
+
   const handleCreatePasskey = async (
     name: string,
   ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
-      onSignUp(await authFlow.createPasskey(name));
+      const result = await authFlow.submitNameAndContinue(name);
+      if (result?.type === "created") {
+        onSignUp(result.identityNumber);
+      }
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
@@ -71,6 +76,21 @@
       isAuthenticating = false;
     }
   };
+
+  const handleContinueCreatePasskey = async (): Promise<void | "cancelled"> => {
+    isAuthenticating = true;
+    try {
+      onSignUp(await authFlow.createPasskey());
+    } catch (error) {
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
   const handleContinueWithGoogle = async (): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
@@ -103,7 +123,14 @@
         (isContinueFromAnotherDeviceVisible = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
-    <CreatePasskey create={handleCreatePasskey} />
+    <CreatePasskey
+      create={handleCreatePasskey}
+      buttonLabel={authFlow.abTestGroup === "infoPasskey"
+        ? "Continue"
+        : "Create Passkey"}
+    />
+  {:else if authFlow.view === "infoPasskey"}
+    <InfoPasskey create={handleContinueCreatePasskey} />
   {/if}
 {/snippet}
 
