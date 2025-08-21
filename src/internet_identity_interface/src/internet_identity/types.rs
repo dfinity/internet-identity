@@ -322,7 +322,7 @@ pub struct OpenIdConfig {
     pub client_id: String,
     pub jwks_uri: String,
     pub auth_uri: String,
-    pub auth_scopes: Vec<String>,
+    pub auth_scope: Vec<String>,
     pub fedcm_uri: Option<String>,
 }
 
