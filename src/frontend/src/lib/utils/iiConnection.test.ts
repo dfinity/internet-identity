@@ -67,6 +67,7 @@ const DEFAULT_INIT: InternetIdentityInit = {
   canister_creation_cycles_cost: [],
   captcha_config: [],
   openid_google: [],
+  openid_configs: [],
   register_rate_limit: [],
   related_origins: [
     [

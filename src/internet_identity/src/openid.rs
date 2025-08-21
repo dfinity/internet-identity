@@ -12,7 +12,7 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, PublicKey,
+    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdGoogleConfig, PublicKey,
     SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
@@ -168,7 +168,7 @@ thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
 }
 
-pub fn setup_google(config: OpenIdConfig) {
+pub fn setup_google(config: OpenIdGoogleConfig) {
     PROVIDERS
         .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
 }

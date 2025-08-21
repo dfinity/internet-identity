@@ -6,6 +6,7 @@ mod captcha_config;
 mod enable_dapps_explorer;
 mod fetch_root_key;
 mod new_flow_origins;
+mod openid_configs;
 mod openid_google;
 mod register_rate_limit;
 mod related_origins;

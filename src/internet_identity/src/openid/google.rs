@@ -15,7 +15,7 @@ use identity_jose::jws::{
     Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
     VerificationInput,
 };
-use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig};
+use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdGoogleConfig};
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -157,7 +157,7 @@ impl OpenIdProvider for Provider {
 }
 
 impl Provider {
-    pub fn create(config: OpenIdConfig) -> Provider {
+    pub fn create(config: OpenIdGoogleConfig) -> Provider {
         #[cfg(test)]
         let certs = Rc::new(RefCell::new(TEST_CERTS.take()));
 
@@ -452,7 +452,7 @@ fn test_data() -> (String, [u8; 32], Claims) {
 #[test]
 fn should_return_credential() {
     let (jwt, salt, claims) = test_data();
-    let provider = Provider::create(OpenIdConfig {
+    let provider = Provider::create(OpenIdGoogleConfig {
         client_id: claims.aud.clone(),
     });
     let credential = OpenIdCredential {
@@ -479,7 +479,7 @@ fn should_return_credential() {
 #[test]
 fn should_return_error_when_encoding_invalid() {
     let (_, salt, claims) = test_data();
-    let provider = Provider::create(OpenIdConfig {
+    let provider = Provider::create(OpenIdGoogleConfig {
         client_id: claims.aud.clone(),
     });
     let invalid_jwt = "invalid-jwt";
@@ -496,7 +496,7 @@ fn should_return_error_when_encoding_invalid() {
 fn should_return_error_when_cert_missing() {
     TEST_CERTS.replace(vec![]);
     let (jwt, salt, claims) = test_data();
-    let provider = Provider::create(OpenIdConfig {
+    let provider = Provider::create(OpenIdGoogleConfig {
         client_id: claims.aud.clone(),
     });
 
@@ -511,7 +511,7 @@ fn should_return_error_when_cert_missing() {
 #[test]
 fn should_return_error_when_signature_invalid() {
     let (jwt, salt, claims) = test_data();
-    let provider = Provider::create(OpenIdConfig {
+    let provider = Provider::create(OpenIdGoogleConfig {
         client_id: claims.aud.clone(),
     });
     let chunks: Vec<&str> = jwt.split('.').collect();
