@@ -54,7 +54,7 @@ fn should_init_config() {
                     client_id: "app.example2.com".into(),
                     jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
                     auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
-                    fedcm_uri: Some("https://example2.com/gsi/fedcm.json".into()),
+                    fedcm_uri: None,
                 },
             ]),
             ..Default::default()
@@ -144,7 +144,7 @@ fn should_update_config() {
         client_id: "app.example2.com".into(),
         jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
         auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
-        fedcm_uri: Some("https://example2.com/gsi/fedcm.json".into()),
+        fedcm_uri: None,
     }]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -198,7 +198,7 @@ fn should_retain_config() {
                     client_id: "app.example2.com".into(),
                     jwks_uri: "https://example2.com/oauth2/v3/certs".into(),
                     auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
-                    fedcm_uri: Some("https://example2.com/gsi/fedcm.json".into()),
+                    fedcm_uri: None,
                 },
             ]),
             ..Default::default()
