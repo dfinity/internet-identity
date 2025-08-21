@@ -328,7 +328,7 @@ fn verify_claims(
             claims.iss
         )));
     }
-    if &claims.aud != client_id {
+    if claims.aud != client_id {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "Invalid audience: {}",
             claims.aud
