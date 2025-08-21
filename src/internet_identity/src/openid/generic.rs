@@ -591,7 +591,7 @@ fn should_return_error_when_not_valid_yet() {
     let (_, salt, config, claims) = test_data();
 
     assert_eq!(
-        verify_claims(&config.client_id, &config.issuer, &claims, &salt),
+        verify_claims(&config.issuer, &config.client_id, &claims, &salt),
         Err(OpenIDJWTVerificationError::GenericError(
             "JWT is not valid yet".into()
         ))
@@ -605,7 +605,7 @@ fn should_return_error_when_email_too_long() {
     invalid_claims.email = Some("thisisanemailaddresswhichistoolongaccordingtothemaxlengththatisallowedbythestandardemailprotocolsandshouldnotbeconsideredasvalidbutitisusefultotestvalidationmechanismsintheapplicationwhichmayexceedstandardlimitationsforemailaddressesandshouldbetested@gmail.com".into());
 
     assert_eq!(
-        verify_claims(&config.client_id, &config.issuer, &invalid_claims, &salt),
+        verify_claims(&config.issuer, &config.client_id, &invalid_claims, &salt),
         Err(OpenIDJWTVerificationError::GenericError(
             "Email too long".into()
         ))
@@ -619,7 +619,7 @@ fn should_return_error_when_name_too_long() {
     invalid_claims.name = Some("Jonathan Maximilian Theodore Alexander Montgomery Fitzgerald Jameson Davidson Hawthorne Winchester Baldwin the Fifth of Lancaster".into());
 
     assert_eq!(
-        verify_claims(&config.client_id, &config.issuer, &invalid_claims, &salt),
+        verify_claims(&config.issuer, &config.client_id, &invalid_claims, &salt),
         Err(OpenIDJWTVerificationError::GenericError(
             "Name too long".into()
         ))
