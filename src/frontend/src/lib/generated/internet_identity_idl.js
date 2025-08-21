@@ -17,6 +17,7 @@ export const idlFactory = ({ IDL }) => {
     }),
   });
   const OpenIdConfig = IDL.Record({
+    'auth_uri' : IDL.Text,
     'jwks_uri' : IDL.Text,
     'logo' : IDL.Text,
     'name' : IDL.Text,
@@ -810,6 +811,7 @@ export const init = ({ IDL }) => {
     }),
   });
   const OpenIdConfig = IDL.Record({
+    'auth_uri' : IDL.Text,
     'jwks_uri' : IDL.Text,
     'logo' : IDL.Text,
     'name' : IDL.Text,

@@ -321,6 +321,7 @@ pub struct OpenIdConfig {
     pub issuer: String,
     pub client_id: String,
     pub jwks_uri: String,
+    pub auth_uri: Option<String>,
     pub fedcm_uri: Option<String>,
 }
 

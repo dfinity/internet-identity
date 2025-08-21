@@ -320,6 +320,7 @@ export type MetadataMapV2 = Array<
 >;
 export interface OpenIDRegFinishArg { 'jwt' : JWT, 'salt' : Salt }
 export interface OpenIdConfig {
+  'auth_uri' : string,
   'jwks_uri' : string,
   'logo' : string,
   'name' : string,
