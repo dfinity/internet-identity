@@ -15,11 +15,7 @@ import {
   requestJWT,
 } from "$lib/utils/openID";
 import { throwCanisterError } from "$lib/utils/utils";
-import {
-  lastUsedIdentitiesStore,
-  lastUsedIdentityStore,
-} from "./last-used-identities.store";
-import { bufEquals } from "@dfinity/agent";
+import { lastUsedIdentitiesStore } from "./last-used-identities.store";
 import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
 
 const fetchIdentityInfo = async () => {
