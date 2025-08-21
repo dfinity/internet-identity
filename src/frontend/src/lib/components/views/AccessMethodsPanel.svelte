@@ -90,11 +90,12 @@
 
     try {
       const credential = removableOpenIdCredential;
+      const isCurrent = isRemovableOpenIdCredentialCurrentAccessMethod;
       // Optimistically remove the passkey
       removableOpenIdCredential = null;
       await identityInfo.removeGoogle({
         credential,
-        isCurrent: isRemovableOpenIdCredentialCurrentAccessMethod,
+        isCurrent,
       });
     } catch (error) {
       handleError(error);
@@ -105,11 +106,12 @@
 
     try {
       const authnMethod = removableAuthnMethod;
+      const isCurrent = isRemovableAuthnMethodCurrentAccessMethod;
       // Optimistically remove the passkey
       removableAuthnMethod = null;
       await identityInfo.removePasskey({
         authnMethod,
-        isCurrent: isRemovableAuthnMethodCurrentAccessMethod,
+        isCurrent,
       });
     } catch (error) {
       handleError(error);
