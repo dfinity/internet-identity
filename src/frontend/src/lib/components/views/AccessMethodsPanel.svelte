@@ -23,14 +23,18 @@
     isLegacyAuthnMethod,
     isWebAuthnMetaData,
     haveMultipleOrigins,
+    isSameAccessMethod,
   } from "$lib/utils/accessMethods";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
-  import { authnMethodEqual, getAuthnMethodAlias } from "$lib/utils/webAuthn";
+  import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { toaster } from "$lib/components/utils/toaster";
 
   const MAX_PASSKEYS = 8;
 
   let isAddAccessMethodWizardOpen = $state(false);
+  let removableAuthnMethod = $state<AuthnMethodData | null>(null);
+  let removableOpenIdCredential = $state<OpenIdCredential | null>(null);
+  let renamableAuthnMethod = $state<AuthnMethodData | null>(null);
 
   const lastUsedAccessMethod = $derived(
     getLastUsedAccessMethod(
@@ -57,21 +61,14 @@
     authnMethods.length + openIdCredentials.length > 1,
   );
   const isRemovableAuthnMethodCurrentAccessMethod = $derived(
-    nonNullish(identityInfo.removableAuthnMethod) &&
-      "WebAuthn" in identityInfo.removableAuthnMethod.authn_method &&
-      identityInfo.isCurrentAccessMethod({
-        passkey: {
-          credentialId: new Uint8Array(
-            identityInfo.removableAuthnMethod.authn_method.WebAuthn.credential_id,
-          ),
-        },
-      }),
+    nonNullish(removableAuthnMethod) &&
+      nonNullish(lastUsedAccessMethod) &&
+      isSameAccessMethod(removableAuthnMethod, lastUsedAccessMethod),
   );
   const isRemovableOpenIdCredentialCurrentAccessMethod = $derived(
-    nonNullish(identityInfo.removableOpenIdCredential) &&
-      identityInfo.isCurrentAccessMethod({
-        openid: identityInfo.removableOpenIdCredential,
-      }),
+    nonNullish(removableOpenIdCredential) &&
+      nonNullish(lastUsedAccessMethod) &&
+      isSameAccessMethod(removableOpenIdCredential, lastUsedAccessMethod),
   );
 
   const handleGoogleLinked = (credential: OpenIdCredential) => {
@@ -89,23 +86,47 @@
     invalidateAll();
   };
   const handleRemoveOpenIdCredential = async () => {
+    if (!removableOpenIdCredential) return;
+
     try {
-      await identityInfo.removeGoogle();
+      const credential = removableOpenIdCredential;
+      const isCurrent = isRemovableOpenIdCredentialCurrentAccessMethod;
+      // Optimistically remove the passkey
+      removableOpenIdCredential = null;
+      await identityInfo.removeGoogle({
+        credential,
+        isCurrent,
+      });
     } catch (error) {
       handleError(error);
     }
   };
   const handleRemovePasskey = async () => {
+    if (!removableAuthnMethod) return;
+
     try {
-      await identityInfo.removePasskey();
+      const authnMethod = removableAuthnMethod;
+      const isCurrent = isRemovableAuthnMethodCurrentAccessMethod;
+      // Optimistically remove the passkey
+      removableAuthnMethod = null;
+      await identityInfo.removePasskey({
+        authnMethod,
+        isCurrent,
+      });
     } catch (error) {
       handleError(error);
     }
   };
 
   const handleRenamePasskey = async (newName: string) => {
+    if (!renamableAuthnMethod) return;
+
     try {
-      await identityInfo.renamePasskey(newName);
+      await identityInfo.renamePasskey({
+        authnMethod: renamableAuthnMethod,
+        newName,
+      });
+      renamableAuthnMethod = null;
     } catch (error) {
       handleError(error);
     }
@@ -114,8 +135,7 @@
   const isCurrentAccessMethod = (accessMethod: AuthnMethodData) => {
     return (
       nonNullish(lastUsedAccessMethod) &&
-      isWebAuthnMetaData(lastUsedAccessMethod) &&
-      authnMethodEqual(accessMethod, lastUsedAccessMethod)
+      isSameAccessMethod(accessMethod, lastUsedAccessMethod)
     );
   };
 
@@ -172,7 +192,7 @@
         {#if !isLegacyAuthnMethod(authnMethod)}
           <div class="flex items-center justify-end gap-2 px-4">
             <Button
-              onclick={() => (identityInfo.renamableAuthnMethod = authnMethod)}
+              onclick={() => (renamableAuthnMethod = authnMethod)}
               variant="tertiary"
               iconOnly
               aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
@@ -181,8 +201,7 @@
             </Button>
             {#if isRemoveAccessMethodVisible}
               <Button
-                onclick={() =>
-                  (identityInfo.removableAuthnMethod = authnMethod)}
+                onclick={() => (removableAuthnMethod = authnMethod)}
                 variant="tertiary"
                 iconOnly
                 aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
@@ -219,8 +238,7 @@
         <div class="flex items-center justify-end px-4">
           {#if isRemoveAccessMethodVisible}
             <Button
-              onclick={() =>
-                (identityInfo.removableOpenIdCredential = credential)}
+              onclick={() => (removableOpenIdCredential = credential)}
               variant="tertiary"
               iconOnly
               class="!text-fg-error-secondary"
@@ -234,27 +252,27 @@
   </div>
 </Panel>
 
-{#if identityInfo.removableOpenIdCredential}
+{#if removableOpenIdCredential}
   <RemoveOpenIdCredential
     onRemove={handleRemoveOpenIdCredential}
-    onClose={() => (identityInfo.removableOpenIdCredential = null)}
+    onClose={() => (removableOpenIdCredential = null)}
     isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
   />
 {/if}
 
-{#if identityInfo.removableAuthnMethod}
+{#if removableAuthnMethod}
   <RemovePasskeyDialog
     onRemove={handleRemovePasskey}
-    onClose={() => (identityInfo.removableAuthnMethod = null)}
+    onClose={() => (removableAuthnMethod = null)}
     isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
   />
 {/if}
 
-{#if identityInfo.renamableAuthnMethod}
+{#if renamableAuthnMethod}
   <RenamePasskeyDialog
-    currentName={getAuthnMethodAlias(identityInfo.renamableAuthnMethod)}
+    currentName={getAuthnMethodAlias(renamableAuthnMethod)}
     onRename={handleRenamePasskey}
-    onClose={() => (identityInfo.renamableAuthnMethod = null)}
+    onClose={() => (renamableAuthnMethod = null)}
   />
 {/if}
 

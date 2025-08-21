@@ -5,6 +5,7 @@ import {
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { isSameOrigin } from "./urlUtils";
 import { canisterConfig } from "$lib/globals";
+import { authnMethodEqual } from "./webAuthn";
 
 /**
  * Check if a `AuthnMethodData` or `OpenIdCredential` is a WebAuthn method
@@ -13,6 +14,10 @@ export const isWebAuthnMetaData = (
   accessMethod: AuthnMethodData | OpenIdCredential,
 ): accessMethod is AuthnMethodData =>
   "authn_method" in accessMethod && "WebAuthn" in accessMethod.authn_method;
+
+export const isOpenIdCredential = (
+  accessMethod: AuthnMethodData | OpenIdCredential,
+): accessMethod is OpenIdCredential => "iss" in accessMethod;
 
 export const getLastUsedAccessMethod = (
   authnMethods: AuthnMethodData[],
@@ -117,4 +122,24 @@ export const isLegacyAuthnMethod = (accessMethod: AuthnMethodData): boolean => {
     !hasSomeOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
     "Recovery" in accessMethod.security_settings.purpose
   );
+};
+
+/**
+ * Check if an access method is the currently used access method for authentication
+ */
+export const isSameAccessMethod = (
+  accessMethod1: AuthnMethodData | OpenIdCredential,
+  accessMethod2: AuthnMethodData | OpenIdCredential,
+): boolean => {
+  if (isWebAuthnMetaData(accessMethod1) && isWebAuthnMetaData(accessMethod2)) {
+    return authnMethodEqual(accessMethod1, accessMethod2);
+  }
+
+  if (isOpenIdCredential(accessMethod1) && isOpenIdCredential(accessMethod2)) {
+    return (
+      accessMethod2.iss === accessMethod1.iss &&
+      accessMethod2.sub === accessMethod1.sub
+    );
+  }
+  return false;
 };
