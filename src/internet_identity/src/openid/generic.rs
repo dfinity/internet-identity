@@ -65,7 +65,7 @@ struct Claims {
     nonce: String,
     exp: u64,
     iat: u64,
-    // Optional Google specific claims
+    // Optional metadata claims
     email: Option<String>,
     name: Option<String>,
 }
@@ -176,8 +176,8 @@ fn schedule_fetch_certs(
     set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
         spawn(async move {
             let new_delay = match fetch_certs(jwks_uri.clone()).await {
-                Ok(google_certs) => {
-                    certs_reference.replace(google_certs);
+                Ok(certs) => {
+                    certs_reference.replace(certs);
                     FETCH_CERTS_INTERVAL
                 }
                 // Try again earlier with backoff if fetch failed, the HTTP outcall responses
@@ -284,8 +284,8 @@ fn create_rsa_public_key(jwk: &Jwk) -> Result<RsaPublicKey, String> {
 #[allow(clippy::needless_pass_by_value)]
 fn verify_signature(input: VerificationInput, jwk: &Jwk) -> Result<(), SignatureVerificationError> {
     // Ensure the algorithm specified in the JWT header matches the expected algorithm (RS256).
-    // JSON Web Keys (JWK) returned from Google API (v3) always use RSA with SHA-256.
     // If the algorithm does not match, return an UnsupportedAlg error.
+    // Additional algorithms can be implemented here if needed in the future.
     if input.alg != RS256 {
         return Err(SignatureVerificationErrorKind::UnsupportedAlg.into());
     }
