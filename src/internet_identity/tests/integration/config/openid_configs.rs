@@ -66,8 +66,8 @@ fn should_init_config() {
     for config in configs {
         let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
         assert_eq!(
-            api::config(&env, canister_id).unwrap().openid_google,
-            config.openid_google
+            api::config(&env, canister_id).unwrap().openid_configs,
+            config.openid_configs
         );
     }
 }
@@ -223,8 +223,8 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id).unwrap().openid_google,
-            config.openid_google.or(Some(None))
+            api::config(&env, canister_id).unwrap().openid_configs,
+            config.openid_configs
         );
     }
 }
