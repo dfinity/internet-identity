@@ -7,6 +7,7 @@ import {
   dummyAuth,
   TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
+  II_URL,
 } from "../utils";
 
 const DEFAULT_USER_NAME = "John Doe";
@@ -123,7 +124,7 @@ test("Authorize by signing in from another device", async ({
 
 test("App logo appears when app is known", async ({ page }) => {
   const auth = dummyAuth();
-  await authorizeWithUrl(page, TEST_APP_URL, async (authPage) => {
+  await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
     await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
 
     await authPage
@@ -140,18 +141,23 @@ test("App logo appears when app is known", async ({ page }) => {
 
 test("App logo doesn't appear when app is not known", async ({ page }) => {
   const auth = dummyAuth();
-  await authorizeWithUrl(page, TEST_APP_CANONICAL_URL, async (authPage) => {
-    await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
-    await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
+  await authorizeWithUrl(
+    page,
+    TEST_APP_CANONICAL_URL,
+    II_URL,
+    async (authPage) => {
+      await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
+      await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
-    await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .click();
-    await authPage
-      .getByRole("button", { name: "Set up a new Passkey" })
-      .click();
-    await authPage.getByLabel("Identity name").fill("John Doe");
-    auth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
-  });
+      await authPage
+        .getByRole("button", { name: "Continue with Passkey" })
+        .click();
+      await authPage
+        .getByRole("button", { name: "Set up a new Passkey" })
+        .click();
+      await authPage.getByLabel("Identity name").fill("John Doe");
+      auth(authPage);
+      await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    },
+  );
 });
