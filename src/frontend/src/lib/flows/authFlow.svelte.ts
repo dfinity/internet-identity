@@ -65,7 +65,9 @@ export class AuthFlow {
 
   constructor() {
     this.chooseMethod();
-    const GROUP_INFO_PERCENTAGE = 0.2;
+    const isE2E = nonNullish(canisterConfig.dummy_auth[0]?.[0]);
+    // No A/B test in E2E runs
+    const GROUP_INFO_PERCENTAGE = isE2E ? -1 : 0.2;
     this.abTestGroup =
       Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
