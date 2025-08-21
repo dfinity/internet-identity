@@ -42,9 +42,6 @@ class IdentityInfo {
   authnMethodRegistration = $state<AuthnMethodRegistrationInfo>();
 
   openIdCredentials = $state<OpenIdCredential[]>([]);
-  removableOpenIdCredential = $state<OpenIdCredential | null>(null);
-  removableAuthnMethod = $state<AuthnMethodData | null>(null);
-  renamableAuthnMethod = $state<AuthnMethodData | null>(null);
 
   totalAccessMethods = $derived<number>(
     this.authnMethods.length + this.openIdCredentials.length,
@@ -124,32 +121,29 @@ class IdentityInfo {
     await throwCanisterError(googleAddResult);
   };
 
-  removeGoogle = async () => {
-    if (!this.removableOpenIdCredential)
-      throw Error("Must first select a credential to be removed!");
-
+  removeGoogle = async ({
+    credential,
+    isCurrent,
+  }: {
+    credential: OpenIdCredential;
+    isCurrent: boolean;
+  }) => {
     const googleRemovePromise = get(
       authenticatedStore,
     ).actor.openid_credential_remove(get(authenticatedStore).identityNumber, [
-      this.removableOpenIdCredential.iss,
-      this.removableOpenIdCredential.sub,
+      credential.iss,
+      credential.sub,
     ]);
     // Optimistically show as removed
     this.openIdCredentials = this.openIdCredentials.filter(
-      (cred) =>
-        !(
-          cred.iss === this.removableOpenIdCredential!.iss &&
-          cred.sub === this.removableOpenIdCredential!.sub
-        ),
+      (cred) => !(cred.iss === credential.iss && cred.sub === credential.sub),
     );
-    const temporaryCredential = this.removableOpenIdCredential;
-    this.removableOpenIdCredential = null;
 
     const googleRemoveResult = await googleRemovePromise;
 
     if ("Ok" in googleRemoveResult) {
       // If we just deleted the method we are logged in with, we log the user out.
-      if (this.isCurrentAccessMethod({ openid: temporaryCredential })) {
+      if (isCurrent) {
         this.logout();
         lastUsedIdentitiesStore.removeIdentity(
           get(authenticatedStore).identityNumber,
@@ -159,24 +153,25 @@ class IdentityInfo {
 
       void this.fetch();
     } else {
-      this.openIdCredentials.push(temporaryCredential);
+      this.openIdCredentials.push(credential);
     }
 
     await throwCanisterError(googleRemoveResult);
   };
 
-  async removePasskey(): Promise<void> {
+  async removePasskey({
+    authnMethod,
+    isCurrent,
+  }: {
+    authnMethod: AuthnMethodData;
+    isCurrent: boolean;
+  }): Promise<void> {
     const { actor, identityNumber } = get(authenticatedStore);
-    if (isNullish(this.removableAuthnMethod)) {
-      throw new Error("No passkey to remove");
-    }
-    const authnMethod = this.removableAuthnMethod;
     const publicKey = new Uint8Array(
       "WebAuthn" in authnMethod.authn_method
         ? authnMethod.authn_method.WebAuthn.pubkey
         : authnMethod.authn_method.PubKey.pubkey,
     );
-    this.removableAuthnMethod = null;
     const index = this.authnMethods.findIndex((value) =>
       authnMethodEqual(value, authnMethod),
     );
@@ -186,16 +181,7 @@ class IdentityInfo {
         .authn_method_remove(identityNumber, publicKey)
         .then(throwCanisterError);
 
-      if (
-        "WebAuthn" in authnMethod.authn_method &&
-        this.isCurrentAccessMethod({
-          passkey: {
-            credentialId: new Uint8Array(
-              authnMethod.authn_method.WebAuthn.credential_id,
-            ),
-          },
-        })
-      ) {
+      if (isCurrent) {
         lastUsedIdentitiesStore.removeIdentity(identityNumber);
         this.logout();
         return;
@@ -207,11 +193,13 @@ class IdentityInfo {
     }
   }
 
-  async renamePasskey(newName: string): Promise<void> {
-    if (!this.renamableAuthnMethod)
-      throw Error("Must first select a credential to be renamed!");
-
-    const authnMethod = this.renamableAuthnMethod;
+  async renamePasskey({
+    authnMethod,
+    newName,
+  }: {
+    authnMethod: AuthnMethodData;
+    newName: string;
+  }): Promise<void> {
     let renamed = false;
     const newMetadata: MetadataMapV2 = authnMethod.metadata.map(
       ([key, value]) => {
@@ -249,35 +237,6 @@ class IdentityInfo {
     // TODO: When we keep a session open we'll need to clean that session.
     // For now we just reload the page to make sure all the states are cleared
     window.location.reload();
-  };
-
-  isCurrentAccessMethod = (
-    accessMethod:
-      | { passkey: { credentialId: Uint8Array } }
-      | { openid: { iss: string; sub: string } },
-  ) => {
-    const lastUsedAuthMethod = get(lastUsedIdentityStore)?.authMethod;
-    if (
-      nonNullish(lastUsedAuthMethod) &&
-      "openid" in lastUsedAuthMethod &&
-      "openid" in accessMethod
-    ) {
-      return (
-        lastUsedAuthMethod.openid.iss === accessMethod.openid.iss &&
-        lastUsedAuthMethod.openid.sub === accessMethod.openid.sub
-      );
-    }
-    if (
-      nonNullish(lastUsedAuthMethod) &&
-      "passkey" in lastUsedAuthMethod &&
-      "passkey" in accessMethod
-    ) {
-      return bufEquals(
-        lastUsedAuthMethod.passkey.credentialId,
-        accessMethod.passkey.credentialId,
-      );
-    }
-    return false;
   };
 
   reset = () => {
