@@ -103,8 +103,7 @@ const requestWithRedirect = async (
   authURL.searchParams.set("response_mode", "fragment");
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
-  // authURL.searchParams.set("scope", "openid profile email");
-  authURL.searchParams.set("scope", "openid");
+  authURL.searchParams.set("scope", "openid profile email");
   authURL.searchParams.set("state", state);
   authURL.searchParams.set("nonce", options.nonce);
   if (options.mediation === "required" && isNullish(options.loginHint)) {
