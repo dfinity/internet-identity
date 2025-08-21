@@ -5,9 +5,6 @@ import {
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { isSameOrigin } from "./urlUtils";
 import { canisterConfig } from "$lib/globals";
-import { bufEquals } from "@dfinity/agent";
-import { get } from "svelte/store";
-import { lastUsedIdentityStore } from "$lib/stores/last-used-identities.store";
 import { authnMethodEqual } from "./webAuthn";
 
 /**
