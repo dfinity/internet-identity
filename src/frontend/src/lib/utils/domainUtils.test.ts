@@ -10,6 +10,7 @@ describe("isOfficialOrigin", () => {
     related_origins: [related_origins],
     fetch_root_key: [false],
     openid_google: [],
+    openid_configs: [],
     enable_dapps_explorer: [],
     assigned_user_number_range: [],
     archive_config: [],

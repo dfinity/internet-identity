@@ -4,6 +4,7 @@ import {
   getOrigin,
   haveMultipleOrigins,
   getRpId,
+  isSameAccessMethod,
 } from "./accessMethods";
 import type {
   AuthnMethodData,
@@ -330,5 +331,65 @@ describe("getRpId", () => {
   it("should return undefined if origin metadata is not a string", () => {
     const accessMethod: AuthnMethodData = makeAuthnMethodWithOrigin("foo");
     expect(getRpId(accessMethod)).toBeUndefined();
+  });
+});
+
+describe("isSameAccessMethod", () => {
+  const makeWebAuthnMethod = (pubkeyBytes: number[]): AuthnMethodData => {
+    return {
+      id: "webauthn-id",
+      last_authentication: [],
+      security_settings: {
+        purpose: { Authentication: null },
+        protection: { Unprotected: null },
+      },
+      metadata: [],
+      authn_method: {
+        WebAuthn: {
+          pubkey: new Uint8Array(pubkeyBytes),
+          credential_id: new Uint8Array([1, 2, 3]),
+        },
+      },
+    } as AuthnMethodData;
+  };
+
+  const makeOpenIdCredential = (iss: string, sub: string): OpenIdCredential =>
+    ({
+      id: "oidc-id",
+      last_usage_timestamp: [],
+      aud: "audience",
+      iss,
+      sub,
+      metadata: [],
+    }) as unknown as OpenIdCredential;
+
+  it("returns true for identical WebAuthn methods (same pubkey)", () => {
+    const a = makeWebAuthnMethod([1, 2, 3]);
+    const b = makeWebAuthnMethod([1, 2, 3]);
+    expect(isSameAccessMethod(a, b)).toBe(true);
+  });
+
+  it("returns false for different WebAuthn methods (different pubkey)", () => {
+    const a = makeWebAuthnMethod([1, 2, 3]);
+    const b = makeWebAuthnMethod([4, 5, 6]);
+    expect(isSameAccessMethod(a, b)).toBe(false);
+  });
+
+  it("returns true for identical OpenID credentials (same iss and sub)", () => {
+    const a = makeOpenIdCredential("https://issuer", "user-sub");
+    const b = makeOpenIdCredential("https://issuer", "user-sub");
+    expect(isSameAccessMethod(a, b)).toBe(true);
+  });
+
+  it("returns false for different OpenID credentials (different sub)", () => {
+    const a = makeOpenIdCredential("https://issuer", "user-sub");
+    const b = makeOpenIdCredential("https://issuer", "other-sub");
+    expect(isSameAccessMethod(a, b)).toBe(false);
+  });
+
+  it("returns false for mixed types (WebAuthn vs OpenID)", () => {
+    const webAuthn = makeWebAuthnMethod([1, 2, 3]);
+    const oidc = makeOpenIdCredential("https://issuer", "user-sub");
+    expect(isSameAccessMethod(webAuthn, oidc)).toBe(false);
   });
 });

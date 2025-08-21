@@ -1,9 +1,12 @@
-import { Page, expect } from "@playwright/test";
+import { CDPSession, Page, expect } from "@playwright/test";
 import { Principal } from "@dfinity/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
+import Protocol from "devtools-protocol";
+import { isNullish } from "@dfinity/utils";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
+export const LEGACY_II_URL = "https://identity.ic0.app";
 export const TEST_APP_URL = "https://nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
@@ -37,7 +40,7 @@ export const authorize = (
   page: Page,
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
-  return authorizeWithUrl(page, TEST_APP_URL, authenticate);
+  return authorizeWithUrl(page, TEST_APP_URL, II_URL, authenticate);
 };
 
 /**
@@ -50,11 +53,12 @@ export const authorize = (
 export const authorizeWithUrl = async (
   page: Page,
   appUrl: string,
+  iiURL: string,
   authenticate: (page: Page) => Promise<void>,
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
-  await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
+  await page.getByRole("textbox", { name: "Identity Provider" }).fill(iiURL);
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
 
@@ -65,8 +69,9 @@ export const authorizeWithUrl = async (
   // Authenticate (with supplied argument fn)
   await authenticate(authPage);
 
-  // Wait for II window to close
-  await authPage.waitForEvent("close");
+  // Wait for II window to close.
+  // During the identity upgrade flow there is a delay of 5s
+  await authPage.waitForEvent("close", { timeout: 15_000 });
 
   // Assert that the user is authenticated (valid principal)
   const principal = (await page.locator("#principal").textContent()) ?? "";
@@ -214,4 +219,76 @@ export const getMessageText = async (
       .locator(`div.postMessage:nth-child(${messageNo}) > div:nth-child(2)`)
       .textContent()) ?? ""
   );
+};
+
+// WebAuthn CDP client cache to reuse the same session per Page
+const webauthnClientCache = new WeakMap<Page, Promise<CDPSession>>();
+const getWebAuthnClient = (page: Page) => {
+  let clientPromise = webauthnClientCache.get(page);
+  if (isNullish(clientPromise)) {
+    clientPromise = (async () => {
+      const client = await page.context().newCDPSession(page);
+      await client.send("WebAuthn.enable");
+      return client;
+    })();
+    webauthnClientCache.set(page, clientPromise);
+  }
+  return clientPromise;
+};
+
+/**
+ * Adds a virtual authenticator to the browser
+ * @param page The page to add the virtual authenticator to
+ * @returns The authenticator ID
+ */
+export const addVirtualAuthenticator = async (page: Page): Promise<string> => {
+  const client = await getWebAuthnClient(page);
+  const { authenticatorId } = await client.send(
+    "WebAuthn.addVirtualAuthenticator",
+    {
+      options: {
+        protocol: "ctap2",
+        transport: "usb",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+      },
+    },
+  );
+  return authenticatorId;
+};
+
+/**
+ * Gets credentials from a virtual authenticator
+ * @param page The page to get the credentials from
+ * @param authenticatorId The authenticator ID
+ * @returns The credentials
+ */
+export const getCredentialsFromVirtualAuthenticator = async (
+  page: Page,
+  authenticatorId: string,
+): Promise<Protocol.WebAuthn.Credential[]> => {
+  const client = await getWebAuthnClient(page);
+  const { credentials } = await client.send("WebAuthn.getCredentials", {
+    authenticatorId,
+  });
+  return credentials;
+};
+
+/**
+ * Adds a credential to a virtual authenticator
+ * @param page The page to add the credential to
+ * @param authenticatorId The authenticator ID
+ * @param credential The credential to add
+ */
+export const addCredentialToVirtualAuthenticator = async (
+  page: Page,
+  authenticatorId: string,
+  credential: Protocol.WebAuthn.Credential,
+): Promise<void> => {
+  const client = await getWebAuthnClient(page);
+  await client.send("WebAuthn.addCredential", {
+    authenticatorId,
+    credential,
+  });
 };
