@@ -282,7 +282,7 @@ impl OpenIdProvider for ExampleProvider {
 impl ExampleProvider {
     fn credential(&self) -> OpenIdCredential {
         OpenIdCredential {
-            iss: self.issuer().into(),
+            iss: self.issuer(),
             sub: "example-sub".into(),
             aud: "example-aud".into(),
             last_usage_timestamp: None,
