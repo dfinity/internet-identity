@@ -575,6 +575,7 @@ body {
 .t-title--main {
   font-size: 2.7rem;
   margin-top: 0.5em;
+  color: grey;
 }
 
 .t-title--list {

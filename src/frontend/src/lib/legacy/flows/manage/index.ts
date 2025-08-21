@@ -239,7 +239,7 @@ const displayManageTemplate = ({
 
   const pageContentSlot = html`<section data-role="identity-management">
     <hgroup>
-      <h1 class="t-title t-title--main">Manage your<br />Internet Identity</h1>
+      <h1 class="t-title t-title--main">Power user's control panel</h1>
     </hgroup>
     ${anchorSection({ userNumber, identityBackground })}
     ${nonNullish(tempKeysWarning)
