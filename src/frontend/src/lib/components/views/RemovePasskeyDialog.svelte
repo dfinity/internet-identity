@@ -21,6 +21,8 @@
   <p class="text-text-tertiary mb-8 font-medium">
     Removing this passkey means you won't be able to use it to sign in anymore.
     You can always add a new one later.
+    <br /><br />
+    It won't be removed from your device or password manager.
     {#if isCurrentAccessMethod}
       <br /><br />
       As you are currently signed in with this passkey, you will be signed out.
