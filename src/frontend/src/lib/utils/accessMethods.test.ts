@@ -353,10 +353,7 @@ describe("isSameAccessMethod", () => {
     } as AuthnMethodData;
   };
 
-  const makeOpenIdCredential = (
-    iss: string,
-    sub: string,
-  ): OpenIdCredential =>
+  const makeOpenIdCredential = (iss: string, sub: string): OpenIdCredential =>
     ({
       id: "oidc-id",
       last_usage_timestamp: [],
@@ -364,7 +361,7 @@ describe("isSameAccessMethod", () => {
       iss,
       sub,
       metadata: [],
-    } as unknown as OpenIdCredential);
+    }) as unknown as OpenIdCredential;
 
   it("returns true for identical WebAuthn methods (same pubkey)", () => {
     const a = makeWebAuthnMethod([1, 2, 3]);
