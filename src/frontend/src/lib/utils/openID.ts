@@ -26,11 +26,9 @@ export interface RequestOptions {
 }
 
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
-  // clientId: "d948c073-eebd-4ab8-861d-055f7ab49e17",
-  clientId: "ai.id.auth",
-  // authURL: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-  authURL: "https://appleid.apple.com/auth/authorize",
-  // configURL: "https://accounts.google.com/gsi/fedcm.json",
+  clientId,
+  authURL: "https://accounts.google.com/o/oauth2/v2/auth",
+  configURL: "https://accounts.google.com/gsi/fedcm.json",
 });
 
 /**
