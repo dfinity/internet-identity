@@ -171,11 +171,12 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
     }
     try {
-      const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-      });
+      const { identity, identityNumber, iss, sub, loginHint } =
+        await authenticateWithJWT({
+          canisterId,
+          session: get(sessionStore),
+          jwt,
+        });
       // If the previous call succeeds, it means the Google user already exists in II.
       // Therefore, they are logging in.
       // If the call fails, it means the Google user does not exist in II.
@@ -187,7 +188,7 @@ export class AuthFlow {
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub } },
+        authMethod: { openid: { iss, sub, loginHint } },
       });
       return { identityNumber, type: "signIn" };
     } catch (error) {
@@ -342,11 +343,12 @@ export class AuthFlow {
           salt: get(sessionStore).salt,
         })
         .then(throwCanisterError);
-      const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-      });
+      const { identity, identityNumber, iss, sub, loginHint } =
+        await authenticateWithJWT({
+          canisterId,
+          session: get(sessionStore),
+          jwt,
+        });
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulGoogleRegistration,
       );
@@ -356,7 +358,7 @@ export class AuthFlow {
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub } },
+        authMethod: { openid: { iss, sub, loginHint } },
       });
       this.#captcha = undefined;
       return identityNumber;
