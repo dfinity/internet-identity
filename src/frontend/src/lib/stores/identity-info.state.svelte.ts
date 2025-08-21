@@ -184,7 +184,6 @@ class IdentityInfo {
       }
       await this.fetch();
     } catch (error) {
-      console.log("in da catch", error);
       this.authnMethods.splice(index, 0, authnMethod);
       throw error;
     }
