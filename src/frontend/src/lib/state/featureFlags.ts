@@ -99,6 +99,7 @@ export const ADD_ACCESS_METHOD = createFeatureFlagStore(
 export const ENABLE_GENERIC_OPEN_ID = createFeatureFlagStore(
   "ENABLE_GENERIC_OPEN_ID",
   false,
+  () => canisterConfig.feature_flag_enable_generic_open_id_fe[0],
 );
 
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
