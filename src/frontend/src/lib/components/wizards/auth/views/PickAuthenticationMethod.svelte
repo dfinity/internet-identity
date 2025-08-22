@@ -6,21 +6,31 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import { ENABLE_MIGRATE_FLOW } from "$lib/state/featureFlags";
+  import {
+    ENABLE_GENERIC_OPEN_ID,
+    ENABLE_MIGRATE_FLOW,
+  } from "$lib/state/featureFlags";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithGoogle: () => Promise<void | "cancelled">;
+    continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
     migrate: () => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithGoogle, migrate }: Props =
-    $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithGoogle,
+    continueWithOpenId,
+    migrate,
+  }: Props = $props();
 
   let isAuthenticating = $state(false);
   let isCancelled = $state(false);
+  let cancelledProviderId = $state<string | null>(null);
 
   const handleContinueWithGoogle = async () => {
     isAuthenticating = true;
@@ -34,8 +44,22 @@
     }
   };
 
+  const handleContinueWithOpenId = async (config: OpenIdConfig) => {
+    isAuthenticating = true;
+    const result = await continueWithOpenId(config);
+    isAuthenticating = false;
+
+    if (result === "cancelled") {
+      cancelledProviderId = config.client_id;
+      await waitFor(4000);
+      cancelledProviderId = null;
+    }
+  };
+
   const supportsPasskeys = nonNullish(window.PublicKeyCredential);
-  const showGoogleButton = canisterConfig.openid_google?.[0]?.[0];
+  const showGoogleButton =
+    canisterConfig.openid_google?.[0]?.[0] && !ENABLE_GENERIC_OPEN_ID;
+  const openIdProviders = canisterConfig.openid_configs?.[0] || [];
 </script>
 
 <div class="flex flex-col items-stretch gap-6">
@@ -47,10 +71,36 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
+    {#if $ENABLE_GENERIC_OPEN_ID}
+      <div class="flex flex-row flex-nowrap justify-stretch gap-3">
+        {#each openIdProviders as provider}
+          <Tooltip
+            label="Interaction canceled. Please try again."
+            hidden={cancelledProviderId !== provider.client_id}
+            manual
+          >
+            <Button
+              onclick={() => handleContinueWithOpenId(provider)}
+              variant="secondary"
+              disabled={isAuthenticating}
+              size="xl"
+              class="flex-1"
+            >
+              {#if isAuthenticating}
+                <ProgressRing />
+              {:else if provider.logo}
+                {@html provider.logo}
+              {/if}
+            </Button>
+          </Tooltip>
+        {/each}
+      </div>
+    {/if}
     <Button
       onclick={setupOrUseExistingPasskey}
       disabled={!supportsPasskeys || isAuthenticating}
       size="xl"
+      variant={$ENABLE_GENERIC_OPEN_ID ? "secondary" : "primary"}
     >
       <PasskeyIcon />
       Continue with Passkey
