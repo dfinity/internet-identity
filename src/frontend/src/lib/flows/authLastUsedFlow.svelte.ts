@@ -59,7 +59,7 @@ export class AuthLastUsedFlow {
         const requestConfig = createGoogleRequestConfig(clientId);
         const jwt = await requestJWT(requestConfig, {
           nonce: get(sessionStore).nonce,
-          mediation: "required",
+          mediation: "optional",
           loginHint:
             lastUsedIdentity.authMethod.openid.loginHint ??
             lastUsedIdentity.authMethod.openid.sub,
