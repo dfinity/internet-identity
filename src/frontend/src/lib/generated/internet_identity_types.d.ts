@@ -326,6 +326,7 @@ export interface OpenIdConfig {
   'name' : string,
   'fedcm_uri' : [] | [string],
   'issuer' : string,
+  'auth_scope' : Array<string>,
   'client_id' : string,
 }
 export interface OpenIdCredential {

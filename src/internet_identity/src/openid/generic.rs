@@ -439,6 +439,7 @@ fn test_data() -> (String, [u8; 32], OpenIdConfig, Claims) {
         client_id: claims.aud.clone(),
         jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
         auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+        auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
     };
 
