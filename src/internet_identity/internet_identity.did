@@ -373,6 +373,7 @@ type OpenIdConfig = record {
     client_id : text;
     jwks_uri : text;
     auth_uri : text;
+    auth_scope : vec text;
     fedcm_uri : opt text;
 };
 

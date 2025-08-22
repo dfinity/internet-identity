@@ -23,6 +23,7 @@ export const idlFactory = ({ IDL }) => {
     'name' : IDL.Text,
     'fedcm_uri' : IDL.Opt(IDL.Text),
     'issuer' : IDL.Text,
+    'auth_scope' : IDL.Vec(IDL.Text),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({
@@ -817,6 +818,7 @@ export const init = ({ IDL }) => {
     'name' : IDL.Text,
     'fedcm_uri' : IDL.Opt(IDL.Text),
     'issuer' : IDL.Text,
+    'auth_scope' : IDL.Vec(IDL.Text),
     'client_id' : IDL.Text,
   });
   const CaptchaConfig = IDL.Record({
