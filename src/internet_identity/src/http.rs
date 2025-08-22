@@ -7,24 +7,31 @@ use serde_bytes::ByteBuf;
 
 mod metrics;
 
-pub fn http_request(req: HttpRequest) -> HttpResponse {
-    let parts: Vec<&str> = req.url.split('?').collect();
+fn http_options_request() -> HttpResponse {
+    HttpResponse {
+        status_code: 204,
+        headers: vec![
+            ("Access-Control-Allow-Origin".to_string(), "*".to_string()),
+            (
+                "Access-Control-Allow-Methods".to_string(),
+                "GET, POST, OPTIONS".to_string(),
+            ),
+            (
+                "Access-Control-Allow-Headers".to_string(),
+                "Content-Type".to_string(),
+            ),
+            ("Content-Length".to_string(), "0".to_string()),
+        ],
+        body: ByteBuf::from(vec![]),
+        upgrade: None,
+        streaming_strategy: None,
+    }
+}
+
+fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpResponse {
+    let parts: Vec<&str> = url.split('?').collect();
+
     match parts[0] {
-        // The FAQ used to live in '/faq' but we now use an external website. We redirect in order to not
-        // break existing links in the wild.
-        "/faq" => HttpResponse {
-            status_code: 301,
-            headers: vec![(
-                "location".to_string(),
-                "https://identitysupport.dfinity.org/hc/en-us".to_string(),
-            )],
-            body: ByteBuf::new(),
-            // Redirects are not allowed as query because certification V1 does not cover headers.
-            // Upgrading to update fixes this. This flag can be removed when switching to
-            // certification V2.
-            upgrade: Some(true),
-            streaming_strategy: None,
-        },
         "/metrics" => match metrics() {
             Ok(body) => {
                 let mut headers = vec![
@@ -51,7 +58,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 streaming_strategy: None,
             },
         },
-        probably_an_asset => match get_asset(probably_an_asset, req.certificate_version) {
+        probably_an_asset => match get_asset(probably_an_asset, certificate_version) {
             Some((status_code, content, headers)) => HttpResponse {
                 status_code,
                 headers,
@@ -67,6 +74,39 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 streaming_strategy: None,
             },
         },
+    }
+}
+
+fn http_head_request(url: String, certificate_version: Option<u16>) -> HttpResponse {
+    let mut resp = http_get_request(url, certificate_version);
+    resp.body.clear(); // HEAD has no body
+    resp
+}
+
+fn method_not_allowed(unsupported_method: &str) -> HttpResponse {
+    HttpResponse {
+        status_code: 405,
+        headers: vec![("Allow".into(), "GET, HEAD, OPTIONS".into())],
+        body: ByteBuf::from(format!("Method {unsupported_method} not allowed.")),
+        upgrade: None,
+        streaming_strategy: None,
+    }
+}
+
+pub fn http_request(req: HttpRequest) -> HttpResponse {
+    let HttpRequest {
+        method,
+        url,
+        certificate_version,
+        headers: _,
+        body: _,
+    } = req;
+
+    match method.as_str() {
+        "OPTIONS" => http_options_request(),
+        "GET" => http_get_request(url, certificate_version),
+        "HEAD" => http_head_request(url, certificate_version),
+        unsupported_method => method_not_allowed(unsupported_method),
     }
 }
 
