@@ -135,10 +135,6 @@ export class AuthFlow {
   };
 
   createPasskey = async (): Promise<bigint> => {
-    authenticationV2Funnel.trigger(
-      AuthenticationV2Events.StartWebauthnCreation,
-      { abTestGroup: this.abTestGroup },
-    );
     if (isNullish(this.#name)) {
       throw new Error("Name is not set");
     }
@@ -146,6 +142,12 @@ export class AuthFlow {
       features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
         ? await DiscoverableDummyIdentity.createNew(this.#name)
         : await DiscoverablePasskeyIdentity.createNew(this.#name);
+    // If we trigger the analytics before the password creation,
+    // it might get blocked by Safari.
+    authenticationV2Funnel.trigger(
+      AuthenticationV2Events.SuccessfulWebauthnCreation,
+      { abTestGroup: this.abTestGroup },
+    );
     await this.#startRegistration();
     return this.#registerWithPasskey(passkeyIdentity);
   };

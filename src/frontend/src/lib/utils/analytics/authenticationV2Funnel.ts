@@ -27,7 +27,7 @@ import { Funnel } from "./Funnel";
  *      continue-with-passkey-screen
  *        enter-name-screen
  *          [info-passkey-screen]
- *          start-webauthn-creation
+ *          successful-webauthn-creation
  *            register-with-passkey
  *              successful-passkey-registration
  *                auth-success
@@ -46,7 +46,7 @@ export const AuthenticationV2Events = {
   LoginWithGoogle: "login-with-google",
   ContinueWithPasskeyScreen: "continue-with-passkey-screen",
   EnterNameScreen: "enter-name-screen",
-  StartWebauthnCreation: "start-webauthn-creation",
+  SuccessfulWebauthnCreation: "successful-webauthn-creation",
   RegisterWithPasskey: "register-with-passkey",
   SuccessfulPasskeyRegistration: "successful-passkey-registration",
   UseExistingPasskey: "use-existing-passkey",
