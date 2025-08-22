@@ -32,6 +32,16 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
     let parts: Vec<&str> = url.split('?').collect();
 
     match parts[0] {
+        "/faq" => HttpResponse {
+            status_code: 301,
+            headers: vec![
+                ("Location".to_string(), "https://identitysupport.dfinity.org/hc/en-us".to_string()),
+                ("Cache-Control".to_string(), "max-age=31536000".to_string()), // Cache for 1 year
+            ],
+            body: ByteBuf::from("Moved permanently to FAQ..."),
+            upgrade: None,
+            streaming_strategy: None,
+        },
         "/metrics" => match metrics() {
             Ok(body) => {
                 let mut headers = vec![

@@ -434,13 +434,6 @@ fn get_account_delegation(
 
 #[query]
 fn http_request(req: HttpRequest) -> HttpResponse {
-    // Handle state-preserving GET/HEAD/OPTIONS requests
-    http::http_request(req)
-}
-
-#[update]
-fn http_request_update(req: HttpRequest) -> HttpResponse {
-    // Handle state-changing POST/PUT/DELETE requests
     http::http_request(req)
 }
 
