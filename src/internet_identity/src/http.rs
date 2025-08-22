@@ -57,6 +57,7 @@ fn http_options_request() -> HttpResponse {
     headers.append(&mut cors_safe_security_headers());
 
     HttpResponse {
+        // Indicates success without any additional content to be sent in the response content.
         status_code: 204,
         headers,
         body: ByteBuf::from(vec![]),
