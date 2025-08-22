@@ -11,7 +11,7 @@ import {
 import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
 
 export class AuthLastUsedFlow {
@@ -19,6 +19,7 @@ export class AuthLastUsedFlow {
   authenticatingIdentity = $state<bigint | null>(null);
   #identityCredentials: Map<bigint, Promise<Uint8Array[] | undefined>> =
     new Map();
+
   init(identities: bigint[]) {
     identities.forEach((identityNumber) => {
       this.#identityCredentials.set(
@@ -27,6 +28,7 @@ export class AuthLastUsedFlow {
       );
     });
   }
+
   authenticate = async (lastUsedIdentity: LastUsedIdentity): Promise<void> => {
     this.authenticatingIdentity = lastUsedIdentity.identityNumber;
     try {
@@ -41,20 +43,26 @@ export class AuthLastUsedFlow {
         });
         authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
-      } else if (
-        "openid" in lastUsedIdentity.authMethod &&
-        lastUsedIdentity.authMethod.openid.iss === "https://accounts.google.com"
-      ) {
+      } else if ("openid" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
-        const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
+        const issuer = lastUsedIdentity.authMethod.openid.iss;
+        const clientId =
+          nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
+          issuer === "https://accounts.google.com"
+            ? canisterConfig.openid_google?.[0]?.[0]?.client_id
+            : canisterConfig.openid_configs[0]?.find(
+                (config) => config.issuer === issuer,
+              )?.client_id;
         if (isNullish(clientId)) {
           throw new Error("Google is not configured");
         }
         const requestConfig = createGoogleRequestConfig(clientId);
         const jwt = await requestJWT(requestConfig, {
           nonce: get(sessionStore).nonce,
-          mediation: "required",
-          loginHint: lastUsedIdentity.authMethod.openid.sub,
+          mediation: "optional",
+          loginHint:
+            lastUsedIdentity.authMethod.openid.loginHint ??
+            lastUsedIdentity.authMethod.openid.sub,
         });
         this.systemOverlay = false;
         const { identity, identityNumber } = await authenticateWithJWT({

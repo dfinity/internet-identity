@@ -95,17 +95,17 @@ const requestWithRedirect = async (
   const state = toBase64URL(window.crypto.getRandomValues(new Uint8Array(12)));
   const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
   const authURL = new URL(config.authURL);
-  authURL.searchParams.set("response_type", "id_token");
+  // Even though we only need an id token, we're still asking for a code
+  // because some identity providers (AppleID) will throw an error otherwise.
+  authURL.searchParams.set("response_type", "code id_token");
+  authURL.searchParams.set("response_mode", "fragment");
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
   authURL.searchParams.set("scope", "openid profile email");
   authURL.searchParams.set("state", state);
   authURL.searchParams.set("nonce", options.nonce);
-  if (options.mediation === "required") {
-    authURL.searchParams.set(
-      "prompt",
-      isNullish(options.loginHint) ? "select_account" : "login",
-    );
+  if (options.mediation === "required" && isNullish(options.loginHint)) {
+    authURL.searchParams.set("prompt", "select_account");
   }
   if (options.mediation === "silent") {
     authURL.searchParams.set("prompt", "silent");
@@ -116,9 +116,9 @@ const requestWithRedirect = async (
 
   const callback = await redirectInPopup(authURL.href);
   const callbackURL = new URL(callback);
-  const searchParams = new URLSearchParams(callbackURL.hash);
+  const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
   const id_token = searchParams.get("id_token");
-  if (searchParams.get("state") === state) {
+  if (searchParams.get("state") !== state) {
     throw new Error("Invalid state");
   }
   if (isNullish(id_token)) {
@@ -180,8 +180,8 @@ export const requestJWT = async (
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
     : await requestWithRedirect(config, options);
-  const { sub } = decodeJWT(jwt);
-  if (nonNullish(options.loginHint) && sub !== options.loginHint) {
+  const { loginHint } = decodeJWT(jwt);
+  if (nonNullish(options.loginHint) && loginHint !== options.loginHint) {
     throw new Error("Account doesn't match");
   }
   return jwt;
@@ -194,10 +194,16 @@ export const requestJWT = async (
  */
 export const decodeJWT = (
   token: string,
-): { iss: string; sub: string; aud: string } => {
+): {
+  iss: string;
+  sub: string;
+  aud: string;
+  loginHint: string;
+} => {
   const [_header, body, _signature] = token.split(".");
-  const { iss, sub, aud } = JSON.parse(atob(body));
-  return { iss, sub, aud };
+  const { iss, sub, aud, email, preferred_username } = JSON.parse(atob(body));
+  // Login hint is usually preferred_username else fall back to email or even sub
+  return { iss, sub, aud, loginHint: preferred_username ?? email ?? sub };
 };
 
 /**

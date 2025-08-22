@@ -23,13 +23,14 @@ export const authenticateWithJWT = async ({
   identityNumber: bigint;
   iss: string;
   sub: string;
+  loginHint: string;
 }> => {
   const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent: session.agent,
     canisterId,
   });
   const sessionKey = new Uint8Array(session.identity.getPublicKey().toDer());
-  const { iss, sub } = decodeJWT(jwt);
+  const { iss, sub, loginHint } = decodeJWT(jwt);
   const {
     anchor_number: identityNumber,
     expiration,
@@ -49,5 +50,5 @@ export const authenticateWithJWT = async ({
     session.identity,
     delegationChain,
   );
-  return { identity, identityNumber, iss, sub };
+  return { identity, identityNumber, iss, sub, loginHint };
 };

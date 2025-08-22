@@ -21,7 +21,7 @@ export type LastUsedIdentity = {
   name?: string;
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
-    | { openid: { iss: string; sub: string } };
+    | { openid: { iss: string; sub: string; loginHint?: string } };
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
 };
