@@ -35,7 +35,10 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
         "/faq" => HttpResponse {
             status_code: 301,
             headers: vec![
-                ("Location".to_string(), "https://identitysupport.dfinity.org/hc/en-us".to_string()),
+                (
+                    "Location".to_string(),
+                    "https://identitysupport.dfinity.org/hc/en-us".to_string(),
+                ),
                 ("Cache-Control".to_string(), "max-age=31536000".to_string()), // Cache for 1 year
             ],
             body: ByteBuf::from("Moved permanently to FAQ..."),
