@@ -58,7 +58,7 @@
 
   const supportsPasskeys = nonNullish(window.PublicKeyCredential);
   const showGoogleButton =
-    canisterConfig.openid_google?.[0]?.[0] && !ENABLE_GENERIC_OPEN_ID;
+    canisterConfig.openid_google?.[0]?.[0] && !$ENABLE_GENERIC_OPEN_ID;
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
 </script>
 
