@@ -14,6 +14,7 @@
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
+  import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -105,6 +106,25 @@
       isAuthenticating = false;
     }
   };
+
+  const handleContinueWithOpenId = async (
+    config: OpenIdConfig,
+  ): Promise<void | "cancelled"> => {
+    isAuthenticating = true;
+    try {
+      const { identityNumber, type } =
+        await authFlow.continueWithOpenId(config);
+      (type === "signUp" ? onSignUp : onSignIn)(identityNumber);
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
   const handleRegistered = async (identityNumber: bigint) => {
     if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
       onSignIn(identityNumber);
@@ -152,6 +172,7 @@
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
       continueWithGoogle={handleContinueWithGoogle}
+      continueWithOpenId={handleContinueWithOpenId}
       migrate={() => (isMigrating = true)}
     />
   {/if}

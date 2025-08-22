@@ -27,8 +27,13 @@ import {
   IdRegFinishError,
   IdRegStartError,
   OpenIdDelegationError,
+  OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
-import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
+import {
+  createGoogleRequestConfig,
+  requestJWT,
+  RequestConfig,
+} from "$lib/utils/openID";
 
 export class AuthFlow {
   #view = $state<
@@ -201,7 +206,73 @@ export class AuthFlow {
           AuthenticationV2Events.RegisterWithGoogle,
         );
         await this.#startRegistration();
-        const identityNumber = await this.#registerWithGoogle(jwt);
+        const identityNumber = await this.#registerWithOpenId(jwt);
+        return { identityNumber, type: "signUp" };
+      }
+      this.#view = "chooseMethod";
+      throw error;
+    }
+  };
+
+  continueWithOpenId = async (
+    config: OpenIdConfig,
+  ): Promise<{
+    identityNumber: bigint;
+    type: "signIn" | "signUp";
+  }> => {
+    let jwt: string | undefined = undefined;
+    // Convert OpenIdConfig to RequestConfig
+    const requestConfig: RequestConfig = {
+      clientId: config.client_id,
+      authURL: config.auth_uri,
+      configURL: config.fedcm_uri?.[0],
+    };
+    // Create two try-catch blocks to avoid double-triggering the analytics.
+    try {
+      this.#systemOverlay = true;
+      jwt = await requestJWT(requestConfig, {
+        nonce: get(sessionStore).nonce,
+        mediation: "required",
+      });
+    } catch (error) {
+      this.#view = "chooseMethod";
+      throw error;
+    } finally {
+      this.#systemOverlay = false;
+      // Moved after `requestJWT` to avoid Safari from blocking the popup.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+    }
+    try {
+      const { identity, identityNumber, iss, sub } = await authenticateWithJWT({
+        canisterId,
+        session: get(sessionStore),
+        jwt,
+      });
+      // If the previous call succeeds, it means the OpenID user already exists in II.
+      // Therefore, they are logging in.
+      // If the call fails, it means the OpenID user does not exist in II.
+      // In that case, we register them.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
+      authenticationStore.set({ identity, identityNumber });
+      const info =
+        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { openid: { iss, sub } },
+      });
+      return { identityNumber, type: "signIn" };
+    } catch (error) {
+      if (
+        isCanisterError<OpenIdDelegationError>(error) &&
+        error.type === "NoSuchAnchor" &&
+        nonNullish(jwt)
+      ) {
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.RegisterWithGoogle,
+        );
+        await this.#startRegistration();
+        const identityNumber = await this.#registerWithOpenId(jwt);
         return { identityNumber, type: "signUp" };
       }
       this.#view = "chooseMethod";
@@ -335,7 +406,7 @@ export class AuthFlow {
     }
   };
 
-  #registerWithGoogle = async (jwt: string): Promise<bigint> => {
+  #registerWithOpenId = async (jwt: string): Promise<bigint> => {
     try {
       await get(sessionStore)
         .actor.openid_identity_registration_finish({
@@ -372,7 +443,7 @@ export class AuthFlow {
           await this.#solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
-          return this.#registerWithGoogle(jwt);
+          return this.#registerWithOpenId(jwt);
         }
       }
       throw error;
