@@ -96,6 +96,10 @@ export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
   true,
 );
+export const ENABLE_GENERIC_OPEN_ID = createFeatureFlagStore(
+  "ENABLE_GENERIC_OPEN_ID",
+  false,
+);
 
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   "CONTINUE_FROM_ANOTHER_DEVICE",
@@ -111,4 +115,5 @@ export default {
   ENABLE_MIGRATE_FLOW,
   ADD_ACCESS_METHOD,
   CONTINUE_FROM_ANOTHER_DEVICE,
+  ENABLE_GENERIC_OPEN_ID,
 } as Record<string, FeatureFlagStore>;
