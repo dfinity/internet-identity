@@ -15,12 +15,10 @@ fn cors_safe_security_headers() -> Vec<HeaderField> {
         // Prevents the page from being displayed in a frame, iframe, embed or object
         // This helps prevent clickjacking attacks
         ("X-Frame-Options".to_string(), "DENY".to_string()),
-
         // X-Content-Type-Options: nosniff
         // Prevents browsers from MIME-sniffing the content type
         // Forces browsers to respect the declared Content-Type header
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
-
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
         // max-age=31536000: Valid for 1 year (365 days)
@@ -29,12 +27,10 @@ fn cors_safe_security_headers() -> Vec<HeaderField> {
             "Strict-Transport-Security".to_string(),
             "max-age=31536000 ; includeSubDomains".to_string(),
         ),
-
         // Referrer-Policy: same-origin
         // Controls how much referrer information is sent with requests
         // same-origin: Only send referrer to same-origin requests
         ("Referrer-Policy".to_string(), "same-origin".to_string()),
-
         // Content-Security-Policy: default-src 'none'
         // Minimal CSP for OPTIONS - blocks all content since no scripts should execute
         (
@@ -187,12 +183,10 @@ pub fn security_headers(
         // Prevents the page from being displayed in a frame, iframe, embed or object
         // This is a legacy header, also enforced by CSP frame-ancestors directive
         ("X-Frame-Options".to_string(), "DENY".to_string()),
-
         // X-Content-Type-Options: nosniff
         // Prevents browsers from MIME-sniffing a response away from the declared content-type
         // Reduces risk of drive-by downloads and serves as defense against MIME confusion attacks
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
-
         // Content-Security-Policy (CSP)
         // Comprehensive policy to prevent XSS attacks and data injection
         // See content_security_policy_header() function for detailed explanation
@@ -200,7 +194,6 @@ pub fn security_headers(
             "Content-Security-Policy".to_string(),
             content_security_policy_header(integrity_hashes, maybe_related_origins),
         ),
-
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
         // max-age=31536000: Valid for 1 year (31,536,000 seconds)
@@ -209,13 +202,11 @@ pub fn security_headers(
             "Strict-Transport-Security".to_string(),
             "max-age=31536000 ; includeSubDomains".to_string(),
         ),
-
         // Referrer-Policy: same-origin
         // Controls how much referrer information is sent with outgoing requests
         // same-origin: Only send referrer to same-origin requests (no cross-origin leakage)
         // Note: "no-referrer" would be more strict but breaks local dev deployment
         ("Referrer-Policy".to_string(), "same-origin".to_string()),
-
         // Permissions-Policy (formerly Feature-Policy)
         // Controls which browser features and APIs can be used
         // Most permissions are denied by default, with specific exceptions:
