@@ -7,54 +7,9 @@ use serde_bytes::ByteBuf;
 
 mod metrics;
 
-/// CORS-safe security headers for OPTIONS requests
-/// These headers provide security without interfering with CORS preflight requests
-fn cors_safe_security_headers() -> Vec<HeaderField> {
-    vec![
-        // X-Frame-Options: DENY
-        // Prevents the page from being displayed in a frame, iframe, embed or object
-        // This helps prevent clickjacking attacks
-        ("X-Frame-Options".to_string(), "DENY".to_string()),
-        // X-Content-Type-Options: nosniff
-        // Prevents browsers from MIME-sniffing the content type
-        // Forces browsers to respect the declared Content-Type header
-        ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
-        // Strict-Transport-Security (HSTS)
-        // Forces browsers to use HTTPS for all future requests to this domain
-        // max-age=31536000: Valid for 1 year (365 days)
-        // includeSubDomains: Also applies to all subdomains
-        (
-            "Strict-Transport-Security".to_string(),
-            "max-age=31536000 ; includeSubDomains".to_string(),
-        ),
-        // Referrer-Policy: same-origin
-        // Controls how much referrer information is sent with requests
-        // same-origin: Only send referrer to same-origin requests
-        ("Referrer-Policy".to_string(), "same-origin".to_string()),
-        // Content-Security-Policy: default-src 'none'
-        // Minimal CSP for OPTIONS - blocks all content since no scripts should execute
-        (
-            "Content-Security-Policy".to_string(),
-            "default-src 'none'".to_string(),
-        ),
-    ]
-}
-
 fn http_options_request() -> HttpResponse {
-    let mut headers = vec![
-        ("Access-Control-Allow-Origin".to_string(), "*".to_string()),
-        (
-            "Access-Control-Allow-Methods".to_string(),
-            "GET, POST, OPTIONS".to_string(),
-        ),
-        (
-            "Access-Control-Allow-Headers".to_string(),
-            "Content-Type".to_string(),
-        ),
-        ("Content-Length".to_string(), "0".to_string()),
-    ];
-
-    headers.append(&mut cors_safe_security_headers());
+    // TODO: Restrict origin to just the II-specific origins.
+    let headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
 
     HttpResponse {
         // Indicates success without any additional content to be sent in the response content.
@@ -115,16 +70,10 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
     }
 }
 
-fn http_head_request(url: String, certificate_version: Option<u16>) -> HttpResponse {
-    let mut resp = http_get_request(url, certificate_version);
-    resp.body.clear(); // HEAD has no body
-    resp
-}
-
 fn method_not_allowed(unsupported_method: &str) -> HttpResponse {
     HttpResponse {
         status_code: 405,
-        headers: vec![("Allow".into(), "GET, HEAD, OPTIONS".into())],
+        headers: vec![("Allow".into(), "GET, OPTIONS".into())],
         body: ByteBuf::from(format!("Method {unsupported_method} not allowed.")),
         upgrade: None,
         streaming_strategy: None,
@@ -143,7 +92,6 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
     match method.as_str() {
         "OPTIONS" => http_options_request(),
         "GET" => http_get_request(url, certificate_version),
-        "HEAD" => http_head_request(url, certificate_version),
         unsupported_method => method_not_allowed(unsupported_method),
     }
 }
