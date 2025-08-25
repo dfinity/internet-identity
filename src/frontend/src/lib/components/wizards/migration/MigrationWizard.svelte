@@ -7,7 +7,6 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
-  import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AlreadyMigrated from "./views/AlreadyMigrated.svelte";
   import { onMount } from "svelte";
   import {
@@ -68,10 +67,7 @@
 </script>
 
 {#if migrationFlow.view === "alreadyMigrated"}
-  <AlreadyMigrated
-    name={identityInfo.name}
-    onUpgradeAgain={migrationFlow.upgradeAgain}
-  />
+  <AlreadyMigrated onUpgradeAgain={migrationFlow.upgradeAgain} />
 {:else if migrationFlow.view === "enterNumber"}
   <EnterIdentityNumber onSubmit={handleSubmit} />
   <!-- User can't move to this step if identityNumber is null or undefined so no need to manage that case. -->

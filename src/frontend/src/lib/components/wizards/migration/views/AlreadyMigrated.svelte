@@ -8,8 +8,7 @@
     UpgradeIdentityEvents,
   } from "$lib/utils/analytics/upgradeIdentityFunnel";
 
-  let { name, onUpgradeAgain }: { name: string; onUpgradeAgain: () => void } =
-    $props();
+  let { onUpgradeAgain }: { onUpgradeAgain: () => void } = $props();
 
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.AlreadyMigratedScreen);
@@ -28,7 +27,7 @@
       <p
         class="text-md text-text-tertiary mb-2 font-medium text-balance sm:text-center"
       >
-        {`${name} is already upgraded to the new experience.`}
+        This identity has already been upgraded to the new experience.
       </p>
       <!-- Removed "text-balance" because it breaks the button name `"Use existing Passkey"` into two lines -->
       <p class="text-md text-text-tertiary font-medium sm:text-center">
