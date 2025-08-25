@@ -31,7 +31,8 @@
       </p>
       <!-- Removed "text-balance" because it breaks the button name `"Use existing Passkey"` into two lines -->
       <p class="text-md text-text-tertiary font-medium sm:text-center">
-        Select "Use existing Passkey" in the login process.
+        Select <b class="text-text-primary">Use existing Passkey</b> in the login
+        process.
       </p>
     </div>
   </div>
