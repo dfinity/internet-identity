@@ -73,9 +73,10 @@ export class MigrationFlow {
 
   upgradeAgain = () => {
     if (isNullish(this.identityNumber) || isNullish(this.#attachElement)) {
+      // This shouldn't happen because `authenticateWithIdentityNumber` is called, before.
       // The identityNumber and attachElement are set in authenticateWithIdentityNumber from "enterNumber" view.
       this.view = "enterNumber";
-      throw new Error("Enter your identity number and try again.");
+      return;
     }
     return this.#authenticate({
       identityNumber: this.identityNumber,
