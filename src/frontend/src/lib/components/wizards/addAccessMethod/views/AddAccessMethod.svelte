@@ -20,10 +20,9 @@
     $props();
 
   let authenticatingGoogle = $state(false);
-  let authenticatingProviderId = $state<Record<string, boolean>>({});
+  let authenticatingProviderId = $state<string | null>();
   let authenticating = $derived(
-    Object.values(authenticatingProviderId).some(Boolean) ||
-      authenticatingGoogle,
+    nonNullish(authenticatingProviderId) || authenticatingGoogle,
   );
 
   const isPasskeySupported = nonNullish(window.PublicKeyCredential);
@@ -38,11 +37,11 @@
   };
 
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
-    authenticatingProviderId[config.client_id] = true;
+    authenticatingProviderId = config.client_id;
     try {
       await linkOpenIdAccount(config);
     } finally {
-      authenticatingProviderId[config.client_id] = false;
+      authenticatingProviderId = null;
     }
   };
 
@@ -91,7 +90,7 @@
             size="xl"
             class="flex-1"
           >
-            {#if authenticatingProviderId[provider.client_id]}
+            {#if authenticatingProviderId === provider.client_id}
               <ProgressRing />
             {:else if provider.logo}
               <div class="size-6">
