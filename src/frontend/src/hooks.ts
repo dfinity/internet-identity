@@ -1,4 +1,4 @@
-import { Reroute, redirect } from "@sveltejs/kit";
+import { Reroute } from "@sveltejs/kit";
 import { WEBAUTHN_IFRAME_PATH } from "$lib/legacy/flows/iframeWebAuthn";
 import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { nonNullish } from "@dfinity/utils";
