@@ -28,6 +28,7 @@ import {
 } from "$lib/utils/analytics/upgradeIdentityFunnel";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
+import { isNewOriginDevice } from "$lib/utils/accessMethods";
 
 export class WrongDomainError extends Error {
   constructor() {
@@ -40,9 +41,11 @@ export class WrongDomainError extends Error {
 }
 
 export class MigrationFlow {
-  view = $state<"enterNumber" | "enterName">("enterNumber");
+  view = $state<"enterNumber" | "enterName" | "alreadyMigrated">("enterNumber");
   identityNumber: UserNumber | undefined;
   #webAuthFlows: { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
+  #attachElement?: HTMLElement;
+  #devices: Omit<DeviceData, "alias">[] = [];
 
   constructor() {
     this.identityNumber = undefined;
@@ -53,85 +56,33 @@ export class MigrationFlow {
     attachElement?: HTMLElement,
   ): Promise<void> => {
     this.identityNumber = identityNumber;
-    const devices = await this.#lookupAuthenticators(identityNumber);
-
-    const webAuthnAuthenticators = devices
-      .filter(({ key_type }) => !("browser_storage_key" in key_type))
-      .map(convertToValidCredentialData)
-      .filter(nonNullish);
-
-    if (isNullish(this.#webAuthFlows)) {
-      const flows = findWebAuthnFlows({
-        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
-        devices: webAuthnAuthenticators,
-        currentOrigin: window.location.origin,
-        // Empty array is the same as no related origins.
-        relatedOrigins: canisterConfig.related_origins[0] ?? [],
-      });
-      this.#webAuthFlows = {
-        flows,
-        currentIndex: 0,
-      };
+    this.#attachElement = attachElement;
+    this.#devices = await this.#lookupAuthenticators(identityNumber);
+    const alreadyMigrated = this.#devices.some(isNewOriginDevice);
+    if (alreadyMigrated) {
+      this.view = "alreadyMigrated";
+      return;
     }
 
-    const flowsLength = this.#webAuthFlows?.flows.length ?? 0;
-    // We reached the last flow. Start from the beginning.
-    // This might happen if the user cancelled manually in the flow that would have been successful.
-    if (this.#webAuthFlows?.currentIndex === flowsLength) {
-      this.#webAuthFlows.currentIndex = 0;
-    }
-    const currentFlow = nonNullish(this.#webAuthFlows)
-      ? this.#webAuthFlows.flows[this.#webAuthFlows.currentIndex]
-      : undefined;
-
-    const passkeyIdentity = MultiWebAuthnIdentity.fromCredentials(
-      webAuthnAuthenticators,
-      currentFlow?.rpId,
-      currentFlow?.useIframe ?? false,
-      // Set user verification to preferred to ensure the user is verified during migration.
-      "preferred",
+    return this.#authenticate({
+      identityNumber,
       attachElement,
-    );
-    try {
-      const session = get(sessionStore);
-      const delegation = await DelegationChain.create(
-        passkeyIdentity,
-        session.identity.getPublicKey(),
-        new Date(Date.now() + 30 * 60 * 1000),
-      );
+      devices: this.#devices,
+    });
+  };
 
-      const identity = DelegationIdentity.fromDelegation(
-        session.identity,
-        delegation,
-      );
-      authenticationStore.set({ identity, identityNumber });
-      upgradeIdentityFunnel.trigger(
-        UpgradeIdentityEvents.AuthenticationSuccessful,
-      );
-    } catch (error) {
-      upgradeIdentityFunnel.trigger(
-        UpgradeIdentityEvents.AuthenticationFailure,
-      );
-      if (isWebAuthnCancelError(error)) {
-        upgradeIdentityFunnel.trigger(
-          UpgradeIdentityEvents.AuthenticationCancelled,
-        );
-      }
-      // We only want to show a special error if the user might have to choose different web auth flow.
-      if (
-        isWebAuthnCancelError(error) &&
-        nonNullish(this.#webAuthFlows) &&
-        flowsLength > 1
-      ) {
-        // Increase the index to try the next flow.
-        this.#webAuthFlows = {
-          flows: this.#webAuthFlows.flows,
-          currentIndex: this.#webAuthFlows.currentIndex + 1,
-        };
-        throw new WrongDomainError();
-      }
-      throw error;
+  upgradeAgain = () => {
+    if (isNullish(this.identityNumber) || isNullish(this.#attachElement)) {
+      // This shouldn't happen because `authenticateWithIdentityNumber` is called, before.
+      // The identityNumber and attachElement are set in authenticateWithIdentityNumber from "enterNumber" view.
+      this.view = "enterNumber";
+      return;
     }
+    return this.#authenticate({
+      identityNumber: this.identityNumber,
+      devices: this.#devices,
+      attachElement: this.#attachElement,
+    });
   };
 
   createPasskey = async (name: string): Promise<void> => {
@@ -230,5 +181,97 @@ export class MigrationFlow {
     const actor = await get(sessionStore).actor;
     const allDevices = await actor.lookup(userNumber);
     return allDevices.filter((device) => "authentication" in device.purpose);
+  };
+
+  #authenticate = async ({
+    identityNumber,
+    attachElement,
+    devices,
+  }: {
+    identityNumber: UserNumber;
+    attachElement?: HTMLElement;
+    devices: Omit<DeviceData, "alias">[];
+  }) => {
+    const webAuthnAuthenticators = devices
+      .filter(({ key_type }) => !("browser_storage_key" in key_type))
+      .map(convertToValidCredentialData)
+      .filter(nonNullish);
+
+    if (isNullish(this.#webAuthFlows)) {
+      const flows = findWebAuthnFlows({
+        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
+        devices: webAuthnAuthenticators,
+        currentOrigin: window.location.origin,
+        // Empty array is the same as no related origins.
+        relatedOrigins: canisterConfig.related_origins[0] ?? [],
+      });
+      this.#webAuthFlows = {
+        flows,
+        currentIndex: 0,
+      };
+    }
+
+    const flowsLength = this.#webAuthFlows?.flows.length ?? 0;
+    // We reached the last flow. Start from the beginning.
+    // This might happen if the user cancelled manually in the flow that would have been successful.
+    if (this.#webAuthFlows?.currentIndex === flowsLength) {
+      this.#webAuthFlows.currentIndex = 0;
+    }
+    const currentFlow = nonNullish(this.#webAuthFlows)
+      ? this.#webAuthFlows.flows[this.#webAuthFlows.currentIndex]
+      : undefined;
+
+    const passkeyIdentity = MultiWebAuthnIdentity.fromCredentials(
+      webAuthnAuthenticators,
+      currentFlow?.rpId,
+      currentFlow?.useIframe ?? false,
+      // Set user verification to preferred to ensure the user is verified during migration.
+      "preferred",
+      attachElement,
+    );
+    try {
+      const session = get(sessionStore);
+      const delegation = await DelegationChain.create(
+        passkeyIdentity,
+        session.identity.getPublicKey(),
+        new Date(Date.now() + 30 * 60 * 1000),
+      );
+
+      const identity = DelegationIdentity.fromDelegation(
+        session.identity,
+        delegation,
+      );
+      authenticationStore.set({
+        identity,
+        identityNumber,
+      });
+      upgradeIdentityFunnel.trigger(
+        UpgradeIdentityEvents.AuthenticationSuccessful,
+      );
+      this.view = "enterName";
+    } catch (error) {
+      upgradeIdentityFunnel.trigger(
+        UpgradeIdentityEvents.AuthenticationFailure,
+      );
+      if (isWebAuthnCancelError(error)) {
+        upgradeIdentityFunnel.trigger(
+          UpgradeIdentityEvents.AuthenticationCancelled,
+        );
+      }
+      // We only want to show a special error if the user might have to choose different web auth flow.
+      if (
+        isWebAuthnCancelError(error) &&
+        nonNullish(this.#webAuthFlows) &&
+        flowsLength > 1
+      ) {
+        // Increase the index to try the next flow.
+        this.#webAuthFlows = {
+          flows: this.#webAuthFlows.flows,
+          currentIndex: this.#webAuthFlows.currentIndex + 1,
+        };
+        throw new WrongDomainError();
+      }
+      throw error;
+    }
   };
 }
