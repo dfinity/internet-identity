@@ -8,7 +8,8 @@
     UpgradeIdentityEvents,
   } from "$lib/utils/analytics/upgradeIdentityFunnel";
 
-  let { name }: { name: string } = $props();
+  let { name, onUpgradeAgain }: { name: string; onUpgradeAgain: () => void } =
+    $props();
 
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.AlreadyMigratedScreen);
@@ -25,9 +26,14 @@
         Identity already upgraded
       </h1>
       <p
-        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+        class="text-md text-text-tertiary mb-2 font-medium text-balance sm:text-center"
       >
         {`${name} is already upgraded to the new experience.`}
+      </p>
+      <p
+        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+      >
+        Select "Use existing Passkey" in the login flow.
       </p>
     </div>
   </div>
@@ -36,10 +42,13 @@
       href={SUPPORT_URL}
       target="_blank"
       rel="noopener noreferrer"
-      variant="tertiary"
+      variant="secondary"
       size="lg"
     >
       Help & FAQ
+    </Button>
+    <Button onclick={onUpgradeAgain} variant="tertiary" size="lg">
+      Upgrade again
     </Button>
   </div>
 </div>
