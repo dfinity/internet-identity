@@ -6,6 +6,7 @@
   import type {
     AuthnMethodData,
     OpenIdCredential,
+    OpenIdConfig,
   } from "$lib/generated/internet_identity_types";
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
@@ -48,6 +49,15 @@
       onError(error);
     }
   };
+
+  const handleContinueWithOpenId = async (config: OpenIdConfig) => {
+    try {
+      onGoogleLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
+      onClose();
+    } catch (error) {
+      onError(error);
+    }
+  };
   const handleCreatePasskey = async () => {
     try {
       onPasskeyRegistered(await addAccessMethodFlow.createPasskey());
@@ -72,6 +82,7 @@
     <AddAccessMethod
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
       linkGoogleAccount={handleContinueWithGoogle}
+      linkOpenIdAccount={handleContinueWithOpenId}
     />
   {:else if addAccessMethodFlow.view === "addPasskey"}
     <AddPasskey
