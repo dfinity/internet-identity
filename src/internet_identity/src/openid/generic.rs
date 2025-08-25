@@ -323,11 +323,6 @@ fn verify_claims(
     let hash: [u8; 32] = hasher.finalize().into();
     let expected_nonce = BASE64_URL_SAFE_NO_PAD.encode(hash);
 
-    // let re = Regex::new(r"\{([^}]+)}").unwrap();
-    // let issuer2 = Regex::new(r"\{([^}]+)}")
-    //     .unwrap()
-    //     .replace_all(issuer, |caps| {});
-
     if claims.iss != issuer {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
             "Invalid issuer: {}",
