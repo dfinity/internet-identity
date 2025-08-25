@@ -53,11 +53,6 @@ export class AddAccessMethodFlow {
       const { nonce, salt } = await createAnonymousNonce(
         identity.getPrincipal(),
       );
-      console.log("in da generic", {
-        clientId: config.client_id,
-        authURL: config.auth_uri,
-        configURL: config.fedcm_uri?.[0],
-      });
       const jwt = await requestJWT(
         {
           clientId: config.client_id,
@@ -98,7 +93,6 @@ export class AddAccessMethodFlow {
     }
     try {
       const requestConfig = createGoogleRequestConfig(clientId);
-      console.log("in da google", requestConfig);
       this.#isSystemOverlayVisible = true;
       const { nonce, salt } = await createAnonymousNonce(
         identity.getPrincipal(),
