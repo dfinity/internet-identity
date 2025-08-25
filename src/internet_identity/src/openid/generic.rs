@@ -1,4 +1,4 @@
-use super::OpenIDJWTVerificationError;
+use super::{replace_issuer_placeholders, OpenIDJWTVerificationError};
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -97,7 +97,8 @@ impl OpenIdProvider for Provider {
                 "Unable to decode claims or expected claims are missing".to_string(),
             )
         })?;
-        verify_claims(&self.issuer, &self.client_id, &claims, salt)?;
+        let effective_issuer = replace_issuer_placeholders(&self.issuer, validation_item.claims());
+        verify_claims(&effective_issuer, &self.client_id, &claims, salt)?;
 
         // Verify JWT signature
         let kid = validation_item
@@ -127,7 +128,7 @@ impl OpenIdProvider for Provider {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
         }
         Ok(OpenIdCredential {
-            iss: claims.iss,
+            iss: self.issuer.clone(), // Do NOT use claims.iss here, this cou
             sub: claims.sub,
             aud: claims.aud,
             last_usage_timestamp: None,
@@ -321,6 +322,11 @@ fn verify_claims(
     hasher.update(caller().to_bytes());
     let hash: [u8; 32] = hasher.finalize().into();
     let expected_nonce = BASE64_URL_SAFE_NO_PAD.encode(hash);
+
+    // let re = Regex::new(r"\{([^}]+)}").unwrap();
+    // let issuer2 = Regex::new(r"\{([^}]+)}")
+    //     .unwrap()
+    //     .replace_all(issuer, |caps| {});
 
     if claims.iss != issuer {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
