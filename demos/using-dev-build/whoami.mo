@@ -1,5 +1,7 @@
-actor {
-    public query ({caller}) func whoami() : async Principal {
-        return caller;
-    };
+import Principal "mo:base/Principal";
+
+persistent actor Whoami {
+  public query (message) func whoami() : async Principal {
+    message.caller;
+  };
 };
