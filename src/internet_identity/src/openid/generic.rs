@@ -128,7 +128,9 @@ impl OpenIdProvider for Provider {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
         }
         Ok(OpenIdCredential {
-            iss: self.issuer.clone(), // Do NOT use claims.iss here, this cou
+            // Do NOT use claims.iss here since it could be different within the
+            // same OpenID provider as seen in Microsoft with multiple tenants.
+            iss: self.issuer.clone(),
             sub: claims.sub,
             aud: claims.aud,
             last_usage_timestamp: None,
