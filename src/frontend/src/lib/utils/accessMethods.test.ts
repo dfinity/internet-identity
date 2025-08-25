@@ -5,6 +5,7 @@ import {
   haveMultipleOrigins,
   getRpId,
   isSameAccessMethod,
+  isNewOriginDevice,
 } from "./accessMethods";
 import type {
   AuthnMethodData,
@@ -12,6 +13,7 @@ import type {
   AuthnMethodPurpose,
   AuthnMethodProtection,
   MetadataMapV2,
+  DeviceData,
 } from "$lib/generated/internet_identity_types";
 import { vi } from "vitest";
 import { nonNullish } from "@dfinity/utils";
@@ -391,5 +393,49 @@ describe("isSameAccessMethod", () => {
     const webAuthn = makeWebAuthnMethod([1, 2, 3]);
     const oidc = makeOpenIdCredential("https://issuer", "user-sub");
     expect(isSameAccessMethod(webAuthn, oidc)).toBe(false);
+  });
+});
+
+describe("isNewOriginDevice", () => {
+  const makeDevice = ({
+    origin,
+    purpose = { Authentication: null },
+  }: {
+    origin?: string;
+    purpose?: { Authentication?: null; Recovery?: null };
+  }) =>
+    ({
+      origin: origin !== undefined ? [origin] : [],
+      purpose,
+    }) as unknown as Omit<DeviceData, "alias">;
+
+  it("returns true when origin matches first new_flow_origin and not Recovery", () => {
+    const device = makeDevice({ origin: "https://id.ai" });
+    expect(isNewOriginDevice(device)).toBe(true);
+  });
+
+  it("returns true when origin matches second new_flow_origin and not Recovery", () => {
+    const device = makeDevice({
+      origin: "https://rdmx6-jaaaa-aaaah-qdrqq-cai.ic0.app",
+    });
+    expect(isNewOriginDevice(device)).toBe(true);
+  });
+
+  it("returns false for Recovery device even with matching origin", () => {
+    const device = makeDevice({
+      origin: "https://id.ai",
+      purpose: { Recovery: null },
+    });
+    expect(isNewOriginDevice(device)).toBe(false);
+  });
+
+  it("returns false when origin does not match any new_flow_origin", () => {
+    const device = makeDevice({ origin: "https://different-origin.com" });
+    expect(isNewOriginDevice(device)).toBe(false);
+  });
+
+  it("returns false when device has no origin (defaults to legacy URL)", () => {
+    const device = makeDevice({});
+    expect(isNewOriginDevice(device)).toBe(false);
   });
 });

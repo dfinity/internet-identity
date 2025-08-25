@@ -1,11 +1,13 @@
 import {
   AuthnMethodData,
+  DeviceData,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { isSameOrigin } from "./urlUtils";
 import { canisterConfig } from "$lib/globals";
 import { authnMethodEqual } from "./webAuthn";
+import { LEGACY_II_URL } from "$lib/config";
 
 /**
  * Check if a `AuthnMethodData` or `OpenIdCredential` is a WebAuthn method
@@ -121,6 +123,26 @@ export const isLegacyAuthnMethod = (accessMethod: AuthnMethodData): boolean => {
   return (
     !hasSomeOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
     "Recovery" in accessMethod.security_settings.purpose
+  );
+};
+
+/**
+ * Returns true if the device's origin is one of the new flow origins.
+ * As long as the device is not a recovery device (which are not yet supported in the new flow origins).
+ *
+ * TODO: Do not use new_flow_origins when old domains move to new flow.
+ * TODO: Remove recovery once they are supported in new flow.
+ *
+ * @param device
+ * @returns {boolean}
+ */
+export const isNewOriginDevice = (
+  device: Omit<DeviceData, "alias">,
+): boolean => {
+  return (
+    (canisterConfig.new_flow_origins[0] ?? []).some((new_origin) =>
+      isSameOrigin(new_origin, device.origin[0] ?? LEGACY_II_URL),
+    ) && !("Recovery" in device.purpose)
   );
 };
 
