@@ -30,10 +30,9 @@
       >
         {`${name} is already upgraded to the new experience.`}
       </p>
-      <p
-        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
-      >
-        Select "Use existing Passkey" in the login flow.
+      <!-- Removed "text-balance" because it breaks the button name `"Use existing Passkey"` into two lines -->
+      <p class="text-md text-text-tertiary font-medium sm:text-center">
+        Select "Use existing Passkey" in the login process.
       </p>
     </div>
   </div>
