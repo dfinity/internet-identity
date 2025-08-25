@@ -6,10 +6,7 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import {
-    ENABLE_GENERIC_OPEN_ID,
-    ENABLE_MIGRATE_FLOW,
-  } from "$lib/state/featureFlags";
+  import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
@@ -132,17 +129,15 @@
         </Button>
       </Tooltip>
     {/if}
-    {#if $ENABLE_MIGRATE_FLOW}
-      <Button
-        onclick={migrate}
-        variant="tertiary"
-        size="xl"
-        disabled={!supportsPasskeys ||
-          nonNullish(authenticatingProviderId) ||
-          isGoogleAuthenticating}
-      >
-        Upgrade from legacy identity
-      </Button>
-    {/if}
+    <Button
+      onclick={migrate}
+      variant="tertiary"
+      size="xl"
+      disabled={!supportsPasskeys ||
+        nonNullish(authenticatingProviderId) ||
+        isGoogleAuthenticating}
+    >
+      Upgrade from legacy identity
+    </Button>
   </div>
 </div>
