@@ -59,7 +59,7 @@
     Add access method
   </h1>
   <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
-    Add another way to sign in with a passkey or identity provider for secure
+    Add another way to sign in with a passkey or third-party account for secure
     access.
   </p>
 </div>
