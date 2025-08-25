@@ -12,6 +12,7 @@ import { throwCanisterError } from "$lib/utils/utils";
 import type {
   AuthnMethodData,
   OpenIdCredential,
+  OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
@@ -41,6 +42,47 @@ export class AddAccessMethodFlow {
       this.#view = "addPasskey";
     }
   }
+
+  linkOpenIdAccount = async (
+    config: OpenIdConfig,
+  ): Promise<OpenIdCredential> => {
+    const { identity, actor, identityNumber } = get(authenticatedStore);
+
+    try {
+      this.#isSystemOverlayVisible = true;
+      const { nonce, salt } = await createAnonymousNonce(
+        identity.getPrincipal(),
+      );
+      const jwt = await requestJWT(
+        {
+          clientId: config.client_id,
+          authURL: config.auth_uri,
+          configURL: config.fedcm_uri?.[0],
+        },
+        {
+          nonce,
+          mediation: "required",
+        },
+      );
+      const { iss, sub, aud, name, email } = decodeJWTWithNameAndEmail(jwt);
+      this.#isSystemOverlayVisible = false;
+      await actor
+        .openid_credential_add(identityNumber, jwt, salt)
+        .then(throwCanisterError);
+      return {
+        aud,
+        iss,
+        sub,
+        metadata: [
+          ["name", { String: name }],
+          ["email", { String: email }],
+        ],
+        last_usage_timestamp: [],
+      };
+    } finally {
+      this.#isSystemOverlayVisible = false;
+    }
+  };
 
   linkGoogleAccount = async (): Promise<OpenIdCredential> => {
     const { identity, actor, identityNumber } = get(authenticatedStore);

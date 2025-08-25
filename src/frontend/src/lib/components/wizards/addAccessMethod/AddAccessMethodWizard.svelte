@@ -6,13 +6,14 @@
   import type {
     AuthnMethodData,
     OpenIdCredential,
+    OpenIdConfig,
   } from "$lib/generated/internet_identity_types";
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
 
   interface Props {
-    onGoogleLinked: (credential: OpenIdCredential) => void;
+    onOpenIDLinked: (credential: OpenIdCredential) => void;
     onPasskeyRegistered: (credential: AuthnMethodData) => void;
     onOtherDeviceRegistered: () => void;
     onClose: () => void;
@@ -22,7 +23,7 @@
   }
 
   const {
-    onGoogleLinked,
+    onOpenIDLinked,
     onPasskeyRegistered,
     onOtherDeviceRegistered,
     onClose,
@@ -42,7 +43,16 @@
 
   const handleContinueWithGoogle = async () => {
     try {
-      onGoogleLinked(await addAccessMethodFlow.linkGoogleAccount());
+      onOpenIDLinked(await addAccessMethodFlow.linkGoogleAccount());
+      onClose();
+    } catch (error) {
+      onError(error);
+    }
+  };
+
+  const handleContinueWithOpenId = async (config: OpenIdConfig) => {
+    try {
+      onOpenIDLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
       onClose();
     } catch (error) {
       onError(error);
@@ -72,6 +82,7 @@
     <AddAccessMethod
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
       linkGoogleAccount={handleContinueWithGoogle}
+      linkOpenIdAccount={handleContinueWithOpenId}
     />
   {:else if addAccessMethodFlow.view === "addPasskey"}
     <AddPasskey
