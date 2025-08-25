@@ -33,6 +33,10 @@ export class FeatureFlag {
     return get(this.#store);
   }
 
+  isSet(): boolean {
+    return this.#storage.getItem(this.#key) !== null;
+  }
+
   set(value: boolean) {
     this.#store.set(Boolean(value));
     this.#storage.setItem(this.#key, JSON.stringify(get(this.#store)));

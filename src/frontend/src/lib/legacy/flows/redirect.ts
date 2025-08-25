@@ -2,6 +2,15 @@ import { withLoader } from "$lib/templates/loader";
 
 export const REDIRECT_CALLBACK_PATH = "/callback";
 
+export class PopupClosedError extends Error {
+  constructor() {
+    super();
+    Object.setPrototypeOf(this, PopupClosedError.prototype);
+  }
+
+  message = "Window closed before a response was received";
+}
+
 export const callbackFlow = (): Promise<never> => {
   // User was returned here after redirect from a OpenID flow callback,
   // these flows are always handled in a popup and the callback url is
@@ -26,7 +35,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
     const closeInterval = setInterval(() => {
       if (redirectWindow?.closed === true) {
         clearInterval(closeInterval);
-        reject(new Error("Window closed before a response was received"));
+        reject(new PopupClosedError());
       }
     }, 500);
     const responseListener = (event: MessageEvent) => {
