@@ -93,7 +93,6 @@
           >
             {#if authenticatingProviderId[provider.client_id]}
               <ProgressRing />
-              <span>Authenticating with {provider.name}...</span>
             {:else if provider.logo}
               <div class="size-6">
                 {@html provider.logo}
