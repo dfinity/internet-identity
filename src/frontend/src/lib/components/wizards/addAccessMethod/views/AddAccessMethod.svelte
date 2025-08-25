@@ -6,26 +6,49 @@
   import Button from "$lib/components/ui/Button.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import { nonNullish } from "@dfinity/utils";
+  import { canisterConfig } from "$lib/globals";
+  import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
+  import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
 
   interface Props {
     linkGoogleAccount: () => Promise<void>;
+    linkOpenIdAccount: (config: OpenIdConfig) => Promise<void>;
     continueWithPasskey: () => void;
   }
 
-  const { linkGoogleAccount, continueWithPasskey }: Props = $props();
+  const { linkGoogleAccount, linkOpenIdAccount, continueWithPasskey }: Props =
+    $props();
 
-  let authenticating = $state(false);
+  let authenticatingGoogle = $state(false);
+  let authenticatingProviderId = $state<Record<string, boolean>>({});
+  let authenticating = $derived(
+    Object.values(authenticatingProviderId).some(Boolean) ||
+      authenticatingGoogle,
+  );
 
   const isPasskeySupported = nonNullish(window.PublicKeyCredential);
 
   const handleContinueWithGoogle = async () => {
-    authenticating = true;
+    authenticatingGoogle = true;
     try {
       await linkGoogleAccount();
     } finally {
-      authenticating = false;
+      authenticatingGoogle = false;
     }
   };
+
+  const handleContinueWithOpenId = async (config: OpenIdConfig) => {
+    authenticatingProviderId[config.client_id] = true;
+    try {
+      await linkOpenIdAccount(config);
+    } finally {
+      authenticatingProviderId[config.client_id] = false;
+    }
+  };
+
+  const showGoogleButton =
+    canisterConfig.openid_google?.[0]?.[0] && !$ENABLE_GENERIC_OPEN_ID;
+  const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
 </script>
 
 <div class="mt-4 mb-6 flex flex-col">
@@ -36,7 +59,7 @@
     Add access method
   </h1>
   <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
-    Add another way to sign in with a passkey or Google account for secure
+    Add another way to sign in with a passkey or identity provider for secure
     access.
   </p>
 </div>
@@ -58,20 +81,40 @@
       <PasskeyIcon />
       Continue with Passkey
     </Button>
-    <Button
-      onclick={handleContinueWithGoogle}
-      variant="secondary"
-      disabled={authenticating}
-      size="xl"
-    >
-      {#if authenticating}
-        <ProgressRing />
-        <span>Authenticating with Google...</span>
-      {:else}
-        <GoogleIcon />
-        <span>Continue with Google</span>
-      {/if}
-    </Button>
+    {#if $ENABLE_GENERIC_OPEN_ID}
+      {#each openIdProviders as provider}
+        <Button
+          onclick={() => handleContinueWithOpenId(provider)}
+          variant="secondary"
+          disabled={authenticating}
+          size="xl"
+        >
+          {#if authenticatingProviderId[provider.client_id]}
+            <ProgressRing />
+            <span>Authenticating with {provider.name}...</span>
+          {:else if provider.logo}
+            <div class="size-6">
+              {@html provider.logo}
+            </div>
+          {/if}
+        </Button>
+      {/each}
+    {:else if showGoogleButton}
+      <Button
+        onclick={handleContinueWithGoogle}
+        variant="secondary"
+        disabled={authenticating}
+        size="xl"
+      >
+        {#if authenticatingGoogle}
+          <ProgressRing />
+          <span>Authenticating with Google...</span>
+        {:else}
+          <GoogleIcon />
+          <span>Continue with Google</span>
+        {/if}
+      </Button>
+    {/if}
   </div>
 </div>
 
