@@ -82,23 +82,26 @@
       Continue with Passkey
     </Button>
     {#if $ENABLE_GENERIC_OPEN_ID}
-      {#each openIdProviders as provider}
-        <Button
-          onclick={() => handleContinueWithOpenId(provider)}
-          variant="secondary"
-          disabled={authenticating}
-          size="xl"
-        >
-          {#if authenticatingProviderId[provider.client_id]}
-            <ProgressRing />
-            <span>Authenticating with {provider.name}...</span>
-          {:else if provider.logo}
-            <div class="size-6">
-              {@html provider.logo}
-            </div>
-          {/if}
-        </Button>
-      {/each}
+      <div class="flex flex-row flex-nowrap justify-stretch gap-3">
+        {#each openIdProviders as provider}
+          <Button
+            onclick={() => handleContinueWithOpenId(provider)}
+            variant="secondary"
+            disabled={authenticating}
+            size="xl"
+            class="flex-1"
+          >
+            {#if authenticatingProviderId[provider.client_id]}
+              <ProgressRing />
+              <span>Authenticating with {provider.name}...</span>
+            {:else if provider.logo}
+              <div class="size-6">
+                {@html provider.logo}
+              </div>
+            {/if}
+          </Button>
+        {/each}
+      </div>
     {:else if showGoogleButton}
       <Button
         onclick={handleContinueWithGoogle}
