@@ -131,8 +131,8 @@ impl OpenIdProvider for Provider {
             // Do NOT use claims.iss here since it could be different within the
             // same OpenID provider as seen in Microsoft with multiple tenants.
             //
-            // The issuer returned there should therefore ALWAYS be the issuer from the config,
-            // so that credentials are always stored with a single issuer per OpenID provider.
+            // The issuer returned should therefore ALWAYS be the issuer from the config,
+            // so that credentials are always stored with a single issuer per provider.
             iss: self.issuer.clone(),
             sub: claims.sub,
             aud: claims.aud,
