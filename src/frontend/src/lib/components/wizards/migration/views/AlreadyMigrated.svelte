@@ -32,7 +32,7 @@
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        Select <b class="text-text-primary whitespace-nowrap"
+        You can continue with <b class="text-text-primary whitespace-nowrap"
           >Use existing Passkey</b
         > in the login process.
       </p>
