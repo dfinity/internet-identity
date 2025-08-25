@@ -1,5 +1,6 @@
 import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
 import {
+  PopupClosedError,
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
@@ -12,6 +13,8 @@ export interface RequestConfig {
   clientId: string;
   // OAuth authentication URL
   authURL: string;
+  // OAuth authentication scope
+  authScope: string;
   // Optional, FedCM config URL
   configURL?: string;
 }
@@ -28,6 +31,7 @@ export interface RequestOptions {
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
   clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
+  authScope: "openid profile email",
   configURL: "https://accounts.google.com/gsi/fedcm.json",
 });
 
@@ -80,7 +84,10 @@ export const isNotSupportedError = (error: unknown) =>
  * @param error to check whether it is a FedCM no permission error
  */
 export const isOpenIdCancelError = (error: unknown) => {
-  return error instanceof Error && error.name === "NetworkError";
+  return (
+    (error instanceof Error && error.name === "NetworkError") ||
+    error instanceof PopupClosedError
+  );
 };
 
 /**
@@ -101,7 +108,7 @@ const requestWithRedirect = async (
   authURL.searchParams.set("response_mode", "fragment");
   authURL.searchParams.set("client_id", config.clientId);
   authURL.searchParams.set("redirect_uri", redirectURL.href);
-  authURL.searchParams.set("scope", "openid profile email");
+  authURL.searchParams.set("scope", config.authScope);
   authURL.searchParams.set("state", state);
   authURL.searchParams.set("nonce", options.nonce);
   if (options.mediation === "required" && isNullish(options.loginHint)) {

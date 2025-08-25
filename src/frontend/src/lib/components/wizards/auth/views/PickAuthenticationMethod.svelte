@@ -28,14 +28,15 @@
     migrate,
   }: Props = $props();
 
-  let isAuthenticating = $state(false);
+  let authenticatingProviderId = $state<string | null>(null);
+  let isGoogleAuthenticating = $state(false);
   let isCancelled = $state(false);
   let cancelledProviderId = $state<string | null>(null);
 
   const handleContinueWithGoogle = async () => {
-    isAuthenticating = true;
+    isGoogleAuthenticating = true;
     const result = await continueWithGoogle();
-    isAuthenticating = false;
+    isGoogleAuthenticating = false;
 
     if (result === "cancelled") {
       isCancelled = true;
@@ -45,9 +46,9 @@
   };
 
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
-    isAuthenticating = true;
+    authenticatingProviderId = config.client_id;
     const result = await continueWithOpenId(config);
-    isAuthenticating = false;
+    authenticatingProviderId = null;
 
     if (result === "cancelled") {
       cancelledProviderId = config.client_id;
@@ -82,14 +83,16 @@
             <Button
               onclick={() => handleContinueWithOpenId(provider)}
               variant="secondary"
-              disabled={isAuthenticating}
+              disabled={nonNullish(authenticatingProviderId)}
               size="xl"
               class="flex-1"
             >
-              {#if isAuthenticating}
+              {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
               {:else if provider.logo}
-                {@html provider.logo}
+                <div class="size-6">
+                  {@html provider.logo}
+                </div>
               {/if}
             </Button>
           </Tooltip>
@@ -98,7 +101,9 @@
     {/if}
     <Button
       onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || isAuthenticating}
+      disabled={!supportsPasskeys ||
+        nonNullish(authenticatingProviderId) ||
+        isGoogleAuthenticating}
       size="xl"
       variant={$ENABLE_GENERIC_OPEN_ID ? "secondary" : "primary"}
     >
@@ -114,10 +119,10 @@
         <Button
           onclick={handleContinueWithGoogle}
           variant="secondary"
-          disabled={isAuthenticating}
+          disabled={isGoogleAuthenticating}
           size="xl"
         >
-          {#if isAuthenticating}
+          {#if isGoogleAuthenticating}
             <ProgressRing />
             <span>Authenticating with Google...</span>
           {:else}
@@ -128,7 +133,14 @@
       </Tooltip>
     {/if}
     {#if $ENABLE_MIGRATE_FLOW}
-      <Button onclick={migrate} variant="tertiary" size="xl">
+      <Button
+        onclick={migrate}
+        variant="tertiary"
+        size="xl"
+        disabled={!supportsPasskeys ||
+          nonNullish(authenticatingProviderId) ||
+          isGoogleAuthenticating}
+      >
         Upgrade from legacy identity
       </Button>
     {/if}

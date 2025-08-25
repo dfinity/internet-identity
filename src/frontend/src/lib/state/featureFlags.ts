@@ -54,8 +54,9 @@ const createFeatureFlagStore = (
     return initializedFeatureFlag;
   };
   const initialize = (): void => {
-    if (nonNullish(getInitValue)) {
-      initializedFeatureFlag.set(getInitValue() ?? defaultValue);
+    // Override feature flag with init method if not already set
+    if (nonNullish(getInitValue) && !initializedFeatureFlag.isSet()) {
+      initializedFeatureFlag.temporaryOverride(getInitValue() ?? defaultValue);
     }
   };
 

@@ -209,7 +209,6 @@ export class AuthFlow {
         const identityNumber = await this.#registerWithOpenId(jwt);
         return { identityNumber, type: "signUp" };
       }
-      this.#view = "chooseMethod";
       throw error;
     }
   };
@@ -225,6 +224,7 @@ export class AuthFlow {
     const requestConfig: RequestConfig = {
       clientId: config.client_id,
       authURL: config.auth_uri,
+      authScope: config.auth_scope.join(" "),
       configURL: config.fedcm_uri?.[0],
     };
     // Create two try-catch blocks to avoid double-triggering the analytics.
@@ -275,7 +275,6 @@ export class AuthFlow {
         const identityNumber = await this.#registerWithOpenId(jwt);
         return { identityNumber, type: "signUp" };
       }
-      this.#view = "chooseMethod";
       throw error;
     }
   };
