@@ -213,10 +213,6 @@ export const requestJWT = async (
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
     : await requestWithRedirect(config, options);
-  const { loginHint } = decodeJWT(jwt);
-  if (nonNullish(options.loginHint) && loginHint !== options.loginHint) {
-    throw new Error("Account doesn't match");
-  }
   return jwt;
 };
 

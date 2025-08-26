@@ -25,6 +25,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
+  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
 
   const { data }: PageProps = $props();
 
@@ -122,7 +123,7 @@
                       {identity.name ?? identity.identityNumber}
                     </div>
                     <div class="text-text-tertiary" aria-hidden="true">
-                      {"passkey" in identity.authMethod ? "Passkey" : "Google"}
+                      {lastUsedIdentityTypeName(identity)}
                     </div>
                   </div>
                 </ButtonCard>
