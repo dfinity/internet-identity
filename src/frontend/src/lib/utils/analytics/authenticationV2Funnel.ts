@@ -11,8 +11,10 @@ import { Funnel } from "./Funnel";
  *        -> Move to select-method-screen
  *      continue-as-passkey
  *        auth-success
+ *        go-to-dashboard
  *      continue-as-google
  *        auth-success
+ *        go-to-dashboard
  *    select-method-screen
  *      continue-with-google
  *        register-with-google
@@ -31,8 +33,10 @@ import { Funnel } from "./Funnel";
  *            register-with-passkey
  *              successful-passkey-registration
  *                auth-success
+ *                go-to-dashboard
  *        use-existing-passkey
  *          auth-success
+ *          go-to-dashboard
  */
 export const AuthenticationV2Events = {
   UseAnother: "use-another",
@@ -54,6 +58,7 @@ export const AuthenticationV2Events = {
   JwtVerificationFailed: "jwt-verification-failed",
   JwtVerificationExpired: "jwt-verification-expired",
   InfoPasskeyScreen: "info-passkey-screen",
+  GoToDashboard: "go-to-dashboard",
 } as const;
 
 export const authenticationV2Funnel = new Funnel<typeof AuthenticationV2Events>(

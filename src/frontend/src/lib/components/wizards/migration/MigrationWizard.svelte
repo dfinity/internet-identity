@@ -55,6 +55,7 @@
     try {
       await migrationFlow.createPasskey(name);
       upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.UpgradeSuccessful);
+      upgradeIdentityFunnel.close();
       onSuccess(migrationFlow.identityNumber);
     } catch (error) {
       upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.UpgradeFailure);

@@ -162,7 +162,9 @@ export async function authenticationProtocol({
   try {
     authenticateResult = await authenticate(authContext);
     authorizeClientFunnel.trigger(AuthorizeClientEvents.Authenticate);
+    authorizeClientFunnel.close();
     authenticationV2Funnel.trigger(AuthenticationV2Events.AuthSuccess);
+    authenticationV2Funnel.close();
   } catch (error: unknown) {
     console.error("Unexpected error during authentication", error);
     authenticateResult = {
