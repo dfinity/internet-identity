@@ -2,16 +2,21 @@ import {
   authenticateWithJWT,
   authenticateWithPasskey,
 } from "$lib/utils/authentication";
-import { canisterConfig, canisterId } from "$lib/globals";
+import { canisterId } from "$lib/globals";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   lastUsedIdentitiesStore,
   type LastUsedIdentity,
 } from "$lib/stores/last-used-identities.store";
-import { createGoogleRequestConfig, requestJWT } from "$lib/utils/openID";
+import {
+  createGoogleRequestConfig,
+  findConfig,
+  isOpenIdConfig,
+  requestJWT,
+} from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
-import { isNullish, nonNullish } from "@dfinity/utils";
+import { isNullish } from "@dfinity/utils";
 import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
 
 export class AuthLastUsedFlow {
@@ -46,17 +51,19 @@ export class AuthLastUsedFlow {
       } else if ("openid" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
         const issuer = lastUsedIdentity.authMethod.openid.iss;
-        const clientId =
-          nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
-          issuer === "https://accounts.google.com"
-            ? canisterConfig.openid_google?.[0]?.[0]?.client_id
-            : canisterConfig.openid_configs[0]?.find(
-                (config) => config.issuer === issuer,
-              )?.client_id;
-        if (isNullish(clientId)) {
-          throw new Error("Google is not configured");
+        const config = findConfig(issuer);
+        if (isNullish(config)) {
+          throw new Error(`OpenID is not configured for ${issuer}`);
         }
-        const requestConfig = createGoogleRequestConfig(clientId);
+        const requestConfig = isOpenIdConfig(config)
+          ? {
+              issuer,
+              clientId: config.client_id,
+              configURL: config.fedcm_uri[0],
+              authURL: config.auth_uri,
+              authScope: config.auth_scope.join(" "),
+            }
+          : createGoogleRequestConfig(config.client_id);
         const jwt = await requestJWT(requestConfig, {
           nonce: get(sessionStore).nonce,
           mediation: "optional",
