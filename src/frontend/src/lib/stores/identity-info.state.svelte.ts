@@ -6,14 +6,7 @@ import {
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
-import { isNullish, nonNullish } from "@dfinity/utils";
-import { canisterConfig } from "$lib/globals";
-import {
-  createAnonymousNonce,
-  createGoogleRequestConfig,
-  decodeJWTWithNameAndEmail,
-  requestJWT,
-} from "$lib/utils/openID";
+import { nonNullish } from "@dfinity/utils";
 import { throwCanisterError } from "$lib/utils/utils";
 import { lastUsedIdentitiesStore } from "./last-used-identities.store";
 import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
