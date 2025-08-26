@@ -247,10 +247,8 @@ pub fn replace_issuer_placeholders(template: &str, claims_bytes: &[u8]) -> Strin
             // Move past '}'
             remaining = &remaining[close_pos + 1..];
         } else {
-            // No closing '}', treat '{' literally and append the rest
-            result.push('{');
-            result.push_str(remaining);
-            return result; // Stop processing
+            // No closing '}', return the original template string
+            return template.to_string();
         }
     }
 
