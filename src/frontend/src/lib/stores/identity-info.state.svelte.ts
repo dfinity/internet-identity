@@ -6,14 +6,7 @@ import {
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { authenticatedStore } from "./authentication.store";
-import { isNullish, nonNullish } from "@dfinity/utils";
-import { canisterConfig } from "$lib/globals";
-import {
-  createAnonymousNonce,
-  createGoogleRequestConfig,
-  decodeJWTWithNameAndEmail,
-  requestJWT,
-} from "$lib/utils/openID";
+import { nonNullish } from "@dfinity/utils";
 import { throwCanisterError } from "$lib/utils/utils";
 import { lastUsedIdentitiesStore } from "./last-used-identities.store";
 import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
@@ -68,53 +61,6 @@ class IdentityInfo {
       this.reset();
       throw e;
     }
-  };
-
-  addGoogle = async () => {
-    const googleClientId = canisterConfig.openid_google[0]?.[0]?.client_id;
-    if (isNullish(googleClientId)) throw new Error("Missing Google client ID");
-    const { nonce, salt } = await createAnonymousNonce(
-      get(authenticatedStore).identity.getPrincipal(),
-    );
-    const jwt = await requestJWT(createGoogleRequestConfig(googleClientId), {
-      mediation: "required",
-      nonce,
-    });
-
-    const { iss, sub, aud, name, email } = decodeJWTWithNameAndEmail(jwt);
-
-    if (this.openIdCredentials.find((c) => c.iss === iss && c.sub === sub)) {
-      throw new Error("Account already linked");
-    }
-
-    const { identityNumber } = get(authenticatedStore);
-
-    const googleAddPromise = get(
-      authenticatedStore,
-    ).actor.openid_credential_add(identityNumber, jwt, salt);
-    // Optimistically show as added
-    this.openIdCredentials.push({
-      aud,
-      iss,
-      sub,
-      metadata: [
-        ["name", { String: name }],
-        ["email", { String: email }],
-      ],
-      last_usage_timestamp: [],
-    });
-
-    const googleAddResult = await googleAddPromise;
-
-    if ("Ok" in googleAddResult) {
-      void this.fetch();
-    } else {
-      this.openIdCredentials = this.openIdCredentials.filter(
-        (cred) => !(cred.iss === iss && cred.sub === sub),
-      );
-    }
-
-    await throwCanisterError(googleAddResult);
   };
 
   removeGoogle = async ({
