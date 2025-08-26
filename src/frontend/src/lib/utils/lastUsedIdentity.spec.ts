@@ -11,7 +11,7 @@ vi.mock("$lib/globals", () => ({
 import { lastUsedIdentityTypeName } from "./lastUsedIdentity";
 import type { LastUsedIdentity } from "../stores/last-used-identities.store";
 
-const baseTimestamp = 1_725_000_000_000; // fixed timestamp for determinism
+const baseTimestamp = 1_725_000_000_000;
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -45,10 +45,7 @@ describe("lastUsedIdentityTypeName", () => {
       lastUsedTimestampMillis: baseTimestamp,
     };
 
-    // Act
     const result = lastUsedIdentityTypeName(identity);
-
-    // Assert
     expect(result).toBe("Example Provider");
   });
 
@@ -66,10 +63,7 @@ describe("lastUsedIdentityTypeName", () => {
       lastUsedTimestampMillis: baseTimestamp,
     };
 
-    // Act
     const result = lastUsedIdentityTypeName(identity);
-
-    // Assert
     expect(result).toBe("Google");
   });
 
@@ -101,10 +95,7 @@ describe("lastUsedIdentityTypeName", () => {
       lastUsedTimestampMillis: baseTimestamp,
     };
 
-    // Act
     const result = lastUsedIdentityTypeName(identity);
-
-    // Assert
     expect(result).toBe("Google");
   });
 
@@ -117,7 +108,6 @@ describe("lastUsedIdentityTypeName", () => {
     };
 
     const result = lastUsedIdentityTypeName(identity);
-
     expect(result).toBe("Passkey");
   });
 });
