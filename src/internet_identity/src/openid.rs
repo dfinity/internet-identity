@@ -199,7 +199,11 @@ where
     PROVIDERS.with_borrow(|providers| {
         providers
             .iter()
-            .find(|provider| provider.issuer() == claims.iss)
+            .find(|provider| {
+                let effective_issuer =
+                    replace_issuer_placeholders(&provider.issuer(), validation_item.claims());
+                effective_issuer == claims.iss
+            })
             .ok_or_else(|| {
                 OpenIDJWTVerificationError::GenericError(format!(
                     "Unsupported issuer: {}",
@@ -208,6 +212,50 @@ where
             })
             .and_then(|provider| callback(provider.as_ref()))
     })
+}
+
+/// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
+/// the Microsoft issuer uri is dynamic based on the `tid` claim, this method makes sure to
+/// replace the placeholders like e.g. `tid` in the issuer uri with the corresponding claims.
+pub fn replace_issuer_placeholders(template: &str, claims_bytes: &[u8]) -> String {
+    let Ok(claims) = serde_json::from_slice::<serde_json::Value>(claims_bytes) else {
+        return template.to_string(); // If claims cannot be decoded, return template as-is
+    };
+
+    let mut result = String::with_capacity(template.len());
+    let mut remaining = template;
+
+    // TODO: Simplify by using Regex once we are not constrained by WASM size
+    while let Some(open_pos) = remaining.find('{') {
+        // Append text before '{'
+        result.push_str(&remaining[..open_pos]);
+        remaining = &remaining[open_pos + 1..];
+
+        if let Some(close_pos) = remaining.find('}') {
+            let key = &remaining[..close_pos];
+
+            // Lookup claim; if missing, leave placeholder as-is
+            if let Some(replacement) = claims.get(key).and_then(|v| v.as_str()) {
+                result.push_str(replacement);
+            } else {
+                // Put back the original placeholder
+                result.push('{');
+                result.push_str(key);
+                result.push('}');
+            }
+
+            // Move past '}'
+            remaining = &remaining[close_pos + 1..];
+        } else {
+            // No closing '}', return the original template string
+            return template.to_string();
+        }
+    }
+
+    // Append any remaining text
+    result.push_str(remaining);
+
+    result
 }
 
 /// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`
@@ -340,5 +388,61 @@ fn should_return_error_when_claims_invalid() {
         Err(OpenIDJWTVerificationError::GenericError(
             "Unable to decode claims".to_string()
         ))
+    );
+}
+
+#[test]
+fn should_replace_placeholders_in_issuer() {
+    assert_eq!(
+        replace_issuer_placeholders(
+            "https://login.microsoftonline.com/{tid}/v2.0",
+            r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad" }"#.as_bytes()
+        ),
+        "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0".to_string()
+    );
+}
+
+#[test]
+fn should_ignore_placeholders_in_issuer_that_dont_have_claim() {
+    assert_eq!(
+        replace_issuer_placeholders(
+            "https://login.microsoftonline.com/{tid}/v2.0",
+            r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
+        ),
+        "https://login.microsoftonline.com/{tid}/v2.0".to_string()
+    );
+}
+
+#[test]
+fn should_ignore_unclosed_placeholders_in_issuer() {
+    assert_eq!(
+        replace_issuer_placeholders(
+            "https://login.microsoftonline.com/{tid/v2.0",
+            r#"{ "tid": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
+        ),
+        "https://login.microsoftonline.com/{tid/v2.0"
+    );
+}
+
+#[test]
+fn should_retain_issuer_without_placeholders_as_is() {
+    assert_eq!(
+        replace_issuer_placeholders(
+            "https://accounts.google.com",
+            r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
+        ),
+        "https://accounts.google.com".to_string()
+    );
+}
+
+#[test]
+fn should_replace_multiple_placeholders_in_issuer() {
+    assert_eq!(
+        replace_issuer_placeholders(
+            "https://login.microsoftonline.com/{tid}/{sub}/v2.0",
+            r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad", "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
+        ),
+        "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c/v2.0"
+            .to_string()
     );
 }

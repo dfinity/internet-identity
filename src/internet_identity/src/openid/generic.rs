@@ -1,4 +1,4 @@
-use super::OpenIDJWTVerificationError;
+use super::{replace_issuer_placeholders, OpenIDJWTVerificationError};
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -97,7 +97,8 @@ impl OpenIdProvider for Provider {
                 "Unable to decode claims or expected claims are missing".to_string(),
             )
         })?;
-        verify_claims(&self.issuer, &self.client_id, &claims, salt)?;
+        let effective_issuer = replace_issuer_placeholders(&self.issuer, validation_item.claims());
+        verify_claims(&effective_issuer, &self.client_id, &claims, salt)?;
 
         // Verify JWT signature
         let kid = validation_item
@@ -127,7 +128,19 @@ impl OpenIdProvider for Provider {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
         }
         Ok(OpenIdCredential {
-            iss: claims.iss,
+            // Do NOT use claims.iss here since it could be different within the
+            // same OpenID provider as seen in Microsoft with multiple tenants.
+            //
+            // The issuer returned should therefore ALWAYS be the issuer from the config,
+            // so that credentials are always stored with a single issuer per provider.
+            //
+            // Example issuer config:
+            // https://login.microsoftonline.com/{tenantid}/v2.0
+            //
+            // Example iss claims:
+            // https://login.microsoftonline.com/164d0422-a01d-41d5-945a-37456ea80dbb/v2.0
+            // https://login.microsoftonline.com/599249e6-791a-48a7-84d0-b3e858773ac2/v2.0
+            iss: self.issuer.clone(),
             sub: claims.sub,
             aud: claims.aud,
             last_usage_timestamp: None,
