@@ -13,6 +13,7 @@ import type {
   AuthnMethodData,
   OpenIdCredential,
   OpenIdConfig,
+  MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
@@ -69,14 +70,19 @@ export class AddAccessMethodFlow {
       await actor
         .openid_credential_add(identityNumber, jwt, salt)
         .then(throwCanisterError);
+
+      const metadata: MetadataMapV2 = [];
+      if (nonNullish(name)) {
+        metadata.push(["name", { String: name }]);
+      }
+      if (nonNullish(email)) {
+        metadata.push(["email", { String: email }]);
+      }
       return {
         aud,
         iss,
         sub,
-        metadata: [
-          ["name", { String: name }],
-          ["email", { String: email }],
-        ],
+        metadata,
         last_usage_timestamp: [],
       };
     } finally {
