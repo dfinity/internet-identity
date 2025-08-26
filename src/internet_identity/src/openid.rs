@@ -15,7 +15,6 @@ use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, OpenIdGoogleConfig,
     PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
 };
-use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
@@ -24,12 +23,6 @@ mod generic;
 mod google;
 
 const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
-
-thread_local! {
-    static PLACEHOLDER_RE: RefCell<Regex> = RefCell::new(
-        Regex::new(r"\{([^{]+)}").expect("Regex pattern should be valid")
-    );
-}
 
 pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
@@ -229,16 +222,42 @@ pub fn replace_issuer_placeholders(template: &str, claims_bytes: &[u8]) -> Strin
         return template.to_string(); // If claims cannot be decoded, return template as-is
     };
 
-    PLACEHOLDER_RE.with_borrow(|re| {
-        re.replace_all(template, |caps: &regex::Captures| {
-            claims
-                .get(&caps[1])
-                .and_then(|v| v.as_str())
-                .unwrap_or(&caps[0])
-                .to_string()
-        })
-        .into_owned()
-    })
+    let mut result = String::with_capacity(template.len());
+    let mut remaining = template;
+
+    // TODO: Simplify by using Regex once we are not constrained by WASM size
+    while let Some(open_pos) = remaining.find('{') {
+        // Append text before '{'
+        result.push_str(&remaining[..open_pos]);
+        remaining = &remaining[open_pos + 1..];
+
+        if let Some(close_pos) = remaining.find('}') {
+            let key = &remaining[..close_pos];
+
+            // Lookup claim; if missing, leave placeholder as-is
+            if let Some(replacement) = claims.get(key).and_then(|v| v.as_str()) {
+                result.push_str(replacement);
+            } else {
+                // Put back the original placeholder
+                result.push('{');
+                result.push_str(key);
+                result.push('}');
+            }
+
+            // Move past '}'
+            remaining = &remaining[close_pos + 1..];
+        } else {
+            // No closing '}', treat '{' literally and append the rest
+            result.push('{');
+            result.push_str(remaining);
+            return result; // Stop processing
+        }
+    }
+
+    // Append any remaining text
+    result.push_str(remaining);
+
+    result
 }
 
 /// Create `Hash` used for a delegation that can make calls on behalf of a `OpenIdCredential`
