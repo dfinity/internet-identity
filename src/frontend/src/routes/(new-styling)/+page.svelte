@@ -21,7 +21,10 @@
   import type { PageProps } from "./$types";
   import { onMount } from "svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
-  import { authenticationV2Funnel } from "$lib/utils/analytics/authenticationV2Funnel";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
 
   const { data }: PageProps = $props();
 
@@ -40,6 +43,8 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
     void triggerDropWaveAnimation();
+    authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
+    authenticationV2Funnel.close();
     await gotoNext();
   };
   const onSignUp = async (identityNumber: bigint) => {
@@ -50,6 +55,8 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
     void triggerDropWaveAnimation();
+    authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
+    authenticationV2Funnel.close();
     await gotoNext();
   };
 
