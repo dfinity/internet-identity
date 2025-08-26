@@ -89,10 +89,6 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const ADD_ACCESS_METHOD = createFeatureFlagStore(
-  "ADD_ACCESS_METHOD",
-  true,
-);
 export const ENABLE_GENERIC_OPEN_ID = createFeatureFlagStore(
   "ENABLE_GENERIC_OPEN_ID",
   false,
@@ -110,7 +106,6 @@ export default {
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
-  ADD_ACCESS_METHOD,
   CONTINUE_FROM_ANOTHER_DEVICE,
   ENABLE_GENERIC_OPEN_ID,
 } as Record<string, FeatureFlagStore>;

@@ -7,8 +7,6 @@
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
-  import AddOpenIdCredential from "$lib/components/views/AddOpenIdCredential.svelte";
-  import { ADD_ACCESS_METHOD } from "$lib/state/featureFlags";
   import { invalidateAll } from "$app/navigation";
   import type {
     AuthnMethodData,
@@ -53,9 +51,7 @@
   );
   const isUsingPasskeys = $derived(authnMethods.length > 0);
   const isAddAccessMethodVisible = $derived(
-    $ADD_ACCESS_METHOD
-      ? !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached
-      : !isMaxOpenIdCredentialsReached,
+    !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached,
   );
   const isRemoveAccessMethodVisible = $derived(
     authnMethods.length + openIdCredentials.length > 1,
@@ -277,18 +273,12 @@
 {/if}
 
 {#if isAddAccessMethodWizardOpen}
-  {#if $ADD_ACCESS_METHOD}
-    <AddAccessMethodWizard
-      onOpenIDLinked={handleOpenIDLinked}
-      onPasskeyRegistered={handlePasskeyRegistered}
-      onOtherDeviceRegistered={handleOtherDeviceRegistered}
-      onClose={() => (isAddAccessMethodWizardOpen = false)}
-      {isMaxOpenIdCredentialsReached}
-      {isUsingPasskeys}
-    />
-  {:else}
-    <AddOpenIdCredential
-      onClose={() => (isAddAccessMethodWizardOpen = false)}
-    />
-  {/if}
+  <AddAccessMethodWizard
+    onOpenIDLinked={handleOpenIDLinked}
+    onPasskeyRegistered={handlePasskeyRegistered}
+    onOtherDeviceRegistered={handleOtherDeviceRegistered}
+    onClose={() => (isAddAccessMethodWizardOpen = false)}
+    {isMaxOpenIdCredentialsReached}
+    {isUsingPasskeys}
+  />
 {/if}
