@@ -31,7 +31,7 @@
 
   <div class="flex w-full flex-col gap-3">
     <Button onclick={onRemove} variant="primary" danger>
-      Unlink {openIDName} account
+      Unlink {openIDName} Account
     </Button>
     <Button variant="tertiary" onclick={onClose}>Keep linked</Button>
   </div>
