@@ -530,7 +530,6 @@ export interface _SERVICE {
   >,
   'get_principal' : ActorMethod<[UserNumber, FrontendHostname], Principal>,
   'http_request' : ActorMethod<[HttpRequest], HttpResponse>,
-  'http_request_update' : ActorMethod<[HttpRequest], HttpResponse>,
   'identity_authn_info' : ActorMethod<
     [IdentityNumber],
     { 'Ok' : IdentityAuthnInfo } |

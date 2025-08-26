@@ -7,24 +7,24 @@ use serde_bytes::ByteBuf;
 
 mod metrics;
 
-pub fn http_request(req: HttpRequest) -> HttpResponse {
-    let parts: Vec<&str> = req.url.split('?').collect();
+fn http_options_request() -> HttpResponse {
+    // TODO: Restrict origin to just the II-specific origins.
+    let headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
+
+    HttpResponse {
+        // Indicates success without any additional content to be sent in the response content.
+        status_code: 204,
+        headers,
+        body: ByteBuf::from(vec![]),
+        upgrade: None,
+        streaming_strategy: None,
+    }
+}
+
+fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpResponse {
+    let parts: Vec<&str> = url.split('?').collect();
+
     match parts[0] {
-        // The FAQ used to live in '/faq' but we now use an external website. We redirect in order to not
-        // break existing links in the wild.
-        "/faq" => HttpResponse {
-            status_code: 301,
-            headers: vec![(
-                "location".to_string(),
-                "https://identitysupport.dfinity.org/hc/en-us".to_string(),
-            )],
-            body: ByteBuf::new(),
-            // Redirects are not allowed as query because certification V1 does not cover headers.
-            // Upgrading to update fixes this. This flag can be removed when switching to
-            // certification V2.
-            upgrade: Some(true),
-            streaming_strategy: None,
-        },
         "/metrics" => match metrics() {
             Ok(body) => {
                 let mut headers = vec![
@@ -51,7 +51,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
                 streaming_strategy: None,
             },
         },
-        probably_an_asset => match get_asset(probably_an_asset, req.certificate_version) {
+        probably_an_asset => match get_asset(probably_an_asset, certificate_version) {
             Some((status_code, content, headers)) => HttpResponse {
                 status_code,
                 headers,
@@ -70,11 +70,37 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
     }
 }
 
+fn method_not_allowed(unsupported_method: &str) -> HttpResponse {
+    HttpResponse {
+        status_code: 405,
+        headers: vec![("Allow".into(), "GET, OPTIONS".into())],
+        body: ByteBuf::from(format!("Method {unsupported_method} not allowed.")),
+        upgrade: None,
+        streaming_strategy: None,
+    }
+}
+
+pub fn http_request(req: HttpRequest) -> HttpResponse {
+    let HttpRequest {
+        method,
+        url,
+        certificate_version,
+        headers: _,
+        body: _,
+    } = req;
+
+    match method.as_str() {
+        "OPTIONS" => http_options_request(),
+        "GET" => http_get_request(url, certificate_version),
+        unsupported_method => method_not_allowed(unsupported_method),
+    }
+}
+
 /// List of recommended security headers as per https://owasp.org/www-project-secure-headers/
 /// These headers enable browser security features (like limit access to platform apis and set
 /// iFrame policies, etc.).
 ///
-/// Integrity hashes for scripts must be speficied.
+/// Integrity hashes for scripts must be specified.
 pub fn security_headers(
     integrity_hashes: Vec<String>,
     maybe_related_origins: Option<Vec<String>>,
@@ -89,19 +115,40 @@ pub fn security_headers(
         });
 
     vec![
+        // X-Frame-Options: DENY
+        // Prevents the page from being displayed in a frame, iframe, embed or object
+        // This is a legacy header, also enforced by CSP frame-ancestors directive
         ("X-Frame-Options".to_string(), "DENY".to_string()),
+        // X-Content-Type-Options: nosniff
+        // Prevents browsers from MIME-sniffing a response away from the declared content-type
+        // Reduces risk of drive-by downloads and serves as defense against MIME confusion attacks
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
+        // Content-Security-Policy (CSP)
+        // Comprehensive policy to prevent XSS attacks and data injection
+        // See content_security_policy_header() function for detailed explanation
         (
             "Content-Security-Policy".to_string(),
             content_security_policy_header(integrity_hashes, maybe_related_origins),
         ),
+        // Strict-Transport-Security (HSTS)
+        // Forces browsers to use HTTPS for all future requests to this domain
+        // max-age=31536000: Valid for 1 year (31,536,000 seconds)
+        // includeSubDomains: Also applies to all subdomains of this domain
         (
             "Strict-Transport-Security".to_string(),
             "max-age=31536000 ; includeSubDomains".to_string(),
         ),
-        // "Referrer-Policy: no-referrer" would be more strict, but breaks local dev deployment
-        // same-origin is still ok from a security perspective
+        // Referrer-Policy: same-origin
+        // Controls how much referrer information is sent with outgoing requests
+        // same-origin: Only send referrer to same-origin requests (no cross-origin leakage)
+        // Note: "no-referrer" would be more strict but breaks local dev deployment
         ("Referrer-Policy".to_string(), "same-origin".to_string()),
+        // Permissions-Policy (formerly Feature-Policy)
+        // Controls which browser features and APIs can be used
+        // Most permissions are denied by default, with specific exceptions:
+        // - clipboard-write=(self): Allow copying to clipboard from same origin
+        // - publickey-credentials-get: Allow WebAuthn from self and related origins
+        // - sync-xhr=(self): Allow synchronous XMLHttpRequest from same origin
         (
             "Permissions-Policy".to_string(),
             format!(
@@ -154,31 +201,44 @@ pub fn security_headers(
 
 /// Full content security policy delivered via HTTP response header.
 ///
-/// script-src 'strict-dynamic' ensures that only scripts with hashes listed here (through
-/// 'integrity_hashes') can be loaded. Transitively loaded scripts don't need their hashes
-/// listed.
+/// CSP directives explained:
 ///
-/// script-src 'unsafe-eval' is required because agent-js uses a WebAssembly module for the
-/// validation of bls signatures.
-/// There is currently no other way to allow execution of WebAssembly modules with CSP.
-/// See https://github.com/WebAssembly/content-security-policy/blob/main/proposals/CSP.md.
+/// default-src 'none':
+///   Default policy for all resource types - deny everything by default
 ///
-/// script-src 'unsafe-inline' https: are only there for backwards compatibility and ignored
-/// by modern browsers.
+/// connect-src 'self' https::
+///   Allow network requests to same origin and any HTTPS endpoint
+///   - 'self': fetch JS bundles from same origin
+///   - https://icp-api.io: official IC HTTP API domain for canister calls
+///   - https://*.icp0.io: HTTP fetches for /.well-known/ii-alternative-origins
+///   - https://*.ic0.app: legacy domain support for alternative origins
 ///
-/// connect-src is used to ensure fetch requests can only be made against known domains:
-///     * 'self': used fetch the JS bundles
-///     * https://icp-api.io: the official IC HTTP API domain for canister calls to the canister
-///     * https://*.icp0.io: HTTP fetches for checking /.well-known/ii-alternative-origins on
-///     other canisters (authenticating canisters setting a derivationOrigin)
-///     * https://*.ic0.app: same as above, but legacy
+/// img-src 'self' data: https://*.googleusercontent.com:
+///   Allow images from same origin, data URIs, and Google profile pictures
 ///
-/// style-src 'unsafe-inline' is currently required due to the way styles are handled by the
-/// application. Adding hashes would require a big restructuring of the application and build
-/// infrastructure.
+/// script-src with 'strict-dynamic':
+///   - 'strict-dynamic': Only scripts with listed hashes can load, transitively loaded scripts inherit permission
+///   - 'unsafe-eval': Required for WebAssembly modules used by agent-js for BLS signature validation
+///   - 'unsafe-inline' https:: Backwards compatibility fallback (ignored by modern browsers)
 ///
-/// upgrade-insecure-requests is omitted when building in dev mode to allow loading II on localhost
-/// with Safari.
+/// base-uri 'none':
+///   Prevents injection of <base> tags that could redirect relative URLs
+///
+/// form-action 'none':
+///   Prevents forms from being submitted anywhere (II doesn't use forms)
+///
+/// style-src 'self' 'unsafe-inline':
+///   Allow stylesheets from same origin and inline styles
+///   'unsafe-inline' needed due to how styles are currently handled in the app
+///
+/// font-src 'self':
+///   Allow fonts only from same origin
+///
+/// frame-ancestors and frame-src:
+///   Control embedding - allow self and related origins for cross-domain WebAuthn
+///
+/// upgrade-insecure-requests (production only):
+///   Automatically upgrade HTTP requests to HTTPS (omitted in dev for localhost)
 fn content_security_policy_header(
     integrity_hashes: Vec<String>,
     maybe_related_origins: Option<Vec<String>>,
@@ -204,7 +264,7 @@ fn content_security_policy_header(
     #[cfg(feature = "dev_csp")]
     let connect_src = format!("{connect_src} http:");
 
-    // Allow related origins to embed one another
+    // Allow related origins to embed one another for cross-domain WebAuthn
     let frame_src = maybe_related_origins
         .unwrap_or_default()
         .iter()
@@ -223,7 +283,8 @@ fn content_security_policy_header(
          frame-ancestors {frame_src};\
          frame-src {frame_src};"
     );
-    // for the dev build skip upgrading all connections to II to https
+    // For production builds, upgrade all HTTP connections to HTTPS
+    // Omitted in dev builds to allow localhost development
     #[cfg(not(feature = "dev_csp"))]
     let csp = format!("{csp}upgrade-insecure-requests;");
     csp

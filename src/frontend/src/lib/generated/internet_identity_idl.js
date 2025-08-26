@@ -661,7 +661,6 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'http_request' : IDL.Func([HttpRequest], [HttpResponse], ['query']),
-    'http_request_update' : IDL.Func([HttpRequest], [HttpResponse], []),
     'identity_authn_info' : IDL.Func(
         [IdentityNumber],
         [IDL.Variant({ 'Ok' : IdentityAuthnInfo, 'Err' : IDL.Null })],
