@@ -59,6 +59,7 @@ export class AddAccessMethodFlow {
           clientId: config.client_id,
           authURL: config.auth_uri,
           configURL: config.fedcm_uri?.[0],
+          authScope: config.auth_scope.join(" "),
         },
         {
           nonce,
