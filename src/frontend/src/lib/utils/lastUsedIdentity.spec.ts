@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // Mock globals to control canisterConfig consumed by findConfig
-let mockCanisterConfig: any = {};
+let mockCanisterConfig: InternetIdentityInit = {} as InternetIdentityInit;
 vi.mock("$lib/globals", () => ({
   get canisterConfig() {
     return mockCanisterConfig;
@@ -10,12 +10,13 @@ vi.mock("$lib/globals", () => ({
 
 import { lastUsedIdentityTypeName } from "./lastUsedIdentity";
 import type { LastUsedIdentity } from "../stores/last-used-identities.store";
+import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 
 const baseTimestamp = 1_725_000_000_000;
 
 afterEach(() => {
   vi.clearAllMocks();
-  mockCanisterConfig = {};
+  mockCanisterConfig = {} as InternetIdentityInit;
 });
 
 describe("lastUsedIdentityTypeName", () => {
@@ -36,7 +37,7 @@ describe("lastUsedIdentityTypeName", () => {
           },
         ],
       ],
-    };
+    } as InternetIdentityInit;
 
     const identity: LastUsedIdentity = {
       identityNumber: BigInt(1),
@@ -53,7 +54,7 @@ describe("lastUsedIdentityTypeName", () => {
     // Arrange: provide Google config (GoogleOpenIdConfig) via canisterConfig
     mockCanisterConfig = {
       openid_google: [[{ client_id: "google-client-id" }]],
-    };
+    } as InternetIdentityInit;
 
     const identity: LastUsedIdentity = {
       identityNumber: BigInt(2),
@@ -85,7 +86,7 @@ describe("lastUsedIdentityTypeName", () => {
           },
         ],
       ],
-    };
+    } as InternetIdentityInit;
 
     const identity: LastUsedIdentity = {
       identityNumber: BigInt(3),

@@ -10,7 +10,6 @@ import {
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
 import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
-import { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
 import { toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -210,7 +209,6 @@ export const requestJWT = async (
   config: RequestConfig,
   options: RequestOptions,
 ): Promise<string> => {
-  console.log("in da request", config);
   const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
