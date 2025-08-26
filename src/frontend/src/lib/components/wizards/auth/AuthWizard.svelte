@@ -155,7 +155,13 @@
 {/snippet}
 
 {#if isContinueFromAnotherDeviceVisible}
-  <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
+  {#if !withinDialog}
+    <Dialog onClose={() => (isContinueFromAnotherDeviceVisible = false)}>
+      <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
+    </Dialog>
+  {:else}
+    <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
+  {/if}
 {:else if isMigrating}
   {#if !withinDialog}
     <Dialog onClose={() => (isMigrating = false)}>
