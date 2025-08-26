@@ -71,7 +71,7 @@
       isSameAccessMethod(removableOpenIdCredential, lastUsedAccessMethod),
   );
 
-  const handleGoogleLinked = (credential: OpenIdCredential) => {
+  const handleOpenIDLinked = (credential: OpenIdCredential) => {
     openIdCredentials.push(credential);
     invalidateAll();
   };
@@ -279,7 +279,7 @@
 {#if isAddAccessMethodWizardOpen}
   {#if $ADD_ACCESS_METHOD}
     <AddAccessMethodWizard
-      onGoogleLinked={handleGoogleLinked}
+      onOpenIDLinked={handleOpenIDLinked}
       onPasskeyRegistered={handlePasskeyRegistered}
       onOtherDeviceRegistered={handleOtherDeviceRegistered}
       onClose={() => (isAddAccessMethodWizardOpen = false)}

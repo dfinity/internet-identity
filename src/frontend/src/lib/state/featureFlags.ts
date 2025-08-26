@@ -89,10 +89,6 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const ENABLE_MIGRATE_FLOW = createFeatureFlagStore(
-  "ENABLE_MIGRATE_FLOW",
-  true,
-);
 export const ADD_ACCESS_METHOD = createFeatureFlagStore(
   "ADD_ACCESS_METHOD",
   true,
@@ -114,7 +110,6 @@ export default {
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
-  ENABLE_MIGRATE_FLOW,
   ADD_ACCESS_METHOD,
   CONTINUE_FROM_ANOTHER_DEVICE,
   ENABLE_GENERIC_OPEN_ID,
