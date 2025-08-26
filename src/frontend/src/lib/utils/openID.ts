@@ -1,12 +1,19 @@
-import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
+import type {
+  GoogleOpenIdConfig,
+  MetadataMapV2,
+  OpenIdConfig,
+} from "$lib/generated/internet_identity_types";
+import { canisterConfig } from "$lib/globals";
 import {
   PopupClosedError,
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
+import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 import { toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
+import { get } from "svelte/store";
 
 export interface RequestConfig {
   // OAuth client ID
@@ -174,6 +181,25 @@ export const isFedCMSupported = (
   return nonNullish(config.configURL) && "IdentityCredential" in window;
 };
 
+export const findConfig = (
+  issuer: string,
+): OpenIdConfig | GoogleOpenIdConfig | undefined => {
+  const genericOpenIdEnabled = get(ENABLE_GENERIC_OPEN_ID);
+  return !genericOpenIdEnabled &&
+    nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
+    issuer === "https://accounts.google.com"
+    ? canisterConfig.openid_google?.[0]?.[0]
+    : canisterConfig.openid_configs?.[0]?.find(
+        (config) => config.issuer === issuer,
+      );
+};
+
+export const isOpenIdConfig = (
+  config: GoogleOpenIdConfig | OpenIdConfig,
+): config is OpenIdConfig => {
+  return "auth_scope" in config;
+};
+
 /**
  * Request JWT token through FedCM with redirect in a popup as fallback
  * @param config of the OpenID provider
@@ -229,4 +255,34 @@ export const decodeJWTWithNameAndEmail = (
 export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
   const value = metadata.find((entry) => entry[0] === key)?.[1];
   return value && "String" in value ? value.String : undefined;
+};
+
+/**
+ * Return the logo of the OpenID provider from the config.
+ * Returns `undefined` if it's a google config or not found.
+ * @param issuer
+ * @returns {string | undefined} The string is an SVG string that must be embedded in the HTML.
+ */
+export const openIdLogo = (issuer: string): string | undefined => {
+  const config = findConfig(issuer);
+  if (nonNullish(config) && isOpenIdConfig(config)) {
+    return config.logo;
+  }
+  // If it's a google config or not found, return `undefined`
+  return undefined;
+};
+
+/**
+ * Return the name of the OpenID provider from the config.
+ * Returns `undefined` if it's a google config or not found.
+ * @param issuer
+ * @returns {string | undefined} The string is the name of the OpenID provider.
+ */
+export const openIdName = (issuer: string): string | undefined => {
+  const config = findConfig(issuer);
+  if (nonNullish(config) && isOpenIdConfig(config)) {
+    return config.name;
+  }
+  // If it's a google config or not found, return `undefined`
+  return undefined;
 };

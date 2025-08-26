@@ -28,6 +28,7 @@
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { toaster } from "$lib/components/utils/toaster";
+  import { openIdLogo, openIdName } from "$lib/utils/openID";
 
   const MAX_PASSKEYS = 8;
 
@@ -219,13 +220,18 @@
       </div>
     {/each}
     {#each openIdCredentials as credential}
+      {@const logo = openIdLogo(credential.iss)}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
         <div
           class="text-text-primary flex min-w-8 items-center justify-center px-4 pr-4"
         >
-          <GoogleIcon />
+          {#if nonNullish(logo)}
+            {@html logo}
+          {:else}
+            <GoogleIcon />
+          {/if}
         </div>
 
         <AccessMethod
@@ -256,6 +262,7 @@
   <RemoveOpenIdCredential
     onRemove={handleRemoveOpenIdCredential}
     onClose={() => (removableOpenIdCredential = null)}
+    openIDName={openIdName(removableOpenIdCredential.iss) ?? "Google"}
     isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
   />
 {/if}
