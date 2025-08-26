@@ -133,6 +133,13 @@ impl OpenIdProvider for Provider {
             //
             // The issuer returned should therefore ALWAYS be the issuer from the config,
             // so that credentials are always stored with a single issuer per provider.
+            //
+            // Example issuer config:
+            // https://login.microsoftonline.com/{tenantid}/v2.0
+            //
+            // Example iss claims:
+            // https://login.microsoftonline.com/164d0422-a01d-41d5-945a-37456ea80dbb/v2.0
+            // https://login.microsoftonline.com/599249e6-791a-48a7-84d0-b3e858773ac2/v2.0
             iss: self.issuer.clone(),
             sub: claims.sub,
             aud: claims.aud,
