@@ -39,7 +39,7 @@ describe("lastUsedIdentityTypeName", () => {
     };
 
     const identity: LastUsedIdentity = {
-      identityNumber: 1n,
+      identityNumber: BigInt(1),
       name: "Alice",
       authMethod: { openid: { iss: "https://example.com", sub: "sub-1" } },
       lastUsedTimestampMillis: baseTimestamp,
@@ -56,7 +56,7 @@ describe("lastUsedIdentityTypeName", () => {
     };
 
     const identity: LastUsedIdentity = {
-      identityNumber: 2n,
+      identityNumber: BigInt(2),
       authMethod: {
         openid: { iss: "https://accounts.google.com", sub: "sub-2" },
       },
@@ -88,7 +88,7 @@ describe("lastUsedIdentityTypeName", () => {
     };
 
     const identity: LastUsedIdentity = {
-      identityNumber: 3n,
+      identityNumber: BigInt(3),
       authMethod: {
         openid: { iss: "https://unknown-idp.example", sub: "sub-3" },
       },
@@ -101,7 +101,7 @@ describe("lastUsedIdentityTypeName", () => {
 
   it("returns 'Passkey' for passkey auth method", () => {
     const identity: LastUsedIdentity = {
-      identityNumber: 4n,
+      identityNumber: BigInt(4),
       name: "Bob",
       authMethod: { passkey: { credentialId: new Uint8Array([1, 2, 3]) } },
       lastUsedTimestampMillis: baseTimestamp,
