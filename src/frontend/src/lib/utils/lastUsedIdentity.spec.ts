@@ -1,7 +1,32 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
+import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
+
+// Helper to build a fully-typed InternetIdentityInit with sensible defaults
+const mockInternetIdentityInit = (
+  overrides: Partial<InternetIdentityInit> = {},
+): InternetIdentityInit => ({
+  fetch_root_key: [],
+  openid_google: [],
+  is_production: [],
+  enable_dapps_explorer: [],
+  assigned_user_number_range: [],
+  new_flow_origins: [],
+  archive_config: [],
+  canister_creation_cycles_cost: [],
+  analytics_config: [],
+  feature_flag_enable_generic_open_id_fe: [],
+  related_origins: [],
+  feature_flag_continue_from_another_device: [],
+  openid_configs: [],
+  captcha_config: [],
+  dummy_auth: [],
+  register_rate_limit: [],
+  ...overrides,
+});
+
 // Mock globals to control canisterConfig consumed by findConfig
-let mockCanisterConfig: InternetIdentityInit = {} as InternetIdentityInit;
+let mockCanisterConfig: InternetIdentityInit = mockInternetIdentityInit();
 vi.mock("$lib/globals", () => ({
   get canisterConfig() {
     return mockCanisterConfig;
@@ -10,19 +35,18 @@ vi.mock("$lib/globals", () => ({
 
 import { lastUsedIdentityTypeName } from "./lastUsedIdentity";
 import type { LastUsedIdentity } from "../stores/last-used-identities.store";
-import { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 
 const baseTimestamp = 1_725_000_000_000;
 
 afterEach(() => {
   vi.clearAllMocks();
-  mockCanisterConfig = {} as InternetIdentityInit;
+  mockCanisterConfig = mockInternetIdentityInit();
 });
 
 describe("lastUsedIdentityTypeName", () => {
   it("returns provider name for OpenID when config is OpenIdConfig", () => {
     // Arrange: provide a valid OpenIdConfig in canisterConfig.openid_configs
-    mockCanisterConfig = {
+    mockCanisterConfig = mockInternetIdentityInit({
       openid_configs: [
         [
           {
@@ -37,7 +61,7 @@ describe("lastUsedIdentityTypeName", () => {
           },
         ],
       ],
-    } as InternetIdentityInit;
+    });
 
     const identity: LastUsedIdentity = {
       identityNumber: BigInt(1),
@@ -52,9 +76,9 @@ describe("lastUsedIdentityTypeName", () => {
 
   it("returns 'Google' for OpenID when config is not OpenIdConfig", () => {
     // Arrange: provide Google config (GoogleOpenIdConfig) via canisterConfig
-    mockCanisterConfig = {
+    mockCanisterConfig = mockInternetIdentityInit({
       openid_google: [[{ client_id: "google-client-id" }]],
-    } as InternetIdentityInit;
+    });
 
     const identity: LastUsedIdentity = {
       identityNumber: BigInt(2),
@@ -70,7 +94,7 @@ describe("lastUsedIdentityTypeName", () => {
 
   it("returns 'Google' for OpenID when config is undefined", () => {
     // Arrange: no matching config in canisterConfig
-    mockCanisterConfig = {
+    mockCanisterConfig = mockInternetIdentityInit({
       // No openid_google and no openid_configs matching issuer
       openid_configs: [
         [
@@ -86,7 +110,7 @@ describe("lastUsedIdentityTypeName", () => {
           },
         ],
       ],
-    } as InternetIdentityInit;
+    });
 
     const identity: LastUsedIdentity = {
       identityNumber: BigInt(3),
