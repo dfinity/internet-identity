@@ -15,4 +15,7 @@ export const lastUsedIdentityTypeName = (
   if ("passkey" in lastUsedIdentity.authMethod) {
     return "Passkey";
   }
+  // Not possible, but in case type safety fails at runtime, we don't want to crash.
+  console.error(`Unknown auth method ${lastUsedIdentity.authMethod}`);
+  return "Unknown";
 };

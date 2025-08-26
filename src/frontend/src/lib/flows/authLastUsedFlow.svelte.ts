@@ -53,7 +53,9 @@ export class AuthLastUsedFlow {
         const issuer = lastUsedIdentity.authMethod.openid.iss;
         const config = findConfig(issuer);
         if (isNullish(config)) {
-          throw new Error(`OpenID is not configured for ${issuer}`);
+          throw new Error(
+            "OpenID authentication is not available for this account.",
+          );
         }
         const requestConfig = isOpenIdConfig(config)
           ? {
