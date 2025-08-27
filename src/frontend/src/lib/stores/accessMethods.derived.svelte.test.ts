@@ -92,22 +92,25 @@ describe("Access methods derived stores", () => {
 
   describe("isMaxOpenIdCredentialsReached", () => {
     describe("When ENABLE_GENERIC_OPEN_ID is false", () => {
+      beforeEach(() => {
+        ENABLE_GENERIC_OPEN_ID.set(false);
+      });
       it("should return true if the max number of openId credentials is reached", () => {
-        const accessMethods = new AccessMethodsDerived(identityInfo, false);
         identityInfo.openIdCredentials = [openIdCredential];
         expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
       });
 
       it("should return false if the max number of openId credentials is not reached", () => {
-        const accessMethods = new AccessMethodsDerived(identityInfo, false);
         identityInfo.openIdCredentials = [];
         expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
       });
     });
 
     describe("When ENABLE_GENERIC_OPEN_ID is true", () => {
+      beforeEach(() => {
+        ENABLE_GENERIC_OPEN_ID.set(true);
+      });
       it("should return true if the max number of openId credentials is reached", () => {
-        const accessMethods = new AccessMethodsDerived(identityInfo, true);
         canisterConfig.openid_configs = [
           [
             {
@@ -140,7 +143,6 @@ describe("Access methods derived stores", () => {
       });
 
       it("should return false if the max number of openId credentials is not reached", () => {
-        const accessMethods = new AccessMethodsDerived(identityInfo, true);
         canisterConfig.openid_configs = [
           [
             {
