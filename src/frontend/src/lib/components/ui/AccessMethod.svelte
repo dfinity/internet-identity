@@ -4,13 +4,14 @@
     type AuthnMethodData,
   } from "$lib/generated/internet_identity_types";
   import { formatLastUsage } from "$lib/utils/time";
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
   import { fade } from "svelte/transition";
   import PlaceHolder from "./PlaceHolder.svelte";
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { getRpId } from "$lib/utils/accessMethods";
+  import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
 
   let {
     accessMethod,
@@ -142,6 +143,22 @@
         <div class="flex min-w-32 items-center gap-2 pr-3">
           <span>
             {getOpenIdCredentialName(accessMethod)}
+          </span>
+          {#if isCurrent}
+            <PulsatingCircleIcon />
+          {/if}
+        </div>
+      {:else if !openIdHasName && !openIdHasEmail}
+        {@const config = findConfig(accessMethod.iss)}
+        <div class="flex min-w-32 items-center gap-2 pr-3">
+          <span>
+            {#if isNullish(config)}
+              Unknown account
+            {:else if isOpenIdConfig(config)}
+              {config.name} account
+            {:else}
+              Google account
+            {/if}
           </span>
           {#if isCurrent}
             <PulsatingCircleIcon />

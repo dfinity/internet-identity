@@ -217,7 +217,9 @@
           class="text-text-primary flex min-w-8 items-center justify-center px-4 pr-4"
         >
           {#if nonNullish(logo)}
-            {@html logo}
+            <div class="size-6">
+              {@html logo}
+            </div>
           {:else}
             <GoogleIcon />
           {/if}
