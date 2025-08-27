@@ -17,7 +17,6 @@
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
   import {
-    getLastUsedAccessMethod,
     isLegacyAuthnMethod,
     isWebAuthnMetaData,
     haveMultipleOrigins,
@@ -27,51 +26,35 @@
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { toaster } from "$lib/components/utils/toaster";
   import { openIdLogo, openIdName } from "$lib/utils/openID";
-  import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
-  import { canisterConfig } from "$lib/globals";
   import Tooltip from "../ui/Tooltip.svelte";
-
-  const MAX_PASSKEYS = 8;
+  import { accessMethods } from "$lib/stores/access-methods.derived.svelte";
 
   let isAddAccessMethodWizardOpen = $state(false);
   let removableAuthnMethod = $state<AuthnMethodData | null>(null);
   let removableOpenIdCredential = $state<OpenIdCredential | null>(null);
   let renamableAuthnMethod = $state<AuthnMethodData | null>(null);
 
-  const lastUsedAccessMethod = $derived(
-    getLastUsedAccessMethod(
-      identityInfo.authnMethods,
-      identityInfo.openIdCredentials,
-    ),
-  );
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const authnMethods = $derived(identityInfo.authnMethods);
-  const isMaxOpenIdCredentialsReached = $derived(
-    $ENABLE_GENERIC_OPEN_ID
-      ? identityInfo.openIdCredentials.length >=
-          (canisterConfig.openid_configs[0]?.length ?? 0)
-      : identityInfo.openIdCredentials.length >= 1,
-  );
-
-  const isMaxPasskeysReached = $derived(
-    identityInfo.authnMethods.length >= MAX_PASSKEYS,
-  );
   const isUsingPasskeys = $derived(authnMethods.length > 0);
-  const accessMethodsMaxReached = $derived(
-    isMaxOpenIdCredentialsReached && isMaxPasskeysReached,
-  );
   const isRemoveAccessMethodVisible = $derived(
     authnMethods.length + openIdCredentials.length > 1,
   );
   const isRemovableAuthnMethodCurrentAccessMethod = $derived(
     nonNullish(removableAuthnMethod) &&
-      nonNullish(lastUsedAccessMethod) &&
-      isSameAccessMethod(removableAuthnMethod, lastUsedAccessMethod),
+      nonNullish(accessMethods.lastUsedAccessMethod) &&
+      isSameAccessMethod(
+        removableAuthnMethod,
+        accessMethods.lastUsedAccessMethod,
+      ),
   );
   const isRemovableOpenIdCredentialCurrentAccessMethod = $derived(
     nonNullish(removableOpenIdCredential) &&
-      nonNullish(lastUsedAccessMethod) &&
-      isSameAccessMethod(removableOpenIdCredential, lastUsedAccessMethod),
+      nonNullish(accessMethods.lastUsedAccessMethod) &&
+      isSameAccessMethod(
+        removableOpenIdCredential,
+        accessMethods.lastUsedAccessMethod,
+      ),
   );
 
   const handleOpenIDLinked = (credential: OpenIdCredential) => {
@@ -137,8 +120,8 @@
 
   const isCurrentAccessMethod = (accessMethod: AuthnMethodData) => {
     return (
-      nonNullish(lastUsedAccessMethod) &&
-      isSameAccessMethod(accessMethod, lastUsedAccessMethod)
+      nonNullish(accessMethods.lastUsedAccessMethod) &&
+      isSameAccessMethod(accessMethod, accessMethods.lastUsedAccessMethod)
     );
   };
 
@@ -159,11 +142,11 @@
     <div>
       <Tooltip
         label="You have reached the maximum number of access methods"
-        hidden={!accessMethodsMaxReached}
+        hidden={!accessMethods.accessMethodsMaxReached}
       >
         <Button
           onclick={() => (isAddAccessMethodWizardOpen = true)}
-          disabled={accessMethodsMaxReached}
+          disabled={accessMethods.accessMethodsMaxReached}
           class="max-md:w-full"
         >
           <span>Add</span>
@@ -242,9 +225,9 @@
 
         <AccessMethod
           accessMethod={credential}
-          isCurrent={nonNullish(lastUsedAccessMethod) &&
-            !isWebAuthnMetaData(lastUsedAccessMethod) &&
-            lastUsedAccessMethod.sub === credential.sub}
+          isCurrent={nonNullish(accessMethods.lastUsedAccessMethod) &&
+            !isWebAuthnMetaData(accessMethods.lastUsedAccessMethod) &&
+            accessMethods.lastUsedAccessMethod.sub === credential.sub}
         />
 
         <div class="flex items-center justify-end px-4">
@@ -295,7 +278,7 @@
     onPasskeyRegistered={handlePasskeyRegistered}
     onOtherDeviceRegistered={handleOtherDeviceRegistered}
     onClose={() => (isAddAccessMethodWizardOpen = false)}
-    maxPasskeysReached={isMaxPasskeysReached}
+    maxPasskeysReached={accessMethods.isMaxPasskeysReached}
     {openIdCredentials}
     {isUsingPasskeys}
   />
