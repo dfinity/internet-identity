@@ -147,13 +147,6 @@ impl OpenIdProvider for Provider {
             metadata,
         })
     }
-
-    fn metadata_name(&self, metadata: HashMap<String, MetadataEntryV2>) -> Option<String> {
-        metadata.get("name").and_then(|entry| match entry {
-            MetadataEntryV2::String(value) => Some(value.clone()),
-            _ => None,
-        })
-    }
 }
 
 impl Provider {

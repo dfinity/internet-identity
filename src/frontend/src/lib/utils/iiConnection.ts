@@ -388,12 +388,14 @@ export class Connection {
       mediation: "required",
       nonce,
     });
+    const { name } = decodeJWT(jwt);
 
     let finishResponse;
     try {
       finishResponse = await actor.openid_identity_registration_finish({
         jwt,
         salt,
+        name: name!, // Google JWT always has a name
       });
     } catch (error: unknown) {
       if (error instanceof Error) {

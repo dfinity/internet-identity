@@ -228,24 +228,23 @@ export const decodeJWT = (
   sub: string;
   aud: string;
   loginHint: string;
+  name?: string;
+  email?: string;
 } => {
   const [_header, body, _signature] = token.split(".");
-  const { iss, sub, aud, email, preferred_username } = JSON.parse(atob(body));
-  // Login hint is usually preferred_username else fall back to email or even sub
-  return { iss, sub, aud, loginHint: preferred_username ?? email ?? sub };
-};
-
-/**
- * Decode a JWT token so it can be compared with others and the name can be displayed
- * @param token to decode
- * @returns common claims
- */
-export const decodeJWTWithNameAndEmail = (
-  token: string,
-): { iss: string; sub: string; aud: string; name: string; email: string } => {
-  const [_header, body, _signature] = token.split(".");
-  const { iss, sub, aud, name, email } = JSON.parse(atob(body));
-  return { iss, sub, aud, name, email };
+  const { iss, sub, aud, name, email, preferred_username } = JSON.parse(
+    atob(body),
+  );
+  return {
+    iss,
+    sub,
+    aud,
+    // Login hint is usually preferred_username else fall back to email or even sub
+    loginHint: preferred_username ?? email ?? sub,
+    // Additional optional metadata claims
+    name,
+    email,
+  };
 };
 
 export const getMetadataString = (metadata: MetadataMapV2, key: string) => {

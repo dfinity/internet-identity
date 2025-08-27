@@ -2,7 +2,6 @@ import { Principal } from "@dfinity/principal";
 import { Actor } from "@dfinity/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import { decodeJWT } from "$lib/utils/openID";
 import {
   throwCanisterError,
   transformSignedDelegation,
@@ -21,16 +20,12 @@ export const authenticateWithJWT = async ({
 }): Promise<{
   identity: DelegationIdentity;
   identityNumber: bigint;
-  iss: string;
-  sub: string;
-  loginHint: string;
 }> => {
   const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent: session.agent,
     canisterId,
   });
   const sessionKey = new Uint8Array(session.identity.getPublicKey().toDer());
-  const { iss, sub, loginHint } = decodeJWT(jwt);
   const {
     anchor_number: identityNumber,
     expiration,
@@ -50,5 +45,5 @@ export const authenticateWithJWT = async ({
     session.identity,
     delegationChain,
   );
-  return { identity, identityNumber, iss, sub, loginHint };
+  return { identity, identityNumber };
 };

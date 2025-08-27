@@ -4,7 +4,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   createAnonymousNonce,
   createGoogleRequestConfig,
-  decodeJWTWithNameAndEmail,
+  decodeJWT,
   requestJWT,
 } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
@@ -66,7 +66,7 @@ export class AddAccessMethodFlow {
           mediation: "required",
         },
       );
-      const { iss, sub, aud, name, email } = decodeJWTWithNameAndEmail(jwt);
+      const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
       await actor
         .openid_credential_add(identityNumber, jwt, salt)
@@ -108,19 +108,24 @@ export class AddAccessMethodFlow {
         nonce,
         mediation: "required",
       });
-      const { iss, sub, aud, name, email } = decodeJWTWithNameAndEmail(jwt);
+      const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
       await actor
         .openid_credential_add(identityNumber, jwt, salt)
         .then(throwCanisterError);
+
+      const metadata: MetadataMapV2 = [];
+      if (nonNullish(name)) {
+        metadata.push(["name", { String: name }]);
+      }
+      if (nonNullish(email)) {
+        metadata.push(["email", { String: email }]);
+      }
       return {
         aud,
         iss,
         sub,
-        metadata: [
-          ["name", { String: name }],
-          ["email", { String: email }],
-        ],
+        metadata,
         last_usage_timestamp: [],
       };
     } finally {
