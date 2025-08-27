@@ -1,8 +1,5 @@
-import {
-  accessMethods,
-  AccessMethodsDerived,
-} from "./accessMethods.derived.svelte";
-import identityInfo from "./identity-info.state.svelte";
+import { accessMethods } from "./accessMethods.derived.svelte";
+import identityInfo from "../stores/identity-info.state.svelte";
 import { canisterConfig } from "$lib/globals";
 import type {
   AuthnMethodData,
