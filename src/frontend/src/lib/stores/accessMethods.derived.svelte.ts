@@ -1,23 +1,19 @@
 import { getLastUsedAccessMethod } from "$lib/utils/accessMethods";
-import type {
-  AuthnMethodData,
-  OpenIdCredential,
-} from "$lib/generated/internet_identity_types";
 import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 import { canisterConfig } from "$lib/globals";
-import identityInfo from "./identity-info.state.svelte";
+import identityInfo, { IdentityInfo } from "./identity-info.state.svelte";
 import { get } from "svelte/store";
 
 const MAX_PASSKEYS = 8;
 
 export class AccessMethodsDerived {
   constructor(
-    private readonly identityInfo: {
-      authnMethods: AuthnMethodData[];
-      openIdCredentials: OpenIdCredential[];
-    },
+    private readonly identityInfo: IdentityInfo,
     private readonly enableGenericOpenId: boolean,
-  ) {}
+  ) {
+    this.identityInfo = identityInfo;
+    this.enableGenericOpenId = enableGenericOpenId;
+  }
 
   lastUsedAccessMethod = $derived(
     getLastUsedAccessMethod(
