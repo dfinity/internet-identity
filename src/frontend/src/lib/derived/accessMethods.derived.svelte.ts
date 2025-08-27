@@ -1,11 +1,11 @@
 import { getLastUsedAccessMethod } from "$lib/utils/accessMethods";
 import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 import { canisterConfig } from "$lib/globals";
-import identityInfoStore from "./identity-info.state.svelte";
+import identityInfo from "$lib/stores/identity-info.state.svelte";
 
 export class AccessMethodsDerived {
   #MAX_PASSKEYS = 8;
-  #identityInfo = identityInfoStore;
+  #identityInfo = identityInfo;
   #enableGenericOpenId = false;
 
   constructor() {
