@@ -29,6 +29,7 @@
   import { openIdLogo, openIdName } from "$lib/utils/openID";
   import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
   import { canisterConfig } from "$lib/globals";
+  import Tooltip from "../ui/Tooltip.svelte";
 
   const MAX_PASSKEYS = 8;
 
@@ -56,8 +57,8 @@
     identityInfo.authnMethods.length >= MAX_PASSKEYS,
   );
   const isUsingPasskeys = $derived(authnMethods.length > 0);
-  const isAddAccessMethodVisible = $derived(
-    !isMaxOpenIdCredentialsReached || !isMaxPasskeysReached,
+  const accessMethodsMaxReached = $derived(
+    isMaxOpenIdCredentialsReached && isMaxPasskeysReached,
   );
   const isRemoveAccessMethodVisible = $derived(
     authnMethods.length + openIdCredentials.length > 1,
@@ -155,17 +156,21 @@
       </p>
     </div>
 
-    {#if isAddAccessMethodVisible}
-      <div>
+    <div>
+      <Tooltip
+        label="You have reached the maximum number of access methods"
+        hidden={!accessMethodsMaxReached}
+      >
         <Button
           onclick={() => (isAddAccessMethodWizardOpen = true)}
+          disabled={accessMethodsMaxReached}
           class="max-md:w-full"
         >
           <span>Add</span>
           <PlusIcon size="1.25rem" />
         </Button>
-      </div>
-    {/if}
+      </Tooltip>
+    </div>
   </div>
   <div
     class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
