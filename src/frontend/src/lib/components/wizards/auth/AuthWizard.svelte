@@ -15,6 +15,7 @@
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
+  import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -112,9 +113,12 @@
   ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
-      const { identityNumber, type } =
-        await authFlow.continueWithOpenId(config);
-      (type === "signUp" ? onSignUp : onSignIn)(identityNumber);
+      const result = await authFlow.continueWithOpenId(config);
+      if (result.type === "signIn") {
+        onSignIn(result.identityNumber);
+      } else if (nonNullish(result.name)) {
+        onSignUp(await authFlow.completeOpenIdRegistration(result.name));
+      }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
         return "cancelled";
@@ -122,6 +126,16 @@
       onError(error); // Propagate unhandled errors to parent component
     } finally {
       isAuthenticating = false;
+    }
+  };
+
+  const handleCompleteOpenIdRegistration = async (
+    name: string,
+  ): Promise<void> => {
+    try {
+      onSignUp(await authFlow.completeOpenIdRegistration(name));
+    } catch (error) {
+      onError(error); // Propagate unhandled errors to parent component
     }
   };
 
@@ -149,6 +163,8 @@
         ? "Continue"
         : "Create Passkey"}
     />
+  {:else if authFlow.view === "setupNewIdentity"}
+    <CreateIdentity create={handleCompleteOpenIdRegistration} />
   {:else if authFlow.view === "infoPasskey"}
     <InfoPasskey create={handleContinueCreatePasskey} />
   {/if}
