@@ -56,13 +56,20 @@ export class Funnel<T extends Record<string, string>> {
     }
   }
 
+  addProperties(additionalProperties: Record<string, string | number>): void {
+    this.#properties = {
+      ...(this.#properties ?? {}),
+      ...additionalProperties,
+    };
+  }
+
   trigger(
     event: T[keyof T],
     additionalProperties?: Record<string, string | number>,
   ): void {
     const eventProperties = {
-      ...(this.#properties || {}),
-      ...(additionalProperties || {}),
+      ...(this.#properties ?? {}),
+      ...(additionalProperties ?? {}),
     };
 
     analytics.event(

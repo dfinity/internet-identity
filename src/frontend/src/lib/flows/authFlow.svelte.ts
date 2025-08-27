@@ -162,6 +162,9 @@ export class AuthFlow {
     if (isNullish(clientId)) {
       throw new Error("Google is not configured");
     }
+    authenticationV2Funnel.addProperties({
+      provider: "Google",
+    });
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
       const requestConfig = createGoogleRequestConfig(clientId);
@@ -176,7 +179,7 @@ export class AuthFlow {
     } finally {
       this.#systemOverlay = false;
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
@@ -189,7 +192,7 @@ export class AuthFlow {
       // Therefore, they are logging in.
       // If the call fails, it means the Google user does not exist in II.
       // In that case, we register them.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       authenticationStore.set({ identity, identityNumber });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
@@ -206,7 +209,7 @@ export class AuthFlow {
         nonNullish(jwt)
       ) {
         authenticationV2Funnel.trigger(
-          AuthenticationV2Events.RegisterWithGoogle,
+          AuthenticationV2Events.RegisterWithOpenID,
         );
         await this.#startRegistration();
         const { name } = decodeJWT(jwt); // Google JWT always has a name
@@ -237,6 +240,9 @@ export class AuthFlow {
       authScope: config.auth_scope.join(" "),
       configURL: config.fedcm_uri?.[0],
     };
+    authenticationV2Funnel.addProperties({
+      provider: config.name,
+    });
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
       this.#systemOverlay = true;
@@ -250,7 +256,7 @@ export class AuthFlow {
     } finally {
       this.#systemOverlay = false;
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
     try {
       const { iss, sub } = decodeJWT(jwt);
@@ -263,7 +269,7 @@ export class AuthFlow {
       // Therefore, they are logging in.
       // If the call fails, it means the OpenID user does not exist in II.
       // In that case, we register them.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       authenticationStore.set({ identity, identityNumber });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
@@ -281,6 +287,9 @@ export class AuthFlow {
       ) {
         this.#jwt = jwt;
         const { name } = decodeJWT(jwt);
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.RegisterWithOpenID,
+        );
         if (isNullish(name)) {
           // Show enter name screen to complete registration,
           this.#view = "setupNewIdentity";
@@ -295,7 +304,7 @@ export class AuthFlow {
     if (isNullish(this.#jwt)) {
       throw new Error("JWT is missing");
     }
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithGoogle);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
     await this.#startRegistration();
     return this.#registerWithOpenId(this.#jwt, name);
   };
@@ -442,7 +451,7 @@ export class AuthFlow {
         jwt,
       });
       authenticationV2Funnel.trigger(
-        AuthenticationV2Events.SuccessfulGoogleRegistration,
+        AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );
       authenticationStore.set({ identity, identityNumber });
       lastUsedIdentitiesStore.addLastUsedIdentity({
