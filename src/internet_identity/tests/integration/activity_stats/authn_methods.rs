@@ -302,7 +302,7 @@ fn should_report_active_openid_authn_methods() {
 }
 
 /// Tests that active Google authn_methods are counted correctly.
-/// TODO: ID-155 Create OpenID mock data on-demand and use this instead in unit/integration tests
+/// TODO: Remove this once we remove Google specific OpenID implementation
 #[test]
 fn should_report_active_google_authn_methods() {
     // Create II instance that mocks Google certs
