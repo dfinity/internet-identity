@@ -1,14 +1,29 @@
-import { accessMethods } from "./access-methods.derived.svelte";
+import {
+  accessMethods,
+  AccessMethodsDerived,
+} from "./accessMethods.derived.svelte";
 import identityInfo from "./identity-info.state.svelte";
 import { canisterConfig } from "$lib/globals";
 import type {
   AuthnMethodData,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { toNullable } from "@dfinity/utils";
+import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
+
+// Mock the canisterConfig
+vi.mock("$lib/globals", () => ({
+  canisterConfig: {
+    openid_configs: [],
+  },
+}));
 
 // Test helpers
-const createAuthnMethod = (n: number): AuthnMethodData => ({
+const createAuthnMethod = (
+  n: number,
+  last_authentication?: bigint,
+): AuthnMethodData => ({
   authn_method: {
     WebAuthn: {
       pubkey: new Uint8Array(Array.from({ length: n + 2 }, (_, i) => 4 + i)),
@@ -17,7 +32,7 @@ const createAuthnMethod = (n: number): AuthnMethodData => ({
       ),
     },
   },
-  last_authentication: [],
+  last_authentication: toNullable(last_authentication),
   metadata: [],
   security_settings: {
     protection: { Unprotected: null },
@@ -34,13 +49,15 @@ const openIdCredential: OpenIdCredential = {
 };
 
 describe("Access methods derived stores", () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
+  beforeEach(() => {
+    canisterConfig.openid_configs = [];
+    ENABLE_GENERIC_OPEN_ID.set(false);
   });
+
   describe("lastUsedAccessMethod", () => {
     it("should return the last used access method", () => {
-      const am1 = createAuthnMethod(1);
-      const am2 = createAuthnMethod(2);
+      const am1 = createAuthnMethod(1, BigInt(1));
+      const am2 = createAuthnMethod(2, BigInt(2));
       const authnMethods = [am1, am2];
       const openIdCredentials = [openIdCredential];
       identityInfo.authnMethods = authnMethods;
@@ -52,7 +69,7 @@ describe("Access methods derived stores", () => {
   describe("isMaxPasskeysReached", () => {
     it("should return true if the max number of passkeys is reached", () => {
       const authnMethods = Array.from({ length: 8 }, (_, i) =>
-        createAuthnMethod(i + 1),
+        createAuthnMethod(i + 1, BigInt(i + 1)),
       );
       identityInfo.authnMethods = authnMethods;
       expect(accessMethods.isMaxPasskeysReached).toBe(true);
@@ -66,7 +83,7 @@ describe("Access methods derived stores", () => {
 
     it("should return true if the number of passkeys is over the max", () => {
       const authnMethods = Array.from({ length: 9 }, (_, i) =>
-        createAuthnMethod(i + 1),
+        createAuthnMethod(i + 1, BigInt(i + 1)),
       );
       identityInfo.authnMethods = authnMethods;
       expect(accessMethods.isMaxPasskeysReached).toBe(true);
@@ -74,42 +91,23 @@ describe("Access methods derived stores", () => {
   });
 
   describe("isMaxOpenIdCredentialsReached", () => {
-    it("should return true if the max number of openId credentials is reached", () => {
-      const openIdCredentials: OpenIdCredential[] = [openIdCredential];
-      identityInfo.openIdCredentials = openIdCredentials;
-      expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
-    });
-
-    it("should return false if the max number of openId credentials is not reached", () => {
-      const openIdCredentials: OpenIdCredential[] = [];
-      identityInfo.openIdCredentials = openIdCredentials;
-      expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
-    });
-
-    describe("When ENABLE_GENERIC_OPEN_ID is true", () => {
+    describe("When ENABLE_GENERIC_OPEN_ID is false", () => {
       it("should return true if the max number of openId credentials is reached", () => {
-        vi.stubEnv("ENABLE_GENERIC_OPEN_ID", "true");
-        canisterConfig.openid_configs = [
-          [
-            {
-              auth_uri: "test",
-              jwks_uri: "test",
-              logo: "test",
-              name: "test",
-              fedcm_uri: [],
-              issuer: "test",
-              auth_scope: ["test"],
-              client_id: "test",
-            },
-          ],
-        ];
-        const openIdCredentials: OpenIdCredential[] = [openIdCredential];
-        identityInfo.openIdCredentials = openIdCredentials;
+        const accessMethods = new AccessMethodsDerived(identityInfo, false);
+        identityInfo.openIdCredentials = [openIdCredential];
         expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
       });
 
       it("should return false if the max number of openId credentials is not reached", () => {
-        vi.stubEnv("ENABLE_GENERIC_OPEN_ID", "true");
+        const accessMethods = new AccessMethodsDerived(identityInfo, false);
+        identityInfo.openIdCredentials = [];
+        expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
+      });
+    });
+
+    describe("When ENABLE_GENERIC_OPEN_ID is true", () => {
+      it("should return true if the max number of openId credentials is reached", () => {
+        const accessMethods = new AccessMethodsDerived(identityInfo, true);
         canisterConfig.openid_configs = [
           [
             {
@@ -122,10 +120,52 @@ describe("Access methods derived stores", () => {
               auth_scope: ["test"],
               client_id: "test",
             },
+            {
+              auth_uri: "test",
+              jwks_uri: "test",
+              logo: "test",
+              name: "test",
+              fedcm_uri: [],
+              issuer: "test",
+              auth_scope: ["test"],
+              client_id: "test",
+            },
           ],
         ];
-        const openIdCredentials: OpenIdCredential[] = [];
-        identityInfo.openIdCredentials = openIdCredentials;
+        identityInfo.openIdCredentials = [
+          openIdCredential,
+          { ...openIdCredential },
+        ];
+        expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
+      });
+
+      it("should return false if the max number of openId credentials is not reached", () => {
+        const accessMethods = new AccessMethodsDerived(identityInfo, true);
+        canisterConfig.openid_configs = [
+          [
+            {
+              auth_uri: "test",
+              jwks_uri: "test",
+              logo: "test",
+              name: "test",
+              fedcm_uri: [],
+              issuer: "test",
+              auth_scope: ["test"],
+              client_id: "test",
+            },
+            {
+              auth_uri: "test",
+              jwks_uri: "test",
+              logo: "test",
+              name: "test",
+              fedcm_uri: [],
+              issuer: "test",
+              auth_scope: ["test"],
+              client_id: "test",
+            },
+          ],
+        ];
+        identityInfo.openIdCredentials = [openIdCredential];
         expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
       });
     });

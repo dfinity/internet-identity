@@ -27,7 +27,7 @@
   import { toaster } from "$lib/components/utils/toaster";
   import { openIdLogo, openIdName } from "$lib/utils/openID";
   import Tooltip from "../ui/Tooltip.svelte";
-  import { accessMethods } from "$lib/stores/access-methods.derived.svelte";
+  import { accessMethods } from "$lib/stores/accessMethods.derived.svelte";
 
   let isAddAccessMethodWizardOpen = $state(false);
   let removableAuthnMethod = $state<AuthnMethodData | null>(null);

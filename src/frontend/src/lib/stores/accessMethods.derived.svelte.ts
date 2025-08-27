@@ -6,6 +6,7 @@ import type {
 import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 import { canisterConfig } from "$lib/globals";
 import identityInfo from "./identity-info.state.svelte";
+import { get } from "svelte/store";
 
 const MAX_PASSKEYS = 8;
 
@@ -15,6 +16,7 @@ export class AccessMethodsDerived {
       authnMethods: AuthnMethodData[];
       openIdCredentials: OpenIdCredential[];
     },
+    private readonly enableGenericOpenId: boolean,
   ) {}
 
   lastUsedAccessMethod = $derived(
@@ -25,7 +27,7 @@ export class AccessMethodsDerived {
   );
 
   isMaxOpenIdCredentialsReached = $derived(
-    ENABLE_GENERIC_OPEN_ID
+    this.enableGenericOpenId
       ? this.identityInfo.openIdCredentials.length >=
           (canisterConfig.openid_configs[0]?.length ?? 0)
       : this.identityInfo.openIdCredentials.length >= 1,
@@ -40,4 +42,10 @@ export class AccessMethodsDerived {
   );
 }
 
-export const accessMethods = new AccessMethodsDerived(identityInfo);
+// We can't combine Svelte 4 stores with runes like `$derived`.
+// This means we won't have reactivity to the flag for this functionality.
+// But we can live with that.
+export const accessMethods = new AccessMethodsDerived(
+  identityInfo,
+  get(ENABLE_GENERIC_OPEN_ID),
+);
