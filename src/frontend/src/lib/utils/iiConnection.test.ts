@@ -784,6 +784,7 @@ describe("Connection.login", () => {
 const mockJwt = "mock.jwt.token";
 const mockSalt = [1, 2, 3];
 const mockNonce = "mock-nonce";
+const mockName = "John Doe";
 
 // Mock the openID utilities
 vi.mock("$lib/utils/openID", () => ({
@@ -791,7 +792,7 @@ vi.mock("$lib/utils/openID", () => ({
     Promise.resolve({ nonce: mockNonce, salt: mockSalt }),
   createGoogleRequestConfig: () => ({}),
   requestJWT: () => Promise.resolve(mockJwt),
-  decodeJWT: () => ({ name: "John Doe" }),
+  decodeJWT: () => ({ name: mockName }),
 }));
 
 vi.mock("$lib/templates/loader", () => ({
@@ -856,6 +857,7 @@ describe("openid_identity_registration_finish", () => {
     expect(mockActor.openid_identity_registration_finish).toHaveBeenCalledWith({
       jwt: mockJwt,
       salt: mockSalt,
+      name: mockName,
     });
   });
 
