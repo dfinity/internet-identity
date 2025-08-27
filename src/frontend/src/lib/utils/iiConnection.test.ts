@@ -791,6 +791,7 @@ vi.mock("$lib/utils/openID", () => ({
     Promise.resolve({ nonce: mockNonce, salt: mockSalt }),
   createGoogleRequestConfig: () => ({}),
   requestJWT: () => Promise.resolve(mockJwt),
+  decodeJWT: () => ({ name: "John Doe" }),
 }));
 
 vi.mock("$lib/templates/loader", () => ({
