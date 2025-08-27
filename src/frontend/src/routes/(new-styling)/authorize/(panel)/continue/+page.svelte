@@ -22,6 +22,7 @@
   import { nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -65,7 +66,13 @@
           AuthenticationV2Events.ContinueAsPasskey,
         );
       } else if ("openid" in selectedIdentity.authMethod) {
-        authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsGoogle);
+        const config = findConfig(selectedIdentity.authMethod.openid.iss);
+        if (nonNullish(config) && isOpenIdConfig(config)) {
+          authenticationV2Funnel.addProperties({
+            provider: config.name,
+          });
+        }
+        authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);
       }
       lastUsedIdentitiesStore.addLastUsedAccount(account);
       await authorizationStore.authorize(account.accountNumber);
