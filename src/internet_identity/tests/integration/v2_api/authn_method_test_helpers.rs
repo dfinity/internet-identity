@@ -132,6 +132,7 @@ pub fn create_identity_with_openid_credential(
         &OpenIDRegFinishArg {
             jwt: jwt.to_owned(),
             salt: *salt,
+            name: "John Doe".into(),
         },
     )
     .expect("API call failed")
