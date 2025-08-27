@@ -304,7 +304,7 @@ export class AuthFlow {
     if (isNullish(this.#jwt)) {
       throw new Error("JWT is missing");
     }
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithGoogle);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
     await this.#startRegistration();
     return this.#registerWithOpenId(this.#jwt, name);
   };
