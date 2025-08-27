@@ -493,6 +493,7 @@ type AuthnMethodData = record {
 type OpenIDRegFinishArg = record {
     jwt : JWT;
     salt : Salt;
+    name : text;
 };
 
 // Extra information about registration status for new authentication methods

@@ -156,8 +156,6 @@ pub trait OpenIdProvider {
         jwt: &str,
         salt: &[u8; 32],
     ) -> Result<OpenIdCredential, OpenIDJWTVerificationError>;
-
-    fn metadata_name(&self, metadata: HashMap<String, MetadataEntryV2>) -> Option<String>;
 }
 
 #[derive(Deserialize)]
@@ -319,10 +317,6 @@ impl OpenIdProvider for ExampleProvider {
         _: &[u8; 32],
     ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
         Ok(self.credential())
-    }
-
-    fn metadata_name(&self, _metadata: HashMap<String, MetadataEntryV2>) -> Option<String> {
-        None
     }
 }
 

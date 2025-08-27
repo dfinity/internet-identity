@@ -433,7 +433,11 @@ export const idlFactory = ({ IDL }) => {
     'JwtExpired' : IDL.Null,
     'JwtVerificationFailed' : IDL.Null,
   });
-  const OpenIDRegFinishArg = IDL.Record({ 'jwt' : JWT, 'salt' : Salt });
+  const OpenIDRegFinishArg = IDL.Record({
+    'jwt' : JWT,
+    'name' : IDL.Text,
+    'salt' : Salt,
+  });
   const UserKey = PublicKey;
   const OpenIdPrepareDelegationResponse = IDL.Record({
     'user_key' : UserKey,

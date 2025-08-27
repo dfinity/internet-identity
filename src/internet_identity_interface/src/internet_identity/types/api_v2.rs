@@ -233,6 +233,7 @@ pub struct IdRegFinishArg {
 pub struct OpenIDRegFinishArg {
     pub jwt: String,
     pub salt: [u8; 32],
+    pub name: String,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

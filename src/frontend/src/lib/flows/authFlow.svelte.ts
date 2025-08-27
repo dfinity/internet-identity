@@ -432,6 +432,7 @@ export class AuthFlow {
         .actor.openid_identity_registration_finish({
           jwt,
           salt: get(sessionStore).salt,
+          name,
         })
         .then(throwCanisterError);
       const { iss, sub, loginHint } = decodeJWT(jwt);
