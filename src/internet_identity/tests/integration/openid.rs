@@ -337,8 +337,6 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
     }
 }
 
-static CLIENT_ID: &str = "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com";
-
 #[derive(Deserialize)]
 #[allow(dead_code)]
 pub struct Claims {
