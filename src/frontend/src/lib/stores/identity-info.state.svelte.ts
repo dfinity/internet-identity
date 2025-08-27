@@ -24,7 +24,7 @@ const fetchIdentityInfo = async () => {
   return identityInfoResponse.Ok;
 };
 
-class IdentityInfo {
+export class IdentityInfo {
   loaded = $state(false);
   name = $state("");
   authnMethods = $state<AuthnMethodData[]>([]);

@@ -18,8 +18,9 @@
     onOtherDeviceRegistered: () => void;
     onClose: () => void;
     onError?: (error: unknown) => void;
-    isMaxOpenIdCredentialsReached?: boolean;
     isUsingPasskeys?: boolean;
+    openIdCredentials?: OpenIdCredential[];
+    maxPasskeysReached?: boolean;
   }
 
   const {
@@ -31,13 +32,12 @@
       onClose();
       handleError(error);
     },
-    isMaxOpenIdCredentialsReached,
     isUsingPasskeys,
+    openIdCredentials,
+    maxPasskeysReached,
   }: Props = $props();
 
-  const addAccessMethodFlow = new AddAccessMethodFlow({
-    isMaxOpenIdCredentialsReached,
-  });
+  const addAccessMethodFlow = new AddAccessMethodFlow();
 
   let isContinueOnAnotherDeviceVisible = $state(false);
 
@@ -83,6 +83,8 @@
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
       linkGoogleAccount={handleContinueWithGoogle}
       linkOpenIdAccount={handleContinueWithOpenId}
+      {maxPasskeysReached}
+      {openIdCredentials}
     />
   {:else if addAccessMethodFlow.view === "addPasskey"}
     <AddPasskey

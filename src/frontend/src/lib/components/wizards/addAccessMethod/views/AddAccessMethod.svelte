@@ -5,19 +5,31 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { openIdName } from "$lib/utils/openID";
   import { nonNullish } from "@dfinity/utils";
   import { canisterConfig } from "$lib/globals";
   import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
-  import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
+  import type {
+    OpenIdConfig,
+    OpenIdCredential,
+  } from "$lib/generated/internet_identity_types";
 
   interface Props {
     linkGoogleAccount: () => Promise<void>;
     linkOpenIdAccount: (config: OpenIdConfig) => Promise<void>;
     continueWithPasskey: () => void;
+    openIdCredentials?: OpenIdCredential[];
+    maxPasskeysReached?: boolean;
   }
 
-  const { linkGoogleAccount, linkOpenIdAccount, continueWithPasskey }: Props =
-    $props();
+  const {
+    linkGoogleAccount,
+    linkOpenIdAccount,
+    continueWithPasskey,
+    openIdCredentials = [],
+    maxPasskeysReached,
+  }: Props = $props();
 
   let authenticatingGoogle = $state(false);
   let authenticatingProviderId = $state<string | null>();
@@ -48,6 +60,10 @@
   const showGoogleButton =
     canisterConfig.openid_google?.[0]?.[0] && !$ENABLE_GENERIC_OPEN_ID;
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
+
+  const hasCredential = (issuer: string): boolean => {
+    return openIdCredentials.some((cred) => cred.iss === issuer);
+  };
 </script>
 
 <div class="mt-4 mb-6 flex flex-col">
@@ -72,49 +88,67 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
-    <Button
-      onclick={continueWithPasskey}
-      disabled={!isPasskeySupported || authenticating}
-      size="xl"
+    <Tooltip
+      label="You have reached the maximum number of passkeys."
+      hidden={!maxPasskeysReached}
     >
-      <PasskeyIcon />
-      Continue with Passkey
-    </Button>
+      <Button
+        onclick={continueWithPasskey}
+        disabled={!isPasskeySupported || authenticating || maxPasskeysReached}
+        size="xl"
+      >
+        <PasskeyIcon />
+        Continue with Passkey
+      </Button>
+    </Tooltip>
     {#if $ENABLE_GENERIC_OPEN_ID}
       <div class="flex flex-row flex-nowrap justify-stretch gap-3">
         {#each openIdProviders as provider}
-          <Button
-            onclick={() => handleContinueWithOpenId(provider)}
-            variant="secondary"
-            disabled={authenticating}
-            size="xl"
-            class="flex-1"
+          <Tooltip
+            label={`You already have a ${openIdName(
+              provider.issuer,
+            )} account linked`}
+            hidden={!hasCredential(provider.issuer)}
           >
-            {#if authenticatingProviderId === provider.client_id}
-              <ProgressRing />
-            {:else if provider.logo}
-              <div class="size-6">
-                {@html provider.logo}
-              </div>
-            {/if}
-          </Button>
+            <Button
+              onclick={() => handleContinueWithOpenId(provider)}
+              variant="secondary"
+              disabled={authenticating || hasCredential(provider.issuer)}
+              size="xl"
+              class="flex-1"
+            >
+              {#if authenticatingProviderId === provider.client_id}
+                <ProgressRing />
+              {:else if provider.logo}
+                <div class="size-6">
+                  {@html provider.logo}
+                </div>
+              {/if}
+            </Button>
+          </Tooltip>
         {/each}
       </div>
     {:else if showGoogleButton}
-      <Button
-        onclick={handleContinueWithGoogle}
-        variant="secondary"
-        disabled={authenticating}
-        size="xl"
+      <Tooltip
+        label="You already have a Google account linked"
+        hidden={!hasCredential("https://accounts.google.com")}
       >
-        {#if authenticatingGoogle}
-          <ProgressRing />
-          <span>Authenticating with Google...</span>
-        {:else}
-          <GoogleIcon />
-          <span>Continue with Google</span>
-        {/if}
-      </Button>
+        <Button
+          onclick={handleContinueWithGoogle}
+          variant="secondary"
+          disabled={authenticating ||
+            hasCredential("https://accounts.google.com")}
+          size="xl"
+        >
+          {#if authenticatingGoogle}
+            <ProgressRing />
+            <span>Authenticating with Google...</span>
+          {:else}
+            <GoogleIcon />
+            <span>Continue with Google</span>
+          {/if}
+        </Button>
+      </Tooltip>
     {/if}
   </div>
 </div>
