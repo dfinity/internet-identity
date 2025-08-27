@@ -1,4 +1,4 @@
-use crate::openid;
+use crate::google;
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_openid_credential, test_authn_method,
 };
@@ -245,12 +245,12 @@ fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
 fn should_report_active_openid_authn_methods() {
     // Create II instance that mocks Google certs
     let env = env();
-    let canister_id = openid::setup_canister(&env);
+    let canister_id = google::setup_canister(&env);
     api::init_salt(&env, canister_id).unwrap();
 
     // OpenID test data and fetch Google certs (mock)
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
-        openid::openid_test_data();
+        google::openid_test_data();
     env.advance_time(Duration::from_millis(test_time) - Duration::from_nanos(time(&env)));
 
     // Ensure stats are initially absent

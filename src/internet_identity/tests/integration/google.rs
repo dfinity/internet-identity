@@ -8,8 +8,8 @@ use canister_tests::{api::internet_identity as api, framework::*};
 use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
-    OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
+    AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdCredentialKey,
+    OpenIdDelegationError, OpenIdGoogleConfig, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{PocketIc, RejectResponse};
@@ -366,17 +366,9 @@ struct Certs {
 
 pub fn setup_canister(env: &PocketIc) -> Principal {
     let args = InternetIdentityInit {
-        openid_configs: Some(vec![OpenIdConfig {
-            name: "Google".into(),
-            logo: "<svg viewBox=\"0 0 24 24\"><path d=\"M12.19 2.83A9.15 9.15 0 0 0 4 16.11c1.5 3 4.6 5.06 8.18 5.06 2.47 0 4.55-.82 6.07-2.22a8.95 8.95 0 0 0 2.73-6.74c0-.65-.06-1.28-.17-1.88h-8.63v3.55h4.93a4.23 4.23 0 0 1-1.84 2.76c-3.03 2-7.12.55-8.22-2.9h-.01a5.5 5.5 0 0 1 5.14-7.26 5 5 0 0 1 3.5 1.37l2.63-2.63a8.8 8.8 0 0 0-6.13-2.39z\" style=\"fill: currentColor;\"></path></svg>".into(),
-            issuer: "https://accounts.google.com".into(),
-            client_id: "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com"
-                .into(),
-            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
-            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
-            auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
-            fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
-        }]),
+        openid_google: Some(Some(OpenIdGoogleConfig {
+            client_id: CLIENT_ID.to_string(),
+        })),
         archive_config: Some(ArchiveConfig {
             module_hash: archive_wasm_hash(&ARCHIVE_WASM),
             entries_buffer_limit: 10_000,

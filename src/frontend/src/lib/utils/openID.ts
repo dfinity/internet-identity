@@ -242,7 +242,7 @@ export const decodeJWT = (
     // Login hint is usually preferred_username else fall back to email or even sub
     loginHint: preferred_username ?? email ?? sub,
     // Additional optional metadata claims
-    name,
+    name: undefined,
     email,
   };
 };
