@@ -5,7 +5,6 @@ import type {
   AuthnMethodData,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import { describe, expect, it, vi } from "vitest";
 import { toNullable } from "@dfinity/utils";
 import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 
