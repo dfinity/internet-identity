@@ -27,6 +27,8 @@
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { toaster } from "$lib/components/utils/toaster";
   import { openIdLogo, openIdName } from "$lib/utils/openID";
+  import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
+  import { canisterConfig } from "$lib/globals";
 
   const MAX_PASSKEYS = 8;
 
@@ -44,7 +46,10 @@
   const openIdCredentials = $derived(identityInfo.openIdCredentials);
   const authnMethods = $derived(identityInfo.authnMethods);
   const isMaxOpenIdCredentialsReached = $derived(
-    identityInfo.openIdCredentials.length >= 1,
+    $ENABLE_GENERIC_OPEN_ID
+      ? identityInfo.openIdCredentials.length >=
+          (canisterConfig.openid_configs[0]?.length ?? 0)
+      : identityInfo.openIdCredentials.length >= 1,
   );
 
   const isMaxPasskeysReached = $derived(
@@ -285,7 +290,8 @@
     onPasskeyRegistered={handlePasskeyRegistered}
     onOtherDeviceRegistered={handleOtherDeviceRegistered}
     onClose={() => (isAddAccessMethodWizardOpen = false)}
-    {isMaxOpenIdCredentialsReached}
+    maxPasskeysReached={isMaxPasskeysReached}
+    {openIdCredentials}
     {isUsingPasskeys}
   />
 {/if}
