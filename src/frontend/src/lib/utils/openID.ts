@@ -212,59 +212,17 @@ export const buildIssuerFromConfig = (
 /**
  * Extract claims from an issuer URL based on a configured issuer template.
  *
+ * This function now only extracts the placeholder names present in the
+ * configured issuer template.
+ *
  * Example:
  *  template: "https://login.microsoftonline.com/{tid}/v2.0"
- *  issuer:   "https://login.microsoftonline.com/4a435c5e-6451-4c1a-a81f-ab9666b6de8f/v2.0"
- *  returns:  { tid: "4a435c5e-6451-4c1a-a81f-ab9666b6de8f" }
- *
- * If the template has no placeholders, returns an empty object when the issuer
- * matches exactly, otherwise `undefined`.
+ *  returns:  ["tid"]
  */
-export const extractIssuerTemplateClaims = (
-  configIssuer: string,
-  issuer: string,
-): Record<string, string> | undefined => {
+export const extractIssuerTemplateClaims = (configIssuer: string): string[] => {
   // Detect placeholders of the form {name}
   const placeholderRegex = /{([^}]+)}/g;
-  const matches = Array.from(configIssuer.matchAll(placeholderRegex));
-  const names: string[] = matches.map((m) => m[1]);
-
-  // No placeholders: exact match -> empty object, else undefined
-  if (names.length === 0) {
-    return issuer === configIssuer ? {} : undefined;
-  }
-
-  // Build a strict regex from the template, escaping literals and creating
-  // capture groups for placeholders. Use non-greedy groups between literals
-  // and greedy for the last placeholder if it is at the end.
-  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-  let lastIndex = 0;
-  let regexStr = "^";
-  matches.forEach((m, idx) => {
-    const start = m.index ?? 0;
-    const end = start + m[0].length;
-    const literal = configIssuer.slice(lastIndex, start);
-    regexStr += escapeRegExp(literal);
-    const isLastAtEnd =
-      idx === matches.length - 1 && end === configIssuer.length;
-    // If last placeholder is at the end, allow greedy capture; otherwise non-greedy until next literal
-    regexStr += isLastAtEnd ? "(.+)" : "(.+?)";
-    lastIndex = end;
-  });
-  // Trailing literal
-  regexStr += escapeRegExp(configIssuer.slice(lastIndex));
-  regexStr += "$";
-
-  const re = new RegExp(regexStr);
-  const res = re.exec(issuer);
-  if (!res) return undefined;
-
-  const values: Record<string, string> = {};
-  names.forEach((name, i) => {
-    values[name] = res[i + 1];
-  });
-  return values;
+  return Array.from(configIssuer.matchAll(placeholderRegex)).map((m) => m[1]);
 };
 
 /**
@@ -301,7 +259,7 @@ export const findConfig = (
   metadata: MetadataMapV2 = [],
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
   // First, try to find a match in the generic OpenID configurations
-  const fromConfigs = canisterConfig.openid_configs?.[0]?.find((config) =>
+  const fromConfigs = canisterConfig.openid_configs[0]?.find((config) =>
     issuerMatches(config.issuer, issuer, metadata),
   );
   if (nonNullish(fromConfigs)) {
@@ -351,11 +309,11 @@ export const decodeJWT = (
   loginHint: string;
   name?: string;
   email?: string;
+  [key: string]: string | undefined;
 } => {
   const [_header, body, _signature] = token.split(".");
-  const { iss, sub, aud, name, email, preferred_username } = JSON.parse(
-    atob(body),
-  );
+  const { iss, sub, aud, name, email, preferred_username, ...rest } =
+    JSON.parse(atob(body));
   return {
     iss,
     sub,
@@ -365,6 +323,7 @@ export const decodeJWT = (
     // Additional optional metadata claims
     name,
     email,
+    ...rest,
   };
 };
 

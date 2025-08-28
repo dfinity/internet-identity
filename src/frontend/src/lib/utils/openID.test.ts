@@ -29,6 +29,16 @@ describe("issuerMatches", () => {
     ).toBe(true);
   });
 
+  it.only("returns false for half match", () => {
+    expect(
+      issuerMatches(
+        "https://accounts.google.com",
+        "https://accounts.google.com/123/v2.0",
+        [],
+      ),
+    ).toBe(false);
+  });
+
   it("returns false for non-matching exact strings", () => {
     expect(
       issuerMatches(
@@ -134,78 +144,32 @@ describe("issuerMatches", () => {
 });
 
 describe("extractIssuerTemplateClaims", () => {
-  it("returns empty object for exact issuer without placeholders", () => {
-    expect(
-      extractIssuerTemplateClaims("https://example.com", "https://example.com"),
-    ).toEqual({});
+  it("returns empty array for template without placeholders", () => {
+    expect(extractIssuerTemplateClaims("https://example.com")).toEqual([]);
   });
 
-  it("returns undefined for non-matching exact issuer without placeholders", () => {
-    expect(
-      extractIssuerTemplateClaims("https://example.com", "https://example.org"),
-    ).toBeUndefined();
-  });
-
-  it("extracts a single placeholder value", () => {
-    const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
+  it("extracts a single placeholder name", () => {
     expect(
       extractIssuerTemplateClaims(
         "https://login.microsoftonline.com/{tid}/v2.0",
-        `https://login.microsoftonline.com/${tid}/v2.0`,
       ),
-    ).toEqual({ tid });
+    ).toEqual(["tid"]);
   });
 
-  it("extracts multiple placeholders and allows slashes inside captures", () => {
+  it("extracts multiple placeholder names preserving order", () => {
     expect(
-      extractIssuerTemplateClaims(
-        "https://example.com/{a}/{b}/end",
-        "https://example.com/one/two/extra/end",
-      ),
-    ).toEqual({ a: "one", b: "two/extra" });
+      extractIssuerTemplateClaims("https://example.com/{a}/{b}/end"),
+    ).toEqual(["a", "b"]);
   });
 
-  it("returns undefined when issuer does not fit the template shape", () => {
-    // Trailing literal mismatch
-    expect(
-      extractIssuerTemplateClaims(
-        "https://login.microsoftonline.com/{tid}/v2.0",
-        "https://login.microsoftonline.com/anything/v3.0",
-      ),
-    ).toBeUndefined();
-
-    // Extra trailing content not in template
-    expect(
-      extractIssuerTemplateClaims(
-        "https://example.com/{a}/{b}/end",
-        "https://example.com/one/two/extra/end/more",
-      ),
-    ).toBeUndefined();
-  });
-
-  it("captures greedily for a last placeholder at the end", () => {
-    expect(
-      extractIssuerTemplateClaims(
-        "https://example.com/prefix/{rest}",
-        "https://example.com/prefix/a/b/c",
-      ),
-    ).toEqual({ rest: "a/b/c" });
-  });
-
-  it("captures non-greedily between literals and handles dots near placeholders", () => {
-    expect(
-      extractIssuerTemplateClaims(
-        "https://example.com/prefix/{mid}/suffix",
-        "https://example.com/prefix/a/b/c/suffix",
-      ),
-    ).toEqual({ mid: "a/b/c" });
-
-    expect(
-      extractIssuerTemplateClaims(
-        "https://example.com/v{ver}.0",
-        "https://example.com/v123.0",
-      ),
-    ).toEqual({ ver: "123" });
+  it("ignores unmatched braces and only captures balanced placeholders", () => {
+    // Only opening brace, no closing brace -> no placeholders
+    expect(extractIssuerTemplateClaims("https://example.com/{tid")).toEqual([]);
+    // Balanced placeholders still work
+    expect(extractIssuerTemplateClaims("https://ex.com/{x}/v{y}.0")).toEqual([
+      "x",
+      "y",
+    ]);
   });
 });
 

@@ -168,14 +168,13 @@ export const isSameAccessMethod = (
 
 export const getOpenIdTitles = (
   credential: OpenIdCredential,
-  metadata: MetadataMapV2,
 ): {
   title: { ellipsis: boolean; text: string };
   subtitle?: { ellipsis: boolean; text: string };
 } => {
   const name = getOpenIdCredentialName(credential);
   const email = getOpenIdCredentialEmail(credential);
-  const config = findConfig(credential.iss, metadata);
+  const config = findConfig(credential.iss, credential.metadata);
   const accountProvider = nonNullish(config)
     ? isOpenIdConfig(config)
       ? config.name

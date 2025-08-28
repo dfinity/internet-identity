@@ -465,7 +465,14 @@ export class AuthFlow {
           name,
         })
         .then(throwCanisterError);
-      const { iss, sub, loginHint, name: jwtName, email } = decodeJWT(jwt);
+      const {
+        iss,
+        sub,
+        loginHint,
+        name: jwtName,
+        email,
+        ...restJWTClaims
+      } = decodeJWT(jwt);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -482,15 +489,17 @@ export class AuthFlow {
       if (nonNullish(email)) {
         metadata.push(["email", { String: email }]);
       }
-      const claims = extractIssuerTemplateClaims(configIssuer, iss);
-      if (nonNullish(claims)) {
-        Object.keys(claims).forEach((key) => {
-          metadata.push([
-            key,
-            {
-              String: claims[key],
-            },
-          ]);
+      const claimKeys = extractIssuerTemplateClaims(configIssuer);
+      if (nonNullish(claimKeys)) {
+        claimKeys.forEach((key) => {
+          if (nonNullish(restJWTClaims[key])) {
+            metadata.push([
+              key,
+              {
+                String: restJWTClaims[key],
+              },
+            ]);
+          }
         });
       }
       lastUsedIdentitiesStore.addLastUsedIdentity({
