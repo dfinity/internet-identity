@@ -186,7 +186,7 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
     try {
-      const { iss, sub, loginHint, name, email } = decodeJWT(jwt);
+      const { iss, sub, loginHint } = decodeJWT(jwt);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -476,10 +476,10 @@ export class AuthFlow {
       );
       authenticationStore.set({ identity, identityNumber });
       const metadata: MetadataMapV2 = [];
-      if (jwtName) {
+      if (nonNullish(jwtName)) {
         metadata.push(["name", { String: jwtName }]);
       }
-      if (email) {
+      if (nonNullish(email)) {
         metadata.push(["email", { String: email }]);
       }
       const claims = extractIssuerTemplateClaims(configIssuer, iss);
