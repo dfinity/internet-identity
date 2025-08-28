@@ -259,7 +259,7 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
     try {
-      const { iss, sub } = decodeJWT(jwt);
+      const { iss, sub, loginHint } = decodeJWT(jwt);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -276,7 +276,7 @@ export class AuthFlow {
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub } },
+        authMethod: { openid: { iss, sub, loginHint } },
       });
       return { identityNumber, type: "signIn" };
     } catch (error) {
