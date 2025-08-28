@@ -6,6 +6,7 @@ import {
   getRpId,
   isSameAccessMethod,
   isNewOriginDevice,
+  getOpenIdTitles,
 } from "./accessMethods";
 import type {
   AuthnMethodData,
@@ -17,15 +18,46 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { vi } from "vitest";
 import { nonNullish } from "@dfinity/utils";
+import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 
-// Mock the canisterConfig
+// Mock the canisterConfig, including OpenID configs used by getOpenIdTitles via findConfig
 vi.mock("$lib/globals", () => ({
   canisterConfig: {
     new_flow_origins: [
       ["https://id.ai", "https://rdmx6-jaaaa-aaaah-qdrqq-cai.ic0.app"],
     ],
+    // Shape matches access in findConfig: openid_google?.[0]?.[0]
+    openid_google: [
+      [
+        {
+          client_id: "test-google-client-id",
+        },
+      ],
+    ],
+    // Shape matches access in findConfig: openid_configs?.[0]?.find(...)
+    openid_configs: [
+      [
+        {
+          issuer: "https://issuer.acme",
+          name: "AcmeID",
+          auth_scope: "openid profile email",
+          logo: "<svg></svg>",
+          client_id: "test-client-id",
+          jwks_uri: "https://issuer.acme/.well-known/jwks.json",
+          auth_uri: "https://issuer.acme/auth",
+          fedcm_uri: [],
+        },
+      ],
+    ],
+    // Provide feature flag defaults to satisfy optional initialization logic
+    feature_flag_enable_generic_open_id_fe: [false],
   },
 }));
+
+// Ensure deterministic default for tests that rely on Google-specific path
+beforeEach(() => {
+  ENABLE_GENERIC_OPEN_ID.set(false);
+});
 
 const makeAuthnMethodWithOrigin = (origin?: string): AuthnMethodData => {
   const metadata: MetadataMapV2 = nonNullish(origin)
@@ -109,6 +141,112 @@ describe("getLastUsedAccessMethod", () => {
     const cred = makeOpenIdCredential("oidc", [999]);
     const result = getLastUsedAccessMethod([method1], [cred]);
     expect(result).toMatchObject({ id: "oidc", last_authentication: [999] });
+  });
+});
+
+describe("getOpenIdTitles", () => {
+  const googleIssuer = "https://accounts.google.com";
+  const makeOpenIdCredential = (
+    iss: string,
+    {
+      name,
+      email,
+      sub = "sub",
+      aud = "audience",
+    }: { name?: string; email?: string; sub?: string; aud?: string },
+  ): OpenIdCredential => ({
+    last_usage_timestamp: [],
+    aud,
+    iss,
+    sub,
+    metadata: [
+      ...(nonNullish(name) ? [["name", { String: name }]] : []),
+      ...(nonNullish(email) ? [["email", { String: email }]] : []),
+    ] as MetadataMapV2,
+  });
+
+  describe("generic open id disabled", () => {
+    beforeEach(() => {
+      ENABLE_GENERIC_OPEN_ID.set(false);
+    });
+
+    it("returns name and email with provider from OpenID config", () => {
+      const cred = makeOpenIdCredential(googleIssuer, {
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      const res = getOpenIdTitles(cred);
+      expect(res).toEqual({
+        title: { ellipsis: false, text: "Alice" },
+        subtitle: {
+          ellipsis: true,
+          text: "Google Account - alice@example.com",
+        },
+      });
+    });
+  });
+
+  describe("generic open id enabled", () => {
+    beforeEach(() => {
+      ENABLE_GENERIC_OPEN_ID.set(true);
+    });
+
+    it("returns name and email with provider from OpenID config", () => {
+      const cred = makeOpenIdCredential("https://issuer.acme", {
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      const res = getOpenIdTitles(cred);
+      expect(res).toEqual({
+        title: { ellipsis: false, text: "Alice" },
+        subtitle: {
+          ellipsis: true,
+          text: "AcmeID Account - alice@example.com",
+        },
+      });
+    });
+
+    it("returns name only with OpenID provider when email missing", () => {
+      const cred = makeOpenIdCredential("https://issuer.acme", {
+        name: "Bob",
+      });
+      const res = getOpenIdTitles(cred);
+      expect(res).toEqual({
+        title: { ellipsis: false, text: "Bob" },
+        subtitle: { ellipsis: false, text: "AcmeID Account" },
+      });
+    });
+
+    it("returns Unknown account if Google provider but not in config", () => {
+      const cred = makeOpenIdCredential("https://accounts.google.com", {
+        name: "Bob",
+      });
+      const res = getOpenIdTitles(cred);
+      expect(res).toEqual({
+        title: { ellipsis: false, text: "Bob" },
+        subtitle: { ellipsis: false, text: "Unknown Account" },
+      });
+    });
+
+    it("returns email only with Unknown provider when config not found", () => {
+      const cred = makeOpenIdCredential("https://unknown.provider", {
+        email: "charlie@example.com",
+      });
+      const res = getOpenIdTitles(cred);
+      expect(res).toEqual({
+        title: { ellipsis: true, text: "charlie@example.com" },
+        subtitle: { ellipsis: false, text: "Unknown Account" },
+      });
+    });
+
+    it("returns Unknown account when neither name nor email is present", () => {
+      const cred = makeOpenIdCredential("https://issuer.acme", {});
+      const res = getOpenIdTitles(cred);
+      expect(res).toEqual({
+        title: { ellipsis: false, text: "Unknown Account" },
+        subtitle: undefined,
+      });
+    });
   });
 });
 
