@@ -52,3 +52,6 @@ pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
+
+// Issuer found in configuration NOT credential/jwt e.g. https://login.microsoftonline.com/{tid}/v2.0
+pub type ConfigIss = String;
