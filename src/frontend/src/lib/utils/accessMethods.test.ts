@@ -243,7 +243,7 @@ describe("getOpenIdTitles", () => {
       const cred = makeOpenIdCredential("https://issuer.acme", {});
       const res = getOpenIdTitles(cred);
       expect(res).toEqual({
-        title: { ellipsis: false, text: "Unknown account" },
+        title: { ellipsis: false, text: "Unknown Account" },
         subtitle: undefined,
       });
     });
