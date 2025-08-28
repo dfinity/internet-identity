@@ -226,15 +226,19 @@ export const issuerMatches = (
 export const findConfig = (
   issuer: string,
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
-  const genericOpenIdEnabled = get(ENABLE_GENERIC_OPEN_ID);
-  return genericOpenIdEnabled
-    ? canisterConfig.openid_configs?.[0]?.find((config) =>
-        issuerMatches(config.issuer, issuer),
-      )
-    : nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
-        issuer === GOOGLE_ISSUER
-      ? canisterConfig.openid_google?.[0]?.[0]
-      : undefined;
+  // First, try to find a match in the generic OpenID configurations
+  const fromConfigs = canisterConfig.openid_configs?.[0]?.find((config) =>
+    issuerMatches(config.issuer, issuer),
+  );
+  if (nonNullish(fromConfigs)) {
+    return fromConfigs;
+  }
+  // Fallback to the Google configuration if the issuer matches Google's issuer
+  const googleConfig = canisterConfig.openid_google?.[0]?.[0];
+  if (nonNullish(googleConfig) && issuer === GOOGLE_ISSUER) {
+    return googleConfig;
+  }
+  return undefined;
 };
 
 export const isOpenIdConfig = (

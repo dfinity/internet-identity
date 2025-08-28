@@ -5,11 +5,11 @@ import {
   OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
 import { canisterConfig } from "$lib/globals";
-import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 
 vi.mock("$lib/globals", () => ({
   canisterConfig: {
     openid_configs: [],
+    openid_google: [],
   },
 }));
 
@@ -116,71 +116,56 @@ describe("findConfig", () => {
     canisterConfig.openid_google = [];
   });
 
-  describe("when generic OpenID is disabled", () => {
-    beforeEach(() => {
-      ENABLE_GENERIC_OPEN_ID.set(false);
-    });
-
-    it("returns Google config if issuer is Google", () => {
-      canisterConfig.openid_google = [[googleCfg]];
-      expect(findConfig(GOOGLE_ISSUER)).toBe(googleCfg);
-    });
-
-    it("returns undefined if issuer is Apple", () => {
-      canisterConfig.openid_google = [[googleCfg]];
-      canisterConfig.openid_configs = [[createOpenIDConfig(appleIssuer)]];
-      expect(findConfig(appleIssuer)).toBeUndefined();
-    });
-
-    it("returns undefined if issuer is Google but there is no google config", () => {
-      canisterConfig.openid_google = [];
-      expect(findConfig(GOOGLE_ISSUER)).toBeUndefined();
-    });
+  it("returns OpenID config when issuer matches in openid_configs", () => {
+    const cfg = createOpenIDConfig("https://example.com/oauth2");
+    canisterConfig.openid_configs = [[cfg]];
+    expect(findConfig("https://example.com/oauth2")).toBe(cfg);
   });
 
-  describe("when generic OpenID is enabled", () => {
-    beforeEach(() => {
-      ENABLE_GENERIC_OPEN_ID.set(true);
-    });
+  it("matches a template issuer in openid_configs", () => {
+    const msCfg = createOpenIDConfig(
+      "https://login.microsoftonline.com/{tid}/v2.0",
+    );
+    canisterConfig.openid_configs = [[msCfg]];
+    expect(
+      findConfig(
+        "https://login.microsoftonline.com/4a435c5e-6451-4c1a-a81f-ab9666b6de8f/v2.0",
+      ),
+    ).toBe(msCfg);
+  });
 
-    it("finds a non-template issuer in openid_configs", () => {
-      const cfg = createOpenIDConfig("https://example.com/oauth2");
-      canisterConfig.openid_configs = [[cfg]];
-      expect(findConfig("https://example.com/oauth2")).toBe(cfg);
-    });
+  it("returns Apple config if issuer is Apple (from openid_configs)", () => {
+    canisterConfig.openid_google = [[googleCfg]];
+    const appleConfig = createOpenIDConfig(appleIssuer);
+    canisterConfig.openid_configs = [[appleConfig]];
+    expect(findConfig(appleIssuer)).toBe(appleConfig);
+  });
 
-    it("returns Apple config if issuer is Apple", () => {
-      canisterConfig.openid_google = [[googleCfg]];
-      const appleConfig = createOpenIDConfig(appleIssuer);
-      canisterConfig.openid_configs = [[appleConfig]];
-      expect(findConfig(appleIssuer)).toBe(appleConfig);
-    });
+  it("returns Google config if issuer is Google and no matching openid_configs", () => {
+    canisterConfig.openid_google = [[googleCfg]];
+    canisterConfig.openid_configs = [];
+    expect(findConfig(GOOGLE_ISSUER)).toBe(googleCfg);
+  });
 
-    it("returns undefined for google if no open id configs but google config is set", () => {
-      canisterConfig.openid_google = [[googleCfg]];
-      canisterConfig.openid_configs = [];
-      expect(findConfig(GOOGLE_ISSUER)).toBeUndefined();
-    });
+  it("prefers openid_configs over Google config for Google issuer when both present", () => {
+    const googleOpenIdCfg = createOpenIDConfig(GOOGLE_ISSUER);
+    canisterConfig.openid_configs = [[googleOpenIdCfg]];
+    canisterConfig.openid_google = [[googleCfg]];
+    expect(findConfig(GOOGLE_ISSUER)).toBe(googleOpenIdCfg);
+  });
 
-    it("matches a template issuer in openid_configs", () => {
-      const msCfg = createOpenIDConfig(
-        "https://login.microsoftonline.com/{tid}/v2.0",
-      );
-      canisterConfig.openid_configs = [[msCfg]];
-      expect(
-        findConfig(
-          "https://login.microsoftonline.com/4a435c5e-6451-4c1a-a81f-ab9666b6de8f/v2.0",
-        ),
-      ).toBe(msCfg);
-    });
+  it("returns undefined for Google issuer when no Google config and no matching openid_configs", () => {
+    canisterConfig.openid_google = [];
+    canisterConfig.openid_configs = [];
+    expect(findConfig(GOOGLE_ISSUER)).toBeUndefined();
+  });
 
-    it("returns undefined when no issuer matches", () => {
-      const cfgs = [
-        createOpenIDConfig("https://example.com/oauth2"),
-        createOpenIDConfig("https://login.microsoftonline.com/{tid}/v2.0"),
-      ];
-      canisterConfig.openid_configs = [cfgs];
-      expect(findConfig("https://no-such-issuer.example.com")).toBeUndefined();
-    });
+  it("returns undefined when no issuer matches", () => {
+    const cfgs = [
+      createOpenIDConfig("https://example.com/oauth2"),
+      createOpenIDConfig("https://login.microsoftonline.com/{tid}/v2.0"),
+    ];
+    canisterConfig.openid_configs = [cfgs];
+    expect(findConfig("https://no-such-issuer.example.com")).toBeUndefined();
   });
 });
