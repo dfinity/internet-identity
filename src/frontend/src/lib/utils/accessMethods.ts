@@ -173,7 +173,7 @@ export const getOpenIdTitles = (
 } => {
   const name = getOpenIdCredentialName(credential);
   const email = getOpenIdCredentialEmail(credential);
-  const config = findConfig(credential.iss);
+  const config = findConfig(credential.iss, credential.metadata);
   const accountProvider = nonNullish(config)
     ? isOpenIdConfig(config)
       ? config.name

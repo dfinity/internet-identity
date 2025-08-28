@@ -2,7 +2,10 @@ import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { derived, get, Readable, writable } from "svelte/store";
 import { writableStored } from "./writable.store";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { AccountInfo } from "$lib/generated/internet_identity_types";
+import {
+  AccountInfo,
+  MetadataMapV2,
+} from "$lib/generated/internet_identity_types";
 
 export type LastUsedAccount = {
   identityNumber: bigint;
@@ -21,7 +24,14 @@ export type LastUsedIdentity = {
   name?: string;
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
-    | { openid: { iss: string; sub: string; loginHint?: string } };
+    | {
+        openid: {
+          iss: string;
+          sub: string;
+          loginHint?: string;
+          metadata?: MetadataMapV2;
+        };
+      };
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
 };

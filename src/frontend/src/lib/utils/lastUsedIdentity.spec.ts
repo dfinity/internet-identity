@@ -38,13 +38,13 @@ import type { LastUsedIdentity } from "../stores/last-used-identities.store";
 
 const baseTimestamp = 1_725_000_000_000;
 
-afterEach(() => {
-  vi.clearAllMocks();
-  mockCanisterConfig = mockInternetIdentityInit();
-});
-
 describe("lastUsedIdentityTypeName", () => {
-  it("returns provider name for OpenID when config is OpenIdConfig", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    mockCanisterConfig = mockInternetIdentityInit();
+  });
+
+  it("returns 'Example Provider' for OpenID when config found is OpenIdConfig", () => {
     // Arrange: provide a valid OpenIdConfig in canisterConfig.openid_configs
     mockCanisterConfig = mockInternetIdentityInit({
       openid_configs: [
@@ -74,7 +74,7 @@ describe("lastUsedIdentityTypeName", () => {
     expect(result).toBe("Example Provider");
   });
 
-  it("returns 'Google' for OpenID when config is not OpenIdConfig", () => {
+  it("returns 'Google' for OpenID when config found is GoogleConfig", () => {
     // Arrange: provide Google config (GoogleOpenIdConfig) via canisterConfig
     mockCanisterConfig = mockInternetIdentityInit({
       openid_google: [[{ client_id: "google-client-id" }]],
@@ -92,7 +92,7 @@ describe("lastUsedIdentityTypeName", () => {
     expect(result).toBe("Google");
   });
 
-  it("returns 'Google' for OpenID when config is undefined", () => {
+  it("returns 'Unknown' for OpenID when issuer is not found", () => {
     // Arrange: no matching config in canisterConfig
     mockCanisterConfig = mockInternetIdentityInit({
       // No openid_google and no openid_configs matching issuer
@@ -121,7 +121,7 @@ describe("lastUsedIdentityTypeName", () => {
     };
 
     const result = lastUsedIdentityTypeName(identity);
-    expect(result).toBe("Google");
+    expect(result).toBe("Unknown");
   });
 
   it("returns 'Passkey' for passkey auth method", () => {

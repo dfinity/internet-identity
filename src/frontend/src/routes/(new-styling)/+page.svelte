@@ -83,7 +83,10 @@
     if ("passkey" in identity.authMethod) {
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsPasskey);
     } else if ("openid" in identity.authMethod) {
-      const config = findConfig(identity.authMethod.openid.iss);
+      const config = findConfig(
+        identity.authMethod.openid.iss,
+        identity.authMethod.openid.metadata,
+      );
       if (nonNullish(config) && isOpenIdConfig(config)) {
         authenticationV2Funnel.addProperties({
           provider: config.name,

@@ -47,6 +47,16 @@ vi.mock("$lib/globals", () => ({
           auth_uri: "https://issuer.acme/auth",
           fedcm_uri: [],
         },
+        {
+          issuer: "https://issuer.acme/{tid}/v2.0",
+          name: "Tenantable AcmeID",
+          auth_scope: "openid profile email",
+          logo: "<svg></svg>",
+          client_id: "test-client-id-2",
+          jwks_uri: "https://issuer.acme/.well-known/jwks.json",
+          auth_uri: "https://issuer.acme/auth",
+          fedcm_uri: [],
+        },
       ],
     ],
     // Provide feature flag defaults to satisfy optional initialization logic
@@ -145,7 +155,6 @@ describe("getLastUsedAccessMethod", () => {
 });
 
 describe("getOpenIdTitles", () => {
-  const googleIssuer = "https://accounts.google.com";
   const makeOpenIdCredential = (
     iss: string,
     {
@@ -153,7 +162,14 @@ describe("getOpenIdTitles", () => {
       email,
       sub = "sub",
       aud = "audience",
-    }: { name?: string; email?: string; sub?: string; aud?: string },
+      tid,
+    }: {
+      name?: string;
+      email?: string;
+      sub?: string;
+      aud?: string;
+      tid?: string;
+    },
   ): OpenIdCredential => ({
     last_usage_timestamp: [],
     aud,
@@ -162,90 +178,81 @@ describe("getOpenIdTitles", () => {
     metadata: [
       ...(nonNullish(name) ? [["name", { String: name }]] : []),
       ...(nonNullish(email) ? [["email", { String: email }]] : []),
+      ...(nonNullish(tid) ? [["tid", { String: tid }]] : []),
     ] as MetadataMapV2,
   });
 
-  describe("generic open id disabled", () => {
-    beforeEach(() => {
-      ENABLE_GENERIC_OPEN_ID.set(false);
+  it("returns name and email with provider from OpenID config", () => {
+    const cred = makeOpenIdCredential("https://issuer.acme", {
+      name: "Alice",
+      email: "alice@example.com",
     });
-
-    it("returns name and email with provider from OpenID config", () => {
-      const cred = makeOpenIdCredential(googleIssuer, {
-        name: "Alice",
-        email: "alice@example.com",
-      });
-      const res = getOpenIdTitles(cred);
-      expect(res).toEqual({
-        title: { ellipsis: false, text: "Alice" },
-        subtitle: {
-          ellipsis: true,
-          text: "Google Account - alice@example.com",
-        },
-      });
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: false, text: "Alice" },
+      subtitle: {
+        ellipsis: true,
+        text: "AcmeID Account - alice@example.com",
+      },
     });
   });
 
-  describe("generic open id enabled", () => {
-    beforeEach(() => {
-      ENABLE_GENERIC_OPEN_ID.set(true);
+  it("returns name and email with provider from OpenID config with template", () => {
+    const tid = "123";
+    const cred = makeOpenIdCredential(`https://issuer.acme/${tid}/v2.0`, {
+      name: "Alice",
+      email: "alice@example.com",
+      tid,
     });
-
-    it("returns name and email with provider from OpenID config", () => {
-      const cred = makeOpenIdCredential("https://issuer.acme", {
-        name: "Alice",
-        email: "alice@example.com",
-      });
-      const res = getOpenIdTitles(cred);
-      expect(res).toEqual({
-        title: { ellipsis: false, text: "Alice" },
-        subtitle: {
-          ellipsis: true,
-          text: "AcmeID Account - alice@example.com",
-        },
-      });
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: false, text: "Alice" },
+      subtitle: {
+        ellipsis: true,
+        text: "Tenantable AcmeID Account - alice@example.com",
+      },
     });
+  });
 
-    it("returns name only with OpenID provider when email missing", () => {
-      const cred = makeOpenIdCredential("https://issuer.acme", {
-        name: "Bob",
-      });
-      const res = getOpenIdTitles(cred);
-      expect(res).toEqual({
-        title: { ellipsis: false, text: "Bob" },
-        subtitle: { ellipsis: false, text: "AcmeID Account" },
-      });
+  it("returns name only with OpenID provider when email missing", () => {
+    const cred = makeOpenIdCredential("https://issuer.acme", {
+      name: "Bob",
     });
-
-    it("returns Unknown account if Google provider but not in config", () => {
-      const cred = makeOpenIdCredential("https://accounts.google.com", {
-        name: "Bob",
-      });
-      const res = getOpenIdTitles(cred);
-      expect(res).toEqual({
-        title: { ellipsis: false, text: "Bob" },
-        subtitle: { ellipsis: false, text: "Unknown Account" },
-      });
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: false, text: "Bob" },
+      subtitle: { ellipsis: false, text: "AcmeID Account" },
     });
+  });
 
-    it("returns email only with Unknown provider when config not found", () => {
-      const cred = makeOpenIdCredential("https://unknown.provider", {
-        email: "charlie@example.com",
-      });
-      const res = getOpenIdTitles(cred);
-      expect(res).toEqual({
-        title: { ellipsis: true, text: "charlie@example.com" },
-        subtitle: { ellipsis: false, text: "Unknown Account" },
-      });
+  it("returns Unknown account if Google provider but not in config", () => {
+    const cred = makeOpenIdCredential("https://accounts.google.com", {
+      name: "Bob",
     });
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: false, text: "Bob" },
+      subtitle: { ellipsis: false, text: "Google Account" },
+    });
+  });
 
-    it("returns Unknown account when neither name nor email is present", () => {
-      const cred = makeOpenIdCredential("https://issuer.acme", {});
-      const res = getOpenIdTitles(cred);
-      expect(res).toEqual({
-        title: { ellipsis: false, text: "Unknown Account" },
-        subtitle: undefined,
-      });
+  it("returns email only with Unknown provider when config not found", () => {
+    const cred = makeOpenIdCredential("https://unknown.provider", {
+      email: "charlie@example.com",
+    });
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: true, text: "charlie@example.com" },
+      subtitle: { ellipsis: false, text: "Unknown Account" },
+    });
+  });
+
+  it("returns Unknown account when neither name nor email is present", () => {
+    const cred = makeOpenIdCredential("https://issuer.acme", {});
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: false, text: "Unknown Account" },
+      subtitle: undefined,
     });
   });
 });
