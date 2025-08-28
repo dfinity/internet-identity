@@ -1,5 +1,6 @@
 use super::{
-    get_claims, get_issuer_placeholders, replace_issuer_placeholders, OpenIDJWTVerificationError,
+    get_all_claims, get_issuer_placeholders, replace_issuer_placeholders,
+    OpenIDJWTVerificationError,
 };
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
@@ -102,7 +103,7 @@ impl OpenIdProvider for Provider {
 
         // Calculate effective issuer and use it to verify the JWT claims
         let issuer_placeholders = get_issuer_placeholders(&self.issuer());
-        let issuer_claims = get_claims(validation_item.claims(), issuer_placeholders);
+        let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
         let effective_issuer = replace_issuer_placeholders(&self.issuer, &issuer_claims);
         verify_claims(&effective_issuer, &self.client_id, &claims, salt)?;
 

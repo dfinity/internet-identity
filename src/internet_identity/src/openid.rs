@@ -222,7 +222,7 @@ where
             .iter()
             .find(|provider| {
                 let issuer_placeholders = get_issuer_placeholders(&provider.issuer());
-                let issuer_claims = get_claims(validation_item.claims(), issuer_placeholders);
+                let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
                 let effective_issuer =
                     replace_issuer_placeholders(&provider.issuer(), &issuer_claims);
                 effective_issuer == iss
@@ -235,7 +235,7 @@ where
 }
 
 /// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
-/// the Microsoft issuer uri is dynamic based on placeholders, this method returns them e.g. `tid`.
+/// the Microsoft issuer uri is dynamic based on placeholders, this method returns them e.g. `["tid"]`.
 pub fn get_issuer_placeholders(template: &str) -> Vec<String> {
     let mut keys: Vec<String> = vec![];
     let mut remaining = template;
@@ -259,7 +259,7 @@ pub fn get_issuer_placeholders(template: &str) -> Vec<String> {
 }
 
 /// Either get all claims for the given keys or nothing.
-pub fn get_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, String)> {
+pub fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, String)> {
     let Ok(claims) = serde_json::from_slice::<serde_json::Value>(claims_bytes) else {
         return vec![]; // If claims cannot be decoded, return empty vector
     };
@@ -421,7 +421,7 @@ fn should_replace_placeholders_in_issuer() {
     let issuer_placeholders = get_issuer_placeholders(issuer);
     assert_eq!(issuer_placeholders, vec!["tid"]);
 
-    let issuer_claims = get_claims(
+    let issuer_claims = get_all_claims(
         r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad" }"#.as_bytes(),
         issuer_placeholders,
     );
@@ -447,7 +447,7 @@ fn should_ignore_placeholders_in_issuer_that_dont_have_claim() {
     let issuer_placeholders = get_issuer_placeholders(issuer);
     assert_eq!(issuer_placeholders, vec!["tid"]);
 
-    let issuer_claims = get_claims(
+    let issuer_claims = get_all_claims(
         r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
         issuer_placeholders,
     );
@@ -467,7 +467,7 @@ fn should_ignore_unclosed_placeholders_in_issuer() {
     let issuer_placeholders = get_issuer_placeholders(issuer);
     assert!(issuer_placeholders.is_empty());
 
-    let issuer_claims = get_claims(
+    let issuer_claims = get_all_claims(
         r#"{ "tid": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
         issuer_placeholders,
     );
@@ -487,7 +487,7 @@ fn should_retain_issuer_without_placeholders_as_is() {
     let issuer_placeholders = get_issuer_placeholders(issuer);
     assert!(issuer_placeholders.is_empty());
 
-    let issuer_claims = get_claims(
+    let issuer_claims = get_all_claims(
         r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
         issuer_placeholders,
     );
@@ -504,7 +504,7 @@ fn should_replace_multiple_placeholders_in_issuer() {
     let issuer_placeholders = get_issuer_placeholders(issuer);
     assert_eq!(issuer_placeholders, vec!["tid", "sub"]);
 
-    let issuer_claims = get_claims(
+    let issuer_claims = get_all_claims(
         r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad", "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
         issuer_placeholders,
     );
@@ -527,4 +527,61 @@ fn should_replace_multiple_placeholders_in_issuer() {
         effective_issuer,
         "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c/v2.0"
     );
+}
+
+#[cfg(test)]
+struct ExamplePlaceholderProvider;
+
+#[cfg(test)]
+impl OpenIdProvider for ExamplePlaceholderProvider {
+    fn issuer(&self) -> String {
+        "https://login.microsoftonline.com/{tid}/v2.0".into()
+    }
+
+    fn verify(
+        &self,
+        _: &str,
+        _: &[u8; 32],
+    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
+        Ok(self.credential())
+    }
+}
+
+#[cfg(test)]
+impl ExamplePlaceholderProvider {
+    fn credential(&self) -> OpenIdCredential {
+        OpenIdCredential {
+            iss: "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
+                .into(),
+            sub: "example-sub".into(),
+            aud: "example-aud".into(),
+            last_usage_timestamp: None,
+            metadata: HashMap::from([(
+                "tid".into(),
+                MetadataEntryV2::String("9188040d-6c67-4c5b-b112-36a304b66dad".into()),
+            )]),
+        }
+    }
+}
+
+#[test]
+fn find_config_issuer_from_credential() {
+    let provider = ExampleProvider {};
+    let placeholder_provider = ExamplePlaceholderProvider {};
+    let config_issuer = provider.issuer();
+    let placeholder_config_issuer = placeholder_provider.issuer();
+    PROVIDERS.replace(vec![Box::new(provider), Box::new(placeholder_provider)]);
+
+    assert_eq!(
+        ExampleProvider.credential().config_issuer(),
+        Some(config_issuer)
+    );
+    assert_eq!(
+        ExamplePlaceholderProvider.credential().config_issuer(),
+        Some(placeholder_config_issuer)
+    );
+
+    let mut unknown_credential = ExampleProvider.credential();
+    unknown_credential.iss = "https://example.com/unknown".to_string();
+    assert_eq!(unknown_credential.config_issuer(), None);
 }
