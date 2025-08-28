@@ -1,0 +1,19 @@
+{
+  "name": "test_openid_provider",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfinity/internet-identity"
+  },
+  "type": "module",
+  "devDependencies": {
+    "oidc-provider": "^9.4.2",
+    "express": "^5.1.0"
+  },
+  "private": true
+}
