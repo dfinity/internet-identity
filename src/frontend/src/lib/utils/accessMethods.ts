@@ -201,7 +201,7 @@ export const getOpenIdTitles = (
     };
   }
   return {
-    title: { ellipsis: false, text: "Unknown account" },
+    title: { ellipsis: false, text: "Unknown Account" },
     subtitle: undefined,
   };
 };
