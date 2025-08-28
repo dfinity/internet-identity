@@ -221,6 +221,18 @@ export const issuerMatches = (
   return configIssuer === issuer;
 };
 
+/**
+ * Find the OpenID configuration for a given issuer.
+ *
+ * First, it tries to find a match in the generic OpenID configurations.
+ * If no match is found, it falls back to the Google configuration if the issuer matches Google's issuer.
+ *
+ * Not relying in the feature flag ENABLE_GENERIC_OPEN_ID means that if we enable and then disable the feature flag,
+ * afterwards, the users that used the generic OpenID configurations will still be able to log in.
+ *
+ * @param issuer The issuer to find the configuration for.
+ * @returns {OpenIdConfig | GoogleOpenIdConfig | undefined} The configuration for the issuer.
+ */
 export const findConfig = (
   issuer: string,
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
