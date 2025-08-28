@@ -155,7 +155,6 @@ describe("getLastUsedAccessMethod", () => {
 });
 
 describe("getOpenIdTitles", () => {
-  const googleIssuer = "https://accounts.google.com";
   const makeOpenIdCredential = (
     iss: string,
     {

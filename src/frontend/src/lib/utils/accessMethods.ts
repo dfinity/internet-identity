@@ -1,7 +1,6 @@
 import {
   AuthnMethodData,
   DeviceData,
-  MetadataMapV2,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { isNullish, nonNullish } from "@dfinity/utils";
