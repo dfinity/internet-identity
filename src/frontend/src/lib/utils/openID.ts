@@ -177,7 +177,11 @@ export const isFedCMSupported = (
   if (isSamsungBrowser) {
     return false;
   }
-  return nonNullish(config.configURL) && "IdentityCredential" in window;
+  return (
+    nonNullish(config.configURL) &&
+    config.configURL.length > 0 &&
+    "IdentityCredential" in window
+  );
 };
 
 /**
@@ -242,7 +246,8 @@ export const extractIssuerTemplateClaims = (
     const end = start + m[0].length;
     const literal = configIssuer.slice(lastIndex, start);
     regexStr += escapeRegExp(literal);
-    const isLastAtEnd = idx === matches.length - 1 && end === configIssuer.length;
+    const isLastAtEnd =
+      idx === matches.length - 1 && end === configIssuer.length;
     // If last placeholder is at the end, allow greedy capture; otherwise non-greedy until next literal
     regexStr += isLastAtEnd ? "(.+)" : "(.+?)";
     lastIndex = end;
