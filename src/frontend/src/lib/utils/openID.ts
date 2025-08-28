@@ -181,45 +181,103 @@ export const isFedCMSupported = (
 };
 
 /**
- * Compare an issuer URL against a config issuer pattern.
+ * Build a concrete issuer URL from a configured issuer pattern and claims.
+ *
+ * Replaces any placeholder wrapped in curly braces, e.g. "{tid}", with the
+ * corresponding value from the claims map. If any placeholder is missing in
+ * the provided claims, the function returns `undefined` to indicate that a
+ * valid issuer cannot be constructed.
+ */
+export const buildIssuerFromConfig = (
+  configIssuer: string,
+  metadata: MetadataMapV2,
+): string | undefined => {
+  if (!configIssuer.includes("{")) {
+    return configIssuer;
+  }
+  let missing = false;
+  const built = configIssuer.replace(/{([^}]+)}/g, (_match, name: string) => {
+    const value = getMetadataString(metadata, name);
+    if (typeof value === "string") return value;
+    missing = true;
+    return "";
+  });
+  return missing ? undefined : built;
+};
+
+/**
+ * Extract claims from an issuer URL based on a configured issuer template.
+ *
+ * Example:
+ *  template: "https://login.microsoftonline.com/{tid}/v2.0"
+ *  issuer:   "https://login.microsoftonline.com/4a435c5e-6451-4c1a-a81f-ab9666b6de8f/v2.0"
+ *  returns:  { tid: "4a435c5e-6451-4c1a-a81f-ab9666b6de8f" }
+ *
+ * If the template has no placeholders, returns an empty object when the issuer
+ * matches exactly, otherwise `undefined`.
+ */
+export const extractIssuerTemplateClaims = (
+  configIssuer: string,
+  issuer: string,
+): Record<string, string> | undefined => {
+  // Detect placeholders of the form {name}
+  const placeholderRegex = /{([^}]+)}/g;
+  const matches = Array.from(configIssuer.matchAll(placeholderRegex));
+  const names: string[] = matches.map((m) => m[1]);
+
+  // No placeholders: exact match -> empty object, else undefined
+  if (names.length === 0) {
+    return issuer === configIssuer ? {} : undefined;
+  }
+
+  // Build a strict regex from the template, escaping literals and creating
+  // capture groups for placeholders. Use non-greedy groups between literals
+  // and greedy for the last placeholder if it is at the end.
+  const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  let lastIndex = 0;
+  let regexStr = "^";
+  matches.forEach((m, idx) => {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    const literal = configIssuer.slice(lastIndex, start);
+    regexStr += escapeRegExp(literal);
+    const isLastAtEnd = idx === matches.length - 1 && end === configIssuer.length;
+    // If last placeholder is at the end, allow greedy capture; otherwise non-greedy until next literal
+    regexStr += isLastAtEnd ? "(.+)" : "(.+?)";
+    lastIndex = end;
+  });
+  // Trailing literal
+  regexStr += escapeRegExp(configIssuer.slice(lastIndex));
+  regexStr += "$";
+
+  const re = new RegExp(regexStr);
+  const res = re.exec(issuer);
+  if (!res) return undefined;
+
+  const values: Record<string, string> = {};
+  names.forEach((name, i) => {
+    values[name] = res[i + 1];
+  });
+  return values;
+};
+
+/**
+ * Compare an issuer URL against a config issuer pattern and claims.
  * If the config issuer contains placeholders in curly braces (e.g.,
- * "https://login.microsoftonline.com/{tid}/v2.0"), each placeholder matches
- * exactly one path segment (i.e., [^/]+). Otherwise, performs exact comparison.
+ * "https://login.microsoftonline.com/{tid}/v2.0"),
+ * extract the placeholders, create a new issuer URL with the claims values,
+ * and perform a comparison.
+ *
+ * Otherwise, performs exact comparison.
  *
  * Exported for testing purposes.
  */
 export const issuerMatches = (
   configIssuer: string,
   issuer: string,
-): boolean => {
-  if (configIssuer.includes("{") && configIssuer.includes("}")) {
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    let pattern = "^";
-    let i = 0;
-    while (i < configIssuer.length) {
-      const open = configIssuer.indexOf("{", i);
-      if (open === -1) {
-        pattern += escapeRegex(configIssuer.slice(i));
-        break;
-      }
-      const close = configIssuer.indexOf("}", open + 1);
-      if (close === -1) {
-        // Unmatched opening brace: treat the remainder literally
-        pattern += escapeRegex(configIssuer.slice(i));
-        break;
-      }
-      // Literal part before the placeholder
-      pattern += escapeRegex(configIssuer.slice(i, open));
-      // Placeholder matches a single path segment
-      pattern += "([^/]+)";
-      i = close + 1;
-    }
-    pattern += "$";
-    const re = new RegExp(pattern);
-    return re.test(issuer);
-  }
-  return configIssuer === issuer;
-};
+  metadata: MetadataMapV2,
+): boolean => buildIssuerFromConfig(configIssuer, metadata) === issuer;
 
 /**
  * Find the OpenID configuration for a given issuer.
@@ -235,10 +293,11 @@ export const issuerMatches = (
  */
 export const findConfig = (
   issuer: string,
+  metadata: MetadataMapV2 = [],
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
   // First, try to find a match in the generic OpenID configurations
   const fromConfigs = canisterConfig.openid_configs?.[0]?.find((config) =>
-    issuerMatches(config.issuer, issuer),
+    issuerMatches(config.issuer, issuer, metadata),
   );
   if (nonNullish(fromConfigs)) {
     return fromConfigs;

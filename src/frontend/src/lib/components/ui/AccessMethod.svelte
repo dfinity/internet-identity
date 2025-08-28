@@ -75,7 +75,7 @@
       {/if}
     </div>
   {:else}
-    {@const openIdTitles = getOpenIdTitles(accessMethod)}
+    {@const openIdTitles = getOpenIdTitles(accessMethod, accessMethod.metadata)}
     <!-- OpenID -->
     <div
       class={[

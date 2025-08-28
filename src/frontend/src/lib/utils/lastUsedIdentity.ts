@@ -6,7 +6,10 @@ export const lastUsedIdentityTypeName = (
   lastUsedIdentity: LastUsedIdentity,
 ) => {
   if ("openid" in lastUsedIdentity.authMethod) {
-    const config = findConfig(lastUsedIdentity.authMethod.openid.iss);
+    const config = findConfig(
+      lastUsedIdentity.authMethod.openid.iss,
+      lastUsedIdentity.authMethod.openid.metadata,
+    );
     if (nonNullish(config) && isOpenIdConfig(config)) {
       return config.name;
     }

@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { findConfig, GOOGLE_ISSUER, issuerMatches } from "./openID";
+import {
+  findConfig,
+  GOOGLE_ISSUER,
+  issuerMatches,
+  extractIssuerTemplateClaims,
+} from "./openID";
 import {
   GoogleOpenIdConfig,
   OpenIdConfig,
@@ -19,6 +24,7 @@ describe("issuerMatches", () => {
       issuerMatches(
         "https://accounts.google.com",
         "https://accounts.google.com",
+        [],
       ),
     ).toBe(true);
   });
@@ -28,39 +34,66 @@ describe("issuerMatches", () => {
       issuerMatches(
         "https://accounts.google.com",
         "https://accounts.example.com",
+        [],
       ),
     ).toBe(false);
   });
 
-  it("matches a single placeholder as one path segment", () => {
+  it("builds issuer by substituting a single placeholder from claims", () => {
+    const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
       issuerMatches(
         "https://login.microsoftonline.com/{tid}/v2.0",
-        "https://login.microsoftonline.com/4a435c5e-6451-4c1a-a81f-ab9666b6de8f/v2.0",
+        `https://login.microsoftonline.com/${tid}/v2.0`,
+        [["tid", { String: tid }]],
       ),
     ).toBe(true);
   });
 
-  it("does not allow placeholder to match across path segments", () => {
+  it("returns false if a required placeholder is missing in claims", () => {
+    const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
       issuerMatches(
         "https://login.microsoftonline.com/{tid}/v2.0",
-        "https://login.microsoftonline.com/foo/bar/v2.0",
+        `https://login.microsoftonline.com/${tid}/v2.0`,
+        [],
       ),
     ).toBe(false);
   });
 
-  it("matches multiple placeholders each to a single segment", () => {
+  it("substitutes multiple placeholders from claims", () => {
     expect(
       issuerMatches(
         "https://example.com/{a}/{b}/end",
         "https://example.com/one/two/end",
+        [
+          ["a", { String: "one" }],
+          ["b", { String: "two" }],
+        ],
       ),
     ).toBe(true);
+  });
+
+  it("uses claim values verbatim (including slashes)", () => {
     expect(
       issuerMatches(
         "https://example.com/{a}/{b}/end",
         "https://example.com/one/two/extra/end",
+        [
+          ["a", { String: "one" }],
+          ["b", { String: "two/extra" }],
+        ],
+      ),
+    ).toBe(true);
+    // If claims include a slash, the exact built string must match
+    expect(
+      issuerMatches(
+        "https://example.com/{a}/{b}/end",
+        "https://example.com/one/two/end",
+        [
+          ["a", { String: "one" }],
+          ["b", { String: "two/extra" }],
+        ],
       ),
     ).toBe(false);
   });
@@ -68,16 +101,18 @@ describe("issuerMatches", () => {
   it("treats unmatched braces literally (no regex)", () => {
     // Only opening brace, no closing brace -> literal comparison
     const pattern = "https://example.com/{tid";
-    expect(issuerMatches(pattern, pattern)).toBe(true);
-    expect(issuerMatches(pattern, "https://example.com/anything")).toBe(false);
+    expect(issuerMatches(pattern, pattern, [])).toBe(true);
+    expect(issuerMatches(pattern, "https://example.com/anything", [])).toBe(
+      false,
+    );
   });
 
   it("escapes regex special characters in literals", () => {
     expect(
-      issuerMatches("https://example.com/v2.0", "https://example.com/v2.0"),
+      issuerMatches("https://example.com/v2.0", "https://example.com/v2.0", []),
     ).toBe(true);
     expect(
-      issuerMatches("https://example.com/v2.0", "https://example.com/v20"),
+      issuerMatches("https://example.com/v2.0", "https://example.com/v20", []),
     ).toBe(false);
 
     // Placeholder next to a dot
@@ -85,14 +120,92 @@ describe("issuerMatches", () => {
       issuerMatches(
         "https://example.com/v{ver}.0",
         "https://example.com/v123.0",
+        [["ver", { String: "123" }]],
       ),
     ).toBe(true);
     expect(
       issuerMatches(
         "https://example.com/v{ver}.0",
         "https://example.com/v/123.0",
+        [["ver", { String: "123" }]],
       ),
     ).toBe(false);
+  });
+});
+
+describe("extractIssuerTemplateClaims", () => {
+  it("returns empty object for exact issuer without placeholders", () => {
+    expect(
+      extractIssuerTemplateClaims("https://example.com", "https://example.com"),
+    ).toEqual({});
+  });
+
+  it("returns undefined for non-matching exact issuer without placeholders", () => {
+    expect(
+      extractIssuerTemplateClaims("https://example.com", "https://example.org"),
+    ).toBeUndefined();
+  });
+
+  it("extracts a single placeholder value", () => {
+    const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
+    expect(
+      extractIssuerTemplateClaims(
+        "https://login.microsoftonline.com/{tid}/v2.0",
+        `https://login.microsoftonline.com/${tid}/v2.0`,
+      ),
+    ).toEqual({ tid });
+  });
+
+  it("extracts multiple placeholders and allows slashes inside captures", () => {
+    expect(
+      extractIssuerTemplateClaims(
+        "https://example.com/{a}/{b}/end",
+        "https://example.com/one/two/extra/end",
+      ),
+    ).toEqual({ a: "one", b: "two/extra" });
+  });
+
+  it("returns undefined when issuer does not fit the template shape", () => {
+    // Trailing literal mismatch
+    expect(
+      extractIssuerTemplateClaims(
+        "https://login.microsoftonline.com/{tid}/v2.0",
+        "https://login.microsoftonline.com/anything/v3.0",
+      ),
+    ).toBeUndefined();
+
+    // Extra trailing content not in template
+    expect(
+      extractIssuerTemplateClaims(
+        "https://example.com/{a}/{b}/end",
+        "https://example.com/one/two/extra/end/more",
+      ),
+    ).toBeUndefined();
+  });
+
+  it("captures greedily for a last placeholder at the end", () => {
+    expect(
+      extractIssuerTemplateClaims(
+        "https://example.com/prefix/{rest}",
+        "https://example.com/prefix/a/b/c",
+      ),
+    ).toEqual({ rest: "a/b/c" });
+  });
+
+  it("captures non-greedily between literals and handles dots near placeholders", () => {
+    expect(
+      extractIssuerTemplateClaims(
+        "https://example.com/prefix/{mid}/suffix",
+        "https://example.com/prefix/a/b/c/suffix",
+      ),
+    ).toEqual({ mid: "a/b/c" });
+
+    expect(
+      extractIssuerTemplateClaims(
+        "https://example.com/v{ver}.0",
+        "https://example.com/v123.0",
+      ),
+    ).toEqual({ ver: "123" });
   });
 });
 
@@ -119,45 +232,57 @@ describe("findConfig", () => {
   it("returns OpenID config when issuer matches in openid_configs", () => {
     const cfg = createOpenIDConfig("https://example.com/oauth2");
     canisterConfig.openid_configs = [[cfg]];
-    expect(findConfig("https://example.com/oauth2")).toBe(cfg);
+    expect(findConfig("https://example.com/oauth2", [])).toBe(cfg);
   });
 
-  it("matches a template issuer in openid_configs", () => {
+  it("matches a template issuer in openid_configs when claims provide values", () => {
     const msCfg = createOpenIDConfig(
       "https://login.microsoftonline.com/{tid}/v2.0",
     );
     canisterConfig.openid_configs = [[msCfg]];
+    const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
-      findConfig(
-        "https://login.microsoftonline.com/4a435c5e-6451-4c1a-a81f-ab9666b6de8f/v2.0",
-      ),
+      findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, [
+        ["tid", { String: tid }],
+      ]),
     ).toBe(msCfg);
+  });
+
+  it("does not match template issuer if required claim is missing", () => {
+    const msCfg = createOpenIDConfig(
+      "https://login.microsoftonline.com/{tid}/v2.0",
+    );
+    canisterConfig.openid_configs = [[msCfg]];
+    const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
+    expect(
+      findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, []),
+    ).toBeUndefined();
   });
 
   it("returns Apple config if issuer is Apple (from openid_configs)", () => {
     canisterConfig.openid_google = [[googleCfg]];
     const appleConfig = createOpenIDConfig(appleIssuer);
     canisterConfig.openid_configs = [[appleConfig]];
-    expect(findConfig(appleIssuer)).toBe(appleConfig);
+    expect(findConfig(appleIssuer, [])).toBe(appleConfig);
   });
 
   it("returns Google config if issuer is Google and no matching openid_configs", () => {
     canisterConfig.openid_google = [[googleCfg]];
     canisterConfig.openid_configs = [];
-    expect(findConfig(GOOGLE_ISSUER)).toBe(googleCfg);
+    expect(findConfig(GOOGLE_ISSUER, [])).toBe(googleCfg);
   });
 
   it("prefers openid_configs over Google config for Google issuer when both present", () => {
     const googleOpenIdCfg = createOpenIDConfig(GOOGLE_ISSUER);
     canisterConfig.openid_configs = [[googleOpenIdCfg]];
     canisterConfig.openid_google = [[googleCfg]];
-    expect(findConfig(GOOGLE_ISSUER)).toBe(googleOpenIdCfg);
+    expect(findConfig(GOOGLE_ISSUER, [])).toBe(googleOpenIdCfg);
   });
 
   it("returns undefined for Google issuer when no Google config and no matching openid_configs", () => {
     canisterConfig.openid_google = [];
     canisterConfig.openid_configs = [];
-    expect(findConfig(GOOGLE_ISSUER)).toBeUndefined();
+    expect(findConfig(GOOGLE_ISSUER, [])).toBeUndefined();
   });
 
   it("returns undefined when no issuer matches", () => {
@@ -166,6 +291,8 @@ describe("findConfig", () => {
       createOpenIDConfig("https://login.microsoftonline.com/{tid}/v2.0"),
     ];
     canisterConfig.openid_configs = [cfgs];
-    expect(findConfig("https://no-such-issuer.example.com")).toBeUndefined();
+    expect(
+      findConfig("https://no-such-issuer.example.com", []),
+    ).toBeUndefined();
   });
 });
