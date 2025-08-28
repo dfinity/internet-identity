@@ -140,6 +140,29 @@ impl OpenIdCredential {
             }
         })
     }
+
+    /// Find current config for stored credential
+    pub fn config_issuer(&self) -> Option<String> {
+        PROVIDERS.with_borrow(|providers| {
+            providers
+                .iter()
+                .find(|provider| {
+                    let issuer_placeholders = get_issuer_placeholders(&provider.issuer());
+                    let mut issuer_claims: Vec<(String, String)> = vec![];
+                    for key in issuer_placeholders {
+                        if let Some(MetadataEntryV2::String(value)) = self.metadata.get(&key) {
+                            issuer_claims.push((key, value.to_string()));
+                        } else {
+                            return false;
+                        }
+                    }
+                    let effective_issuer =
+                        replace_issuer_placeholders(&provider.issuer(), &issuer_claims);
+                    effective_issuer == self.iss
+                })
+                .map(|provider| provider.issuer())
+        })
+    }
 }
 
 pub trait OpenIdProvider {
@@ -190,7 +213,7 @@ where
             OpenIDJWTVerificationError::GenericError("Failed to decode JWT".to_string())
         })?;
 
-    let claims: PartialClaims = serde_json::from_slice(validation_item.claims()).map_err(|_| {
+    let PartialClaims { iss } = serde_json::from_slice(validation_item.claims()).map_err(|_| {
         OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string())
     })?;
 
@@ -198,61 +221,67 @@ where
         providers
             .iter()
             .find(|provider| {
+                let issuer_placeholders = get_issuer_placeholders(&provider.issuer());
+                let issuer_claims = get_claims(validation_item.claims(), issuer_placeholders);
                 let effective_issuer =
-                    replace_issuer_placeholders(&provider.issuer(), validation_item.claims());
-                effective_issuer == claims.iss
+                    replace_issuer_placeholders(&provider.issuer(), &issuer_claims);
+                effective_issuer == iss
             })
             .ok_or_else(|| {
-                OpenIDJWTVerificationError::GenericError(format!(
-                    "Unsupported issuer: {}",
-                    claims.iss
-                ))
+                OpenIDJWTVerificationError::GenericError(format!("Unsupported issuer: {}", iss))
             })
             .and_then(|provider| callback(provider.as_ref()))
     })
 }
 
 /// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
-/// the Microsoft issuer uri is dynamic based on the `tid` claim, this method makes sure to
-/// replace the placeholders like e.g. `tid` in the issuer uri with the corresponding claims.
-pub fn replace_issuer_placeholders(template: &str, claims_bytes: &[u8]) -> String {
-    let Ok(claims) = serde_json::from_slice::<serde_json::Value>(claims_bytes) else {
-        return template.to_string(); // If claims cannot be decoded, return template as-is
-    };
-
-    let mut result = String::with_capacity(template.len());
+/// the Microsoft issuer uri is dynamic based on placeholders, this method returns them e.g. `tid`.
+pub fn get_issuer_placeholders(template: &str) -> Vec<String> {
+    let mut keys: Vec<String> = vec![];
     let mut remaining = template;
 
     // TODO: Simplify by using Regex once we are not constrained by WASM size
     while let Some(open_pos) = remaining.find('{') {
-        // Append text before '{'
-        result.push_str(&remaining[..open_pos]);
         remaining = &remaining[open_pos + 1..];
 
         if let Some(close_pos) = remaining.find('}') {
             let key = &remaining[..close_pos];
-
-            // Lookup claim; if missing, leave placeholder as-is
-            if let Some(replacement) = claims.get(key).and_then(|v| v.as_str()) {
-                result.push_str(replacement);
-            } else {
-                // Put back the original placeholder
-                result.push('{');
-                result.push_str(key);
-                result.push('}');
-            }
-
+            keys.push(key.to_string());
             // Move past '}'
             remaining = &remaining[close_pos + 1..];
         } else {
-            // No closing '}', return the original template string
-            return template.to_string();
+            // No closing '}', return the empty vector
+            return vec![];
         }
     }
 
-    // Append any remaining text
-    result.push_str(remaining);
+    keys
+}
 
+/// Either get all claims for the given keys or nothing.
+pub fn get_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, String)> {
+    let Ok(claims) = serde_json::from_slice::<serde_json::Value>(claims_bytes) else {
+        return vec![]; // If claims cannot be decoded, return empty vector
+    };
+    let mut result: Vec<(String, String)> = vec![];
+    for key in keys {
+        if let Some(claim) = claims.get(key.clone()).and_then(|v| v.as_str()) {
+            result.push((key.to_string(), claim.to_string()));
+        } else {
+            return vec![];
+        }
+    }
+    result
+}
+
+/// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
+/// the Microsoft issuer uri is dynamic based on the `tid` claim, this method makes sure to
+/// replace the placeholders like e.g. `tid` in the issuer uri with the corresponding claims.
+pub fn replace_issuer_placeholders(template: &str, claims: &Vec<(String, String)>) -> String {
+    let mut result = template.to_string();
+    for (key, value) in claims {
+        result = result.replace(&format!("{{{key}}}"), value);
+    }
     result
 }
 
@@ -387,56 +416,115 @@ fn should_return_error_when_claims_invalid() {
 
 #[test]
 fn should_replace_placeholders_in_issuer() {
+    let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
+
+    let issuer_placeholders = get_issuer_placeholders(issuer);
+    assert_eq!(issuer_placeholders, vec!["tid"]);
+
+    let issuer_claims = get_claims(
+        r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad" }"#.as_bytes(),
+        issuer_placeholders,
+    );
     assert_eq!(
-        replace_issuer_placeholders(
-            "https://login.microsoftonline.com/{tid}/v2.0",
-            r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad" }"#.as_bytes()
-        ),
-        "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0".to_string()
+        issuer_claims,
+        vec![(
+            "tid".to_string(),
+            "9188040d-6c67-4c5b-b112-36a304b66dad".to_string()
+        )]
+    );
+
+    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
+    assert_eq!(
+        effective_issuer,
+        "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0"
     );
 }
 
 #[test]
 fn should_ignore_placeholders_in_issuer_that_dont_have_claim() {
+    let issuer = "https://login.microsoftonline.com/{tid}/v2.0";
+
+    let issuer_placeholders = get_issuer_placeholders(issuer);
+    assert_eq!(issuer_placeholders, vec!["tid"]);
+
+    let issuer_claims = get_claims(
+        r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
+        issuer_placeholders,
+    );
+    assert!(issuer_claims.is_empty());
+
+    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
     assert_eq!(
-        replace_issuer_placeholders(
-            "https://login.microsoftonline.com/{tid}/v2.0",
-            r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
-        ),
-        "https://login.microsoftonline.com/{tid}/v2.0".to_string()
+        effective_issuer,
+        "https://login.microsoftonline.com/{tid}/v2.0"
     );
 }
 
 #[test]
 fn should_ignore_unclosed_placeholders_in_issuer() {
+    let issuer = "https://login.microsoftonline.com/{tid/v2.0";
+
+    let issuer_placeholders = get_issuer_placeholders(issuer);
+    assert!(issuer_placeholders.is_empty());
+
+    let issuer_claims = get_claims(
+        r#"{ "tid": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
+        issuer_placeholders,
+    );
+    assert!(issuer_claims.is_empty());
+
+    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
     assert_eq!(
-        replace_issuer_placeholders(
-            "https://login.microsoftonline.com/{tid/v2.0",
-            r#"{ "tid": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
-        ),
+        effective_issuer,
         "https://login.microsoftonline.com/{tid/v2.0"
     );
 }
 
 #[test]
 fn should_retain_issuer_without_placeholders_as_is() {
-    assert_eq!(
-        replace_issuer_placeholders(
-            "https://accounts.google.com",
-            r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
-        ),
-        "https://accounts.google.com".to_string()
+    let issuer = "https://accounts.google.com";
+
+    let issuer_placeholders = get_issuer_placeholders(issuer);
+    assert!(issuer_placeholders.is_empty());
+
+    let issuer_claims = get_claims(
+        r#"{ "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
+        issuer_placeholders,
     );
+    assert!(issuer_claims.is_empty());
+
+    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
+    assert_eq!(effective_issuer, issuer);
 }
 
 #[test]
 fn should_replace_multiple_placeholders_in_issuer() {
+    let issuer = "https://login.microsoftonline.com/{tid}/{sub}/v2.0";
+
+    let issuer_placeholders = get_issuer_placeholders(issuer);
+    assert_eq!(issuer_placeholders, vec!["tid", "sub"]);
+
+    let issuer_claims = get_claims(
+        r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad", "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes(),
+        issuer_placeholders,
+    );
     assert_eq!(
-        replace_issuer_placeholders(
-            "https://login.microsoftonline.com/{tid}/{sub}/v2.0",
-            r#"{ "tid": "9188040d-6c67-4c5b-b112-36a304b66dad", "sub": "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c" }"#.as_bytes()
-        ),
+        issuer_claims,
+        vec![
+            (
+                "tid".to_string(),
+                "9188040d-6c67-4c5b-b112-36a304b66dad".to_string(),
+            ),
+            (
+                "sub".to_string(),
+                "MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c".to_string()
+            )
+        ]
+    );
+
+    let effective_issuer = replace_issuer_placeholders(issuer, &issuer_claims);
+    assert_eq!(
+        effective_issuer,
         "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/MdNi5RU6AxYZr7-2_F83sTswMq_2fvaK6rj8x3fbE9c/v2.0"
-            .to_string()
     );
 }

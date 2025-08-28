@@ -220,15 +220,19 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
             let OpenIDRegFinishArg { jwt, salt, name } = openid_registration_data;
-            let openid_credential =
-                openid::with_provider(jwt, |provider| provider.verify(jwt, salt))?;
+            let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
+                Ok((provider.verify(jwt, salt)?, provider.issuer()))
+            })?;
             add_openid_credential(&mut identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
             set_name(&mut identity, Some(name.clone()))
                 .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
             activity_bookkeeping(
                 &mut identity,
-                &AuthorizationKey::OpenIdCredentialKey(openid_credential.key()),
+                &AuthorizationKey::OpenIdCredentialKey((
+                    openid_credential.key(),
+                    Some(openid_config_iss),
+                )),
             );
 
             Operation::RegisterAnchorWithOpenIdCredential {

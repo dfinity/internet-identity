@@ -329,7 +329,7 @@ pub struct OpenIdConfig {
 
 pub enum AuthorizationKey {
     DeviceKey(DeviceKey),
-    OpenIdCredentialKey(OpenIdCredentialKey),
+    OpenIdCredentialKey((OpenIdCredentialKey, Option<ConfigIss>)),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -1,4 +1,6 @@
-use super::{replace_issuer_placeholders, OpenIDJWTVerificationError};
+use super::{
+    get_claims, get_issuer_placeholders, replace_issuer_placeholders, OpenIDJWTVerificationError,
+};
 use crate::openid::OpenIdCredential;
 use crate::openid::OpenIdProvider;
 use crate::openid::MINUTE_NS;
@@ -86,7 +88,7 @@ impl OpenIdProvider for Provider {
         jwt: &str,
         salt: &[u8; 32],
     ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
-        // Decode JWT and verify claims
+        // Decode JWT and decode claims
         let validation_item = Decoder::new()
             .decode_compact_serialization(jwt.as_bytes(), None)
             .map_err(|_| {
@@ -97,7 +99,11 @@ impl OpenIdProvider for Provider {
                 "Unable to decode claims or expected claims are missing".to_string(),
             )
         })?;
-        let effective_issuer = replace_issuer_placeholders(&self.issuer, validation_item.claims());
+
+        // Calculate effective issuer and use it to verify the JWT claims
+        let issuer_placeholders = get_issuer_placeholders(&self.issuer());
+        let issuer_claims = get_claims(validation_item.claims(), issuer_placeholders);
+        let effective_issuer = replace_issuer_placeholders(&self.issuer, &issuer_claims);
         verify_claims(&effective_issuer, &self.client_id, &claims, salt)?;
 
         // Verify JWT signature
@@ -127,12 +133,14 @@ impl OpenIdProvider for Provider {
         if let Some(name) = claims.name {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
         }
+        // Store issuer specific claims in the metadata e.g. `tid`
+        for (key, value) in issuer_claims {
+            metadata.insert(key, MetadataEntryV2::String(value));
+        }
         Ok(OpenIdCredential {
-            // Do NOT use claims.iss here since it could be different within the
-            // same OpenID provider as seen in Microsoft with multiple tenants.
-            //
-            // The issuer returned should therefore ALWAYS be the issuer from the config,
-            // so that credentials are always stored with a single issuer per provider.
+            // Do NOT use self.issuer() here since every iss and sub pair should uniquely identify
+            // an account, the config issuer in the case of Microsoft is not the actual issuer
+            // but a string with placeholders that doesn't identify in which issuer a sub belongs.
             //
             // Example issuer config:
             // https://login.microsoftonline.com/{tenantid}/v2.0
@@ -140,7 +148,7 @@ impl OpenIdProvider for Provider {
             // Example iss claims:
             // https://login.microsoftonline.com/164d0422-a01d-41d5-945a-37456ea80dbb/v2.0
             // https://login.microsoftonline.com/599249e6-791a-48a7-84d0-b3e858773ac2/v2.0
-            iss: self.issuer.clone(),
+            iss: claims.iss,
             sub: claims.sub,
             aud: claims.aud,
             last_usage_timestamp: None,
