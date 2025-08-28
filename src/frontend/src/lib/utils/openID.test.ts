@@ -29,7 +29,7 @@ describe("issuerMatches", () => {
     ).toBe(true);
   });
 
-  it.only("returns false for half match", () => {
+  it("returns false for half match", () => {
     expect(
       issuerMatches(
         "https://accounts.google.com",
