@@ -8,6 +8,7 @@ import { isSameOrigin } from "./urlUtils";
 import { canisterConfig } from "$lib/globals";
 import { authnMethodEqual } from "./webAuthn";
 import { LEGACY_II_URL } from "$lib/config";
+import { findConfig, getMetadataString, isOpenIdConfig } from "./openID";
 
 /**
  * Check if a `AuthnMethodData` or `OpenIdCredential` is a WebAuthn method
@@ -63,16 +64,14 @@ export const getLastUsedAccessMethod = (
 /**
  * Extract the origin from an AuthnMethodData's metadata
  */
-export const getOrigin = (
-  accessMethod: AuthnMethodData,
-): string | undefined => {
-  const metadataEntry = accessMethod.metadata.find(([key]) => key === "origin");
-  const metadataValue = metadataEntry?.[1];
-  if (nonNullish(metadataValue) && "String" in metadataValue) {
-    return metadataValue.String;
-  }
-  return undefined;
-};
+export const getOrigin = (accessMethod: AuthnMethodData): string | undefined =>
+  getMetadataString(accessMethod.metadata, "origin");
+
+const getOpenIdCredentialName = (credential: OpenIdCredential) =>
+  getMetadataString(credential.metadata, "name");
+
+const getOpenIdCredentialEmail = (credential: OpenIdCredential) =>
+  getMetadataString(credential.metadata, "email");
 
 /**
  * Extract the RP ID (origin without protocol) from an AuthnMethodData's metadata
@@ -164,4 +163,45 @@ export const isSameAccessMethod = (
     );
   }
   return false;
+};
+
+export const getOpenIdTitles = (
+  credential: OpenIdCredential,
+): {
+  title: { ellipsis: boolean; text: string };
+  subtitle?: { ellipsis: boolean; text: string };
+} => {
+  const name = getOpenIdCredentialName(credential);
+  const email = getOpenIdCredentialEmail(credential);
+  const config = findConfig(credential.iss);
+  const accountProvider = nonNullish(config)
+    ? isOpenIdConfig(config)
+      ? config.name
+      : "Google"
+    : "Unknown";
+  if (nonNullish(name) && nonNullish(email)) {
+    return {
+      title: { ellipsis: false, text: name },
+      subtitle: {
+        ellipsis: true,
+        text: `${accountProvider} Account - ${email}`,
+      },
+    };
+  }
+  if (nonNullish(name)) {
+    return {
+      title: { ellipsis: false, text: name },
+      subtitle: { ellipsis: false, text: `${accountProvider} Account` },
+    };
+  }
+  if (nonNullish(email)) {
+    return {
+      title: { ellipsis: true, text: email },
+      subtitle: { ellipsis: false, text: `${accountProvider} Account` },
+    };
+  }
+  return {
+    title: { ellipsis: false, text: "Unknown account" },
+    subtitle: undefined,
+  };
 };
