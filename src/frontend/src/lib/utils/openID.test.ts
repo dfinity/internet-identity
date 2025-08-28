@@ -121,18 +121,18 @@ describe("findConfig", () => {
       ENABLE_GENERIC_OPEN_ID.set(false);
     });
 
-    it("returns Google config if issuer is Google", async () => {
+    it("returns Google config if issuer is Google", () => {
       canisterConfig.openid_google = [[googleCfg]];
       expect(findConfig(GOOGLE_ISSUER)).toBe(googleCfg);
     });
 
-    it("returns undefined if issuer is Apple", async () => {
+    it("returns undefined if issuer is Apple", () => {
       canisterConfig.openid_google = [[googleCfg]];
       canisterConfig.openid_configs = [[createOpenIDConfig(appleIssuer)]];
       expect(findConfig(appleIssuer)).toBeUndefined();
     });
 
-    it("returns undefined if issuer is Google but there is no google config", async () => {
+    it("returns undefined if issuer is Google but there is no google config", () => {
       canisterConfig.openid_google = [];
       expect(findConfig(GOOGLE_ISSUER)).toBeUndefined();
     });
@@ -143,26 +143,26 @@ describe("findConfig", () => {
       ENABLE_GENERIC_OPEN_ID.set(true);
     });
 
-    it("finds a non-template issuer in openid_configs", async () => {
+    it("finds a non-template issuer in openid_configs", () => {
       const cfg = createOpenIDConfig("https://example.com/oauth2");
       canisterConfig.openid_configs = [[cfg]];
       expect(findConfig("https://example.com/oauth2")).toBe(cfg);
     });
 
-    it("returns Apple config if issuer is Apple", async () => {
+    it("returns Apple config if issuer is Apple", () => {
       canisterConfig.openid_google = [[googleCfg]];
       const appleConfig = createOpenIDConfig(appleIssuer);
       canisterConfig.openid_configs = [[appleConfig]];
       expect(findConfig(appleIssuer)).toBe(appleConfig);
     });
 
-    it("returns undefined for google if no open id configs but google config is set", async () => {
+    it("returns undefined for google if no open id configs but google config is set", () => {
       canisterConfig.openid_google = [[googleCfg]];
       canisterConfig.openid_configs = [];
       expect(findConfig(GOOGLE_ISSUER)).toBeUndefined();
     });
 
-    it("matches a template issuer in openid_configs", async () => {
+    it("matches a template issuer in openid_configs", () => {
       const msCfg = createOpenIDConfig(
         "https://login.microsoftonline.com/{tid}/v2.0",
       );
@@ -174,7 +174,7 @@ describe("findConfig", () => {
       ).toBe(msCfg);
     });
 
-    it("returns undefined when no issuer matches", async () => {
+    it("returns undefined when no issuer matches", () => {
       const cfgs = [
         createOpenIDConfig("https://example.com/oauth2"),
         createOpenIDConfig("https://login.microsoftonline.com/{tid}/v2.0"),
