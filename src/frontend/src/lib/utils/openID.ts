@@ -181,6 +181,47 @@ export const isFedCMSupported = (
   return nonNullish(config.configURL) && "IdentityCredential" in window;
 };
 
+/**
+ * Compare an issuer URL against a config issuer pattern.
+ * If the config issuer contains placeholders in curly braces (e.g.,
+ * "https://login.microsoftonline.com/{tid}/v2.0"), each placeholder matches
+ * exactly one path segment (i.e., [^/]+). Otherwise, performs exact comparison.
+ *
+ * Exported for testing purposes.
+ */
+export const issuerMatches = (
+  configIssuer: string,
+  issuer: string,
+): boolean => {
+  if (configIssuer.includes("{") && configIssuer.includes("}")) {
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    let pattern = "^";
+    let i = 0;
+    while (i < configIssuer.length) {
+      const open = configIssuer.indexOf("{", i);
+      if (open === -1) {
+        pattern += escapeRegex(configIssuer.slice(i));
+        break;
+      }
+      const close = configIssuer.indexOf("}", open + 1);
+      if (close === -1) {
+        // Unmatched opening brace: treat the remainder literally
+        pattern += escapeRegex(configIssuer.slice(i));
+        break;
+      }
+      // Literal part before the placeholder
+      pattern += escapeRegex(configIssuer.slice(i, open));
+      // Placeholder matches a single path segment
+      pattern += "([^/]+)";
+      i = close + 1;
+    }
+    pattern += "$";
+    const re = new RegExp(pattern);
+    return re.test(issuer);
+  }
+  return configIssuer === issuer;
+};
+
 export const findConfig = (
   issuer: string,
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
@@ -189,8 +230,8 @@ export const findConfig = (
     nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
     issuer === "https://accounts.google.com"
     ? canisterConfig.openid_google?.[0]?.[0]
-    : canisterConfig.openid_configs?.[0]?.find(
-        (config) => config.issuer === issuer,
+    : canisterConfig.openid_configs?.[0]?.find((config) =>
+        issuerMatches(config.issuer, issuer),
       );
 };
 
