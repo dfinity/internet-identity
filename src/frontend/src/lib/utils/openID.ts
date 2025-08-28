@@ -35,6 +35,7 @@ export interface RequestOptions {
   mediation?: CredentialMediationRequirement;
 }
 
+export const GOOGLE_ISSUER = "https://accounts.google.com";
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
   clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -226,13 +227,14 @@ export const findConfig = (
   issuer: string,
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
   const genericOpenIdEnabled = get(ENABLE_GENERIC_OPEN_ID);
-  return !genericOpenIdEnabled &&
-    nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
-    issuer === "https://accounts.google.com"
-    ? canisterConfig.openid_google?.[0]?.[0]
-    : canisterConfig.openid_configs?.[0]?.find((config) =>
+  return genericOpenIdEnabled
+    ? canisterConfig.openid_configs?.[0]?.find((config) =>
         issuerMatches(config.issuer, issuer),
-      );
+      )
+    : nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
+        issuer === GOOGLE_ISSUER
+      ? canisterConfig.openid_google?.[0]?.[0]
+      : undefined;
 };
 
 export const isOpenIdConfig = (

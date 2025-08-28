@@ -69,9 +69,7 @@ export class AuthLastUsedFlow {
         const jwt = await requestJWT(requestConfig, {
           nonce: get(sessionStore).nonce,
           mediation: "optional",
-          loginHint:
-            lastUsedIdentity.authMethod.openid.loginHint ??
-            lastUsedIdentity.authMethod.openid.sub,
+          loginHint: lastUsedIdentity.authMethod.openid.loginHint,
         });
         this.systemOverlay = false;
         const { identity, identityNumber } = await authenticateWithJWT({
