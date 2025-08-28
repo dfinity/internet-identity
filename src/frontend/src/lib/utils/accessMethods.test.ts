@@ -160,8 +160,8 @@ describe("getOpenIdTitles", () => {
     iss,
     sub,
     metadata: [
-      ...(name ? [["name", { String: name }]] : []),
-      ...(email ? [["email", { String: email }]] : []),
+      ...(nonNullish(name) ? [["name", { String: name }]] : []),
+      ...(nonNullish(email) ? [["email", { String: email }]] : []),
     ] as MetadataMapV2,
   });
 
