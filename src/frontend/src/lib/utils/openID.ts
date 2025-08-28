@@ -14,6 +14,7 @@ import { toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { get } from "svelte/store";
+import { decodeBase64 } from "$lib/utils/base64";
 
 export interface RequestConfig {
   // OAuth client ID
@@ -261,7 +262,7 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
 export const openIdLogo = (issuer: string): string | undefined => {
   const config = findConfig(issuer);
   if (nonNullish(config) && isOpenIdConfig(config)) {
-    return config.logo;
+    return decodeBase64(config.logo);
   }
   // If it's a google config or not found, return `undefined`
   return undefined;

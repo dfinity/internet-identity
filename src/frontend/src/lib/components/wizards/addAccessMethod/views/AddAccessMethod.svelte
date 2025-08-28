@@ -14,10 +14,11 @@
     OpenIdConfig,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
+  import { decode } from "$lib/utils/base64";
 
   interface Props {
     linkGoogleAccount: () => Promise<void>;
-    linkOpenIdAccount: (config: OpenIdConfig) => Promise<void>;
+    linkdecodeBase64Account: (config: OpenIdConfig) => Promise<void>;
     continueWithPasskey: () => void;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
@@ -104,7 +105,7 @@
     {#if $ENABLE_GENERIC_OPEN_ID}
       <div class="flex flex-row flex-nowrap justify-stretch gap-3">
         {#each openIdProviders as provider}
-          <Tooltip
+          <TooltipdecodeBase64
             label={`You already have a ${openIdName(
               provider.issuer,
             )} account linked`}
@@ -121,7 +122,7 @@
                 <ProgressRing />
               {:else if provider.logo}
                 <div class="size-6">
-                  {@html provider.logo}
+                  {@html decode(provider.logo)}
                 </div>
               {/if}
             </Button>

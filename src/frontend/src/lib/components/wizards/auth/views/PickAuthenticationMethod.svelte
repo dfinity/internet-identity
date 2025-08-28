@@ -10,10 +10,12 @@
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
+  import { openIdLogo } from "$lib/utils/openID";
+  import { decode } from "$lib/utils/base64";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
-    continueWithGoogle: () => Promise<void | "cancelled">;
+    contdecodeBase64thGoogle: () => Promise<void | "cancelled">;
     continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
     migrate: () => void;
   }
@@ -88,7 +90,8 @@
                 <ProgressRing />
               {:else if provider.logo}
                 <div class="size-6">
-                  {@html provider.logo}
+                  decodeBase64
+                  {@html decode(provider.logo)}
                 </div>
               {/if}
             </Button>
