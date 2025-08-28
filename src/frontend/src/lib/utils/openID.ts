@@ -9,11 +9,9 @@ import {
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
-import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 import { toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { get } from "svelte/store";
 
 export interface RequestConfig {
   // OAuth client ID
