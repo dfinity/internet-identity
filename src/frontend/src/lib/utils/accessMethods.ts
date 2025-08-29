@@ -201,7 +201,7 @@ export const getOpenIdTitles = (
     };
   }
   return {
-    title: { ellipsis: false, text: "Unknown Account" },
+    title: { ellipsis: false, text: `${accountProvider} Account` },
     subtitle: undefined,
   };
 };
