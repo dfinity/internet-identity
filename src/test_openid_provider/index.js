@@ -8,10 +8,10 @@ const provider = new oidc.Provider("https://oidc.local", {
   clients: [
     {
       client_id: "internet_identity",
-      client_secret: "secret",
+      client_secret: "secret", // Not used but required here
       redirect_uris: [
         "http://localhost:5173/callback", // Local development
-        "https://id.ai", // e2e tests
+        "https://id.ai/callback", // e2e tests
       ],
       response_types: ["code id_token"],
       grant_types: ["implicit", "authorization_code"],
@@ -31,7 +31,7 @@ const provider = new oidc.Provider("https://oidc.local", {
   },
 });
 
-// Bypass "select_account` prompt is unsupported" error
+// Bypass "`select_account` prompt is unsupported" error
 provider.use(async (ctx, next) => {
   if (ctx.path === "/auth") {
     // Change prompt to `login`, which is supported

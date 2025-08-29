@@ -247,8 +247,17 @@ describe("getOpenIdTitles", () => {
     });
   });
 
-  it("returns Unknown account when neither name nor email is present", () => {
+  it("returns AcmeID account when neither name nor email is present", () => {
     const cred = makeOpenIdCredential("https://issuer.acme", {});
+    const res = getOpenIdTitles(cred);
+    expect(res).toEqual({
+      title: { ellipsis: false, text: "AcmeID Account" },
+      subtitle: undefined,
+    });
+  });
+
+  it("returns Unknown account when neither name nor email is present and config not found", () => {
+    const cred = makeOpenIdCredential("https://unknown.provider", {});
     const res = getOpenIdTitles(cred);
     expect(res).toEqual({
       title: { ellipsis: false, text: "Unknown Account" },
