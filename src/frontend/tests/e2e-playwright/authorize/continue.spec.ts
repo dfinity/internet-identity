@@ -26,9 +26,8 @@ test("Authorize by switching to another identity", async ({ page }) => {
   const otherPrincipal = await createIdentity(page, "Jane Doe", auth2);
   const principal = await authorize(page, async (authPage) => {
     await authPage.getByRole("button", { name: "Switch identity" }).click();
-    await authPage.getByRole("button", { name: "John Doe" }).click();
     auth1(authPage);
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage.getByRole("button", { name: "John Doe" }).click();
   });
   expect(principal).toBe(expectedPrincipal);
   expect(principal).not.toBe(otherPrincipal);
