@@ -525,7 +525,7 @@ mod application_lookup_tests {
     #[test]
     fn should_maintain_dual_lookup_consistency() {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
-        let origins = vec![
+        let origins = [
             "https://app1.com".to_string(),
             "https://app2.org".to_string(),
             "https://app3.net".to_string(),
@@ -545,7 +545,7 @@ mod application_lookup_tests {
         for (origin, expected_number) in &expected_numbers {
             assert_application_lookup(
                 &storage,
-                &origin,
+                origin,
                 Some(*expected_number),
                 Some(*expected_number),
             );
@@ -585,7 +585,7 @@ mod application_lookup_tests {
     fn should_increment_application_counter_correctly() {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
 
-        let origins = vec![
+        let origins = [
             "https://app1.com".to_string(),
             "https://app2.com".to_string(),
             "https://app3.com".to_string(),
@@ -671,7 +671,7 @@ mod storable_origin_sha256_tests {
 
     #[test]
     fn should_handle_short_byte_arrays() {
-        let short_bytes = vec![1, 2, 3, 4, 5];
+        let short_bytes = [1, 2, 3, 4, 5];
         let hash = StorableOriginSha256::from_bytes(Cow::Borrowed(&short_bytes));
 
         // Should be padded with zeros
@@ -683,7 +683,7 @@ mod storable_origin_sha256_tests {
 
     #[test]
     fn should_handle_oversized_byte_arrays() {
-        let oversized_bytes = vec![42u8; 40];
+        let oversized_bytes = [42u8; 40];
         let hash = StorableOriginSha256::from_bytes(Cow::Borrowed(&oversized_bytes));
 
         // Should be truncated to 32 bytes
