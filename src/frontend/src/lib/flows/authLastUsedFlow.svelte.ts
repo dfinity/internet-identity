@@ -53,7 +53,7 @@ export class AuthLastUsedFlow {
         const issuer = lastUsedIdentity.authMethod.openid.iss;
         const config = findConfig(
           issuer,
-          lastUsedIdentity.authMethod.openid.metadata,
+          lastUsedIdentity.authMethod.openid.metadata ?? [],
         );
         if (isNullish(config)) {
           throw new Error(

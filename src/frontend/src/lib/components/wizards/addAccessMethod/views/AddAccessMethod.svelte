@@ -6,7 +6,6 @@
   import Button from "$lib/components/ui/Button.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import { openIdName } from "$lib/utils/openID";
   import { nonNullish } from "@dfinity/utils";
   import { canisterConfig } from "$lib/globals";
   import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
@@ -105,9 +104,7 @@
       <div class="flex flex-row flex-nowrap justify-stretch gap-3">
         {#each openIdProviders as provider}
           <Tooltip
-            label={`You already have a ${openIdName(
-              provider.issuer,
-            )} account linked`}
+            label={`You already have a ${provider.name} account linked`}
             hidden={!hasCredential(provider.issuer)}
           >
             <Button
