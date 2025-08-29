@@ -56,7 +56,7 @@ provider.Client.Schema.prototype.invalidate = function invalidate(
 app.post("/account/:id/claims", express.json(), async (req, res) => {
   const accountId = req.params.id;
   accountClaims.set(accountId, req.body);
-  res.status(201);
+  res.status(201).send();
 });
 
 // Register provider and start server
