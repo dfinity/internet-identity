@@ -11,6 +11,7 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -37,6 +38,7 @@
       identityNumber,
       accountNumber: undefined,
     });
+    triggerDropWaveAnimation();
     await authorizationStore.authorize(undefined, 4000);
   };
   // TODO: Remove this method once we have sessions

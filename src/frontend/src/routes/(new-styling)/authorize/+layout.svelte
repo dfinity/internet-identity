@@ -68,12 +68,9 @@
       closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    preloadAccounts();
     triggerDropWaveAnimation();
-
-    await gotoAccounts();
-
     isAuthDialogOpen = false;
+    await authorizationStore.authorize(undefined, 4000);
   };
   const onOtherDevice = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
