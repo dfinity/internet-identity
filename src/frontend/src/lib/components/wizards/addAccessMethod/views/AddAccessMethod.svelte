@@ -63,7 +63,7 @@
 
   const hasCredential = (configIssuer: string): boolean =>
     openIdCredentials.some((cred) =>
-      issuerMatches(configIssuer, cred.iss, cred.metadata ?? []),
+      issuerMatches(configIssuer, cred.iss, cred.metadata),
     );
 </script>
 
