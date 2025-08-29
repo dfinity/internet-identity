@@ -6,6 +6,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { issuerMatches } from "$lib/utils/openID";
   import { nonNullish } from "@dfinity/utils";
   import { canisterConfig } from "$lib/globals";
   import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
@@ -60,9 +61,10 @@
     canisterConfig.openid_google?.[0]?.[0] && !$ENABLE_GENERIC_OPEN_ID;
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
 
-  const hasCredential = (issuer: string): boolean => {
-    return openIdCredentials.some((cred) => cred.iss === issuer);
-  };
+  const hasCredential = (configIssuer: string): boolean =>
+    openIdCredentials.some((cred) =>
+      issuerMatches(configIssuer, cred.iss, cred.metadata),
+    );
 </script>
 
 <div class="mt-4 mb-6 flex flex-col">
