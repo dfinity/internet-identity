@@ -68,7 +68,7 @@
       } else if ("openid" in selectedIdentity.authMethod) {
         const config = findConfig(
           selectedIdentity.authMethod.openid.iss,
-          selectedIdentity.authMethod.openid.metadata,
+          selectedIdentity.authMethod.openid.metadata ?? [],
         );
         if (nonNullish(config) && isOpenIdConfig(config)) {
           authenticationV2Funnel.addProperties({

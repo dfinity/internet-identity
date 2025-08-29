@@ -209,7 +209,7 @@
       </div>
     {/each}
     {#each openIdCredentials as credential}
-      {@const logo = openIdLogo(credential.iss)}
+      {@const logo = openIdLogo(credential.iss, credential.metadata)}
       <div
         class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
       >
@@ -253,7 +253,10 @@
   <RemoveOpenIdCredential
     onRemove={handleRemoveOpenIdCredential}
     onClose={() => (removableOpenIdCredential = null)}
-    openIDName={openIdName(removableOpenIdCredential.iss) ?? "Google"}
+    openIDName={openIdName(
+      removableOpenIdCredential.iss,
+      removableOpenIdCredential.metadata,
+    ) ?? "Google"}
     isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
   />
 {/if}

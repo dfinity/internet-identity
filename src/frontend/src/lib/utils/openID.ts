@@ -256,7 +256,7 @@ export const issuerMatches = (
  */
 export const findConfig = (
   issuer: string,
-  metadata: MetadataMapV2 = [],
+  metadata: MetadataMapV2,
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
   // First, try to find a match in the generic OpenID configurations
   const fromConfigs = canisterConfig.openid_configs[0]?.find((config) =>
@@ -338,8 +338,11 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
  * @param issuer
  * @returns {string | undefined} The string is an SVG string that must be embedded in the HTML.
  */
-export const openIdLogo = (issuer: string): string | undefined => {
-  const config = findConfig(issuer);
+export const openIdLogo = (
+  issuer: string,
+  metadata: MetadataMapV2,
+): string | undefined => {
+  const config = findConfig(issuer, metadata);
   if (nonNullish(config) && isOpenIdConfig(config)) {
     return config.logo;
   }
@@ -353,8 +356,11 @@ export const openIdLogo = (issuer: string): string | undefined => {
  * @param issuer
  * @returns {string | undefined} The string is the name of the OpenID provider.
  */
-export const openIdName = (issuer: string): string | undefined => {
-  const config = findConfig(issuer);
+export const openIdName = (
+  issuer: string,
+  metadata: MetadataMapV2,
+): string | undefined => {
+  const config = findConfig(issuer, metadata);
   if (nonNullish(config) && isOpenIdConfig(config)) {
     return config.name;
   }
