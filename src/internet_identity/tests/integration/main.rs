@@ -11,6 +11,7 @@ mod anchor_management;
 mod archive_integration;
 mod config;
 mod delegation;
+mod google;
 mod http;
 mod openid;
 mod rollback;

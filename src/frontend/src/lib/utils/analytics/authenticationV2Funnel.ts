@@ -12,17 +12,17 @@ import { Funnel } from "./Funnel";
  *      continue-as-passkey
  *        auth-success
  *        go-to-dashboard
- *      continue-as-google
+ *      continue-as-openid
  *        auth-success
  *        go-to-dashboard
  *    select-method-screen
- *      continue-with-google
- *        register-with-google
- *          successful-google-registration
+ *      continue-with-openid
+ *        register-with-openid
+ *          successful-openid-registration
  *            auth-success
  *          jwt-verification-failed
  *          jwt-verification-expired
- *        login-with-google
+ *        login-with-openid
  *          auth-success
  *          jwt-verification-failed
  *          jwt-verification-expired
@@ -42,12 +42,12 @@ export const AuthenticationV2Events = {
   UseAnother: "use-another",
   ContinueAsScreen: "continue-as-screen",
   ContinueAsPasskey: "continue-as-passkey",
-  ContinueAsGoogle: "continue-as-google",
+  ContinueAsOpenID: "continue-as-openid",
   SelectMethodScreen: "select-method-screen",
-  ContinueWithGoogle: "continue-with-google",
-  RegisterWithGoogle: "register-with-google",
-  SuccessfulGoogleRegistration: "successful-google-registration",
-  LoginWithGoogle: "login-with-google",
+  ContinueWithOpenID: "continue-with-openid",
+  RegisterWithOpenID: "register-with-openid",
+  SuccessfulOpenIDRegistration: "successful-openid-registration",
+  LoginWithOpenID: "login-with-openid",
   ContinueWithPasskeyScreen: "continue-with-passkey-screen",
   EnterNameScreen: "enter-name-screen",
   StartWebauthnCreation: "start-webauthn-creation",

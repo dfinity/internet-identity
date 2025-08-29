@@ -114,12 +114,6 @@ export const createNewIdentityInII = async (
   await page.getByLabel("Identity name").fill(name);
   dummyAuth(page);
   await page.getByRole("button", { name: "Create Passkey" }).click();
-
-  if (onContinueScreen) {
-    // If we're coming from the continue screen (through identity switcher),
-    // we'll also need to explicitly select the primary account to continue.
-    await page.getByRole("button", { name: "Primary account" }).click();
-  }
 };
 
 /**

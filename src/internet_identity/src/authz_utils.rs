@@ -122,7 +122,10 @@ pub fn check_authorization(
         if caller == credential.principal(anchor_number) {
             return Ok((
                 anchor.clone(),
-                AuthorizationKey::OpenIdCredentialKey(credential.key()),
+                AuthorizationKey::OpenIdCredentialKey((
+                    credential.key(),
+                    credential.config_issuer(),
+                )),
             ));
         }
     }

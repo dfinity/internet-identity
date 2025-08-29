@@ -10,7 +10,7 @@
   import Ellipsis from "../utils/Ellipsis.svelte";
   import PulsatingCircleIcon from "../icons/PulsatingCircleIcon.svelte";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
-  import { getRpId } from "$lib/utils/accessMethods";
+  import { getOpenIdTitles, getRpId } from "$lib/utils/accessMethods";
 
   let {
     accessMethod,
@@ -25,39 +25,6 @@
     isDisabled?: boolean;
     showOrigin?: boolean;
   } = $props();
-
-  const getOpenIdCredentialName = (credential: OpenIdCredential | null) => {
-    if (!credential) return null;
-    const metadataName = credential.metadata.find(
-      ([key, _val]) => key === "name",
-    )?.[1]!;
-    if (metadataName && "String" in metadataName) {
-      return metadataName.String;
-    }
-    return undefined;
-  };
-
-  const getOpenIdCredentialEmail = (credential: OpenIdCredential | null) => {
-    if (!credential) return null;
-    const metadataEmail = credential.metadata.find(
-      ([key, _val]) => key === "email",
-    )?.[1]!;
-    if (metadataEmail && "String" in metadataEmail) {
-      return metadataEmail.String;
-    }
-    return undefined;
-  };
-
-  let openIdHasName = $derived(
-    accessMethod &&
-      !("authn_method" in accessMethod) &&
-      !!getOpenIdCredentialName(accessMethod),
-  );
-  let openIdHasEmail = $derived(
-    accessMethod &&
-      !("authn_method" in accessMethod) &&
-      !!getOpenIdCredentialEmail(accessMethod),
-  );
 </script>
 
 {#if accessMethod}
@@ -108,6 +75,7 @@
       {/if}
     </div>
   {:else}
+    {@const openIdTitles = getOpenIdTitles(accessMethod)}
     <!-- OpenID -->
     <div
       class={[
@@ -117,37 +85,29 @@
       in:fade={{ delay: 30, duration: 30 }}
       out:fade={{ duration: 30 }}
     >
-      {#if openIdHasName && openIdHasEmail}
-        <div class="flex min-w-32 flex-col justify-center pr-3">
-          <div class="flex items-center gap-2">
-            <span>
-              {getOpenIdCredentialName(accessMethod)}
-            </span>
-            {#if isCurrent}
-              <PulsatingCircleIcon />
-            {/if}
-          </div>
-          <div class="text-text-tertiary font-extralight">
-            <Ellipsis text={getOpenIdCredentialEmail(accessMethod)!}></Ellipsis>
-          </div>
-        </div>
-      {:else if !openIdHasName && openIdHasEmail}
-        <div class="flex min-w-32 items-center gap-2 pr-3">
-          <Ellipsis text={getOpenIdCredentialEmail(accessMethod)!}></Ellipsis>
-          {#if isCurrent}
-            <PulsatingCircleIcon />
-          {/if}
-        </div>
-      {:else if openIdHasName && !openIdHasEmail}
-        <div class="flex min-w-32 items-center gap-2 pr-3">
+      <div class="flex min-w-32 flex-col justify-center pr-3">
+        <div class="flex items-center gap-2">
           <span>
-            {getOpenIdCredentialName(accessMethod)}
+            {#if openIdTitles.title.ellipsis}
+              <Ellipsis text={openIdTitles.title.text}></Ellipsis>
+            {:else}
+              {openIdTitles.title.text}
+            {/if}
           </span>
           {#if isCurrent}
             <PulsatingCircleIcon />
           {/if}
         </div>
-      {/if}
+        {#if nonNullish(openIdTitles.subtitle)}
+          <div class="text-text-tertiary font-extralight">
+            {#if openIdTitles.subtitle.ellipsis}
+              <Ellipsis text={openIdTitles.subtitle.text}></Ellipsis>
+            {:else}
+              {openIdTitles.subtitle.text}
+            {/if}
+          </div>
+        {/if}
+      </div>
 
       {#if isCurrent}
         <div

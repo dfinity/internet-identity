@@ -28,12 +28,15 @@ import {
   IdRegStartError,
   OpenIdDelegationError,
   OpenIdConfig,
+  MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import {
   createGoogleRequestConfig,
   requestJWT,
   RequestConfig,
   decodeJWT,
+  GOOGLE_ISSUER,
+  extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
 
 export class AuthFlow {
@@ -53,6 +56,7 @@ export class AuthFlow {
   #confirmationCode = $state<string>();
   #name = $state<string>();
   #jwt = $state<string>();
+  #configIssuer = $state<string>();
   abTestGroup: "infoPasskey" | "default";
 
   get view() {
@@ -162,6 +166,9 @@ export class AuthFlow {
     if (isNullish(clientId)) {
       throw new Error("Google is not configured");
     }
+    authenticationV2Funnel.addProperties({
+      provider: "Google",
+    });
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
       const requestConfig = createGoogleRequestConfig(clientId);
@@ -176,7 +183,7 @@ export class AuthFlow {
     } finally {
       this.#systemOverlay = false;
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
@@ -189,14 +196,19 @@ export class AuthFlow {
       // Therefore, they are logging in.
       // If the call fails, it means the Google user does not exist in II.
       // In that case, we register them.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       authenticationStore.set({ identity, identityNumber });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+      const authnMethod = info.openid_credentials[0]?.find(
+        (method) => method.iss === iss,
+      );
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub, loginHint } },
+        authMethod: {
+          openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
+        },
       });
       return { identityNumber, type: "signIn" };
     } catch (error) {
@@ -206,11 +218,15 @@ export class AuthFlow {
         nonNullish(jwt)
       ) {
         authenticationV2Funnel.trigger(
-          AuthenticationV2Events.RegisterWithGoogle,
+          AuthenticationV2Events.RegisterWithOpenID,
         );
         await this.#startRegistration();
         const { name } = decodeJWT(jwt); // Google JWT always has a name
-        const identityNumber = await this.#registerWithOpenId(jwt, name!);
+        const identityNumber = await this.#registerWithOpenId(
+          jwt,
+          name!,
+          GOOGLE_ISSUER,
+        );
         return { identityNumber, type: "signUp" };
       }
       throw error;
@@ -237,6 +253,9 @@ export class AuthFlow {
       authScope: config.auth_scope.join(" "),
       configURL: config.fedcm_uri?.[0],
     };
+    authenticationV2Funnel.addProperties({
+      provider: config.name,
+    });
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
       this.#systemOverlay = true;
@@ -250,10 +269,10 @@ export class AuthFlow {
     } finally {
       this.#systemOverlay = false;
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
     try {
-      const { iss, sub } = decodeJWT(jwt);
+      const { iss, sub, loginHint } = decodeJWT(jwt);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -263,14 +282,19 @@ export class AuthFlow {
       // Therefore, they are logging in.
       // If the call fails, it means the OpenID user does not exist in II.
       // In that case, we register them.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithGoogle);
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
       authenticationStore.set({ identity, identityNumber });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+      const authnMethod = info.openid_credentials[0]?.find(
+        (method) => method.iss === iss,
+      );
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { openid: { iss, sub } },
+        authMethod: {
+          openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
+        },
       });
       return { identityNumber, type: "signIn" };
     } catch (error) {
@@ -280,7 +304,11 @@ export class AuthFlow {
         nonNullish(jwt)
       ) {
         this.#jwt = jwt;
+        this.#configIssuer = config.issuer;
         const { name } = decodeJWT(jwt);
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.RegisterWithOpenID,
+        );
         if (isNullish(name)) {
           // Show enter name screen to complete registration,
           this.#view = "setupNewIdentity";
@@ -292,12 +320,12 @@ export class AuthFlow {
   };
 
   completeOpenIdRegistration = async (name: string): Promise<bigint> => {
-    if (isNullish(this.#jwt)) {
-      throw new Error("JWT is missing");
+    if (isNullish(this.#jwt) || isNullish(this.#configIssuer)) {
+      throw new Error("JWT or config issuer is missing");
     }
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithGoogle);
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
     await this.#startRegistration();
-    return this.#registerWithOpenId(this.#jwt, name);
+    return this.#registerWithOpenId(this.#jwt, name, this.#configIssuer);
   };
 
   #solveCaptcha = (image: string, attempt = 0): Promise<void> =>
@@ -426,7 +454,11 @@ export class AuthFlow {
     }
   };
 
-  #registerWithOpenId = async (jwt: string, name: string): Promise<bigint> => {
+  #registerWithOpenId = async (
+    jwt: string,
+    name: string,
+    configIssuer: string,
+  ): Promise<bigint> => {
     try {
       await get(sessionStore)
         .actor.openid_identity_registration_finish({
@@ -435,20 +467,47 @@ export class AuthFlow {
           name,
         })
         .then(throwCanisterError);
-      const { iss, sub, loginHint } = decodeJWT(jwt);
+      const {
+        iss,
+        sub,
+        loginHint,
+        name: jwtName,
+        email,
+        ...restJWTClaims
+      } = decodeJWT(jwt);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
         jwt,
       });
       authenticationV2Funnel.trigger(
-        AuthenticationV2Events.SuccessfulGoogleRegistration,
+        AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );
       authenticationStore.set({ identity, identityNumber });
+      const metadata: MetadataMapV2 = [];
+      if (nonNullish(jwtName)) {
+        metadata.push(["name", { String: jwtName }]);
+      }
+      if (nonNullish(email)) {
+        metadata.push(["email", { String: email }]);
+      }
+      const claimKeys = extractIssuerTemplateClaims(configIssuer);
+      if (nonNullish(claimKeys)) {
+        claimKeys.forEach((key) => {
+          if (nonNullish(restJWTClaims[key])) {
+            metadata.push([
+              key,
+              {
+                String: restJWTClaims[key],
+              },
+            ]);
+          }
+        });
+      }
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name,
-        authMethod: { openid: { iss, sub, loginHint } },
+        authMethod: { openid: { iss, sub, loginHint, metadata } },
       });
       this.#captcha = undefined;
       return identityNumber;
@@ -462,7 +521,7 @@ export class AuthFlow {
           await this.#solveCaptcha(
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
-          return this.#registerWithOpenId(jwt, name);
+          return this.#registerWithOpenId(jwt, name, configIssuer);
         }
       }
       throw error;

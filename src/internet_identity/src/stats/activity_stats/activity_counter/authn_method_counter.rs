@@ -54,7 +54,7 @@ impl ActivityCounter for AuthnMethodCounter {
             AuthorizationKey::DeviceKey(device_key) => anchor
                 .device(device_key)
                 .and_then(|d| d.last_usage_timestamp),
-            AuthorizationKey::OpenIdCredentialKey(openid_credential_key) => anchor
+            AuthorizationKey::OpenIdCredentialKey((openid_credential_key, _)) => anchor
                 .openid_credential(openid_credential_key)
                 .and_then(|c| c.last_usage_timestamp),
         };
@@ -91,11 +91,18 @@ impl ActivityCounter for AuthnMethodCounter {
                     }
                 }
             }
-            AuthorizationKey::OpenIdCredentialKey((iss, _)) => {
-                if let Some(map) = &mut self.openid_credential_auth_counter {
-                    map.entry(iss.clone())
-                        .and_modify(|count| *count += 1)
-                        .or_insert(1);
+            // We explicitly use the config issuer here since we want to keep track of the
+            // authentication count within the scope of a single OpenID provider.
+            //
+            // Some providers like e.g. Microsoft might have multiple issuers due to tenants,
+            // the config issuer in this case is the unique identifier across these tenants.
+            AuthorizationKey::OpenIdCredentialKey((_, config_iss)) => {
+                if let Some(config_iss) = config_iss {
+                    if let Some(map) = &mut self.openid_credential_auth_counter {
+                        map.entry(config_iss.to_string())
+                            .and_modify(|count| *count += 1)
+                            .or_insert(1);
+                    }
                 }
             }
         }

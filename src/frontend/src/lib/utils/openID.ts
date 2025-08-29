@@ -9,11 +9,9 @@ import {
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
-import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 import { toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@dfinity/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { get } from "svelte/store";
 
 export interface RequestConfig {
   // OAuth client ID
@@ -35,6 +33,7 @@ export interface RequestOptions {
   mediation?: CredentialMediationRequirement;
 }
 
+export const GOOGLE_ISSUER = "https://accounts.google.com";
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
   clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -178,20 +177,100 @@ export const isFedCMSupported = (
   if (isSamsungBrowser) {
     return false;
   }
-  return nonNullish(config.configURL) && "IdentityCredential" in window;
+  return (
+    nonNullish(config.configURL) &&
+    config.configURL.length > 0 &&
+    "IdentityCredential" in window
+  );
 };
 
+/**
+ * Build a concrete issuer URL from a configured issuer pattern and claims.
+ *
+ * Replaces any placeholder wrapped in curly braces, e.g. "{tid}", with the
+ * corresponding value from the claims map. If any placeholder is missing in
+ * the provided claims, the function returns `undefined` to indicate that a
+ * valid issuer cannot be constructed.
+ */
+export const buildIssuerFromConfig = (
+  configIssuer: string,
+  metadata: MetadataMapV2,
+): string | undefined => {
+  if (!configIssuer.includes("{")) {
+    return configIssuer;
+  }
+  let missing = false;
+  const built = configIssuer.replace(/{([^}]+)}/g, (_match, name: string) => {
+    const value = getMetadataString(metadata, name);
+    if (typeof value === "string") return value;
+    missing = true;
+    return "";
+  });
+  return missing ? undefined : built;
+};
+
+/**
+ * Extract claims from an issuer URL based on a configured issuer template.
+ *
+ * This function now only extracts the placeholder names present in the
+ * configured issuer template.
+ *
+ * Example:
+ *  template: "https://login.microsoftonline.com/{tid}/v2.0"
+ *  returns:  ["tid"]
+ */
+export const extractIssuerTemplateClaims = (configIssuer: string): string[] => {
+  // Detect placeholders of the form {name}
+  const placeholderRegex = /{([^}]+)}/g;
+  return Array.from(configIssuer.matchAll(placeholderRegex)).map((m) => m[1]);
+};
+
+/**
+ * Compare an issuer URL against a config issuer pattern and claims.
+ * If the config issuer contains placeholders in curly braces (e.g.,
+ * "https://login.microsoftonline.com/{tid}/v2.0"),
+ * extract the placeholders, create a new issuer URL with the claims values,
+ * and perform a comparison.
+ *
+ * Otherwise, performs exact comparison.
+ *
+ * Exported for testing purposes.
+ */
+export const issuerMatches = (
+  configIssuer: string,
+  issuer: string,
+  metadata: MetadataMapV2,
+): boolean => buildIssuerFromConfig(configIssuer, metadata) === issuer;
+
+/**
+ * Find the OpenID configuration for a given issuer.
+ *
+ * First, it tries to find a match in the generic OpenID configurations.
+ * If no match is found, it falls back to the Google configuration if the issuer matches Google's issuer.
+ *
+ * Not relying in the feature flag ENABLE_GENERIC_OPEN_ID means that if we enable and then disable the feature flag,
+ * afterwards, the users that used the generic OpenID configurations will still be able to log in.
+ *
+ * @param issuer The issuer to find the configuration for.
+ * @returns {OpenIdConfig | GoogleOpenIdConfig | undefined} The configuration for the issuer.
+ */
 export const findConfig = (
   issuer: string,
+  metadata: MetadataMapV2 = [],
 ): OpenIdConfig | GoogleOpenIdConfig | undefined => {
-  const genericOpenIdEnabled = get(ENABLE_GENERIC_OPEN_ID);
-  return !genericOpenIdEnabled &&
-    nonNullish(canisterConfig.openid_google?.[0]?.[0]) &&
-    issuer === "https://accounts.google.com"
-    ? canisterConfig.openid_google?.[0]?.[0]
-    : canisterConfig.openid_configs?.[0]?.find(
-        (config) => config.issuer === issuer,
-      );
+  // First, try to find a match in the generic OpenID configurations
+  const fromConfigs = canisterConfig.openid_configs[0]?.find((config) =>
+    issuerMatches(config.issuer, issuer, metadata),
+  );
+  if (nonNullish(fromConfigs)) {
+    return fromConfigs;
+  }
+  // Fallback to the Google configuration if the issuer matches Google's issuer
+  const googleConfig = canisterConfig.openid_google?.[0]?.[0];
+  if (nonNullish(googleConfig) && issuer === GOOGLE_ISSUER) {
+    return googleConfig;
+  }
+  return undefined;
 };
 
 export const isOpenIdConfig = (
@@ -230,11 +309,11 @@ export const decodeJWT = (
   loginHint: string;
   name?: string;
   email?: string;
+  [key: string]: string | undefined;
 } => {
   const [_header, body, _signature] = token.split(".");
-  const { iss, sub, aud, name, email, preferred_username } = JSON.parse(
-    atob(body),
-  );
+  const { iss, sub, aud, name, email, preferred_username, ...rest } =
+    JSON.parse(atob(body));
   return {
     iss,
     sub,
@@ -244,6 +323,7 @@ export const decodeJWT = (
     // Additional optional metadata claims
     name,
     email,
+    ...rest,
   };
 };
 

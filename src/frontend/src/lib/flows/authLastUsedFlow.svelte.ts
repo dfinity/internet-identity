@@ -51,7 +51,10 @@ export class AuthLastUsedFlow {
       } else if ("openid" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
         const issuer = lastUsedIdentity.authMethod.openid.iss;
-        const config = findConfig(issuer);
+        const config = findConfig(
+          issuer,
+          lastUsedIdentity.authMethod.openid.metadata,
+        );
         if (isNullish(config)) {
           throw new Error(
             "OpenID authentication is not available for this account.",
@@ -69,9 +72,7 @@ export class AuthLastUsedFlow {
         const jwt = await requestJWT(requestConfig, {
           nonce: get(sessionStore).nonce,
           mediation: "optional",
-          loginHint:
-            lastUsedIdentity.authMethod.openid.loginHint ??
-            lastUsedIdentity.authMethod.openid.sub,
+          loginHint: lastUsedIdentity.authMethod.openid.loginHint,
         });
         this.systemOverlay = false;
         const { identity, identityNumber } = await authenticateWithJWT({

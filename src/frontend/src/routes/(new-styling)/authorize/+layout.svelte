@@ -49,13 +49,8 @@
       invalidateAll: true,
       state: { disableNavigationAnimation: true },
     });
-  const preloadAccounts = () => {
-    void preloadCode("/authorize/account");
-    void preloadData("/authorize/account");
-  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    preloadAccounts();
     triggerDropWaveAnimation();
     isAuthDialogOpen = false;
 
@@ -68,12 +63,9 @@
       closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    preloadAccounts();
     triggerDropWaveAnimation();
-
-    await gotoAccounts();
-
     isAuthDialogOpen = false;
+    await authorizationStore.authorize(undefined, 4000);
   };
   const onOtherDevice = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);

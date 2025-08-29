@@ -58,7 +58,7 @@ pub fn activity_bookkeeping(anchor: &mut Anchor, current_authorization_key: &Aut
         AuthorizationKey::DeviceKey(device_key) => {
             anchor.set_device_usage_timestamp(device_key, time())
         }
-        AuthorizationKey::OpenIdCredentialKey(openid_credential_key) => {
+        AuthorizationKey::OpenIdCredentialKey((openid_credential_key, _)) => {
             anchor.set_openid_credential_usage_timestamp(openid_credential_key, time())
         }
     }
