@@ -21,6 +21,7 @@
   } from "$lib/config";
   import { nonNullish } from "@dfinity/utils";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
+  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -93,7 +94,7 @@
               {identity.name ?? identity.identityNumber}
             </div>
             <div class="text-text-tertiary" aria-hidden="true">
-              {"passkey" in identity.authMethod ? "Passkey" : "Google"}
+              {lastUsedIdentityTypeName(identity)}
             </div>
           </div>
           {#if selected === identity.identityNumber}
