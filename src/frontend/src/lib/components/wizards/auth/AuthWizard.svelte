@@ -82,7 +82,7 @@
   const handleContinueCreatePasskey = async (): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
-      onSignIn(await authFlow.createPasskey());
+      onSignUp(await authFlow.createPasskey());
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
