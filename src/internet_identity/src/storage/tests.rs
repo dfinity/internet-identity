@@ -376,3 +376,336 @@ fn sample_persistent_state() -> PersistentState {
         ..PersistentState::default()
     }
 }
+
+#[cfg(test)]
+mod application_lookup_tests {
+    use super::*;
+    use crate::storage::storable::application::{StorableOriginHash, StorableOriginSha256};
+    use ic_stable_structures::VectorMemory;
+    use std::collections::HashMap;
+
+    #[track_caller]
+    fn assert_application_lookup<M: Memory + Clone>(
+        storage: &Storage<M>,
+        origin: &str,
+        expected_new: Option<u64>,
+        expected_old: Option<u64>,
+    ) {
+        let origin = origin.to_string();
+        let origin_hash = StorableOriginHash::from_origin(&origin);
+        let origin_sha256 = StorableOriginSha256::from_origin(&origin);
+
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&origin),
+            expected_old,
+            "Unexpected result from lookup_application_number_with_origin for origin {}",
+            origin
+        );
+        assert_eq!(
+            storage
+                .lookup_application_with_origin_memory
+                .get(&origin_sha256),
+            expected_new,
+            "Unexpected lookup_application_with_origin_memory entry for key {}",
+            origin_sha256
+        );
+        assert_eq!(
+            storage
+                .lookup_application_with_origin_memory_old
+                .get(&origin_hash),
+            expected_old,
+            "Unexpected lookup_application_with_origin_memory_old entry for key {}",
+            origin_hash
+        );
+    }
+
+    #[test]
+    fn should_create_new_application_with_sha256_lookup() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        let origin = "https://example.com".to_string();
+
+        let app_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        // Should create application number 0 for first application
+        assert_eq!(app_number, 0);
+
+        // Should exist in both old and new lookup maps
+        assert_application_lookup(&storage, &origin, Some(0), Some(0));
+
+        // Should exist in applications storage
+        let stored_app = storage.stable_application_memory.get(&0);
+        assert!(stored_app.is_some());
+        let app = stored_app.unwrap();
+        assert_eq!(app.origin, origin);
+        assert_eq!(app.stored_accounts, 0);
+        assert_eq!(app.stored_account_references, 0);
+    }
+
+    #[test]
+    fn should_return_existing_application_number() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        let origin = "https://example.com".to_string();
+
+        // Create application first time
+        let app_number1 = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        // Should return same application number on second call
+        let app_number2 = storage.lookup_or_insert_application_number_with_origin(&origin);
+
+        assert_eq!(app_number1, app_number2);
+        assert_eq!(app_number1, 0);
+    }
+
+    #[test]
+    fn should_create_different_numbers_for_different_origins() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+
+        let origin1 = "https://example.com".to_string();
+        let origin2 = "https://different.com".to_string();
+        let origin3 = "https://another.org".to_string();
+
+        let app_num1 = storage.lookup_or_insert_application_number_with_origin(&origin1);
+        let app_num2 = storage.lookup_or_insert_application_number_with_origin(&origin2);
+        let app_num3 = storage.lookup_or_insert_application_number_with_origin(&origin3);
+
+        assert_eq!(app_num1, 0);
+        assert_eq!(app_num2, 1);
+        assert_eq!(app_num3, 2);
+
+        // All should be present in both lookup maps
+        assert_application_lookup(&storage, &origin1, Some(0), Some(0));
+        assert_application_lookup(&storage, &origin2, Some(1), Some(1));
+        assert_application_lookup(&storage, &origin3, Some(2), Some(2));
+    }
+
+    #[test]
+    fn should_handle_collision_prone_origins_with_sha256() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+
+        // These origins have hash prefix collisions with 8-byte hash but not with full SHA-256.
+        // Example taken from https://github.com/yugt/sha256-prefix-collision
+        let origin1 = "08RTz8".to_string();
+        let origin2 = "4iRDWF".to_string();
+
+        // Smoke test: these are indeed distinct origins.
+        assert_ne!(origin1, origin2);
+        // However, the SHA256 prefix is the same.
+        assert_eq!(
+            StorableOriginHash::from_origin(&origin1),
+            StorableOriginHash::from_origin(&origin2)
+        );
+        // But the entire SHA256 sum is different.
+        assert_ne!(
+            StorableOriginSha256::from_origin(&origin1),
+            StorableOriginSha256::from_origin(&origin2)
+        );
+
+        // Test what happens if we insert both origins
+        let app_num1 = storage.lookup_or_insert_application_number_with_origin(&origin1);
+        let app_num2 = storage.lookup_or_insert_application_number_with_origin(&origin2);
+
+        // Should get the same application number, as we do not yet detect collisions (since the
+        // source of truth is still the old lookup map).
+        // TODO[ID-352]: This assertion should be changed to `assert_ne`.
+        assert_eq!(app_num1, app_num2);
+        assert_eq!(app_num1, 0);
+
+        // Both should be stored correctly in new SHA-256 map
+
+        assert_application_lookup(&storage, &origin1, Some(0), Some(0));
+        assert_application_lookup(&storage, &origin2, None, Some(0));
+
+        // Applications should be stored with correct origins
+        let stored_app1 = storage.stable_application_memory.get(&app_num1).unwrap();
+
+        // The first origin took place, not the second one
+        assert_eq!(stored_app1.origin, origin1);
+    }
+
+    #[test]
+    fn should_maintain_dual_lookup_consistency() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+        let origins = vec![
+            "https://app1.com".to_string(),
+            "https://app2.org".to_string(),
+            "https://app3.net".to_string(),
+            "https://app4.io".to_string(),
+            "https://app5.co".to_string(),
+        ];
+
+        // Insert all origins
+        let mut expected_numbers = HashMap::new();
+        for (i, origin) in origins.iter().enumerate() {
+            let app_number = storage.lookup_or_insert_application_number_with_origin(origin);
+            expected_numbers.insert(origin.clone(), app_number);
+            assert_eq!(app_number, i as u64); // Should be sequential
+        }
+
+        // Assert expectations: all origins correspond to an app and are present in both maps.
+        for (origin, expected_number) in &expected_numbers {
+            assert_application_lookup(
+                &storage,
+                &origin,
+                Some(*expected_number),
+                Some(*expected_number),
+            );
+            let stored_app = storage
+                .stable_application_memory
+                .get(expected_number)
+                .unwrap();
+            assert_eq!(stored_app.origin, **origin);
+        }
+    }
+
+    #[test]
+    fn new_storage_should_have_empty_maps() {
+        let storage = Storage::new((10, 20), VectorMemory::default());
+        assert_eq!(storage.lookup_application_with_origin_memory.len(), 0);
+        assert_eq!(storage.lookup_application_with_origin_memory_old.len(), 0);
+    }
+
+    #[test]
+    fn should_handle_very_long_origins_with_sha256() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+
+        let long_origin = format!("https://{}.com", "a".repeat(20_000));
+
+        let app_number = storage.lookup_or_insert_application_number_with_origin(&long_origin);
+        assert_eq!(app_number, 0);
+
+        // Should be findable in both maps
+        assert_application_lookup(&storage, &long_origin, Some(0), Some(0));
+
+        // Application should be stored with full origin
+        let stored_app = storage.stable_application_memory.get(&0).unwrap();
+        assert_eq!(stored_app.origin, long_origin);
+    }
+
+    #[test]
+    fn should_increment_application_counter_correctly() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+
+        let origins = vec![
+            "https://app1.com".to_string(),
+            "https://app2.com".to_string(),
+            "https://app3.com".to_string(),
+        ];
+
+        for (i, origin) in origins.iter().enumerate() {
+            let app_number = storage.lookup_or_insert_application_number_with_origin(origin);
+            assert_eq!(app_number, i as u64);
+
+            // Total application count should increment
+            assert_eq!(storage.get_total_application_count(), (i + 1) as u64);
+        }
+    }
+
+    #[test]
+    fn should_preserve_existing_data_on_storage_restart() {
+        let memory = VectorMemory::default();
+        let origin = "https://persistent-test.com".to_string();
+
+        // Create storage and add application
+        {
+            let mut storage = Storage::new((10, 20), memory.clone());
+            let app_number = storage.lookup_or_insert_application_number_with_origin(&origin);
+            assert_eq!(app_number, 0);
+        }
+
+        // Recreate storage from same memory
+        let storage = Storage::from_memory(memory);
+
+        // Should find existing application in old lookup
+        assert_eq!(
+            storage.lookup_application_number_with_origin(&origin),
+            Some(0)
+        );
+
+        // Should find it in both maps
+        assert_application_lookup(&storage, &origin, Some(0), Some(0));
+
+        // Application should still exist in storage
+        let stored_app = storage.stable_application_memory.get(&0);
+        assert!(stored_app.is_some());
+    }
+}
+
+#[cfg(test)]
+mod storable_origin_sha256_tests {
+    use crate::storage::storable::application::StorableOriginSha256;
+    use ic_stable_structures::Storable;
+    use std::borrow::Cow;
+
+    #[test]
+    fn should_create_different_hashes_for_different_origins() {
+        let origin1 = "https://example.com".to_string();
+        let origin2 = "https://different.com".to_string();
+
+        let hash1 = StorableOriginSha256::from_origin(&origin1);
+        let hash2 = StorableOriginSha256::from_origin(&origin2);
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn should_create_same_hash_for_same_origin() {
+        let origin = "https://example.com".to_string();
+
+        let hash1 = StorableOriginSha256::from_origin(&origin);
+        let hash2 = StorableOriginSha256::from_origin(&origin);
+
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn should_be_storable_and_retrievable() {
+        let origin = "https://storable-test.com".to_string();
+        let original_hash = StorableOriginSha256::from_origin(&origin);
+
+        // Test round-trip serialization
+        let bytes = original_hash.to_bytes();
+        let recovered_hash = StorableOriginSha256::from_bytes(bytes);
+
+        assert_eq!(original_hash, recovered_hash);
+    }
+
+    #[test]
+    fn should_handle_short_byte_arrays() {
+        let short_bytes = vec![1, 2, 3, 4, 5];
+        let hash = StorableOriginSha256::from_bytes(Cow::Borrowed(&short_bytes));
+
+        // Should be padded with zeros
+        let bytes = hash.to_bytes();
+        assert_eq!(bytes.len(), 32);
+        assert_eq!(&bytes[..5], &short_bytes[..]);
+        assert_eq!(&bytes[5..], &[0u8; 27]);
+    }
+
+    #[test]
+    fn should_handle_oversized_byte_arrays() {
+        let oversized_bytes = vec![42u8; 40];
+        let hash = StorableOriginSha256::from_bytes(Cow::Borrowed(&oversized_bytes));
+
+        // Should be truncated to 32 bytes
+        let bytes = hash.to_bytes();
+        assert_eq!(bytes.len(), 32);
+        assert_eq!(&bytes[..], &[42u8; 32]);
+    }
+
+    #[test]
+    fn should_handle_empty_byte_array() {
+        let empty_bytes: Vec<u8> = vec![];
+        let hash = StorableOriginSha256::from_bytes(Cow::Borrowed(&empty_bytes));
+
+        // Should be all zeros
+        let bytes = hash.to_bytes();
+        assert_eq!(bytes.len(), 32);
+        assert_eq!(&bytes[..], &[0u8; 32]);
+    }
+
+    #[test]
+    fn should_respect_storable_bound() {
+        assert_eq!(StorableOriginSha256::BOUND.max_size(), 32);
+        assert!(StorableOriginSha256::BOUND.is_fixed_size());
+    }
+}
