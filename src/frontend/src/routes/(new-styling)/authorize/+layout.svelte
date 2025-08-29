@@ -49,13 +49,8 @@
       invalidateAll: true,
       state: { disableNavigationAnimation: true },
     });
-  const preloadAccounts = () => {
-    void preloadCode("/authorize/account");
-    void preloadData("/authorize/account");
-  };
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    preloadAccounts();
     triggerDropWaveAnimation();
     isAuthDialogOpen = false;
 
