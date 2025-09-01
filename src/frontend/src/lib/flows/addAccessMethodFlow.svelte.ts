@@ -2,7 +2,6 @@ import { canisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {
-  createAnonymousNonce,
   createGoogleRequestConfig,
   decodeJWT,
   requestJWT,
