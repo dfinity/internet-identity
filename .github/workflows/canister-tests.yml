@@ -496,7 +496,9 @@ jobs:
       # Needs to run before the canisters so they can fetch the JWK keys
       # from this test OpenID provider instance immediately after starting.
       - name: "Run test OpenID provider"
-        run: npm start --prefix ./src/test_openid_provider
+        run: |
+          npm ci --prefix ./src/test_openid_provider
+          npm start --prefix ./src/test_openid_provider
 
       - name: "Run dfx"
         run: dfx start --background --artificial-delay 0
