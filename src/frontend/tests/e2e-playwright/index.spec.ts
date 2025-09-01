@@ -126,7 +126,7 @@ test.describe("First visit", () => {
     ).toBeVisible();
   });
 
-  test.skip("Sign up with OpenID", async ({ page }) => {
+  test("Sign up with OpenID", async ({ page }) => {
     const userId = crypto.randomUUID();
 
     // Set name claim
@@ -175,7 +175,7 @@ test.describe("First visit", () => {
     ).toBeVisible();
   });
 
-  test.skip("Sign up with OpenID (no name available)", async ({ page }) => {
+  test("Sign up with OpenID (no name available)", async ({ page }) => {
     const userId = crypto.randomUUID();
 
     // Pick OpenID to continue
