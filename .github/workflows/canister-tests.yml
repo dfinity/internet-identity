@@ -604,7 +604,9 @@ jobs:
       openid_jwks_uri: http://localhost:11105/jwks
       openid_auth_uri: http://localhost:11105/auth
       openid_scope: |
-        "openid"; "profile"; "email"
+        "openid";
+        "profile";
+        "email";
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node
