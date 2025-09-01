@@ -4,7 +4,7 @@ import express from "express";
 const app = express();
 const port = 11105; // "OpenID" (O = 111, I = 105)
 const accountClaims = new Map();
-const provider = new oidc.Provider("https://oidc.local", {
+const provider = new oidc.Provider("http://localhost:11105", {
   clients: [
     {
       client_id: "internet_identity",

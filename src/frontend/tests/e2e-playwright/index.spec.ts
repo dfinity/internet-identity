@@ -125,6 +125,99 @@ test.describe("First visit", () => {
       newDevicePage.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
     ).toBeVisible();
   });
+
+  test("Sign up with OpenID", async ({ page }) => {
+    const userId = crypto.randomUUID();
+
+    // Set name claim
+    await fetch(`http://localhost:11105/account/${userId}/claims`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name: DEFAULT_USER_NAME }),
+    });
+
+    // Pick OpenID to continue
+    const pagePromise = page.context().waitForEvent("page");
+    await page.goto(II_URL);
+    await page
+      .getByRole("button", { name: "Continue with Test OpenID" })
+      .click();
+
+    // Authenticate and authorize with OpenID
+    const authPage = await pagePromise;
+    await expect(
+      authPage.getByRole("heading", {
+        name: "Sign-in",
+      }),
+    ).toBeVisible();
+    await authPage.getByPlaceholder("Enter any login").fill(userId);
+    await authPage.getByPlaceholder("and password").fill("secret");
+    await authPage.getByRole("button", { name: "Sign-in" }).click();
+    await expect(
+      authPage.getByRole("heading", {
+        name: "Authorize",
+      }),
+    ).toBeVisible();
+    await authPage.getByRole("button", { name: "Continue" }).click();
+    await authPage.waitForEvent("close", { timeout: 15_000 });
+
+    // Assert that dashboard is shown
+    await page.waitForURL(II_URL + "/manage");
+    await expect(
+      page.getByRole("heading", {
+        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
+    ).toBeVisible();
+  });
+
+  test("Sign up with OpenID (no name available)", async ({ page }) => {
+    const userId = crypto.randomUUID();
+
+    // Pick OpenID to continue
+    const pagePromise = page.context().waitForEvent("page");
+    await page.goto(II_URL);
+    await page
+      .getByRole("button", { name: "Continue with Test OpenID" })
+      .click();
+
+    // Authenticate and authorize with OpenID
+    const authPage = await pagePromise;
+    await expect(
+      authPage.getByRole("heading", {
+        name: "Sign-in",
+      }),
+    ).toBeVisible();
+    await authPage.getByPlaceholder("Enter any login").fill(userId);
+    await authPage.getByPlaceholder("and password").fill("secret");
+    await authPage.getByRole("button", { name: "Sign-in" }).click();
+    await expect(
+      authPage.getByRole("heading", {
+        name: "Authorize",
+      }),
+    ).toBeVisible();
+    await authPage.getByRole("button", { name: "Continue" }).click();
+    await authPage.waitForEvent("close", { timeout: 15_000 });
+
+    // Enter identity name
+    await page.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
+    await page.getByRole("button", { name: "Create identity" }).click();
+
+    // Assert that dashboard is shown
+    await page.waitForURL(II_URL + "/manage");
+    await expect(
+      page.getByRole("heading", {
+        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
+    ).toBeVisible();
+  });
 });
 
 test.describe("Last used identities listed", () => {
