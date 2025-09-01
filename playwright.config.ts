@@ -42,7 +42,7 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--ignore-certificate-errors",
-            "--host-resolver-rules=MAP * localhost:5173",
+            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
           ],
         },
       },
@@ -54,7 +54,7 @@ export default defineConfig({
         launchOptions: {
           args: [
             "--ignore-certificate-errors",
-            "--host-resolver-rules=MAP * localhost:5173",
+            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
           ],
         },
       },

@@ -83,6 +83,7 @@
               disabled={nonNullish(authenticatingProviderId)}
               size="xl"
               class="flex-1"
+              aria-label={`Continue with ${provider.name}`}
             >
               {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
