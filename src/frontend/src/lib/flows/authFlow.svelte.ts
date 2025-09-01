@@ -108,7 +108,7 @@ export class AuthFlow {
         canisterId,
         session: get(sessionStore),
       });
-    authenticationStore.set({ identity, identityNumber });
+    await authenticationStore.set({ identity, identityNumber });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
     lastUsedIdentitiesStore.addLastUsedIdentity({
@@ -197,7 +197,7 @@ export class AuthFlow {
       // If the call fails, it means the Google user does not exist in II.
       // In that case, we register them.
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
-      authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({ identity, identityNumber });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
       const authnMethod = info.openid_credentials[0]?.find(
@@ -283,7 +283,7 @@ export class AuthFlow {
       // If the call fails, it means the OpenID user does not exist in II.
       // In that case, we register them.
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
-      authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({ identity, identityNumber });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
       const authnMethod = info.openid_credentials[0]?.find(
@@ -393,7 +393,7 @@ export class AuthFlow {
       const identity = await authenticateWithSession({
         session: get(sessionStore),
       });
-      authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({ identity, identityNumber });
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: passkeyIdentity.getName(),
@@ -483,7 +483,7 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );
-      authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({ identity, identityNumber });
       const metadata: MetadataMapV2 = [];
       if (nonNullish(jwtName)) {
         metadata.push(["name", { String: jwtName }]);

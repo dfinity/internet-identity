@@ -108,7 +108,7 @@ export class RegisterAccessMethodFlow {
         )
       ) {
         const identity = await authenticateWithSession({ session });
-        authenticationStore.set({
+        await authenticationStore.set({
           identity,
           identityNumber,
         });
@@ -184,7 +184,7 @@ export class RegisterAccessMethodFlow {
         ])
         .then(throwCanisterError);
       const identity = await authenticateWithSession({ session });
-      authenticationStore.set({
+      await authenticationStore.set({
         identity,
         identityNumber: this.#identityNumber,
       });

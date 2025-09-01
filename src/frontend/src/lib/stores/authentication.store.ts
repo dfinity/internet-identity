@@ -15,8 +15,8 @@ import { createAnonymousNonce } from "$lib/utils/openID";
 
 export interface Authenticated {
   identityNumber: bigint;
-  nonce?: string;
-  salt?: Uint8Array;
+  nonce: string;
+  salt: Uint8Array;
   identity: DelegationIdentity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;
@@ -29,7 +29,7 @@ type AuthenticationStore = Readable<Authenticated | undefined> & {
   }) => void;
   set: (
     value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
-  ) => void;
+  ) => Promise<void>;
   reset: () => void;
 };
 
@@ -56,28 +56,18 @@ export const authenticationStore: AuthenticationStore = {
     }
     return { ...authenticated, ...initialized };
   }).subscribe,
-  set: (authenticated) =>
+  set: async (authenticated) => {
+    const { nonce, salt } = await createAnonymousNonce(
+      authenticated.identity.getPrincipal(),
+    );
     internalStore.update(({ initialized }) => {
       if (isNullish(initialized)) {
         throw new Error("Not initialized");
       }
       initialized.agent.replaceIdentity(authenticated.identity);
-      // Create the OpenID nonce using the identity's principal
-      void createAnonymousNonce(authenticated.identity.getPrincipal()).then(
-        ({ nonce, salt }) => {
-          internalStore.update((currentState) => ({
-            ...currentState,
-            authenticated: {
-              identityNumber: authenticated.identityNumber,
-              nonce,
-              salt,
-              identity: authenticated.identity,
-            },
-          }));
-        },
-      );
-      return { authenticated, initialized };
-    }),
+      return { authenticated: { ...authenticated, nonce, salt }, initialized };
+    });
+  },
   reset: () =>
     internalStore.update(({ initialized }) => {
       if (isNullish(initialized)) {
