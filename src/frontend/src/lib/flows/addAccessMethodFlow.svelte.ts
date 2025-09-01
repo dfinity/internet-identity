@@ -48,7 +48,6 @@ export class AddAccessMethodFlow {
     config: OpenIdConfig,
   ): Promise<OpenIdCredential> => {
     const { actor, identityNumber, salt, nonce } = get(authenticatedStore);
-    console.log(actor, identityNumber, salt, nonce);
 
     try {
       this.#isSystemOverlayVisible = true;
@@ -60,7 +59,7 @@ export class AddAccessMethodFlow {
           authScope: config.auth_scope.join(" "),
         },
         {
-          nonce: nonce,
+          nonce,
           mediation: "required",
         },
       );
