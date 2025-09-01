@@ -100,6 +100,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// The return type is an optional tuple containing the migrated entries, missing apps, and app
     /// collisions (where None indicates that the migration had already run before).
+    #[allow(clippy::type_complexity)]
     pub fn maybe_apply_lookup_application_with_origin_map_data_migration(
         &mut self,
     ) -> Option<(
