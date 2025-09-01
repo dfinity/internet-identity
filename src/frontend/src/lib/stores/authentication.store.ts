@@ -63,7 +63,7 @@ export const authenticationStore: AuthenticationStore = {
       }
       initialized.agent.replaceIdentity(authenticated.identity);
       // Create the OpenID nonce using the identity's principal
-      createAnonymousNonce(authenticated.identity.getPrincipal()).then(
+      void createAnonymousNonce(authenticated.identity.getPrincipal()).then(
         ({ nonce, salt }) => {
           internalStore.update((currentState) => ({
             ...currentState,
