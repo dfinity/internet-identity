@@ -153,7 +153,7 @@ test.describe("First visit", () => {
       }),
     ).toBeVisible();
     await authPage.getByPlaceholder("Enter any login").fill(userId);
-    await authPage.getByPlaceholder("and password").fill("secret");
+    await authPage.getByPlaceholder("and password").fill("any-password-works");
     await authPage.getByRole("button", { name: "Sign-in" }).click();
     await expect(
       authPage.getByRole("heading", {
@@ -193,7 +193,7 @@ test.describe("First visit", () => {
       }),
     ).toBeVisible();
     await authPage.getByPlaceholder("Enter any login").fill(userId);
-    await authPage.getByPlaceholder("and password").fill("secret");
+    await authPage.getByPlaceholder("and password").fill("any-password-works");
     await authPage.getByRole("button", { name: "Sign-in" }).click();
     await expect(
       authPage.getByRole("heading", {
