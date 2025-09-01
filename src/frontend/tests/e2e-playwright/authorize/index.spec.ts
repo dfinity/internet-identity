@@ -122,6 +122,47 @@ test("Authorize by signing in from another device", async ({
   expect(principal).toBe(expectedPrincipal);
 });
 
+test("Authorize by signing up with OpenID", async ({ page }) => {
+  const userId = crypto.randomUUID();
+
+  // Set name claim
+  await fetch(`http://localhost:11105/account/${userId}/claims`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: DEFAULT_USER_NAME }),
+  });
+
+  await authorize(page, async (authPage) => {
+    // Pick OpenID to continue
+    const pagePromise = authPage.context().waitForEvent("page");
+    await authPage
+      .getByRole("button", { name: "Continue with Test OpenID" })
+      .click();
+
+    // Authenticate and authorize with OpenID
+    const openIdPage = await pagePromise;
+    await expect(
+      openIdPage.getByRole("heading", {
+        name: "Sign-in",
+      }),
+    ).toBeVisible();
+    await openIdPage.getByPlaceholder("Enter any login").fill(userId);
+    await openIdPage
+      .getByPlaceholder("and password")
+      .fill("any-password-works");
+    await openIdPage.getByRole("button", { name: "Sign-in" }).click();
+    await expect(
+      openIdPage.getByRole("heading", {
+        name: "Authorize",
+      }),
+    ).toBeVisible();
+    await openIdPage.getByRole("button", { name: "Continue" }).click();
+    await openIdPage.waitForEvent("close", { timeout: 15_000 });
+  });
+});
+
 test("App logo appears when app is known", async ({ page }) => {
   const auth = dummyAuth();
   await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
