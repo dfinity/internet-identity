@@ -241,7 +241,7 @@ export class MigrationFlow {
         session.identity,
         delegation,
       );
-      authenticationStore.set({
+      await authenticationStore.set({
         identity,
         identityNumber,
       });

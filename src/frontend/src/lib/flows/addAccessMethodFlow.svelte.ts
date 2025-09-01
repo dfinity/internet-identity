@@ -2,7 +2,6 @@ import { canisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {
-  createAnonymousNonce,
   createGoogleRequestConfig,
   decodeJWT,
   requestJWT,
@@ -47,13 +46,10 @@ export class AddAccessMethodFlow {
   linkOpenIdAccount = async (
     config: OpenIdConfig,
   ): Promise<OpenIdCredential> => {
-    const { identity, actor, identityNumber } = get(authenticatedStore);
+    const { actor, identityNumber, salt, nonce } = get(authenticatedStore);
 
     try {
       this.#isSystemOverlayVisible = true;
-      const { nonce, salt } = await createAnonymousNonce(
-        identity.getPrincipal(),
-      );
       const jwt = await requestJWT(
         {
           clientId: config.client_id,
@@ -92,18 +88,16 @@ export class AddAccessMethodFlow {
   };
 
   linkGoogleAccount = async (): Promise<OpenIdCredential> => {
-    const { identity, actor, identityNumber } = get(authenticatedStore);
+    const { actor, identityNumber, salt, nonce } = get(authenticatedStore);
 
     const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
     if (isNullish(clientId)) {
       throw new Error("Google is not configured");
     }
+
     try {
       const requestConfig = createGoogleRequestConfig(clientId);
       this.#isSystemOverlayVisible = true;
-      const { nonce, salt } = await createAnonymousNonce(
-        identity.getPrincipal(),
-      );
       const jwt = await requestJWT(requestConfig, {
         nonce,
         mediation: "required",

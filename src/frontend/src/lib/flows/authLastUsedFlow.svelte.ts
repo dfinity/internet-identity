@@ -46,7 +46,7 @@ export class AuthLastUsedFlow {
           session: get(sessionStore),
           credentialIds,
         });
-        authenticationStore.set({ identity, identityNumber });
+        await authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
       } else if ("openid" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
@@ -80,7 +80,7 @@ export class AuthLastUsedFlow {
           session: get(sessionStore),
           jwt,
         });
-        authenticationStore.set({ identity, identityNumber });
+        await authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
       } else {
         throw new Error("Unrecognized authentication method");
