@@ -21,10 +21,6 @@ import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store"
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 
-export interface AddAccessMethodFlowOptions {
-  isMaxOpenIdCredentialsReached?: boolean;
-}
-
 export class AddAccessMethodFlow {
   #view = $state<"chooseMethod" | "addPasskey">("chooseMethod");
   #isSystemOverlayVisible = $state(false);
@@ -35,12 +31,6 @@ export class AddAccessMethodFlow {
 
   get isSystemOverlayVisible() {
     return this.#isSystemOverlayVisible;
-  }
-
-  constructor(options?: AddAccessMethodFlowOptions) {
-    if (options?.isMaxOpenIdCredentialsReached === true) {
-      this.#view = "addPasskey";
-    }
   }
 
   linkOpenIdAccount = async (
