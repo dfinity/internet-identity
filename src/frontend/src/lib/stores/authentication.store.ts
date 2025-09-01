@@ -11,9 +11,12 @@ import { Principal } from "@dfinity/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
+import { createAnonymousNonce } from "$lib/utils/openID";
 
 export interface Authenticated {
   identityNumber: bigint;
+  nonce?: string;
+  salt?: Uint8Array;
   identity: DelegationIdentity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;
@@ -24,7 +27,9 @@ type AuthenticationStore = Readable<Authenticated | undefined> & {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
   }) => void;
-  set: (value: Omit<Authenticated, "agent" | "actor">) => void;
+  set: (
+    value: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
+  ) => void;
   reset: () => void;
 };
 
@@ -57,6 +62,20 @@ export const authenticationStore: AuthenticationStore = {
         throw new Error("Not initialized");
       }
       initialized.agent.replaceIdentity(authenticated.identity);
+      // Create the OpenID nonce using the identity's principal
+      createAnonymousNonce(authenticated.identity.getPrincipal()).then(
+        ({ nonce, salt }) => {
+          internalStore.update((currentState) => ({
+            ...currentState,
+            authenticated: {
+              identityNumber: authenticated.identityNumber,
+              nonce,
+              salt,
+              identity: authenticated.identity,
+            },
+          }));
+        },
+      );
       return { authenticated, initialized };
     }),
   reset: () =>

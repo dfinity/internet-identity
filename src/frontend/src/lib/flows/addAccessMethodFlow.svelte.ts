@@ -47,13 +47,16 @@ export class AddAccessMethodFlow {
   linkOpenIdAccount = async (
     config: OpenIdConfig,
   ): Promise<OpenIdCredential> => {
-    const { identity, actor, identityNumber } = get(authenticatedStore);
+    const { actor, identityNumber, identity, salt, nonce } =
+      get(authenticatedStore);
+
+    const openIDNonce: { nonce: string; salt: Uint8Array } =
+      nonNullish(salt) && nonNullish(nonce)
+        ? { nonce, salt }
+        : await createAnonymousNonce(identity.getPrincipal());
 
     try {
       this.#isSystemOverlayVisible = true;
-      const { nonce, salt } = await createAnonymousNonce(
-        identity.getPrincipal(),
-      );
       const jwt = await requestJWT(
         {
           clientId: config.client_id,
@@ -62,14 +65,14 @@ export class AddAccessMethodFlow {
           authScope: config.auth_scope.join(" "),
         },
         {
-          nonce,
+          nonce: openIDNonce.nonce,
           mediation: "required",
         },
       );
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
       await actor
-        .openid_credential_add(identityNumber, jwt, salt)
+        .openid_credential_add(identityNumber, jwt, openIDNonce.salt)
         .then(throwCanisterError);
 
       const metadata: MetadataMapV2 = [];
@@ -92,26 +95,30 @@ export class AddAccessMethodFlow {
   };
 
   linkGoogleAccount = async (): Promise<OpenIdCredential> => {
-    const { identity, actor, identityNumber } = get(authenticatedStore);
+    const { actor, identityNumber, identity, salt, nonce } =
+      get(authenticatedStore);
 
     const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
     if (isNullish(clientId)) {
       throw new Error("Google is not configured");
     }
+
+    const openIDNonce: { nonce: string; salt: Uint8Array } =
+      nonNullish(salt) && nonNullish(nonce)
+        ? { nonce, salt }
+        : await createAnonymousNonce(identity.getPrincipal());
+
     try {
       const requestConfig = createGoogleRequestConfig(clientId);
       this.#isSystemOverlayVisible = true;
-      const { nonce, salt } = await createAnonymousNonce(
-        identity.getPrincipal(),
-      );
       const jwt = await requestJWT(requestConfig, {
-        nonce,
+        nonce: openIDNonce.nonce,
         mediation: "required",
       });
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
       await actor
-        .openid_credential_add(identityNumber, jwt, salt)
+        .openid_credential_add(identityNumber, jwt, openIDNonce.salt)
         .then(throwCanisterError);
 
       const metadata: MetadataMapV2 = [];
