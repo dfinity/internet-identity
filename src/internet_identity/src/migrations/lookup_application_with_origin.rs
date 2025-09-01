@@ -41,7 +41,7 @@ impl<M: Memory + Clone> Storage<M> {
                 "INFO: Migrated origins (origin -> new hash):\n{}",
                 migrated_entries
                     .iter()
-                    .map(|(k, v)| format!("{}:{}\n", k, v))
+                    .map(|(k, v)| format!("{}:{}", k, v))
                     .collect::<Vec<_>>()
                     .join("\n")
             );
@@ -49,7 +49,7 @@ impl<M: Memory + Clone> Storage<M> {
                 "INFO: lookup_application_with_origin_memory_old:\n{}",
                 self.lookup_application_with_origin_memory_old
                     .iter()
-                    .map(|(k, v)| format!("{}:{}\n", k, v))
+                    .map(|(k, v)| format!("{}:{}", k, v))
                     .collect::<Vec<_>>()
                     .join("\n")
             );
@@ -65,7 +65,7 @@ impl<M: Memory + Clone> Storage<M> {
             "INFO: lookup_application_with_origin_memory:\n{}",
             self.lookup_application_with_origin_memory
                 .iter()
-                .map(|(k, v)| format!("{}:{}\n", k, v))
+                .map(|(k, v)| format!("{}:{}", k, v))
                 .collect::<Vec<_>>()
                 .join("\n")
         );
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn should_migrate_multiple_entries_successfully() {
         let mut storage = Storage::new((10, 20), VectorMemory::default());
-        let origins = vec![
+        let origins = [
             "https://app1.com",
             "https://app2.org",
             "https://app3.net",
@@ -475,7 +475,7 @@ mod tests {
         // Example taken from https://github.com/yugt/sha256-prefix-collision
         let origin1 = "08RTz8".to_string();
         let origin2 = "4iRDWF".to_string();
-        let origins = vec![origin1.clone(), origin2.clone()];
+        let origins = [origin1.clone(), origin2.clone()];
 
         let mut expected_apps = HashMap::new();
 
