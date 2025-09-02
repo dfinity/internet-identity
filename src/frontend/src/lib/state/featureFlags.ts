@@ -101,6 +101,11 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 
+export const LANDING_PAGE_REDESIGN = createFeatureFlagStore(
+  "LANDING_PAGE_REDESIGN",
+  true,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
@@ -108,4 +113,5 @@ export default {
   DISCOVERABLE_PASSKEY_FLOW,
   CONTINUE_FROM_ANOTHER_DEVICE,
   ENABLE_GENERIC_OPEN_ID,
+  LANDING_PAGE_REDESIGN,
 } as Record<string, FeatureFlagStore>;

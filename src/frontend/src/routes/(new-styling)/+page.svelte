@@ -20,15 +20,24 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
   import { onMount } from "svelte";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { LANDING_PAGE_REDESIGN } from "$lib/state/featureFlags";
   import {
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
+  import Button from "$lib/components/ui/Button.svelte";
+  import FlickeringGrid from "$lib/components/ui/FlickeringGrid.svelte";
+  import { derived } from "svelte/store";
+  import { themeStore } from "$lib/stores/theme.store";
+  import TextFade from "$lib/components/ui/TextFade.svelte";
 
   const { data }: PageProps = $props();
+
+  const flickerColor = derived(themeStore, (isDark) =>
+    isDark ? "#000" : "#e8e8e8",
+  );
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
 
@@ -44,7 +53,6 @@
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
-    void triggerDropWaveAnimation();
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
     await gotoNext();
@@ -56,7 +64,6 @@
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
-    void triggerDropWaveAnimation();
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
     await gotoNext();
@@ -99,103 +106,140 @@
 
   onMount(() => {
     authenticationV2Funnel.init({ origin: window.location.origin });
-    setTimeout(() => {
-      triggerDropWaveAnimation();
-    });
   });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header />
-  <div class="flex flex-1 flex-col items-center justify-center">
-    <AuthPanel class="sm:max-w-100">
-      <div class="flex-1"></div>
-      {#if lastUsedIdentities.length > 0}
-        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          Manage your Internet&nbsp;Identity
-        </h1>
-        <p class="text-text-secondary mb-6 self-start text-sm">
-          choose identity to continue
-        </p>
-        <div class="flex flex-col gap-1.5">
-          <ul class="contents">
-            {#each lastUsedIdentities as identity}
-              <li class="contents">
-                <ButtonCard
-                  onclick={() => handleContinueAs(identity)}
-                  disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-                >
-                  <Avatar size="sm">
-                    {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
-                      <ProgressRing />
-                    {:else}
-                      <UserIcon size="1.25rem" />
-                    {/if}
-                  </Avatar>
-                  <div class="flex flex-col text-left text-sm">
-                    <div class="font-semibold">
-                      {identity.name ?? identity.identityNumber}
-                    </div>
-                    <div class="text-text-tertiary" aria-hidden="true">
-                      {lastUsedIdentityTypeName(identity)}
-                    </div>
-                  </div>
-                </ButtonCard>
-              </li>
-            {/each}
-          </ul>
-          <ButtonCard
-            onclick={() => (isAuthDialogOpen = true)}
-            disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-          >
-            <FeaturedIcon size="sm">
-              <PlusIcon size="1.25rem" />
-            </FeaturedIcon>
-            <span>Use another identity</span>
-          </ButtonCard>
+  {#if $LANDING_PAGE_REDESIGN}
+    <Header>
+      <div class="flex flex-1 flex-row items-center justify-end gap-5">
+        <Button variant="secondary">For developers</Button>
+        <Button variant="primary">Manage Identity</Button>
+      </div>
+    </Header>
+    <div class="flex h-[512px] w-full flex-row">
+      <div class="relative w-1/4 overflow-hidden">
+        <FlickeringGrid color={$flickerColor} />
+      </div>
+      <div class="flex w-1/2 flex-col items-center justify-center gap-6">
+        <div class="flex w-full flex-col gap-2">
+          <h1 class="text-text-disabled text-center text-7xl">Experience</h1>
+          <TextFade
+            texts={[
+              "Full Privacy",
+              "Ownership",
+              "Control",
+              "Internet Identity",
+            ]}
+            duration={500}
+            delay={2000}
+            className="text-7xl text-text-primary"
+            containerClass="h-[80px] w-full flex items-center justify-center"
+          />
         </div>
-        {#if isAuthDialogOpen}
-          <Dialog
-            onClose={() => (isAuthDialogOpen = false)}
-            showCloseButton={!isAuthenticating}
-            closeOnOutsideClick={!isAuthenticating}
-          >
-            <AuthWizard
-              bind:isAuthenticating
-              {onSignIn}
-              {onSignUp}
-              {onMigration}
-              onOtherDevice={() => (isAuthDialogOpen = false)}
-              onError={(error) => {
-                isAuthDialogOpen = false;
-                handleError(error);
-              }}
-              withinDialog
-            >
-              <h1
-                class="text-text-primary my-2 self-start text-2xl font-medium"
-              >
-                Use another identity
-              </h1>
-              <p class="text-text-secondary mb-6 self-start text-sm">
-                choose method
-              </p>
-            </AuthWizard>
-          </Dialog>
-        {/if}
-      {:else}
-        <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
+        <p class="text-text-tertiary max-w-[534px] text-center text-base">
+          Internet Identity lets you access apps and services securely, without
+          creating passwords, sharing personal data, or giving up control.
+        </p>
+      </div>
+      <div class="relative w-1/4 overflow-hidden">
+        <FlickeringGrid color={$flickerColor} />
+      </div>
+    </div>
+  {:else}
+    <Header />
+    <div class="flex flex-1 flex-col items-center justify-center">
+      <AuthPanel class="sm:max-w-100">
+        <div class="flex-1"></div>
+        {#if lastUsedIdentities.length > 0}
           <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
             Manage your Internet&nbsp;Identity
           </h1>
           <p class="text-text-secondary mb-6 self-start text-sm">
-            sign in to continue
+            choose identity to continue
           </p>
-        </AuthWizard>
-      {/if}
-    </AuthPanel>
-  </div>
-  <Footer />
+          <div class="flex flex-col gap-1.5">
+            <ul class="contents">
+              {#each lastUsedIdentities as identity}
+                <li class="contents">
+                  <ButtonCard
+                    onclick={() => handleContinueAs(identity)}
+                    disabled={nonNullish(
+                      authLastUsedFlow.authenticatingIdentity,
+                    )}
+                  >
+                    <Avatar size="sm">
+                      {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
+                        <ProgressRing />
+                      {:else}
+                        <UserIcon size="1.25rem" />
+                      {/if}
+                    </Avatar>
+                    <div class="flex flex-col text-left text-sm">
+                      <div class="font-semibold">
+                        {identity.name ?? identity.identityNumber}
+                      </div>
+                      <div class="text-text-tertiary" aria-hidden="true">
+                        {lastUsedIdentityTypeName(identity)}
+                      </div>
+                    </div>
+                  </ButtonCard>
+                </li>
+              {/each}
+            </ul>
+            <ButtonCard
+              onclick={() => (isAuthDialogOpen = true)}
+              disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+            >
+              <FeaturedIcon size="sm">
+                <PlusIcon size="1.25rem" />
+              </FeaturedIcon>
+              <span>Use another identity</span>
+            </ButtonCard>
+          </div>
+          {#if isAuthDialogOpen}
+            <Dialog
+              onClose={() => (isAuthDialogOpen = false)}
+              showCloseButton={!isAuthenticating}
+              closeOnOutsideClick={!isAuthenticating}
+            >
+              <AuthWizard
+                bind:isAuthenticating
+                {onSignIn}
+                {onSignUp}
+                {onMigration}
+                onOtherDevice={() => (isAuthDialogOpen = false)}
+                onError={(error) => {
+                  isAuthDialogOpen = false;
+                  handleError(error);
+                }}
+                withinDialog
+              >
+                <h1
+                  class="text-text-primary my-2 self-start text-2xl font-medium"
+                >
+                  Use another identity
+                </h1>
+                <p class="text-text-secondary mb-6 self-start text-sm">
+                  choose method
+                </p>
+              </AuthWizard>
+            </Dialog>
+          {/if}
+        {:else}
+          <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
+            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+              Manage your Internet&nbsp;Identity
+            </h1>
+            <p class="text-text-secondary mb-6 self-start text-sm">
+              sign in to continue
+            </p>
+          </AuthWizard>
+        {/if}
+      </AuthPanel>
+    </div>
+    <Footer />
+  {/if}
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
