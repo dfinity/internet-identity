@@ -11,83 +11,88 @@ impl<M: Memory + Clone> Storage<M> {
         migrated_entries: &BTreeMap<String, StorableOriginSha256>,
         missing_apps: &BTreeMap<StorableOriginHash, u64>,
         app_collisions: &BTreeMap<StorableOriginSha256, u64>,
-    ) {
+    ) -> Vec<String> {
+        let mut log_entries = Vec::new();
+
         // Log any missing applications
         if !missing_apps.is_empty() {
-            ic_cdk::println!(
+            log_entries.push(format!(
                 "ERROR: Skipped {} apps with IDs in the old map but without an app entry.",
-                missing_apps.len()
-            );
-            ic_cdk::println!(
+                missing_apps.len(),
+            ));
+            log_entries.push(format!(
                 "INFO: missing_apps:\n{}",
                 missing_apps
                     .iter()
                     .map(|(k, v)| format!("{}: {}\n", k, v))
                     .collect::<Vec<_>>()
-                    .join("")
-            );
+                    .join(""),
+            ));
         }
 
         // Log the main invariants
         if self.lookup_application_with_origin_memory_old.len()
             != self.lookup_application_with_origin_memory.len()
         {
-            ic_cdk::println!(
+            log_entries.push(format!(
                 "ERROR: There were **{}** old map entries but **{}** new map entries.",
                 self.lookup_application_with_origin_memory_old.len(),
-                self.lookup_application_with_origin_memory.len()
-            );
-            ic_cdk::println!(
-                "INFO: Migrated origins (origin -> new hash):\n{}",
+                self.lookup_application_with_origin_memory.len(),
+            ));
+            log_entries.push(format!(
+                "INFO: Migrated origins (origin:new hash):\n{}",
                 migrated_entries
                     .iter()
                     .map(|(k, v)| format!("{}:{}", k, v))
                     .collect::<Vec<_>>()
                     .join("\n")
-            );
-            ic_cdk::println!(
+            ));
+            log_entries.push(format!(
                 "INFO: lookup_application_with_origin_memory_old:\n{}",
                 self.lookup_application_with_origin_memory_old
                     .iter()
                     .map(|(k, v)| format!("{}:{}", k, v))
                     .collect::<Vec<_>>()
                     .join("\n")
-            );
-        } else {
-            ic_cdk::println!(
-                "INFO: Successfully migrated {} entries.",
-                self.lookup_application_with_origin_memory.len()
-            );
+            ));
         }
 
         // Log all migrated entries (compactly)
-        ic_cdk::println!(
+        log_entries.push(format!(
             "INFO: lookup_application_with_origin_memory:\n{}",
             self.lookup_application_with_origin_memory
                 .iter()
                 .map(|(k, v)| format!("{}:{}", k, v))
                 .collect::<Vec<_>>()
                 .join("\n")
-        );
+        ));
 
         if !app_collisions.is_empty() {
-            ic_cdk::println!(
+            log_entries.push(format!(
                 "WARNING: Discovered {} app collisions (not present in the old map).",
                 app_collisions.len()
-            );
-            ic_cdk::println!(
+            ));
+            log_entries.push(format!(
                 "INFO: app_collisions:\n{}",
                 app_collisions
                     .iter()
                     .map(|(k, v)| format!("{}:{}\n", k, v))
                     .collect::<Vec<_>>()
                     .join("\n")
-            );
-        } else {
-            ic_cdk::println!(
-                "INFO: Migration completed SUCCESSFULLY without discovering any app collisions."
-            );
+            ));
         }
+
+        if app_collisions.is_empty() && missing_apps.is_empty() {
+            log_entries.push(format!(
+                "INFO: Migration completed SUCCESSFULLY without app collisions or missing apps."
+            ));
+        }
+
+        for log_entry in &log_entries {
+            ic_cdk::println!("{}", log_entry);
+        }
+
+        log_entries
     }
 
     /// This function implements the Application Origin Hash Collision Resistance data migration,
@@ -135,7 +140,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         let mut app_collisions = BTreeMap::<StorableOriginSha256, u64>::new();
 
-        for (add_id, StorableApplication { origin, .. }) in self.stable_application_memory.iter() {
+        for (app_id, StorableApplication { origin, .. }) in self.stable_application_memory.iter() {
             let new_key = StorableOriginSha256::from_origin(&origin);
 
             if self
@@ -148,9 +153,9 @@ impl<M: Memory + Clone> Storage<M> {
             }
 
             self.lookup_application_with_origin_memory
-                .insert(new_key.clone(), add_id);
+                .insert(new_key.clone(), app_id);
 
-            app_collisions.insert(new_key, add_id);
+            app_collisions.insert(new_key, app_id);
         }
 
         self.log_after_migration(&migrated_entries, &missing_apps, &app_collisions);
@@ -166,6 +171,7 @@ mod tests {
     };
     use crate::Storage;
     use ic_stable_structures::VectorMemory;
+    use pretty_assertions::assert_eq;
     use std::collections::{BTreeMap, HashMap};
 
     // Helper function to avoid repetitive conversions
@@ -544,5 +550,59 @@ mod tests {
                 .unwrap();
             assert_eq!(stored_app, expected_app);
         }
+    }
+
+    #[test]
+    fn should_log_successful_migration() {
+        let mut storage = Storage::new((10, 20), VectorMemory::default());
+
+        // Setup: Create two successful migrations
+        let origin1 = "https://app1.com";
+        let origin2 = "https://app2.org";
+        let (_, new_key1) = create_origin_keys(origin1);
+        let (_, new_key2) = create_origin_keys(origin2);
+
+        // Add entries to the new map to simulate successful migration
+        storage
+            .lookup_application_with_origin_memory
+            .insert(new_key1.clone(), 101);
+        storage
+            .lookup_application_with_origin_memory
+            .insert(new_key2.clone(), 102);
+
+        // Add corresponding entries to old map to match counts
+        let (old_key1, _) = create_origin_keys(origin1);
+        let (old_key2, _) = create_origin_keys(origin2);
+        storage
+            .lookup_application_with_origin_memory_old
+            .insert(old_key1, 101);
+        storage
+            .lookup_application_with_origin_memory_old
+            .insert(old_key2, 102);
+
+        // Prepare test data for successful migration
+        let migrated_entries = BTreeMap::from([
+            (origin1.to_string(), new_key1.clone()),
+            (origin2.to_string(), new_key2.clone()),
+        ]);
+        let missing_apps = BTreeMap::new();
+        let app_collisions = BTreeMap::new();
+
+        // Call log_after_migration and verify the returned log entries
+        let log_entries =
+            storage.log_after_migration(&migrated_entries, &missing_apps, &app_collisions);
+
+        let expected_log_entries = vec![
+            format!(
+                "INFO: lookup_application_with_origin_memory:\n\
+                 {}:102\n\
+                 {}:101",
+                new_key2, new_key1
+            ),
+            "INFO: Migration completed SUCCESSFULLY without app collisions or missing apps."
+                .to_string(),
+        ];
+
+        assert_eq!(log_entries, expected_log_entries);
     }
 }

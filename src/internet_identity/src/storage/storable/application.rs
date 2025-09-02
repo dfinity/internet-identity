@@ -34,7 +34,7 @@ impl Storable for StorableApplication {
 
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct StorableOriginSha256 {
-    pub(crate) hash: [u8; 32],
+    hash: [u8; 32],
 }
 
 impl Display for StorableOriginSha256 {
@@ -82,7 +82,7 @@ impl Storable for StorableOriginSha256 {
 // TODO[ID_353]: Remove this type.
 #[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct StorableOriginHash {
-    pub(crate) hash: [u8; 8],
+    hash: [u8; 8],
 }
 
 impl Display for StorableOriginHash {

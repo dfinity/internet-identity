@@ -52,6 +52,7 @@ candid_parser.workspace = true
 canister_tests.workspace = true
 hex-literal = "0.4"
 regex.workspace = true
+pretty_assertions.workspace = true
 ic-response-verification.workspace = true
 flate2 = "1.0"
 getrandom = "0.2"
