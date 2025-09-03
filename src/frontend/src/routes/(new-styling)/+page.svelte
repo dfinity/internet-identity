@@ -32,11 +32,68 @@
   import { derived } from "svelte/store";
   import { themeStore } from "$lib/stores/theme.store";
   import TextFade from "$lib/components/ui/TextFade.svelte";
+  import FullControlIllustration from "$lib/components/illustrations/FullControlIllustration.svelte";
+  import EasyAccessIllustration from "$lib/components/illustrations/EasyAccessIllustration.svelte";
+  import PasswordFreeIllustration from "$lib/components/illustrations/PasswordFreeIllustration.svelte";
+  import LandingCard from "$lib/components/ui/LandingCard.svelte";
+  import Accordion from "$lib/components/ui/Accordion.svelte";
 
   const { data }: PageProps = $props();
 
+  const faq = [
+    {
+      question: "What is Internet Identity?",
+      answer:
+        "Internet Identity is a new way to log in without usernames or passwords, otherwise known as decentralized.\n\nInstead of using usernames and passwords (which can be hacked, stolen, or forgotten), Internet Identity lets you log in securely with devices you already own — like your phone, laptop, or a hardware key.",
+    },
+    {
+      question: "How do passkeys work?",
+      answer:
+        "Internet Identity is a new way to log in without usernames or passwords, otherwise known as decentralized.\n\nInstead of using usernames and passwords (which can be hacked, stolen, or forgotten), Internet Identity lets you log in securely with devices you already own — like your phone, laptop, or a hardware key.",
+    },
+    {
+      question: "What makes Internet Identity secure & easy to use?",
+      answer:
+        "Internet Identity is a new way to log in without usernames or passwords, otherwise known as decentralized.\n\nInstead of using usernames and passwords (which can be hacked, stolen, or forgotten), Internet Identity lets you log in securely with devices you already own — like your phone, laptop, or a hardware key.",
+    },
+    {
+      question: "What makes Internet Identity privacy-preserving?",
+      answer:
+        "Internet Identity is a new way to log in without usernames or passwords, otherwise known as decentralized.\n\nInstead of using usernames and passwords (which can be hacked, stolen, or forgotten), Internet Identity lets you log in securely with devices you already own — like your phone, laptop, or a hardware key.",
+    },
+    {
+      question: "How do Web2 integrations work with Internet Identity?",
+      answer:
+        "Internet Identity is a new way to log in without usernames or passwords, otherwise known as decentralized.\n\nInstead of using usernames and passwords (which can be hacked, stolen, or forgotten), Internet Identity lets you log in securely with devices you already own — like your phone, laptop, or a hardware key.",
+    },
+  ];
+
   const flickerColor = derived(themeStore, (isDark) =>
-    isDark ? "#000" : "#e8e8e8",
+    isDark
+      ? "#000000"
+      : getComputedStyle(document.documentElement).getPropertyValue(
+          "--border-tertiary",
+        ),
+  );
+
+  const illustrationColours = derived(themeStore, (isDark) =>
+    isDark
+      ? {
+          start: getComputedStyle(document.documentElement).getPropertyValue(
+            "--fg-quaternary",
+          ),
+          end: getComputedStyle(document.documentElement).getPropertyValue(
+            "--fg-quaternary_hover",
+          ),
+        }
+      : {
+          start: getComputedStyle(document.documentElement).getPropertyValue(
+            "--fg-tertiary",
+          ),
+          end: getComputedStyle(document.documentElement).getPropertyValue(
+            "--fg-primary",
+          ),
+        },
   );
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
@@ -147,6 +204,70 @@
         <FlickeringGrid color={$flickerColor} />
       </div>
     </div>
+    <div class="mx-auto flex flex-row gap-4 px-8 pb-8">
+      <LandingCard
+        header="EASY ACCESS"
+        subheader="Sign in with multiple providers"
+        description="Make sign-up simple by connecting your Google, Apple, or Microsoft account - the familiar way to log in, now powered by decentralized identity."
+      >
+        <EasyAccessIllustration
+          slot="illustration"
+          class="w-[233px]"
+          colors={$illustrationColours}
+        />
+      </LandingCard>
+      <LandingCard
+        header="PASSWORD-FREE"
+        subheader="Discoverable passkeys"
+        description="Forget about remembering identity numbers or complicated passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
+      >
+        <PasswordFreeIllustration
+          slot="illustration"
+          colors={$illustrationColours}
+          class="w-[264px]"
+        />
+      </LandingCard>
+      <LandingCard
+        header="FULL CONTROL"
+        subheader="Advanced identity management"
+        description="Manage your identities and stay in control of your dApps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
+      >
+        <FullControlIllustration
+          slot="illustration"
+          colors={$illustrationColours}
+          class="w-[170px]"
+        />
+      </LandingCard>
+    </div>
+    <div class="mx-auto flex max-w-7xl flex-row gap-16 px-16 py-24">
+      <div class="flex flex-1 flex-col gap-5">
+        <div class="flex flex-col gap-3">
+          <p class="text-text-tertiary text-sm">
+            Understanding Internet Identity
+          </p>
+          <p class="text-text-primary text-4xl">FAQs</p>
+        </div>
+        <p class="text-text-tertiary text-lg">
+          Everything you need to know about Internet Identity and how your
+          privacy is protected, secure, decentralized and managed only by you.
+        </p>
+      </div>
+      <div class="flex flex-1 flex-col gap-8">
+        {#each faq as item, i}
+          <div class="flex flex-col gap-6">
+            {#if i > 0 && i < faq.length}
+              <div class="border-border-secondary border-t"></div>
+            {/if}
+            <Accordion header={item.question}>
+              <p class="text-text-secondary text-base whitespace-pre-line">
+                {item.answer}
+              </p>
+            </Accordion>
+          </div>
+        {/each}
+      </div>
+    </div>
+    <Footer />
   {:else}
     <Header />
     <div class="flex flex-1 flex-col items-center justify-center">
