@@ -376,7 +376,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
             fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
         }]),
         archive_config: Some(ArchiveConfig {
-            module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+            module_hash: wasm_module_hash(&ARCHIVE_WASM),
             entries_buffer_limit: 10_000,
             polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
             entries_fetch_limit: 10,
