@@ -1,4 +1,8 @@
-<!-- Due to the linear design of the stroke, colors must be passed through from the parent in order to manage both light and dark mode changes without simply duplicating the image -->
+<!-- Gradients for SVG strokes must be defined with <linearGradient> inside the SVG. 
+     We pass colours down from the parent so they update in light and dark mode 
+     without duplicating the SVG definition. 
+     Docs: https://developer.mozilla.org/en-US/docs/Web/SVG/Element/linearGradient 
+           https://developer.mozilla.org/en-US/docs/Web/SVG/Element/stop -->
 
 <script lang="ts">
   import type { SVGAttributes } from "svelte/elements";
