@@ -29,3 +29,14 @@ export const INTERNET_COMPUTER_URL = "https://internetcomputer.org";
 // Pin is disallowed by default unless this query parameter is set.
 // This is used for testing purposes because we still support logging in with PIN but not registering with it.
 export const ENABLE_PIN_QUERY_PARAM_KEY = "enablePin";
+
+// FAQ Passkey URL
+export const FAQ_PASSKEY_URL = "https://www.passkeys.com/";
+
+// FAQ Passkey Support URL
+export const FAQ_PASSKEY_SUPPORT_URL =
+  "https://identitysupport.dfinity.org/hc/en-us/articles/15738590400148-What-is-a-passkey";
+
+// Internet Identity Development Docs URL
+export const II_DEVELOPER_DOCS_URL =
+  "https://internetcomputer.org/docs/building-apps/authentication/integrate-internet-identity";
