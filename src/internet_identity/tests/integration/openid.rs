@@ -645,7 +645,7 @@ fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
         }
 
         if attempts >= MAX_ATTEMPTS {
-            panic!("No Microsoft cert requests found after {MAX_ATTEMPTS} attempts");
+            panic!("No cert requests found for URL '{url}' after {MAX_ATTEMPTS} attempts");
         }
     }
 }
