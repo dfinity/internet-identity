@@ -6,17 +6,21 @@
   let contentRef: HTMLDivElement;
 </script>
 
-<div>
+<div
+  class="flex flex-col gap-1 rounded-2xl p-5 md:bg-transparent"
+  class:bg-bg-secondary={open}
+  class:sm:bg-bg-secondary={open}
+>
   <button
-    class="flex w-full items-center justify-between py-1 text-left font-medium focus:outline-none"
+    class="flex w-full items-center justify-between gap-2 text-left font-medium focus:outline-none"
     on:click={() => (open = !open)}
     aria-expanded={open}
   >
-    <span class="text-text-primary text-xl">{header}</span>
+    <span class="text-text-primary flex-1 text-base md:text-xl">{header}</span>
     {#if open}
-      <MinusCircle class="text-text-placeholder size-5" />
+      <MinusCircle class="text-text-placeholder min-size-4 md:min-size-5" />
     {:else}
-      <PlusCircle class="text-text-placeholder size-5" />
+      <PlusCircle class="text-text-placeholder min-size-4 md:min-size-5" />
     {/if}
   </button>
 
