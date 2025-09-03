@@ -61,10 +61,10 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         if app_collisions.is_empty() && missing_apps.is_empty() {
-            log_entries.push(
-                "INFO: Migration completed SUCCESSFULLY without app collisions or missing apps."
-                    .to_string(),
-            );
+            log_entries.push(format!(
+                "INFO: SUCCESSFULLY migrated {} entries without app collisions or missing apps.",
+                migrated_entries.len()
+            ));
         }
 
         for log_entry in &log_entries {
@@ -572,13 +572,7 @@ mod tests {
             storage.log_after_migration(&migrated_entries, &missing_apps, &app_collisions);
 
         let expected_log_entries = vec![
-            format!(
-                "INFO: lookup_application_with_origin_memory:\n\
-                 {}:102\n\
-                 {}:101",
-                new_key2, new_key1
-            ),
-            "INFO: Migration completed SUCCESSFULLY without app collisions or missing apps."
+            "INFO: SUCCESSFULLY migrated 2 entries without app collisions or missing apps."
                 .to_string(),
         ];
 
