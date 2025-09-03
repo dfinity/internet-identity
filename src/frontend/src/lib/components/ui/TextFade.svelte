@@ -3,14 +3,16 @@
   import { tick } from "svelte";
   import { onMount } from "svelte";
 
-  export let texts: string[] = [];
-  export let duration: number = 1000;
-  export let delay: number = 2000;
-  export let className: string = "";
-  export let containerClass: string = "";
+  const {
+    texts = [],
+    duration = 1000,
+    delay = 2000,
+    className = "",
+    containerClass = "",
+  } = $props();
 
-  let index = 0;
-  let currentText = texts[0];
+  let index = $state(0);
+  let currentText = $state(texts[0]);
 
   const next = async () => {
     if (index < texts.length - 1) {
