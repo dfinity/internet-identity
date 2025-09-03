@@ -222,7 +222,7 @@
             ]}
             duration={500}
             delay={2000}
-            className=" text-4xl md:text-5xl lg:text-7xl text-text-primary"
+            textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
             containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
           />
         </div>

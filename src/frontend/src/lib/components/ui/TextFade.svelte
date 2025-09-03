@@ -7,7 +7,7 @@
     texts = [],
     duration = 1000,
     delay = 2000,
-    className = "",
+    textClass = "",
     containerClass = "",
   } = $props();
 
@@ -33,7 +33,7 @@
 
 <div class={`relative ${containerClass}`}>
   {#key currentText}
-    <p transition:fade={{ duration }} class={`absolute ${className}`}>
+    <p transition:fade={{ duration }} class={`absolute ${textClass}`}>
       {currentText}
     </p>
   {/key}
