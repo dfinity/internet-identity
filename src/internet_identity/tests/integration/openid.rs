@@ -87,7 +87,7 @@ fn can_link_microsoft_account() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that the same microsoft account cannot be linked to two different identities
+/// Verifies that the same Microsoft account cannot be linked to two different identities
 #[test]
 fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectResponse> {
     let env = env();
