@@ -147,7 +147,7 @@ fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectRespo
     Ok(())
 }
 
-// This is not allowed in the frontend, but it's allowed in the backend.
+// Linking Microsoft accounts from different tenants to the same identity is not allowed in the frontend, but is allowed in the backend. This test verifies that the backend permits this behaviour.
 #[test]
 fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectResponse> {
     let env = env();
