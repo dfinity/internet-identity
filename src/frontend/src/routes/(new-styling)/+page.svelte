@@ -20,6 +20,7 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
   import { onMount } from "svelte";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { LANDING_PAGE_REDESIGN } from "$lib/state/featureFlags";
   import {
     AuthenticationV2Events,
@@ -28,7 +29,6 @@
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
   import Button from "$lib/components/ui/Button.svelte";
-  import FlickeringGrid from "$lib/components/ui/FlickeringGrid.svelte";
   import { derived } from "svelte/store";
   import { themeStore } from "$lib/stores/theme.store";
   import TextFade from "$lib/components/ui/TextFade.svelte";
@@ -131,6 +131,7 @@
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
+    void triggerDropWaveAnimation();
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
     await gotoNext();
@@ -142,6 +143,7 @@
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     isAuthDialogOpen = false;
+    void triggerDropWaveAnimation();
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
     await gotoNext();
@@ -184,6 +186,9 @@
 
   onMount(() => {
     authenticationV2Funnel.init({ origin: window.location.origin });
+    setTimeout(() => {
+      triggerDropWaveAnimation();
+    });
   });
 </script>
 
@@ -201,12 +206,7 @@
       </div>
     </LandingHeader>
     <div class="flex h-[512px] w-full flex-row px-4">
-      <div class="relative hidden h-full w-1/4 overflow-hidden lg:block">
-        <FlickeringGrid color={$flickerColor} />
-      </div>
-      <div
-        class="flex w-full flex-col items-center justify-center gap-6 lg:w-1/2"
-      >
+      <div class="flex w-full flex-col items-center justify-center gap-6">
         <div class="flex w-full flex-col gap-2">
           <h1
             class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
@@ -230,9 +230,6 @@
           Internet Identity lets you access apps and services securely, without
           creating passwords, sharing personal data, or giving up control.
         </p>
-      </div>
-      <div class="relative hidden h-full w-1/4 overflow-hidden lg:block">
-        <FlickeringGrid color={$flickerColor} />
       </div>
     </div>
     <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
