@@ -89,7 +89,8 @@
     },
   ];
 
-  // Used for managing the linear colors of the illustrations dynamically through theme changes
+  // Provides dynamic gradient colours for illustrations, reacting to theme changes.
+  // Values are pulled from CSS variables so strokes update automatically in light/dark mode.
   const illustrationColours = derived(themeStore, (isDark) =>
     isDark
       ? {
