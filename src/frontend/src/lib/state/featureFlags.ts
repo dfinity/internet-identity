@@ -103,7 +103,7 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
 
 export const LANDING_PAGE_REDESIGN = createFeatureFlagStore(
   "LANDING_PAGE_REDESIGN",
-  true,
+  false,
 );
 
 export default {
