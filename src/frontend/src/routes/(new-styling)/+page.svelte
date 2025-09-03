@@ -32,9 +32,9 @@
   import { derived } from "svelte/store";
   import { themeStore } from "$lib/stores/theme.store";
   import TextFade from "$lib/components/ui/TextFade.svelte";
-  import FullControlIllustration from "$lib/components/illustrations/FullControlIllustration.svelte";
-  import EasyAccessIllustration from "$lib/components/illustrations/EasyAccessIllustration.svelte";
-  import PasswordFreeIllustration from "$lib/components/illustrations/PasswordFreeIllustration.svelte";
+  import FullControlIllustration from "$lib/components/illustrations/landing/FullControlIllustration.svelte";
+  import EasyAccessIllustration from "$lib/components/illustrations/landing/EasyAccessIllustration.svelte";
+  import PasswordFreeIllustration from "$lib/components/illustrations/landing/PasswordFreeIllustration.svelte";
   import LandingCard from "$lib/components/ui/LandingCard.svelte";
   import Accordion from "$lib/components/ui/Accordion.svelte";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
@@ -89,6 +89,7 @@
     },
   ];
 
+  // Used for managing the linear colors of the illustrations dynamically through theme changes
   const illustrationColours = derived(themeStore, (isDark) =>
     isDark
       ? {

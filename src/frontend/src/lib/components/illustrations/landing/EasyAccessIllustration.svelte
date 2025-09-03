@@ -1,3 +1,5 @@
+<!-- Due to the linear design of the stroke, colors must be passed through from the parent in order to manage both light and dark mode changes without simply duplicating the image -->
+
 <script lang="ts">
   import type { SVGAttributes } from "svelte/elements";
 
