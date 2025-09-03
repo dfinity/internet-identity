@@ -89,14 +89,6 @@
     },
   ];
 
-  const flickerColor = derived(themeStore, (isDark) =>
-    isDark
-      ? "#000000"
-      : getComputedStyle(document.documentElement).getPropertyValue(
-          "--border-tertiary",
-        ),
-  );
-
   const illustrationColours = derived(themeStore, (isDark) =>
     isDark
       ? {
