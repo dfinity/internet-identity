@@ -180,7 +180,7 @@ pub fn install_ii_canister_with_arg_and_cycles(
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
-            module_hash: archive_wasm_hash(&wasm),
+            module_hash: wasm_module_hash(&wasm),
             entries_buffer_limit: 10_000,
             polling_interval_ns: Duration::from_secs(1).as_nanos() as u64,
             entries_fetch_limit: 10,
@@ -247,7 +247,7 @@ pub fn install_ii_with_archive(
     ii_canister_id
 }
 
-pub fn archive_wasm_hash(wasm: &Vec<u8>) -> [u8; 32] {
+pub fn wasm_module_hash(wasm: &Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(wasm);
     hasher.finalize().into()
@@ -263,8 +263,35 @@ pub fn upgrade_ii_canister_with_arg(
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
 ) -> Result<(), RejectResponse> {
+    let pre_upgrade_module_hash = env
+        .canister_status(canister_id, None)
+        .unwrap()
+        .module_hash
+        .unwrap();
+
+    let expected_module_hash = wasm_module_hash(&wasm);
+
+    // Smoke test
+    assert_ne!(
+        pre_upgrade_module_hash, expected_module_hash,
+        "Same Wasm before and after upgrade, this is probably a bug in the test."
+    );
+
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
-    env.upgrade_canister(canister_id, wasm, byts, None)
+    env.upgrade_canister(canister_id, wasm, byts, None)?;
+
+    let post_upgrade_module_hash = env
+        .canister_status(canister_id, None)
+        .unwrap()
+        .module_hash
+        .unwrap();
+
+    assert_eq!(
+        post_upgrade_module_hash, expected_module_hash,
+        "Unexpected module hash after upgrade. Most likely, there was a panic in post_upgrade."
+    );
+
+    Ok(())
 }
 
 /// Utility function to create compressed stable memory backups for use in backup tests.
