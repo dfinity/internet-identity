@@ -253,10 +253,12 @@ pub fn wasm_module_hash(wasm: &Vec<u8>) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+#[track_caller]
 pub fn upgrade_ii_canister(env: &PocketIc, canister_id: CanisterId, wasm: Vec<u8>) {
     upgrade_ii_canister_with_arg(env, canister_id, wasm, None).unwrap()
 }
 
+#[track_caller]
 pub fn upgrade_ii_canister_with_arg(
     env: &PocketIc,
     canister_id: CanisterId,
