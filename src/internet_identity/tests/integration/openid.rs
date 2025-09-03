@@ -644,22 +644,22 @@ fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
  * - test_time: the `iat` (issued at) field from the JWT
  * - test_principal: the principal of the identity used the link the OpenID account.
  * - test_pubkey: the public key of the credential used to sign in with the identity from `test_principal`.
- *      Not the public key of the principal of the identity. You don't get it with connection.identity.getPublicKey().
+ *   Not the public key of the principal of the identity. You don't get it with connection.identity.getPublicKey().
  * 
  * How to get the test data:
  * 1. Setup a local environment with open id providers.
  * 2. Create an identity with Passkey in the local environment.
  * 3. Log in with that identity and console.log the public key from `DiscoverablePasskeyIdentity.useExisting` `getPublicKey` argument.
- *      console.log("in da lookup", lookupResult.pubkey);
- *      This is the `test_pubkey`.
+ *  console.log("in da lookup", lookupResult.pubkey);
+ *  This is the `test_pubkey`.
  * 4. Link an OpenID account to that identity.
- *    Add a few logs:
- *    - the identity's principal with `identity.getPrincipal().toUint8Array()`. This goes to `test_principal`.
- *    - the jwt after requesting it. This goes to `jwt`.
- *    - the salt from the authenticatedStore. This goes to `salt`.
- *    - the rest of the fields in the JWT claims, find the `iat`. This goes to `test_time`.
- *    For example, you can find the JWT, salt and principal in `linkOpenIdAccount` from `addAccessMethodFlow`.
- *    The claims you can log them in `decodeJWT`.
+ *  Add a few logs:
+ *  - the identity's principal with `identity.getPrincipal().toUint8Array()`. This goes to `test_principal`.
+ *  - the jwt after requesting it. This goes to `jwt`.
+ *  - the salt from the authenticatedStore. This goes to `salt`.
+ *  - the rest of the fields in the JWT claims, find the `iat`. This goes to `test_time`.
+ *  For example, you can find the JWT, salt and principal in `linkOpenIdAccount` from `addAccessMethodFlow`.
+ *  The claims you can log them in `decodeJWT`.
  * 
  * Additional notes:
  * - The openID configuration when installing the canister in the test environment must match your local environment.
