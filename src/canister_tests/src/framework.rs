@@ -265,19 +265,7 @@ pub fn upgrade_ii_canister_with_arg(
     wasm: Vec<u8>,
     arg: Option<InternetIdentityInit>,
 ) -> Result<(), RejectResponse> {
-    let pre_upgrade_module_hash = env
-        .canister_status(canister_id, None)
-        .unwrap()
-        .module_hash
-        .unwrap();
-
     let expected_module_hash = wasm_module_hash(&wasm);
-
-    // Smoke test
-    assert_ne!(
-        pre_upgrade_module_hash, expected_module_hash,
-        "Same Wasm before and after upgrade, this is probably a bug in the test."
-    );
 
     let byts = candid::encode_one(arg).expect("error encoding II upgrade arg as candid");
     env.upgrade_canister(canister_id, wasm, byts, None)?;

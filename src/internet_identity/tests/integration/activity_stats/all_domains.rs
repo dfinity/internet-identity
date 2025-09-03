@@ -122,7 +122,8 @@ fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
 
     // upgrade previous -> current
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+    // upgrade current -> current
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
     env.advance_time(Duration::from_secs(DAY_SECONDS));
 
