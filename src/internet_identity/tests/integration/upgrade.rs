@@ -316,15 +316,13 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
     assert_eq!(accounts_between, accounts_after);
 }
 
-// TODO[ID-352]: Remove this test after the migration takes place.
+// TODO[ID-353]: Remove this test after the migration takes place.
 #[test]
 fn upgrade_and_rollback_with_realistic_data_migration() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-    // test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 359 filtered out; finished in 319.35s
-    // for i in 0..2000 {
-    for i in 0..10 {
+    for i in 0..2000 {
         let pubkey = format!("pub-key-{}", i);
         let sender = Principal::self_authenticating(pubkey.clone());
         let origin = format!("https://www.app{}.org", i);
@@ -356,6 +354,4 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
 
     upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
     api::health_check(&env, canister_id);
-
-    panic!("Boo!")
 }

@@ -40,32 +40,10 @@ impl<M: Memory + Clone> Storage<M> {
                 self.lookup_application_with_origin_memory.len(),
             ));
             log_entries.push(format!(
-                "INFO: Migrated origins (origin:new hash):\n{}",
-                migrated_entries
-                    .iter()
-                    .map(|(k, v)| format!("{}:{}", k, v))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ));
-            log_entries.push(format!(
-                "INFO: lookup_application_with_origin_memory_old:\n{}",
-                self.lookup_application_with_origin_memory_old
-                    .iter()
-                    .map(|(k, v)| format!("{}:{}", k, v))
-                    .collect::<Vec<_>>()
-                    .join("\n")
+                "INFO: Successfully migrated {} origins.",
+                migrated_entries.len()
             ));
         }
-
-        // Log all migrated entries (compactly)
-        log_entries.push(format!(
-            "INFO: lookup_application_with_origin_memory:\n{}",
-            self.lookup_application_with_origin_memory
-                .iter()
-                .map(|(k, v)| format!("{}:{}", k, v))
-                .collect::<Vec<_>>()
-                .join("\n")
-        ));
 
         if !app_collisions.is_empty() {
             log_entries.push(format!(
@@ -83,9 +61,10 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         if app_collisions.is_empty() && missing_apps.is_empty() {
-            log_entries.push(format!(
+            log_entries.push(
                 "INFO: Migration completed SUCCESSFULLY without app collisions or missing apps."
-            ));
+                    .to_string(),
+            );
         }
 
         for log_entry in &log_entries {
