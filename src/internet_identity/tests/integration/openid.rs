@@ -9,7 +9,7 @@ use identity_jose::{jwk::Jwk, jws::Decoder};
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, DeployArchiveResult, InternetIdentityInit, OpenIdConfig,
-    OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn, OpenIdCredentialAddError,
+    OpenIdCredentialAddError, OpenIdCredentialKey, OpenIdDelegationError, PublicKeyAuthn,
 };
 use pocket_ic::common::rest::{CanisterHttpReply, CanisterHttpResponse, MockCanisterHttpResponse};
 use pocket_ic::{PocketIc, RejectResponse};
@@ -22,7 +22,8 @@ use std::time::Duration;
 fn can_link_google_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
-    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_google_test_data();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
@@ -56,7 +57,8 @@ fn can_link_google_account() -> Result<(), RejectResponse> {
 fn can_link_microsoft_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
-    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_microsoft_test_data();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_microsoft_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
@@ -76,7 +78,7 @@ fn can_link_microsoft_account() -> Result<(), RejectResponse> {
         &jwt,
         &salt,
     )?;
-    
+
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
         1
@@ -90,11 +92,14 @@ fn can_link_microsoft_account() -> Result<(), RejectResponse> {
 fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
-    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_microsoft_test_data();
-    let (jwt2, salt2, _claims2, test_time2, test_principal2, test_authn_method2) = openid_microsoft_test_data_same_microsoft_different_user();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_microsoft_test_data();
+    let (jwt2, salt2, _claims2, test_time2, test_principal2, test_authn_method2) =
+        openid_microsoft_test_data_same_microsoft_different_user();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
-    let identity_number2 = create_identity_with_authn_method(&env, canister_id, &test_authn_method2);
+    let identity_number2 =
+        create_identity_with_authn_method(&env, canister_id, &test_authn_method2);
 
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
@@ -130,7 +135,10 @@ fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectRespo
         &salt2,
     )?;
 
-    assert_eq!(result, Err(OpenIdCredentialAddError::OpenIdCredentialAlreadyRegistered));
+    assert_eq!(
+        result,
+        Err(OpenIdCredentialAddError::OpenIdCredentialAlreadyRegistered)
+    );
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal2, identity_number2)?,
         0
@@ -144,8 +152,10 @@ fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectRespo
 fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
-    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_microsoft_test_data();
-    let (jwt2, salt2, _claims2, test_time2, _test_principal2, _test_authn_method2) = second_openid_microsoft_test_data();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_microsoft_test_data();
+    let (jwt2, salt2, _claims2, test_time2, _test_principal2, _test_authn_method2) =
+        second_openid_microsoft_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
@@ -166,7 +176,7 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
         &jwt,
         &salt,
     )?;
-    
+
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
         1
@@ -197,7 +207,8 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
 fn can_remove_google_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
-    let (jwt, salt, claims, test_time, test_principal, test_authn_method) = openid_google_test_data();
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
@@ -264,7 +275,8 @@ fn can_get_valid_jwt_delegation() -> Result<(), RejectResponse> {
 
     let canister_id = setup_canister(&env);
 
-    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) = openid_google_test_data();
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
+        openid_google_test_data();
 
     // Create identity
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
@@ -341,7 +353,8 @@ fn can_register_with_google() -> Result<(), RejectResponse> {
 
     let canister_id = setup_canister(&env);
 
-    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) = openid_google_test_data();
+    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
+        openid_google_test_data();
 
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
@@ -363,7 +376,8 @@ fn can_register_with_microsoft() -> Result<(), RejectResponse> {
 
     let canister_id = setup_canister(&env);
 
-    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) = openid_microsoft_test_data();
+    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
+        openid_microsoft_test_data();
 
     let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
     env.advance_time(time_to_advance);
@@ -387,7 +401,8 @@ fn cannot_register_with_faulty_jwt() {
 
     let canister_id = setup_canister(&env);
 
-    let (_jwt, salt, _claims, test_time, test_principal, _test_authn_method) = openid_google_test_data();
+    let (_jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
+        openid_google_test_data();
 
     let faulty_jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijc2M2Y3YzRjZDI2YTFlYjJiMWIzOWE4OGY0NDM0ZDFmNGQ5YTM2OGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDcxNzAzNjg4OTgyMTkwMzU3MjEiLCJoZCI6ImRmaW5pdHkub3JnIiwiZW1haWwiOiJhbmRyaS5zY2hhdHpAZGZpbml0eS5vcmciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJmQkcxS3IzUWt5Z0dHelNJWG9Pd2p3RF95QjhXS0FfcVJPUlZjMFp0WHlJIiwibmJmIjoxNzQwNTgzNDEyLCJuYW1lIjoiQW5kcmkgU2NoYXR6IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k1YUU0Mmo0Ml9JcEdqSHFjT2lUemVQLXRZaWNhMFZSLURnYklWcjJCWGtOSWxoUT1zOTYtYyIsImdpdmVuX25hbWUiOiJBbmRyaSIsImZhbWlseV9uYW1lIjoiU2NoYXR6IiwiaWF0IjoxNzQwNTgzNzEyLCJleHAiOjE3NDA1ODczMTIsImp0aSI6IjhjNjkzMWE4YmVmZjllOWM3OTRmYjM5ZTkwNTExOTM4MTk4MDgxZDYifQ.PVAbLj1Fv7AUwH16nFiedJkmPOUg1UkPnAkVj6S9MDhpEV467tP7iOxQCx64i0_imTymcjkzH9pcfTsaKpY8fWPrWSWZzDy9S4GygjOQeg13NXg_H23X2-IY_OVHKqtrAibhZZUppvczijqZja7-HmUivoAJIGsMOk1IxbJdalOhE5yQtsYEx4ZBxFemR7CTfMzopsAaRWgPHI7T0MENuiCbkSy_NYQPBzNpmGcKoZoyUbleFUzej8gbkqpoIUVdfwuNtoe_TMjED5eqJxi1Pip85iy4wJTa2RKUTZxUfqVCaTEftVt8U-PV1UgPsxpu0mKS5z5bXylmgclUzcNnmh";
 
@@ -412,7 +427,8 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
 
     let canister_id = setup_canister(&env);
 
-    let (jwt, salt, claims, test_time, test_principal, test_authn_method_data) = openid_google_test_data();
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method_data) =
+        openid_google_test_data();
     let (
         second_jwt,
         second_salt,
@@ -606,10 +622,7 @@ fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
 
         let requests = env.get_canister_http();
 
-        if let Some(cert_request) = requests
-            .iter()
-            .find(|req| req.url == url)
-        {
+        if let Some(cert_request) = requests.iter().find(|req| req.url == url) {
             // Use the same test certificate data that's used in google.rs
             let mock_certs = serde_json::from_str::<Certs>(mock_certs).unwrap().keys;
 
@@ -645,7 +658,7 @@ fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
  * - test_principal: the principal of the identity used the link the OpenID account.
  * - test_pubkey: the public key of the credential used to sign in with the identity from `test_principal`.
  *   Not the public key of the principal of the identity. You don't get it with connection.identity.getPublicKey().
- * 
+ *
  * How to get the test data:
  * 1. Setup a local environment with open id providers.
  * 2. Create an identity with Passkey in the local environment.
@@ -660,7 +673,7 @@ fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
  *  - the rest of the fields in the JWT claims, find the `iat`. This goes to `test_time`.
  *  For example, you can find the JWT, salt and principal in `linkOpenIdAccount` from `addAccessMethodFlow`.
  *  The claims you can log them in `decodeJWT`.
- * 
+ *
  * Additional notes:
  * - The openID configuration when installing the canister in the test environment must match your local environment.
  * - If you add a new openID providers, you need to mock the credentials with `mock_certs_response`.
@@ -759,17 +772,25 @@ fn second_openid_google_test_data() -> (String, [u8; 32], Claims, u64, Principal
 
 fn openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
     let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IkpZaEFjVFBNWl9MWDZEQmxPV1E3SG4wTmVYRSJ9.eyJhdWQiOiJkOTQ4YzA3My1lZWJkLTRhYjgtODYxZC0wNTVmN2FiNDllMTciLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmL3YyLjAiLCJpYXQiOjE3NTY4MDgzMjQsIm5iZiI6MTc1NjgwODMyNCwiZXhwIjoxNzU2ODEyMjI0LCJhaW8iOiJBVlFBcS84WkFBQUExQjhrYVdEVWp6V0xnSUxVT2hIQ1pWVndhbk1wNGVnVzdURzZwTytnVSsyYzdKRVRJckV5VHlySkxQQ0h1VkZINkUrbzRlMzhCQjZ6dmlWSU9kTzkxNVRHVDhEaUR3bkhCazYxTSt2bTdJaz0iLCJjX2hhc2giOiJGUzJsWllUYTIwcWozZVl1enczUXBnIiwibmFtZSI6Ikxsb3JlbsOnIE11bnRhbmVyIFBlcmVsbG8iLCJub25jZSI6ImN1UmM4VlNEN1ZkQU9ISmpsX1UxbkNWdlpvamQtMGJoUE81X0lGbTc0N2MiLCJvaWQiOiIxYjI2NDVmNy04YjdmLTQyMTAtYjQxYy01MDM1MmQ1OWYyZTgiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJsbG9yZW5jLm11bnRhbmVyQGRmaW5pdHkub3JnIiwicmgiOiIxLkFTNEFYbHhEU2xGa0dreW9INnVXWnJiZWozUEFTTm05N3JoS2hoMEZYM3EwbmhlNUFPd3VBQS4iLCJzaWQiOiIwMDdkZWE3OS0yNjY5LWZjNTItMzQwOS01Y2NjZDkxOTAzMjEiLCJzdWIiOiJydkF0eGluNk1TblRsN1RnUlg4RlhYQ0tQbEVlTklmUHI0bHdQT1lfd293IiwidGlkIjoiNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmIiwidXRpIjoiU3pLR0k3cG44MC1ZdnRmMmxuZ0RBUSIsInZlciI6IjIuMCJ9.kS8C8IlRoMaYoFyru-D06WzdeS8mHA3LupXyrOqXwwb4AIMMUDETlJEznAQ6iZxK4iAhAPAqAnC9TS_j0sacRCTBA3Rks-tkuwV2sA3XdwDsoFOnJdBs-N5GEXJNv45TzQ0jQANnXBJwwgH9hS-ledFZiutvzaTfDGpAymxx58qj7VDG5fTMxpiPMNCr42sNidw7B8ifUJgcfcxt_8wsTN_mui4Q6wtWRQvPnbesyTvRaOg2S6LMG3m8RBNYtHvXlICwD1kaKS5wUiYcrN3gg6wqOXCI3w57S5yfnGNo1tF4sWCfR0ZkfyHfVzdXK_6BwCty7rt4udp-NFsCAVXNRQ";
-    let salt: [u8; 32] = [196, 116, 153, 227, 8, 104, 231, 67, 202, 28, 156, 132, 101, 84, 170, 111, 86, 233, 29, 54, 230, 234, 243, 167, 159, 27, 102, 53, 166, 149, 172, 207];
+    let salt: [u8; 32] = [
+        196, 116, 153, 227, 8, 104, 231, 67, 202, 28, 156, 132, 101, 84, 170, 111, 86, 233, 29, 54,
+        230, 234, 243, 167, 159, 27, 102, 53, 166, 149, 172, 207,
+    ];
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .unwrap();
     let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
     let test_time = 1756808324000;
     let test_principal = Principal::from_slice(&[
-        33, 56, 228, 195, 129, 228, 78, 174, 18, 66, 159, 91, 0, 114, 146, 13, 69, 50, 30, 206, 73, 70, 162, 63, 23, 149, 200, 139, 2
+        33, 56, 228, 195, 129, 228, 78, 174, 18, 66, 159, 91, 0, 114, 146, 13, 69, 50, 30, 206, 73,
+        70, 162, 63, 23, 149, 200, 139, 2,
     ]);
     let test_pubkey = [
-        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 114, 42, 126, 192, 250, 94, 195, 79, 142, 211, 6, 212, 9, 135, 147, 58, 253, 65, 125, 244, 95, 13, 249, 210, 209, 90, 66, 232, 237, 16, 43, 67, 34, 88, 32, 202, 212, 22, 86, 222, 64, 75, 9, 157, 166, 125, 253, 46, 167, 174, 115, 181, 178, 11, 188, 189, 144, 205, 63, 23, 227, 218, 35, 14, 101, 7, 235
+        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32,
+        1, 33, 88, 32, 114, 42, 126, 192, 250, 94, 195, 79, 142, 211, 6, 212, 9, 135, 147, 58, 253,
+        65, 125, 244, 95, 13, 249, 210, 209, 90, 66, 232, 237, 16, 43, 67, 34, 88, 32, 202, 212,
+        22, 86, 222, 64, 75, 9, 157, 166, 125, 253, 46, 167, 174, 115, 181, 178, 11, 188, 189, 144,
+        205, 63, 23, 227, 218, 35, 14, 101, 7, 235,
     ];
 
     let test_authn_method = AuthnMethodData {
@@ -794,19 +815,28 @@ fn openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, Au
     )
 }
 
-fn openid_microsoft_test_data_same_microsoft_different_user() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
+fn openid_microsoft_test_data_same_microsoft_different_user(
+) -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
     let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IkpZaEFjVFBNWl9MWDZEQmxPV1E3SG4wTmVYRSJ9.eyJhdWQiOiJkOTQ4YzA3My1lZWJkLTRhYjgtODYxZC0wNTVmN2FiNDllMTciLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmL3YyLjAiLCJpYXQiOjE3NTY4MDk4OTcsIm5iZiI6MTc1NjgwOTg5NywiZXhwIjoxNzU2ODEzNzk3LCJhaW8iOiJBVlFBcS84WkFBQUEwSnViSXg1RGp6MkdhZ2tHVVlCaENaMnZuL0lQUEhMTzlFLzZOak1HNFZnZ1MyZ1Fjb21adGhwSTlYcTE0Z3VDVzl4NGhtOG9ZSWNlbnIrNys4SUxxeEU3SlFYYklJSFR2ekt0ZjAvaXd6ND0iLCJjX2hhc2giOiJzUzRxbFJHM0dTcGl1R2d6dnp2N3lRIiwibmFtZSI6Ikxsb3JlbsOnIE11bnRhbmVyIFBlcmVsbG8iLCJub25jZSI6IjRRc3QzVTNBeEl5OUx1ajQtck9UczhqbnlxbWVIYUxuVjc5UHdiZkQ2c0UiLCJvaWQiOiIxYjI2NDVmNy04YjdmLTQyMTAtYjQxYy01MDM1MmQ1OWYyZTgiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJsbG9yZW5jLm11bnRhbmVyQGRmaW5pdHkub3JnIiwicmgiOiIxLkFTNEFYbHhEU2xGa0dreW9INnVXWnJiZWozUEFTTm05N3JoS2hoMEZYM3EwbmhlNUFPd3VBQS4iLCJzaWQiOiIwMDdkZWE3OS0yNjY5LWZjNTItMzQwOS01Y2NjZDkxOTAzMjEiLCJzdWIiOiJydkF0eGluNk1TblRsN1RnUlg4RlhYQ0tQbEVlTklmUHI0bHdQT1lfd293IiwidGlkIjoiNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmIiwidXRpIjoidmdNd1BCVzB3MGVrUjhnbVF2d0FBQSIsInZlciI6IjIuMCJ9.dOLgbEsEkh-2unXLBWCjr9OPV27I3hqF4zuE9PgaGAnNfPqMa2dNjlDbIp74buUO8O9BxVQdzWZ4yP36GohbLstl6hS5uxG10Z4VMwsv6L9qXxLfS_4wjKEi3fu1z_4fdbTCYClJryQ2COQnSzIShudQtR6Sw12snQylv8AWs0sreBbi2TVZwrgewQ_6HC3RaQfNoO1MBKXLR8P3V-7mLrplDNu3nWUHFBfgK8iI58usgHO3NFpdYd2FvSjX8ShMdU35PogNz520T8cQEVsjc_IUiEWFgBjXOzuTw18rEHDf5_0DfMRnJDZ6u7qn5OBtjDY7bgZ1pxtJas-u1TT43A";
-    let salt: [u8; 32] = [248, 17, 147, 158, 173, 176, 67, 222, 21, 206, 90, 244, 23, 215, 200, 214, 219, 39, 213, 124, 225, 127, 112, 189, 122, 46, 84, 28, 4, 177, 98, 233];
+    let salt: [u8; 32] = [
+        248, 17, 147, 158, 173, 176, 67, 222, 21, 206, 90, 244, 23, 215, 200, 214, 219, 39, 213,
+        124, 225, 127, 112, 189, 122, 46, 84, 28, 4, 177, 98, 233,
+    ];
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .unwrap();
     let claims: Claims = serde_json::from_slice(validation_item.claims()).unwrap();
     let test_time = 1756809897000;
     let test_principal = Principal::from_slice(&[
-        207, 89, 197, 37, 100, 13, 121, 8, 153, 196, 203, 90, 42, 72, 233, 220, 119, 173, 118, 203, 235, 245, 229, 42, 249, 96, 210, 28, 2
+        207, 89, 197, 37, 100, 13, 121, 8, 153, 196, 203, 90, 42, 72, 233, 220, 119, 173, 118, 203,
+        235, 245, 229, 42, 249, 96, 210, 28, 2,
     ]);
     let test_pubkey = [
-        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 8, 146, 104, 45, 59, 242, 233, 149, 153, 10, 83, 252, 72, 236, 114, 32, 116, 99, 16, 86, 47, 224, 150, 170, 9, 191, 42, 181, 81, 125, 157, 194, 34, 88, 32, 64, 124, 12, 58, 148, 180, 243, 137, 40, 0, 10, 151, 172, 157, 34, 32, 129, 114, 68, 156, 126, 187, 174, 224, 55, 171, 240, 28, 242, 24, 183, 78
+        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32,
+        1, 33, 88, 32, 8, 146, 104, 45, 59, 242, 233, 149, 153, 10, 83, 252, 72, 236, 114, 32, 116,
+        99, 16, 86, 47, 224, 150, 170, 9, 191, 42, 181, 81, 125, 157, 194, 34, 88, 32, 64, 124, 12,
+        58, 148, 180, 243, 137, 40, 0, 10, 151, 172, 157, 34, 32, 129, 114, 68, 156, 126, 187, 174,
+        224, 55, 171, 240, 28, 242, 24, 183, 78,
     ];
 
     let test_authn_method = AuthnMethodData {
@@ -831,9 +861,13 @@ fn openid_microsoft_test_data_same_microsoft_different_user() -> (String, [u8; 3
     )
 }
 
-fn second_openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
+fn second_openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData)
+{
     let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IjRweGhwaHJGam9vQlhWNnQwSk9fa3BUUU5sOCJ9.eyJ2ZXIiOiIyLjAiLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vOTE4ODA0MGQtNmM2Ny00YzViLWIxMTItMzZhMzA0YjY2ZGFkL3YyLjAiLCJzdWIiOiJBQUFBQUFBQUFBQUFBQUFBQUFBQUFLQmNkbVNjQmM1WlJMVldfTnZCbm5VIiwiYXVkIjoiZDk0OGMwNzMtZWViZC00YWI4LTg2MWQtMDU1ZjdhYjQ5ZTE3IiwiZXhwIjoxNzU2ODk1MzE2LCJpYXQiOjE3NTY4MDg2MTYsIm5iZiI6MTc1NjgwODYxNiwibmFtZSI6Ikxsb3JlbsOnIE11bnRhbmVyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoibGxvcmVuYy5tdW50YW5lckBnbWFpbC5jb20iLCJvaWQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtYzJlYS05YzU2NDhjNjQ5NDMiLCJlbWFpbCI6Imxsb3JlbmMubXVudGFuZXJAZ21haWwuY29tIiwidGlkIjoiOTE4ODA0MGQtNmM2Ny00YzViLWIxMTItMzZhMzA0YjY2ZGFkIiwiY19oYXNoIjoiYjBIODJIZFNRcFZWY2RRU0QyLUFnUSIsIm5vbmNlIjoiSjUtTXQ3WlNhTWFwQlNzRkdJVzJWY25pRTAxa3ZtYjl1cUlJTzdUNWlWbyIsImFpbyI6IkRoOUtQWURNVTNpWU56SmhDQW01R0E1V3FkSk0yck9VZlhTbDJMV25qN3ltWEZGMWZ6OFpVMnJOeW56NWhWZEVmOHpabzhqNFAzKjE3RURvZndGQXNLNnFub1ZnUGRJdklCbGw2M2NpQmhHOWpQZGohQlcycVRtbko0cUtGdjBEckdGR1QyUFkzbkg5ZEdLN0doWXBWbVMwQXY0RjhGcW1iQjNSakRwWm1BR3gifQ.bkhQEC4oTvewk2k2oasFoPuTKC0i7QRUU13fugnDiXEGwWJ4oJz2gzrrVNcenBQ2-GH4WSWul-iwAmOCq9keFtLDb3Y5_7SApFoRqO0QLzV50Kl1wryLg7dVHrZfoJ0Juj29mdlej0nwUYlkxSn2qRoHFQappmpWBZOGCiohJRx7rb9Q_FcLMWelPL8FBSArHQhznOfJxQAxouEpK5tZVZHgSZjnfX8lxg2LF0cgw6mwy3t6eJQ4cA-Rp4-G-3YndkDmaNtoac1arYMTMggXQxZseU__RSkrpxRae8EkIIGhyDKqwiw46RZLAQnpHV0CkjolIvcUqaNpXtSscwZADg";
-    let salt: [u8; 32] = [130, 72, 159, 133, 3, 151, 246, 106, 96, 151, 157, 243, 233, 14, 234, 0, 220, 62, 210, 94, 76, 220, 218, 255, 97, 101, 136, 232, 156, 181, 30, 210];
+    let salt: [u8; 32] = [
+        130, 72, 159, 133, 3, 151, 246, 106, 96, 151, 157, 243, 233, 14, 234, 0, 220, 62, 210, 94,
+        76, 220, 218, 255, 97, 101, 136, 232, 156, 181, 30, 210,
+    ];
     let validation_item = Decoder::new()
         .decode_compact_serialization(jwt.as_bytes(), None)
         .unwrap();
@@ -841,11 +875,16 @@ fn second_openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Princi
     let test_time = 1756808616000;
     // Same as `openid_microsoft_test_data`.
     let test_principal = Principal::from_slice(&[
-        33, 56, 228, 195, 129, 228, 78, 174, 18, 66, 159, 91, 0, 114, 146, 13, 69, 50, 30, 206, 73, 70, 162, 63, 23, 149, 200, 139, 2
+        33, 56, 228, 195, 129, 228, 78, 174, 18, 66, 159, 91, 0, 114, 146, 13, 69, 50, 30, 206, 73,
+        70, 162, 63, 23, 149, 200, 139, 2,
     ]);
     // Same as `openid_microsoft_test_data`.
     let test_pubkey = [
-        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32, 1, 33, 88, 32, 114, 42, 126, 192, 250, 94, 195, 79, 142, 211, 6, 212, 9, 135, 147, 58, 253, 65, 125, 244, 95, 13, 249, 210, 209, 90, 66, 232, 237, 16, 43, 67, 34, 88, 32, 202, 212, 22, 86, 222, 64, 75, 9, 157, 166, 125, 253, 46, 167, 174, 115, 181, 178, 11, 188, 189, 144, 205, 63, 23, 227, 218, 35, 14, 101, 7, 235
+        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32,
+        1, 33, 88, 32, 114, 42, 126, 192, 250, 94, 195, 79, 142, 211, 6, 212, 9, 135, 147, 58, 253,
+        65, 125, 244, 95, 13, 249, 210, 209, 90, 66, 232, 237, 16, 43, 67, 34, 88, 32, 202, 212,
+        22, 86, 222, 64, 75, 9, 157, 166, 125, 253, 46, 167, 174, 115, 181, 178, 11, 188, 189, 144,
+        205, 63, 23, 227, 218, 35, 14, 101, 7, 235,
     ];
 
     let test_authn_method = AuthnMethodData {
