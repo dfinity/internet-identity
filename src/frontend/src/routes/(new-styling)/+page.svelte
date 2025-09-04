@@ -102,7 +102,7 @@
       <Button variant="primary" href="/login">Manage Identity</Button>
     </div>
   </LandingHeader>
-  <div class="flex h-[512px] w-full flex-row px-4">
+  <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
     <div class="flex w-full flex-col items-center justify-center gap-6">
       <div class="flex w-full flex-col gap-2">
         <h1
@@ -140,7 +140,7 @@
       >
         <EasyAccessIllustration
           slot="illustration"
-          class="w-[233px]"
+          class="max-w-[233px]"
           colors={$illustrationColours}
         />
       </LandingCard>
@@ -152,7 +152,7 @@
         <PasswordFreeIllustration
           slot="illustration"
           colors={$illustrationColours}
-          class="w-[264px]"
+          class="max-w-[264px]"
         />
       </LandingCard>
       <LandingCard
@@ -163,7 +163,7 @@
         <FullControlIllustration
           slot="illustration"
           colors={$illustrationColours}
-          class="w-[170px]"
+          class="max-w-[170px]"
         />
       </LandingCard>
     </div>
