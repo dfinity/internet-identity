@@ -145,7 +145,7 @@ test.describe("First visit", () => {
     const pagePromise = page.context().waitForEvent("page");
     await page.goto(II_URL);
     await page.getByRole("link", { name: "Manage Identity" }).click();
-    await await page
+    await page
       .getByRole("button", { name: "Continue with Test OpenID" })
       .click();
 
