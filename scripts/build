@@ -181,7 +181,7 @@ function build_canister() {
           fi
 
         fi
-        gzip --no-name --force "$canister.wasm"
+        gzip --best --no-name --force "$canister.wasm"
     fi
 }
 

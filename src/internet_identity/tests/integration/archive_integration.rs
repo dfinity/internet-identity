@@ -49,7 +49,7 @@ mod deployment_tests {
         let env = env();
         let arg = Some(InternetIdentityInit {
             archive_config: Some(ArchiveConfig {
-                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                module_hash: wasm_module_hash(&ARCHIVE_WASM),
                 entries_buffer_limit: 0,
                 polling_interval_ns: 0,
                 entries_fetch_limit: 0,
@@ -153,7 +153,7 @@ mod deployment_tests {
             II_WASM.clone(),
             Some(InternetIdentityInit {
                 archive_config: Some(ArchiveConfig {
-                    module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                    module_hash: wasm_module_hash(&ARCHIVE_WASM),
                     entries_buffer_limit: 10,
                     polling_interval_ns: 5_000,
                     entries_fetch_limit: 10,
@@ -633,7 +633,7 @@ mod pull_entries_tests {
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let init_arg = InternetIdentityInit {
             archive_config: Some(ArchiveConfig {
-                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                module_hash: wasm_module_hash(&ARCHIVE_WASM),
                 entries_buffer_limit: 20_000,
                 polling_interval_ns: Duration::from_secs(3).as_nanos() as u64,
                 entries_fetch_limit: 10,
@@ -667,7 +667,7 @@ mod pull_entries_tests {
         let ii_canister = setup_ii(&env, arg_with_wasm_hash(ARCHIVE_WASM.clone()));
         let init_arg = InternetIdentityInit {
             archive_config: Some(ArchiveConfig {
-                module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                module_hash: wasm_module_hash(&ARCHIVE_WASM),
                 entries_buffer_limit: 20_000,
                 polling_interval_ns: Duration::from_secs(60).as_nanos() as u64,
                 entries_fetch_limit: 2, // only fetch 2 entries at a time
@@ -865,7 +865,7 @@ mod pull_entries_tests {
             II_WASM.clone(),
             Some(InternetIdentityInit {
                 archive_config: Some(ArchiveConfig {
-                    module_hash: archive_wasm_hash(&ARCHIVE_WASM),
+                    module_hash: wasm_module_hash(&ARCHIVE_WASM),
                     entries_buffer_limit: 3,
                     polling_interval_ns: 0,
                     entries_fetch_limit: 0,

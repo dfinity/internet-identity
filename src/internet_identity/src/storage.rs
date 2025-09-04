@@ -135,7 +135,7 @@ pub mod registration_rates;
 
 pub mod account;
 
-mod storable;
+pub(crate) mod storable;
 
 #[cfg(test)]
 mod tests;
@@ -272,7 +272,7 @@ pub struct Storage<M: Memory> {
     stable_account_memory: StableBTreeMap<StorableAccountNumber, StorableAccount, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable application memory.
     stable_application_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    stable_application_memory:
+    pub(crate) stable_application_memory:
         StableBTreeMap<StorableApplicationNumber, StorableApplication, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the stable account counter memory.
     stable_anchor_account_counter_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
@@ -302,9 +302,9 @@ pub struct Storage<M: Memory> {
 
     // This field is deprecated in favor of `lookup_application_with_origin_memory`.
     // TODO[ID-354]: Remove this after the production data is migrated to the new map.
-    lookup_application_with_origin_memory_old:
+    pub(crate) lookup_application_with_origin_memory_old:
         StableBTreeMap<StorableOriginHash, StorableApplicationNumber, ManagedMemory<M>>,
-    lookup_application_with_origin_memory:
+    pub(crate) lookup_application_with_origin_memory:
         StableBTreeMap<StorableOriginSha256, StorableApplicationNumber, ManagedMemory<M>>,
 }
 
