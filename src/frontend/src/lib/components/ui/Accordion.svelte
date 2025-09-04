@@ -1,16 +1,22 @@
 <script lang="ts">
+  import type { HTMLAttributes } from "svelte/elements";
   import { PlusCircle, MinusCircle } from "@lucide/svelte";
+  import { nonNullish } from "@dfinity/utils";
 
-  export let header: string;
-  let open = false;
-  let contentRef: HTMLDivElement;
+  type Props = HTMLAttributes<HTMLDivElement> & {
+    header: string;
+  };
+
+  const { children, header }: Props = $props();
+  let open = $state(false);
+  let contentRef = $state<HTMLDivElement>();
 </script>
 
 <button
   class="flex flex-col gap-1 rounded-2xl p-5 text-left md:bg-transparent"
   class:bg-bg-secondary={open}
   class:sm:bg-bg-secondary={open}
-  on:click={() => (open = !open)}
+  onclick={() => (open = !open)}
 >
   <div
     class="flex w-full items-center justify-between gap-2 font-medium focus:outline-none"
@@ -29,8 +35,10 @@
     style:max-height={open ? `${contentRef?.scrollHeight}px` : "0px"}
     aria-hidden={!open}
   >
-    <div bind:this={contentRef}>
-      <slot />
-    </div>
+    {#if nonNullish(children)}
+      <div bind:this={contentRef}>
+        {@render children()}
+      </div>
+    {/if}
   </div>
 </button>

@@ -1,7 +1,14 @@
 <script lang="ts">
-  export let header: string;
-  export let subheader: string;
-  export let description: string;
+  import type { HTMLAttributes } from "svelte/elements";
+  import { nonNullish } from "@dfinity/utils";
+
+  type Props = HTMLAttributes<HTMLDivElement> & {
+    header: string;
+    subheader: string;
+    description: string;
+  };
+
+  const { children, header, subheader, description }: Props = $props();
 </script>
 
 <div
@@ -9,7 +16,9 @@
 >
   <p class="text-text-tertiary text-sm uppercase">{header}</p>
   <div class="grid h-[280px] place-items-center">
-    <slot name="illustration" />
+    {#if nonNullish(children)}
+      {@render children()}
+    {/if}
   </div>
   <div class="flex flex-col gap-2">
     <p class="text-text-primary text-xl">{subheader}</p>

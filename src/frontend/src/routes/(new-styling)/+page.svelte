@@ -139,7 +139,6 @@
         description="Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
       >
         <EasyAccessIllustration
-          slot="illustration"
           class="max-w-[233px]"
           colors={$illustrationColours}
         />
@@ -150,7 +149,6 @@
         description="Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
       >
         <PasswordFreeIllustration
-          slot="illustration"
           colors={$illustrationColours}
           class="max-w-[264px]"
         />
@@ -161,7 +159,6 @@
         description="Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
       >
         <FullControlIllustration
-          slot="illustration"
           colors={$illustrationColours}
           class="max-w-[170px]"
         />
