@@ -26,7 +26,6 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
 
   const { data }: PageProps = $props();
 
