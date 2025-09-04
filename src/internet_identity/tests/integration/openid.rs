@@ -89,7 +89,7 @@ fn can_link_microsoft_account() -> Result<(), RejectResponse> {
 
 /// Verifies that the same Microsoft account cannot be linked to two different identities
 #[test]
-fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectResponse> {
+fn cannot_link_same_microsoft_account_to_two_identities() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
@@ -108,6 +108,10 @@ fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectRespo
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
         0
     );
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal2, identity_number2)?,
+        0
+    );
 
     let _ = api::openid_credential_add(
         &env,
@@ -121,6 +125,10 @@ fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectRespo
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
         1
+    );
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal2, identity_number2)?,
+        0
     );
 
     let time_to_advance = Duration::from_millis(test_time2) - Duration::from_nanos(time(&env));
@@ -138,6 +146,10 @@ fn cannot_link_same_microsoft_account_two_identities() -> Result<(), RejectRespo
     assert_eq!(
         result,
         Err(OpenIdCredentialAddError::OpenIdCredentialAlreadyRegistered)
+    );
+    assert_eq!(
+        number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
+        1
     );
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal2, identity_number2)?,
