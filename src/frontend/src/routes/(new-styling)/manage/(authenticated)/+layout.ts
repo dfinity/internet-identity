@@ -18,7 +18,7 @@ export const load: LayoutLoad = ({ url }) => {
     // Add original target URL as next search param,
     // if it's not the default target URL (/manage).
     const next = url.pathname + url.search;
-    const location = new URL("/", url.origin);
+    const location = new URL("/login", url.origin);
     if (next !== "/manage") {
       location.searchParams.set("next", next);
     }

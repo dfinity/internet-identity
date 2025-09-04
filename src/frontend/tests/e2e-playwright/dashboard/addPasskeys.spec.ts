@@ -51,6 +51,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await clearStorage(page);
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
+  await newPage.getByRole("link", { name: "Manage Identity" }).click();
   await newPage.getByRole("button", { name: "Continue with Passkey" }).click();
   auth2(newPage);
   await newPage
@@ -182,6 +183,7 @@ test("User can add a new passkey and use it with cached identity without clearin
   // This should use the cached identity
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
+  await newPage.getByRole("link", { name: "Manage Identity" }).click();
 
   // Click on the cached identity button directly
   // But use the new passkey to authenticate

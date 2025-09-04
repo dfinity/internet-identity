@@ -172,7 +172,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
 
   // Verify we're back at the login screen without selectable identity
   await expect(
-    page.getByRole("button", { name: "Continue with Passkey" }),
+    page.getByRole("link", { name: "Manage Identity" }),
   ).toBeVisible();
 
   // Verify we're no longer at the dashboard
