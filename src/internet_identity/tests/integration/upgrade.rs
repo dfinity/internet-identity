@@ -322,7 +322,9 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-    for i in 0..2000 {
+    // For manual runs, use (too slow for CI):
+    // for i in 0..2000 {
+    for i in 0..10 {
         let pubkey = format!("pub-key-{}", i);
         let sender = Principal::self_authenticating(pubkey.clone());
         let origin = format!("https://www.app{}.org", i);
