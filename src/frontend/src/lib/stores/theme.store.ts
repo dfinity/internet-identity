@@ -5,17 +5,11 @@ import { readable } from "svelte/store";
 export const themeStore = readable(false, (set) => {
   if (typeof window === "undefined") return;
 
-  let media: MediaQueryList;
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const update = () => set(media.matches);
 
-  const init = () => {
-    media = window.matchMedia("(prefers-color-scheme: dark)");
-    set(media.matches);
-    media.addEventListener("change", update);
-  };
+  requestAnimationFrame(update); // ensure sync after paint
+  media.addEventListener("change", update);
 
-  const update = (e: MediaQueryListEvent) => set(e.matches);
-
-  requestAnimationFrame(init);
-
-  return () => media?.removeEventListener("change", update);
+  return () => media.removeEventListener("change", update);
 });
