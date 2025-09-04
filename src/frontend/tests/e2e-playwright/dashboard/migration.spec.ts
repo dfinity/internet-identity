@@ -47,6 +47,7 @@ test.describe("Migration", () => {
 
     // Step 2: Navigate to the new II_URL to start the migration
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
 
     // Step 3: Perform the migration
     const auth = dummyAuth();
@@ -64,6 +65,7 @@ test.describe("Migration", () => {
 
     // Step 5: Login again
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     auth(page);
     await page.getByRole("button", { name: TEST_USER_NAME }).click();
     await page.waitForURL(II_URL + "/manage");
@@ -85,6 +87,7 @@ test.describe("Migration", () => {
 
     // Step 2: Navigate to the new II_URL to start the migration
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
 
     // Step 3: Perform the migration
     const auth = dummyAuth();
@@ -103,6 +106,7 @@ test.describe("Migration", () => {
 
     // Step 5: Login again with discoverable passkey
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use an existing Passkey" }).click();

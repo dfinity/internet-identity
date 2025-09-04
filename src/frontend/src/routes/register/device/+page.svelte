@@ -24,7 +24,7 @@
     registerDeviceResult: Awaited<ReturnType<typeof registerTentativeDevice>>,
   ) => {
     if (registerDeviceResult.tag === "canceled") {
-      goto("/");
+      goto("/login");
       return;
     }
     void (registerDeviceResult satisfies { tag: "deviceAdded" });

@@ -1,33 +1,7 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { handleError } from "$lib/components/utils/error";
-  import {
-    lastUsedIdentitiesStore,
-    type LastUsedIdentity,
-  } from "$lib/stores/last-used-identities.store";
-  import { toaster } from "$lib/components/utils/toaster";
-  import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { PlusIcon, UserIcon } from "@lucide/svelte";
-  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
-  import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { goto } from "$app/navigation";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { AuthWizard } from "$lib/components/wizards/auth";
-  import type { PageProps } from "./$types";
   import { onMount } from "svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
-  import { LANDING_PAGE_REDESIGN } from "$lib/state/featureFlags";
-  import {
-    AuthenticationV2Events,
-    authenticationV2Funnel,
-  } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
   import Button from "$lib/components/ui/Button.svelte";
   import { derived } from "svelte/store";
   import { themeStore } from "$lib/stores/theme.store";
@@ -43,8 +17,6 @@
     FAQ_PASSKEY_URL,
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
-
-  const { data }: PageProps = $props();
 
   const faq = [
     {
@@ -111,75 +83,7 @@
         },
   );
 
-  const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
-
-  const onMigration = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    toaster.success({
-      title: "Migration completed successfully",
-      duration: 4000,
-    });
-    isAuthDialogOpen = false;
-    await goto("/manage");
-  };
-  const onSignIn = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isAuthDialogOpen = false;
-    void triggerDropWaveAnimation();
-    authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
-    authenticationV2Funnel.close();
-    await gotoNext();
-  };
-  const onSignUp = async (identityNumber: bigint) => {
-    toaster.success({
-      title: "You're all set. Your identity has been created.",
-      duration: 2000,
-    });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isAuthDialogOpen = false;
-    void triggerDropWaveAnimation();
-    authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
-    authenticationV2Funnel.close();
-    await gotoNext();
-  };
-
-  const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore.identities)
-      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3),
-  );
-  const authLastUsedFlow = new AuthLastUsedFlow();
-  // Initialize the flow every time the last used identities change
-  $effect(() =>
-    authLastUsedFlow.init(
-      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
-    ),
-  );
-
-  let isAuthDialogOpen = $state(false);
-  let isAuthenticating = $state(false);
-
-  const handleContinueAs = async (identity: LastUsedIdentity) => {
-    await authLastUsedFlow.authenticate(identity).catch(handleError);
-    if ("passkey" in identity.authMethod) {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsPasskey);
-    } else if ("openid" in identity.authMethod) {
-      const config = findConfig(
-        identity.authMethod.openid.iss,
-        identity.authMethod.openid.metadata ?? [],
-      );
-      if (nonNullish(config) && isOpenIdConfig(config)) {
-        authenticationV2Funnel.addProperties({
-          provider: config.name,
-        });
-      }
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);
-    }
-    await onSignIn(identity.identityNumber);
-  };
-
   onMount(() => {
-    authenticationV2Funnel.init({ origin: window.location.origin });
     setTimeout(() => {
       triggerDropWaveAnimation();
     });
@@ -188,217 +92,120 @@
 
 <div class="flex min-h-[100dvh] flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  {#if $LANDING_PAGE_REDESIGN}
-    <LandingHeader class="w-full flex-col md:flex-row">
-      <div
-        class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
-      >
-        <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank"
-          >For developers</Button
-        >
-        <Button variant="primary" href="/login">Manage Identity</Button>
-      </div>
-    </LandingHeader>
-    <div class="flex h-[512px] w-full flex-row px-4">
-      <div class="flex w-full flex-col items-center justify-center gap-6">
-        <div class="flex w-full flex-col gap-2">
-          <h1
-            class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
-          >
-            Experience
-          </h1>
-          <TextFade
-            texts={[
-              "Real Privacy",
-              "Full Ownership",
-              "Seamless Access",
-              "Internet Identity",
-            ]}
-            duration={500}
-            delay={2000}
-            textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
-            containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
-          />
-        </div>
-        <p class="text-text-tertiary max-w-[534px] text-center text-base">
-          Internet Identity lets you access apps and services securely, without
-          creating passwords, sharing personal data, or giving up control.
-        </p>
-      </div>
-    </div>
-    <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
-      <div
-        class="flex min-w-[fit-content] flex-row flex-nowrap justify-center gap-4"
-      >
-        <LandingCard
-          header="EASY ACCESS"
-          subheader="Sign in using familiar methods"
-          description="Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
-        >
-          <EasyAccessIllustration
-            slot="illustration"
-            class="w-[233px]"
-            colors={$illustrationColours}
-          />
-        </LandingCard>
-        <LandingCard
-          header="PASSWORD-FREE"
-          subheader="Discoverable passkeys"
-          description="Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
-        >
-          <PasswordFreeIllustration
-            slot="illustration"
-            colors={$illustrationColours}
-            class="w-[264px]"
-          />
-        </LandingCard>
-        <LandingCard
-          header="FULL CONTROL"
-          subheader="Advanced identity management"
-          description="Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
-        >
-          <FullControlIllustration
-            slot="illustration"
-            colors={$illustrationColours}
-            class="w-[170px]"
-          />
-        </LandingCard>
-      </div>
-    </div>
+  <LandingHeader class="w-full flex-col md:flex-row">
     <div
-      class="mx-auto flex max-w-7xl flex-col gap-16 px-4 py-24 md:px-16 lg:flex-row"
+      class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
     >
-      <div class="flex flex-1 flex-col gap-5">
-        <div class="flex flex-col gap-3">
-          <p
-            class="text-text-tertiary text-center text-xs md:text-left md:text-sm"
-          >
-            Understanding Internet Identity
-          </p>
-          <p
-            class="text-text-primary text-center text-3xl font-semibold md:text-left md:text-4xl"
-          >
-            FAQs
-          </p>
-        </div>
-        <p
-          class="text-text-tertiary text-center text-sm md:text-left md:text-lg"
+      <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank"
+        >For developers</Button
+      >
+      <Button variant="primary" href="/login">Manage Identity</Button>
+    </div>
+  </LandingHeader>
+  <div class="flex h-[512px] w-full flex-row px-4">
+    <div class="flex w-full flex-col items-center justify-center gap-6">
+      <div class="flex w-full flex-col gap-2">
+        <h1
+          class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
         >
-          Everything you need to know about Internet Identity, your private,
-          secure, and easy way to log in to apps on the Internet Computer.
+          Experience
+        </h1>
+        <TextFade
+          texts={[
+            "Real Privacy",
+            "Full Ownership",
+            "Seamless Access",
+            "Internet Identity",
+          ]}
+          duration={500}
+          delay={2000}
+          textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
+          containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
+        />
+      </div>
+      <p class="text-text-tertiary max-w-[534px] text-center text-base">
+        Internet Identity lets you access apps and services securely, without
+        creating passwords, sharing personal data, or giving up control.
+      </p>
+    </div>
+  </div>
+  <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
+    <div
+      class="flex min-w-[fit-content] flex-row flex-nowrap justify-center gap-4"
+    >
+      <LandingCard
+        header="EASY ACCESS"
+        subheader="Sign in using familiar methods"
+        description="Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
+      >
+        <EasyAccessIllustration
+          slot="illustration"
+          class="w-[233px]"
+          colors={$illustrationColours}
+        />
+      </LandingCard>
+      <LandingCard
+        header="PASSWORD-FREE"
+        subheader="Discoverable passkeys"
+        description="Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
+      >
+        <PasswordFreeIllustration
+          slot="illustration"
+          colors={$illustrationColours}
+          class="w-[264px]"
+        />
+      </LandingCard>
+      <LandingCard
+        header="FULL CONTROL"
+        subheader="Advanced identity management"
+        description="Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
+      >
+        <FullControlIllustration
+          slot="illustration"
+          colors={$illustrationColours}
+          class="w-[170px]"
+        />
+      </LandingCard>
+    </div>
+  </div>
+  <div
+    class="mx-auto flex max-w-7xl flex-col gap-16 px-4 py-24 md:px-16 lg:flex-row"
+  >
+    <div class="flex flex-1 flex-col gap-5">
+      <div class="flex flex-col gap-3">
+        <p
+          class="text-text-tertiary text-center text-xs md:text-left md:text-sm"
+        >
+          Understanding Internet Identity
+        </p>
+        <p
+          class="text-text-primary text-center text-3xl font-semibold md:text-left md:text-4xl"
+        >
+          FAQs
         </p>
       </div>
-      <div class="flex flex-1 flex-col gap-8">
-        {#each faq as item, i}
-          <div class="flex flex-col gap-6">
-            {#if i > 0 && i < faq.length}
-              <div class="border-border-secondary mx-5 border-t"></div>
-            {/if}
-            <Accordion header={item.question}>
-              <p
-                class="text-text-secondary text-sm whitespace-pre-line md:text-base"
-              >
-                {@html item.answer}
-              </p>
-            </Accordion>
-          </div>
-        {/each}
-      </div>
+      <p class="text-text-tertiary text-center text-sm md:text-left md:text-lg">
+        Everything you need to know about Internet Identity, your private,
+        secure, and easy way to log in to apps on the Internet Computer.
+      </p>
     </div>
-    <Footer />
-  {:else}
-    <Header />
-    <div class="flex flex-1 flex-col items-center justify-center">
-      <AuthPanel class="sm:max-w-100">
-        <div class="flex-1"></div>
-        {#if lastUsedIdentities.length > 0}
-          <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-            Manage your Internet&nbsp;Identity
-          </h1>
-          <p class="text-text-secondary mb-6 self-start text-sm">
-            choose identity to continue
-          </p>
-          <div class="flex flex-col gap-1.5">
-            <ul class="contents">
-              {#each lastUsedIdentities as identity}
-                <li class="contents">
-                  <ButtonCard
-                    onclick={() => handleContinueAs(identity)}
-                    disabled={nonNullish(
-                      authLastUsedFlow.authenticatingIdentity,
-                    )}
-                  >
-                    <Avatar size="sm">
-                      {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
-                        <ProgressRing />
-                      {:else}
-                        <UserIcon size="1.25rem" />
-                      {/if}
-                    </Avatar>
-                    <div class="flex flex-col text-left text-sm">
-                      <div class="font-semibold">
-                        {identity.name ?? identity.identityNumber}
-                      </div>
-                      <div class="text-text-tertiary" aria-hidden="true">
-                        {lastUsedIdentityTypeName(identity)}
-                      </div>
-                    </div>
-                  </ButtonCard>
-                </li>
-              {/each}
-            </ul>
-            <ButtonCard
-              onclick={() => (isAuthDialogOpen = true)}
-              disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-            >
-              <FeaturedIcon size="sm">
-                <PlusIcon size="1.25rem" />
-              </FeaturedIcon>
-              <span>Use another identity</span>
-            </ButtonCard>
-          </div>
-          {#if isAuthDialogOpen}
-            <Dialog
-              onClose={() => (isAuthDialogOpen = false)}
-              showCloseButton={!isAuthenticating}
-              closeOnOutsideClick={!isAuthenticating}
-            >
-              <AuthWizard
-                bind:isAuthenticating
-                {onSignIn}
-                {onSignUp}
-                {onMigration}
-                onOtherDevice={() => (isAuthDialogOpen = false)}
-                onError={(error) => {
-                  isAuthDialogOpen = false;
-                  handleError(error);
-                }}
-                withinDialog
-              >
-                <h1
-                  class="text-text-primary my-2 self-start text-2xl font-medium"
-                >
-                  Use another identity
-                </h1>
-                <p class="text-text-secondary mb-6 self-start text-sm">
-                  choose method
-                </p>
-              </AuthWizard>
-            </Dialog>
+    <div class="flex flex-1 flex-col gap-8">
+      {#each faq as item, i}
+        <div class="flex flex-col gap-6">
+          {#if i > 0 && i < faq.length}
+            <div class="border-border-secondary mx-5 border-t"></div>
           {/if}
-        {:else}
-          <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
-            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              Manage your Internet&nbsp;Identity
-            </h1>
-            <p class="text-text-secondary mb-6 self-start text-sm">
-              sign in to continue
+          <Accordion header={item.question}>
+            <p
+              class="text-text-secondary text-sm whitespace-pre-line md:text-base"
+            >
+              {@html item.answer}
             </p>
-          </AuthWizard>
-        {/if}
-      </AuthPanel>
+          </Accordion>
+        </div>
+      {/each}
     </div>
-    <Footer />
-  {/if}
+  </div>
+  <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
