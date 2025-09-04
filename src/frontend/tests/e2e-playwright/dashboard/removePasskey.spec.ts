@@ -168,11 +168,11 @@ test("User is logged out after removing the passkey they used to authenticate", 
 
   // Verify the user is logged out and redirected to the login page
   // The URL should change from /manage to the root or login page
-  await page.waitForURL(II_URL);
+  await page.waitForURL(`${II_URL}/login`);
 
   // Verify we're back at the login screen without selectable identity
   await expect(
-    page.getByRole("link", { name: "Manage Identity" }),
+    page.getByRole("button", { name: "Continue with Passkey" }),
   ).toBeVisible();
 
   // Verify we're no longer at the dashboard
