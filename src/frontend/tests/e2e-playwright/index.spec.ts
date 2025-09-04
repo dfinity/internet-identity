@@ -59,7 +59,7 @@ test.describe("First visit", () => {
     const newContext = await browser.newContext();
     const newDevicePage = await newContext.newPage();
     await newDevicePage.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await newDevicePage.getByRole("link", { name: "Manage Identity" }).click();
     await newDevicePage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
