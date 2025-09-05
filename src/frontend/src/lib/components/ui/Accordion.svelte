@@ -41,7 +41,7 @@
     aria-hidden={!open}
   >
     {#if nonNullish(children)}
-      <div bind:this={contentRef}>
+      <div bind:this={contentRef} class={!open ? "hidden" : ""}>
         {@render children()}
       </div>
     {/if}
