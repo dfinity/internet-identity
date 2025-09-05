@@ -2,7 +2,7 @@
   import type { HTMLAttributes } from "svelte/elements";
   import Logo from "$lib/components/ui/Logo.svelte";
 
-  type Props = HTMLAttributes<HTMLHeadElement>;
+  type Props = HTMLAttributes<HTMLElement>;
 
   const { children, class: className, ...props }: Props = $props();
 </script>
