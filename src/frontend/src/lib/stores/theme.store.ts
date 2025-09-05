@@ -10,7 +10,8 @@ export const themeStore = readable(false, (set) => {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   const update = () => set(media.matches);
 
-  requestAnimationFrame(update); // ensure sync after paint
+  update(); // sync immediately to avoid flicker
+  requestAnimationFrame(update); // backup in case of late browser updates before paint
   media.addEventListener("change", update);
 
   return () => media.removeEventListener("change", update);
