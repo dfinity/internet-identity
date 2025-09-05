@@ -1,6 +1,8 @@
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { CredentialData } from "./credential-devices";
+import { canisterConfig } from "$lib/globals";
+import { isSameOrigin } from "./urlUtils";
 
 export type WebAuthnFlow = {
   useIframe: boolean;
@@ -41,20 +43,45 @@ export const findWebAuthnFlows = ({
   );
 
   // The devices are expected to be ordered by recently used already
-  const orderedDeviceRpIds = [
-    ...new Set(
-      devices
-        // Device origin to RP ID (hostname)
-        .map((device) =>
-          device.origin === currentOrigin ||
-          (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
-            ? undefined
-            : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname,
-        )
-        // Filter out RP IDs that are not within `relatedRpIds`
-        .filter((rpId) => isNullish(rpId) || relatedRpIds.includes(rpId)),
-    ),
-  ];
+  // Move devices registered on the new flow origins to the end using toSorted (preserving relative order within groups)
+  const newFlowOrigins = canisterConfig.new_flow_origins[0] ?? [];
+  const isInNewFlow = (credentialData: CredentialData): boolean => {
+    const origin = credentialData.origin ?? II_LEGACY_ORIGIN;
+    return newFlowOrigins.some((o) => isSameOrigin(o, origin));
+  };
+  const sortNewFlowOriginsToEnd = (
+    a: CredentialData,
+    b: CredentialData,
+  ): number => {
+    const aIn = isInNewFlow(a);
+    const bIn = isInNewFlow(b);
+    // Keep the order if both are in the new flow or both are not
+    if (aIn === bIn) return 0;
+    // Move the one that is in the new flow to the end
+    return aIn ? 1 : -1;
+  };
+
+  const orderedDeviceRpIds: (string | undefined)[] = [...devices]
+    .sort(sortNewFlowOriginsToEnd)
+    // Device origin to RP ID (hostname)
+    .map((device: CredentialData) =>
+      device.origin === currentOrigin ||
+      (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
+        ? undefined
+        : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname,
+    )
+    // Filter out RP IDs that are not within `relatedRpIds`
+    .filter(
+      (rpId: string | undefined) =>
+        isNullish(rpId) || relatedRpIds.includes(rpId),
+    )
+    // Remove duplicates
+    .reduce((rpIds: Array<string | undefined>, rpId: string | undefined) => {
+      if (rpIds.includes(rpId)) {
+        return rpIds;
+      }
+      return [...rpIds, rpId];
+    }, []);
 
   // Create steps from `deviceRpIds`, currently that's one step per RP ID
   const steps: WebAuthnFlow[] = orderedDeviceRpIds.map((rpId) => ({

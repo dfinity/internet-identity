@@ -2,13 +2,22 @@ import { LEGACY_II_URL } from "$lib/config";
 import { CredentialData } from "./credential-devices";
 import { findWebAuthnFlows } from "./findWebAuthnFlows";
 
+vi.mock("$lib/globals", () => ({
+  canisterConfig: {
+    new_flow_origins: [["https://id.ai"]],
+  },
+}));
+
 describe("findWebAuthnFlows", () => {
+  const newOrigin = "https://id.ai";
+  const newOriginRpId = new URL(newOrigin).hostname;
   const currentOrigin = "https://identity.internetcomputer.org";
   const nonCurrentOrigin1 = "https://identity.ic0.app";
   const nonCurrentOrigin1RpId = new URL(nonCurrentOrigin1).hostname;
   const nonCurrentOrigin2 = "https://identity.icp0.io";
   const nonCurrentOrigin2RpId = new URL(nonCurrentOrigin2).hostname;
   const relatedOrigins = [
+    newOrigin,
     "https://identity.ic0.app",
     "https://identity.internetcomputer.org",
     "https://identity.icp0.io",
@@ -147,6 +156,28 @@ describe("findWebAuthnFlows", () => {
       { useIframe: true, rpId: nonCurrentOrigin2RpId },
       { useIframe: false, rpId: undefined },
       { useIframe: true, rpId: nonCurrentOrigin1RpId },
+    ]);
+  });
+
+  it("pushes RP IDs from new_flow_origins to the end while preserving relative order", async () => {
+    const result = findWebAuthnFlows({
+      supportsRor: true,
+      devices: [
+        createMockCredential(newOrigin),
+        createMockCredential(currentOrigin),
+        createMockCredential(nonCurrentOrigin1),
+        createMockCredential(currentOrigin),
+      ],
+      currentOrigin,
+      relatedOrigins: [currentOrigin, nonCurrentOrigin1, newOrigin],
+    });
+
+    // Expect that the RP ID corresponding to newOrigin (in new_flow_origins)
+    // is moved after the ones not in new_flow_origins
+    expect(result).toEqual([
+      { useIframe: false, rpId: undefined },
+      { useIframe: true, rpId: nonCurrentOrigin1RpId },
+      { useIframe: true, rpId: newOriginRpId },
     ]);
   });
 });
