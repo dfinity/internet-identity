@@ -14,10 +14,12 @@ test("User can rename the current passkey used for authentication", async ({
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use an existing Passkey" }).click();
@@ -59,10 +61,12 @@ test("User can rename a newly added passkey from the same device", async ({
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use an existing Passkey" }).click();
@@ -99,10 +103,12 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use an existing Passkey" }).click();

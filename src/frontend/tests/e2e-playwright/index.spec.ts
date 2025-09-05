@@ -8,6 +8,7 @@ test.describe("First visit", () => {
   test("Sign up with a new passkey", async ({ page }) => {
     const auth = dummyAuth();
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     await page.getByRole("button", { name: "Set up a new Passkey" }).click();
     await page.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
@@ -29,6 +30,7 @@ test.describe("First visit", () => {
     await createIdentity(page, DEFAULT_USER_NAME, auth);
     await clearStorage(page);
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use an existing Passkey" }).click();
@@ -57,6 +59,7 @@ test.describe("First visit", () => {
     const newContext = await browser.newContext();
     const newDevicePage = await newContext.newPage();
     await newDevicePage.goto(II_URL);
+    await newDevicePage.getByRole("link", { name: "Manage Identity" }).click();
     await newDevicePage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
@@ -141,6 +144,7 @@ test.describe("First visit", () => {
     // Pick OpenID to continue
     const pagePromise = page.context().waitForEvent("page");
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page
       .getByRole("button", { name: "Continue with Test OpenID" })
       .click();
@@ -181,6 +185,7 @@ test.describe("First visit", () => {
     // Pick OpenID to continue
     const pagePromise = page.context().waitForEvent("page");
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page
       .getByRole("button", { name: "Continue with Test OpenID" })
       .click();
@@ -225,6 +230,7 @@ test.describe("Last used identities listed", () => {
     const auth = dummyAuth();
     await createIdentity(page, DEFAULT_USER_NAME, auth);
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     auth(page);
     await page.getByRole("button", { name: DEFAULT_USER_NAME }).click();
     await page.waitForURL(II_URL + "/manage");
@@ -242,6 +248,7 @@ test.describe("Last used identities listed", () => {
     const auth = dummyAuth();
     await createIdentity(page, DEFAULT_USER_NAME, auth);
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page.getByRole("button", { name: "Use another identity" }).click();
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     auth(page);
@@ -261,6 +268,7 @@ test.describe("Last used identities listed", () => {
     const auth = dummyAuth();
     await createIdentity(page, DEFAULT_USER_NAME, auth);
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page.getByRole("button", { name: "Use another identity" }).click();
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     await page.getByRole("button", { name: "Set up a new Passkey" }).click();

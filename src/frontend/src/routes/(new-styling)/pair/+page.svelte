@@ -21,7 +21,7 @@
       lastUsedIdentitiesStore.selectIdentity(identityNumber);
       goto("/manage");
     } else {
-      goto("/");
+      goto("/login");
     }
   };
 </script>

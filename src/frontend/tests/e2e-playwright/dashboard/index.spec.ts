@@ -11,6 +11,7 @@ test.describe("Dashboard Navigation", () => {
     await createIdentity(page, TEST_USER_NAME, auth);
     await clearStorage(page);
     await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
     await page.getByRole("button", { name: "Continue with Passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use an existing Passkey" }).click();
