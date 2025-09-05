@@ -17,6 +17,11 @@ use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
+fn sync_time(env: &PocketIc, test_time: u64) {
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(env));
+    env.advance_time(time_to_advance);
+}
+
 /// Verifies that Google Accounts can be added
 #[test]
 fn can_link_google_account() -> Result<(), RejectResponse> {
@@ -27,8 +32,7 @@ fn can_link_google_account() -> Result<(), RejectResponse> {
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -62,8 +66,7 @@ fn can_link_microsoft_account() -> Result<(), RejectResponse> {
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -101,8 +104,7 @@ fn cannot_link_same_microsoft_account_to_two_identities() -> Result<(), RejectRe
     let identity_number2 =
         create_identity_with_authn_method(&env, canister_id, &test_authn_method2);
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -131,8 +133,7 @@ fn cannot_link_same_microsoft_account_to_two_identities() -> Result<(), RejectRe
         0
     );
 
-    let time_to_advance = Duration::from_millis(test_time2) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time2);
 
     let result = api::openid_credential_add(
         &env,
@@ -172,9 +173,7 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
-    let initial_time = time(&env);
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(initial_time);
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -195,8 +194,7 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
         1
     );
 
-    let time_to_advance = Duration::from_millis(test_time2) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time2);
 
     let _ = api::openid_credential_add(
         &env,
@@ -225,8 +223,7 @@ fn can_remove_google_account() -> Result<(), RejectResponse> {
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     assert_eq!(
         number_of_openid_credentials(&env, canister_id, test_principal, identity_number)?,
@@ -294,9 +291,7 @@ fn can_get_valid_jwt_delegation() -> Result<(), RejectResponse> {
     // Create identity
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
-    // Link Google Account to Identity
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     let _ = api::openid_credential_add(
         &env,
@@ -369,8 +364,7 @@ fn can_register_with_google() -> Result<(), RejectResponse> {
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
         openid_google_test_data();
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     // Create identity (this will panic if it doesn't work)
     // the test principal here is technically from webauthn, while in practice it would be a temporary random frontend keypair
@@ -392,8 +386,7 @@ fn can_register_with_microsoft() -> Result<(), RejectResponse> {
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
         openid_microsoft_test_data();
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     // Create identity (this will panic if it doesn't work)
     // the test principal here is technically from webauthn, while in practice it would be a temporary random frontend keypair
@@ -419,8 +412,7 @@ fn cannot_register_with_faulty_jwt() {
 
     let faulty_jwt = "eyJhbGciOiJSUzI1NiIsImtpZCI6Ijc2M2Y3YzRjZDI2YTFlYjJiMWIzOWE4OGY0NDM0ZDFmNGQ5YTM2OGIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIzNjA1ODc5OTE2NjgtNjNicGMxZ25ncDFzNWdibzFhbGRhbDRhNTBjMWowYmIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDcxNzAzNjg4OTgyMTkwMzU3MjEiLCJoZCI6ImRmaW5pdHkub3JnIiwiZW1haWwiOiJhbmRyaS5zY2hhdHpAZGZpbml0eS5vcmciLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJmQkcxS3IzUWt5Z0dHelNJWG9Pd2p3RF95QjhXS0FfcVJPUlZjMFp0WHlJIiwibmJmIjoxNzQwNTgzNDEyLCJuYW1lIjoiQW5kcmkgU2NoYXR6IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0k1YUU0Mmo0Ml9JcEdqSHFjT2lUemVQLXRZaWNhMFZSLURnYklWcjJCWGtOSWxoUT1zOTYtYyIsImdpdmVuX25hbWUiOiJBbmRyaSIsImZhbWlseV9uYW1lIjoiU2NoYXR6IiwiaWF0IjoxNzQwNTgzNzEyLCJleHAiOjE3NDA1ODczMTIsImp0aSI6IjhjNjkzMWE4YmVmZjllOWM3OTRmYjM5ZTkwNTExOTM4MTk4MDgxZDYifQ.PVAbLj1Fv7AUwH16nFiedJkmPOUg1UkPnAkVj6S9MDhpEV467tP7iOxQCx64i0_imTymcjkzH9pcfTsaKpY8fWPrWSWZzDy9S4GygjOQeg13NXg_H23X2-IY_OVHKqtrAibhZZUppvczijqZja7-HmUivoAJIGsMOk1IxbJdalOhE5yQtsYEx4ZBxFemR7CTfMzopsAaRWgPHI7T0MENuiCbkSy_NYQPBzNpmGcKoZoyUbleFUzej8gbkqpoIUVdfwuNtoe_TMjED5eqJxi1Pip85iy4wJTa2RKUTZxUfqVCaTEftVt8U-PV1UgPsxpu0mKS5z5bXylmgclUzcNnmh";
 
-    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
-    env.advance_time(time_to_advance);
+    sync_time(&env, test_time);
 
     // Create identity - this will panic if it doesn't work. It should panic as we are using a faulty jwt.
 
