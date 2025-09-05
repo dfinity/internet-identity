@@ -248,9 +248,9 @@ fn should_report_active_openid_authn_methods() {
     let canister_id = openid::setup_canister(&env);
     api::init_salt(&env, canister_id).unwrap();
 
-    // OpenID test data and fetch Google certs (mock)
+    // Using Google as OpenID provider, but we could have used any other configured OpenID provider.
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
-        openid::openid_test_data();
+        openid::openid_google_test_data();
     env.advance_time(Duration::from_millis(test_time) - Duration::from_nanos(time(&env)));
 
     // Ensure stats are initially absent
