@@ -27,6 +27,9 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
+  import { LANDING_PAGE_REDESIGN } from "$lib/state/featureFlags";
+  import Button from "$lib/components/ui/Button.svelte";
+  import { DialogId, dialogsStore } from "$lib/state/dialogs";
 
   const { data }: PageProps = $props();
 
@@ -103,99 +106,117 @@
       triggerDropWaveAnimation();
     });
   });
+
+  const openTestDialog = () => {
+    dialogsStore.openDialog(DialogId.Test, { test: "Hello World" });
+  };
+  const openTestDialog2 = () => {
+    dialogsStore.openDialog(DialogId.Test2, {
+      callback: () => alert("Hello World"),
+    });
+  };
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <Header />
-  <div class="flex flex-1 flex-col items-center justify-center">
-    <AuthPanel class="sm:max-w-100">
-      <div class="flex-1"></div>
-      {#if lastUsedIdentities.length > 0}
-        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          Manage your Internet&nbsp;Identity
-        </h1>
-        <p class="text-text-secondary mb-6 self-start text-sm">
-          choose identity to continue
-        </p>
-        <div class="flex flex-col gap-1.5">
-          <ul class="contents">
-            {#each lastUsedIdentities as identity}
-              <li class="contents">
-                <ButtonCard
-                  onclick={() => handleContinueAs(identity)}
-                  disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-                >
-                  <Avatar size="sm">
-                    {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
-                      <ProgressRing />
-                    {:else}
-                      <UserIcon size="1.25rem" />
-                    {/if}
-                  </Avatar>
-                  <div class="flex flex-col text-left text-sm">
-                    <div class="font-semibold">
-                      {identity.name ?? identity.identityNumber}
-                    </div>
-                    <div class="text-text-tertiary" aria-hidden="true">
-                      {lastUsedIdentityTypeName(identity)}
-                    </div>
-                  </div>
-                </ButtonCard>
-              </li>
-            {/each}
-          </ul>
-          <ButtonCard
-            onclick={() => (isAuthDialogOpen = true)}
-            disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
-          >
-            <FeaturedIcon size="sm">
-              <PlusIcon size="1.25rem" />
-            </FeaturedIcon>
-            <span>Use another identity</span>
-          </ButtonCard>
-        </div>
-        {#if isAuthDialogOpen}
-          <Dialog
-            onClose={() => (isAuthDialogOpen = false)}
-            showCloseButton={!isAuthenticating}
-            closeOnOutsideClick={!isAuthenticating}
-          >
-            <AuthWizard
-              bind:isAuthenticating
-              {onSignIn}
-              {onSignUp}
-              {onMigration}
-              onOtherDevice={() => (isAuthDialogOpen = false)}
-              onError={(error) => {
-                isAuthDialogOpen = false;
-                handleError(error);
-              }}
-              withinDialog
-            >
-              <h1
-                class="text-text-primary my-2 self-start text-2xl font-medium"
-              >
-                Use another identity
-              </h1>
-              <p class="text-text-secondary mb-6 self-start text-sm">
-                choose method
-              </p>
-            </AuthWizard>
-          </Dialog>
-        {/if}
-      {:else}
-        <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
+  {#if $LANDING_PAGE_REDESIGN}
+    <Header>
+      <Button onclick={openTestDialog}>Test</Button>
+      <Button onclick={openTestDialog2}>Test 2</Button>
+    </Header>
+  {:else}
+    <Header />
+    <div class="flex flex-1 flex-col items-center justify-center">
+      <AuthPanel class="sm:max-w-100">
+        <div class="flex-1"></div>
+        {#if lastUsedIdentities.length > 0}
           <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
             Manage your Internet&nbsp;Identity
           </h1>
           <p class="text-text-secondary mb-6 self-start text-sm">
-            sign in to continue
+            choose identity to continue
           </p>
-        </AuthWizard>
-      {/if}
-    </AuthPanel>
-  </div>
-  <Footer />
-  <div class="h-[env(safe-area-inset-bottom)]"></div>
+          <div class="flex flex-col gap-1.5">
+            <ul class="contents">
+              {#each lastUsedIdentities as identity}
+                <li class="contents">
+                  <ButtonCard
+                    onclick={() => handleContinueAs(identity)}
+                    disabled={nonNullish(
+                      authLastUsedFlow.authenticatingIdentity,
+                    )}
+                  >
+                    <Avatar size="sm">
+                      {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
+                        <ProgressRing />
+                      {:else}
+                        <UserIcon size="1.25rem" />
+                      {/if}
+                    </Avatar>
+                    <div class="flex flex-col text-left text-sm">
+                      <div class="font-semibold">
+                        {identity.name ?? identity.identityNumber}
+                      </div>
+                      <div class="text-text-tertiary" aria-hidden="true">
+                        {lastUsedIdentityTypeName(identity)}
+                      </div>
+                    </div>
+                  </ButtonCard>
+                </li>
+              {/each}
+            </ul>
+            <ButtonCard
+              onclick={() => (isAuthDialogOpen = true)}
+              disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+            >
+              <FeaturedIcon size="sm">
+                <PlusIcon size="1.25rem" />
+              </FeaturedIcon>
+              <span>Use another identity</span>
+            </ButtonCard>
+          </div>
+          {#if isAuthDialogOpen}
+            <Dialog
+              onClose={() => (isAuthDialogOpen = false)}
+              showCloseButton={!isAuthenticating}
+              closeOnOutsideClick={!isAuthenticating}
+            >
+              <AuthWizard
+                bind:isAuthenticating
+                {onSignIn}
+                {onSignUp}
+                {onMigration}
+                onOtherDevice={() => (isAuthDialogOpen = false)}
+                onError={(error) => {
+                  isAuthDialogOpen = false;
+                  handleError(error);
+                }}
+                withinDialog
+              >
+                <h1
+                  class="text-text-primary my-2 self-start text-2xl font-medium"
+                >
+                  Use another identity
+                </h1>
+                <p class="text-text-secondary mb-6 self-start text-sm">
+                  choose method
+                </p>
+              </AuthWizard>
+            </Dialog>
+          {/if}
+        {:else}
+          <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
+            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+              Manage your Internet&nbsp;Identity
+            </h1>
+            <p class="text-text-secondary mb-6 self-start text-sm">
+              sign in to continue
+            </p>
+          </AuthWizard>
+        {/if}
+      </AuthPanel>
+    </div>
+    <Footer />
+    <div class="h-[env(safe-area-inset-bottom)]"></div>
+  {/if}
 </div>
