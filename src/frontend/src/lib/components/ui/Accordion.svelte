@@ -12,15 +12,19 @@
   let contentRef = $state<HTMLDivElement>();
 </script>
 
-<button
-  class="flex flex-col gap-1 rounded-2xl p-5 text-left md:bg-transparent"
+<div
+  class="flex cursor-pointer flex-col gap-1 rounded-2xl pb-5 md:bg-transparent"
   class:bg-bg-secondary={open}
   class:sm:bg-bg-secondary={open}
+  role="button"
+  tabindex="0"
+  aria-expanded={open}
+  aria-controls="accordion-content"
   onclick={() => (open = !open)}
+  onkeydown={(e) => (e.key === "Enter" || e.key === " ") && (open = !open)}
 >
   <div
-    class="flex w-full items-center justify-between gap-2 font-medium focus:outline-none"
-    aria-expanded={open}
+    class="flex w-full items-center justify-between gap-2 px-5 pt-5 text-left font-medium"
   >
     <span class="text-text-primary flex-1 text-base md:text-xl">{header}</span>
     {#if open}
@@ -31,7 +35,8 @@
   </div>
 
   <div
-    class="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+    id="accordion-content"
+    class="overflow-hidden px-5 transition-[max-height] duration-300 ease-in-out"
     style:max-height={open ? `${contentRef?.scrollHeight}px` : "0px"}
     aria-hidden={!open}
   >
@@ -41,4 +46,4 @@
       </div>
     {/if}
   </div>
-</button>
+</div>
