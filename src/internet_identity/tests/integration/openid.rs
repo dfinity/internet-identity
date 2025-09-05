@@ -62,7 +62,7 @@ fn can_link_microsoft_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
-        openid_microsoft_test_data();
+        one_openid_microsoft_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
 
@@ -96,9 +96,11 @@ fn cannot_link_same_microsoft_account_to_two_identities() -> Result<(), RejectRe
     let env = env();
     let canister_id = setup_canister(&env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
-        openid_microsoft_test_data();
+        one_openid_microsoft_test_data();
+    // This is the same Microsoft account as the one in `one_openid_microsoft_test_data`, but with a different principal.
+    // This information is part of the hardcoded JWT.
     let (jwt2, salt2, _claims2, test_time2, test_principal2, test_authn_method2) =
-        openid_microsoft_test_data_same_microsoft_different_user();
+        openid_microsoft_same_as_one_but_different_principal_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
     let identity_number2 =
@@ -167,7 +169,8 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
     let env = env();
     let canister_id = setup_canister(&env);
     let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
-        openid_microsoft_test_data();
+        one_openid_microsoft_test_data();
+    // The tenant is part of `jwt`
     let (jwt2, salt2, _claims2, test_time2, _test_principal2, _test_authn_method2) =
         second_openid_microsoft_test_data();
 
@@ -384,7 +387,7 @@ fn can_register_with_microsoft() -> Result<(), RejectResponse> {
     let canister_id = setup_canister(&env);
 
     let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
-        openid_microsoft_test_data();
+        one_openid_microsoft_test_data();
 
     sync_time(&env, test_time);
 
@@ -775,7 +778,7 @@ fn second_openid_google_test_data() -> (String, [u8; 32], Claims, u64, Principal
     )
 }
 
-fn openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
+fn one_openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
     let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IkpZaEFjVFBNWl9MWDZEQmxPV1E3SG4wTmVYRSJ9.eyJhdWQiOiJkOTQ4YzA3My1lZWJkLTRhYjgtODYxZC0wNTVmN2FiNDllMTciLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmL3YyLjAiLCJpYXQiOjE3NTY4MDgzMjQsIm5iZiI6MTc1NjgwODMyNCwiZXhwIjoxNzU2ODEyMjI0LCJhaW8iOiJBVlFBcS84WkFBQUExQjhrYVdEVWp6V0xnSUxVT2hIQ1pWVndhbk1wNGVnVzdURzZwTytnVSsyYzdKRVRJckV5VHlySkxQQ0h1VkZINkUrbzRlMzhCQjZ6dmlWSU9kTzkxNVRHVDhEaUR3bkhCazYxTSt2bTdJaz0iLCJjX2hhc2giOiJGUzJsWllUYTIwcWozZVl1enczUXBnIiwibmFtZSI6Ikxsb3JlbsOnIE11bnRhbmVyIFBlcmVsbG8iLCJub25jZSI6ImN1UmM4VlNEN1ZkQU9ISmpsX1UxbkNWdlpvamQtMGJoUE81X0lGbTc0N2MiLCJvaWQiOiIxYjI2NDVmNy04YjdmLTQyMTAtYjQxYy01MDM1MmQ1OWYyZTgiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJsbG9yZW5jLm11bnRhbmVyQGRmaW5pdHkub3JnIiwicmgiOiIxLkFTNEFYbHhEU2xGa0dreW9INnVXWnJiZWozUEFTTm05N3JoS2hoMEZYM3EwbmhlNUFPd3VBQS4iLCJzaWQiOiIwMDdkZWE3OS0yNjY5LWZjNTItMzQwOS01Y2NjZDkxOTAzMjEiLCJzdWIiOiJydkF0eGluNk1TblRsN1RnUlg4RlhYQ0tQbEVlTklmUHI0bHdQT1lfd293IiwidGlkIjoiNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmIiwidXRpIjoiU3pLR0k3cG44MC1ZdnRmMmxuZ0RBUSIsInZlciI6IjIuMCJ9.kS8C8IlRoMaYoFyru-D06WzdeS8mHA3LupXyrOqXwwb4AIMMUDETlJEznAQ6iZxK4iAhAPAqAnC9TS_j0sacRCTBA3Rks-tkuwV2sA3XdwDsoFOnJdBs-N5GEXJNv45TzQ0jQANnXBJwwgH9hS-ledFZiutvzaTfDGpAymxx58qj7VDG5fTMxpiPMNCr42sNidw7B8ifUJgcfcxt_8wsTN_mui4Q6wtWRQvPnbesyTvRaOg2S6LMG3m8RBNYtHvXlICwD1kaKS5wUiYcrN3gg6wqOXCI3w57S5yfnGNo1tF4sWCfR0ZkfyHfVzdXK_6BwCty7rt4udp-NFsCAVXNRQ";
     let salt: [u8; 32] = [
         196, 116, 153, 227, 8, 104, 231, 67, 202, 28, 156, 132, 101, 84, 170, 111, 86, 233, 29, 54,
@@ -820,7 +823,7 @@ fn openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, Au
     )
 }
 
-fn openid_microsoft_test_data_same_microsoft_different_user(
+fn openid_microsoft_same_as_one_but_different_principal_test_data(
 ) -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
     let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IkpZaEFjVFBNWl9MWDZEQmxPV1E3SG4wTmVYRSJ9.eyJhdWQiOiJkOTQ4YzA3My1lZWJkLTRhYjgtODYxZC0wNTVmN2FiNDllMTciLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmL3YyLjAiLCJpYXQiOjE3NTY4MDk4OTcsIm5iZiI6MTc1NjgwOTg5NywiZXhwIjoxNzU2ODEzNzk3LCJhaW8iOiJBVlFBcS84WkFBQUEwSnViSXg1RGp6MkdhZ2tHVVlCaENaMnZuL0lQUEhMTzlFLzZOak1HNFZnZ1MyZ1Fjb21adGhwSTlYcTE0Z3VDVzl4NGhtOG9ZSWNlbnIrNys4SUxxeEU3SlFYYklJSFR2ekt0ZjAvaXd6ND0iLCJjX2hhc2giOiJzUzRxbFJHM0dTcGl1R2d6dnp2N3lRIiwibmFtZSI6Ikxsb3JlbsOnIE11bnRhbmVyIFBlcmVsbG8iLCJub25jZSI6IjRRc3QzVTNBeEl5OUx1ajQtck9UczhqbnlxbWVIYUxuVjc5UHdiZkQ2c0UiLCJvaWQiOiIxYjI2NDVmNy04YjdmLTQyMTAtYjQxYy01MDM1MmQ1OWYyZTgiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJsbG9yZW5jLm11bnRhbmVyQGRmaW5pdHkub3JnIiwicmgiOiIxLkFTNEFYbHhEU2xGa0dreW9INnVXWnJiZWozUEFTTm05N3JoS2hoMEZYM3EwbmhlNUFPd3VBQS4iLCJzaWQiOiIwMDdkZWE3OS0yNjY5LWZjNTItMzQwOS01Y2NjZDkxOTAzMjEiLCJzdWIiOiJydkF0eGluNk1TblRsN1RnUlg4RlhYQ0tQbEVlTklmUHI0bHdQT1lfd293IiwidGlkIjoiNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmIiwidXRpIjoidmdNd1BCVzB3MGVrUjhnbVF2d0FBQSIsInZlciI6IjIuMCJ9.dOLgbEsEkh-2unXLBWCjr9OPV27I3hqF4zuE9PgaGAnNfPqMa2dNjlDbIp74buUO8O9BxVQdzWZ4yP36GohbLstl6hS5uxG10Z4VMwsv6L9qXxLfS_4wjKEi3fu1z_4fdbTCYClJryQ2COQnSzIShudQtR6Sw12snQylv8AWs0sreBbi2TVZwrgewQ_6HC3RaQfNoO1MBKXLR8P3V-7mLrplDNu3nWUHFBfgK8iI58usgHO3NFpdYd2FvSjX8ShMdU35PogNz520T8cQEVsjc_IUiEWFgBjXOzuTw18rEHDf5_0DfMRnJDZ6u7qn5OBtjDY7bgZ1pxtJas-u1TT43A";
     let salt: [u8; 32] = [
