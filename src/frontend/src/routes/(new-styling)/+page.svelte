@@ -11,12 +11,12 @@
   import PasswordFreeIllustration from "$lib/components/illustrations/landing/PasswordFreeIllustration.svelte";
   import LandingCard from "$lib/components/ui/LandingCard.svelte";
   import Accordion from "$lib/components/ui/Accordion.svelte";
-  import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import {
     INTERNET_COMPUTER_URL,
     FAQ_PASSKEY_URL,
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
+  import Header from "$lib/components/layout/Header.svelte";
 
   const faq = [
     {
@@ -92,7 +92,7 @@
 
 <div class="flex min-h-[100dvh] flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <LandingHeader class="w-full flex-col md:flex-row">
+  <Header>
     <div
       class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
     >
@@ -101,7 +101,7 @@
       >
       <Button variant="primary" href="/login">Manage Identity</Button>
     </div>
-  </LandingHeader>
+  </Header>
   <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
     <div class="flex w-full flex-col items-center justify-center gap-6">
       <div class="flex w-full flex-col gap-2">
