@@ -16,7 +16,6 @@
     FAQ_PASSKEY_URL,
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
-  import Header from "$lib/components/layout/Header.svelte";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
 
   const faq = [
