@@ -159,7 +159,7 @@ describe("findWebAuthnFlows", () => {
     ]);
   });
 
-  it("pushes RP IDs from new_flow_origins to the end while preserving relative order", async () => {
+  it("pushes RP IDs from new_flow_origins to the end while preserving relative order", () => {
     const result = findWebAuthnFlows({
       supportsRor: true,
       devices: [
