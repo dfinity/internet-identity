@@ -85,6 +85,12 @@ const DEFAULT_INIT: InternetIdentityInit = {
   feature_flag_enable_generic_open_id_fe: [],
 };
 
+vi.mock("$lib/globals", () => ({
+  canisterConfig: {
+    new_flow_origins: [["https://id.ai"]],
+  },
+}));
+
 const mockActor = {
   identity_info: vi.fn().mockImplementation(async () => {
     // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
@@ -226,6 +232,39 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [convertToValidCredentialData(mockDevice)],
+          "identity.ic0.app",
+          true,
+        );
+      }
+    });
+
+    it("login returns authenticated connection with expected rpID if new flow origins are enabled", async () => {
+      const newOriginDevice = createMockDevice("https://id.ai");
+      const mockActor = {
+        identity_info: vi.fn().mockImplementation(async () => {
+          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
+          infoResponse = await mockRawMetadata;
+          return { Ok: { metadata: mockRawMetadata } };
+        }),
+        identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
+        // The order here matters, the first device is the one that would be used normally.
+        // But we changed to push the new_flow_origins to the end.
+        lookup: vi.fn().mockResolvedValue([newOriginDevice, mockDevice]),
+      } as unknown as ActorSubclass<_SERVICE>;
+      const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
+
+      const loginResult = await connection.login(BigInt(12345));
+
+      expect(loginResult.kind).toBe("loginSuccess");
+      if (loginResult.kind === "loginSuccess") {
+        expect(loginResult.connection).toBeInstanceOf(AuthenticatedConnection);
+        expect(loginResult.showAddCurrentDevice).toBe(false);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
+        expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
+          [
+            convertToValidCredentialData(newOriginDevice),
+            convertToValidCredentialData(mockDevice),
+          ],
           "identity.ic0.app",
           true,
         );
