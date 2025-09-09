@@ -42,7 +42,6 @@ class AnimationDispatcher {
    * Process the animation queue sequentially
    */
   async #processQueue(): Promise<void> {
-    console.log(this.#animationQueue);
     if (this.#isAnimating || this.#animationQueue.length === 0) {
       return;
     }
@@ -91,7 +90,6 @@ class AnimationDispatcher {
   }
 
   async clearWaveAnimation(): Promise<void> {
-    console.log("clearWaveAnimation");
     this.#cancelCurrent?.(); // cancel current
     this.#cancelCurrent = null;
     await this.#clearFunction?.(); // call visual reset

@@ -24,13 +24,13 @@
 
   const faq = [
     {
+      question: "What is Internet Identity?",
+      answer: `Internet Identity is an authentication system for applications running on the <a onclick="event.stopPropagation()" href=${INTERNET_COMPUTER_URL} class='text-text-primary underline' target='_blank'>Internet Computer</a>. Instead of traditional usernames and passwords, it uses keys created via <a onclick="event.stopPropagation()" href=${FAQ_PASSKEY_URL} class='text-text-primary underline' target='_blank'>passkeys</a> or other authentication systems like Google, Microsoft or Apple.`,
+    },
+    {
       question: "Is my Face ID or Fingerprint stored in Internet Identity?",
       answer:
         "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use.",
-    },
-    {
-      question: "What is Internet Identity?",
-      answer: `Internet Identity is an authentication system for applications running on the <a onclick="event.stopPropagation()" href=${INTERNET_COMPUTER_URL} class='text-text-primary underline' target='_blank'>Internet Computer</a>. Instead of traditional usernames and passwords, it uses keys created via <a onclick="event.stopPropagation()" href=${FAQ_PASSKEY_URL} class='text-text-primary underline' target='_blank'>passkeys</a> or other authentication systems like Google, Microsoft or Apple.`,
     },
     {
       question: "How do passkeys work?",

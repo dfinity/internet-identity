@@ -918,7 +918,6 @@ export async function createPausedTweenedWave(
   from = 0,
   pauseValue: number,
 ): Promise<void> {
-  console.log("createPausedTweenedWave");
   await motionController.set(from, { duration: 0 });
   await tick();
   await motionController.set(pauseValue, { duration });
@@ -1083,7 +1082,6 @@ export const clearWave = async (
   motionController: Tween<number>,
   springs: NodeMotion[][],
 ): Promise<void> => {
-  console.log("clearWave");
   await motionController.set(0, { duration: 0 });
   resetNodes(springs);
 };
