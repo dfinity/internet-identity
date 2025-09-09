@@ -6,7 +6,6 @@ type TriggerFunction = (opts: FlairAnimationOptions) => Promise<void>;
 class AnimationDispatcher {
   #triggerFunction: TriggerFunction | null = null;
   #clearFunction: (() => Promise<void>) | null = null;
-  #cancelCurrent: (() => void) | null = null;
   #animationQueue: Array<() => Promise<void>> = [];
   #isAnimating: boolean = false;
 
@@ -65,23 +64,15 @@ class AnimationDispatcher {
    */
   dropWaveAnimation(): Promise<void> {
     return new Promise((resolve) => {
-      let cancelled = false;
-
-      this.#cancelCurrent = () => {
-        cancelled = true;
-        resolve(); // Resolve immediately on cancel
-      };
-
       this.#animationQueue.push(async () => {
         try {
-          if (!cancelled && this.#triggerFunction) {
+          if (this.#triggerFunction) {
             await this.#triggerFunction(DROP_WAVE_ANIMATION);
           }
         } catch (error) {
           console.warn("Animation failed:", error);
         } finally {
-          if (!cancelled) resolve();
-          this.#cancelCurrent = null;
+          resolve();
         }
       });
 
@@ -90,8 +81,6 @@ class AnimationDispatcher {
   }
 
   async clearWaveAnimation(): Promise<void> {
-    this.#cancelCurrent?.(); // cancel current
-    this.#cancelCurrent = null;
     await this.#clearFunction?.(); // call visual reset
   }
 }
