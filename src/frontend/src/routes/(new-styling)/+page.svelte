@@ -208,7 +208,7 @@
     </div>
     <div class="flex flex-1 flex-col gap-8">
       {#each faq as item, i}
-        <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-4">
           {#if i > 0 && i < faq.length}
             <div class="border-border-secondary mx-5 border-t"></div>
           {/if}
