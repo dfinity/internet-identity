@@ -316,6 +316,8 @@ export async function createImpulse(
   await Promise.all(promises);
 }
 
+// Duplicate of createImpulse used to stop the rebound happening
+// TODO: refactor to allow for a single function as long as longer term support is approved
 export async function createOneWayImpulse(
   x: number,
   y: number,
