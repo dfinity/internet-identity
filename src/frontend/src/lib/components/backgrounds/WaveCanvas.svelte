@@ -7,11 +7,14 @@
     unregisterAnimationTrigger,
   } from "$lib/utils/animation-dispatcher";
 
-  let { triggerAnimation = $bindable() } = $props();
+  let {
+    triggerAnimation = $bindable(),
+    clearAnimation = $bindable<() => void>(),
+  } = $props();
 
   onMount(() => {
     if (triggerAnimation) {
-      registerAnimationTrigger(triggerAnimation);
+      registerAnimationTrigger(triggerAnimation, clearAnimation);
     }
   });
 
@@ -28,10 +31,12 @@
     vignette="none"
     visibility="maskwave"
     maskWaveRampIn={0.001}
-    maskWaveRampOut={0.12}
+    maskWaveRampOut={0.5}
     maskWaveThickness="large"
     maskWaveMinValue={0}
-    maskWaveSpeedMultiplier={4}
+    maskWaveSpeedMultiplier={2}
+    maskWavePauseValue={0.25}
+    maskWaveOneWay={true}
     enableRandomPointSize
     enableRandomOpacity={false}
     pointSizeNoiseScale="medium"
@@ -42,5 +47,6 @@
       dampening: "medium",
     }}
     bind:triggerAnimation
+    bind:clearAnimation
   />
 {/if}

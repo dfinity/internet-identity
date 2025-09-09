@@ -35,7 +35,7 @@ export interface FlairCanvasProps {
   bgType?: "dots" | "grid" | "noisedots";
   spacing?: "large" | "medium" | "small" | number;
   aspect?: "square" | "wide" | "ultrawide" | number;
-  visibility?: "always" | "moving" | "maskwave";
+  visibility?: "always" | "moving" | "maskwave" | "pausedmaskwave";
   dotSize?: "large" | "medium" | "small" | number;
   vignette?: "center" | "top" | "left" | "right" | "bottom" | "none";
   hoverAction?: "intense" | "minimal" | "none";
@@ -62,9 +62,12 @@ export interface FlairCanvasProps {
   maskWaveThickness?: "large" | "medium" | "small" | number;
   maskWaveMinValue?: number;
   maskWaveSpeedMultiplier?: number;
+  maskWavePauseValue?: number | null;
+  maskWaveOneWay?: boolean;
   customColor?: string;
   customColorMode?: "all" | "moving";
   triggerAnimation?: (opts: FlairAnimationOptions) => Promise<void>;
+  clearAnimation?: () => void;
 }
 
 export interface NodeMotion {
