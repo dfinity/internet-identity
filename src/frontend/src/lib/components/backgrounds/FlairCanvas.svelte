@@ -15,6 +15,9 @@
     getImpulseLocation,
     getVignetteConfig,
     resetNodes,
+    createPausedTweenedWave,
+    createOneWayImpulse,
+    clearWave,
   } from "$lib/utils/UI/backgrounds/waveBackground";
   import { Spring, Tween } from "svelte/motion";
   import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
@@ -46,9 +49,12 @@
     maskWaveRampIn,
     maskWaveRampOut,
     maskWaveSpeedMultiplier = 1,
+    maskWavePauseValue = null,
+    maskWaveOneWay = false,
     customColor,
     customColorMode,
     triggerAnimation = $bindable(),
+    clearAnimation = $bindable(),
   }: FlairCanvasProps = $props();
 
   let backgroundRef = $state<HTMLDivElement>();
@@ -243,6 +249,8 @@
   let vignetteConfig = $derived(
     getVignetteConfig(vignette, clientHeight, clientWidth),
   );
+
+  clearAnimation = async () => await clearWave(opacityWaveMotion, springs);
 
   triggerAnimation = async (opts) => {
     const {
@@ -459,27 +467,49 @@
         return;
       }
 
-      const firstImpulse = createImpulse(
-        x,
-        y,
-        xPositions,
-        yPositions,
-        offsetX,
-        offsetY,
-        springs,
-        rippleRadius *
-          (typeof size === "number" ? size : rippleSizeTable[size]),
-        impulseScalar *
-          (typeof intensity === "number"
-            ? intensity
-            : intensityTable[intensity]),
-        waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
-        impulseDuration *
-          (typeof speed === "number" ? speed : speedTable[speed]),
-        motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
-        easingFunction,
-      );
-      promises.push(firstImpulse);
+      if (maskWaveOneWay) {
+        const firstImpulse = createOneWayImpulse(
+          x,
+          y,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          rippleRadius *
+            (typeof size === "number" ? size : rippleSizeTable[size]),
+          impulseScalar *
+            (typeof intensity === "number"
+              ? intensity
+              : intensityTable[intensity]),
+          waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
+          motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
+          easingFunction,
+        );
+        promises.push(firstImpulse);
+      } else {
+        const firstImpulse = createImpulse(
+          x,
+          y,
+          xPositions,
+          yPositions,
+          offsetX,
+          offsetY,
+          springs,
+          rippleRadius *
+            (typeof size === "number" ? size : rippleSizeTable[size]),
+          impulseScalar *
+            (typeof intensity === "number"
+              ? intensity
+              : intensityTable[intensity]),
+          waveSpeed * (typeof speed === "number" ? speed : speedTable[speed]),
+          impulseDuration *
+            (typeof speed === "number" ? speed : speedTable[speed]),
+          motionType === "omni" ? "omni" : motionType === "xy" ? "x" : "y",
+          easingFunction,
+        );
+        promises.push(firstImpulse);
+      }
 
       if (nImpulses === "double") {
         const delay =
@@ -530,6 +560,26 @@
               ? maskWaveSpeedMultiplier
               : 1),
           0,
+        );
+        promises.push(maskWave);
+      }
+
+      if (visibility === "pausedmaskwave") {
+        if (impulseEasing) {
+          opacityWaveMotion = new Tween(0, {
+            easing: easingFunctions[impulseEasing],
+          });
+        }
+        const maskWave = createPausedTweenedWave(
+          opacityWaveMotion,
+          rippleRadius *
+            waveSpeed *
+            (typeof speed === "number" ? speed : speedTable[speed]) *
+            (typeof maskWaveSpeedMultiplier === "number"
+              ? maskWaveSpeedMultiplier
+              : 1),
+          0,
+          maskWavePauseValue || 1,
         );
         promises.push(maskWave);
       }
@@ -714,6 +764,27 @@
       );
     }
 
+    if (
+      visibility === "pausedmaskwave" &&
+      !!clientWidth &&
+      !!clientHeight &&
+      maskWaveThickness !== undefined
+    ) {
+      drawMovingRingMask(
+        clientWidth,
+        clientHeight,
+        opacityWaveMotion.current,
+        getHypotenuse(clientHeight, clientWidth) *
+          (typeof maskWaveThickness === "number"
+            ? maskWaveThickness
+            : maskWaveThicknessTable[maskWaveThickness]),
+        ctx,
+        maskWaveRampIn,
+        maskWaveRampOut,
+        maskWaveMinValue,
+      );
+    }
+
     animateNoise(now);
 
     requestAnimationFrame(render);
@@ -780,7 +851,7 @@
 </script>
 
 <div
-  class="absolute inset-0 -z-50 h-full w-full select-none"
+  class="absolute inset-0 top-12 -z-50 h-[640px] w-full select-none"
   aria-hidden="true"
   bind:this={backgroundRef}
   onpointerleave={handleReset}
