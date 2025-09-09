@@ -66,12 +66,10 @@
   };
 
   if (provider) {
-    handleContinueWithOpenId(provider).finally(() => {
-      url.searchParams.delete("authMethod");
-      goto(`${url.pathname}?${url.searchParams.toString()}`, {
-        replaceState: true,
-      });
-    });
+    handleContinueWithOpenId(provider);
+  } else {
+    // if an incorrect provider is provided redirect the user to the login page
+    goto(`/login${data.next ? `next=${data.next}` : ""}`);
   }
 </script>
 
