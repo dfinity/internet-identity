@@ -7,7 +7,7 @@
 
 <header
   {...props}
-  class={["flex items-center px-0 md:px-6 lg:px-8", className]}
+  class={["bg-bg-primary flex items-center px-0 md:px-6 lg:px-8", className]}
 >
   <div class="flex min-h-16 flex-1 items-center gap-4">
     <Logo class="text-fg-primary h-5.5" />
