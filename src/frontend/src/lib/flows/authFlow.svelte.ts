@@ -235,6 +235,7 @@ export class AuthFlow {
 
   continueWithOpenId = async (
     config: OpenIdConfig,
+    useFullRedirect?: boolean,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -262,6 +263,7 @@ export class AuthFlow {
       jwt = await requestJWT(requestConfig, {
         nonce: get(sessionStore).nonce,
         mediation: "required",
+        useFullRedirect,
       });
     } catch (error) {
       this.#view = "chooseMethod";

@@ -26,7 +26,6 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
-  import { page } from "$app/stores";
 
   const { data }: PageProps = $props();
 
@@ -97,11 +96,6 @@
 
   onMount(() => {
     authenticationV2Funnel.init({ origin: window.location.origin });
-
-    // if the authMethod parameter exists, then we want to automatically
-    // open the dialog to allow the authentication flow to automatically initiate
-    const authMethod = $page.url.searchParams.get("authMethod");
-    if (authMethod) isAuthDialogOpen = true;
   });
 </script>
 

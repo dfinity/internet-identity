@@ -100,8 +100,6 @@
         >For developers</Button
       >
       <Button variant="primary" href="/login">Manage Identity</Button>
-      <!-- Button to be removed before merge, used for testing on beta only -->
-      <Button variant="primary" href="/login?authMethod=Microsoft">Test</Button>
     </div>
   </LandingHeader>
   <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
