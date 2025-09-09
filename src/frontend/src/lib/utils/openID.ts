@@ -134,7 +134,9 @@ const requestWithRedirect = async (
     sessionStorage.setItem("openid_state", state);
     sessionStorage.setItem("openid_nonce", options.nonce);
     window.location.href = authURL.toString();
-    return new Promise(() => {}); // never resolves
+    // Returning a never-resolving promise to satisfy the declared return type,
+    // even though the browser will navigate away immediately after this line.
+    return new Promise(() => {});
   }
 
   const callback = await redirectInPopup(authURL.href);
