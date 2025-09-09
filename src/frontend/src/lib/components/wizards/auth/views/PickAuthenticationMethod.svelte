@@ -10,6 +10,9 @@
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
+  import { onMount } from "svelte";
+  import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
@@ -58,6 +61,22 @@
   const showGoogleButton =
     canisterConfig.openid_google?.[0]?.[0] && !$ENABLE_GENERIC_OPEN_ID;
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
+
+  onMount(() => {
+    const url = new URL($page.url);
+    const authMethod = url.searchParams.get("authMethod");
+    if (!authMethod) return;
+
+    const provider = openIdProviders.find((p) => p.name === authMethod);
+    try {
+      if (provider) handleContinueWithOpenId(provider);
+    } finally {
+      url.searchParams.delete("authMethod");
+      goto(`${url.pathname}?${url.searchParams.toString()}`, {
+        replaceState: true,
+      });
+    }
+  });
 </script>
 
 <div class="flex flex-col items-stretch gap-6">

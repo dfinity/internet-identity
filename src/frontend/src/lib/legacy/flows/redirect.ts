@@ -62,5 +62,24 @@ export const redirectInPopup = (url: string): Promise<string> => {
     "_blank",
     `width=${width},height=${height},left=${left},top=${top}`,
   );
+
+  if (
+    !redirectWindow ||
+    redirectWindow.closed ||
+    typeof redirectWindow.closed === "undefined"
+  ) {
+    throw new OpenIdCancelError(); // you define this below
+  }
+
   return callbackPromise;
 };
+
+export class OpenIdCancelError extends Error {
+  constructor() {
+    super("Popup was blocked or cancelled");
+    this.name = "OpenIdCancelError";
+  }
+}
+
+export const isOpenIdCancelError = (e: unknown): e is OpenIdCancelError =>
+  e instanceof OpenIdCancelError;
