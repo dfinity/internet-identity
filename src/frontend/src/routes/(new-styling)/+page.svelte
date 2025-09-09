@@ -100,7 +100,7 @@
   });
 
   onDestroy(() => {
-    setTimeout(async () => await clearDropWaveAnimation());
+    void clearDropWaveAnimation();
   });
 </script>
 

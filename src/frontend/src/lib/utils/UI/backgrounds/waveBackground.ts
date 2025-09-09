@@ -358,6 +358,7 @@ export async function createOneWayImpulse(
             if (direction === "x") yVal = 0;
             if (direction === "y") xVal = 0;
             springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+            resolve();
           } else {
             resolve();
           }
