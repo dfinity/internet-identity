@@ -67,7 +67,9 @@
     const authMethod = url.searchParams.get("authMethod");
     if (!authMethod) return;
 
-    const provider = openIdProviders.find((p) => p.name === authMethod);
+    const provider = openIdProviders.find(
+      (p) => p.name.toLowerCase() === authMethod.toLowerCase(),
+    );
     try {
       if (provider) handleContinueWithOpenId(provider);
     } finally {
