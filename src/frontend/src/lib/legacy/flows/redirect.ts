@@ -63,12 +63,14 @@ export const redirectInPopup = (url: string): Promise<string> => {
     `width=${width},height=${height},left=${left},top=${top}`,
   );
 
+  // If the popup window is blocked for any reason by the browser
+  // We need to inform the user that the popup was blocked using an error toaster
   if (
     !redirectWindow ||
     redirectWindow.closed ||
     typeof redirectWindow.closed === "undefined"
   ) {
-    throw new OpenIdCancelError(); // you define this below
+    throw new OpenIdCancelError();
   }
 
   return callbackPromise;
@@ -76,7 +78,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
 
 export class OpenIdCancelError extends Error {
   constructor() {
-    super("Popup was blocked or cancelled");
+    super("Authentication popup was blocked or cancelled, please try again");
     this.name = "OpenIdCancelError";
   }
 }
