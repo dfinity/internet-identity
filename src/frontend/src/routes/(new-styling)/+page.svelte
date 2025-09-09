@@ -16,7 +16,6 @@
     FAQ_PASSKEY_URL,
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
-  import Header from "$lib/components/layout/Header.svelte";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
 
   const faq = [
@@ -101,6 +100,7 @@
         >For developers</Button
       >
       <Button variant="primary" href="/login">Manage Identity</Button>
+      <!-- Button to be removed before merge, used for testing on beta only -->
       <Button variant="primary" href="/login?authMethod=Microsoft">Test</Button>
     </div>
   </LandingHeader>

@@ -71,6 +71,7 @@
     try {
       if (provider) handleContinueWithOpenId(provider);
     } finally {
+      // We want to always remove the authMethod to keep a clean URL whether this succeeds or fails
       url.searchParams.delete("authMethod");
       goto(`${url.pathname}?${url.searchParams.toString()}`, {
         replaceState: true,
