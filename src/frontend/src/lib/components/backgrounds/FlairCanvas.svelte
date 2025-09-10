@@ -86,6 +86,7 @@
 
   $effect(() => {
     opacityWaveMotion = new Tween(0, {
+      easing: easingFunctions.linear,
       duration: opacityWaveDuration,
     });
   });
