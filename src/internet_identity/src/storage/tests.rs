@@ -504,17 +504,17 @@ mod application_lookup_tests {
         assert_application_lookup(&storage, &origin0, None, None);
 
         // Test what happens if we insert both origins
-        let app_num1 = storage.lookup_or_insert_application_number_with_origin(&origin0);
+        let app_num0 = storage.lookup_or_insert_application_number_with_origin(&origin0);
 
         assert_application_lookup(&storage, &origin1, None, Some(0));
         assert_application_lookup(&storage, &origin0, Some(0), Some(0));
 
-        let app_num2 = storage.lookup_or_insert_application_number_with_origin(&origin1);
+        let app_num1 = storage.lookup_or_insert_application_number_with_origin(&origin1);
 
         // Should get the different application numbers, as we prevented the collision by using
         // the full SHA-256, not just a 8-byte prefix thereof.
-        assert_eq!(app_num1, 0);
-        assert_eq!(app_num2, 1);
+        assert_eq!(app_num0, 0);
+        assert_eq!(app_num1, 1);
 
         // Both should be stored correctly in new SHA-256 map, but the collision in the old map
         // would cause the application to be overwritten (hence we expect app ID 1 for origin0).
@@ -522,10 +522,10 @@ mod application_lookup_tests {
         assert_application_lookup(&storage, &origin0, Some(0), Some(1));
 
         // Applications should be stored with correct origins
+        let stored_app0 = storage.stable_application_memory.get(&app_num0).unwrap();
         let stored_app1 = storage.stable_application_memory.get(&app_num1).unwrap();
-
-        // The first origin took place, not the second one
-        assert_eq!(stored_app1.origin, origin0);
+        assert_eq!(stored_app0.origin, origin0);
+        assert_eq!(stored_app1.origin, origin1);
     }
 
     #[test]
