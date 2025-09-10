@@ -18,25 +18,6 @@ type Parameters = {
   relatedOrigins: string[];
 };
 
-// The devices are expected to be ordered by recently used already
-// Move devices registered on the new flow origins to the end using toSorted (preserving relative order within groups)
-const newFlowOrigins = canisterConfig.new_flow_origins[0] ?? [];
-const isInNewFlow = (credentialData: CredentialData): boolean => {
-  const origin = credentialData.origin ?? II_LEGACY_ORIGIN;
-  return newFlowOrigins.some((o) => isSameOrigin(o, origin));
-};
-const sortNewFlowOriginsToEnd = (
-  a: CredentialData,
-  b: CredentialData,
-): number => {
-  const aIn = isInNewFlow(a);
-  const bIn = isInNewFlow(b);
-  // Keep the order if both are in the new flow or both are not
-  if (aIn === bIn) return 0;
-  // Move the one that is in the new flow to the end
-  return aIn ? 1 : -1;
-};
-
 /**
  * Function that returns the ordered steps to try to perform the webauthn authentication.
  *
@@ -62,6 +43,26 @@ export const findWebAuthnFlows = ({
   currentOrigin,
   relatedOrigins,
 }: Parameters): WebAuthnFlow[] => {
+  // We need the helpers inside so that when `canisterConfig` is accessed, it already exists.
+  // The devices are expected to be ordered by recently used already
+  // Move devices registered on the new flow origins to the end using toSorted (preserving relative order within groups)
+  const newFlowOrigins = canisterConfig.new_flow_origins[0] ?? [];
+  const isInNewFlow = (credentialData: CredentialData): boolean => {
+    const origin = credentialData.origin ?? II_LEGACY_ORIGIN;
+    return newFlowOrigins.some((o) => isSameOrigin(o, origin));
+  };
+  const sortNewFlowOriginsToEnd = (
+    a: CredentialData,
+    b: CredentialData,
+  ): number => {
+    const aIn = isInNewFlow(a);
+    const bIn = isInNewFlow(b);
+    // Keep the order if both are in the new flow or both are not
+    if (aIn === bIn) return 0;
+    // Move the one that is in the new flow to the end
+    return aIn ? 1 : -1;
+  };
+
   const currentRpId = new URL(currentOrigin).hostname;
   const relatedRpIds = relatedOrigins.map(
     (relatedOrigin) => new URL(relatedOrigin).hostname,
