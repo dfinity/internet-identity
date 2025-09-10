@@ -82,9 +82,13 @@
 
   let opacityWaveDuration = $state(500);
 
-  let opacityWaveMotion = new Tween(0, {
-    easing: easingFunctions.linear,
-    duration: opacityWaveDuration,
+  let opacityWaveMotion: Tween<number>;
+
+  $effect(() => {
+    opacityWaveMotion = new Tween(0, {
+      easing: easingFunctions.linear,
+      duration: opacityWaveDuration,
+    });
   });
 
   let motionNoiseScale = $state<number>(0.01);
