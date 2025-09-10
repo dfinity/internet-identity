@@ -9,6 +9,7 @@ import {
   type FlairAnimationOptions,
 } from "$lib/components/backgrounds/FlairCanvas";
 import { nonNullish } from "@dfinity/utils";
+import { tick } from "svelte";
 
 ////// ANIMATION //////
 export function createXYSprings(
@@ -301,6 +302,65 @@ export async function createImpulse(
               springs[xIndex][yIndex].motion.target = { x: 0, y: 0 };
               resolve();
             }, impulseDuration);
+          } else {
+            resolve();
+          }
+        }, delay);
+      });
+
+      promises.push(promise);
+    }
+  }
+
+  // Wait for all animations to complete
+  await Promise.all(promises);
+}
+
+// Duplicate of createImpulse used to stop the rebound happening
+// TODO: refactor to allow for a single function as long as longer term support is approved
+export async function createOneWayImpulse(
+  x: number,
+  y: number,
+  xPositions: number[],
+  yPositions: number[],
+  offsetX: number,
+  offsetY: number,
+  springs: NodeMotion[][],
+  clickRadius: number,
+  impulseScalar: number,
+  waveSpeed: number,
+  direction: "omni" | "x" | "y",
+  impulseEasing?: EasingFunction,
+): Promise<void> {
+  const promises: Promise<void>[] = [];
+
+  for (let xIndex = 0; xIndex < xPositions.length; xIndex++) {
+    for (let yIndex = 0; yIndex < yPositions.length; yIndex++) {
+      const nodeX = xPositions[xIndex] + offsetX;
+      const nodeY = yPositions[yIndex] + offsetY;
+      const dx = nodeX - x;
+      const dy = nodeY - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < 1e-6) continue;
+
+      const falloff = Math.max(0, 1 - dist / clickRadius);
+      const strength = Math.pow(falloff, 2) * impulseScalar * clickRadius;
+
+      // Easing for the delay
+      const t = Math.min(dist / clickRadius, 1); // normalized distance [0,1]
+      const eased = impulseEasing ? impulseEasing(t) : t; // or any easing function you prefer
+      const delay = eased * clickRadius * waveSpeed; // or: delay = eased * dist * waveSpeed;
+
+      const promise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (strength > 0.01) {
+            let xVal = (dx / dist) * strength;
+            let yVal = (dy / dist) * strength;
+            if (direction === "x") yVal = 0;
+            if (direction === "y") xVal = 0;
+            springs[xIndex][yIndex].motion.target = { x: xVal, y: yVal };
+            resolve();
           } else {
             resolve();
           }
@@ -850,8 +910,19 @@ export async function createTweenedWave(
   from = 0,
 ): Promise<void> {
   await motionController.set(from, { duration: 0 });
-
+  await tick();
   await motionController.set(1, { duration });
+}
+
+export async function createPausedTweenedWave(
+  motionController: Tween<number>,
+  duration: number,
+  from = 0,
+  pauseValue: number,
+): Promise<void> {
+  await motionController.set(from, { duration: 0 });
+  await tick();
+  await motionController.set(pauseValue, { duration });
 }
 
 export function drawMovingRingMask(
@@ -1008,3 +1079,11 @@ function parseColor(color: string): {
   // Fallback: black
   return { r: 0, g: 0, b: 0, a: 1 };
 }
+
+export const clearWave = async (
+  motionController: Tween<number>,
+  springs: NodeMotion[][],
+): Promise<void> => {
+  await motionController.set(0, { duration: 0 });
+  resetNodes(springs);
+};

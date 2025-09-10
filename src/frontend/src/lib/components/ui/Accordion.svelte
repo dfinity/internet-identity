@@ -13,7 +13,7 @@
 </script>
 
 <div
-  class="flex cursor-pointer flex-col gap-1 rounded-2xl pb-5 md:bg-transparent"
+  class="flex cursor-pointer flex-col gap-1 rounded-2xl pb-3 md:bg-transparent"
   class:bg-bg-secondary={open}
   class:sm:bg-bg-secondary={open}
   role="button"
@@ -41,7 +41,7 @@
     aria-hidden={!open}
   >
     {#if nonNullish(children)}
-      <div bind:this={contentRef}>
+      <div bind:this={contentRef} class={!open ? "hidden" : ""}>
         {@render children()}
       </div>
     {/if}

@@ -108,7 +108,9 @@ const requestWithRedirect = async (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
 ): Promise<string> => {
-  const state = toBase64URL(window.crypto.getRandomValues(new Uint8Array(12)));
+  const state = toBase64URL(
+    window.crypto.getRandomValues(new Uint8Array(12)).buffer,
+  );
   const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
   const authURL = new URL(config.authURL);
   // Even though we only need an id token, we're still asking for a code

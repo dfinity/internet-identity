@@ -5,6 +5,7 @@ type TriggerFunction = (opts: FlairAnimationOptions) => Promise<void>;
 
 class AnimationDispatcher {
   #triggerFunction: TriggerFunction | null = null;
+  #clearFunction: (() => Promise<void>) | null = null;
   #animationQueue: Array<() => Promise<void>> = [];
   #isAnimating: boolean = false;
 
@@ -12,8 +13,12 @@ class AnimationDispatcher {
    * Register a trigger function from a WaveCanvas component
    * @param triggerFn The trigger function that handles wave animations
    */
-  registerTrigger(triggerFn: TriggerFunction): void {
+  registerTrigger(
+    triggerFn: TriggerFunction,
+    clearFn?: () => Promise<void>,
+  ): void {
     this.#triggerFunction = triggerFn;
+    this.#clearFunction = clearFn ?? null;
   }
 
   /**
@@ -64,16 +69,19 @@ class AnimationDispatcher {
           if (this.#triggerFunction) {
             await this.#triggerFunction(DROP_WAVE_ANIMATION);
           }
-          // If no trigger function is registered, resolve immediately (graceful degradation)
         } catch (error) {
-          // Even if the trigger function fails, we should still resolve the promise
           console.warn("Animation failed:", error);
         } finally {
           resolve();
         }
       });
+
       void this.#processQueue();
     });
+  }
+
+  async clearWaveAnimation(): Promise<void> {
+    await this.#clearFunction?.(); // call visual reset
   }
 }
 
@@ -83,8 +91,13 @@ const animationDispatcher = new AnimationDispatcher();
 export const triggerDropWaveAnimation = (): Promise<void> =>
   animationDispatcher.dropWaveAnimation();
 
-export const registerAnimationTrigger = (triggerFn: TriggerFunction): void =>
-  animationDispatcher.registerTrigger(triggerFn);
+export const clearDropWaveAnimation = (): Promise<void> =>
+  animationDispatcher.clearWaveAnimation();
+
+export const registerAnimationTrigger = (
+  triggerFn: TriggerFunction,
+  clearFn?: () => Promise<void>,
+): void => animationDispatcher.registerTrigger(triggerFn, clearFn);
 
 export const unregisterAnimationTrigger = (): void =>
   animationDispatcher.unregisterTrigger();

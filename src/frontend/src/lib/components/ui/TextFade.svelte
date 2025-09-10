@@ -6,7 +6,8 @@
   const {
     texts = [],
     duration = 1000,
-    delay = 2000,
+    delayBetween = 2000,
+    startDelay = 0,
     textClass = "",
     containerClass = "",
   } = $props();
@@ -26,8 +27,16 @@
 
   onMount(() => {
     if (texts.length <= 1) return;
-    interval = setInterval(next, delay + duration);
-    return () => clearInterval(interval);
+
+    const start = setTimeout(() => {
+      interval = setInterval(next, delayBetween + duration);
+      next();
+    }, startDelay);
+
+    return () => {
+      clearTimeout(start);
+      clearInterval(interval);
+    };
   });
 </script>
 

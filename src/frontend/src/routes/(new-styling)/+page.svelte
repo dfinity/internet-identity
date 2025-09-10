@@ -1,9 +1,12 @@
 <script lang="ts">
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { onMount } from "svelte";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { onDestroy, onMount, tick } from "svelte";
+  import {
+    clearDropWaveAnimation,
+    triggerDropWaveAnimation,
+    unregisterAnimationTrigger,
+  } from "$lib/utils/animation-dispatcher";
   import Button from "$lib/components/ui/Button.svelte";
-  import { derived } from "svelte/store";
   import { themeStore } from "$lib/stores/theme.store";
   import TextFade from "$lib/components/ui/TextFade.svelte";
   import FullControlIllustration from "$lib/components/illustrations/landing/FullControlIllustration.svelte";
@@ -17,20 +20,21 @@
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
+  import { fade } from "svelte/transition";
 
   const faq = [
+    {
+      question: "What is Internet Identity?",
+      answer: `Internet Identity is an authentication system for applications running on the <a onclick="event.stopPropagation()" href=${INTERNET_COMPUTER_URL} class='text-text-primary underline' target='_blank'>Internet Computer</a>. Instead of traditional usernames and passwords, it uses keys created via <a onclick="event.stopPropagation()" href=${FAQ_PASSKEY_URL} class='text-text-primary underline' target='_blank'>passkeys</a> or other authentication systems like Google, Microsoft or Apple.`,
+    },
     {
       question: "Is my Face ID or Fingerprint stored in Internet Identity?",
       answer:
         "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use.",
     },
     {
-      question: "What is Internet Identity?",
-      answer: `Internet Identity is an authentication system for applications running on the <a href=${INTERNET_COMPUTER_URL} class='text-text-primary underline' target='_blank'>Internet Computer</a>. Instead of traditional usernames and passwords, it uses keys created via <a href=${FAQ_PASSKEY_URL} class='text-text-primary underline' target='_blank'>passkeys</a> or other authentication systems like Google, Microsoft or Apple.`,
-    },
-    {
       question: "How do passkeys work?",
-      answer: `Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code.<br /><br />When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password.<br /><br />Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <a href=${FAQ_PASSKEY_URL} class='text-text-primary underline' target='_blank'>Learn more.</a>`,
+      answer: `Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code.<br /><br />When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password.<br /><br />Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <a onclick="event.stopPropagation()" href=${FAQ_PASSKEY_URL} class='text-text-primary underline' target='_blank'>Learn more.</a>`,
     },
     {
       question: "What makes Internet Identity secure & easy to use?",
@@ -52,41 +56,51 @@
       question:
         "How do Google, Microsoft and Apple integrations work with Internet Identity?",
       answer:
-        "The integration with Google, Microsoft and Apple use a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google.<br /><br />Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer.<br /><br />No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity.<br /><br />For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user.",
+        "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google.<br /><br />Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer.<br /><br />No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity.<br /><br />For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user.",
     },
     {
       question: "What's new in Internet Identity 2.0? ",
       answer:
-        "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:<br />Completely Redesigned Interface: We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey.<br /><br />No More Identity Numbers: As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined.<br /><br />Seamless Passkey Integration: We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use.<br /><br />Google Integration: While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we’ve integrated Google as an alternative authentication option.",
+        "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:<br />Completely Redesigned Interface: We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey.<br /><br />No More Identity Numbers: As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined.<br /><br />Seamless Passkey Integration: We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use.<br /><br />Google Integration: While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated Google as an alternative authentication option.",
     },
   ];
 
   // Provides dynamic gradient colours for illustrations, reacting to theme changes.
   // Values are pulled from CSS variables so strokes update automatically in light/dark mode.
-  const illustrationColours = derived(themeStore, (isDark) =>
-    isDark
-      ? {
-          start: getComputedStyle(document.documentElement).getPropertyValue(
-            "--fg-quaternary",
-          ),
-          end: getComputedStyle(document.documentElement).getPropertyValue(
-            "--fg-quaternary_hover",
-          ),
-        }
-      : {
-          start: getComputedStyle(document.documentElement).getPropertyValue(
-            "--fg-tertiary",
-          ),
-          end: getComputedStyle(document.documentElement).getPropertyValue(
-            "--fg-primary",
-          ),
-        },
-  );
+  let illustrationColours = $state({ start: "", end: "" });
+  let showFadeIn = $state(false);
+
+  $effect(() => {
+    if ($themeStore !== null) {
+      // Wait for hydration + media query CSS to apply
+      tick().then(() => {
+        requestAnimationFrame(() => {
+          const root = document.documentElement;
+
+          illustrationColours = $themeStore
+            ? {
+                start:
+                  getComputedStyle(root).getPropertyValue("--fg-quaternary"),
+                end: getComputedStyle(root).getPropertyValue(
+                  "--fg-quaternary_hover",
+                ),
+              }
+            : {
+                start: getComputedStyle(root).getPropertyValue("--fg-tertiary"),
+                end: getComputedStyle(root).getPropertyValue("--fg-primary"),
+              };
+        });
+      });
+    }
+  });
 
   onMount(() => {
-    setTimeout(() => {
-      triggerDropWaveAnimation();
-    });
+    requestAnimationFrame(() => (showFadeIn = true));
+    setTimeout(async () => await triggerDropWaveAnimation());
+  });
+
+  onDestroy(() => {
+    void clearDropWaveAnimation();
   });
 </script>
 
@@ -103,31 +117,37 @@
     </div>
   </LandingHeader>
   <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
-    <div class="flex w-full flex-col items-center justify-center gap-6">
-      <div class="flex w-full flex-col gap-2">
-        <h1
-          class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
-        >
-          Experience
-        </h1>
-        <TextFade
-          texts={[
-            "Real Privacy",
-            "Full Ownership",
-            "Seamless Access",
-            "Internet Identity",
-          ]}
-          duration={500}
-          delay={2000}
-          textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
-          containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
-        />
+    {#if showFadeIn}
+      <div
+        in:fade={{ delay: 200, duration: 600 }}
+        class="flex w-full flex-col items-center justify-center gap-6"
+      >
+        <div class="flex w-full flex-col gap-2">
+          <h1
+            class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
+          >
+            Experience
+          </h1>
+          <TextFade
+            texts={[
+              "Real Privacy",
+              "Full Ownership",
+              "Seamless Access",
+              "Internet Identity",
+            ]}
+            duration={500}
+            delayBetween={2000}
+            startDelay={2800}
+            textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
+            containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
+          />
+        </div>
+        <p class="text-text-tertiary max-w-[534px] text-center text-base">
+          Internet Identity lets you access apps and services securely, without
+          creating passwords, sharing personal data, or giving up control.
+        </p>
       </div>
-      <p class="text-text-tertiary max-w-[534px] text-center text-base">
-        Internet Identity lets you access apps and services securely, without
-        creating passwords, sharing personal data, or giving up control.
-      </p>
-    </div>
+    {/if}
   </div>
   <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
     <div
@@ -140,7 +160,7 @@
       >
         <EasyAccessIllustration
           class="max-w-[233px]"
-          colors={$illustrationColours}
+          colors={illustrationColours}
         />
       </LandingCard>
       <LandingCard
@@ -149,7 +169,7 @@
         description="Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
       >
         <PasswordFreeIllustration
-          colors={$illustrationColours}
+          colors={illustrationColours}
           class="max-w-[264px]"
         />
       </LandingCard>
@@ -159,7 +179,7 @@
         description="Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
       >
         <FullControlIllustration
-          colors={$illustrationColours}
+          colors={illustrationColours}
           class="max-w-[170px]"
         />
       </LandingCard>
@@ -188,7 +208,7 @@
     </div>
     <div class="flex flex-1 flex-col gap-8">
       {#each faq as item, i}
-        <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-4">
           {#if i > 0 && i < faq.length}
             <div class="border-border-secondary mx-5 border-t"></div>
           {/if}
