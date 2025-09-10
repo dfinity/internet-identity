@@ -463,9 +463,8 @@ impl<M: Memory + Clone> Storage<M> {
                 lookup_anchor_with_device_credential_memory,
             ),
 
-            // TODO[ID-352]: Change this to use `lookup_application_with_origin_memory`.
             lookup_application_with_origin_memory_wrapper: MemoryWrapper::new(
-                lookup_application_with_origin_memory_old.clone(),
+                lookup_application_with_origin_memory.clone(),
             ),
             // TODO[ID-354]: Remove this after the production data is migrated to the new map.
             lookup_application_with_origin_memory_old: StableBTreeMap::init(
@@ -737,22 +736,21 @@ impl<M: Memory + Clone> Storage<M> {
         let origin_hash = StorableOriginHash::from_origin(origin);
         let origin_sha256 = StorableOriginSha256::from_origin(origin);
 
-        // TODO[ID_352]: Switch to `lookup_application_with_origin_memory`.
         if let Some(existing_number) = self
-            .lookup_application_with_origin_memory_old
-            .get(&origin_hash)
+            .lookup_application_with_origin_memory
+            .get(&origin_sha256)
         {
             existing_number
         } else {
             let new_number: ApplicationNumber =
                 self.lookup_application_with_origin_memory_old.len();
 
-            // Update the source of truth.
+            // Update the old map (will eventually be removed).
             // TODO[ID_353]: Remove this line.
             self.lookup_application_with_origin_memory_old
                 .insert(origin_hash, new_number);
 
-            // Update the new map (will eventually become the source of truth).
+            // Update the source of truth.
             self.lookup_application_with_origin_memory
                 .insert(origin_sha256, new_number);
 
@@ -772,9 +770,8 @@ impl<M: Memory + Clone> Storage<M> {
         &self,
         origin: &FrontendHostname,
     ) -> Option<ApplicationNumber> {
-        // TODO[ID-352]: Start reading from the new map (`lookup_application_with_origin_memory`).
-        self.lookup_application_with_origin_memory_old
-            .get(&StorableOriginHash::from_origin(origin))
+        self.lookup_application_with_origin_memory
+            .get(&StorableOriginSha256::from_origin(origin))
     }
 
     /// Only used in tests.
