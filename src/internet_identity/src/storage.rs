@@ -742,8 +742,7 @@ impl<M: Memory + Clone> Storage<M> {
         {
             existing_number
         } else {
-            let new_number: ApplicationNumber =
-                self.lookup_application_with_origin_memory_old.len();
+            let new_number: ApplicationNumber = self.lookup_application_with_origin_memory.len();
 
             // Update the old map (will eventually be removed).
             // TODO[ID_353]: Remove this line.
