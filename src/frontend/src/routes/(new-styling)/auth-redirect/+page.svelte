@@ -68,7 +68,7 @@
   if (provider) {
     handleContinueWithOpenId(provider);
   } else {
-    // if an incorrect provider is provided redirect the user to the login page
+    // If an incorrect provider is provided, redirect the user to the login page.
     goto(`/login${data.next ? `next=${data.next}` : ""}`);
   }
 </script>
