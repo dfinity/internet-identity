@@ -31,6 +31,9 @@ export interface RequestOptions {
   loginHint?: string;
   // Optional, see: https://developers.google.com/privacy-sandbox/blog/fedcm-auto-reauthn#mediation-options
   mediation?: CredentialMediationRequirement;
+
+  // Optional, use redirect instead of popup
+  useFullRedirect?: boolean;
 }
 
 export const GOOGLE_ISSUER = "https://accounts.google.com";
@@ -127,6 +130,15 @@ const requestWithRedirect = async (
   }
   if (nonNullish(options.loginHint)) {
     authURL.searchParams.set("login_hint", options.loginHint);
+  }
+
+  if (nonNullish(options.useFullRedirect)) {
+    sessionStorage.setItem("openid_state", state);
+    sessionStorage.setItem("openid_nonce", options.nonce);
+    window.location.href = authURL.toString();
+    // Returning a never-resolving promise to satisfy the declared return type,
+    // even though the browser will navigate away immediately after this line.
+    return new Promise(() => {});
   }
 
   const callback = await redirectInPopup(authURL.href);
@@ -291,9 +303,10 @@ export const requestJWT = async (
   options: RequestOptions,
 ): Promise<string> => {
   const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
-  const jwt = supportsFedCM
-    ? await requestWithCredentials(config, options)
-    : await requestWithRedirect(config, options);
+  const jwt =
+    supportsFedCM && !nonNullish(options.useFullRedirect)
+      ? await requestWithCredentials(config, options)
+      : await requestWithRedirect(config, options);
   return jwt;
 };
 
