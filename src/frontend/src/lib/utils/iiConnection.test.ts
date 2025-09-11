@@ -262,8 +262,8 @@ describe("Connection.login", () => {
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledTimes(1);
         expect(MultiWebAuthnIdentity.fromCredentials).toHaveBeenCalledWith(
           [
-            convertToValidCredentialData(newOriginDevice),
             convertToValidCredentialData(mockDevice),
+            convertToValidCredentialData(newOriginDevice),
           ],
           "identity.ic0.app",
           true,
