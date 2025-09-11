@@ -4,8 +4,16 @@
   import WaveCanvas from "$lib/components/backgrounds/WaveCanvas.svelte";
   import Toaster from "$lib/components/utils/Toaster.svelte";
   import type { LayoutProps } from "./$types";
+  import { loadTranslations, locale } from "$lib/utils/translations";
+  import { onMount } from "svelte";
 
   const { children }: LayoutProps = $props();
+
+  onMount(async () => {
+    const initLocale = "en";
+
+    await loadTranslations(initLocale, "t");
+  });
 </script>
 
 <svelte:head>

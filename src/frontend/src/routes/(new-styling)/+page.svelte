@@ -21,6 +21,7 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { fade } from "svelte/transition";
+  import { t } from "$lib/utils/translations";
 
   const faq = [
     {
@@ -126,7 +127,7 @@
           <h1
             class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
           >
-            Experience
+            {$t("t.landing.experience", { default: "Experience" })}
           </h1>
           <TextFade
             texts={[

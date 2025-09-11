@@ -100,6 +100,7 @@
     "plausible-tracker": "0.3.9",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
+    "sveltekit-i18n": "^2.4.2",
     "ua-parser-js": "^1.0.35",
     "zod": "^3.22.3"
   },
