@@ -1,7 +1,10 @@
 <script lang="ts">
   import { sessionStore } from "$lib/stores/session.store";
   import { canisterId } from "$lib/globals";
-  import { authenticateWithJWT } from "$lib/utils/authentication";
+  import {
+    authenticateIntermediateWithJWT,
+    authenticateWithJWT,
+  } from "$lib/utils/authentication";
   import { get } from "svelte/store";
   import { decodeJWT } from "$lib/utils/openID";
   import {
@@ -53,12 +56,16 @@
         throw new Error(validation.message);
       }
 
+      // Generate intermediate key
+      const intermediateKey = await ECDSAKeyIdentity.generate();
+
       // Build identity
       const session = get(sessionStore);
-      const { identity: iiIdentity } = await authenticateWithJWT({
-        canisterId, // import or inject your II canister id
+      const intermediateIdentity = await authenticateIntermediateWithJWT({
+        canisterId,
         session,
         jwt: idToken,
+        intermediateIdentity: intermediateKey,
       });
 
       // Load app keypair from session storage
@@ -67,16 +74,6 @@
       );
       const appIdentity = await restoreECDSAIdentity(appKeypairRaw);
       const appPublicKey = appIdentity.getPublicKey();
-
-      // Generate intermediate key
-      const intermediateKey = await ECDSAKeyIdentity.generate();
-
-      // Step 1: II → Intermediate
-      const iiDelegation = iiIdentity.getDelegation();
-      const intermediateIdentity = DelegationIdentity.fromDelegation(
-        intermediateKey,
-        iiDelegation,
-      );
 
       // Step 2: Intermediate → App
       const appDelegationChain = await DelegationChain.create(

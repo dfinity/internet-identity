@@ -39,11 +39,51 @@ export const authenticateWithJWT = async ({
   const transformedDelegation = transformSignedDelegation(signedDelegation);
   const delegationChain = DelegationChain.fromDelegations(
     [transformedDelegation],
-    new Uint8Array(user_key),
+    new Uint8Array(user_key).buffer,
   );
   const identity = DelegationIdentity.fromDelegation(
     session.identity,
     delegationChain,
   );
   return { identity, identityNumber };
+};
+
+export const authenticateIntermediateWithJWT = async ({
+  canisterId,
+  session,
+  jwt,
+  intermediateIdentity,
+}: {
+  canisterId: Principal;
+  session: Session;
+  jwt: string;
+  intermediateIdentity: ECDSAKeyIdentity;
+}): Promise<DelegationIdentity> => {
+  const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+    agent: session.agent,
+    canisterId,
+  });
+
+  const intermedKeyDer = new Uint8Array(
+    intermediateIdentity.getPublicKey().toDer(),
+  );
+
+  const { expiration, user_key } = await actor
+    .openid_prepare_delegation(jwt, session.salt, intermedKeyDer)
+    .then(throwCanisterError);
+
+  const signedDelegation = await actor
+    .openid_get_delegation(jwt, session.salt, intermedKeyDer, expiration)
+    .then(throwCanisterError);
+
+  const transformedDelegation = transformSignedDelegation(signedDelegation);
+  const delegationChain = DelegationChain.fromDelegations(
+    [transformedDelegation],
+    new Uint8Array(user_key),
+  );
+
+  return DelegationIdentity.fromDelegation(
+    intermediateIdentity,
+    delegationChain,
+  );
 };
