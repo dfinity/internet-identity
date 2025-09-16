@@ -31,9 +31,6 @@ export interface RequestOptions {
   loginHint?: string;
   // Optional, see: https://developers.google.com/privacy-sandbox/blog/fedcm-auto-reauthn#mediation-options
   mediation?: CredentialMediationRequirement;
-
-  // Optional, use redirect instead of popup
-  useFullRedirect?: boolean;
 }
 
 export const GOOGLE_ISSUER = "https://accounts.google.com";
@@ -100,21 +97,21 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Request JWT through redirect flow in a popup
- * @param config of the OpenID provider
- * @param options for the JWT request
+ * Build the OpenID Connect authorisation URL with all required query parameters.
+ *
+ * @param config - The OpenID provider configuration (clientId, authURL, scopes, etc.).
+ * @param options - Options for the JWT request (nonce, mediation, loginHint).
+ * @param state - A random string used to protect against CSRF.
+ * @returns A fully prepared URL to start the OIDC flow.
  */
-const requestWithRedirect = async (
+const buildAuthUrl = (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
-): Promise<string> => {
-  const state = toBase64URL(
-    window.crypto.getRandomValues(new Uint8Array(12)).buffer,
-  );
+  state: string,
+): URL => {
   const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
   const authURL = new URL(config.authURL);
-  // Even though we only need an id token, we're still asking for a code
-  // because some identity providers (AppleID) will throw an error otherwise.
+
   authURL.searchParams.set("response_type", "code id_token");
   authURL.searchParams.set("response_mode", "fragment");
   authURL.searchParams.set("client_id", config.clientId);
@@ -122,6 +119,7 @@ const requestWithRedirect = async (
   authURL.searchParams.set("scope", config.authScope);
   authURL.searchParams.set("state", state);
   authURL.searchParams.set("nonce", options.nonce);
+
   if (options.mediation === "required" && isNullish(options.loginHint)) {
     authURL.searchParams.set("prompt", "select_account");
   }
@@ -132,27 +130,63 @@ const requestWithRedirect = async (
     authURL.searchParams.set("login_hint", options.loginHint);
   }
 
-  if (nonNullish(options.useFullRedirect)) {
-    sessionStorage.setItem("openid_state", state);
-    sessionStorage.setItem("openid_nonce", options.nonce);
-    window.location.href = authURL.toString();
-    // Returning a never-resolving promise to satisfy the declared return type,
-    // even though the browser will navigate away immediately after this line.
-    return new Promise(() => {});
-  }
+  return authURL;
+};
+
+/**
+ * Request a JWT through redirect flow inside a popup window.
+ *
+ * @param config - The OpenID provider configuration.
+ * @param options - Options for the JWT request, including nonce and mediation.
+ * @returns A promise resolving to the ID token string.
+ * @throws Error if state does not match or no token is received.
+ */
+const requestWithPopupRedirect = async (
+  config: Omit<RequestConfig, "configURL">,
+  options: RequestOptions,
+): Promise<string> => {
+  const state = toBase64URL(
+    window.crypto.getRandomValues(new Uint8Array(12)).buffer,
+  );
+  const authURL = buildAuthUrl(config, options, state);
 
   const callback = await redirectInPopup(authURL.href);
   const callbackURL = new URL(callback);
   const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
-  const id_token = searchParams.get("id_token");
+
   if (searchParams.get("state") !== state) {
     throw new Error("Invalid state");
   }
+  const id_token = searchParams.get("id_token");
   if (isNullish(id_token)) {
     throw new Error("No token received");
   }
 
   return id_token;
+};
+
+/**
+ * Request a JWT through a full-page redirect flow.
+ * Stores state and nonce in sessionStorage before navigation.
+ *
+ * @param config - The OpenID provider configuration.
+ * @param options - Options for the JWT request, including nonce.
+ * @returns A promise that never resolves because the page will navigate away.
+ */
+export const requestWithFullRedirect = (
+  config: Omit<RequestConfig, "configURL">,
+  options: RequestOptions,
+): Promise<never> => {
+  const state = toBase64URL(
+    window.crypto.getRandomValues(new Uint8Array(12)).buffer,
+  );
+  const authURL = buildAuthUrl(config, options, state);
+
+  sessionStorage.setItem("openid_state", state);
+  sessionStorage.setItem("openid_nonce", options.nonce);
+  window.location.href = authURL.toString();
+
+  return new Promise(() => {}); // never resolves
 };
 
 /**
@@ -303,10 +337,9 @@ export const requestJWT = async (
   options: RequestOptions,
 ): Promise<string> => {
   const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
-  const jwt =
-    supportsFedCM && !nonNullish(options.useFullRedirect)
-      ? await requestWithCredentials(config, options)
-      : await requestWithRedirect(config, options);
+  const jwt = supportsFedCM
+    ? await requestWithCredentials(config, options)
+    : await requestWithPopupRedirect(config, options);
   return jwt;
 };
 
