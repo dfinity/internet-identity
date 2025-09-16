@@ -6,7 +6,11 @@ import {
   throwCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
-import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+} from "@dfinity/identity";
 import { Session } from "$lib/stores/session.store";
 
 export const authenticateWithJWT = async ({
@@ -79,7 +83,7 @@ export const authenticateIntermediateWithJWT = async ({
   const transformedDelegation = transformSignedDelegation(signedDelegation);
   const delegationChain = DelegationChain.fromDelegations(
     [transformedDelegation],
-    new Uint8Array(user_key),
+    new Uint8Array(user_key).buffer,
   );
 
   return DelegationIdentity.fromDelegation(
