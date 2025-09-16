@@ -108,8 +108,9 @@ const buildAuthUrl = (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
   state: string,
+  callback: string,
 ): URL => {
-  const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
+  const redirectURL = new URL(callback, window.location.origin);
   const authURL = new URL(config.authURL);
 
   authURL.searchParams.set("response_type", "code id_token");
@@ -148,7 +149,7 @@ const requestWithPopupRedirect = async (
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
-  const authURL = buildAuthUrl(config, options, state);
+  const authURL = buildAuthUrl(config, options, state, REDIRECT_CALLBACK_PATH);
 
   const callback = await redirectInPopup(authURL.href);
   const callbackURL = new URL(callback);
@@ -180,7 +181,7 @@ export const requestWithFullRedirect = (
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
-  const authURL = buildAuthUrl(config, options, state);
+  const authURL = buildAuthUrl(config, options, state, "/oidc-return");
 
   sessionStorage.setItem("openid_state", state);
   sessionStorage.setItem("openid_nonce", options.nonce);
