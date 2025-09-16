@@ -46,21 +46,11 @@ export interface Icrc21VcConsentMessageRequest {
   'credential_spec' : CredentialSpec,
 }
 export type IssueCredentialError = { 'Internal' : string } |
-  {
-    'SignatureNotFound' : string
-  } |
-  {
-    'InvalidIdAlias' : string
-  } |
-  {
-    'UnauthorizedSubject' : string
-  } |
-  {
-    'UnknownSubject' : string
-  } |
-  {
-    'UnsupportedCredentialSpec' : string
-  };
+  { 'SignatureNotFound' : string } |
+  { 'InvalidIdAlias' : string } |
+  { 'UnauthorizedSubject' : string } |
+  { 'UnknownSubject' : string } |
+  { 'UnsupportedCredentialSpec' : string };
 export interface IssuedCredentialData { 'vc_jws' : string }
 export interface IssuerConfig {
   'derivation_origin' : string,
