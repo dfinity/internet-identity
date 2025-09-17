@@ -23,18 +23,19 @@
 
     const authFlow = new AuthFlow();
     const session = get(sessionStore);
-    const exportECDSAIdentityAsJWK = async (identity: ECDSAKeyIdentity) => {
-      const key = await crypto.subtle.exportKey(
-        "jwk",
-        identity.getKeyPair().privateKey,
-      );
-      return key;
-    };
+    const { privateKey, publicKey } = (
+      session.identity as ECDSAKeyIdentity
+    ).getKeyPair();
 
-    const jwk = await exportECDSAIdentityAsJWK(
-      session.identity as ECDSAKeyIdentity,
+    const [privJwk, pubJwk] = await Promise.all([
+      crypto.subtle.exportKey("jwk", privateKey),
+      crypto.subtle.exportKey("jwk", publicKey),
+    ]);
+
+    sessionStorage.setItem(
+      "openid_ii_keypair",
+      JSON.stringify({ privateKey: privJwk, publicKey: pubJwk }),
     );
-    sessionStorage.setItem("openid_ii_keypair", JSON.stringify(jwk));
 
     sessionStorage.setItem(
       "openid_salt",
