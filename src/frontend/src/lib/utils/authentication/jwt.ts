@@ -44,7 +44,7 @@ export const authenticateWithJWT = async ({
   const transformedDelegation = transformSignedDelegation(signedDelegation);
   const delegationChain = DelegationChain.fromDelegations(
     [transformedDelegation],
-    new Uint8Array(user_key).buffer,
+    new Uint8Array(user_key),
   );
   const identity = DelegationIdentity.fromDelegation(
     session.identity,
@@ -100,7 +100,7 @@ export const authenticateRedirectCallbackWithJWT = async ({
 
   const chain = DelegationChain.fromDelegations(
     [transformed],
-    new Uint8Array(user_key).buffer,
+    new Uint8Array(user_key),
   );
 
   console.log("🔗 Delegation chain built", chain);
