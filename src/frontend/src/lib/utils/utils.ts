@@ -408,9 +408,11 @@ export const throwCanisterError = <
 ): Promise<S> => {
   if ("Err" in response) {
     if (isNullish(response.Err)) {
-      throw new Error("Unexpected error occurred");
+      throw new Error("Unexpected error occurred (Err was null)");
     }
-    throw new CanisterError(response.Err);
+    const errDetails = JSON.stringify(response.Err, null, 2);
+    console.error("⛔ Canister returned Err:", errDetails);
+    throw new Error(`Canister error: ${errDetails}`);
   }
   return response.Ok as Promise<S>;
 };

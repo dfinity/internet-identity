@@ -181,10 +181,10 @@ export const requestWithFullRedirect = (
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
-  const authURL = buildAuthUrl(config, options, state, "/oidc-return");
+  // const authURL = buildAuthUrl(config, options, state, "/oidc-return");
+  const authURL = buildAuthUrl(config, options, state, REDIRECT_CALLBACK_PATH);
 
   sessionStorage.setItem("openid_state", state);
-  sessionStorage.setItem("openid_nonce", options.nonce);
   window.location.href = authURL.toString();
 
   return new Promise(() => {}); // never resolves

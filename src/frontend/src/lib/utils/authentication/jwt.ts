@@ -1,5 +1,5 @@
 import { Principal } from "@dfinity/principal";
-import { Actor } from "@dfinity/agent";
+import { Actor, HttpAgent } from "@dfinity/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
@@ -12,6 +12,7 @@ import {
   ECDSAKeyIdentity,
 } from "@dfinity/identity";
 import { Session } from "$lib/stores/session.store";
+import { restoreECDSAIdentity } from "../restoreECDSAIdentity";
 
 export const authenticateWithJWT = async ({
   canisterId,
@@ -52,42 +53,57 @@ export const authenticateWithJWT = async ({
   return { identity, identityNumber };
 };
 
-export const authenticateIntermediateWithJWT = async ({
+export const authenticateRedirectCallbackWithJWT = async ({
   canisterId,
-  session,
   jwt,
-  intermediateIdentity,
+  salt,
+  identity,
 }: {
   canisterId: Principal;
-  session: Session;
   jwt: string;
-  intermediateIdentity: ECDSAKeyIdentity;
-}): Promise<DelegationIdentity> => {
+  salt: Uint8Array;
+  identity: ECDSAKeyIdentity;
+}): Promise<DelegationChain> => {
+  console.log("📨 Starting redirect callback authentication");
+  console.log("🎟️ JWT (first 50 chars):", jwt.slice(0, 50), "...");
+  console.log("🧂 Salt (hex):", Buffer.from(salt).toString("hex"));
+  console.log(
+    "🔑 II Public Key (DER hex):",
+    Buffer.from(identity.getPublicKey().toDer()).toString("hex"),
+  );
+
+  const publicKey = new Uint8Array(identity.getPublicKey().toDer());
+  const agent = new HttpAgent({ identity });
+  if (import.meta.env.DEV) await agent.fetchRootKey();
+
   const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-    agent: session.agent,
+    agent,
     canisterId,
   });
 
-  const intermedKeyDer = new Uint8Array(
-    intermediateIdentity.getPublicKey().toDer(),
-  );
-
   const { expiration, user_key } = await actor
-    .openid_prepare_delegation(jwt, session.salt, intermedKeyDer)
+    .openid_prepare_delegation(jwt, salt, publicKey)
     .then(throwCanisterError);
+
+  console.log("✅ prepare_delegation:", {
+    expiration,
+    user_key: Buffer.from(user_key).toString("hex"),
+  });
 
   const signedDelegation = await actor
-    .openid_get_delegation(jwt, session.salt, intermedKeyDer, expiration)
+    .openid_get_delegation(jwt, salt, publicKey, expiration)
     .then(throwCanisterError);
 
-  const transformedDelegation = transformSignedDelegation(signedDelegation);
-  const delegationChain = DelegationChain.fromDelegations(
-    [transformedDelegation],
+  console.log("✅ get_delegation:", signedDelegation);
+
+  const transformed = transformSignedDelegation(signedDelegation);
+
+  const chain = DelegationChain.fromDelegations(
+    [transformed],
     new Uint8Array(user_key).buffer,
   );
 
-  return DelegationIdentity.fromDelegation(
-    intermediateIdentity,
-    delegationChain,
-  );
+  console.log("🔗 Delegation chain built", chain);
+
+  return chain;
 };

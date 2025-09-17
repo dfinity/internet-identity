@@ -297,6 +297,7 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
+    let jwt: string | undefined = undefined;
     // Convert OpenIdConfig to RequestConfig
     const requestConfig: RequestConfig = {
       clientId: config.client_id,
@@ -310,15 +311,20 @@ export class AuthFlow {
     // Create two try-catch blocks to avoid double-triggering the analytics.
     try {
       this.#systemOverlay = true;
-      const jwt = await requestJWT(requestConfig, {
+      jwt = await requestJWT(requestConfig, {
         nonce: get(sessionStore).nonce,
         mediation: "required",
       });
-      return await this.handleOpenIdResult(jwt);
     } catch (error) {
       this.#view = "chooseMethod";
       throw error;
+    } finally {
+      this.#systemOverlay = false;
+      // Moved after `requestJWT` to avoid Safari from blocking the popup.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
+
+    return await this.handleOpenIdResult(jwt);
   };
 
   continueWithOpenIdFullRedirect = (config: OpenIdConfig): Promise<never> => {

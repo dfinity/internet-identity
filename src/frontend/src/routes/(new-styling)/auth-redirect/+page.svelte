@@ -7,61 +7,65 @@
   import { sessionStore } from "$lib/stores/session.store";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
+  import { ECDSAKeyIdentity } from "@dfinity/identity";
 
   const { data }: PageProps = $props();
   const { redirectUri, derivationOrigin, appKeypair, provider, maxTimeToLive } =
     data;
 
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
-
-  const authMethod = openIdProviders.find(
+  let authMethod = openIdProviders.find(
     (p) => p.name.toLowerCase() === provider?.toLowerCase(),
   );
 
-  onMount(async () => {
-    try {
-      if (!authMethod) throw Error;
+  const startRedirect = async () => {
+    if (!authMethod) return;
 
-      const authFlow = new AuthFlow();
+    const authFlow = new AuthFlow();
+    const session = get(sessionStore);
+    const exportECDSAIdentityAsJWK = async (identity: ECDSAKeyIdentity) => {
+      const key = await crypto.subtle.exportKey(
+        "jwk",
+        identity.getKeyPair().privateKey,
+      );
+      return key;
+    };
 
-      const session = get(sessionStore);
+    const jwk = await exportECDSAIdentityAsJWK(
+      session.identity as ECDSAKeyIdentity,
+    );
+    sessionStorage.setItem("openid_ii_keypair", JSON.stringify(jwk));
 
-      sessionStorage.setItem(
-        "openid_ii_keypair",
-        JSON.stringify({
-          publicKey: Buffer.from(
-            session.identity.getPublicKey().toDer(),
-          ).toString("base64"),
-          principal: session.identity.getPrincipal().toText(),
-        }),
-      );
-      sessionStorage.setItem(
-        "openid_salt",
-        Buffer.from(session.salt).toString("base64"),
-      );
-      sessionStorage.setItem("openid_nonce", session.nonce);
+    sessionStorage.setItem(
+      "openid_salt",
+      Buffer.from(session.salt).toString("base64"),
+    );
+    sessionStorage.setItem("openid_nonce", session.nonce);
+    sessionStorage.setItem("openid_redirect_uri", redirectUri ?? "");
+    sessionStorage.setItem("openid_derivation_origin", derivationOrigin ?? "");
+    sessionStorage.setItem(
+      "openid_app_keypair",
+      JSON.stringify(appKeypair ?? {}),
+    );
+    sessionStorage.setItem(
+      "openid_max_time_to_live",
+      maxTimeToLive?.toString() ?? "",
+    );
 
-      sessionStorage.setItem("openid_redirect_uri", redirectUri ?? "");
-      sessionStorage.setItem(
-        "openid_derivation_origin",
-        derivationOrigin ?? "",
-      );
-      sessionStorage.setItem(
-        "openid_app_keypair",
-        JSON.stringify(appKeypair ?? {}),
-      );
-      sessionStorage.setItem(
-        "openid_max_time_to_live",
-        maxTimeToLive?.toString() ?? "",
-      );
+    console.log("📝 Storing session data for OpenID redirect");
+    console.log(
+      "🔑 II Public Key (DER hex):",
+      Buffer.from(session.identity.getPublicKey().toDer()).toString("hex"),
+    );
+    console.log("🧂 Salt (hex):", Buffer.from(session.salt).toString("hex"));
+    console.log("🌀 Nonce:", session.nonce);
+    console.log("🔁 Redirect URI:", redirectUri);
+    console.log("🌍 Derivation Origin:", derivationOrigin);
+    console.log("🔐 App Keypair:", appKeypair);
+    console.log("⏳ Max TTL (ms):", maxTimeToLive);
 
-      await authFlow.continueWithOpenIdFullRedirect(authMethod);
-    } catch {
-      // If an incorrect provider is provided, redirect the user to the default authorize flow page.
-      // TODO: handle correctly
-      goto("/authorize");
-    }
-  });
+    await authFlow.continueWithOpenIdFullRedirect(authMethod);
+  };
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
@@ -71,5 +75,11 @@
       <p class="text-text-primary">Redirecting you to {authMethod.name}</p>
     {/if}
     <ProgressRing class="text-fg-brand-primary" />
+    <button
+      on:click={startRedirect}
+      class="bg-fg-brand-primary hover:bg-fg-brand-primary/80 mt-4 rounded px-6 py-2 text-white transition"
+    >
+      Continue with {authMethod?.name}
+    </button>
   </div>
 </div>
