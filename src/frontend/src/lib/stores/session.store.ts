@@ -35,7 +35,7 @@ const internalStore = writable<Session | undefined>();
 export const sessionStore: SessionStore = {
   init: async ({ canisterId, agentOptions }) => {
     const identity = await ECDSAKeyIdentity.generate({
-      extractable: true,
+      extractable: false,
     });
     const agent = LazyHttpAgent.createLazy({ ...agentOptions, identity });
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
@@ -53,7 +53,7 @@ export const sessionStore: SessionStore = {
   }).subscribe,
   reset: async () => {
     const identity = await ECDSAKeyIdentity.generate({
-      extractable: true,
+      extractable: false,
     });
     const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
     internalStore.update((session) => {

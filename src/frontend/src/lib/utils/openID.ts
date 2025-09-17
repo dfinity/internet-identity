@@ -135,12 +135,9 @@ const buildAuthUrl = (
 };
 
 /**
- * Request a JWT through redirect flow inside a popup window.
- *
- * @param config - The OpenID provider configuration.
- * @param options - Options for the JWT request, including nonce and mediation.
- * @returns A promise resolving to the ID token string.
- * @throws Error if state does not match or no token is received.
+ * Request JWT through redirect flow in a popup
+ * @param config of the OpenID provider
+ * @param options for the JWT request
  */
 const requestWithPopupRedirect = async (
   config: Omit<RequestConfig, "configURL">,
@@ -149,16 +146,34 @@ const requestWithPopupRedirect = async (
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
-  const authURL = buildAuthUrl(config, options, state, REDIRECT_CALLBACK_PATH);
+  const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
+  const authURL = new URL(config.authURL);
+  // Even though we only need an id token, we're still asking for a code
+  // because some identity providers (AppleID) will throw an error otherwise.
+  authURL.searchParams.set("response_type", "code id_token");
+  authURL.searchParams.set("response_mode", "fragment");
+  authURL.searchParams.set("client_id", config.clientId);
+  authURL.searchParams.set("redirect_uri", redirectURL.href);
+  authURL.searchParams.set("scope", config.authScope);
+  authURL.searchParams.set("state", state);
+  authURL.searchParams.set("nonce", options.nonce);
+  if (options.mediation === "required" && isNullish(options.loginHint)) {
+    authURL.searchParams.set("prompt", "select_account");
+  }
+  if (options.mediation === "silent") {
+    authURL.searchParams.set("prompt", "silent");
+  }
+  if (nonNullish(options.loginHint)) {
+    authURL.searchParams.set("login_hint", options.loginHint);
+  }
 
   const callback = await redirectInPopup(authURL.href);
   const callbackURL = new URL(callback);
   const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
-
+  const id_token = searchParams.get("id_token");
   if (searchParams.get("state") !== state) {
     throw new Error("Invalid state");
   }
-  const id_token = searchParams.get("id_token");
   if (isNullish(id_token)) {
     throw new Error("No token received");
   }
@@ -181,8 +196,27 @@ export const requestWithFullRedirect = (
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
-  // const authURL = buildAuthUrl(config, options, state, "/oidc-return");
-  const authURL = buildAuthUrl(config, options, state, REDIRECT_CALLBACK_PATH);
+
+  const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
+  const authURL = new URL(config.authURL);
+  // Even though we only need an id token, we're still asking for a code
+  // because some identity providers (AppleID) will throw an error otherwise.
+  authURL.searchParams.set("response_type", "code id_token");
+  authURL.searchParams.set("response_mode", "fragment");
+  authURL.searchParams.set("client_id", config.clientId);
+  authURL.searchParams.set("redirect_uri", redirectURL.href);
+  authURL.searchParams.set("scope", config.authScope);
+  authURL.searchParams.set("state", state);
+  authURL.searchParams.set("nonce", options.nonce);
+  if (options.mediation === "required" && isNullish(options.loginHint)) {
+    authURL.searchParams.set("prompt", "select_account");
+  }
+  if (options.mediation === "silent") {
+    authURL.searchParams.set("prompt", "silent");
+  }
+  if (nonNullish(options.loginHint)) {
+    authURL.searchParams.set("login_hint", options.loginHint);
+  }
 
   sessionStorage.setItem("openid_state", state);
   window.location.href = authURL.toString();

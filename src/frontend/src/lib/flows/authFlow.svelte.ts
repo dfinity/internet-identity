@@ -234,57 +234,6 @@ export class AuthFlow {
     }
   };
 
-  handleOpenIdResult = async (
-    jwt: string,
-  ): Promise<
-    | { identityNumber: bigint; type: "signIn" }
-    | { name?: string; type: "signUp" }
-  > => {
-    try {
-      const { iss, sub, loginHint } = decodeJWT(jwt);
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-      });
-
-      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
-      await authenticationStore.set({ identity, identityNumber });
-
-      const info =
-        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-      const authnMethod = info.openid_credentials[0]?.find(
-        (m) => m.iss === iss,
-      );
-
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: {
-          openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
-        },
-      });
-
-      return { identityNumber, type: "signIn" };
-    } catch (error) {
-      if (
-        isCanisterError<OpenIdDelegationError>(error) &&
-        error.type === "NoSuchAnchor" &&
-        nonNullish(jwt)
-      ) {
-        const { name } = decodeJWT(jwt);
-        authenticationV2Funnel.trigger(
-          AuthenticationV2Events.RegisterWithOpenID,
-        );
-        if (isNullish(name)) {
-          this.#view = "setupNewIdentity";
-        }
-        return { name, type: "signUp" };
-      }
-      throw error;
-    }
-  };
-
   continueWithOpenId = async (
     config: OpenIdConfig,
   ): Promise<
@@ -323,8 +272,52 @@ export class AuthFlow {
       // Moved after `requestJWT` to avoid Safari from blocking the popup.
       authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
     }
-
-    return await this.handleOpenIdResult(jwt);
+    try {
+      const { iss, sub, loginHint } = decodeJWT(jwt);
+      const { identity, identityNumber } = await authenticateWithJWT({
+        canisterId,
+        session: get(sessionStore),
+        jwt,
+      });
+      // If the previous call succeeds, it means the OpenID user already exists in II.
+      // Therefore, they are logging in.
+      // If the call fails, it means the OpenID user does not exist in II.
+      // In that case, we register them.
+      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
+      await authenticationStore.set({ identity, identityNumber });
+      const info =
+        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
+      const authnMethod = info.openid_credentials[0]?.find(
+        (method) => method.iss === iss,
+      );
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: {
+          openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
+        },
+      });
+      return { identityNumber, type: "signIn" };
+    } catch (error) {
+      if (
+        isCanisterError<OpenIdDelegationError>(error) &&
+        error.type === "NoSuchAnchor" &&
+        nonNullish(jwt)
+      ) {
+        this.#jwt = jwt;
+        this.#configIssuer = config.issuer;
+        const { name } = decodeJWT(jwt);
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.RegisterWithOpenID,
+        );
+        if (isNullish(name)) {
+          // Show enter name screen to complete registration,
+          this.#view = "setupNewIdentity";
+        }
+        return { name, type: "signUp" };
+      }
+      throw error;
+    }
   };
 
   continueWithOpenIdFullRedirect = (config: OpenIdConfig): Promise<never> => {
