@@ -81,9 +81,12 @@ export const authenticateRedirectCallbackWithJWT = async ({
     canisterId,
   });
 
+  console.log("test1");
   const { expiration, user_key } = await actor
     .openid_prepare_delegation(jwt, salt, publicKey)
     .then(throwCanisterError);
+
+  console.log("test2");
 
   console.log("✅ prepare_delegation:", {
     expiration,

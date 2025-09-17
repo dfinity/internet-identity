@@ -26,7 +26,7 @@
 
     // Restore session data
     const iiKeypairRaw = sessionStorage.getItem("openid_ii_keypair");
-    console.log(iiKeypairRaw);
+    console.log("iiKeypairRaw: ", iiKeypairRaw);
     const saltRaw = sessionStorage.getItem("openid_salt");
     const expectedState = sessionStorage.getItem("openid_state");
     const nonce = sessionStorage.getItem("openid_nonce");
@@ -46,6 +46,9 @@
 
     const { privateKey: privJwk, publicKey: pubJwk } = JSON.parse(iiKeypairRaw);
 
+    console.log("Priv JWK:", JSON.stringify(privJwk, null, 2));
+    console.log("Pub JWK:", JSON.stringify(pubJwk, null, 2));
+
     const privateKey = await crypto.subtle.importKey(
       "jwk",
       privJwk,
@@ -54,13 +57,17 @@
       ["sign"],
     );
 
-    const publicKey = await crypto.subtle.importKey(
-      "jwk",
-      pubJwk,
-      { name: "ECDSA", namedCurve: "P-256" },
-      true,
-      ["verify"],
-    );
+    const publicKey = await crypto.subtle
+      .exportKey("jwk", privateKey)
+      .then((jwk) =>
+        crypto.subtle.importKey(
+          "jwk",
+          { ...jwk, key_ops: ["verify"] },
+          { name: "ECDSA", namedCurve: "P-256" },
+          true,
+          ["verify"],
+        ),
+      );
 
     console.log(
       "🔑 WebCrypto Public Key (DER hex):",

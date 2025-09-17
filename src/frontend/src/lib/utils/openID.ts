@@ -97,44 +97,6 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Build the OpenID Connect authorisation URL with all required query parameters.
- *
- * @param config - The OpenID provider configuration (clientId, authURL, scopes, etc.).
- * @param options - Options for the JWT request (nonce, mediation, loginHint).
- * @param state - A random string used to protect against CSRF.
- * @returns A fully prepared URL to start the OIDC flow.
- */
-const buildAuthUrl = (
-  config: Omit<RequestConfig, "configURL">,
-  options: RequestOptions,
-  state: string,
-  callback: string,
-): URL => {
-  const redirectURL = new URL(callback, window.location.origin);
-  const authURL = new URL(config.authURL);
-
-  authURL.searchParams.set("response_type", "code id_token");
-  authURL.searchParams.set("response_mode", "fragment");
-  authURL.searchParams.set("client_id", config.clientId);
-  authURL.searchParams.set("redirect_uri", redirectURL.href);
-  authURL.searchParams.set("scope", config.authScope);
-  authURL.searchParams.set("state", state);
-  authURL.searchParams.set("nonce", options.nonce);
-
-  if (options.mediation === "required" && isNullish(options.loginHint)) {
-    authURL.searchParams.set("prompt", "select_account");
-  }
-  if (options.mediation === "silent") {
-    authURL.searchParams.set("prompt", "silent");
-  }
-  if (nonNullish(options.loginHint)) {
-    authURL.searchParams.set("login_hint", options.loginHint);
-  }
-
-  return authURL;
-};
-
-/**
  * Request JWT through redirect flow in a popup
  * @param config of the OpenID provider
  * @param options for the JWT request

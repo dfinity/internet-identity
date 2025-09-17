@@ -32,6 +32,9 @@
       crypto.subtle.exportKey("jwk", publicKey),
     ]);
 
+    console.log("Priv JWK:", JSON.stringify(privJwk, null, 2));
+    console.log("Pub JWK:", JSON.stringify(pubJwk, null, 2));
+
     sessionStorage.setItem(
       "openid_ii_keypair",
       JSON.stringify({ privateKey: privJwk, publicKey: pubJwk }),
