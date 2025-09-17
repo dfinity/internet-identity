@@ -1071,7 +1071,7 @@ mod openid_api {
         remove_openid_credential, update_openid_credential,
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
-    use crate::openid::{self, OpenIDJWTVerificationError, OpenIdCredentialKey};
+    use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
@@ -1150,25 +1150,30 @@ mod openid_api {
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         let openid_credential =
             openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt)).map_err(
-                |err| match err {
-                    OpenIDJWTVerificationError::GenericError(message) => {
-                        OpenIdDelegationError::GenericOpenIDJWTVerificationError(message)
-                    }
-                    OpenIDJWTVerificationError::JWTExpired => OpenIdDelegationError::JwtExpired,
+                |err| {
+                    ic_cdk::println!("openid::with_provider failed: {err:?}");
+                    OpenIdDelegationError::JwtVerificationFailed
                 },
             )?;
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
-            .ok_or(OpenIdDelegationError::GenericError("AAA".to_string()))?;
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)
+            .map_err(|err| {
+                ic_cdk::println!("lookup_anchor_with_openid_credential error A: {err:?}");
+                err
+            })?;
 
         // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
         let mut anchor = state::anchor(anchor_number);
-        update_openid_credential(&mut anchor, openid_credential.clone())
-            .map_err(|err| OpenIdDelegationError::GenericError(format!("{:?}", err)))?;
-
-        state::storage_borrow_mut(|storage| storage.update(anchor))
-            .map_err(|err| OpenIdDelegationError::GenericError(format!("{:?}", err)))?;
+        update_openid_credential(&mut anchor, openid_credential.clone()).map_err(|err| {
+            ic_cdk::println!("update_openid_credential failed: {err:?}");
+            OpenIdDelegationError::NoSuchAnchor
+        })?;
+        state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+            ic_cdk::println!("state::storage_borrow_mut error: {err:?}");
+            OpenIdDelegationError::NoSuchAnchor
+        })?;
 
         let (user_key, expiration) = openid_credential
             .prepare_jwt_delegation(session_key, anchor_number)
@@ -1176,10 +1181,15 @@ mod openid_api {
 
         // Checking again because the association could've changed during the .await
         let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
-            .ok_or(OpenIdDelegationError::GenericError("BBB".to_string()))?;
+            .ok_or(OpenIdDelegationError::NoSuchAnchor)
+            .map_err(|err| {
+                ic_cdk::println!("lookup_anchor_with_openid_credential error B: {err:?}");
+                err
+            })?;
 
         if anchor_number != still_anchor_number {
-            return Err(OpenIdDelegationError::GenericError("CCC".to_string()));
+            ic_cdk::println!("anchor_number != still_anchor_number");
+            return Err(OpenIdDelegationError::NoSuchAnchor);
         }
 
         Ok(OpenIdPrepareDelegationResponse {

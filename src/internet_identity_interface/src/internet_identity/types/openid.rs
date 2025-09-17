@@ -46,8 +46,6 @@ pub enum OpenIdDelegationError {
     NoSuchDelegation,
     JwtVerificationFailed,
     JwtExpired,
-    GenericOpenIDJWTVerificationError(String),
-    GenericError(String),
 }
 
 pub type OpenIdCredentialKey = (Iss, Sub);
