@@ -57,17 +57,20 @@
       ["sign"],
     );
 
-    const publicKey = await crypto.subtle
-      .exportKey("jwk", privateKey)
-      .then((jwk) =>
-        crypto.subtle.importKey(
-          "jwk",
-          { ...jwk, key_ops: ["verify"] },
-          { name: "ECDSA", namedCurve: "P-256" },
-          true,
-          ["verify"],
-        ),
-      );
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      {
+        crv: pubJwk.crv,
+        ext: true,
+        key_ops: ["verify"],
+        kty: "EC",
+        x: pubJwk.x!,
+        y: pubJwk.y!,
+      },
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["verify"],
+    );
 
     console.log(
       "🔑 WebCrypto Public Key (DER hex):",
