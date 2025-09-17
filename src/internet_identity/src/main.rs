@@ -1071,7 +1071,7 @@ mod openid_api {
         remove_openid_credential, update_openid_credential,
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
-    use crate::openid::{self, OpenIdCredentialKey};
+    use crate::openid::{self, OpenIDJWTVerificationError, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
         state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
@@ -1149,8 +1149,14 @@ mod openid_api {
         session_key: SessionKey,
     ) -> Result<OpenIdPrepareDelegationResponse, OpenIdDelegationError> {
         let openid_credential =
-            openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
-                .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
+            openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt)).map_err(
+                |err| match err {
+                    OpenIDJWTVerificationError::GenericError(message) => {
+                        OpenIdDelegationError::GenericOpenIDJWTVerificationError(message)
+                    }
+                    OpenIDJWTVerificationError::JWTExpired => OpenIdDelegationError::JwtExpired,
+                },
+            )?;
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
             .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
@@ -1159,9 +1165,10 @@ mod openid_api {
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
         let mut anchor = state::anchor(anchor_number);
         update_openid_credential(&mut anchor, openid_credential.clone())
-            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            .map_err(|err| OpenIdDelegationError::GenericError(format!("{:?}", err)))?;
+
         state::storage_borrow_mut(|storage| storage.update(anchor))
-            .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
+            .map_err(|err| OpenIdDelegationError::GenericError(format!("{:?}", err)))?;
 
         let (user_key, expiration) = openid_credential
             .prepare_jwt_delegation(session_key, anchor_number)
