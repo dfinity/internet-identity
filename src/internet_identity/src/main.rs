@@ -1159,7 +1159,7 @@ mod openid_api {
             )?;
 
         let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            .ok_or(OpenIdDelegationError::GenericError("AAA".to_string()))?;
 
         // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
@@ -1176,10 +1176,10 @@ mod openid_api {
 
         // Checking again because the association could've changed during the .await
         let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+            .ok_or(OpenIdDelegationError::GenericError("BBB".to_string()))?;
 
         if anchor_number != still_anchor_number {
-            return Err(OpenIdDelegationError::NoSuchAnchor);
+            return Err(OpenIdDelegationError::GenericError("CCC".to_string()));
         }
 
         Ok(OpenIdPrepareDelegationResponse {
