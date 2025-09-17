@@ -380,19 +380,16 @@ fn sample_persistent_state() -> PersistentState {
 #[cfg(test)]
 mod application_lookup_tests {
     use super::*;
-    use crate::storage::storable::application::{StorableOriginHash, StorableOriginSha256};
+    use crate::storage::storable::application::StorableOriginSha256;
     use ic_stable_structures::VectorMemory;
-    use std::collections::HashMap;
 
     #[track_caller]
     fn assert_application_lookup<M: Memory + Clone>(
         storage: &Storage<M>,
         origin: &str,
         expected_new: Option<u64>,
-        expected_old: Option<u64>,
     ) {
         let origin = origin.to_string();
-        let origin_hash = StorableOriginHash::from_origin(&origin);
         let origin_sha256 = StorableOriginSha256::from_origin(&origin);
 
         assert_eq!(
@@ -409,14 +406,6 @@ mod application_lookup_tests {
             "Unexpected lookup_application_with_origin_memory entry for key {}",
             origin_sha256
         );
-        assert_eq!(
-            storage
-                .lookup_application_with_origin_memory_old
-                .get(&origin_hash),
-            expected_old,
-            "Unexpected lookup_application_with_origin_memory_old entry for key {}",
-            origin_hash
-        );
     }
 
     #[test]
@@ -430,7 +419,7 @@ mod application_lookup_tests {
         assert_eq!(app_number, 0);
 
         // Should exist in both old and new lookup maps
-        assert_application_lookup(&storage, &origin, Some(0), Some(0));
+        assert_application_lookup(&storage, &origin, Some(0));
 
         // Should exist in applications storage
         let stored_app = storage.stable_application_memory.get(&0);
@@ -473,101 +462,15 @@ mod application_lookup_tests {
         assert_eq!(app_num3, 2);
 
         // All should be present in both lookup maps
-        assert_application_lookup(&storage, &origin1, Some(0), Some(0));
-        assert_application_lookup(&storage, &origin2, Some(1), Some(1));
-        assert_application_lookup(&storage, &origin3, Some(2), Some(2));
-    }
-
-    #[test]
-    fn should_handle_collision_prone_origins_with_sha256() {
-        let mut storage = Storage::new((10, 20), VectorMemory::default());
-
-        // These origins have hash prefix collisions with 8-byte hash but not with full SHA-256.
-        // Example taken from https://github.com/yugt/sha256-prefix-collision
-        let origin0 = "08RTz8".to_string();
-        let origin1 = "4iRDWF".to_string();
-
-        // Smoke test: these are indeed distinct origins.
-        assert_ne!(origin0, origin1);
-        // However, the SHA256 prefix is the same.
-        assert_eq!(
-            StorableOriginHash::from_origin(&origin0),
-            StorableOriginHash::from_origin(&origin1)
-        );
-        // But the entire SHA256 sum is different.
-        assert_ne!(
-            StorableOriginSha256::from_origin(&origin0),
-            StorableOriginSha256::from_origin(&origin1)
-        );
-
-        assert_application_lookup(&storage, &origin1, None, None);
-        assert_application_lookup(&storage, &origin0, None, None);
-
-        // Test what happens if we insert both origins
-        let app_num0 = storage.lookup_or_insert_application_number_with_origin(&origin0);
-
-        assert_application_lookup(&storage, &origin1, None, Some(0));
-        assert_application_lookup(&storage, &origin0, Some(0), Some(0));
-
-        let app_num1 = storage.lookup_or_insert_application_number_with_origin(&origin1);
-
-        // Should get the different application numbers, as we prevented the collision by using
-        // the full SHA-256, not just a 8-byte prefix thereof.
-        assert_eq!(app_num0, 0);
-        assert_eq!(app_num1, 1);
-
-        // Both should be stored correctly in new SHA-256 map, but the collision in the old map
-        // would cause the application to be overwritten (hence we expect app ID 1 for origin0).
-        assert_application_lookup(&storage, &origin1, Some(1), Some(1));
-        assert_application_lookup(&storage, &origin0, Some(0), Some(1));
-
-        // Applications should be stored with correct origins
-        let stored_app0 = storage.stable_application_memory.get(&app_num0).unwrap();
-        let stored_app1 = storage.stable_application_memory.get(&app_num1).unwrap();
-        assert_eq!(stored_app0.origin, origin0);
-        assert_eq!(stored_app1.origin, origin1);
-    }
-
-    #[test]
-    fn should_maintain_dual_lookup_consistency() {
-        let mut storage = Storage::new((10, 20), VectorMemory::default());
-        let origins = [
-            "https://app1.com".to_string(),
-            "https://app2.org".to_string(),
-            "https://app3.net".to_string(),
-            "https://app4.io".to_string(),
-            "https://app5.co".to_string(),
-        ];
-
-        // Insert all origins
-        let mut expected_numbers = HashMap::new();
-        for (i, origin) in origins.iter().enumerate() {
-            let app_number = storage.lookup_or_insert_application_number_with_origin(origin);
-            expected_numbers.insert(origin.clone(), app_number);
-            assert_eq!(app_number, i as u64); // Should be sequential
-        }
-
-        // Assert expectations: all origins correspond to an app and are present in both maps.
-        for (origin, expected_number) in &expected_numbers {
-            assert_application_lookup(
-                &storage,
-                origin,
-                Some(*expected_number),
-                Some(*expected_number),
-            );
-            let stored_app = storage
-                .stable_application_memory
-                .get(expected_number)
-                .unwrap();
-            assert_eq!(stored_app.origin, **origin);
-        }
+        assert_application_lookup(&storage, &origin1, Some(0));
+        assert_application_lookup(&storage, &origin2, Some(1));
+        assert_application_lookup(&storage, &origin3, Some(2));
     }
 
     #[test]
     fn new_storage_should_have_empty_maps() {
         let storage = Storage::new((10, 20), VectorMemory::default());
         assert_eq!(storage.lookup_application_with_origin_memory.len(), 0);
-        assert_eq!(storage.lookup_application_with_origin_memory_old.len(), 0);
     }
 
     #[test]
@@ -580,7 +483,7 @@ mod application_lookup_tests {
         assert_eq!(app_number, 0);
 
         // Should be findable in both maps
-        assert_application_lookup(&storage, &long_origin, Some(0), Some(0));
+        assert_application_lookup(&storage, &long_origin, Some(0));
 
         // Application should be stored with full origin
         let stored_app = storage.stable_application_memory.get(&0).unwrap();
@@ -628,7 +531,7 @@ mod application_lookup_tests {
         );
 
         // Should find it in both maps
-        assert_application_lookup(&storage, &origin, Some(0), Some(0));
+        assert_application_lookup(&storage, &origin, Some(0));
 
         // Application should still exist in storage
         let stored_app = storage.stable_application_memory.get(&0);

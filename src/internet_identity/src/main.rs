@@ -39,7 +39,6 @@ mod conversions;
 mod delegation;
 mod http;
 mod ii_domain;
-mod migrations;
 mod openid;
 mod state;
 mod stats;
@@ -537,11 +536,6 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::load_persistent_state();
 
     initialize(maybe_arg);
-
-    // TODO[ID-353]: Remove the data migration.
-    state::storage_borrow_mut(|storage| {
-        storage.maybe_apply_lookup_application_with_origin_map_data_migration();
-    });
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {

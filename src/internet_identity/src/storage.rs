@@ -122,7 +122,7 @@ use crate::storage::storable::application_number::StorableApplicationNumber;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
-use storable::application::{StorableApplication, StorableOriginHash};
+use storable::application::StorableApplication;
 use storable::credential_id::StorableCredentialId;
 use storable::discrepancy_counter::{DiscrepancyType, StorableDiscrepancyCounter};
 use storable::fixed_anchor::StorableFixedAnchor;
@@ -161,11 +161,11 @@ const REGISTRATION_CURRENT_RATE_MEMORY_INDEX: u8 = 6u8;
 // These memory indexes have been abandoned, do not use them
 // const DEPRECATED_STABLE_ANCHOR_MEMORY_INDEX: u8 = 7u8;
 // const DEPRECATED_LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 8u8;
+// const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX_OLD: u8 = 12u8;
+
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX: u8 = 9u8;
 const STABLE_ACCOUNT_MEMORY_INDEX: u8 = 10u8;
 const STABLE_APPLICATION_MEMORY_INDEX: u8 = 11u8;
-// TODO[ID-354]: Abandon this after the production data is migrated to the new map.
-const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX_OLD: u8 = 12u8;
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX: u8 = 13u8;
 const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 14u8;
 const STABLE_ACCOUNT_COUNTER_MEMORY_INDEX: u8 = 15u8;
@@ -199,9 +199,6 @@ const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
 const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX);
 
-// TODO[ID-354]: Remove this after the production data is migrated to the new map.
-const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID_OLD: MemoryId =
-    MemoryId::new(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX_OLD);
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX);
 
@@ -300,10 +297,6 @@ pub struct Storage<M: Memory> {
 
     lookup_application_with_origin_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
 
-    // This field is deprecated in favor of `lookup_application_with_origin_memory`.
-    // TODO[ID-354]: Remove this after the production data is migrated to the new map.
-    pub(crate) lookup_application_with_origin_memory_old:
-        StableBTreeMap<StorableOriginHash, StorableApplicationNumber, ManagedMemory<M>>,
     pub(crate) lookup_application_with_origin_memory:
         StableBTreeMap<StorableOriginSha256, StorableApplicationNumber, ManagedMemory<M>>,
 }
@@ -381,14 +374,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
         let lookup_anchor_with_device_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID);
-
-        // TODO[ID-354]: Remove this after the production data is migrated to the new map.
-        let lookup_application_with_origin_memory_old =
-            memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID_OLD);
-
         let lookup_application_with_origin_memory =
             memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID);
-
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
                 .expect("failed to initialize registration reference rate min heap"),
@@ -465,10 +452,6 @@ impl<M: Memory + Clone> Storage<M> {
 
             lookup_application_with_origin_memory_wrapper: MemoryWrapper::new(
                 lookup_application_with_origin_memory.clone(),
-            ),
-            // TODO[ID-354]: Remove this after the production data is migrated to the new map.
-            lookup_application_with_origin_memory_old: StableBTreeMap::init(
-                lookup_application_with_origin_memory_old,
             ),
             lookup_application_with_origin_memory: StableBTreeMap::init(
                 lookup_application_with_origin_memory,
@@ -733,7 +716,6 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         origin: &FrontendHostname,
     ) -> ApplicationNumber {
-        let origin_hash = StorableOriginHash::from_origin(origin);
         let origin_sha256 = StorableOriginSha256::from_origin(origin);
 
         if let Some(existing_number) = self
@@ -743,11 +725,6 @@ impl<M: Memory + Clone> Storage<M> {
             existing_number
         } else {
             let new_number: ApplicationNumber = self.lookup_application_with_origin_memory.len();
-
-            // Update the old map (will eventually be removed).
-            // TODO[ID_353]: Remove this line.
-            self.lookup_application_with_origin_memory_old
-                .insert(origin_hash, new_number);
 
             // Update the source of truth.
             self.lookup_application_with_origin_memory
