@@ -173,7 +173,7 @@ describe("findWebAuthnFlows", () => {
           { useIframe: false, rpId: undefined },
           { useIframe: true, rpId: nonCurrentOrigin1RpId },
           { useIframe: true, rpId: newOriginRpId },
-        ]
+        ],
       },
       {
         label: "newOrigin first, 1st currentOrigin after nonCurrentOrigin1",
@@ -187,7 +187,7 @@ describe("findWebAuthnFlows", () => {
           { useIframe: true, rpId: nonCurrentOrigin1RpId },
           { useIframe: false, rpId: undefined },
           { useIframe: true, rpId: newOriginRpId },
-        ]
+        ],
       },
       {
         label: "newOrigin last, 1st currentOrigin after nonCurrentOrigin1",
@@ -201,7 +201,7 @@ describe("findWebAuthnFlows", () => {
           { useIframe: true, rpId: nonCurrentOrigin1RpId },
           { useIframe: false, rpId: undefined },
           { useIframe: true, rpId: newOriginRpId },
-        ]
+        ],
       },
       {
         label: "triplicate currentOrigin",
@@ -216,15 +216,11 @@ describe("findWebAuthnFlows", () => {
           { useIframe: false, rpId: undefined },
           { useIframe: true, rpId: nonCurrentOrigin1RpId },
           { useIframe: true, rpId: newOriginRpId },
-        ]
+        ],
       },
     ];
 
-    for (const {
-      label,
-      devices,
-      expectedOrder
-    } of test_cases) {
+    for (const { label, devices, expectedOrder } of test_cases) {
       const result = findWebAuthnFlows({
         supportsRor: true, // irrelevant for this test
         devices,
