@@ -159,25 +159,80 @@ describe("findWebAuthnFlows", () => {
     ]);
   });
 
-  it("pushes RP IDs from new_flow_origins to the end while preserving relative order", () => {
-    const result = findWebAuthnFlows({
-      supportsRor: true,
-      devices: [
-        createMockCredential(newOrigin),
-        createMockCredential(currentOrigin),
-        createMockCredential(nonCurrentOrigin1),
-        createMockCredential(currentOrigin),
-      ],
-      currentOrigin,
-      relatedOrigins: [currentOrigin, nonCurrentOrigin1, newOrigin],
-    });
+  it("pushes RP IDs from new_flow_origins to the end while preserving relative order for some permutations", () => {
+    const test_cases = [
+      {
+        label: "newOrigin first, 1st currentOrigin before nonCurrentOrigin1",
+        devices: [
+          createMockCredential(newOrigin),
+          createMockCredential(currentOrigin),
+          createMockCredential(nonCurrentOrigin1),
+          createMockCredential(currentOrigin),
+        ],
+        expectedOrder: [
+          { useIframe: false, rpId: undefined },
+          { useIframe: true, rpId: nonCurrentOrigin1RpId },
+          { useIframe: true, rpId: newOriginRpId },
+        ]
+      },
+      {
+        label: "newOrigin first, 1st currentOrigin after nonCurrentOrigin1",
+        devices: [
+          createMockCredential(newOrigin),
+          createMockCredential(nonCurrentOrigin1),
+          createMockCredential(currentOrigin),
+          createMockCredential(currentOrigin),
+        ],
+        expectedOrder: [
+          { useIframe: true, rpId: nonCurrentOrigin1RpId },
+          { useIframe: false, rpId: undefined },
+          { useIframe: true, rpId: newOriginRpId },
+        ]
+      },
+      {
+        label: "newOrigin last, 1st currentOrigin after nonCurrentOrigin1",
+        devices: [
+          createMockCredential(nonCurrentOrigin1),
+          createMockCredential(currentOrigin),
+          createMockCredential(currentOrigin),
+          createMockCredential(newOrigin),
+        ],
+        expectedOrder: [
+          { useIframe: true, rpId: nonCurrentOrigin1RpId },
+          { useIframe: false, rpId: undefined },
+          { useIframe: true, rpId: newOriginRpId },
+        ]
+      },
+      {
+        label: "triplicate currentOrigin",
+        devices: [
+          createMockCredential(newOrigin),
+          createMockCredential(currentOrigin),
+          createMockCredential(nonCurrentOrigin1),
+          createMockCredential(currentOrigin),
+          createMockCredential(currentOrigin),
+        ],
+        expectedOrder: [
+          { useIframe: false, rpId: undefined },
+          { useIframe: true, rpId: nonCurrentOrigin1RpId },
+          { useIframe: true, rpId: newOriginRpId },
+        ]
+      },
+    ];
 
-    // Expect that the RP ID corresponding to newOrigin (in new_flow_origins)
-    // is moved after the ones not in new_flow_origins
-    expect(result).toEqual([
-      { useIframe: false, rpId: undefined },
-      { useIframe: true, rpId: nonCurrentOrigin1RpId },
-      { useIframe: true, rpId: newOriginRpId },
-    ]);
+    for (const {
+      label,
+      devices,
+      expectedOrder
+    } of test_cases) {
+      const result = findWebAuthnFlows({
+        supportsRor: true, // irrelevant for this test
+        devices,
+        currentOrigin,
+        relatedOrigins: [currentOrigin, nonCurrentOrigin1, newOrigin],
+      });
+
+      expect(result, label).toEqual(expectedOrder);
+    }
   });
 });
