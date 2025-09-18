@@ -2,7 +2,11 @@ import {
   AuthenticationV2Events,
   authenticationV2Funnel,
 } from "$lib/utils/analytics/authenticationV2Funnel";
+import { Actor, HttpAgent } from "@dfinity/agent";
+import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
+  authenticateRedirectCallbackWithJWT,
   authenticateWithJWT,
   authenticateWithPasskey,
   authenticateWithSession,
@@ -39,6 +43,11 @@ import {
   extractIssuerTemplateClaims,
   requestWithFullRedirect,
 } from "$lib/utils/openID";
+import {
+  DelegationChain,
+  DelegationIdentity,
+  ECDSAKeyIdentity,
+} from "@dfinity/identity";
 
 export class AuthFlow {
   #view = $state<
@@ -328,16 +337,85 @@ export class AuthFlow {
       configURL: config.fedcm_uri?.[0],
     };
 
-    authenticationV2Funnel.addProperties({ provider: config.name });
-
-    this.#systemOverlay = true;
-    authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
-
     // This navigates away, so the promise never resolves
     return requestWithFullRedirect(requestConfig, {
       nonce: get(sessionStore).nonce,
       mediation: "required",
     });
+  };
+
+  completeOpenIdFullRedirect = async (
+    config: OpenIdConfig,
+    jwt: string,
+    salt: Uint8Array,
+    intermediateIdentity: ECDSAKeyIdentity,
+    appIdentity: ECDSAKeyIdentity,
+  ): Promise<
+    | {
+        identityNumber: bigint;
+        type: "signIn";
+      }
+    | {
+        name?: string;
+        type: "signUp";
+      }
+  > => {
+    try {
+      console.log("test");
+      const { iss, sub, loginHint } = decodeJWT(jwt);
+      const { identity, identityNumber } =
+        await authenticateRedirectCallbackWithJWT({
+          canisterId,
+          jwt,
+          salt,
+          intermediateIdentity,
+          appIdentity,
+        });
+
+      await authenticationStore.set({
+        identity,
+        identityNumber,
+      });
+      const agent = new HttpAgent({ identity: intermediateIdentity });
+      if (import.meta.env.DEV) await agent.fetchRootKey();
+
+      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+        agent,
+        canisterId,
+      });
+
+      const info = await actor.get_anchor_info(identityNumber);
+      const authnMethod = info.openid_credentials[0]?.find(
+        (method) => method.iss === iss,
+      );
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: {
+          openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
+        },
+      });
+      return { identityNumber, type: "signIn" };
+    } catch (error) {
+      console.log("test error:", error);
+      if (
+        isCanisterError<OpenIdDelegationError>(error) &&
+        error.type === "NoSuchAnchor" &&
+        nonNullish(jwt)
+      ) {
+        this.#jwt = jwt;
+        this.#configIssuer = config.issuer;
+        const { name } = decodeJWT(jwt);
+        console.log(name);
+        if (isNullish(name)) {
+          // Show enter name screen to complete registration,
+          console.log("setupNewIdentity");
+          this.#view = "setupNewIdentity";
+        }
+        return { name, type: "signUp" };
+      }
+      throw error;
+    }
   };
 
   completeOpenIdRegistration = async (name: string): Promise<bigint> => {
@@ -347,6 +425,27 @@ export class AuthFlow {
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
     await this.#startRegistration();
     return this.#registerWithOpenId(this.#jwt, name, this.#configIssuer);
+  };
+
+  completeRedirectOpenIdRegistration = async (
+    interemediateIdentity: ECDSAKeyIdentity,
+    name: string,
+    salt: Uint8Array,
+    appIdentity: ECDSAKeyIdentity,
+  ): Promise<{ identity: DelegationIdentity; identityNumber: bigint }> => {
+    if (isNullish(this.#jwt) || isNullish(this.#configIssuer)) {
+      throw new Error("JWT or config issuer is missing");
+    }
+    await this.#startRedirectRegistration(interemediateIdentity);
+    console.log("registerRedirectWithOpenId");
+    return this.#registerRedirectWithOpenId(
+      interemediateIdentity,
+      this.#jwt,
+      name,
+      this.#configIssuer,
+      salt,
+      appIdentity,
+    );
   };
 
   #solveCaptcha = (image: string, attempt = 0): Promise<void> =>
@@ -543,6 +642,179 @@ export class AuthFlow {
             `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
           );
           return this.#registerWithOpenId(jwt, name, configIssuer);
+        }
+      }
+      throw error;
+    }
+  };
+
+  #solveRedirectCaptcha = (
+    intermediateIdentity: ECDSAKeyIdentity,
+    image: string,
+    attempt = 0,
+  ): Promise<void> =>
+    new Promise((resolve, reject) => {
+      this.#captcha = {
+        image,
+        attempt,
+        solve: async (solution) => {
+          try {
+            const agent = new HttpAgent({ identity: intermediateIdentity });
+            if (import.meta.env.DEV) await agent.fetchRootKey();
+
+            const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+              agent,
+              canisterId,
+            });
+
+            console.log(solution);
+
+            await actor.check_captcha({ solution }).then(throwCanisterError);
+            resolve();
+          } catch (error) {
+            console.log(error);
+            if (
+              isCanisterError<CheckCaptchaError>(error) &&
+              error.type === "WrongSolution"
+            ) {
+              const nextImage = `data:image/png;base64,${error.value(error.type).new_captcha_png_base64}`;
+              this.#solveRedirectCaptcha(
+                intermediateIdentity,
+                nextImage,
+                attempt + 1,
+              )
+                .then(resolve)
+                .catch(reject);
+              return;
+            }
+            reject(error);
+          }
+        },
+      };
+    });
+
+  #startRedirectRegistration = async (
+    intermediateIdentity: ECDSAKeyIdentity,
+  ): Promise<void> => {
+    try {
+      const agent = new HttpAgent({ identity: intermediateIdentity });
+      if (import.meta.env.DEV) await agent.fetchRootKey();
+
+      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+        agent,
+        canisterId,
+      });
+
+      console.log("test4");
+      const { next_step } = await actor
+        .identity_registration_start()
+        .then(throwCanisterError);
+      console.log(next_step);
+      if ("CheckCaptcha" in next_step) {
+        await this.#solveRedirectCaptcha(
+          intermediateIdentity,
+          `data:image/png;base64,${next_step.CheckCaptcha.captcha_png_base64}`,
+        );
+      }
+    } catch (error) {
+      if (
+        isCanisterError<IdRegStartError>(error) &&
+        error.type === "AlreadyInProgress"
+      ) {
+        // Ignore since it means we can continue with an existing registration
+        return;
+      }
+      throw error;
+    }
+  };
+  #registerRedirectWithOpenId = async (
+    intermediateIdentity: ECDSAKeyIdentity,
+    jwt: string,
+    name: string,
+    configIssuer: string,
+    salt: Uint8Array,
+    appIdentity: ECDSAKeyIdentity,
+  ): Promise<{ identity: DelegationIdentity; identityNumber: bigint }> => {
+    try {
+      const agent = new HttpAgent({ identity: intermediateIdentity });
+      if (import.meta.env.DEV) await agent.fetchRootKey();
+
+      const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+        agent,
+        canisterId,
+      });
+
+      await actor
+        .openid_identity_registration_finish({
+          jwt,
+          salt,
+          name,
+        })
+        .then(throwCanisterError);
+      const {
+        iss,
+        sub,
+        loginHint,
+        name: jwtName,
+        email,
+        ...restJWTClaims
+      } = decodeJWT(jwt);
+      console.log("test9");
+      const { identity, identityNumber } =
+        await authenticateRedirectCallbackWithJWT({
+          canisterId,
+          jwt,
+          salt,
+          intermediateIdentity,
+          appIdentity,
+        });
+      console.log("test10");
+      // await authenticationStore.set({ identity, identityNumber });
+      const metadata: MetadataMapV2 = [];
+      if (nonNullish(jwtName)) {
+        metadata.push(["name", { String: jwtName }]);
+      }
+      if (nonNullish(email)) {
+        metadata.push(["email", { String: email }]);
+      }
+      const claimKeys = extractIssuerTemplateClaims(configIssuer);
+      if (nonNullish(claimKeys)) {
+        claimKeys.forEach((key) => {
+          if (nonNullish(restJWTClaims[key])) {
+            metadata.push([
+              key,
+              {
+                String: restJWTClaims[key],
+              },
+            ]);
+          }
+        });
+      }
+      // lastUsedIdentitiesStore.addLastUsedIdentity({
+      //   identityNumber,
+      //   name,
+      //   authMethod: { openid: { iss, sub, loginHint, metadata } },
+      // });
+      this.#captcha = undefined;
+      return { identity, identityNumber };
+    } catch (error) {
+      if (
+        isCanisterError<IdRegFinishError>(error) &&
+        error.type === "UnexpectedCall"
+      ) {
+        const nextStep = error.value(error.type).next_step;
+        if ("CheckCaptcha" in nextStep) {
+          await this.#solveCaptcha(
+            `data:image/png;base64,${nextStep.CheckCaptcha.captcha_png_base64}`,
+          );
+          return this.#registerRedirectWithOpenId(
+            intermediateIdentity,
+            jwt,
+            name,
+            configIssuer,
+            salt,
+            appIdentity,
+          );
         }
       }
       throw error;

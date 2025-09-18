@@ -20,26 +20,27 @@
 
   const startRedirect = async () => {
     if (!authMethod) return;
+    if (!appKeypair) return;
 
     const authFlow = new AuthFlow();
     const session = get(sessionStore);
-    const { privateKey, publicKey } = (
-      session.identity as ECDSAKeyIdentity
-    ).getKeyPair();
 
-    const [privJwk, pubJwk] = await Promise.all([
-      crypto.subtle.exportKey("jwk", privateKey),
-      crypto.subtle.exportKey("jwk", publicKey),
-    ]);
+    const exportECDSAIdentityAsJWK = async (identity: ECDSAKeyIdentity) => {
+      const keypair = identity.getKeyPair();
+      const privateKey = await crypto.subtle.exportKey(
+        "jwk",
+        keypair.privateKey,
+      );
+      const publicKey = await crypto.subtle.exportKey("jwk", keypair.publicKey);
+      return { privateKey, publicKey };
+    };
 
-    console.log("Priv JWK:", JSON.stringify(privJwk, null, 2));
-    console.log("Pub JWK:", JSON.stringify(pubJwk, null, 2));
-
-    sessionStorage.setItem(
-      "openid_ii_keypair",
-      JSON.stringify({ privateKey: privJwk, publicKey: pubJwk }),
+    const jwkPair = await exportECDSAIdentityAsJWK(
+      session.identity as ECDSAKeyIdentity,
     );
+    sessionStorage.setItem("openid_ii_keypair", JSON.stringify(jwkPair));
 
+    sessionStorage.setItem("openid_auth_method", JSON.stringify(authMethod));
     sessionStorage.setItem(
       "openid_salt",
       Buffer.from(session.salt).toString("base64"),
@@ -47,10 +48,8 @@
     sessionStorage.setItem("openid_nonce", session.nonce);
     sessionStorage.setItem("openid_redirect_uri", redirectUri ?? "");
     sessionStorage.setItem("openid_derivation_origin", derivationOrigin ?? "");
-    sessionStorage.setItem(
-      "openid_app_keypair",
-      JSON.stringify(appKeypair ?? {}),
-    );
+
+    sessionStorage.setItem("openid_app_keypair", appKeypair);
     sessionStorage.setItem(
       "openid_max_time_to_live",
       maxTimeToLive?.toString() ?? "",
