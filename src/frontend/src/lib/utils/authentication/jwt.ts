@@ -8,6 +8,7 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 import {
+  Delegation,
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
@@ -120,23 +121,125 @@ export const authenticateRedirectCallbackWithJWT = async ({
 
   console.log("🔗 Delegation chain built", chain);
 
-  // Final identity with full chain
-  const identity = DelegationIdentity.fromDelegation(appIdentity, chain);
+  // First: use II's chain to delegate to intermediateIdentity
+  const intermediateDelegationIdentity = DelegationIdentity.fromDelegation(
+    intermediateIdentity,
+    chain,
+  );
 
-  const agent2 = await HttpAgent.create({
-    host: "http://127.0.0.1:4943",
+  const value = intermediateDelegationIdentity.getPrincipal();
+
+  value.toString();
+  await testIdentity(
+    "http://127.0.0.1:4943",
+    "u6s2n-gx777-77774-qaaba-cai",
+    "whoami",
+    intermediateDelegationIdentity,
+  );
+
+  await testIdentity(
+    "http://127.0.0.1:4943",
+    "u6s2n-gx777-77774-qaaba-cai",
+    "whoami",
+  );
+
+  chain.delegations.forEach((d, i) => {
+    console.log(`🔗 Chain level ${i}:`, {
+      pubkey: Buffer.from(d.delegation.pubkey).toString("hex"),
+      expiration: d.delegation.expiration.toString(),
+    });
+  });
+  console.log(
+    "➕ Adding delegation to:",
+    Buffer.from(appIdentity.getPublicKey().toDer()).toString("hex"),
+  );
+
+  const newExpiration = BigInt(Date.now() + 60 * 60 * 1000) * BigInt(1_000_000); // 1 hour
+  const finalDelegation = new Delegation(
+    appIdentity.getPublicKey().toDer(),
+    newExpiration,
+  );
+
+  const signedFinalDelegation = await intermediateIdentity.sign(
+    finalDelegation.toCBOR(),
+  );
+
+  const signedDelegation2 = {
+    delegation: finalDelegation,
+    signature: signedFinalDelegation,
+  };
+
+  const extendedChain = DelegationChain.fromDelegations(
+    [...chain.delegations, signedDelegation2],
+    chain.publicKey,
+  );
+
+  const identity = DelegationIdentity.fromDelegation(
+    appIdentity,
+    extendedChain,
+  );
+
+  console.log(
+    "🗝️ Root public key (chain):",
+    Buffer.from(chain.publicKey).toString("hex"),
+  );
+
+  console.log(
+    "🧑 Intermediate principal:",
+    intermediateDelegationIdentity.getPrincipal().toText(),
+  );
+  console.log("📱 App principal:", identity.getPrincipal().toText());
+  console.log(
+    "🧾 Delegation chain JSON:",
+    JSON.stringify(identity.getDelegation()?.toJSON(), null, 2),
+  );
+
+  // run tests again
+
+  value.toString();
+  await testIdentity(
+    "http://127.0.0.1:4943",
+    "u6s2n-gx777-77774-qaaba-cai",
+    "whoami",
     identity,
-  });
-  await agent2.fetchRootKey();
+  );
 
-  const arg = IDL.encode([], []);
-  // call your backend canister
-  const result = await agent2.query("umunu-kh777-77774-qaaca-cai", {
-    methodName: "whoami",
-    arg,
-  });
-
-  console.log("Backend whoami:", result.toString());
+  await testIdentity(
+    "http://127.0.0.1:4943",
+    "u6s2n-gx777-77774-qaaba-cai",
+    "whoami",
+  );
 
   return { identity, identityNumber };
+};
+
+export const testIdentity = async (
+  host: string,
+  canisterId: string,
+  methodName: string,
+  identity?: DelegationIdentity,
+) => {
+  try {
+    const agent2 = await HttpAgent.create({
+      host,
+      identity,
+    });
+    await agent2.fetchRootKey();
+
+    const arg = IDL.encode([], []);
+    const result = await agent2.query(canisterId, {
+      methodName,
+      arg,
+    });
+
+    console.log(
+      "Backend whoami:",
+      JSON.stringify(result, (_, v) =>
+        typeof v === "bigint" ? v.toString() : v,
+      ),
+    );
+  } catch (err) {
+    console.error("❌ testIdentity failed:", err);
+    throw err;
+  }
 };
