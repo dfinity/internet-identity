@@ -15,6 +15,7 @@ import {
 import { Session } from "$lib/stores/session.store";
 import { restoreECDSAIdentity } from "../restoreECDSAIdentity";
 import { decodeJWT } from "../openID";
+import { IDL } from "@dfinity/candid";
 
 export const authenticateWithJWT = async ({
   canisterId,
@@ -121,6 +122,21 @@ export const authenticateRedirectCallbackWithJWT = async ({
 
   // Final identity with full chain
   const identity = DelegationIdentity.fromDelegation(appIdentity, chain);
+
+  const agent2 = await HttpAgent.create({
+    host: "http://127.0.0.1:4943",
+    identity,
+  });
+  await agent2.fetchRootKey();
+
+  const arg = IDL.encode([], []);
+  // call your backend canister
+  const result = await agent2.query("umunu-kh777-77774-qaaca-cai", {
+    methodName: "whoami",
+    arg,
+  });
+
+  console.log("Backend whoami:", result.toString());
 
   return { identity, identityNumber };
 };
