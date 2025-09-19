@@ -372,7 +372,6 @@ dry_run_proposal() {
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
     --arg arg.bin \
     --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum | cut -f1 -d' ')" \
-    --use-explicit-action-type \
     --dry-run \
     --summary-file ./proposal.md \
     --proposal-title "Upgrade Internet Identity Canister to $(git rev-parse --short HEAD)"
@@ -397,7 +396,6 @@ make_proposal() {
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
     --arg arg.bin \
     --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum | cut -f1 -d' ')" \
-    --use-explicit-action-type \
     --summary-file ./proposal.md \
     --proposal-title "Upgrade Internet Identity Canister to $(git rev-parse --short HEAD)"
 }
