@@ -237,7 +237,13 @@ The Internet Identity frontend will use `event.origin` as the "Frontend URL" to 
 ## Alternative frontend origins
 
 To allow flexibility regarding the canister frontend URL, the client may choose to provide another URL as the `derivationOrigin` (see [Client authentication protocol](#client-authentication-protocol)). This means that Internet Identity will issue the same principals to the frontend (which uses a different origin) as it would if it were using the `derivationOrigin` directly.
+
 This feature works for `canisterId` based URLs and [ICP custom domains](https://internetcomputer.org/docs/current/developer-docs/web-apps/custom-domains/using-custom-domains) (backed by canisters) as `derivationOrigin`.
+
+Glossary:
+
+- Derivation origin: The origin used to create the principal.
+- Alternative origin: An origin that is allowed to use the same principal as the derivation origin.
 
 :::caution
 This feature is intended to allow more flexibility with respect to the origins of a _single_ service. Do _not_ use this feature to allow _third party_ services to use the same principals. Only add origins you fully control to `/.well-known/ii-alternative-origins` and never set origins you do not control as `derivationOrigin`!
@@ -248,6 +254,39 @@ This feature is intended to allow more flexibility with respect to the origins o
 :::
 
 In order for Internet Identity to accept the `derivationOrigin` the origin of the client application must be listed in the JSON object served on the URL `https://<canister_id>.icp0.io/.well-known/ii-alternative-origins` (i.e. the file must be hosted by an ICP canister that must implement the `http_request` query call as specified [here](https://internetcomputer.org/docs/current/references/http-gateway-protocol-spec)).
+
+Internet Identity will fetch the `/.well-known/ii-alternative-origins` file from the derivation origin and check if the alternative origin is listed in the file.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as App Alternative Origin
+    participant IF as II Frontend
+    participant D as App Derivation Origin
+    D->>D: Adds /.well-known/ii-alternative-origins endpoint
+    D->>D: Adds "Alternative Origin" in "ii-alternative-origins" response
+    U->>A: User accesses Alternative Origin
+    U->>A: Clicks to log in with II
+    A->>IF: Opens II in new Tab
+    A->>IF: Sends Derivation Origin
+    IF->>D: Fetches /.well-known/ii-alternative-origins
+    IF->>IF: Checks presence of "Alternative Origin" in response
+    alt is present
+        IF->>U: Request user authentication
+        U->>IF: User authenticates
+        IF->>A: Authentication successful
+    else is NOT present
+        IF->>U: Invalid origin request
+    end
+```
+
+Requirements:
+
+- No more than 10 alternative origins can be listed in the `/.well-known/ii-alternative-origins` file.
+- Derivation Origin must expose the `/.well-known/ii-alternative-origins` file.
+- The `/.well-known/ii-alternative-origins` file must be hosted by an ICP canister that must implement the `http_request` query call.
+- The alternative origins must be present in the file `/.well-known/ii-alternative-origins` of the derivation origin requested.
+- Set desired Derivation Origin when [logging in the user with AuthClient](https://github.com/dfinity/icp-js-core/blob/a6aa6e2eb58cf2cbae92156b957293e40f458323/packages/auth-client/src/index.ts#L132).
 
 ### JSON Schema {#alternative-frontend-origins-schema}
 
