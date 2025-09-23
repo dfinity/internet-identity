@@ -93,20 +93,6 @@ pub struct ChallengeInfo {
 
 pub type ChallengeKey = String;
 
-// The user's attempt
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct ChallengeAttempt {
-    pub chars: String,
-    pub key: ChallengeKey,
-}
-
-// What we send the user
-#[derive(Clone, Debug, CandidType, Deserialize)]
-pub struct Challenge {
-    pub png_base64: String,
-    pub challenge_key: ChallengeKey,
-}
-
 #[derive(Clone, CandidType, Deserialize, Eq, PartialEq, Debug)]
 pub struct PersistentState {
     // Information related to the archive
