@@ -582,6 +582,7 @@ jobs:
     needs: [cached-build, test-app-build]
     strategy:
       matrix:
+        browser: ["chrome", "safari"]
         device: ["desktop", "mobile"]
         shard: ["1_3", "2_3", "3_3"]
       # Make sure that one failing test does not cancel all other matrix jobs
@@ -589,7 +590,7 @@ jobs:
 
     env:
       # Suffix used for tagging artifacts
-      artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
+      artifact_suffix: next-${{ matrix.browser }}-${{ matrix.device }}-${{ matrix.shard }}
       # OpenID configuration for provider in /src/test_openid_provider
       openid_name: Test OpenID
       openid_logo: |
@@ -615,7 +616,12 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install Playwright Browsers
-        run: npx playwright install chromium
+        run: |
+          if [ "${{ matrix.browser }}" = "chrome" ]; then
+            npx playwright install chromium
+          else
+            npx playwright install webkit
+          fi
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
@@ -666,7 +672,7 @@ jobs:
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
 
       - run: |
-          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+          npx playwright test --project ${{ matrix.browser }}-${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
 
       - name: Stop dfx
         if: ${{ always() }}
