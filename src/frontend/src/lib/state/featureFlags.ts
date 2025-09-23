@@ -101,6 +101,11 @@ export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   () => canisterConfig.feature_flag_continue_from_another_device[0],
 );
 
+export const AUTH_FLOW_UPDATES = createFeatureFlagStore(
+  "AUTH_FLOW_UPDATES",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
