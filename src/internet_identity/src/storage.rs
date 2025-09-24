@@ -942,21 +942,26 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         params: CreateAccountParams,
     ) -> Result<Account, StorageError> {
-        check_frontend_length(&params.origin);
-        let anchor_number = params.anchor_number;
-        let origin = &params.origin;
+        let CreateAccountParams {
+            anchor_number,
+            name,
+            origin,
+            is_default,
+        } = params;
+
+        check_frontend_length(&origin);
 
         // Create and store account in stable memory
         let account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
-            name: params.name.clone(),
+            name: name.clone(),
             seed_from_anchor: None,
         };
         self.stable_account_memory
             .insert(account_number, storable_account);
 
         // Update application data
-        let app_num = self.lookup_or_insert_application_number_with_origin(origin);
+        let app_num = self.lookup_or_insert_application_number_with_origin(&origin);
 
         // Update counters with one more account.
         self.update_counters(app_num, anchor_number, AccountType::Account)?;
@@ -1003,8 +1008,8 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(Account::new(
             anchor_number,
             origin.to_string(),
-            Some(params.name),
-            None,
+            Some(name),
+            is_default,
             Some(account_number),
         ))
     }
@@ -1024,7 +1029,7 @@ impl<M: Memory + Clone> Storage<M> {
                 anchor_number,
                 origin.clone(),
                 None,
-                None,
+                true,
                 None,
             )],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
@@ -1032,7 +1037,8 @@ impl<M: Memory + Clone> Storage<M> {
                     anchor_number,
                     origin.clone(),
                     None,
-                    None,
+                    // Only the primary account exists, so it must be the default.
+                    true,
                     None,
                 )],
                 Some(refs) => refs
@@ -1073,7 +1079,7 @@ impl<M: Memory + Clone> Storage<M> {
                         params.anchor_number,
                         params.origin.clone(),
                         None,
-                        None,
+                        true,
                         None,
                     ));
                 }
@@ -1098,7 +1104,7 @@ impl<M: Memory + Clone> Storage<M> {
                             params.anchor_number,
                             params.origin.clone(),
                             None,
-                            None,
+                            true,
                             None,
                         ));
                     }
@@ -1114,7 +1120,7 @@ impl<M: Memory + Clone> Storage<M> {
                                 params.anchor_number,
                                 params.origin.clone(),
                                 None,
-                                None,
+                                true,
                                 acc_ref.account_number,
                                 acc_ref.last_used,
                             )
@@ -1125,7 +1131,7 @@ impl<M: Memory + Clone> Storage<M> {
                         params.anchor_number,
                         params.origin.clone(),
                         None,
-                        None,
+                        true,
                         None,
                     ))
                 }
@@ -1147,7 +1153,8 @@ impl<M: Memory + Clone> Storage<M> {
                             params.anchor_number,
                             params.origin.clone(),
                             Some(storable_account.name.clone()),
-                            None,
+                            // TODO[ID-363]: Read from the storage.
+                            false,
                             Some(account_number),
                             acc_ref.last_used,
                             storable_account.seed_from_anchor,
@@ -1162,21 +1169,44 @@ impl<M: Memory + Clone> Storage<M> {
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
     pub fn update_account(&mut self, params: UpdateAccountParams) -> Result<Account, StorageError> {
-        check_frontend_length(&params.origin);
-        match params.account_number {
+        let UpdateAccountParams {
+            anchor_number,
+            name,
+            origin,
+            account_number,
+            is_default,
+        } = params;
+
+        check_frontend_length(&origin);
+
+        // TODO[ID-363]: Once the default accounts are stored in the storage, we should start using
+        // TODO[ID-363]: the pre-existing value when `is_default` is None.
+        //
+        // TODO[ID-363]: If `is_default` is Some(true), we should unset the respective flag for
+        // TODO[ID-363]: the previous default account AND set the flag for this account.
+        //
+        // TODO[ID-363]: If `is_default` is Some(false), we should return an error if this account
+        // TODO[ID-363]: was the default account before, as we cannot have no default account.
+        // TODO[ID-363]: Otherwise, no changes required for the `is_default` flag of any accounts.
+        let is_default = is_default.unwrap_or(true);
+
+        match account_number {
             Some(account_number) => self.update_existing_account(UpdateExistingAccountParams {
                 account_number,
-                anchor_number: params.anchor_number,
-                name: params.name,
-                origin: params.origin,
+                anchor_number,
+                name,
+                origin,
+                is_default,
             }),
             None => {
                 // Default accounts are not stored by default.
                 // They are created only once they are updated.
                 self.create_default_account(CreateAccountParams {
-                    anchor_number: params.anchor_number,
-                    name: params.name,
-                    origin: params.origin.clone(),
+                    anchor_number,
+                    name,
+                    origin,
+                    // Ensure the first account is set as the default account.
+                    is_default: true,
                 })
             }
         }
@@ -1187,43 +1217,41 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         params: UpdateExistingAccountParams,
     ) -> Result<Account, StorageError> {
+        let UpdateExistingAccountParams {
+            account_number,
+            anchor_number,
+            name,
+            origin,
+            is_default,
+        } = params;
+
         // Check if account reference exists for given anchor number, origin and account number,
         // if the account refence exists for a given anchor, that means the anchor has access.
-        let application_number = self.lookup_application_number_with_origin(&params.origin);
+        let application_number = self.lookup_application_number_with_origin(&origin);
         let account_reference = self
-            .find_account_reference(
-                params.anchor_number,
-                application_number,
-                Some(params.account_number),
-            )
-            .ok_or(StorageError::AccountNotFound {
-                account_number: params.account_number,
-            })?;
+            .find_account_reference(anchor_number, application_number, Some(account_number))
+            .ok_or(StorageError::AccountNotFound { account_number })?;
         // Check if the account reference has an account number,
         // throw error if it doesn't since we only want to update
         // accounts with an account number in this function.
-        let account_number =
-            account_reference
-                .account_number
-                .ok_or(StorageError::AccountNotFound {
-                    account_number: params.account_number,
-                })?;
+        let account_number = account_reference
+            .account_number
+            .ok_or(StorageError::AccountNotFound { account_number })?;
         // Read account from storage
-        let mut storable_account = self.stable_account_memory.get(&account_number).ok_or(
-            StorageError::AccountNotFound {
-                account_number: params.account_number,
-            },
-        )?;
+        let mut storable_account = self
+            .stable_account_memory
+            .get(&account_number)
+            .ok_or(StorageError::AccountNotFound { account_number })?;
         // Update account and write back to storage
-        storable_account.name = params.name;
+        storable_account.name = name;
         self.stable_account_memory
-            .insert(params.account_number, storable_account.clone());
+            .insert(account_number, storable_account.clone());
         // Return updated account
         Ok(Account::new_full(
-            params.anchor_number,
-            params.origin,
+            anchor_number,
+            origin,
             Some(storable_account.name),
-            None,
+            is_default,
             Some(account_number),
             account_reference.last_used,
             storable_account.seed_from_anchor,
@@ -1238,28 +1266,30 @@ impl<M: Memory + Clone> Storage<M> {
         &mut self,
         params: CreateAccountParams,
     ) -> Result<Account, StorageError> {
+        let CreateAccountParams {
+            anchor_number,
+            name,
+            origin,
+            is_default,
+        } = params;
+
         // Create and store the default account.
         let new_account_number = self.allocate_account_number()?;
         let storable_account = StorableAccount {
-            name: params.name.clone(),
+            name: name.clone(),
             // This was a default account which uses the anchor number for the seed.
-            seed_from_anchor: Some(params.anchor_number),
+            seed_from_anchor: Some(anchor_number),
         };
         self.stable_account_memory
             .insert(new_account_number, storable_account.clone());
 
         // Get or create an application number from the account's origin.
-        let application_number =
-            self.lookup_or_insert_application_number_with_origin(&params.origin);
+        let application_number = self.lookup_or_insert_application_number_with_origin(&origin);
         // Update counters with one more account.
-        self.update_counters(
-            application_number,
-            params.anchor_number,
-            AccountType::Account,
-        )?;
+        self.update_counters(application_number, anchor_number, AccountType::Account)?;
 
         // Update the account references list.
-        let account_references_key = (params.anchor_number, application_number);
+        let account_references_key = (anchor_number, application_number);
         match self
             .stable_account_reference_list_memory
             .get(&account_references_key)
@@ -1277,7 +1307,7 @@ impl<M: Memory + Clone> Storage<M> {
                 // One new account reference was created.
                 self.update_counters(
                     application_number,
-                    params.anchor_number,
+                    anchor_number,
                     AccountType::AccountReference,
                 )?;
             }
@@ -1297,8 +1327,8 @@ impl<M: Memory + Clone> Storage<M> {
                 // This could happen if the account was removed and now we try to update it.
                 if !found_and_updated {
                     return Err(StorageError::MissingAccount {
-                        anchor_number: params.anchor_number,
-                        name: params.name.clone(),
+                        anchor_number,
+                        name: name.clone(),
                     });
                 }
                 self.stable_account_reference_list_memory
@@ -1308,10 +1338,10 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Return created default account
         Ok(Account::new_full(
-            params.anchor_number,
-            params.origin,
+            anchor_number,
+            origin,
             Some(storable_account.name),
-            None,
+            is_default,
             Some(new_account_number),
             None,
             storable_account.seed_from_anchor,
