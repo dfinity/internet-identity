@@ -59,6 +59,9 @@ pub fn create_account_for_origin(
                 anchor_number,
                 name: name.clone(),
                 origin,
+                // TODO[ID-361]: Read the is_default function parameter when it becomes available.
+                // For now, assume that the newly creted account should be the default.
+                is_default: true,
             })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })?;
@@ -113,6 +116,11 @@ pub fn update_account_for_origin(
                             anchor_number,
                             name: new_name.clone(),
                             origin: origin.clone(),
+                            // TODO[ID-362]: Read the is_default function parameter when it becomes
+                            // TODO[ID-362]: available.
+                            // For now, the default status of the account cannot be changed using
+                            // this function.
+                            is_default: None,
                         })
                         .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
 
@@ -283,6 +291,10 @@ fn should_create_account_for_origin() {
             anchor.anchor_number(),
             origin,
             Some(name),
+<<<<<<< Updated upstream
+=======
+            true,
+>>>>>>> Stashed changes
             Some(1),
             None,
             None
@@ -357,11 +369,19 @@ fn should_get_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
+<<<<<<< Updated upstream
             Account::new(anchor_number, origin.clone(), None, None),
+=======
+            Account::new(anchor_number, origin.clone(), None, true, None),
+>>>>>>> Stashed changes
             Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(1),
                 None,
                 None
@@ -370,6 +390,10 @@ fn should_get_accounts_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(2),
                 None,
                 None
@@ -399,11 +423,19 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
+<<<<<<< Updated upstream
             Account::new(anchor_number, origin.clone(), None, None),
+=======
+            Account::new(anchor_number, origin.clone(), None, true, None),
+>>>>>>> Stashed changes
             Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(1),
                 None,
                 None
@@ -414,11 +446,19 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number_two, &origin),
         vec![
+<<<<<<< Updated upstream
             Account::new(anchor_number_two, origin.clone(), None, None),
+=======
+            Account::new(anchor_number_two, origin.clone(), None, true, None),
+>>>>>>> Stashed changes
             Account::new_full(
                 anchor_number_two,
                 origin.clone(),
                 Some("Bob".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(2),
                 None,
                 None
@@ -446,11 +486,19 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
+<<<<<<< Updated upstream
             Account::new(anchor_number, origin.clone(), None, None),
+=======
+            Account::new(anchor_number, origin.clone(), None, true, None),
+>>>>>>> Stashed changes
             Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(1),
                 None,
                 None
@@ -459,6 +507,10 @@ fn should_update_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(2),
                 None,
                 None
@@ -479,6 +531,10 @@ fn should_update_account_for_origin() {
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
+<<<<<<< Updated upstream
+=======
+            false,
+>>>>>>> Stashed changes
             Some(1),
             None,
             None
@@ -488,11 +544,19 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
+<<<<<<< Updated upstream
             Account::new(anchor_number, origin.clone(), None, None),
+=======
+            Account::new(anchor_number, origin.clone(), None, true, None),
+>>>>>>> Stashed changes
             Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Becky".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(1),
                 None,
                 None
@@ -501,6 +565,10 @@ fn should_update_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(2),
                 None,
                 None
@@ -528,11 +596,19 @@ fn should_update_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
+<<<<<<< Updated upstream
             Account::new(anchor_number, origin.clone(), None, None),
+=======
+            Account::new(anchor_number, origin.clone(), None, true, None),
+>>>>>>> Stashed changes
             Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(1),
                 None,
                 None
@@ -541,6 +617,10 @@ fn should_update_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(2),
                 None,
                 None
@@ -561,6 +641,10 @@ fn should_update_default_account_for_origin() {
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
+<<<<<<< Updated upstream
+=======
+            false,
+>>>>>>> Stashed changes
             Some(3),
             None,
             Some(anchor_number)
@@ -574,6 +658,10 @@ fn should_update_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Becky".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(3),
                 None,
                 Some(anchor_number)
@@ -582,6 +670,10 @@ fn should_update_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(1),
                 None,
                 None
@@ -590,6 +682,10 @@ fn should_update_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
+<<<<<<< Updated upstream
+=======
+                false,
+>>>>>>> Stashed changes
                 Some(2),
                 None,
                 None
