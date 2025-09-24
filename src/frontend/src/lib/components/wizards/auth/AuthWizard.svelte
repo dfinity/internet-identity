@@ -16,6 +16,7 @@
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
+  import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -161,7 +162,9 @@
       create={handleCreatePasskey}
       buttonLabel={authFlow.abTestGroup === "infoPasskey"
         ? "Continue"
-        : "Create Identity"}
+        : $AUTH_FLOW_UPDATES
+          ? "Create Identity"
+          : "Create Passkey"}
     />
   {:else if authFlow.view === "setupNewIdentity"}
     <CreateIdentity create={handleCompleteOpenIdRegistration} />
