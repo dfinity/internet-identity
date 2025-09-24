@@ -48,7 +48,7 @@ fn should_create_account() -> Result<(), RejectResponse> {
             last_used: None,
             origin,
             name: Some(name),
-            is_default: None,
+            is_default: false,
         }
     );
     Ok(())
@@ -117,28 +117,28 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
                 origin: origin.clone(),
                 last_used: None,
                 name: None,
-                is_default: None,
+                is_default: true,
             },
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
                 name: Some(name),
-                is_default: None,
+                is_default: false,
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
                 name: Some(name_two),
-                is_default: None,
+                is_default: false,
             },
             AccountInfo {
                 account_number: third_created_account.account_number,
                 origin,
                 last_used: None,
                 name: Some(name_three),
-                is_default: None,
+                is_default: false,
             },
         ]
     );
@@ -171,7 +171,7 @@ fn should_list_default_account() -> Result<(), RejectResponse> {
             origin: origin.clone(),
             last_used: None,
             name: None,
-            is_default: None,
+            is_default: true,
         },]
     );
     Ok(())
@@ -252,21 +252,21 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
                 origin: origin.clone(),
                 last_used: None,
                 name: None,
-                is_default: None,
+                is_default: true,
             },
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
                 name: Some(name),
-                is_default: None,
+                is_default: false,
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
                 name: Some(name_two),
-                is_default: None,
+                is_default: false,
             },
         ]
     );
@@ -280,14 +280,14 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
                 origin: origin.clone(),
                 last_used: None,
                 name: None,
-                is_default: None,
+                is_default: true,
             },
             AccountInfo {
                 account_number: another_identity_account.account_number,
                 origin,
                 last_used: None,
                 name: Some(name_three),
-                is_default: None,
+                is_default: false,
             },
         ]
     );
@@ -339,7 +339,7 @@ fn should_update_account() -> Result<(), RejectResponse> {
             last_used: None,
             origin,
             name: new_name,
-            is_default: None,
+            is_default: false,
         }
     );
     Ok(())
@@ -410,7 +410,7 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             origin: origin.clone(),
             last_used: None,
             name: None,
-            is_default: None,
+            is_default: true,
         },]
     );
 
@@ -437,7 +437,7 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             last_used: None,
             origin: origin.clone(),
             name: Some(name.clone()),
-            is_default: None,
+            is_default: true,
         }
     );
 
@@ -459,7 +459,7 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             origin,
             last_used: None,
             name: Some(name),
-            is_default: None,
+            is_default: true,
         },]
     );
 

@@ -54,6 +54,7 @@ fn should_create_additional_account() {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
+        is_default: false,
     };
     storage
         .create_additional_account(new_account_params)
@@ -66,7 +67,7 @@ fn should_create_additional_account() {
         anchor_number,
         origin: origin.clone(),
         name: Some(account_name.clone()),
-        is_default: None,
+        is_default: false,
         last_used: None,
         seed_from_anchor: None,
     };
@@ -121,15 +122,16 @@ fn should_list_accounts() {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
+        is_default: true,
     };
     let expected_additional_account = Account::new(
         anchor_number,
         origin.clone(),
         Some(account_name),
-        None,
+        false,
         Some(1),
     );
-    let expected_default_account = Account::new(anchor_number, origin.clone(), None, None, None);
+    let expected_default_account = Account::new(anchor_number, origin.clone(), None, true, None);
     storage.create_additional_account(new_account).unwrap();
 
     // 5. List accounts returns default account
@@ -190,6 +192,7 @@ fn should_list_all_identity_accounts() {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
+        is_default: false,
     };
     storage
         .create_additional_account(new_account_params)
@@ -205,6 +208,7 @@ fn should_list_all_identity_accounts() {
         anchor_number,
         origin: origin_2.clone(),
         name: account_name.clone(),
+        is_default: false,
     };
     storage
         .create_additional_account(new_account_params)
@@ -244,7 +248,7 @@ fn should_update_default_account() {
 
     // 2. Default account exists withuot creating it
     let initial_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, None, None);
+    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, true, None);
     assert_eq!(initial_accounts, vec![expected_unreserved_account]);
 
     // 3. Update default account
@@ -253,6 +257,7 @@ fn should_update_default_account() {
         origin: origin.clone(),
         name: account_name.clone(),
         account_number: None,
+        is_default: None,
     };
     let new_account = storage.update_account(updated_account_params).unwrap();
 
@@ -263,7 +268,7 @@ fn should_update_default_account() {
             anchor_number,
             origin,
             Some(account_name),
-            None,
+            true,
             new_account.account_number,
             None,
             Some(anchor_number),
@@ -322,6 +327,7 @@ fn should_update_additional_account() {
         anchor_number,
         origin: origin.clone(),
         name: account_name.clone(),
+        is_default: false,
     };
     storage
         .create_additional_account(new_account_params)
@@ -333,6 +339,7 @@ fn should_update_additional_account() {
         anchor_number,
         origin: origin.clone(),
         name: new_account_name.clone(),
+        is_default: None,
         account_number: Some(1),
     };
     let updated_account = storage.update_account(updated_account_params).unwrap();
@@ -346,7 +353,7 @@ fn should_update_additional_account() {
             origin: origin.clone(),
             last_used: None,
             name: Some(new_account_name),
-            is_default: None,
+            is_default: false,
             seed_from_anchor: None,
         }
     );
@@ -409,6 +416,7 @@ fn should_count_accounts_different_anchors() {
         anchor_number: anchor_number_1,
         origin: origin_1.clone(),
         name: account_name_1.clone(),
+        is_default: false,
     };
     storage.create_additional_account(create_params_1).unwrap();
 
@@ -467,6 +475,7 @@ fn should_count_accounts_different_anchors() {
         anchor_number: anchor_number_2,
         origin: origin_2.clone(),
         name: account_name_2.clone(),
+        is_default: false,
     };
     storage.create_additional_account(create_params_2).unwrap();
 
@@ -533,7 +542,7 @@ fn should_read_default_account_with_empty_reference_list() {
     let default_account = storage.read_account(read_params).unwrap();
 
     // 4. Verify we get a synthetic default account
-    let expected_account = Account::new(anchor_number, origin, None, None, None);
+    let expected_account = Account::new(anchor_number, origin, None, true, None);
     assert_eq!(default_account, expected_account);
 }
 
@@ -554,6 +563,7 @@ fn should_not_read_account_from_wrong_anchor() {
         anchor_number: anchor_number_1,
         origin: origin.clone(),
         name: account_name,
+        is_default: true,
     };
     storage.create_additional_account(create_params).unwrap();
 
