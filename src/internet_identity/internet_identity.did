@@ -775,6 +775,7 @@ type AccountInfo = record {
     last_used : opt Timestamp;
     // Configurable properties
     name : opt text;
+    is_default : opt bool;
 };
 
 type AccountUpdate = record {

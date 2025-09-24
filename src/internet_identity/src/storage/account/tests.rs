@@ -66,6 +66,7 @@ fn should_create_additional_account() {
         anchor_number,
         origin: origin.clone(),
         name: Some(account_name.clone()),
+        is_default: None,
         last_used: None,
         seed_from_anchor: None,
     };
@@ -121,9 +122,14 @@ fn should_list_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    let expected_additional_account =
-        Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
-    let expected_default_account = Account::new(anchor_number, origin.clone(), None, None);
+    let expected_additional_account = Account::new(
+        anchor_number,
+        origin.clone(),
+        Some(account_name),
+        None,
+        Some(1),
+    );
+    let expected_default_account = Account::new(anchor_number, origin.clone(), None, None, None);
     storage.create_additional_account(new_account).unwrap();
 
     // 5. List accounts returns default account
@@ -238,7 +244,7 @@ fn should_update_default_account() {
 
     // 2. Default account exists withuot creating it
     let initial_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, None);
+    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, None, None);
     assert_eq!(initial_accounts, vec![expected_unreserved_account]);
 
     // 3. Update default account
@@ -257,6 +263,7 @@ fn should_update_default_account() {
             anchor_number,
             origin,
             Some(account_name),
+            None,
             new_account.account_number,
             None,
             Some(anchor_number),
@@ -339,6 +346,7 @@ fn should_update_additional_account() {
             origin: origin.clone(),
             last_used: None,
             name: Some(new_account_name),
+            is_default: None,
             seed_from_anchor: None,
         }
     );
@@ -525,7 +533,7 @@ fn should_read_default_account_with_empty_reference_list() {
     let default_account = storage.read_account(read_params).unwrap();
 
     // 4. Verify we get a synthetic default account
-    let expected_account = Account::new(anchor_number, origin, None, None);
+    let expected_account = Account::new(anchor_number, origin, None, None, None);
     assert_eq!(default_account, expected_account);
 }
 

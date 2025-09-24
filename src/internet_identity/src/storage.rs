@@ -1004,6 +1004,7 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             origin.to_string(),
             Some(params.name),
+            None,
             Some(account_number),
         ))
     }
@@ -1019,9 +1020,21 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Vec<Account> {
         check_frontend_length(origin);
         match self.lookup_application_number_with_origin(origin) {
-            None => vec![Account::new(anchor_number, origin.clone(), None, None)],
+            None => vec![Account::new(
+                anchor_number,
+                origin.clone(),
+                None,
+                None,
+                None,
+            )],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
-                None => vec![Account::new(anchor_number, origin.clone(), None, None)],
+                None => vec![Account::new(
+                    anchor_number,
+                    origin.clone(),
+                    None,
+                    None,
+                    None,
+                )],
                 Some(refs) => refs
                     .iter()
                     .filter_map(|acc_ref| {
@@ -1061,6 +1074,7 @@ impl<M: Memory + Clone> Storage<M> {
                         params.origin.clone(),
                         None,
                         None,
+                        None,
                     ));
                 }
                 // check if there is a stored account reference list
@@ -1085,6 +1099,7 @@ impl<M: Memory + Clone> Storage<M> {
                             params.origin.clone(),
                             None,
                             None,
+                            None,
                         ));
                     }
 
@@ -1099,6 +1114,7 @@ impl<M: Memory + Clone> Storage<M> {
                                 params.anchor_number,
                                 params.origin.clone(),
                                 None,
+                                None,
                                 acc_ref.account_number,
                                 acc_ref.last_used,
                             )
@@ -1108,6 +1124,7 @@ impl<M: Memory + Clone> Storage<M> {
                     Some(Account::new(
                         params.anchor_number,
                         params.origin.clone(),
+                        None,
                         None,
                         None,
                     ))
@@ -1130,6 +1147,7 @@ impl<M: Memory + Clone> Storage<M> {
                             params.anchor_number,
                             params.origin.clone(),
                             Some(storable_account.name.clone()),
+                            None,
                             Some(account_number),
                             acc_ref.last_used,
                             storable_account.seed_from_anchor,
@@ -1205,6 +1223,7 @@ impl<M: Memory + Clone> Storage<M> {
             params.anchor_number,
             params.origin,
             Some(storable_account.name),
+            None,
             Some(account_number),
             account_reference.last_used,
             storable_account.seed_from_anchor,
@@ -1292,6 +1311,7 @@ impl<M: Memory + Clone> Storage<M> {
             params.anchor_number,
             params.origin,
             Some(storable_account.name),
+            None,
             Some(new_account_number),
             None,
             storable_account.seed_from_anchor,
