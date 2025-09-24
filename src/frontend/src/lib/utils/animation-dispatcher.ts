@@ -64,7 +64,7 @@ class AnimationDispatcher {
    * @returns Promise that resolves when the animation completes
    */
   dropWaveAnimation(
-    overrideOptions: Partial<FlairAnimationOptions>,
+    overrideOptions: Partial<FlairAnimationOptions> = {},
   ): Promise<void> {
     return new Promise((resolve) => {
       this.#animationQueue.push(async () => {
@@ -96,7 +96,7 @@ const animationDispatcher = new AnimationDispatcher();
 
 // Public API
 export const triggerDropWaveAnimation = (
-  overrideOptions: Partial<FlairAnimationOptions>,
+  overrideOptions?: Partial<FlairAnimationOptions>,
 ): Promise<void> => animationDispatcher.dropWaveAnimation(overrideOptions);
 
 export const clearDropWaveAnimation = (): Promise<void> =>
