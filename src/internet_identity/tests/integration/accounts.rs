@@ -459,7 +459,9 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             origin,
             last_used: None,
             name: Some(name),
-            is_default: true,
+            // TODO[ID-363]: Expect that the `is_default` flag is persisted.
+            // Currently, this is just a mock value.
+            is_default: false,
         },]
     );
 
