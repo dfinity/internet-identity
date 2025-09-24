@@ -618,9 +618,9 @@ jobs:
       - name: Install Playwright Browsers
         run: |
           if [ "${{ matrix.browser }}" = "chrome" ]; then
-            npx playwright install chromium
+            npx playwright install --with-deps chromium
           else
-            npx playwright install webkit
+            npx playwright install --with-deps webkit
           fi
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
