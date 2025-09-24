@@ -65,7 +65,6 @@ export default defineConfig({
         ...devices["Desktop Safari"],
         launchOptions: {
           args: [
-            "--ignore-certificate-errors",
             "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
           ],
         },
@@ -77,7 +76,6 @@ export default defineConfig({
         ...devices["iPhone 12"],
         launchOptions: {
           args: [
-            "--ignore-certificate-errors",
             "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
           ],
         },
