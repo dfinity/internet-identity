@@ -9,4 +9,5 @@ export const DROP_WAVE_ANIMATION: FlairAnimationOptions = {
   nImpulses: "single",
   size: "large",
   impulseEasing: "cubicIn",
+  containerHeight: "h-full",
 };

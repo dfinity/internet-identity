@@ -29,6 +29,7 @@ export interface FlairAnimationOptions {
   size: "large" | "medium" | "small" | number;
   nImpulses: "single" | "double";
   impulseEasing?: keyof typeof easingFunctions;
+  containerHeight?: "h-full" | "h-[640px]";
 }
 
 export interface FlairCanvasProps {

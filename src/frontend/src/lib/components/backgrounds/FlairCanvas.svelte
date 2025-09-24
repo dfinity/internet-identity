@@ -57,6 +57,11 @@
     clearAnimation = $bindable(),
   }: FlairCanvasProps = $props();
 
+  // State for dynamic height during animations
+  let animationHeight = $state<string | null>(null);
+  let defaultHeight = "h-full"; // Default height
+  let heightResetTimeout = $state<ReturnType<typeof setTimeout>>();
+
   let backgroundRef = $state<HTMLDivElement>();
   let canvasRef = $state<HTMLCanvasElement>();
   let ctx = $state<CanvasRenderingContext2D | null>(null);
@@ -266,7 +271,29 @@
       size,
       nImpulses,
       impulseEasing,
+      containerHeight,
     } = opts;
+
+    // Handle container height animation
+    if (containerHeight) {
+      // Clear any pending reset
+      if (heightResetTimeout) {
+        clearTimeout(heightResetTimeout);
+      }
+
+      // Apply new height
+      animationHeight = containerHeight;
+
+      // Calculate animation duration based on speed
+      const speedValue = typeof speed === "number" ? speed : speedTable[speed];
+      const animationDuration = 2000 * speedValue; // Base duration of 2 seconds adjusted by speed
+
+      // Schedule height reset after animation completes
+      heightResetTimeout = setTimeout(() => {
+        animationHeight = null;
+        heightResetTimeout = undefined;
+      }, animationDuration);
+    }
 
     let easingFunction = impulseEasing
       ? easingFunctions[impulseEasing]
@@ -855,7 +882,8 @@
 </script>
 
 <div
-  class="absolute inset-0 top-12 -z-50 h-[640px] w-full select-none"
+  class={`${animationHeight ?? defaultHeight} absolute inset-0 top-12
+    -z-50 w-full select-none`}
   aria-hidden="true"
   bind:this={backgroundRef}
   onpointerleave={handleReset}

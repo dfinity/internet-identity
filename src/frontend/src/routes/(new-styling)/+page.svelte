@@ -96,7 +96,10 @@
 
   onMount(() => {
     requestAnimationFrame(() => (showFadeIn = true));
-    setTimeout(async () => await triggerDropWaveAnimation());
+    setTimeout(
+      async () =>
+        await triggerDropWaveAnimation({ containerHeight: "h-[640px]" }),
+    );
   });
 
   onDestroy(() => {
