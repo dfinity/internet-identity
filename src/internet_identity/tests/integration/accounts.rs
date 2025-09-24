@@ -339,7 +339,7 @@ fn should_update_account() -> Result<(), RejectResponse> {
             last_used: None,
             origin,
             name: new_name,
-            is_default: false,
+            is_default: true,
         }
     );
     Ok(())
