@@ -146,7 +146,7 @@ impl Account {
             origin: self.origin.clone(),
             last_used: self.last_used,
             name: self.name.clone(),
-            is_default: self.is_default.clone(),
+            is_default: self.is_default,
         }
     }
 
