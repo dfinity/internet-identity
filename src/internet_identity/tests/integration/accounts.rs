@@ -48,7 +48,7 @@ fn should_create_account() -> Result<(), RejectResponse> {
             last_used: None,
             origin,
             name: Some(name),
-            is_default: false,
+            is_default: true,
         }
     );
     Ok(())
