@@ -23,6 +23,7 @@
   import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
   import { onMount } from "svelte";
   import * as easingFunctions from "svelte/easing";
+  import { nonNullish } from "@dfinity/utils";
 
   let {
     bgType = "dots",
@@ -60,7 +61,6 @@
   // State for dynamic height during animations
   let animationHeight = $state<string | null>(null);
   let defaultHeight = "h-full"; // Default height
-  let heightResetTimeout = $state<ReturnType<typeof setTimeout>>();
 
   let backgroundRef = $state<HTMLDivElement>();
   let canvasRef = $state<HTMLCanvasElement>();
@@ -274,25 +274,9 @@
       containerHeight,
     } = opts;
 
-    // Handle container height animation
-    if (containerHeight) {
-      // Clear any pending reset
-      if (heightResetTimeout) {
-        clearTimeout(heightResetTimeout);
-      }
-
-      // Apply new height
+    // Check whether the container height needs to change for this animation.
+    if (nonNullish(containerHeight)) {
       animationHeight = containerHeight;
-
-      // Calculate animation duration based on speed
-      const speedValue = typeof speed === "number" ? speed : speedTable[speed];
-      const animationDuration = 2000 * speedValue; // Base duration of 2 seconds adjusted by speed
-
-      // Schedule height reset after animation completes
-      heightResetTimeout = setTimeout(() => {
-        animationHeight = null;
-        heightResetTimeout = undefined;
-      }, animationDuration);
     }
 
     let easingFunction = impulseEasing
@@ -359,11 +343,7 @@
           });
           promises.push(secondImpulse);
         }
-        await Promise.all(promises);
-        return;
-      }
-
-      if (
+      } else if (
         motionType === "down" ||
         motionType === "up" ||
         motionType === "left" ||
@@ -426,11 +406,7 @@
           });
           promises.push(secondImpulse);
         }
-        await Promise.all(promises);
-        return;
-      }
-
-      if (motionType === "perlin") {
+      } else if (motionType === "perlin") {
         const firstImpulse = createPerlinImpulse(
           x,
           y,
@@ -494,8 +470,6 @@
           });
           promises.push(secondImpulse);
         }
-        await Promise.all(promises);
-        return;
       }
 
       if (maskWaveOneWay) {
@@ -593,9 +567,7 @@
           0,
         );
         promises.push(maskWave);
-      }
-
-      if (visibility === "pausedmaskwave") {
+      } else if (visibility === "pausedmaskwave") {
         if (impulseEasing) {
           opacityWaveMotion = new Tween(0, {
             easing: easingFunctions[impulseEasing],
@@ -616,6 +588,8 @@
       }
 
       await Promise.all(promises);
+      // Reset animation height to default after animation is done
+      animationHeight = null;
     }
   };
 
