@@ -60,14 +60,21 @@ class AnimationDispatcher {
 
   /**
    * Trigger the drop wave animation
+   * @param containerHeight Optional height to use during animation (e.g. "h-full", "h-[640px]")
    * @returns Promise that resolves when the animation completes
    */
-  dropWaveAnimation(): Promise<void> {
+  dropWaveAnimation(
+    overrideOptions: Partial<FlairAnimationOptions> = {},
+  ): Promise<void> {
     return new Promise((resolve) => {
       this.#animationQueue.push(async () => {
         try {
           if (this.#triggerFunction) {
-            await this.#triggerFunction(DROP_WAVE_ANIMATION);
+            const animationOptions: FlairAnimationOptions = {
+              ...DROP_WAVE_ANIMATION,
+              ...overrideOptions,
+            };
+            await this.#triggerFunction(animationOptions);
           }
         } catch (error) {
           console.warn("Animation failed:", error);
@@ -88,8 +95,9 @@ class AnimationDispatcher {
 const animationDispatcher = new AnimationDispatcher();
 
 // Public API
-export const triggerDropWaveAnimation = (): Promise<void> =>
-  animationDispatcher.dropWaveAnimation();
+export const triggerDropWaveAnimation = (
+  overrideOptions?: Partial<FlairAnimationOptions>,
+): Promise<void> => animationDispatcher.dropWaveAnimation(overrideOptions);
 
 export const clearDropWaveAnimation = (): Promise<void> =>
   animationDispatcher.clearWaveAnimation();
