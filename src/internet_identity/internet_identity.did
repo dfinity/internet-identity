@@ -775,10 +775,7 @@ type AccountInfo = record {
     last_used : opt Timestamp;
     // Configurable properties
     name : opt text;
-<<<<<<< Updated upstream
-=======
     is_default : bool;
->>>>>>> Stashed changes
 };
 
 type AccountUpdate = record {

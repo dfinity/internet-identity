@@ -344,10 +344,7 @@ pub struct AccountInfo {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
-<<<<<<< Updated upstream
-=======
     pub is_default: bool,
->>>>>>> Stashed changes
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
