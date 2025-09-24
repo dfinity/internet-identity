@@ -59,6 +59,9 @@ pub fn create_account_for_origin(
                 anchor_number,
                 name: name.clone(),
                 origin,
+                // TODO[ID-361]: Read the is_default function parameter when it becomes available.
+                // For now, assume that the newly creted account should be the default.
+                is_default: true,
             })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })?;
@@ -113,6 +116,11 @@ pub fn update_account_for_origin(
                             anchor_number,
                             name: new_name.clone(),
                             origin: origin.clone(),
+                            // TODO[ID-362]: Read the is_default function parameter when it becomes
+                            // TODO[ID-362]: available.
+                            // For now, the default status of the account cannot be changed using
+                            // this function.
+                            is_default: None,
                         })
                         .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
 
