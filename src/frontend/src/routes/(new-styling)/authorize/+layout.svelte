@@ -20,15 +20,16 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { goto, preloadCode, preloadData } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { page } from "$app/state";
 
-  const { children }: LayoutProps = $props();
+  const { children, data }: LayoutProps = $props();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -83,11 +84,19 @@
   };
 
   onMount(() => {
-    authorizationStore.init();
+    authorizationStore.init(data.rpc);
 
     setTimeout(() => {
       triggerDropWaveAnimation();
     });
+  });
+
+  // Remove rpc from URL bar after initializing the authorization store
+  afterNavigate(() => {
+    if (page.url.searchParams.has("rpc")) {
+      page.url.searchParams.delete("rpc");
+      replaceState(page.url, page.state);
+    }
   });
 </script>
 
@@ -161,6 +170,12 @@
   <div class="flex flex-1 flex-col items-center justify-center">
     {#if status === "authenticating"}
       {@render children()}
+    {:else if status === "waiting" && data.rpc}
+      <!-- Show spinner since rpc takes time -->
+      <div class="flex flex-col items-center justify-center gap-4">
+        <ProgressRing class="text-fg-primary size-14" />
+        <p class="text-text-secondary text-lg">Loading</p>
+      </div>
     {:else if status === "authorizing"}
       <!-- Spinner is not shown for other statuses to avoid flicker -->
       <div class="flex flex-col items-center justify-center gap-4">

@@ -22,7 +22,7 @@ export interface Session {
   salt: Uint8Array;
 }
 
-type SessionStore = Readable<Session> & {
+export type SessionStore = Readable<Session> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;

@@ -6,7 +6,7 @@ import type { PageLoad } from "./$types";
 
 let firstVisit = true;
 
-export const load: PageLoad = () => {
+export const load: PageLoad = ({ url }) => {
   const lastUsedIdentityAvailable = nonNullish(
     get(lastUsedIdentitiesStore).selected,
   );
@@ -15,7 +15,9 @@ export const load: PageLoad = () => {
     firstVisit = false;
 
     if (lastUsedIdentityAvailable) {
-      throw redirect(307, "/authorize/continue");
+      const nextURL = new URL(url);
+      nextURL.pathname = "/authorize/continue";
+      throw redirect(307, nextURL);
     }
   }
 };

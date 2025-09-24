@@ -38,6 +38,7 @@ import {
   GOOGLE_ISSUER,
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
+import { persistentSessionStore } from "$lib/stores/persistent-session.store";
 
 export class AuthFlow {
   #view = $state<
@@ -235,6 +236,7 @@ export class AuthFlow {
 
   continueWithOpenId = async (
     config: OpenIdConfig,
+    existingJWT?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -245,7 +247,7 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
-    let jwt: string | undefined = undefined;
+    let jwt: string | undefined = existingJWT;
     // Convert OpenIdConfig to RequestConfig
     const requestConfig: RequestConfig = {
       clientId: config.client_id,
@@ -256,26 +258,33 @@ export class AuthFlow {
     authenticationV2Funnel.addProperties({
       provider: config.name,
     });
-    // Create two try-catch blocks to avoid double-triggering the analytics.
-    try {
-      this.#systemOverlay = true;
-      jwt = await requestJWT(requestConfig, {
-        nonce: get(sessionStore).nonce,
-        mediation: "required",
-      });
-    } catch (error) {
-      this.#view = "chooseMethod";
-      throw error;
-    } finally {
-      this.#systemOverlay = false;
-      // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
+    if (isNullish(jwt)) {
+      // Create two try-catch blocks to avoid double-triggering the analytics.
+      try {
+        this.#systemOverlay = true;
+        jwt = await requestJWT(requestConfig, {
+          nonce: get(sessionStore).nonce,
+          mediation: "required",
+        });
+      } catch (error) {
+        this.#view = "chooseMethod";
+        throw error;
+      } finally {
+        this.#systemOverlay = false;
+        // Moved after `requestJWT` to avoid Safari from blocking the popup.
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.ContinueWithOpenID,
+        );
+      }
     }
     try {
+      console.log("jwt", jwt);
       const { iss, sub, loginHint } = decodeJWT(jwt);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
-        session: get(sessionStore),
+        session: get(
+          nonNullish(existingJWT) ? persistentSessionStore : sessionStore,
+        ),
         jwt,
       });
       // If the previous call succeeds, it means the OpenID user already exists in II.
