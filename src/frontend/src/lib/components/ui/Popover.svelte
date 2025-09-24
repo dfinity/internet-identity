@@ -39,6 +39,7 @@
       if (nonNullish(anchorRef) && nonNullish(popoverRef)) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
+
         popoverRef.style.top = {
           up: `calc(${anchorRect.top - popoverRect.height}px - ${distance})`,
           right: {
@@ -53,6 +54,7 @@
             end: `${anchorRect.bottom - popoverRect.height}px`,
           }[align],
         }[direction];
+
         popoverRef.style.left = {
           up: {
             start: `${anchorRect.left}px`,
@@ -93,6 +95,12 @@
 
 {#if windowWidth >= MOBILE_BREAKPOINT}
   <div
+    class="fixed inset-0 z-10"
+    role="presentation"
+    tabindex="-1"
+    onclick={() => onClose?.()}
+  ></div>
+  <div
     {...props}
     bind:this={popoverRef}
     popover={closeOnOutsideClick ? "auto" : "manual"}
@@ -100,11 +108,11 @@
     out:fade|global={{ delay: 160, duration: 1 }}
     onintrostart={() => popoverRef?.showPopover()}
     onoutrostart={() => popoverRef?.hidePopover()}
-    class="popover fixed overflow-visible bg-transparent"
+    class="popover backdrop:bg-bg-overlay fixed overflow-visible bg-transparent backdrop:opacity-40"
   >
     <div
       class={[
-        "bg-bg-primary_alt border-border-secondary flex w-90 flex-col rounded-xl border p-4 shadow-xl",
+        "border-border-secondary bg-bg-primary_alt relative flex w-90 flex-col rounded-xl border p-4 shadow-xl",
         {
           up: {
             start: "origin-bottom-left",

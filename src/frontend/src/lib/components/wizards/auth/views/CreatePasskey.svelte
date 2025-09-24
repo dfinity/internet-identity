@@ -12,6 +12,10 @@
     upgradeIdentityFunnel,
     UpgradeIdentityEvents,
   } from "$lib/utils/analytics/upgradeIdentityFunnel";
+  import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
+  import { HelpCircleIcon } from "@lucide/svelte";
+  import Popover from "$lib/components/ui/Popover.svelte";
+  import { II_SUPPORT_PASSKEY_URL } from "$lib/config";
 
   interface Props {
     create: (name: string) => Promise<void | "cancelled">;
@@ -31,10 +35,12 @@
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.CreatePasskeyScreen);
   });
 
+  let popoverAnchorRef = $state<HTMLDivElement>();
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
   let isCreating = $state(false);
   let isCancelled = $state(false);
+  let showPrivacyPopover = $state(false);
 
   const handleCreate = async () => {
     isCreating = true;
@@ -65,7 +71,12 @@
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        This will label your passkey, and you can't rename it later once set.
+        {#if $AUTH_FLOW_UPDATES}
+          Internet Identity <b>does not</b> store your biometric data. It stays on
+          your device. Your Identity functions as a secure passkey manager for authentication.
+        {:else}
+          This will label your passkey, and you can't rename it later once set
+        {/if}
       </p>
     </div>
   </div>
@@ -75,7 +86,9 @@
       bind:value={name}
       inputmode="text"
       placeholder="Identity name"
-      hint="Pick something recognizable, like your name."
+      hint={$AUTH_FLOW_UPDATES
+        ? "You cannot rename this once it is set."
+        : "Pick something recognizable, like your name."}
       type="text"
       size="md"
       autocomplete="off"
@@ -110,6 +123,50 @@
         You are upgrading ID &nbsp;
         <Badge size="sm">{identityNumber}</Badge>
       </p>
+    {/if}
+
+    {#if $AUTH_FLOW_UPDATES}
+      <div class="flex flex-row items-center justify-between gap-4">
+        <p class="text-text-secondary text-sm">What is a passkey?</p>
+        <div bind:this={popoverAnchorRef}>
+          <Button
+            variant="tertiary"
+            onclick={() => (showPrivacyPopover = !showPrivacyPopover)}
+          >
+            <HelpCircleIcon
+              size="20"
+              class="text-text-primary stroke-fg-tertiary"
+            />
+          </Button>
+        </div>
+      </div>
+      {#if showPrivacyPopover}
+        <Popover
+          anchor={popoverAnchorRef}
+          direction="up"
+          align="end"
+          distance="10px"
+          class="gap-0.5"
+          onClose={() => (showPrivacyPopover = false)}
+        >
+          <p class="text-text-primary text-xs font-semibold">
+            What is a Passkey
+          </p>
+          <p class="text-text-secondary text-xs font-medium">
+            Passkeys are a secure, password-free way to log in. They use
+            cryptographic keys stored safely on your device, letting you sign in
+            to dapps with Face ID, Touch ID, or a security key - no personal
+            data is ever shared.
+          </p>
+          <a
+            href={II_SUPPORT_PASSKEY_URL}
+            target="_blank"
+            class="text-text-tertiary mt-2.5 self-end text-xs font-bold underline"
+          >
+            Learn More
+          </a>
+        </Popover>
+      {/if}
     {/if}
   </div>
 </form>

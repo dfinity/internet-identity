@@ -161,7 +161,7 @@
       create={handleCreatePasskey}
       buttonLabel={authFlow.abTestGroup === "infoPasskey"
         ? "Continue"
-        : "Create Passkey"}
+        : "Create Identity"}
     />
   {:else if authFlow.view === "setupNewIdentity"}
     <CreateIdentity create={handleCompleteOpenIdRegistration} />

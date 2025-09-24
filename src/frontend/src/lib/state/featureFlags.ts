@@ -113,4 +113,5 @@ export default {
   DISCOVERABLE_PASSKEY_FLOW,
   CONTINUE_FROM_ANOTHER_DEVICE,
   ENABLE_GENERIC_OPEN_ID,
+  AUTH_FLOW_UPDATES,
 } as Record<string, FeatureFlagStore>;
