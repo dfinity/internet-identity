@@ -882,7 +882,7 @@
 </script>
 
 <div
-  class={`${animationHeight ?? defaultHeight} absolute inset-0 top-12
+  class={`${animationHeight ?? defaultHeight} absolute inset-0
     -z-50 w-full select-none`}
   aria-hidden="true"
   bind:this={backgroundRef}
