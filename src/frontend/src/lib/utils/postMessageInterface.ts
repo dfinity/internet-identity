@@ -115,13 +115,29 @@ export function rpcAuthenticationProtocol({
           // ICRC-34
           if (event.data.method === "icrc34_delegation") {
             const delegationRequest = event.data as DelegationRequest;
-            // Ignore if required params are missing or invalid
+            // Return error if required params are missing or invalid
             if (
               isNullish(delegationRequest.params) ||
               !("publicKey" in delegationRequest.params) ||
               isNullish(delegationRequest.params.publicKey) ||
               typeof delegationRequest.params.publicKey !== "string"
             ) {
+              try {
+                source.postMessage(
+                  {
+                    id: event.data.id,
+                    jsonrpc: "2.0",
+                    error: {
+                      code: -32602,
+                      message: "Invalid params",
+                      description: "publicKey must be a non-empty string",
+                    },
+                  },
+                  origin,
+                );
+              } catch (error) {
+                console.error("Failed to send postMessage response:", error);
+              }
               return;
             }
             const derivationOrigin =
