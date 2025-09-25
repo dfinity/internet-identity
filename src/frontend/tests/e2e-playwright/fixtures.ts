@@ -24,7 +24,8 @@ export const test = base.extend({
         }
 
         const newUrl = `https://localhost:5173${url.pathname}${url.search}`;
-        return route.continue({ url: newUrl });
+        // The vite server uses the Host header to determine where the redirect the request.
+        return route.continue({ url: newUrl, headers: { Host: url.hostname } });
       });
     }
 
