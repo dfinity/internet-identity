@@ -30,6 +30,8 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
+    /* Accept self-signed certificates when dev server runs with TLS */
+    ignoreHTTPSErrors: true,
   },
   timeout: 60000,
 
@@ -63,22 +65,12 @@ export default defineConfig({
       name: "safari-desktop",
       use: {
         ...devices["Desktop Safari"],
-        launchOptions: {
-          args: [
-            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
-          ],
-        },
       },
     },
     {
       name: "safari-mobile",
       use: {
         ...devices["iPhone 12"],
-        launchOptions: {
-          args: [
-            "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
-          ],
-        },
       },
     },
   ],
