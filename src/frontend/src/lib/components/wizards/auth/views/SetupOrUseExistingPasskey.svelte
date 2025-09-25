@@ -130,7 +130,7 @@
         <p class="text-text-secondary text-xs font-medium">
           Internet Identity never shares your personal data, such as email or
           name, with apps or websites. Instead, it creates a unique pseudonym
-          for each app, so you can’t be tracked across apps. All of this happens
+          for each app, so you can't be tracked across apps. All of this happens
           automatically in the background. You don't need to manage anything.
         </p>
         <a

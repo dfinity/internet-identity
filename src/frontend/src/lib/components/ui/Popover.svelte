@@ -79,16 +79,6 @@
       tracking = false;
     };
   });
-
-  $effect(() => {
-    const listener = () => {
-      if (!popoverRef?.matches(":popover-open")) {
-        onClose?.();
-      }
-    };
-    popoverRef?.addEventListener("toggle", listener);
-    return () => popoverRef?.removeEventListener("toggle", listener);
-  });
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} />
@@ -99,6 +89,12 @@
     role="presentation"
     tabindex="-1"
     onclick={() => onClose?.()}
+    onkeydown={(e) => {
+      if (e.key === "Escape" && document.activeElement?.closest(".popover")) {
+        e.stopPropagation();
+        onClose?.();
+      }
+    }}
   ></div>
   <div
     {...props}
@@ -106,8 +102,17 @@
     popover={closeOnOutsideClick ? "auto" : "manual"}
     in:fade|global={{ duration: 1 }}
     out:fade|global={{ delay: 160, duration: 1 }}
+    ontoggle={() => {
+      if (!popoverRef?.matches(":popover-open")) onClose?.();
+    }}
     onintrostart={() => popoverRef?.showPopover()}
     onoutrostart={() => popoverRef?.hidePopover()}
+    onfocusout={(e) => {
+      if (!popoverRef?.contains(e.relatedTarget as Node)) {
+        anchorRef?.querySelector("button")?.focus();
+        onClose?.();
+      }
+    }}
     class="popover backdrop:bg-bg-overlay fixed overflow-visible bg-transparent backdrop:opacity-40"
   >
     <div
