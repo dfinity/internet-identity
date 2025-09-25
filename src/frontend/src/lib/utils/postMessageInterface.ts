@@ -115,11 +115,15 @@ export function rpcAuthenticationProtocol({
           // ICRC-34
           if (event.data.method === "icrc34_delegation") {
             const delegationRequest = event.data as DelegationRequest;
-            // Ignore if params are missing
-            if (isNullish(delegationRequest.params)) {
+            // Ignore if required params are missing or invalid
+            if (
+              isNullish(delegationRequest.params) ||
+              !("publicKey" in delegationRequest.params) ||
+              isNullish(delegationRequest.params.publicKey) ||
+              typeof delegationRequest.params.publicKey !== "string"
+            ) {
               return;
             }
-            // Get derivation origin
             const derivationOrigin =
               "icrc95DerivationOrigin" in delegationRequest.params &&
               nonNullish(delegationRequest.params.icrc95DerivationOrigin) &&
@@ -174,46 +178,56 @@ export function rpcAuthenticationProtocol({
                   failureReason: authenticateResult.text,
                 },
               );
-              (source as WindowProxy).postMessage(
-                {
-                  id: event.data.id,
-                  jsonrpc: "2.0",
-                  error: {
-                    code: 1000,
-                    message: "Generic error",
-                    description: authenticateResult.text,
+              try {
+                (source as WindowProxy).postMessage(
+                  {
+                    id: event.data.id,
+                    jsonrpc: "2.0",
+                    error: {
+                      code: 1000,
+                      message: "Generic error",
+                      description: authenticateResult.text,
+                    },
                   },
-                },
-                origin,
-              );
-              resolve(authenticateResult.kind);
+                  origin,
+                );
+                resolve(authenticateResult.kind);
+              } catch (error) {
+                console.error("Failed to send postMessage response:", error);
+              }
               return;
             }
             void (authenticateResult.kind satisfies "success");
             authorizeClientFunnel.trigger(
               AuthorizeClientEvents.AuthenticateSuccess,
             );
-            (source as WindowProxy).postMessage(
-              {
-                id: event.data.id,
-                jsonrpc: "2.0",
-                result: {
-                  publicKey: toBase64(authenticateResult.userPublicKey.buffer),
-                  signerDelegation: authenticateResult.delegations.map(
-                    (delegation) => ({
-                      delegation: {
-                        pubkey: toBase64(delegation.delegation.pubkey),
-                        expiration:
-                          delegation.delegation.expiration.toString(10),
-                      },
-                      signature: toBase64(delegation.signature),
-                    }),
-                  ),
+            try {
+              (source as WindowProxy).postMessage(
+                {
+                  id: event.data.id,
+                  jsonrpc: "2.0",
+                  result: {
+                    publicKey: toBase64(
+                      authenticateResult.userPublicKey.buffer,
+                    ),
+                    signerDelegation: authenticateResult.delegations.map(
+                      (delegation) => ({
+                        delegation: {
+                          pubkey: toBase64(delegation.delegation.pubkey),
+                          expiration:
+                            delegation.delegation.expiration.toString(10),
+                        },
+                        signature: toBase64(delegation.signature),
+                      }),
+                    ),
+                  },
                 },
-              },
-              origin,
-            );
-            resolve("success");
+                origin,
+              );
+              resolve("success");
+            } catch (error) {
+              console.error("Failed to send postMessage response:", error);
+            }
           }
         });
       },
