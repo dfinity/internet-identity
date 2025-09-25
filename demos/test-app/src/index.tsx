@@ -74,6 +74,7 @@ const autoSelectionPrincipalEl = document.getElementById(
 const allowPinAuthenticationEl = document.getElementById(
   "allowPinAuthentication",
 ) as HTMLInputElement;
+const useIcrc25El = document.getElementById("useIcrc25") as HTMLInputElement;
 
 let iiProtocolTestWindow: Window | undefined;
 
@@ -82,6 +83,7 @@ let delegationIdentity: DelegationIdentity | undefined = undefined;
 
 // The local, ephemeral key-pair
 let localIdentity_: SignIdentity | undefined = undefined;
+
 function getLocalIdentity(): SignIdentity {
   if (localIdentity_ === undefined) {
     localIdentity_ = Ed25519KeyIdentity.generate();
@@ -241,6 +243,7 @@ const init = async () => {
         allowPinAuthentication,
         sessionIdentity: getLocalIdentity(),
         autoSelectionPrincipal,
+        useIcrc25: useIcrc25El.checked,
       });
       delegationIdentity = result.identity;
       updateDelegationView({

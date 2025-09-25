@@ -21,6 +21,8 @@
   "devDependencies": {
     "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/internet-identity-vite-plugins": "*",
+    "@slide-computer/signer": "^3.17.0",
+    "@slide-computer/signer-web": "^3.17.0",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.0",

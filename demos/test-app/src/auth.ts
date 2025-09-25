@@ -6,6 +6,8 @@ import {
   SignedDelegation,
 } from "@dfinity/identity";
 import { Principal } from "@dfinity/principal";
+import { Signer } from "@slide-computer/signer";
+import { PostMessageTransport } from "@slide-computer/signer-web";
 
 // The type of response from II as per the spec
 interface AuthResponseSuccess {
@@ -30,6 +32,7 @@ export const authWithII = async ({
   derivationOrigin,
   sessionIdentity,
   autoSelectionPrincipal,
+  useIcrc25,
 }: {
   url: string;
   maxTimeToLive?: bigint;
@@ -37,7 +40,22 @@ export const authWithII = async ({
   derivationOrigin?: string;
   autoSelectionPrincipal?: string;
   sessionIdentity: SignIdentity;
+  useIcrc25?: boolean;
 }): Promise<{ identity: DelegationIdentity; authnMethod: string }> => {
+  // Authenticate with signer-js instead if we use the ICRC-25 protocol
+  if (useIcrc25) {
+    const transport = new PostMessageTransport({ url: url_ });
+    const signer = new Signer({ transport });
+    const delegation = await signer.delegation({
+      maxTimeToLive,
+      publicKey: sessionIdentity.getPublicKey().toDer(),
+    });
+    return {
+      identity: DelegationIdentity.fromDelegation(sessionIdentity, delegation),
+      authnMethod: "passkey",
+    };
+  }
+
   // Figure out the II URL to use
   const iiUrl = new URL(url_);
   iiUrl.hash = "#authorize";
