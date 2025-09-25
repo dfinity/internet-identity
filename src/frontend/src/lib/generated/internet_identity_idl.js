@@ -298,6 +298,12 @@ export const idlFactory = ({ IDL }) => {
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
   });
+  const GetDefaultAccountError = IDL.Variant({
+    'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
+    'NoSuchAnchor' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+  });
   const GetDelegationResponse = IDL.Variant({
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
@@ -470,6 +476,16 @@ export const idlFactory = ({ IDL }) => {
     'bad_challenge' : IDL.Null,
     'canister_full' : IDL.Null,
     'registered' : IDL.Record({ 'user_number' : UserNumber }),
+  });
+  const SetDefaultAccountError = IDL.Variant({
+    'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
+    'NoSuchAnchor' : IDL.Null,
+    'InternalCanisterError' : IDL.Text,
+    'Unauthorized' : IDL.Principal,
+    'NoSuchAccount' : IDL.Record({
+      'account_number' : IDL.Opt(AccountNumber),
+      'anchor_number' : UserNumber,
+    }),
   });
   const ArchiveInfo = IDL.Record({
     'archive_config' : IDL.Opt(ArchiveConfig),
@@ -649,6 +665,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
+    'get_default_account' : IDL.Func(
+        [UserNumber, FrontendHostname],
+        [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : GetDefaultAccountError })],
+        [],
+      ),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],
         [GetDelegationResponse],
@@ -785,6 +806,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'remove' : IDL.Func([UserNumber, DeviceKey], [], []),
     'replace' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
+    'set_default_account' : IDL.Func(
+        [UserNumber, FrontendHostname, IDL.Opt(AccountNumber)],
+        [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : SetDefaultAccountError })],
+        [],
+      ),
     'stats' : IDL.Func([], [InternetIdentityStats], ['query']),
     'update' : IDL.Func([UserNumber, DeviceKey, DeviceData], [], []),
     'update_account' : IDL.Func(
