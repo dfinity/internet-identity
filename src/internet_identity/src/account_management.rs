@@ -12,6 +12,7 @@ use crate::{
             validate_account_name, Account, AccountDelegationError, AccountsCounter,
             CreateAccountParams, PrepareAccountDelegation, ReadAccountParams, UpdateAccountParams,
         },
+        storable::anchor_application_config::AnchorApplicationConfig,
         Storage,
     },
     update_root_hash,
@@ -24,10 +25,14 @@ use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::{
     archive::types::{Operation, Private},
     internet_identity::types::{
-        AccountNumber, AccountUpdate, AnchorNumber, CheckMaxAccountError, CreateAccountError,
-        Delegation, FrontendHostname, SessionKey, SignedDelegation, Timestamp, UpdateAccountError,
+        AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, ApplicationNumber,
+        CheckMaxAccountError, CreateAccountError, Delegation, FrontendHostname,
+        GetDefaultAccountError, SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp,
+        UpdateAccountError,
     },
 };
+#[cfg(test)]
+use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 
 const MAX_ANCHOR_ACCOUNTS: usize = 500;
@@ -37,6 +42,88 @@ pub fn get_accounts_for_origin(
     origin: &FrontendHostname,
 ) -> Vec<Account> {
     storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
+}
+
+fn try_read_account_info(
+    anchor_number: AnchorNumber,
+    origin: &FrontendHostname,
+    application_number: ApplicationNumber,
+    account_number: Option<AccountNumber>,
+) -> Result<AccountInfo, String> {
+    let Some(account) = storage_borrow(|storage| {
+        storage.read_account(ReadAccountParams {
+            account_number,
+            anchor_number,
+            origin: &origin,
+            known_app_num: Some(application_number),
+        })
+    }) else {
+        let account_str = account_number
+            .map(|num| format!("#{}", num))
+            // The following case should not happen, as it is handled by `read_account` above.
+            // We include it here nonetheless for completeness.
+            .unwrap_or_else(|| "without a number".to_string());
+
+        let message = format!(
+            "Account {} does not exist for anchor {} and origin {}.",
+            account_str, anchor_number, origin
+        );
+
+        return Err(message);
+    };
+
+    Ok(account.to_info())
+}
+
+pub fn get_default_account_for_origin(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+) -> Result<AccountInfo, GetDefaultAccountError> {
+    let Some(application_number) =
+        storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
+    else {
+        return Err(GetDefaultAccountError::NoSuchOrigin { anchor_number });
+    };
+
+    let AnchorApplicationConfig {
+        default_account_number: account_number,
+    } = storage_borrow(|storage| {
+        storage.lookup_anchor_application_config(anchor_number, application_number)
+    });
+
+    let account = try_read_account_info(anchor_number, &origin, application_number, account_number)
+        .map_err(GetDefaultAccountError::InternalCanisterError)?;
+
+    Ok(account)
+}
+
+pub fn set_default_account_for_origin(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> Result<AccountInfo, SetDefaultAccountError> {
+    let Some(application_number) =
+        storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
+    else {
+        return Err(SetDefaultAccountError::NoSuchOrigin { anchor_number });
+    };
+
+    // Ensure the account exists for this (anchor, origin).
+    let account = try_read_account_info(anchor_number, &origin, application_number, account_number)
+        .map_err(|_| SetDefaultAccountError::NoSuchAccount {
+            anchor_number,
+            origin,
+        })?;
+
+    let config = AnchorApplicationConfig {
+        default_account_number: account_number,
+    };
+
+    storage_borrow_mut(|storage| {
+        storage.set_anchor_application_config(anchor_number, application_number, config);
+    });
+
+    Ok(account)
 }
 
 pub fn create_account_for_origin(
@@ -723,4 +810,285 @@ fn should_increment_discrepancy_counter() {
         let discrepancy_counter_after = storage.get_discrepancy_counter();
         assert_eq!(discrepancy_counter_after.account_counter_rebuilds, 1);
     });
+}
+
+#[test]
+fn should_get_default_account_for_origin() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let origin = "https://example.com".to_string();
+    let anchor_number = anchor.anchor_number();
+
+    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
+    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string()).unwrap();
+
+    // Smoke test
+    assert_eq!(
+        get_accounts_for_origin(anchor_number, &origin),
+        vec![
+            Account::new(anchor_number, origin.clone(), None, None),
+            Account {
+                anchor_number,
+                origin: origin.clone(),
+                account_number: Some(1),
+                name: Some("Alice".to_string()),
+                last_used: None,
+                seed_from_anchor: None,
+            },
+            Account {
+                anchor_number,
+                origin: origin.clone(),
+                account_number: Some(2),
+                name: Some("Bob".to_string()),
+                last_used: None,
+                seed_from_anchor: None,
+            }
+        ]
+    );
+
+    let test_cases = [
+        (
+            "GET without ever calling SET (getter works from the start)",
+            None,
+            Ok(AccountInfo {
+                account_number: None,
+                origin: origin.clone(),
+                last_used: None,
+                name: None,
+            }),
+        ),
+        (
+            "SET to Some(1) (Alice), then GET (default can be customized)",
+            Some((
+                Some(1),
+                Ok(AccountInfo {
+                    account_number: Some(1),
+                    origin: origin.clone(),
+                    last_used: None,
+                    name: Some("Alice".to_string()),
+                }),
+            )),
+            Ok(AccountInfo {
+                account_number: Some(1),
+                origin: origin.clone(),
+                last_used: None,
+                name: Some("Alice".to_string()),
+            }),
+        ),
+        (
+            "SET to Some(0) (no such account), then GET (error is returned by SET, GET returns what was there before)",
+            Some((
+                Some(0),
+                Err(SetDefaultAccountError::NoSuchAccount {
+                    anchor_number,
+                    origin: origin.clone(),
+                }),
+            )),
+            Ok(AccountInfo {
+                account_number: Some(1),
+                origin: origin.clone(),
+                last_used: None,
+                name: Some("Alice".to_string()),
+            }),
+        ),
+        (
+            "SET to Some(42) (non-existent), then GET (error is returned by SET, GET returns what was there before)",
+            Some((
+                Some(42),
+                Err(SetDefaultAccountError::NoSuchAccount {
+                    anchor_number,
+                    origin: origin.clone(),
+                }),
+            )),
+            Ok(AccountInfo {
+                account_number: Some(1),
+                origin: origin.clone(),
+                last_used: None,
+                name: Some("Alice".to_string()),
+            }),
+        ),
+        (
+            "SET to Some(2) (Bob), then GET (default can be changed a second time)",
+            Some((
+                Some(2),
+                Ok(AccountInfo {
+                    account_number: Some(2),
+                    origin: origin.clone(),
+                    last_used: None,
+                    name: Some("Bob".to_string()),
+                }),
+            )),
+            Ok(AccountInfo {
+                account_number: Some(2),
+                origin: origin.clone(),
+                last_used: None,
+                name: Some("Bob".to_string()),
+            }),
+        ),
+        (
+            "SET to None (reset to default), then GET (can set default to None again)",
+            Some((
+                None,
+                Ok(AccountInfo {
+                    account_number: None,
+                    origin: origin.clone(),
+                    last_used: None,
+                    name: None,
+                }),
+            )),
+            Ok(AccountInfo {
+                account_number: None,
+                origin: origin.clone(),
+                last_used: None,
+                name: None,
+            }),
+        ),
+    ];
+
+    // Run code under test
+    for (label, default_account_number_and_expected_set_result, expected_get_result) in test_cases {
+        if let Some((default_account_number, expected_set_result)) =
+            default_account_number_and_expected_set_result
+        {
+            let result = set_default_account_for_origin(
+                anchor_number,
+                origin.clone(),
+                default_account_number,
+            );
+
+            assert_eq!(
+                result, expected_set_result,
+                "{label}: unexpected SET result"
+            );
+        }
+
+        let result = get_default_account_for_origin(anchor_number, origin.clone());
+
+        assert_eq!(
+            result, expected_get_result,
+            "{label}: unexpected GET result"
+        );
+    }
+}
+
+#[test]
+fn cannot_get_default_before_update_account_for_origin() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let origin = "https://example.com".to_string();
+    let anchor_number = anchor.anchor_number();
+
+    // Run code under test
+    let result = get_default_account_for_origin(anchor_number, origin.clone());
+
+    assert_eq!(
+        result,
+        Err(GetDefaultAccountError::NoSuchOrigin { anchor_number })
+    );
+}
+
+#[test]
+fn should_get_updated_default_account_after_modification() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let origin = "https://example.com".to_string();
+    let anchor_number = anchor.anchor_number();
+
+    // Update the default account (this should give it a name and account number)
+    update_account_for_origin(
+        anchor_number,
+        None, // None means default account
+        origin.clone(),
+        AccountUpdate {
+            name: Some("Default Account".to_string()),
+        },
+    )
+    .unwrap();
+
+    // Run code under test
+    let result = get_default_account_for_origin(anchor_number, origin.clone());
+
+    assert_eq!(
+        result,
+        Ok(AccountInfo {
+            account_number: Some(1),
+            origin: origin.clone(),
+            last_used: None,
+            name: Some("Default Account".to_string()),
+        })
+    );
+}
+
+#[test]
+fn should_fail_get_default_account_for_nonexistent_anchor() {
+    use crate::state::storage_replace;
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let nonexistent_anchor = 99999;
+    let origin = "https://example.com".to_string();
+
+    // Run code under test
+    let result = get_default_account_for_origin(nonexistent_anchor, origin);
+
+    assert_eq!(
+        result,
+        Err(GetDefaultAccountError::NoSuchOrigin {
+            anchor_number: 99999
+        })
+    );
+}
+
+#[test]
+fn should_get_default_account_for_different_origins() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let origin1 = "https://app1.com".to_string();
+    let origin2 = "https://app2.com".to_string();
+    let anchor_number = anchor.anchor_number();
+
+    // Create accounts for both origins
+    create_account_for_origin(anchor_number, origin1.clone(), "Alice".to_string()).unwrap();
+    create_account_for_origin(anchor_number, origin2.clone(), "Bob".to_string()).unwrap();
+
+    // Run code under test
+    let result1 = get_default_account_for_origin(anchor_number, origin1.clone());
+    let result2 = get_default_account_for_origin(anchor_number, origin2.clone());
+
+    assert_eq!(
+        result1,
+        Ok(AccountInfo {
+            account_number: None,
+            origin: origin1.clone(),
+            last_used: None,
+            name: None,
+        })
+    );
+
+    assert_eq!(
+        result2,
+        Ok(AccountInfo {
+            account_number: None,
+            origin: origin2.clone(),
+            last_used: None,
+            name: None,
+        })
+    );
 }

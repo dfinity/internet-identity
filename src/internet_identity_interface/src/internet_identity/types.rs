@@ -433,7 +433,7 @@ pub struct DummyAuthConfig {
     pub prompt_for_index: bool,
 }
 
-#[derive(CandidType, Debug, Deserialize)]
+#[derive(CandidType, Debug, Deserialize, PartialEq)]
 pub enum GetDefaultAccountError {
     InternalCanisterError(String),
     Unauthorized(Principal),
@@ -441,7 +441,7 @@ pub enum GetDefaultAccountError {
     NoSuchOrigin { anchor_number: AnchorNumber },
 }
 
-#[derive(CandidType, Debug, Deserialize)]
+#[derive(CandidType, Debug, Deserialize, PartialEq)]
 pub enum SetDefaultAccountError {
     InternalCanisterError(String),
     Unauthorized(Principal),
@@ -451,6 +451,6 @@ pub enum SetDefaultAccountError {
     },
     NoSuchAccount {
         anchor_number: AnchorNumber,
-        account_number: Option<AccountNumber>, // None is the unreserved default account
+        origin: FrontendHostname,
     },
 }

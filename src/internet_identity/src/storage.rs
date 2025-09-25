@@ -117,6 +117,7 @@ use crate::storage::storable::account::StorableAccount;
 use crate::storage::storable::account_number::StorableAccountNumber;
 use crate::storage::storable::account_reference::StorableAccountReference;
 use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCounter};
+use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use internet_identity_interface::internet_identity::types::*;
@@ -173,6 +174,7 @@ const STABLE_ANCHOR_MEMORY_INDEX: u8 = 16u8;
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 17u8;
 const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
+const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -188,6 +190,8 @@ const STABLE_ACCOUNT_MEMORY_ID: MemoryId = MemoryId::new(STABLE_ACCOUNT_MEMORY_I
 const STABLE_APPLICATION_MEMORY_ID: MemoryId = MemoryId::new(STABLE_APPLICATION_MEMORY_INDEX);
 const STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_INDEX);
+const STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID: MemoryId =
+    MemoryId::new(STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX);
 const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX);
 const STABLE_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
@@ -282,6 +286,13 @@ pub struct Storage<M: Memory> {
         StorableAccountReferenceList,
         ManagedMemory<M>,
     >,
+    /// Memory wrapper used to report the size of the stable (anchor, application)-config memory.
+    stable_anchor_application_config_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    stable_anchor_application_config_memory: StableBTreeMap<
+        (StorableAnchorNumber, StorableApplicationNumber),
+        AnchorApplicationConfig,
+        ManagedMemory<M>,
+    >,
     stable_account_counter_memory: StableCell<StorableAccountsCounter, ManagedMemory<M>>,
     /// Counter that counts how often there was a discrepancy between the anchor accounts counter and the actual number of accounts
     stable_account_counter_discrepancy_counter_memory:
@@ -367,6 +378,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID);
         let stable_account_reference_list_memory =
             memory_manager.get(STABLE_ACCOUNT_REFERENCE_LIST_MEMORY_ID);
+        let stable_default_account_reference_memory =
+            memory_manager.get(STABLE_DEFAULT_ACCOUNT_REFERENCE_MEMORY_ID);
         let stable_account_counter_memory = memory_manager.get(STABLE_ACCOUNT_COUNTER_MEMORY_ID);
         let stable_account_counter_discrepancy_counter_memory =
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
@@ -426,6 +439,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             stable_account_reference_list_memory: StableBTreeMap::init(
                 stable_account_reference_list_memory,
+            ),
+            stable_anchor_application_config_memory_wrapper: MemoryWrapper::new(
+                stable_default_account_reference_memory.clone(),
+            ),
+            stable_anchor_application_config_memory: StableBTreeMap::init(
+                stable_default_account_reference_memory,
             ),
             stable_account_counter_memory: StableCell::init(
                 stable_account_counter_memory,
@@ -786,6 +805,33 @@ impl<M: Memory + Clone> Storage<M> {
                         .cloned()
                 })
         })
+    }
+
+    pub fn lookup_anchor_application_config(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+    ) -> AnchorApplicationConfig {
+        if let Some(config) = self
+            .stable_anchor_application_config_memory
+            .get(&(anchor_number, application_number))
+        {
+            return config;
+        }
+
+        AnchorApplicationConfig::default()
+    }
+
+    pub fn set_anchor_application_config(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: ApplicationNumber,
+        anchor_application_config: AnchorApplicationConfig,
+    ) {
+        self.stable_anchor_application_config_memory.insert(
+            (anchor_number, application_number),
+            anchor_application_config,
+        );
     }
 
     /// Updates the anchor account, application and account counters.
@@ -1232,6 +1278,17 @@ impl<M: Memory + Clone> Storage<M> {
         // Get or create an application number from the account's origin.
         let application_number =
             self.lookup_or_insert_application_number_with_origin(&params.origin);
+
+        // Update default account in the (anchor, origin) config.
+        {
+            let mut config =
+                self.lookup_anchor_application_config(params.anchor_number, application_number);
+
+            config.default_account_number = Some(new_account_number);
+
+            self.set_anchor_application_config(params.anchor_number, application_number, config);
+        }
+
         // Update counters with one more account.
         self.update_counters(
             application_number,
@@ -1485,6 +1542,10 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "stable_account_reference_list".to_string(),
                 self.stable_account_reference_list_memory_wrapper.size(),
+            ),
+            (
+                "stable_anchor_application_config".to_string(),
+                self.stable_anchor_application_config_memory_wrapper.size(),
             ),
         ])
     }

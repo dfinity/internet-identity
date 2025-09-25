@@ -653,7 +653,7 @@ type SetDefaultAccountError = variant {
     };
     NoSuchAccount : record {
         anchor_number : UserNumber;
-        account_number : opt AccountNumber;
+        origin : FrontendHostname;
     };
 };
 

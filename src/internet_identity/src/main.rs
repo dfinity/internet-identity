@@ -391,28 +391,30 @@ fn update_account(
 #[update]
 fn get_default_account(
     anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
+    origin: FrontendHostname,
 ) -> Result<AccountInfo, GetDefaultAccountError> {
     check_authorization(anchor_number)
         .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
 
-    Err(GetDefaultAccountError::InternalCanisterError(
-        "Function get_default_account is not implemented yet.".to_string(),
-    ))
+    let default_account_info =
+        account_management::get_default_account_for_origin(anchor_number, origin)?;
+
+    Ok(default_account_info)
 }
 
 #[update]
 fn set_default_account(
     anchor_number: AnchorNumber,
-    _origin: FrontendHostname,
-    _account_number: Option<AccountNumber>,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     check_authorization(anchor_number)
         .map_err(|err| SetDefaultAccountError::Unauthorized(err.principal))?;
 
-    Err(SetDefaultAccountError::InternalCanisterError(
-        "Function set_default_account is not implemented yet.".to_string(),
-    ))
+    let default_account_info =
+        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
+
+    Ok(default_account_info)
 }
 
 #[update]
