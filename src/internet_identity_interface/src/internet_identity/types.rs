@@ -432,3 +432,25 @@ pub enum AccountNameValidationError {
 pub struct DummyAuthConfig {
     pub prompt_for_index: bool,
 }
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum GetDefaultAccountError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
+    NoSuchAnchor,
+    NoSuchOrigin { anchor_number: AnchorNumber },
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub enum SetDefaultAccountError {
+    InternalCanisterError(String),
+    Unauthorized(Principal),
+    NoSuchAnchor,
+    NoSuchOrigin {
+        anchor_number: AnchorNumber,
+    },
+    NoSuchAccount {
+        anchor_number: AnchorNumber,
+        account_number: Option<AccountNumber>, // None is the unreserved default account
+    },
+}

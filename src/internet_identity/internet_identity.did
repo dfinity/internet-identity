@@ -635,6 +635,28 @@ type AccountDelegationError = variant {
     NoSuchDelegation;
 };
 
+type GetDefaultAccountError = variant {
+    InternalCanisterError : text;
+    Unauthorized : principal;
+    NoSuchAnchor;
+    NoSuchOrigin : record {
+        anchor_number : UserNumber;
+    };
+};
+
+type SetDefaultAccountError = variant {
+    InternalCanisterError : text;
+    Unauthorized : principal;
+    NoSuchAnchor;
+    NoSuchOrigin : record {
+        anchor_number : UserNumber;
+    };
+    NoSuchAccount : record {
+        anchor_number : UserNumber;
+        account_number : opt AccountNumber;
+    };
+};
+
 type PrepareAccountDelegation = record {
     user_key : UserKey;
     expiration : Timestamp;
@@ -985,4 +1007,15 @@ service : (opt InternetIdentityInit) -> {
         session_key : SessionKey,
         expiration : Timestamp
     ) -> (variant { Ok : SignedDelegation; Err : AccountDelegationError }) query;
+
+    get_default_account : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+    ) -> (variant { Ok : AccountInfo; Err: GetDefaultAccountError });
+
+    set_default_account : (
+        anchor_number : UserNumber,
+        origin : FrontendHostname,
+        account_number : opt AccountNumber
+    ) -> (variant { Ok : AccountInfo; Err: SetDefaultAccountError });
 };
