@@ -45,7 +45,7 @@ export const authWithII = async ({
   // Authenticate with signer-js instead if we use the ICRC-25 protocol
   if (useIcrc25) {
     const transport = new PostMessageTransport({ url: url_ });
-    const signer = new Signer({ transport });
+    const signer = new Signer({ transport, derivationOrigin });
     const delegation = await signer.delegation({
       maxTimeToLive,
       publicKey: sessionIdentity.getPublicKey().toDer(),
