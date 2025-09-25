@@ -7,6 +7,8 @@
     "@dfinity/candid": "*",
     "@dfinity/identity": "*",
     "@dfinity/principal": "*",
+    "@slide-computer/signer": "^3.19.0",
+    "@slide-computer/signer-web": "^3.19.0",
     "buffer": "^6.0.3",
     "jose": "^5.1.2",
     "react": "^18.2.0",
