@@ -405,6 +405,7 @@ fn get_default_account(
 fn set_default_account(
     anchor_number: AnchorNumber,
     _origin: FrontendHostname,
+    _account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
     check_authorization(anchor_number)
         .map_err(|err| SetDefaultAccountError::Unauthorized(err.principal))?;
