@@ -20,6 +20,7 @@ pub struct CreateAccountParams {
     pub anchor_number: AnchorNumber,
     pub name: String,
     pub origin: FrontendHostname,
+    pub is_default: bool,
 }
 
 pub struct UpdateAccountParams {
@@ -27,6 +28,7 @@ pub struct UpdateAccountParams {
     pub anchor_number: AnchorNumber,
     pub name: String,
     pub origin: FrontendHostname,
+    pub is_default: Option<bool>,
 }
 
 pub struct UpdateExistingAccountParams {
@@ -34,6 +36,7 @@ pub struct UpdateExistingAccountParams {
     pub anchor_number: AnchorNumber,
     pub name: String,
     pub origin: FrontendHostname,
+    pub is_default: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -65,6 +68,7 @@ pub struct Account {
     pub origin: FrontendHostname,
     pub last_used: Option<Timestamp>,
     pub name: Option<String>,
+    pub is_default: bool,
     seed_from_anchor: Option<AnchorNumber>,
 }
 
@@ -73,6 +77,7 @@ impl Account {
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
+        is_default: bool,
         account_number: Option<AccountNumber>,
     ) -> Account {
         Self {
@@ -81,6 +86,7 @@ impl Account {
             origin,
             last_used: None,
             name,
+            is_default,
             seed_from_anchor: None,
         }
     }
@@ -89,6 +95,7 @@ impl Account {
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
+        is_default: bool,
         account_number: Option<AccountNumber>,
         last_used: Option<Timestamp>,
     ) -> Account {
@@ -98,6 +105,7 @@ impl Account {
             origin,
             last_used,
             name,
+            is_default,
             seed_from_anchor: None,
         }
     }
@@ -106,6 +114,7 @@ impl Account {
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
         name: Option<String>,
+        is_default: bool,
         account_number: Option<AccountNumber>,
         last_used: Option<Timestamp>,
         seed_from_anchor: Option<AnchorNumber>,
@@ -116,6 +125,7 @@ impl Account {
             origin,
             last_used,
             name,
+            is_default,
             seed_from_anchor,
         }
     }
@@ -139,6 +149,7 @@ impl Account {
             origin: self.origin.clone(),
             last_used: self.last_used,
             name: self.name.clone(),
+            is_default: self.is_default,
         }
     }
 
