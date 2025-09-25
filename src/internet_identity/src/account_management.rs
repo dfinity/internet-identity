@@ -54,7 +54,7 @@ fn try_read_account_info(
         storage.read_account(ReadAccountParams {
             account_number,
             anchor_number,
-            origin: &origin,
+            origin,
             known_app_num: Some(application_number),
         })
     }) else {
