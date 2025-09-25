@@ -1,4 +1,5 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import { Page } from "@playwright/test";
 import {
   addVirtualAuthenticator,
   clearStorage,
