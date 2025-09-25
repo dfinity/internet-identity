@@ -286,7 +286,7 @@ Requirements:
 - Derivation Origin must expose the `/.well-known/ii-alternative-origins` file.
 - The `/.well-known/ii-alternative-origins` file must be hosted by an ICP canister that must implement the `http_request` query call.
 - The alternative origins must be present in the file `/.well-known/ii-alternative-origins` of the derivation origin requested.
-- Set desired Derivation Origin when [logging in the user with AuthClient](https://github.com/dfinity/icp-js-core/blob/a6aa6e2eb58cf2cbae92156b957293e40f458323/packages/auth-client/src/index.ts#L132).
+- The alternative origin's application must set the desired Derivation Origin when [logging in the user with AuthClient](https://github.com/dfinity/icp-js-core/blob/a6aa6e2eb58cf2cbae92156b957293e40f458323/packages/auth-client/src/index.ts#L132).
 
 ### JSON Schema {#alternative-frontend-origins-schema}
 
