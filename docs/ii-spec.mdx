@@ -264,7 +264,7 @@ sequenceDiagram
     participant IF as II Frontend
     participant D as App Derivation Origin
     D->>D: Adds /.well-known/ii-alternative-origins endpoint
-    D->>D: Adds "Alternative Origin" in "ii-alternative-origins" response
+    D->>D: Adds "Alternative Origin" in /.well-known/ii-alternative-origins response
     U->>A: User accesses Alternative Origin
     U->>A: Clicks to log in with II
     A->>IF: Opens II in new Tab
