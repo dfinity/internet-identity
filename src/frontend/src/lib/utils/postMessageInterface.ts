@@ -75,7 +75,7 @@ export function rpcAuthenticationProtocol({
       onDisconnect(): void {
         resolve("closed");
       },
-      onEstablish(origin: string, source: MessageEventSource): void {
+      onEstablish(origin, source): void {
         window.addEventListener("message", async (event) => {
           // Ignore invalid requests
           if (
@@ -179,7 +179,7 @@ export function rpcAuthenticationProtocol({
                 },
               );
               try {
-                (source as WindowProxy).postMessage(
+                source.postMessage(
                   {
                     id: event.data.id,
                     jsonrpc: "2.0",
@@ -202,7 +202,7 @@ export function rpcAuthenticationProtocol({
               AuthorizeClientEvents.AuthenticateSuccess,
             );
             try {
-              (source as WindowProxy).postMessage(
+              source.postMessage(
                 {
                   id: event.data.id,
                   jsonrpc: "2.0",
