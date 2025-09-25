@@ -16,6 +16,7 @@ import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store"
 import { features } from "$lib/legacy/features";
 import { canisterConfig } from "$lib/globals";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
+import { rpcAuthenticationProtocol } from "$lib/utils/postMessageInterface";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest; // Additional details e.g. derivation origin
@@ -50,7 +51,7 @@ type AuthorizationStore = Readable<{
   context?: AuthorizationContext;
   status: AuthorizationStatus;
 }> & {
-  init: () => Promise<void>;
+  init: (rpc?: boolean) => Promise<void>;
   authorize: (
     accountNumber: bigint | undefined,
     artificialDelay?: number,
@@ -68,8 +69,10 @@ let authorize: (
 ) => Promise<void>;
 
 export const authorizationStore: AuthorizationStore = {
-  init: async () => {
-    const status = await authenticationProtocol({
+  init: async (rpc = false) => {
+    const status = await (
+      rpc ? rpcAuthenticationProtocol : authenticationProtocol
+    )({
       authenticate: async (context) => {
         const effectiveOrigin = remapToLegacyDomain(
           context.authRequest.derivationOrigin ?? context.requestOrigin,

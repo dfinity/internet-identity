@@ -10,12 +10,15 @@
         margin: 1rem 0;
         overflow-wrap: break-word;
       }
+
       .postMessage-title {
         font-weight: bold;
       }
+
       .received {
         background-color: lightblue;
       }
+
       .sent {
         background-color: lightgreen;
       }
@@ -68,6 +71,12 @@
             >PIN Authentication allowed:</label
           >
           <input type="checkbox" checked id="allowPinAuthentication" />
+        </div>
+        <div>
+          <label for="useIcrc25" style="display: inline-block; width: 200px"
+            >Use ICRC-25 protocol:</label
+          >
+          <input type="checkbox" id="useIcrc25" />
         </div>
         <button data-action="authenticate" id="signinBtn">Sign In</button>
         <h3>/.well-known/ii-alternative-origins</h3>

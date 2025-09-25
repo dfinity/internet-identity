@@ -1,7 +1,7 @@
 <script lang="ts">
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { goto, preloadCode, preloadData } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import {
     authorizationStore,
     authorizationContextStore,

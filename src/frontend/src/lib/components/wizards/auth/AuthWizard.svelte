@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
-  import type { Snippet } from "svelte";
+  import { onMount, type Snippet } from "svelte";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
   import PickAuthenticationMethod from "$lib/components/wizards/auth/views/PickAuthenticationMethod.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -13,11 +13,17 @@
   import { canisterConfig } from "$lib/globals";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
-  import { isOpenIdCancelError } from "$lib/utils/openID";
+  import {
+    decodeJWT,
+    findConfig,
+    isOpenIdCancelError,
+    isOpenIdConfig,
+  } from "$lib/utils/openID";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
 
   interface Props {
+    continueWithJWT?: string;
     isAuthenticating?: boolean;
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
@@ -36,6 +42,7 @@
     onMigration = () => {},
     onError,
     withinDialog = false,
+    continueWithJWT,
     children,
   }: Props = $props();
 
@@ -110,10 +117,11 @@
 
   const handleContinueWithOpenId = async (
     config: OpenIdConfig,
+    existingJWT?: string,
   ): Promise<void | "cancelled"> => {
     isAuthenticating = true;
     try {
-      const result = await authFlow.continueWithOpenId(config);
+      const result = await authFlow.continueWithOpenId(config, existingJWT);
       if (result.type === "signIn") {
         onSignIn(result.identityNumber);
       } else if (nonNullish(result.name)) {
@@ -146,6 +154,22 @@
       onOtherDevice(identityNumber);
     }
   };
+
+  // Continue automatically with JWT if one is already provided
+  onMount(() => {
+    if (isNullish(continueWithJWT)) {
+      return;
+    }
+    const { iss, ...metadata } = decodeJWT(continueWithJWT);
+    const config = findConfig(
+      iss,
+      Object.entries(metadata).map(([key, value]) => [key, { String: value! }]),
+    );
+    if (isNullish(config) || !isOpenIdConfig(config)) {
+      return;
+    }
+    handleContinueWithOpenId(config, continueWithJWT);
+  });
 </script>
 
 {#snippet dialogContent()}
@@ -191,12 +215,14 @@
 {:else}
   {#if authFlow.view === "chooseMethod" || !withinDialog}
     {@render children?.()}
-    <PickAuthenticationMethod
-      setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
-      continueWithGoogle={handleContinueWithGoogle}
-      continueWithOpenId={handleContinueWithOpenId}
-      migrate={() => (isMigrating = true)}
-    />
+    {#if isNullish(continueWithJWT)}
+      <PickAuthenticationMethod
+        setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
+        continueWithGoogle={handleContinueWithGoogle}
+        continueWithOpenId={handleContinueWithOpenId}
+        migrate={() => (isMigrating = true)}
+      />
+    {/if}
   {/if}
   {#if authFlow.view !== "chooseMethod"}
     {#if !withinDialog}

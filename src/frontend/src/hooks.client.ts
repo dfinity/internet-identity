@@ -10,6 +10,7 @@ import {
 } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
 import { isSameOrigin } from "$lib/utils/urlUtils";
+import { persistentSessionStore } from "$lib/stores/persistent-session.store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -69,5 +70,6 @@ export const init: ClientInit = async () => {
   overrideFeatureFlags();
   maybeSetDiscoverablePasskeyFlowFlag();
   await sessionStore.init({ canisterId, agentOptions });
+  await persistentSessionStore.init({ canisterId, agentOptions });
   authenticationStore.init({ canisterId, agentOptions });
 };
