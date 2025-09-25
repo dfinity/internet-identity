@@ -60,8 +60,7 @@ fn try_read_account_info(
     }) else {
         let account_str = account_number
             .map(|num| format!("#{}", num))
-            // The following case should not happen, as it is handled by `read_account` above.
-            // We include it here nonetheless for completeness.
+            // This can happen if update_account_for_origin was never called to init this account.
             .unwrap_or_else(|| "without a number".to_string());
 
         let message = format!(
