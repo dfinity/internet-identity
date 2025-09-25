@@ -23,6 +23,7 @@
   import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
   import { onMount } from "svelte";
   import * as easingFunctions from "svelte/easing";
+  import { nonNullish } from "@dfinity/utils";
 
   let {
     bgType = "dots",
@@ -56,6 +57,10 @@
     triggerAnimation = $bindable(),
     clearAnimation = $bindable(),
   }: FlairCanvasProps = $props();
+
+  // State for dynamic height during animations
+  let animationHeight = $state<string | null>(null);
+  let defaultHeight = "h-full"; // Default height
 
   let backgroundRef = $state<HTMLDivElement>();
   let canvasRef = $state<HTMLCanvasElement>();
@@ -266,7 +271,13 @@
       size,
       nImpulses,
       impulseEasing,
+      containerHeight,
     } = opts;
+
+    // Check whether the container height needs to change for this animation.
+    if (nonNullish(containerHeight)) {
+      animationHeight = containerHeight;
+    }
 
     let easingFunction = impulseEasing
       ? easingFunctions[impulseEasing]
@@ -332,11 +343,7 @@
           });
           promises.push(secondImpulse);
         }
-        await Promise.all(promises);
-        return;
-      }
-
-      if (
+      } else if (
         motionType === "down" ||
         motionType === "up" ||
         motionType === "left" ||
@@ -399,11 +406,7 @@
           });
           promises.push(secondImpulse);
         }
-        await Promise.all(promises);
-        return;
-      }
-
-      if (motionType === "perlin") {
+      } else if (motionType === "perlin") {
         const firstImpulse = createPerlinImpulse(
           x,
           y,
@@ -467,8 +470,6 @@
           });
           promises.push(secondImpulse);
         }
-        await Promise.all(promises);
-        return;
       }
 
       if (maskWaveOneWay) {
@@ -566,9 +567,7 @@
           0,
         );
         promises.push(maskWave);
-      }
-
-      if (visibility === "pausedmaskwave") {
+      } else if (visibility === "pausedmaskwave") {
         if (impulseEasing) {
           opacityWaveMotion = new Tween(0, {
             easing: easingFunctions[impulseEasing],
@@ -589,6 +588,8 @@
       }
 
       await Promise.all(promises);
+      // Reset animation height to default after animation is done
+      animationHeight = null;
     }
   };
 
@@ -855,7 +856,8 @@
 </script>
 
 <div
-  class="absolute inset-0 top-12 -z-50 h-[640px] w-full select-none"
+  class={`${animationHeight ?? defaultHeight} absolute inset-0
+    -z-50 w-full select-none`}
   aria-hidden="true"
   bind:this={backgroundRef}
   onpointerleave={handleReset}
