@@ -4,7 +4,6 @@
   import {
     clearDropWaveAnimation,
     triggerDropWaveAnimation,
-    unregisterAnimationTrigger,
   } from "$lib/utils/animation-dispatcher";
   import Button from "$lib/components/ui/Button.svelte";
   import { themeStore } from "$lib/stores/theme.store";
