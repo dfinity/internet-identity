@@ -996,7 +996,7 @@ fn should_get_default_account_for_origin() {
 }
 
 #[test]
-fn cannot_get_default_before_update_account_for_origin() {
+fn can_get_default_before_update_account_for_origin() {
     use crate::state::{storage_borrow_mut, storage_replace};
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
@@ -1011,7 +1011,7 @@ fn cannot_get_default_before_update_account_for_origin() {
 
     assert_eq!(
         result,
-        Err(GetDefaultAccountError::NoSuchOrigin { anchor_number })
+        Ok(Account::synthetic(anchor_number, origin.clone()).to_info())
     );
 }
 
