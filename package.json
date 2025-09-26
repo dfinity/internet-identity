@@ -53,7 +53,7 @@
     "@types/ua-parser-js": "^0.7.36",
     "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitest/browser": "^3.0.9",
-    "@wdio/globals": "^8.43.0",
+    "@wdio/globals": "^9.17.0",
     "@zag-js/svelte": "^1.12.0",
     "@zag-js/toast": "^1.12.0",
     "astro": "^5.5.4",
@@ -78,7 +78,7 @@
     "vite": "^6.3.6",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^3.0.9",
-    "webdriverio": "^8.43.0"
+    "webdriverio": "^9.19.2"
   },
   "dependencies": {
     "@dfinity/agent": "^2.1.2",
