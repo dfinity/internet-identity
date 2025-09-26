@@ -388,7 +388,7 @@ fn update_account(
     }
 }
 
-#[update]
+#[query]
 fn get_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,

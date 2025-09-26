@@ -44,28 +44,28 @@ pub fn get_accounts_for_origin(
     storage_borrow(|storage| storage.list_accounts(anchor_number, origin))
 }
 
+/// Helper function to read an account by application number, unlike `storage.read_account` this
+/// returns `Result` instead of `Option`.
+///
+/// This function is applicable only to numbered accounts; synthetic accounts are not currently
+/// stored in the memory and thus cannot be fetched from the storage.
 fn try_read_account_info(
     anchor_number: AnchorNumber,
-    origin: &FrontendHostname,
+    origin: FrontendHostname,
     application_number: ApplicationNumber,
-    account_number: Option<AccountNumber>,
+    account_number: AccountNumber,
 ) -> Result<AccountInfo, String> {
     let Some(account) = storage_borrow(|storage| {
         storage.read_account(ReadAccountParams {
-            account_number,
+            account_number: Some(account_number),
             anchor_number,
-            origin,
+            origin: &origin,
             known_app_num: Some(application_number),
         })
     }) else {
-        let account_str = account_number
-            .map(|num| format!("#{}", num))
-            // This can happen if update_account_for_origin was never called to init this account.
-            .unwrap_or_else(|| "without a number".to_string());
-
         let message = format!(
-            "Account {} does not exist for anchor {} and origin {}.",
-            account_str, anchor_number, origin
+            "Account #{} does not exist for anchor {} and origin {}.",
+            account_number, anchor_number, origin
         );
 
         return Err(message);
@@ -74,6 +74,9 @@ fn try_read_account_info(
     Ok(account.to_info())
 }
 
+/// Best effort to determin the default account for the given (anchor, origin).
+///
+/// An Err case would indicate internal inconsistency in the canister state.
 pub fn get_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -81,38 +84,56 @@ pub fn get_default_account_for_origin(
     let Some(application_number) =
         storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
     else {
-        return Err(GetDefaultAccountError::NoSuchOrigin { anchor_number });
+        return Ok(Account::synthetic(anchor_number, origin).to_info());
     };
 
     let AnchorApplicationConfig {
-        default_account_number: account_number,
+        default_account_number,
     } = storage_borrow(|storage| {
         storage.lookup_anchor_application_config(anchor_number, application_number)
     });
 
-    let account = try_read_account_info(anchor_number, &origin, application_number, account_number)
-        .map_err(GetDefaultAccountError::InternalCanisterError)?;
+    let Some(default_account_number) = default_account_number else {
+        return Ok(Account::synthetic(anchor_number, origin).to_info());
+    };
+
+    let account = try_read_account_info(
+        anchor_number,
+        origin,
+        application_number,
+        default_account_number,
+    )
+    .map_err(GetDefaultAccountError::InternalCanisterError)?;
 
     Ok(account)
 }
 
+/// Sets the default account for the given (anchor, origin) to the specified `account_number`.
+///
+/// If this is the first time an origin is seen for the anchor, a new application number is created.
 pub fn set_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    let Some(application_number) =
-        storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
-    else {
-        return Err(SetDefaultAccountError::NoSuchOrigin { anchor_number });
-    };
+    let application_number = storage_borrow_mut(|storage| {
+        storage.lookup_or_insert_application_number_with_origin(&origin)
+    });
 
-    // Ensure the account exists for this (anchor, origin).
-    let account = try_read_account_info(anchor_number, &origin, application_number, account_number)
+    let account = if let Some(account_number) = account_number {
+        try_read_account_info(
+            anchor_number,
+            origin.clone(),
+            application_number,
+            account_number,
+        )
         .map_err(|_| SetDefaultAccountError::NoSuchAccount {
             anchor_number,
             origin,
-        })?;
+        })?
+    } else {
+        Account::synthetic(anchor_number, origin).to_info()
+    };
 
     let config = AnchorApplicationConfig {
         default_account_number: account_number,
@@ -443,7 +464,7 @@ fn should_get_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new(anchor_number, origin.clone(), None, None),
+            Account::synthetic(anchor_number, origin.clone()),
             Account::new_full(
                 anchor_number,
                 origin.clone(),
@@ -485,7 +506,7 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new(anchor_number, origin.clone(), None, None),
+            Account::synthetic(anchor_number, origin.clone()),
             Account::new_full(
                 anchor_number,
                 origin.clone(),
@@ -500,7 +521,7 @@ fn should_only_get_own_accounts_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number_two, &origin),
         vec![
-            Account::new(anchor_number_two, origin.clone(), None, None),
+            Account::synthetic(anchor_number_two, origin.clone()),
             Account::new_full(
                 anchor_number_two,
                 origin.clone(),
@@ -532,7 +553,7 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new(anchor_number, origin.clone(), None, None),
+            Account::synthetic(anchor_number, origin.clone()),
             Account::new_full(
                 anchor_number,
                 origin.clone(),
@@ -574,7 +595,7 @@ fn should_update_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new(anchor_number, origin.clone(), None, None),
+            Account::synthetic(anchor_number, origin.clone()),
             Account::new_full(
                 anchor_number,
                 origin.clone(),
@@ -614,7 +635,7 @@ fn should_update_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new(anchor_number, origin.clone(), None, None),
+            Account::synthetic(anchor_number, origin.clone()),
             Account::new_full(
                 anchor_number,
                 origin.clone(),
@@ -829,7 +850,7 @@ fn should_get_default_account_for_origin() {
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
-            Account::new(anchor_number, origin.clone(), None, None),
+            Account::synthetic(anchor_number, origin.clone()),
             Account {
                 anchor_number,
                 origin: origin.clone(),
@@ -1031,7 +1052,7 @@ fn should_get_updated_default_account_after_modification() {
 }
 
 #[test]
-fn should_fail_get_default_account_for_nonexistent_anchor() {
+fn should_succeed_get_default_account_for_nonexistent_anchor() {
     use crate::state::storage_replace;
     use crate::storage::Storage;
     use ic_stable_structures::VectorMemory;
@@ -1045,8 +1066,11 @@ fn should_fail_get_default_account_for_nonexistent_anchor() {
 
     assert_eq!(
         result,
-        Err(GetDefaultAccountError::NoSuchOrigin {
-            anchor_number: 99999
+        Ok(AccountInfo {
+            account_number: None,
+            origin: "https://example.com".to_string(),
+            last_used: None,
+            name: None,
         })
     );
 }

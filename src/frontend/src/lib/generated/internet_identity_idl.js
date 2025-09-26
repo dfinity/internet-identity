@@ -483,7 +483,7 @@ export const idlFactory = ({ IDL }) => {
     'InternalCanisterError' : IDL.Text,
     'Unauthorized' : IDL.Principal,
     'NoSuchAccount' : IDL.Record({
-      'account_number' : IDL.Opt(AccountNumber),
+      'origin' : FrontendHostname,
       'anchor_number' : UserNumber,
     }),
   });

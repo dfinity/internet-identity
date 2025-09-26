@@ -1065,9 +1065,9 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Vec<Account> {
         check_frontend_length(origin);
         match self.lookup_application_number_with_origin(origin) {
-            None => vec![Account::new(anchor_number, origin.clone(), None, None)],
+            None => vec![Account::synthetic(anchor_number, origin.clone())],
             Some(app_num) => match self.lookup_account_references(anchor_number, app_num) {
-                None => vec![Account::new(anchor_number, origin.clone(), None, None)],
+                None => vec![Account::synthetic(anchor_number, origin.clone())],
                 Some(refs) => refs
                     .iter()
                     .filter_map(|acc_ref| {

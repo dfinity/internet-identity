@@ -1011,7 +1011,7 @@ service : (opt InternetIdentityInit) -> {
     get_default_account : (
         anchor_number : UserNumber,
         origin : FrontendHostname,
-    ) -> (variant { Ok : AccountInfo; Err: GetDefaultAccountError });
+    ) -> (variant { Ok : AccountInfo; Err: GetDefaultAccountError }) query;
 
     set_default_account : (
         anchor_number : UserNumber,
