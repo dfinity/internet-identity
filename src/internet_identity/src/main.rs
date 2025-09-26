@@ -389,6 +389,33 @@ fn update_account(
 }
 
 #[update]
+fn get_default_account(
+    anchor_number: AnchorNumber,
+    _origin: FrontendHostname,
+) -> Result<AccountInfo, GetDefaultAccountError> {
+    check_authorization(anchor_number)
+        .map_err(|err| GetDefaultAccountError::Unauthorized(err.principal))?;
+
+    Err(GetDefaultAccountError::InternalCanisterError(
+        "Function get_default_account is not implemented yet.".to_string(),
+    ))
+}
+
+#[update]
+fn set_default_account(
+    anchor_number: AnchorNumber,
+    _origin: FrontendHostname,
+    _account_number: Option<AccountNumber>,
+) -> Result<AccountInfo, SetDefaultAccountError> {
+    check_authorization(anchor_number)
+        .map_err(|err| SetDefaultAccountError::Unauthorized(err.principal))?;
+
+    Err(SetDefaultAccountError::InternalCanisterError(
+        "Function set_default_account is not implemented yet.".to_string(),
+    ))
+}
+
+#[update]
 async fn prepare_account_delegation(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
