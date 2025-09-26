@@ -13,8 +13,8 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
-    "@wdio/globals": "8.32.3",
     "@wdio/cli": "8.32.3",
+    "@wdio/globals": "8.32.3",
     "@wdio/local-runner": "8.32.3",
     "@wdio/mocha-framework": "8.32.3",
     "@wdio/spec-reporter": "^8.21.0",
@@ -25,6 +25,6 @@
     "vite": "^5.4.19"
   },
   "dependencies": {
-    "@dfinity/auth-client": "^2.1.1"
+    "@icp-sdk/auth": "^4.0.0"
   }
 }
