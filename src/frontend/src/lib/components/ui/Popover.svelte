@@ -113,7 +113,7 @@
         onClose?.();
       }
     }}
-    class="popover backdrop:bg-bg-overlay fixed overflow-visible bg-transparent backdrop:opacity-40"
+    class="popover fixed overflow-visible bg-transparent"
   >
     <div
       class={[

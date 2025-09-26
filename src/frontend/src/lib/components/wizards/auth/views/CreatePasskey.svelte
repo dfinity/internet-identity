@@ -145,7 +145,7 @@
           anchor={popoverAnchorRef}
           direction="up"
           align="end"
-          distance="10px"
+          distance="0.5rem"
           class="gap-0.5"
           onClose={() => (showPrivacyPopover = false)}
         >

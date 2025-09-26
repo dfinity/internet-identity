@@ -139,15 +139,12 @@
         <p class="text-text-secondary text-sm">
           Still have an identity number?
         </p>
-        <Button
-          variant="tertiary"
+        <button
           onclick={migrate}
-          disabled={!supportsPasskeys ||
-            nonNullish(authenticatingProviderId) ||
-            isGoogleAuthenticating}
+          class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
         >
           Upgrade
-        </Button>
+        </button>
       </div>
     {:else}
       <Button
