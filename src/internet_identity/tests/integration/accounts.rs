@@ -47,7 +47,8 @@ fn should_create_account() -> Result<(), RejectResponse> {
             account_number: Some(1),
             last_used: None,
             origin,
-            name: Some(name)
+            name: Some(name),
+            is_default: None,
         }
     );
     Ok(())
@@ -115,25 +116,29 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
                 account_number: None,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                is_default: None,
             },
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some(name)
+                name: Some(name),
+                is_default: None,
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some(name_two)
+                name: Some(name_two),
+                is_default: None,
             },
             AccountInfo {
                 account_number: third_created_account.account_number,
                 origin,
                 last_used: None,
-                name: Some(name_three)
+                name: Some(name_three),
+                is_default: None,
             },
         ]
     );
@@ -165,7 +170,8 @@ fn should_list_default_account() -> Result<(), RejectResponse> {
             account_number: None,
             origin: origin.clone(),
             last_used: None,
-            name: None
+            name: None,
+            is_default: None,
         },]
     );
     Ok(())
@@ -245,19 +251,22 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
                 account_number: None,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                is_default: None,
             },
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some(name)
+                name: Some(name),
+                is_default: None,
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
                 last_used: None,
-                name: Some(name_two)
+                name: Some(name_two),
+                is_default: None,
             },
         ]
     );
@@ -270,13 +279,15 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
                 account_number: None,
                 origin: origin.clone(),
                 last_used: None,
-                name: None
+                name: None,
+                is_default: None,
             },
             AccountInfo {
                 account_number: another_identity_account.account_number,
                 origin,
                 last_used: None,
-                name: Some(name_three)
+                name: Some(name_three),
+                is_default: None,
             },
         ]
     );
@@ -327,7 +338,8 @@ fn should_update_account() -> Result<(), RejectResponse> {
             account_number: created_account.account_number,
             last_used: None,
             origin,
-            name: new_name
+            name: new_name,
+            is_default: None,
         }
     );
     Ok(())
@@ -397,7 +409,8 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             account_number: None,
             origin: origin.clone(),
             last_used: None,
-            name: None
+            name: None,
+            is_default: None,
         },]
     );
 
@@ -423,7 +436,8 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             account_number: Some(1),
             last_used: None,
             origin: origin.clone(),
-            name: Some(name.clone())
+            name: Some(name.clone()),
+            is_default: None,
         }
     );
 
@@ -444,7 +458,8 @@ fn should_update_default_account() -> Result<(), RejectResponse> {
             account_number: Some(1),
             origin,
             last_used: None,
-            name: Some(name)
+            name: Some(name),
+            is_default: None,
         },]
     );
 
