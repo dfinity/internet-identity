@@ -69,6 +69,18 @@ pub struct Account {
 }
 
 impl Account {
+    /// A default account that is not meant to be stored.
+    pub fn synthetic(anchor_number: AnchorNumber, origin: FrontendHostname) -> Self {
+        Self {
+            anchor_number,
+            origin,
+            account_number: None,
+            last_used: None,
+            name: None,
+            seed_from_anchor: None,
+        }
+    }
+
     pub fn new(
         anchor_number: AnchorNumber,
         origin: FrontendHostname,
@@ -79,8 +91,8 @@ impl Account {
             account_number,
             anchor_number,
             origin,
-            last_used: None,
             name,
+            last_used: None,
             seed_from_anchor: None,
         }
     }

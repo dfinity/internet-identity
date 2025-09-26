@@ -123,7 +123,7 @@ fn should_list_accounts() {
     };
     let expected_additional_account =
         Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
-    let expected_default_account = Account::new(anchor_number, origin.clone(), None, None);
+    let expected_default_account = Account::synthetic(anchor_number, origin.clone());
     storage.create_additional_account(new_account).unwrap();
 
     // 5. List accounts returns default account
@@ -238,7 +238,7 @@ fn should_update_default_account() {
 
     // 2. Default account exists withuot creating it
     let initial_accounts = storage.list_accounts(anchor_number, &origin);
-    let expected_unreserved_account = Account::new(anchor_number, origin.clone(), None, None);
+    let expected_unreserved_account = Account::synthetic(anchor_number, origin.clone());
     assert_eq!(initial_accounts, vec![expected_unreserved_account]);
 
     // 3. Update default account
@@ -525,7 +525,7 @@ fn should_read_default_account_with_empty_reference_list() {
     let default_account = storage.read_account(read_params).unwrap();
 
     // 4. Verify we get a synthetic default account
-    let expected_account = Account::new(anchor_number, origin, None, None);
+    let expected_account = Account::synthetic(anchor_number, origin.clone());
     assert_eq!(default_account, expected_account);
 }
 

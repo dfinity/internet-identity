@@ -4,6 +4,7 @@ pub mod account_reference;
 pub mod account_reference_list;
 pub mod accounts_counter;
 pub mod anchor;
+pub mod anchor_application_config;
 pub mod anchor_number;
 pub mod anchor_number_list;
 pub mod application;
