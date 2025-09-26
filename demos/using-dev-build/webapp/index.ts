@@ -3,8 +3,8 @@
  */
 
 import { Actor, ActorMethod, HttpAgent } from "@dfinity/agent";
-import { AuthClient } from "@dfinity/auth-client";
 import type { Principal } from "@dfinity/principal";
+import { AuthClient } from "@icp-sdk/auth/client";
 
 const webapp_id = process.env.WHOAMI_CANISTER_ID;
 // The <canisterId>.localhost URL is used as opposed to setting the canister id as a parameter
