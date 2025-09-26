@@ -91,8 +91,8 @@ impl Account {
             account_number,
             anchor_number,
             origin,
-            last_used: None,
             name,
+            last_used: None,
             seed_from_anchor: None,
         }
     }

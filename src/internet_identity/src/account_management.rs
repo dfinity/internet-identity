@@ -851,22 +851,18 @@ fn should_get_default_account_for_origin() {
         get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::synthetic(anchor_number, origin.clone()),
-            Account {
+            Account::new(
                 anchor_number,
-                origin: origin.clone(),
-                account_number: Some(1),
-                name: Some("Alice".to_string()),
-                last_used: None,
-                seed_from_anchor: None,
-            },
-            Account {
+                origin.clone(),
+                Some("Alice".to_string()),
+                Some(1)
+            ),
+            Account::new(
                 anchor_number,
-                origin: origin.clone(),
-                account_number: Some(2),
-                name: Some("Bob".to_string()),
-                last_used: None,
-                seed_from_anchor: None,
-            }
+                origin.clone(),
+                Some("Bob".to_string()),
+                Some(2)
+            ),
         ]
     );
 
