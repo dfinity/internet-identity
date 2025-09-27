@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { authorize, createIdentity, dummyAuth } from "../utils";
 
 test("Create and authorize with additional account", async ({ page }) => {
