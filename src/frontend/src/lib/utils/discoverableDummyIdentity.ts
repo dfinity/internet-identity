@@ -66,6 +66,6 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
   }
 
   sign(blob: ArrayBuffer): Promise<Signature> {
-    return this.#identity.sign(blob);
+    return this.#identity.sign(new Uint8Array(blob));
   }
 }

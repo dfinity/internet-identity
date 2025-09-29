@@ -51,7 +51,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
   try {
     const [jsonValue] = IDL.decode(
       [init({ IDL })[0]._type],
-      fromBase64(setupJs.dataset.canisterConfig),
+      new Uint8Array(fromBase64(setupJs.dataset.canisterConfig)),
     );
     return jsonValue as unknown as InternetIdentityInit;
   } catch {
