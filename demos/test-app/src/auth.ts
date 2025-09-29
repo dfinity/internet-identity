@@ -138,7 +138,7 @@ const identityFromResponse = ({
 
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
-    response.userPublicKey.buffer,
+    response.userPublicKey,
   );
 
   const identity = DelegationIdentity.fromDelegation(
