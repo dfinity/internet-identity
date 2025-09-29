@@ -1,5 +1,5 @@
 import { isUserNumber } from "$lib/utils/userNumber";
-import { toHexString } from "@dfinity/candid";
+import { bytesToHex } from "@noble/hashes/utils";
 import { entropyToMnemonic, validateMnemonic, wordlists } from "bip39";
 
 /**
@@ -9,7 +9,7 @@ export function generate(): string {
   const entropy = new Uint32Array(8); // NOTE: please change RECOVERYPHRASE_WORDCOUNT if this changes
   crypto.getRandomValues(entropy);
   return entropyToMnemonic(
-    toHexString(entropy.buffer),
+    bytesToHex(new Uint8Array(entropy.buffer)),
     RECOVERYPHRASE_WORDLIST,
   );
 }

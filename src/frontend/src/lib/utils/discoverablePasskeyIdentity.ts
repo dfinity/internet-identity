@@ -1,5 +1,4 @@
 import {
-  bufFromBufLike,
   type DerEncodedPublicKey,
   type PublicKey,
   type Signature,
@@ -9,6 +8,7 @@ import { DER_COSE_OID, unwrapDER, wrapDER } from "@dfinity/identity";
 import borc from "borc";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { extractAAGUID } from "$lib/utils/webAuthn";
+import { bufFromBufLike } from "$lib/utils/utils";
 
 /**
  * From the documentation;
@@ -33,18 +33,18 @@ export function authDataToCose(authData: Uint8Array): Uint8Array {
   return borc.encode(cleaned);
 }
 
-function coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
+function coseToDerEncodedBlob(cose: Uint8Array): DerEncodedPublicKey {
   return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
 }
 
-function coseFromDerEncodedBlob(derEncoded: DerEncodedPublicKey): ArrayBuffer {
-  return unwrapDER(derEncoded, DER_COSE_OID).buffer as ArrayBuffer;
+function coseFromDerEncodedBlob(derEncoded: DerEncodedPublicKey): Uint8Array {
+  return unwrapDER(derEncoded, DER_COSE_OID);
 }
 
 export class CosePublicKey implements PublicKey {
   protected _encodedKey: DerEncodedPublicKey;
 
-  public constructor(protected _cose: ArrayBuffer) {
+  public constructor(protected _cose: Uint8Array) {
     this._encodedKey = coseToDerEncodedBlob(_cose);
   }
 
@@ -52,15 +52,15 @@ export class CosePublicKey implements PublicKey {
     return this._encodedKey;
   }
 
-  public getCose(): ArrayBuffer {
+  public getCose(): Uint8Array {
     return this._cose;
   }
 
-  static fromDer(derEncodedBlob: ArrayBuffer): CosePublicKey {
+  static fromDer(derEncodedBlob: Uint8Array): CosePublicKey {
     return new CosePublicKey(coseFromDerEncodedBlob(derEncodedBlob));
   }
 
-  static fromCose(cose: ArrayBuffer): CosePublicKey {
+  static fromCose(cose: Uint8Array): CosePublicKey {
     return new CosePublicKey(cose);
   }
 }
@@ -129,9 +129,7 @@ const publicKeyFromResult = (
     new Uint8Array(result.response.attestationObject),
   );
   return Promise.resolve(
-    new CosePublicKey(
-      authDataToCose(new Uint8Array(attObject.authData)).buffer,
-    ),
+    new CosePublicKey(authDataToCose(new Uint8Array(attObject.authData))),
   );
 };
 
@@ -176,9 +174,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     const identity = new DiscoverablePasskeyIdentity({
       credentialCreationOptions: creationOptions(name),
     });
-    await identity.sign(
-      Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)).buffer,
-    );
+    await identity.sign(Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)));
     return identity;
   }
 
@@ -220,7 +216,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     return this.#authenticatorAttachment;
   }
 
-  async sign(blob: ArrayBuffer): Promise<Signature> {
+  async sign(blob: Uint8Array): Promise<Signature> {
     const credential = await (nonNullish(this.#credentialCreationOptions)
       ? navigator.credentials.create({
           ...this.#credentialCreationOptions,

@@ -415,22 +415,30 @@ export const throwCanisterError = <
   return response.Ok as Promise<S>;
 };
 
+// Helper that normalizes ArrayBuffer-like inputs.
+// Given a Uint8Array or an ArrayBuffer, always return an ArrayBuffer corresponding
+// exactly to the view's bytes (respects byteOffset/byteLength for typed arrays).
+export const bufFromBufLike = (
+  bufLike: ArrayBuffer | Uint8Array,
+): ArrayBuffer => {
+  if (bufLike instanceof ArrayBuffer) {
+    return bufLike;
+  }
+  // bufLike is a Uint8Array view into an ArrayBuffer; slice to get the exact range
+  return bufLike.buffer.slice(
+    bufLike.byteOffset,
+    bufLike.byteOffset + bufLike.byteLength,
+  );
+};
+
 export const toBase64 = (bytes: ArrayBuffer): string =>
   btoa(String.fromCharCode(...new Uint8Array(bytes)));
 
 export const toBase64URL = (bytes: ArrayBuffer): string =>
   toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-export const fromBase64 = (base64: string): ArrayBuffer =>
-  Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0)).buffer;
-
-export const fromBase64URL = (base64Url: string): ArrayBuffer =>
-  fromBase64(
-    base64Url
-      .replace(/-/g, "+")
-      .replace(/_/g, "/")
-      .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
-  );
+export const fromBase64 = (base64: string): Uint8Array =>
+  Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0));
 
 // Utility to transform the signed delegation received from the backend into one that the frontend DelegationChain understands.
 export const transformSignedDelegation = (
