@@ -62,11 +62,7 @@ document.getElementById("loginBtn")?.addEventListener("click", async () => {
   // At this point we're authenticated, and we can get the identity from the auth client:
   const identity = authClient.getIdentity();
   // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
-  const agent = await HttpAgent.create({
-    identity,
-    shouldFetchRootKey: true,
-    host: "http://localhost:4943",
-  });
+  const agent = await HttpAgent.create({ identity, shouldFetchRootKey: true });
   // Using the interface description of our webapp, we create an actor that we use to call the service methods.
   const webapp: _SERVICE = Actor.createActor(webapp_idl, {
     agent,
