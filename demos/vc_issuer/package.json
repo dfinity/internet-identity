@@ -5,11 +5,11 @@
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
     "@dfinity/agent": "*",
-    "@dfinity/auth-client": "*",
     "@dfinity/candid": "*",
     "@dfinity/identity": "*",
     "@dfinity/principal": "*",
     "@dfinity/utils": "*",
+    "@icp-sdk/auth": "^4.0.1",
     "buffer": "^6.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
