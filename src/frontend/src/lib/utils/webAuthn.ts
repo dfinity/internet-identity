@@ -6,11 +6,11 @@ import { features } from "$lib/legacy/features";
 import {
   DummyIdentity,
   IIWebAuthnIdentity,
+  bufferEqual,
   creationOptions,
 } from "$lib/utils/iiConnection";
 import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
-import { bufEquals } from "@dfinity/agent";
 
 export const constructIdentity = async ({
   devices,
@@ -80,13 +80,13 @@ export const authnMethodEqual = (
   b: AuthnMethodData,
 ): boolean => {
   if ("WebAuthn" in a.authn_method && "WebAuthn" in b.authn_method) {
-    return bufEquals(
+    return bufferEqual(
       new Uint8Array(a.authn_method.WebAuthn.pubkey),
       new Uint8Array(b.authn_method.WebAuthn.pubkey),
     );
   }
   if ("PubKey" in a.authn_method && "PubKey" in b.authn_method) {
-    return bufEquals(
+    return bufferEqual(
       new Uint8Array(a.authn_method.PubKey.pubkey),
       new Uint8Array(b.authn_method.PubKey.pubkey),
     );

@@ -1,5 +1,5 @@
 import { Principal } from "@dfinity/principal";
-import { Actor, toHex } from "@dfinity/agent";
+import { Actor } from "@dfinity/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
@@ -12,6 +12,7 @@ import { Session } from "$lib/stores/session.store";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { canisterConfig } from "$lib/globals";
+import { bytesToHex } from "@noble/hashes/utils";
 
 export class CredentialNotFound extends Error {
   constructor() {
@@ -62,7 +63,9 @@ export const authenticateWithPasskey = async ({
           } catch (error: unknown) {
             // To help debug, log the credential id
             console.error(error);
-            console.error(`Error looking up device key ${toHex(result.rawId)}`);
+            console.error(
+              `Error looking up device key ${bytesToHex(new Uint8Array(result.rawId))}`,
+            );
             throw error;
           }
         },

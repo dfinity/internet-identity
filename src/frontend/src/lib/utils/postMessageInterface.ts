@@ -149,9 +149,7 @@ export function rpcAuthenticationProtocol({
                 : undefined;
             const authRequest: AuthRequest = {
               kind: "authorize-client",
-              sessionPublicKey: new Uint8Array(
-                fromBase64(delegationRequest.params.publicKey),
-              ),
+              sessionPublicKey: fromBase64(delegationRequest.params.publicKey),
               maxTimeToLive: nonNullish(delegationRequest.params.maxTimeToLive)
                 ? BigInt(delegationRequest.params.maxTimeToLive)
                 : undefined,
