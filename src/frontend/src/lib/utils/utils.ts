@@ -46,6 +46,22 @@ export const withInputElement = <E extends Event>(
   return f(evnt, element);
 };
 
+// Helper that normalizes ArrayBuffer-like inputs.
+// Given a Uint8Array or an ArrayBuffer, always return an ArrayBuffer corresponding
+// exactly to the view's bytes (respects byteOffset/byteLength for typed arrays).
+export const bufFromBufLike = (
+  bufLike: ArrayBuffer | Uint8Array,
+): ArrayBuffer => {
+  if (bufLike instanceof ArrayBuffer) {
+    return bufLike;
+  }
+  // bufLike is a Uint8Array view into an ArrayBuffer; slice to get the exact range
+  return bufLike.buffer.slice(
+    bufLike.byteOffset,
+    bufLike.byteOffset + bufLike.byteLength,
+  );
+};
+
 /** Try to read unknown data as a record */
 export function unknownToRecord(
   msg: unknown,

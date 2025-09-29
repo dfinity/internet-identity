@@ -5,14 +5,13 @@ import {
   PublicKey,
   SignIdentity,
   Signature,
-  fromHex,
-  toHex,
   wrapDER,
 } from "@dfinity/agent";
-import { bufFromBufLike } from "@dfinity/candid";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { isNullish } from "@dfinity/utils";
 import { randomBytes } from "@noble/hashes/utils";
 import borc from "borc";
+import { bufFromBufLike } from "$lib/utils/utils";
 
 /**
  * This whole file was copied agent-js:
@@ -24,7 +23,8 @@ import borc from "borc";
  */
 
 function _coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
-  return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
+  return wrapDER(new Uint8Array(cose), DER_COSE_OID)
+    .buffer as DerEncodedPublicKey;
 }
 
 type PublicKeyCredentialWithAttachment = Omit<PublicKeyCredential, "toJSON"> & {
@@ -165,8 +165,8 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     return new this(
-      fromHex(rawId),
-      fromHex(publicKey),
+      hexToBytes(rawId),
+      hexToBytes(publicKey),
       undefined,
       rpId,
       undefined,
@@ -273,8 +273,8 @@ export class WebAuthnIdentity extends SignIdentity {
    */
   public toJSON(): JsonnableWebAuthnIdentity {
     return {
-      publicKey: toHex(this._publicKey.getCose()),
-      rawId: toHex(this.rawId),
+      publicKey: bytesToHex(new Uint8Array(this._publicKey.getCose())),
+      rawId: bytesToHex(new Uint8Array(this.rawId)),
       rpId: this.rpId,
     };
   }

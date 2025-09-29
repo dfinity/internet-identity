@@ -24,8 +24,10 @@ export interface _SERVICE {
   whoami: ActorMethod<[], Principal>;
 }
 
+let authClient: AuthClient;
+
 // Autofills the <input> for the II Url to point to the correct canister.
-document.body.onload = () => {
+document.body.onload = async () => {
   let iiUrl;
 
   if (process.env.DFX_NETWORK === "local") {
@@ -37,13 +39,12 @@ document.body.onload = () => {
     iiUrl = local_ii_url;
   }
   document.querySelector<HTMLInputElement>("#iiUrl")!.value = iiUrl;
+  // Create the auth client once the DOM is loaded.
+  // Safari blocks WebAuthn interactions if there are async operations before requesting the credentials.
+  authClient = await AuthClient.create();
 };
 
 document.getElementById("loginBtn")?.addEventListener("click", async () => {
-  // When the user clicks, we start the login process.
-  // First we have to create and AuthClient.
-  const authClient = await AuthClient.create();
-
   // Find out which URL should be used for login.
   const iiUrl = document.querySelector<HTMLInputElement>("#iiUrl")!.value;
 
@@ -61,7 +62,11 @@ document.getElementById("loginBtn")?.addEventListener("click", async () => {
   // At this point we're authenticated, and we can get the identity from the auth client:
   const identity = authClient.getIdentity();
   // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
-  const agent = await HttpAgent.create({ identity, shouldFetchRootKey: true });
+  const agent = await HttpAgent.create({
+    identity,
+    shouldFetchRootKey: true,
+    host: "http://localhost:4943",
+  });
   // Using the interface description of our webapp, we create an actor that we use to call the service methods.
   const webapp: _SERVICE = Actor.createActor(webapp_idl, {
     agent,

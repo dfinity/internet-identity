@@ -1,5 +1,4 @@
 import {
-  bufFromBufLike,
   type DerEncodedPublicKey,
   type PublicKey,
   type Signature,
@@ -9,6 +8,7 @@ import { DER_COSE_OID, unwrapDER, wrapDER } from "@dfinity/identity";
 import borc from "borc";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { extractAAGUID } from "$lib/utils/webAuthn";
+import { bufFromBufLike } from "$lib/utils/utils";
 
 /**
  * From the documentation;
@@ -34,7 +34,8 @@ export function authDataToCose(authData: Uint8Array): Uint8Array {
 }
 
 function coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
-  return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
+  return wrapDER(new Uint8Array(cose), DER_COSE_OID)
+    .buffer as DerEncodedPublicKey;
 }
 
 function coseFromDerEncodedBlob(derEncoded: DerEncodedPublicKey): ArrayBuffer {
@@ -56,7 +57,7 @@ export class CosePublicKey implements PublicKey {
     return this._cose;
   }
 
-  static fromDer(derEncodedBlob: ArrayBuffer): CosePublicKey {
+  static fromDer(derEncodedBlob: DerEncodedPublicKey): CosePublicKey {
     return new CosePublicKey(coseFromDerEncodedBlob(derEncodedBlob));
   }
 
