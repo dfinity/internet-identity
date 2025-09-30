@@ -46,10 +46,12 @@ export const authWithII = async ({
   if (useIcrc25) {
     const transport = new PostMessageTransport({ url: url_ });
     const signer = new Signer({ transport, derivationOrigin });
-    const delegation = await signer.delegation({
+    // We need to cast the delegation from signer-js to avoid a TS issue because one type is imported from cjs and another esm:
+    // Types of property 'delegations' are incompatible.
+    const delegation = (await signer.delegation({
       maxTimeToLive,
       publicKey: sessionIdentity.getPublicKey().toDer(),
-    });
+    })) as unknown as DelegationChain;
     return {
       identity: DelegationIdentity.fromDelegation(sessionIdentity, delegation),
       authnMethod: "passkey",
