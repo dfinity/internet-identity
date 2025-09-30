@@ -162,7 +162,7 @@
   <div class="flex flex-col items-stretch gap-1.5 self-stretch">
     <ul class="contents">
       {#each accounts as account}
-        <li class="relative contents">
+        <li class="contents">
           <ButtonCard
             onclick={() => continueAs(account)}
             disabled={isAuthorizing}
