@@ -219,7 +219,7 @@ const readCanisterId = (): string => {
 const init = async () => {
   signInBtn.onclick = async () => {
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
-    // The default max TTL setin the @icp-sdk/auth/client library
+    // The default max TTL set in the @icp-sdk/auth/client library
     const authClientDefaultMaxTTL =
       /* hours */ BigInt(8) * /* nanoseconds */ BigInt(3_600_000_000_000);
     const maxTimeToLive =
