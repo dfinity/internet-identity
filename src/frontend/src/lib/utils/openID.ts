@@ -290,11 +290,10 @@ export const requestJWT = async (
   config: RequestConfig,
   options: RequestOptions,
 ): Promise<string> => {
-  // const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
-  // const jwt = supportsFedCM
-  //   ? await requestWithCredentials(config, options)
-  //   : await requestWithRedirect(config, options);
-  const jwt = await requestWithRedirect(config, options);
+  const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
+  const jwt = supportsFedCM
+    ? await requestWithCredentials(config, options)
+    : await requestWithRedirect(config, options);
   return jwt;
 };
 
