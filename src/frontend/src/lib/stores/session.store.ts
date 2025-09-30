@@ -67,8 +67,8 @@ const read = async () => {
   }
   const { privateJwk, publicJwk, nonce, salt, createdAt } = JSON.parse(item);
   // Ignore persisted sessions older than 5 minutes
-  const expiry = new Date().getTime() + 5 * 60 * 1000;
-  if (parseInt(createdAt) > expiry) {
+  const expiresAt = parseInt(createdAt, 10) + 5 * 60 * 1000;
+  if (Date.now() > expiresAt) {
     return undefined;
   }
   const privateKey = await crypto.subtle.importKey(
