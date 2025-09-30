@@ -6,7 +6,7 @@
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
-  import Checkbox from "../ui/Checkbox.svelte";
+  import Checkbox from "$lib/components/ui/Checkbox.svelte";
 
   interface Props {
     create: (name: string, isDefault: boolean) => void;
