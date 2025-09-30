@@ -74,9 +74,12 @@ fn try_read_account_info(
     Ok(account.to_info())
 }
 
-/// Best effort to determin the default account for the given (anchor, origin).
+/// Best effort to determine the default account for the given (anchor, origin).
+/// - If the application is not found, returns a "synthetic" account.
+/// - If no default account stored, returns a "synthetic" account.
+/// - Else, read from storage, returning an Err result if not found.
 ///
-/// An Err case would indicate internal inconsistency in the canister state.
+/// An Err case indicates internal inconsistency in the canister state.
 pub fn get_default_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
@@ -109,6 +112,9 @@ pub fn get_default_account_for_origin(
 }
 
 /// Sets the default account for the given (anchor, origin) to the specified `account_number`.
+///
+/// If the `account_number` is `None`, then the synthetic account is returned, and also `None`
+/// is stored (just so that the previous default account is not retained).
 ///
 /// If this is the first time an origin is seen for the anchor, a new application number is created.
 pub fn set_default_account_for_origin(
