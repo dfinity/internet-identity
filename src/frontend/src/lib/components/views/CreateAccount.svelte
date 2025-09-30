@@ -9,7 +9,7 @@
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
 
   interface Props {
-    create: (name: string, isDefault: boolean) => void;
+    create: (name: string, isDefault?: boolean) => void;
   }
 
   const { create }: Props = $props();
@@ -21,7 +21,11 @@
 
   const handleSubmit = () => {
     loading = true;
-    create(name, isDefault);
+    if ($AUTH_FLOW_UPDATES) {
+      create(name, isDefault);
+    } else {
+      create(name);
+    }
   };
 
   onMount(() => {

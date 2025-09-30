@@ -55,7 +55,7 @@
   let tooltipAnchorRef = $state<HTMLElement>();
   let accountToEdit = $state<AccountInfo | undefined>(undefined);
 
-  const createAccount = async (name: string, isDefault: boolean) => {
+  const createAccount = async (name: string, isDefault?: boolean) => {
     try {
       const account = await $authenticatedStore.actor
         .create_account(
