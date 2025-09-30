@@ -32,11 +32,7 @@
 
   const handleSubmit = () => {
     loading = true;
-    try {
-      handleEdit(account, name, defaultIsDisabled ? undefined : isDefault);
-    } catch {
-      loading = false;
-    }
+    handleEdit(account, name, defaultIsDisabled ? undefined : isDefault);
   };
 
   onMount(() => {

@@ -112,9 +112,6 @@
       accountToEdit = undefined;
     } catch (error) {
       handleError(error);
-      // throw error so that it feeds back up to the EditAccount component to turn off the loading
-      // TODO: actually make this work... because it doesn't....
-      throw error;
     }
   };
 
