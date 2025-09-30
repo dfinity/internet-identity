@@ -27,6 +27,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { sessionStore } from "$lib/stores/session.store";
 
   const { children }: LayoutProps = $props();
 
@@ -116,8 +117,9 @@
           <IdentitySwitcher
             selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
-            switchIdentity={(identityNumber) => {
+            switchIdentity={async (identityNumber) => {
               authenticationStore.reset();
+              await sessionStore.reset();
               lastUsedIdentitiesStore.selectIdentity(identityNumber);
               isIdentityPopoverOpen = false;
             }}
