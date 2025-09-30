@@ -6,7 +6,10 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { canisterConfig } from "$lib/globals";
-  import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
+  import {
+    AUTH_FLOW_UPDATES,
+    ENABLE_GENERIC_OPEN_ID,
+  } from "$lib/state/featureFlags";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
@@ -130,15 +133,30 @@
         </Button>
       </Tooltip>
     {/if}
-    <Button
-      onclick={migrate}
-      variant="tertiary"
-      size="xl"
-      disabled={!supportsPasskeys ||
-        nonNullish(authenticatingProviderId) ||
-        isGoogleAuthenticating}
-    >
-      Upgrade from legacy identity
-    </Button>
+    {#if $AUTH_FLOW_UPDATES}
+      <div class="border-border-tertiary border-t"></div>
+      <div class="flex flex-row items-center justify-between gap-4">
+        <p class="text-text-secondary text-sm">
+          Still have an identity number?
+        </p>
+        <button
+          onclick={migrate}
+          class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+        >
+          Upgrade
+        </button>
+      </div>
+    {:else}
+      <Button
+        onclick={migrate}
+        variant="tertiary"
+        size="xl"
+        disabled={!supportsPasskeys ||
+          nonNullish(authenticatingProviderId) ||
+          isGoogleAuthenticating}
+      >
+        Upgrade from legacy identity
+      </Button>
+    {/if}
   </div>
 </div>

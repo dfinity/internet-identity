@@ -5,6 +5,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
 
   interface Props {
     create: (name: string) => Promise<void>;
@@ -39,7 +40,12 @@
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        This will label your identity, and you can't rename it later once set.
+        {#if $AUTH_FLOW_UPDATES}
+          Internet Identity <b>does not</b> store your biometric data. It stays on
+          your device. Your Identity functions as a secure passkey manager for authentication.
+        {:else}
+          This will label your passkey, and you can't rename it later once set
+        {/if}
       </p>
     </div>
   </div>

@@ -5,14 +5,12 @@ import {
   PublicKey,
   SignIdentity,
   Signature,
-  fromHex,
-  toHex,
   wrapDER,
 } from "@dfinity/agent";
-import { bufFromBufLike } from "@dfinity/candid";
 import { isNullish } from "@dfinity/utils";
-import { randomBytes } from "@noble/hashes/utils";
+import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils";
 import borc from "borc";
+import { bufFromBufLike } from "$lib/utils/utils";
 
 /**
  * This whole file was copied agent-js:
@@ -23,7 +21,7 @@ import borc from "borc";
  * We will move it back to agent-js once the changes are stable.
  */
 
-function _coseToDerEncodedBlob(cose: ArrayBuffer): DerEncodedPublicKey {
+function _coseToDerEncodedBlob(cose: Uint8Array): DerEncodedPublicKey {
   return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
 }
 
@@ -58,7 +56,7 @@ function _authDataToCose(authData: ArrayBuffer): ArrayBuffer {
 export class CosePublicKey implements PublicKey {
   protected _encodedKey: DerEncodedPublicKey;
 
-  public constructor(protected _cose: ArrayBuffer) {
+  public constructor(protected _cose: Uint8Array) {
     this._encodedKey = _coseToDerEncodedBlob(_cose);
   }
 
@@ -66,7 +64,7 @@ export class CosePublicKey implements PublicKey {
     return this._encodedKey;
   }
 
-  public getCose(): ArrayBuffer {
+  public getCose(): Uint8Array {
     return this._cose;
   }
 }
@@ -165,8 +163,8 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     return new this(
-      fromHex(rawId),
-      fromHex(publicKey),
+      hexToBytes(rawId),
+      hexToBytes(publicKey),
       undefined,
       rpId,
       undefined,
@@ -215,7 +213,7 @@ export class WebAuthnIdentity extends SignIdentity {
     public readonly aaguid: string | undefined,
   ) {
     super();
-    this._publicKey = new CosePublicKey(cose);
+    this._publicKey = new CosePublicKey(new Uint8Array(cose));
   }
 
   public getPublicKey(): PublicKey {
@@ -273,8 +271,8 @@ export class WebAuthnIdentity extends SignIdentity {
    */
   public toJSON(): JsonnableWebAuthnIdentity {
     return {
-      publicKey: toHex(this._publicKey.getCose()),
-      rawId: toHex(this.rawId),
+      publicKey: bytesToHex(this._publicKey.getCose()),
+      rawId: bytesToHex(new Uint8Array(this.rawId)),
       rpId: this.rpId,
     };
   }
