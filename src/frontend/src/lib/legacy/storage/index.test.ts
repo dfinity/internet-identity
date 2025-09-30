@@ -1,4 +1,4 @@
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { nonNullish } from "@dfinity/utils";
 import { IDBFactory } from "fake-indexeddb";
 import {

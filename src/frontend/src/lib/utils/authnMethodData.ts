@@ -4,7 +4,7 @@ import type {
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import { CredentialId } from "$lib/utils/credential-devices";
-import { DerEncodedPublicKey } from "@dfinity/agent";
+import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { nonNullish } from "@dfinity/utils";
 
 /**

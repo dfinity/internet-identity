@@ -1,5 +1,5 @@
 import { resolveCanisterId } from "$lib/utils/canisterIdResolution";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 
 const HEADER_NAME = "x-ic-canister-id";
 

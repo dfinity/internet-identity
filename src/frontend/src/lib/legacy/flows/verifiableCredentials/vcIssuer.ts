@@ -2,7 +2,7 @@ import type { SignedIdAlias } from "$lib/generated/internet_identity_types";
 import { idlFactory as vc_issuer_idl } from "$lib/generated/vc_issuer_idl";
 
 import { features } from "$lib/legacy/features";
-import { Actor, ActorSubclass, HttpAgent, Identity } from "@dfinity/agent";
+import { Actor, ActorSubclass, HttpAgent, Identity } from "@icp-sdk/core/agent";
 import {
   CredentialSpec,
   Icrc21ConsentInfo,
@@ -12,7 +12,7 @@ import {
 } from "@dfinity/internet-identity-vc-api";
 
 import { inferHost } from "$lib/utils/iiConnection";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 
 // Boilerplate for contacting a canister implementing the Issuer API
 export class VcIssuer {

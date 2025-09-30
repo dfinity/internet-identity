@@ -61,14 +61,14 @@ import {
   DerEncodedPublicKey,
   HttpAgent,
   SignIdentity,
-} from "@dfinity/agent";
+} from "@icp-sdk/core/agent";
 import {
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
   Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
+} from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   convertToValidCredentialData,

@@ -1,5 +1,5 @@
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { expect } from "vitest";
 
 const FETCH_OPTS = {

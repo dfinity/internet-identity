@@ -1,11 +1,11 @@
 // Turns an 'unknown' into a string, if possible, otherwise use the default
 // `def` parameter.
 import type { SignedDelegation } from "$lib/generated/internet_identity_types";
-import { Signature } from "@dfinity/agent";
+import { Signature } from "@icp-sdk/core/agent";
 import {
   Delegation,
   SignedDelegation as FrontendSignedDelegation,
-} from "@dfinity/identity";
+} from "@icp-sdk/core/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 export function unknownToString(obj: unknown, def: string): string {

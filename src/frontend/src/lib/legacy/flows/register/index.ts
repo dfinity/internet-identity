@@ -33,8 +33,8 @@ import {
 } from "$lib/utils/iiConnection";
 import { isRegistrationAllowed } from "$lib/utils/isRegistrationAllowed";
 import { lookupAAGUID } from "$lib/utils/webAuthn";
-import { SignIdentity } from "@dfinity/agent";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
+import { SignIdentity } from "@icp-sdk/core/agent";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { nonNullish } from "@dfinity/utils";
 import { TemplateResult } from "lit-html";
 import type { UAParser } from "ua-parser-js";

@@ -1,11 +1,11 @@
-import type { SignIdentity, Signature } from "@dfinity/agent";
+import type { SignIdentity, Signature } from "@icp-sdk/core/agent";
 import {
   Delegation,
   DelegationChain,
   DelegationIdentity,
   SignedDelegation,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
+} from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 import { Signer } from "@slide-computer/signer";
 import { PostMessageTransport } from "@slide-computer/signer-web";
 

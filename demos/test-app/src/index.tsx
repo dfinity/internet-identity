@@ -1,13 +1,13 @@
 import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
 
-import type { Identity, SignIdentity } from "@dfinity/agent";
-import { Actor, HttpAgent } from "@dfinity/agent";
+import type { Identity, SignIdentity } from "@icp-sdk/core/agent";
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import {
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
+} from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -219,7 +219,7 @@ const readCanisterId = (): string => {
 const init = async () => {
   signInBtn.onclick = async () => {
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
-    // The default max TTL setin the @dfinity/auth-client library
+    // The default max TTL setin the @icp-sdk/auth/client library
     const authClientDefaultMaxTTL =
       /* hours */ BigInt(8) * /* nanoseconds */ BigInt(3_600_000_000_000);
     const maxTimeToLive =

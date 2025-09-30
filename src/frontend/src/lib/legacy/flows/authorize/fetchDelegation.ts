@@ -5,7 +5,7 @@ import type {
 import { toast } from "$lib/templates/toast";
 import { AuthenticatedConnection } from "$lib/utils/iiConnection";
 import { transformSignedDelegation, unknownToString } from "$lib/utils/utils";
-import type { SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
+import type { SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
 
 /**
  * Prepares and fetches a delegation valid for the authenticated user and the derivation.

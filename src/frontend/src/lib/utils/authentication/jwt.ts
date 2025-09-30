@@ -1,12 +1,12 @@
-import { Principal } from "@dfinity/principal";
-import { Actor } from "@dfinity/agent";
+import { Principal } from "@icp-sdk/core/principal";
+import { Actor } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
   throwCanisterError,
   transformSignedDelegation,
 } from "$lib/utils/utils";
-import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
+import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 
 export const authenticateWithJWT = async ({

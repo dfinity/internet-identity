@@ -1,7 +1,7 @@
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { randomString, wrapError } from "$lib/utils/utils";
-import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
+import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import { nonNullish } from "@dfinity/utils";
 // @ts-expect-error TODO: Fix this error
 import { ChromeOptions } from "@wdio/types/build/Capabilities";
