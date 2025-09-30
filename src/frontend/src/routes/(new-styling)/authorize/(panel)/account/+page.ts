@@ -19,5 +19,8 @@ export const load: PageLoad = async () => {
     effectiveOrigin,
     accounts,
   );
-  return { accounts };
+  const defaultAccount = await actor
+    .get_default_account(identityNumber, effectiveOrigin)
+    .then(throwCanisterError);
+  return { accounts, defaultAccount };
 };

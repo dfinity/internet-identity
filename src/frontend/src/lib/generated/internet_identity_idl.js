@@ -668,7 +668,7 @@ export const idlFactory = ({ IDL }) => {
     'get_default_account' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : GetDefaultAccountError })],
-        [],
+        ['query'],
       ),
     'get_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, Timestamp],

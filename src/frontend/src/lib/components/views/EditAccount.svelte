@@ -7,21 +7,36 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
   import Checkbox from "../ui/Checkbox.svelte";
+  import { type AccountInfo } from "$lib/generated/internet_identity_types";
 
   interface Props {
-    create: (name: string, isDefault: boolean) => void;
+    handleEdit: (
+      account: AccountInfo,
+      name: string,
+      defaultAccount?: boolean,
+    ) => void;
+    account: AccountInfo;
+    defaultAccount: AccountInfo;
   }
 
-  const { create }: Props = $props();
+  const { handleEdit, account, defaultAccount }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let name = $state("");
+  let name = $state<string>(account.name[0] ?? "");
   let loading = $state(false);
-  let isDefault = $state<boolean>(false);
+  let isDefault = $state<boolean>(
+    defaultAccount.account_number[0] === account.account_number[0],
+  );
+  let defaultIsDisabled =
+    defaultAccount.account_number[0] === account.account_number[0];
 
   const handleSubmit = () => {
     loading = true;
-    create(name, isDefault);
+    try {
+      handleEdit(account, name, defaultIsDisabled ? undefined : isDefault);
+    } catch {
+      loading = false;
+    }
   };
 
   onMount(() => {
@@ -70,9 +85,12 @@
       <div class="mt-4.5 flex flex-col gap-6">
         <div class="border-border-tertiary border-t"></div>
         <div class="flex flex-row items-center gap-4">
-          <label class="flex cursor-pointer items-center gap-2">
+          <label
+            class={`${defaultIsDisabled ? "cursor-not-allowed" : "cursor-pointer"} flex items-center gap-2`}
+          >
             <Checkbox
               checked={isDefault}
+              disabled={defaultIsDisabled}
               onchange={(e) => (isDefault = e.currentTarget.checked)}
             />
             <span class="text-text-secondary text-sm font-medium">
@@ -93,10 +111,8 @@
     >
       {#if loading}
         <ProgressRing />
-        <span>Creating account...</span>
-      {:else}
-        <span>Create account</span>
       {/if}
+      <span>Save changes</span>
     </Button>
   </div>
 </form>
