@@ -3,10 +3,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@dfinity/agent": "*",
-    "@dfinity/candid": "*",
-    "@dfinity/identity": "*",
-    "@dfinity/principal": "*",
+    "@icp-sdk/core": "*",
     "@slide-computer/signer": "^3.20.0",
     "@slide-computer/signer-web": "^3.20.0",
     "buffer": "^6.0.3",
