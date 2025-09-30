@@ -71,7 +71,7 @@ pub struct Account {
 impl Account {
     /// A "synthetic" account, i.e., one that is not meant to be stored.
     ///
-    /// Once exception when it may be stored is to overwrite an existing stored account.
+    /// One exception when it may be stored is to overwrite an existing stored account.
     pub fn synthetic(anchor_number: AnchorNumber, origin: FrontendHostname) -> Self {
         Self {
             anchor_number,
