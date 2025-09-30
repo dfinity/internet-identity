@@ -108,7 +108,10 @@
     onintrostart={() => popoverRef?.showPopover()}
     onoutrostart={() => popoverRef?.hidePopover()}
     onfocusout={(e) => {
-      if (!popoverRef?.contains(e.relatedTarget as Node)) {
+      if (
+        !(e.relatedTarget instanceof Node) ||
+        !popoverRef?.contains(e.relatedTarget)
+      ) {
         anchorRef?.querySelector("button")?.focus();
         onClose?.();
       }
