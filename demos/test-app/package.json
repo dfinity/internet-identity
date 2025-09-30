@@ -6,6 +6,7 @@
     "@icp-sdk/core": "*",
     "@slide-computer/signer": "*",
     "@slide-computer/signer-web": "*",
+    "@noble/hashes": "*",
     "buffer": "^6.0.3",
     "jose": "^5.1.2",
     "react": "^18.2.0",

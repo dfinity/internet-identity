@@ -1,5 +1,5 @@
 import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
-
+import { bytesToHex } from "@noble/hashes/utils";
 import type { Identity, SignIdentity } from "@icp-sdk/core/agent";
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import {
@@ -134,11 +134,39 @@ const updateDelegationView = ({
   }
 
   if (identity instanceof DelegationIdentity) {
-    delegationEl.innerText = JSON.stringify(
-      identity.getDelegation().toJSON(),
-      undefined,
-      2,
-    );
+    const delegation = identity.getDelegation();
+    // Try to call toJSON and log the result
+    let jsonResult;
+    try {
+      // `toJSON` is failing due to `bytesToHex(delegation.publicKey)`
+      // `bytesToHex` expects a Uint8Array and delegation.publicKey is a ArrayBuffer
+      jsonResult = {
+        delegations: delegation.delegations.map((signedDelegation) => {
+          const { delegation, signature } = signedDelegation;
+          const { targets } = delegation;
+          return {
+            delegation: {
+              expiration: delegation.expiration.toString(16),
+              pubkey: bytesToHex(delegation.pubkey),
+              ...(targets && {
+                targets: targets.map((t) => t.toHex()),
+              }),
+            },
+            signature: bytesToHex(new Uint8Array(signature)),
+          };
+        }),
+        publicKey: bytesToHex(new Uint8Array(delegation.publicKey)),
+      };
+      // jsonResult = delegation.toJSON();
+    } catch (error) {
+      console.error("identity 7 - toJSON error:", error);
+      jsonResult = {
+        error: "toJSON failed",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    delegationEl.innerText = JSON.stringify(jsonResult, undefined, 2);
 
     // cannot use Math.min, as we deal with bigint here
     const nextExpiration = identity
