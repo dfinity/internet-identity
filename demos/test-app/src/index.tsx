@@ -135,7 +135,6 @@ const updateDelegationView = ({
 
   if (identity instanceof DelegationIdentity) {
     const delegation = identity.getDelegation();
-    // Try to call toJSON and log the result
     let jsonResult;
     try {
       // `toJSON` is failing due to `bytesToHex(delegation.publicKey)`
