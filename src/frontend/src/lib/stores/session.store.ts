@@ -50,6 +50,7 @@ const create = async () => {
       publicJwk,
       nonce,
       salt: toBase64(salt),
+      createdAt: new Date().getTime(),
     }),
   );
   return {
@@ -64,7 +65,12 @@ const read = async () => {
   if (isNullish(item)) {
     return undefined;
   }
-  const { privateJwk, publicJwk, nonce, salt } = JSON.parse(item);
+  const { privateJwk, publicJwk, nonce, salt, createdAt } = JSON.parse(item);
+  // Ignore persisted sessions older than 5 minutes
+  const expiry = new Date().getTime() + 5 * 60 * 1000;
+  if (parseInt(createdAt) > expiry) {
+    return undefined;
+  }
   const privateKey = await crypto.subtle.importKey(
     "jwk",
     privateJwk,
