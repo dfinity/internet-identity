@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PageProps } from "./$types";
-  import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
+  import { throwCanisterError } from "$lib/utils/utils";
   import {
     authenticatedStore,
     isAuthenticatedStore,
