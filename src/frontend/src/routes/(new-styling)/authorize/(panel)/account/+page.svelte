@@ -21,10 +21,7 @@
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { goto } from "$app/navigation";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import type {
-    AccountInfo,
-    UpdateAccountError,
-  } from "$lib/generated/internet_identity_types";
+  import type { AccountInfo } from "$lib/generated/internet_identity_types";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
   import Button from "$lib/components/ui/Button.svelte";
