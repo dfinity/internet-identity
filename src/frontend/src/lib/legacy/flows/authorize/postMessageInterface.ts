@@ -10,8 +10,8 @@ import {
 } from "$lib/utils/analytics/authorizeClientFunnel";
 import { loginFunnel } from "$lib/utils/analytics/loginFunnel";
 import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
-import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
+import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
 
 // The type of messages that kick start the flow (II -> RP)

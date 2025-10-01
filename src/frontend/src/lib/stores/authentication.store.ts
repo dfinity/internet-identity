@@ -1,13 +1,13 @@
 import { type Readable, derived, writable } from "svelte/store";
-import { DelegationIdentity } from "@dfinity/identity";
+import { DelegationIdentity } from "@icp-sdk/core/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   Actor,
   ActorSubclass,
   HttpAgent,
   HttpAgentOptions,
-} from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
+} from "@icp-sdk/core/agent";
+import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";

@@ -13,7 +13,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
 import { convertToValidCredentialData } from "$lib/utils/credential-devices";
-import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
+import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";

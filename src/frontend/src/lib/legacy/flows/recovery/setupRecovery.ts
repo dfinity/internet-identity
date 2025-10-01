@@ -13,7 +13,7 @@ import {
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";
 import { unreachable, unreachableLax } from "$lib/utils/utils";
 import { WebAuthnIdentity } from "$lib/utils/webAuthnIdentity";
-import { DerEncodedPublicKey, SignIdentity } from "@dfinity/agent";
+import { DerEncodedPublicKey, SignIdentity } from "@icp-sdk/core/agent";
 import { nonNullish } from "@dfinity/utils";
 import { confirmSeedPhrase } from "./confirmSeedPhrase";
 import { displaySeedPhrase } from "./displaySeedPhrase";

@@ -58,8 +58,8 @@ import {
   isNonEmptyArray,
   unknownToString,
 } from "$lib/utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
+import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html, render } from "lit-html";
 import { infoToastTemplate } from "../infoToast";

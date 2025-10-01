@@ -25,9 +25,9 @@ import {
 
 import { idlFactory as vc_issuer_idl } from "$lib/generated/vc_issuer_idl";
 import { KnownDapp } from "$lib/legacy/flows/dappsExplorer/dapps";
-import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
+import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import { _SERVICE } from "@dfinity/internet-identity-vc-api";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { nonNullish } from "@dfinity/utils";
 
 /**

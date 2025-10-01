@@ -6,7 +6,7 @@ import {
   SignIdentity,
   Signature,
   wrapDER,
-} from "@dfinity/agent";
+} from "@icp-sdk/core/agent";
 import { isNullish } from "@dfinity/utils";
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils";
 import borc from "borc";

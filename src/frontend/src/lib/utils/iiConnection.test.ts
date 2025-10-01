@@ -14,8 +14,8 @@ import {
   DerEncodedPublicKey,
   SignIdentity,
   Signature,
-} from "@dfinity/agent";
-import { DelegationIdentity } from "@dfinity/identity";
+} from "@icp-sdk/core/agent";
+import { DelegationIdentity } from "@icp-sdk/core/identity";
 import { IDBFactory } from "fake-indexeddb";
 import { clear as idbClear } from "idb-keyval";
 import {

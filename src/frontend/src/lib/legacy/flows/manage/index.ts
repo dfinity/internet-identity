@@ -74,8 +74,8 @@ import {
   shuffleArray,
   unreachable,
 } from "$lib/utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
+import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { registerCurrentDeviceCurrentOrigin } from "../addDevice/registerCurrentDeviceCurrentOrigin";

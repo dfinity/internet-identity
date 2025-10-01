@@ -1,5 +1,5 @@
-import { PublicKey, type Signature } from "@dfinity/agent";
-import { Ed25519KeyIdentity } from "@dfinity/identity";
+import { PublicKey, type Signature } from "@icp-sdk/core/agent";
+import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { DiscoverablePasskeyIdentity } from "./discoverablePasskeyIdentity";
 import { canisterConfig } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";

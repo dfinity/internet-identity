@@ -1,4 +1,4 @@
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import type {
   _SERVICE,
   InternetIdentityInit,
@@ -9,7 +9,7 @@ import {
   ActorSubclass,
   HttpAgent,
   HttpAgentOptions,
-} from "@dfinity/agent";
+} from "@icp-sdk/core/agent";
 import { inferHost } from "$lib/utils/iiConnection";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { features } from "$lib/legacy/features";

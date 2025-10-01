@@ -1,5 +1,5 @@
 import { type Readable, derived, writable } from "svelte/store";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { isNullish } from "@dfinity/utils";
 import {
   Actor,
@@ -7,10 +7,10 @@ import {
   HttpAgent,
   HttpAgentOptions,
   SignIdentity,
-} from "@dfinity/agent";
+} from "@icp-sdk/core/agent";
 import { createAnonymousNonce } from "$lib/utils/openID";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
 

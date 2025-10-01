@@ -1,5 +1,5 @@
 import { unknownToString } from "$lib/utils/utils";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 /**
