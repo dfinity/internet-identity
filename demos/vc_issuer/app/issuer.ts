@@ -1,5 +1,5 @@
-import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
-import { Principal } from "@dfinity/principal";
+import { Actor, ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
+import { Principal } from "@icp-sdk/core/principal";
 
 import { idlFactory as vc_issuer_idl } from "./generated/vc_issuer_idl";
 import { _SERVICE } from "./generated/vc_issuer_types";

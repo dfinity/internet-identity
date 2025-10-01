@@ -11,7 +11,7 @@ import { version } from "./version";
 import { init } from "$lib/generated/internet_identity_idl";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { fromBase64 } from "$lib/utils/utils";
-import { IDL } from "@dfinity/candid";
+import { IDL } from "@icp-sdk/core/candid";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser

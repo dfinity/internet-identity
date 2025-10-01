@@ -3,7 +3,7 @@ import type {
   DeviceKey,
 } from "$lib/generated/internet_identity_types";
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
-import { DerEncodedPublicKey } from "@dfinity/agent";
+import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 
 export type CredentialId = ArrayBuffer;
 export type CredentialData = {

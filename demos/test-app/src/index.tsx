@@ -1,13 +1,13 @@
 import { VcFlowRequestWire } from "@dfinity/internet-identity-vc-api";
-
-import type { Identity, SignIdentity } from "@dfinity/agent";
-import { Actor, HttpAgent } from "@dfinity/agent";
+import { bytesToHex } from "@noble/hashes/utils";
+import type { Identity, SignIdentity } from "@icp-sdk/core/agent";
+import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import {
   DelegationChain,
   DelegationIdentity,
   Ed25519KeyIdentity,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
+} from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
@@ -134,11 +134,38 @@ const updateDelegationView = ({
   }
 
   if (identity instanceof DelegationIdentity) {
-    delegationEl.innerText = JSON.stringify(
-      identity.getDelegation().toJSON(),
-      undefined,
-      2,
-    );
+    const delegation = identity.getDelegation();
+    let jsonResult;
+    try {
+      // `toJSON` is failing due to `bytesToHex(delegation.publicKey)`
+      // `bytesToHex` expects a Uint8Array and delegation.publicKey is a ArrayBuffer
+      // jsonResult = delegation.toJSON();
+      jsonResult = {
+        delegations: delegation.delegations.map((signedDelegation) => {
+          const { delegation, signature } = signedDelegation;
+          const { targets } = delegation;
+          return {
+            delegation: {
+              expiration: delegation.expiration.toString(16),
+              pubkey: bytesToHex(delegation.pubkey),
+              ...(targets && {
+                targets: targets.map((t) => t.toHex()),
+              }),
+            },
+            signature: bytesToHex(new Uint8Array(signature)),
+          };
+        }),
+        publicKey: bytesToHex(new Uint8Array(delegation.publicKey)),
+      };
+    } catch (error) {
+      console.error("toJSON error:", error);
+      jsonResult = {
+        error: "toJSON failed",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    delegationEl.innerText = JSON.stringify(jsonResult, undefined, 2);
 
     // cannot use Math.min, as we deal with bigint here
     const nextExpiration = identity
@@ -219,7 +246,7 @@ const readCanisterId = (): string => {
 const init = async () => {
   signInBtn.onclick = async () => {
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
-    // The default max TTL setin the @dfinity/auth-client library
+    // The default max TTL set in the @icp-sdk/auth/client library
     const authClientDefaultMaxTTL =
       /* hours */ BigInt(8) * /* nanoseconds */ BigInt(3_600_000_000_000);
     const maxTimeToLive =

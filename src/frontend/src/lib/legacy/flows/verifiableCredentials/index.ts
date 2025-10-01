@@ -15,12 +15,12 @@ import {
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
-} from "@dfinity/identity";
+} from "@icp-sdk/core/identity";
 import {
   CredentialSpec,
   IssuedCredentialData,
 } from "@dfinity/internet-identity-vc-api";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import infoToastCopy from "$lib/templates/infoToast/copy.json";
 import { abortedCredentials } from "./abortedCredentials";
 import { allowCredentials } from "./allowCredentials";

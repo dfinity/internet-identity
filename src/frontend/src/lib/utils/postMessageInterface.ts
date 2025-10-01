@@ -1,5 +1,5 @@
 import { AuthRequest } from "$lib/legacy/flows/authorize/postMessageInterface";
-import { type SignedDelegation as FrontendSignedDelegation } from "@dfinity/identity";
+import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
 import {
   isJsonRpcRequest,
   type SupportedStandard,

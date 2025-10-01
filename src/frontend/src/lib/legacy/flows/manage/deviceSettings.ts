@@ -15,7 +15,7 @@ import {
 import { renderPage } from "$lib/utils/lit-html";
 import { isProtected, RecoveryPhrase } from "$lib/utils/recoveryDevice";
 import { unknownToString } from "$lib/utils/utils";
-import { DerEncodedPublicKey } from "@dfinity/agent";
+import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import copyJson from "./deviceSettings.json";
 
 /* Rename the device and return */

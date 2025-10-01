@@ -2,8 +2,8 @@
  * then calls the whoami canister to check the user's principal.
  */
 
-import { Actor, ActorMethod, HttpAgent } from "@dfinity/agent";
-import type { Principal } from "@dfinity/principal";
+import { Actor, ActorMethod, HttpAgent } from "@icp-sdk/core/agent";
+import type { Principal } from "@icp-sdk/core/principal";
 import { AuthClient } from "@icp-sdk/auth/client";
 
 const webapp_id = process.env.WHOAMI_CANISTER_ID;

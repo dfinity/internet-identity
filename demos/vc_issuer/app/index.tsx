@@ -1,4 +1,4 @@
-import { AuthClient } from "@dfinity/auth-client";
+import { AuthClient } from "@icp-sdk/auth/client";
 
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";

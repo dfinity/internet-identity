@@ -1,11 +1,11 @@
-import type { SignIdentity, Signature } from "@dfinity/agent";
+import type { SignIdentity, Signature } from "@icp-sdk/core/agent";
 import {
   Delegation,
   DelegationChain,
   DelegationIdentity,
   SignedDelegation,
-} from "@dfinity/identity";
-import { Principal } from "@dfinity/principal";
+} from "@icp-sdk/core/identity";
+import { Principal } from "@icp-sdk/core/principal";
 import { Signer } from "@slide-computer/signer";
 import { PostMessageTransport } from "@slide-computer/signer-web";
 
@@ -46,10 +46,12 @@ export const authWithII = async ({
   if (useIcrc25) {
     const transport = new PostMessageTransport({ url: url_ });
     const signer = new Signer({ transport, derivationOrigin });
-    const delegation = await signer.delegation({
+    // We need to cast the delegation from signer-js to avoid a TS issue because one type is imported from cjs and another esm:
+    // Types of property 'delegations' are incompatible.
+    const delegation = (await signer.delegation({
       maxTimeToLive,
       publicKey: sessionIdentity.getPublicKey().toDer(),
-    });
+    })) as unknown as DelegationChain;
     return {
       identity: DelegationIdentity.fromDelegation(sessionIdentity, delegation),
       authnMethod: "passkey",
@@ -138,7 +140,7 @@ const identityFromResponse = ({
 
   const delegationChain = DelegationChain.fromDelegations(
     delegations,
-    response.userPublicKey.buffer,
+    response.userPublicKey,
   );
 
   const identity = DelegationIdentity.fromDelegation(

@@ -1,7 +1,7 @@
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { displayError } from "$lib/templates/displayError";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
-import { IDL } from "@dfinity/candid";
+import { IDL } from "@icp-sdk/core/candid";
 import { init } from "$lib/generated/internet_identity_idl";
 import { version } from "$lib/legacy/version";
 import { anyFeatures, features } from "$lib/legacy/features";

@@ -3,8 +3,8 @@ import {
   type PublicKey,
   type Signature,
   SignIdentity,
-} from "@dfinity/agent";
-import { DER_COSE_OID, unwrapDER, wrapDER } from "@dfinity/identity";
+} from "@icp-sdk/core/agent";
+import { DER_COSE_OID, unwrapDER, wrapDER } from "@icp-sdk/core/identity";
 import borc from "borc";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { extractAAGUID } from "$lib/utils/webAuthn";

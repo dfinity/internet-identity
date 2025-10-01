@@ -1,5 +1,5 @@
-import { Principal } from "@dfinity/principal";
-import { Actor } from "@dfinity/agent";
+import { Principal } from "@icp-sdk/core/principal";
+import { Actor } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import {
@@ -7,7 +7,7 @@ import {
   DiscoverablePasskeyIdentity,
 } from "$lib/utils/discoverablePasskeyIdentity";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { DelegationChain, DelegationIdentity } from "@dfinity/identity";
+import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
