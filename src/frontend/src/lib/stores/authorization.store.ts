@@ -51,7 +51,7 @@ type AuthorizationStore = Readable<{
   context?: AuthorizationContext;
   status: AuthorizationStatus;
 }> & {
-  init: (rpc?: boolean) => Promise<void>;
+  init: (legacyProtocol?: boolean) => Promise<void>;
   authorize: (
     accountNumber: bigint | undefined,
     artificialDelay?: number,
@@ -69,9 +69,11 @@ let authorize: (
 ) => Promise<void>;
 
 export const authorizationStore: AuthorizationStore = {
-  init: async (rpc) => {
+  init: async (legacyProtocol) => {
     const status = await (
-      rpc === true ? rpcAuthenticationProtocol : authenticationProtocol
+      legacyProtocol === true
+        ? authenticationProtocol
+        : rpcAuthenticationProtocol
     )({
       authenticate: async (context) => {
         const effectiveOrigin = remapToLegacyDomain(

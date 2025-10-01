@@ -2,11 +2,10 @@ import { get } from "svelte/store";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { redirect } from "@sveltejs/kit";
 import { nonNullish } from "@dfinity/utils";
-import type { PageLoad } from "./$types";
 
 let firstVisit = true;
 
-export const load: PageLoad = () => {
+export const load = ({ url }) => {
   const lastUsedIdentityAvailable = nonNullish(
     get(lastUsedIdentitiesStore).selected,
   );
@@ -15,7 +14,9 @@ export const load: PageLoad = () => {
     firstVisit = false;
 
     if (lastUsedIdentityAvailable) {
-      throw redirect(307, "/authorize/continue");
+      const next = new URL(url);
+      next.pathname = "/authorize/continue";
+      throw redirect(307, next);
     }
   }
 };
