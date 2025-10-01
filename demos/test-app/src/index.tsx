@@ -139,6 +139,7 @@ const updateDelegationView = ({
     try {
       // `toJSON` is failing due to `bytesToHex(delegation.publicKey)`
       // `bytesToHex` expects a Uint8Array and delegation.publicKey is a ArrayBuffer
+      // jsonResult = delegation.toJSON();
       jsonResult = {
         delegations: delegation.delegations.map((signedDelegation) => {
           const { delegation, signature } = signedDelegation;
@@ -156,9 +157,8 @@ const updateDelegationView = ({
         }),
         publicKey: bytesToHex(new Uint8Array(delegation.publicKey)),
       };
-      // jsonResult = delegation.toJSON();
     } catch (error) {
-      console.error("identity 7 - toJSON error:", error);
+      console.error("toJSON error:", error);
       jsonResult = {
         error: "toJSON failed",
         message: error instanceof Error ? error.message : String(error),
