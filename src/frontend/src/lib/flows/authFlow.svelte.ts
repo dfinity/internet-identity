@@ -44,7 +44,6 @@ export class AuthFlow {
     | "chooseMethod"
     | "setupOrUseExistingPasskey"
     | "setupNewPasskey"
-    | "infoPasskey"
     | "setupNewIdentity"
   >("chooseMethod");
   #captcha = $state<{
@@ -57,7 +56,6 @@ export class AuthFlow {
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
-  abTestGroup: "infoPasskey" | "default";
 
   get view() {
     return this.#view;
@@ -77,32 +75,22 @@ export class AuthFlow {
 
   constructor() {
     this.chooseMethod();
-    const isE2E = nonNullish(canisterConfig.dummy_auth[0]?.[0]);
-    // No A/B test in E2E runs
-    const GROUP_INFO_PERCENTAGE = isE2E ? -1 : 0.2;
-    this.abTestGroup =
-      Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
 
   chooseMethod = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
     this.#view = "chooseMethod";
   };
 
   setupOrUseExistingPasskey = (): void => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.ContinueWithPasskeyScreen,
-      { abTestGroup: this.abTestGroup },
     );
     this.#view = "setupOrUseExistingPasskey";
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
     const { identity, identityNumber, credentialId } =
       await authenticateWithPasskey({
         canisterId,
@@ -120,31 +108,20 @@ export class AuthFlow {
   };
 
   setupNewPasskey = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
     this.#view = "setupNewPasskey";
   };
 
   submitNameAndContinue = async (
     name: string,
-  ): Promise<undefined | { type: "created"; identityNumber: bigint }> => {
+  ): Promise<{ type: "created"; identityNumber: bigint }> => {
     this.#name = name;
-    if (this.abTestGroup === "infoPasskey") {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.InfoPasskeyScreen, {
-        abTestGroup: this.abTestGroup,
-      });
-      this.#view = "infoPasskey";
-      return;
-    } else {
-      return { type: "created", identityNumber: await this.createPasskey() };
-    }
+    return { type: "created", identityNumber: await this.createPasskey() };
   };
 
   createPasskey = async (): Promise<bigint> => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.StartWebauthnCreation,
-      { abTestGroup: this.abTestGroup },
     );
     if (isNullish(this.#name)) {
       throw new Error("Name is not set");
@@ -360,9 +337,7 @@ export class AuthFlow {
     passkeyIdentity: DiscoverablePasskeyIdentity,
     attempts = 0,
   ): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
@@ -387,7 +362,6 @@ export class AuthFlow {
         .then(throwCanisterError);
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulPasskeyRegistration,
-        { abTestGroup: this.abTestGroup },
       );
       const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
       const identity = await authenticateWithSession({
