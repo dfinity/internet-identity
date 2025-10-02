@@ -10,6 +10,7 @@ import { nonNullish } from "@dfinity/utils";
 import { throwCanisterError } from "$lib/utils/utils";
 import { lastUsedIdentitiesStore } from "./last-used-identities.store";
 import { authnMethodEqual, authnMethodToPublicKey } from "$lib/utils/webAuthn";
+import { sessionStore } from "$lib/stores/session.store";
 
 const fetchIdentityInfo = async () => {
   const authenticated = get(authenticatedStore);
@@ -86,7 +87,7 @@ export class IdentityInfo {
     if ("Ok" in googleRemoveResult) {
       // If we just deleted the method we are logged in with, we log the user out.
       if (isCurrent) {
-        this.logout();
+        await this.logout();
         lastUsedIdentitiesStore.removeIdentity(
           get(authenticatedStore).identityNumber,
         );
@@ -125,7 +126,7 @@ export class IdentityInfo {
 
       if (isCurrent) {
         lastUsedIdentitiesStore.removeIdentity(identityNumber);
-        this.logout();
+        await this.logout();
         return;
       }
       await this.fetch();
@@ -175,9 +176,11 @@ export class IdentityInfo {
     await this.fetch();
   }
 
-  logout = () => {
+  logout = async () => {
     // TODO: When we keep a session open we'll need to clean that session.
-    // For now we just reload the page to make sure all the states are cleared
+    // For now we reset the session store and just reload the page
+    // to make sure all the states are cleared when the user returns.
+    await sessionStore.reset();
     window.location.reload();
   };
 

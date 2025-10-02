@@ -20,13 +20,7 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import {
-    afterNavigate,
-    goto,
-    preloadCode,
-    preloadData,
-    replaceState,
-  } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
@@ -35,6 +29,7 @@
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { page } from "$app/state";
   import { canisterConfig } from "$lib/globals";
+  import { sessionStore } from "$lib/stores/session.store";
 
   const { children, data }: LayoutProps = $props();
 
@@ -132,8 +127,9 @@
           <IdentitySwitcher
             selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
-            switchIdentity={(identityNumber) => {
+            switchIdentity={async (identityNumber) => {
               authenticationStore.reset();
+              await sessionStore.reset();
               lastUsedIdentitiesStore.selectIdentity(identityNumber);
               isIdentityPopoverOpen = false;
             }}
