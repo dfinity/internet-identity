@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PageProps } from "./$types";
+  import type { PageProps } from "../../../../../../.svelte-kit/types/src/frontend";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { onMount } from "svelte";
   import { createRedirectURL } from "$lib/utils/openID";

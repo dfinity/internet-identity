@@ -1,11 +1,13 @@
 import { redirect } from "@sveltejs/kit";
 import { canisterConfig } from "$lib/globals";
-import { isNullish } from "@dfinity/utils";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import { PageLoad } from "./$types";
 
-export const load: PageLoad = ({ params }) => {
+export const load: PageLoad = ({ url }) => {
+  const openid = url.searchParams.get("openid");
   const config = canisterConfig.openid_configs[0]?.find(
-    (config) => config.name.toLowerCase() === params.openid.toLowerCase(),
+    (config) =>
+      nonNullish(openid) && config.name.toLowerCase() === openid.toLowerCase(),
   );
   if (isNullish(config)) {
     // If OpenID config can't be found, fallback to original authorization flow
