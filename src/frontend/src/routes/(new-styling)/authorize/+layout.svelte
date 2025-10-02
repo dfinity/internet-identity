@@ -34,6 +34,9 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { page } from "$app/state";
+  import { canisterConfig } from "$lib/globals";
+  import { createRedirectURL } from "$lib/utils/openID";
+  import { sessionStore } from "$lib/stores/session.store";
 
   const { children, data }: LayoutProps = $props();
 
@@ -44,6 +47,12 @@
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
   const status = $derived($authorizationStatusStore);
+
+  const directOpenIdConfig = canisterConfig.openid_configs[0]?.find(
+    (config) =>
+      nonNullish(data.openid) &&
+      config.name.toLowerCase() === data.openid.toLowerCase(),
+  );
 
   let identityButtonRef = $state<HTMLElement>();
   let isIdentityPopoverOpen = $state(false);
@@ -90,17 +99,25 @@
   };
 
   onMount(() => {
-    authorizationStore.init(data.legacyProtocol);
-
-    setTimeout(() => {
-      triggerDropWaveAnimation();
+    authorizationStore.init({
+      // Use either legacy PostMessage protocol or ICRC-29 PostMessage protocol
+      legacyProtocol: data.legacyProtocol,
     });
+
+    // Avoid animation when redirecting in direct OpenID authentication
+    if (!directOpenIdConfig) {
+      setTimeout(() => {
+        triggerDropWaveAnimation();
+      });
+    }
   });
 
-  // Remove legacyProtocol param from URL bar after initializing authorization store
+  // Remove legacyProtocol param from URL bar after initializing
   afterNavigate(() => {
     if (page.url.searchParams.has("legacyProtocol")) {
-      replaceState(page.url.pathname, {});
+      const next = new URL(page.url);
+      next.searchParams.delete("legacyProtocol");
+      replaceState(next, {});
     }
   });
 </script>

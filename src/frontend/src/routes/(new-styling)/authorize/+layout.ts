@@ -1,3 +1,5 @@
 export const load = ({ url }) => {
-  return { legacyProtocol: url.searchParams.has("legacyProtocol") };
+  return {
+    legacyProtocol: url.searchParams.has("legacyProtocol"),
+  };
 };

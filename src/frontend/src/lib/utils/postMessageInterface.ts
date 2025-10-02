@@ -48,6 +48,7 @@ const scopes: PermissionScope[] = [
 export function rpcAuthenticationProtocol({
   authenticate,
   onProgress,
+  allowedOrigin,
 }: {
   /** The callback used to get auth data (i.e. select or create anchor) */
   authenticate: (authContext: {
@@ -65,6 +66,7 @@ export function rpcAuthenticationProtocol({
   >;
   /* Progress update messages to let the user know what's happening. */
   onProgress: (state: "waiting" | "validating") => void;
+  allowedOrigin?: string;
 }): Promise<
   "orphan" | "closed" | "invalid" | "success" | "failure" | "unverified-origin"
 > {
@@ -72,6 +74,7 @@ export function rpcAuthenticationProtocol({
     authorizeClientFunnel.init();
     onProgress("waiting");
     new HeartbeatServer({
+      allowedOrigin,
       onDisconnect(): void {
         resolve("closed");
       },
@@ -245,6 +248,7 @@ export function rpcAuthenticationProtocol({
           }
         });
       },
+      establishTimeout: 2000,
       onEstablishTimeout(): void {
         resolve("closed");
       },
