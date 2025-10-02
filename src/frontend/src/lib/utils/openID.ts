@@ -137,7 +137,7 @@ export const createRedirectURL = (
  * @param config of the OpenID provider
  * @param options for the JWT request
  */
-const requestWithRedirect = async (
+const requestWithPopup = async (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
 ): Promise<string> => {
@@ -306,7 +306,7 @@ export const requestJWT = async (
   const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
-    : await requestWithRedirect(config, options);
+    : await requestWithPopup(config, options);
   return jwt;
 };
 

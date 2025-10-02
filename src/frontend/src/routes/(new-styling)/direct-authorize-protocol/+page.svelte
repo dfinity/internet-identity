@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PageProps } from "../../../../../../.svelte-kit/types/src/frontend";
+  import type { PageProps } from "./$types";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { onMount } from "svelte";
   import { createRedirectURL } from "$lib/utils/openID";
@@ -9,9 +9,16 @@
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
 
+  // The maximum amount of time in milliseconds we're willing to wait before
+  // having to consider the establishment of the ICRC-29 channel a failure.
+  //
+  // Waiting any longer than this would likely not result in a successful ICRC-29
+  // channel establishment while making the user wait too long for visual feedback.
+  const establishTimeout = 2000;
+
   const { data }: PageProps = $props();
 
-  let establishTimeout = $state(false);
+  let timedOut = $state(false);
 
   onMount(() => {
     new HeartbeatServer({
@@ -34,9 +41,9 @@
         );
         window.location.assign(next);
       },
-      establishTimeout: 2000,
+      establishTimeout,
       onEstablishTimeout(): void {
-        establishTimeout = true;
+        timedOut = true;
       },
       onDisconnect(): void {
         // Unreachable, we redirect immediately after establishing
@@ -45,7 +52,7 @@
   });
 </script>
 
-{#if establishTimeout}
+{#if timedOut}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
       <CircleAlertIcon size="1.5rem" />

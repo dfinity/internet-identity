@@ -10,7 +10,7 @@ export const load: PageLoad = ({ url }) => {
       nonNullish(openid) && config.name.toLowerCase() === openid.toLowerCase(),
   );
   if (isNullish(config)) {
-    // If OpenID config can't be found, fallback to original authorization flow
+    // If OpenID config can't be found, fallback to ICRC-29 authorization flow
     throw redirect(307, "/authorize");
   }
   return { config };

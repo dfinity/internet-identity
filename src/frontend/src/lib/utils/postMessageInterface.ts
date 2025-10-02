@@ -41,6 +41,12 @@ const scopes: PermissionScope[] = [
     method: "icrc34_delegation",
   },
 ];
+// The maximum amount of time in milliseconds we're willing to wait before
+// having to consider the establishment of the ICRC-29 channel a failure.
+//
+// Waiting any longer than this would likely not result in a successful ICRC-29
+// channel establishment while making the user wait too long for visual feedback.
+const establishTimeout = 2000;
 
 /**
  * The postMessage-based authentication protocol.
@@ -248,7 +254,7 @@ export function rpcAuthenticationProtocol({
           }
         });
       },
-      establishTimeout: 2000,
+      establishTimeout,
       onEstablishTimeout(): void {
         resolve("closed");
       },

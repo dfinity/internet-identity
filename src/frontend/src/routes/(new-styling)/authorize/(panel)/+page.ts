@@ -15,6 +15,7 @@ export const load: PageLoad = ({ url }) => {
     firstVisit = false;
 
     if (lastUsedIdentityAvailable) {
+      // Copy and modify URL path to retain other data e.g. search params
       const next = new URL(url);
       next.pathname = "/authorize/continue";
       throw redirect(307, next);
