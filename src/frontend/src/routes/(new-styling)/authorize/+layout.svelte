@@ -20,13 +20,7 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import {
-    afterNavigate,
-    goto,
-    preloadCode,
-    preloadData,
-    replaceState,
-  } from "$app/navigation";
+  import { afterNavigate, goto, replaceState } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
