@@ -23,9 +23,17 @@ export const test = base.extend({
           return route.continue();
         }
 
-        const newUrl = `https://localhost:5173${url.pathname}${url.search}`;
-        // The vite server uses the Host header to determine where the redirect the request.
-        return route.continue({ url: newUrl, headers: { Host: url.hostname } });
+        if (url.hostname.includes("localhost")) {
+          return route.continue();
+        }
+
+        // The vite server uses
+        const newUrl = `https://internet_identity.localhost:5173${url.pathname}${url.search}`;
+        return route.continue({
+          url: newUrl,
+          // The vite server uses the Host header to determine where the redirect the request.
+          headers: { ...req.headers(), Host: url.hostname },
+        });
       });
     }
 
