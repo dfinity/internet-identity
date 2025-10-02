@@ -1,8 +1,9 @@
 import { redirect } from "@sveltejs/kit";
 import { canisterConfig } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
+import { PageLoad } from "./$types";
 
-export const load = ({ params }) => {
+export const load: PageLoad = ({ params }) => {
   const config = canisterConfig.openid_configs[0]?.find(
     (config) => config.name.toLowerCase() === params.openid.toLowerCase(),
   );
