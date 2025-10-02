@@ -97,14 +97,14 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Request JWT through redirect flow in a popup
+ * Create JWT request redirect flow URL
  * @param config of the OpenID provider
  * @param options for the JWT request
  */
-const requestWithRedirect = async (
+export const createRedirectURL = (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
-): Promise<string> => {
+): URL => {
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
@@ -129,11 +129,24 @@ const requestWithRedirect = async (
     authURL.searchParams.set("login_hint", options.loginHint);
   }
 
-  const callback = await redirectInPopup(authURL.href);
+  return authURL;
+};
+
+/**
+ * Request JWT through redirect flow in a popup
+ * @param config of the OpenID provider
+ * @param options for the JWT request
+ */
+const requestWithPopup = async (
+  config: Omit<RequestConfig, "configURL">,
+  options: RequestOptions,
+): Promise<string> => {
+  const redirectURL = createRedirectURL(config, options);
+  const callback = await redirectInPopup(redirectURL.href);
   const callbackURL = new URL(callback);
   const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
   const id_token = searchParams.get("id_token");
-  if (searchParams.get("state") !== state) {
+  if (searchParams.get("state") !== redirectURL.searchParams.get("state")) {
     throw new Error("Invalid state");
   }
   if (isNullish(id_token)) {
@@ -293,7 +306,7 @@ export const requestJWT = async (
   const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
-    : await requestWithRedirect(config, options);
+    : await requestWithPopup(config, options);
   return jwt;
 };
 

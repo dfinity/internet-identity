@@ -20,16 +20,24 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { goto, preloadCode, preloadData } from "$app/navigation";
+  import {
+    afterNavigate,
+    goto,
+    preloadCode,
+    preloadData,
+    replaceState,
+  } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { page } from "$app/state";
+  import { canisterConfig } from "$lib/globals";
   import { sessionStore } from "$lib/stores/session.store";
 
-  const { children }: LayoutProps = $props();
+  const { children, data }: LayoutProps = $props();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -84,11 +92,19 @@
   };
 
   onMount(() => {
-    authorizationStore.init();
-
-    setTimeout(() => {
-      triggerDropWaveAnimation();
+    authorizationStore.init({
+      // Use either legacy PostMessage protocol or ICRC-29 PostMessage protocol
+      legacyProtocol: data.legacyProtocol,
     });
+  });
+
+  // Remove legacyProtocol param from URL bar after initializing
+  afterNavigate(() => {
+    if (page.url.searchParams.has("legacyProtocol")) {
+      const next = new URL(page.url);
+      next.searchParams.delete("legacyProtocol");
+      replaceState(next, {});
+    }
   });
 </script>
 

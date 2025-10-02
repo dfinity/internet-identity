@@ -41,6 +41,12 @@ const scopes: PermissionScope[] = [
     method: "icrc34_delegation",
   },
 ];
+// The maximum amount of time in milliseconds we're willing to wait before
+// having to consider the establishment of the ICRC-29 channel a failure.
+//
+// Waiting any longer than this would likely not result in a successful ICRC-29
+// channel establishment while making the user wait too long for visual feedback.
+const establishTimeout = 2000;
 
 /**
  * The postMessage-based authentication protocol.
@@ -48,6 +54,7 @@ const scopes: PermissionScope[] = [
 export function rpcAuthenticationProtocol({
   authenticate,
   onProgress,
+  allowedOrigin,
 }: {
   /** The callback used to get auth data (i.e. select or create anchor) */
   authenticate: (authContext: {
@@ -65,6 +72,7 @@ export function rpcAuthenticationProtocol({
   >;
   /* Progress update messages to let the user know what's happening. */
   onProgress: (state: "waiting" | "validating") => void;
+  allowedOrigin?: string;
 }): Promise<
   "orphan" | "closed" | "invalid" | "success" | "failure" | "unverified-origin"
 > {
@@ -72,6 +80,7 @@ export function rpcAuthenticationProtocol({
     authorizeClientFunnel.init();
     onProgress("waiting");
     new HeartbeatServer({
+      allowedOrigin,
       onDisconnect(): void {
         resolve("closed");
       },
@@ -245,6 +254,7 @@ export function rpcAuthenticationProtocol({
           }
         });
       },
+      establishTimeout,
       onEstablishTimeout(): void {
         resolve("closed");
       },

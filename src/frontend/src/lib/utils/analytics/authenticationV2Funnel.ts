@@ -28,7 +28,6 @@ import { Funnel } from "./Funnel";
  *          jwt-verification-expired
  *      continue-with-passkey-screen
  *        enter-name-screen
- *          [info-passkey-screen]
  *          start-webauthn-creation
  *            register-with-passkey
  *              successful-passkey-registration
@@ -57,7 +56,6 @@ export const AuthenticationV2Events = {
   AuthSuccess: "auth-success",
   JwtVerificationFailed: "jwt-verification-failed",
   JwtVerificationExpired: "jwt-verification-expired",
-  InfoPasskeyScreen: "info-passkey-screen",
   GoToDashboard: "go-to-dashboard",
 } as const;
 
