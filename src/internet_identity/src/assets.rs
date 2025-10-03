@@ -1,19 +1,19 @@
 // All assets
 //
 // This file describes which assets are used and how (content, content type and content encoding).
-use crate::http::security_headers;
 use crate::state;
+use crate::{http::security_headers, state::ASSET_ROUTER};
 use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::Encode;
-use ic_cdk::api;
+use ic_cdk::api::{self, set_certified_data};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::InternetIdentityInit;
 use serde_json::json;
 use sha2::Digest;
 
-// used both in init and post_upgrade
+/// Used in both http_options_requesthttp_options_request and post_upgrade.
 pub fn init_assets(config: &InternetIdentityInit) {
     state::assets_mut(|certified_assets| {
         let assets = get_static_assets(config);
@@ -37,6 +37,23 @@ pub fn init_assets(config: &InternetIdentityInit) {
             assets,
             &security_headers(integrity_hashes, config.related_origins.clone()),
         );
+    });
+
+    // Initialize assets that are to be certified using ic_asset_certification.
+
+    let asset_config = ic_asset_certification::AssetConfig::Pattern {
+        pattern: "**".to_string(),
+        content_type: None,
+        headers: vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())],
+        encodings: vec![],
+    };
+
+    ASSET_ROUTER.with_borrow_mut(|asset_router| {
+        if let Err(err) = asset_router.certify_assets([], [asset_config]) {
+            ic_cdk::trap(&format!("Failed to certify assets: {}", err));
+        }
+
+        set_certified_data(&asset_router.root_hash());
     });
 }
 
@@ -83,6 +100,14 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
     assets.push(Asset {
         url_path: "/.well-known/ic-domains".to_string(),
         content: b"identity.internetcomputer.org\nbeta.identity.ic0.app\nbeta.identity.internetcomputer.org\nid.ai\nbeta.id.ai\nwww.id.ai".to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
+
+    // Special asset for responding to OPTIONS requests.
+    assets.push(Asset {
+        url_path: "/".to_string(),
+        content: vec![],
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });

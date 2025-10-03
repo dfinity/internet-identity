@@ -12,6 +12,7 @@ use crate::storage::MAX_ENTRIES;
 use crate::{random_salt, Storage};
 use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize, Principal};
+use ic_asset_certification::AssetRouter;
 use ic_canister_sig_creation::signature_map::SignatureMap;
 use ic_cdk::trap;
 use ic_stable_structures::DefaultMemoryImpl;
@@ -39,6 +40,8 @@ pub const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = RateLimitConfig {
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
+
+    pub(crate) static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::default());
 }
 
 #[derive(Clone)]
