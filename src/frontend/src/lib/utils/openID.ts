@@ -326,7 +326,6 @@ export const decodeJWT = (
   email?: string;
   [key: string]: string | undefined;
 } => {
-  console.log("Decoding token", token);
   const [_header, body, _signature] = token.split(".");
 
   // JWT encodes the token using base64URL which is slightly different than base64.
