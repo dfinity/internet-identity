@@ -795,6 +795,7 @@
     "name": "Caffeine",
     "oneLiner": "Self-writing apps platform: the first complete tech stack designed for AI.",
     "website": "https://caffeine.ai",
+    "authOrigins": ["https://caffeine.ai", "https://app.caffeine.ai"],
     "logo": "caffeine_logo.svg"
   }
 ]
