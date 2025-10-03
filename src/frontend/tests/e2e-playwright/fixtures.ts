@@ -12,7 +12,15 @@ export const test = base.extend({
 
     if (browserName === "webkit") {
       // Apply routing for Safari since it doesn't support host-resolver-rules
-      await page.route("**/*", (route) => {
+      await page.context().route("**/*", (route) => {
+        // Should map the config in `vite.config.ts`
+        const hostToCanisterName: Record<string, string> = {
+          ["id.ai"]: "internet_identity",
+          ["identity.ic0.app"]: "internet_identity",
+          ["identity.internetcomputer.org"]: "internet_identity",
+          ["nice-name.com"]: "test_app",
+        };
+
         const req = route.request();
         const urlStr = req.url();
 
@@ -27,8 +35,12 @@ export const test = base.extend({
           return route.continue();
         }
 
-        // The vite server uses
-        const newUrl = `https://internet_identity.localhost:5173${url.pathname}${url.search}`;
+        const canister_name = hostToCanisterName[url.hostname];
+        if (!canister_name) {
+          return route.continue();
+        }
+        // The vite server uses the Host header and the localhost subdomain to determine where the redirect the request.
+        const newUrl = `https://${canister_name}.localhost:5173${url.pathname}${url.search}`;
         return route.continue({
           url: newUrl,
           // The vite server uses the Host header to determine where the redirect the request.
