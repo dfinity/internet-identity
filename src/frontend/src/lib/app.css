@@ -172,6 +172,7 @@ a:not(:disabled) {
   --bg-secondary_alt: var(--color-surface-light-100);
   --bg-secondary_hover: var(--color-surface-light-100);
   --bg-tertiary: var(--color-surface-light-200);
+  --bg-quaternary: var(--color-surface-light-200);
   --bg-active: var(--color-surface-light-50);
   --bg-disabled: var(--color-surface-light-200);
   --bg-disabled_subtle: var(--color-surface-light-50);
@@ -264,6 +265,7 @@ a:not(:disabled) {
     --bg-secondary_alt: var(--color-surface-dark-800);
     --bg-secondary_hover: var(--color-surface-dark-800);
     --bg-tertiary: var(--color-surface-dark-800);
+    --bg-quaternary: var(--color-surface-light-700);
     --bg-active: var(--color-surface-dark-800);
     --bg-disabled: var(--color-surface-dark-700);
     --bg-disabled_subtle: var(--color-surface-dark-900);
@@ -357,6 +359,7 @@ a:not(:disabled) {
   --color-bg-secondary_alt: var(--bg-secondary_alt);
   --color-bg-secondary_hover: var(--bg-secondary_hover);
   --color-bg-tertiary: var(--bg-tertiary);
+  --color-bg-quaternary: var(--bg-quaternary);
   --color-bg-active: var(--bg-active);
   --color-bg-disabled: var(--bg-disabled);
   --color-bg-disabled_subtle: var(--bg-disabled_subtle);

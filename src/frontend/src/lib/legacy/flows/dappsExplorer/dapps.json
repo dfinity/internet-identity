@@ -790,5 +790,11 @@
     "oneLiner": "Experience next-gen decentralized authentication.",
     "website": "https://try.id.ai",
     "logo": "try-id-ai.svg"
+  },
+  {
+    "name": "Caffeine",
+    "oneLiner": "Self-writing apps platform: the first complete tech stack designed for AI.",
+    "website": "https://caffeine.ai",
+    "logo": "caffeine_logo.svg"
   }
 ]

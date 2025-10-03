@@ -39,7 +39,12 @@ import {
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
 
+interface AuthFlowOptions {
+  trackLastUsed?: boolean;
+}
+
 export class AuthFlow {
+  #options: Required<AuthFlowOptions>;
   #view = $state<
     | "chooseMethod"
     | "setupOrUseExistingPasskey"
@@ -73,7 +78,11 @@ export class AuthFlow {
     return this.#confirmationCode;
   }
 
-  constructor() {
+  constructor(options?: AuthFlowOptions) {
+    this.#options = {
+      trackLastUsed: true,
+      ...options,
+    };
     this.chooseMethod();
   }
 
@@ -99,11 +108,13 @@ export class AuthFlow {
     await authenticationStore.set({ identity, identityNumber });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-    lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber,
-      name: info.name[0],
-      authMethod: { passkey: { credentialId } },
-    });
+    if (this.#options.trackLastUsed) {
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { passkey: { credentialId } },
+      });
+    }
     return identityNumber;
   };
 
@@ -180,13 +191,15 @@ export class AuthFlow {
       const authnMethod = info.openid_credentials[0]?.find(
         (method) => method.iss === iss,
       );
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: {
-          openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
-        },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: info.name[0],
+          authMethod: {
+            openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
+          },
+        });
+      }
       return { identityNumber, type: "signIn" };
     } catch (error) {
       if (
@@ -212,6 +225,7 @@ export class AuthFlow {
 
   continueWithOpenId = async (
     config: OpenIdConfig,
+    existingJwt?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -222,7 +236,7 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
-    let jwt: string | undefined = undefined;
+    let jwt: string | undefined = existingJwt;
     // Convert OpenIdConfig to RequestConfig
     const requestConfig: RequestConfig = {
       clientId: config.client_id,
@@ -233,20 +247,24 @@ export class AuthFlow {
     authenticationV2Funnel.addProperties({
       provider: config.name,
     });
-    // Create two try-catch blocks to avoid double-triggering the analytics.
-    try {
-      this.#systemOverlay = true;
-      jwt = await requestJWT(requestConfig, {
-        nonce: get(sessionStore).nonce,
-        mediation: "required",
-      });
-    } catch (error) {
-      this.#view = "chooseMethod";
-      throw error;
-    } finally {
-      this.#systemOverlay = false;
-      // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
+    if (isNullish(jwt)) {
+      // Create two try-catch blocks to avoid double-triggering the analytics.
+      try {
+        this.#systemOverlay = true;
+        jwt = await requestJWT(requestConfig, {
+          nonce: get(sessionStore).nonce,
+          mediation: "required",
+        });
+      } catch (error) {
+        this.#view = "chooseMethod";
+        throw error;
+      } finally {
+        this.#systemOverlay = false;
+        // Moved after `requestJWT` to avoid Safari from blocking the popup.
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.ContinueWithOpenID,
+        );
+      }
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
@@ -266,13 +284,15 @@ export class AuthFlow {
       const authnMethod = info.openid_credentials[0]?.find(
         (method) => method.iss === iss,
       );
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: {
-          openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
-        },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: info.name[0],
+          authMethod: {
+            openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
+          },
+        });
+      }
       return { identityNumber, type: "signIn" };
     } catch (error) {
       if (
@@ -368,11 +388,13 @@ export class AuthFlow {
         session: get(sessionStore),
       });
       await authenticationStore.set({ identity, identityNumber });
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: passkeyIdentity.getName(),
-        authMethod: { passkey: { credentialId } },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: passkeyIdentity.getName(),
+          authMethod: { passkey: { credentialId } },
+        });
+      }
       this.#captcha = undefined;
       return identityNumber;
     } catch (error) {
@@ -478,11 +500,13 @@ export class AuthFlow {
           }
         });
       }
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name,
-        authMethod: { openid: { iss, sub, loginHint, metadata } },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name,
+          authMethod: { openid: { iss, sub, loginHint, metadata } },
+        });
+      }
       this.#captcha = undefined;
       return identityNumber;
     } catch (error) {

@@ -113,16 +113,21 @@ export const authorizationStore: AuthorizationStore = {
               status: "authorizing",
             }));
             const { identityNumber, actor } = get(authenticatedStore);
-            const syncLastUsedAccountsPromise = actor
-              .get_accounts(identityNumber, effectiveOrigin)
-              .then(throwCanisterError)
-              .then((accounts) =>
-                lastUsedIdentitiesStore.syncLastUsedAccounts(
-                  identityNumber,
-                  effectiveOrigin,
-                  accounts,
-                ),
-              );
+            // Only fetch and sync accounts if identity is actually stored
+            const syncLastUsedAccountsPromise = nonNullish(
+              get(lastUsedIdentitiesStore).identities[`${identityNumber}`],
+            )
+              ? actor
+                  .get_accounts(identityNumber, effectiveOrigin)
+                  .then(throwCanisterError)
+                  .then((accounts) =>
+                    lastUsedIdentitiesStore.syncLastUsedAccounts(
+                      identityNumber,
+                      effectiveOrigin,
+                      accounts,
+                    ),
+                  )
+              : Promise.resolve().then(() => []);
             const artificialDelayPromise = waitFor(
               features.DUMMY_AUTH ||
                 nonNullish(canisterConfig.dummy_auth[0]?.[0])
@@ -207,6 +212,7 @@ export const authorizationContextStore: Readable<AuthorizationContext> =
     if (isNullish(context)) {
       throw new Error("Authorization context is not available yet");
     }
+    context.requestOrigin = "https://caffeine.ai";
     return context;
   });
 
