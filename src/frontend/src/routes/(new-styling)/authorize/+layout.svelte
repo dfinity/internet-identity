@@ -11,12 +11,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import {
-    RotateCcwIcon,
-    CircleAlertIcon,
-    ChevronDownIcon,
-  } from "@lucide/svelte";
-  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import { ChevronDownIcon } from "@lucide/svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -28,8 +23,8 @@
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { page } from "$app/state";
-  import { canisterConfig } from "$lib/globals";
   import { sessionStore } from "$lib/stores/session.store";
+  import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -54,7 +49,7 @@
     });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    triggerDropWaveAnimation();
+    void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
 
     await gotoAccounts();
@@ -66,7 +61,7 @@
       closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    triggerDropWaveAnimation();
+    void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
     await authorizationStore.authorize(undefined, 4000);
   };
@@ -179,55 +174,11 @@
         <ProgressRing class="text-fg-primary size-14" />
         <p class="text-text-secondary text-lg">Redirecting to the app</p>
       </div>
-    {:else if status === "orphan" || status === "closed" || status === "invalid" || status === "failure" || status === "unverified-origin"}
-      {@const title = {
-        orphan: "Missing request",
-        closed: "Connection closed",
-        invalid: "Invalid request",
-        failure: "Something went wrong",
-        "unverified-origin": "Unverified origin",
-      }[status]}
-      {@const description = {
-        orphan:
-          "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer.",
-        closed:
-          "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support.",
-        invalid:
-          "It seems like an invalid authentication request was received.",
-        failure:
-          "Something went wrong during authentication. Authenticating service was notified and you may close this page.",
-        "unverified-origin":
-          "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page.",
-      }[status]}
-      <Dialog>
-        <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-          <CircleAlertIcon size="1.5rem" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">{title}</h1>
-        <p class="text-md text-text-tertiary mb-6 font-medium">{description}</p>
-        <Button onclick={() => window.close()} variant="secondary">
-          <RotateCcwIcon size="1rem" />
-          Return to app
-        </Button>
-      </Dialog>
-    {:else if status === "late-success"}
-      <Dialog>
-        <FeaturedIcon size="lg" class="mb-4 self-start">
-          <CircleAlertIcon size="1.5rem" />
-        </FeaturedIcon>
-        <h1 class="text-text-primary mb-3 text-2xl font-medium">
-          Authentication successful
-        </h1>
-        <p class="text-md text-text-tertiary mb-6 font-medium">
-          You may close this page.
-        </p>
-        <Button onclick={() => window.close()} variant="secondary">
-          <RotateCcwIcon size="1rem" />
-          Return to app
-        </Button>
-      </Dialog>
     {/if}
   </div>
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+<!-- Renders any error status or late success status dialog when needed -->
+<AuthorizeError {status} />

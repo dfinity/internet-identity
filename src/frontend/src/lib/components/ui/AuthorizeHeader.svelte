@@ -30,7 +30,7 @@
         <img
           src={dapp?.logoSrc}
           alt={`${dapp?.name ?? origin} logo`}
-          class="h-16 max-w-24 object-contain"
+          class="h-16 max-w-50 object-contain"
         />
       {:else}
         <div
