@@ -9,7 +9,7 @@ import {
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
-import { toBase64URL } from "$lib/utils/utils";
+import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
@@ -327,8 +327,12 @@ export const decodeJWT = (
   [key: string]: string | undefined;
 } => {
   const [_header, body, _signature] = token.split(".");
+
+  // JWT encodes the token using base64URL which is slightly different than base64.
+  const payload = new TextDecoder().decode(fromBase64URL(body));
+
   const { iss, sub, aud, name, email, preferred_username, ...rest } =
-    JSON.parse(atob(body));
+    JSON.parse(payload);
   return {
     iss,
     sub,

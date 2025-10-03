@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
 
-const DEFAULT_USER_NAME = "John Doe";
+// This is chosen on purpose to exhibit a JWT token that is encoded in base64url but cannot
+// be decoded as simply base64. Works as a regression test.
+const DEFAULT_USER_NAME = "įìęèéêêëėįì";
 const SECONDARY_USER_NAME = "Jane Doe";
 
 test.describe("First visit", () => {
