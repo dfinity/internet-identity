@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <style>
@@ -21,6 +21,10 @@
 
       section {
         padding: 1em 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1em;
       }
     </style>
     <meta charset="UTF-8" />
@@ -35,7 +39,12 @@
         <input size="50" id="iiUrl" type="text" />
       </section>
       <section>
-        <button id="loginBtn">Login with Internet Identity</button>
+        <div>
+          <button id="loginBtn">Login with Internet Identity</button>
+        </div>
+        <div>
+          <button id="loginOpenIdBtn">Logi with OpenID directly</button>
+        </div>
       </section>
       <section id="loginStatus">
         <p>Not logged in</p>
