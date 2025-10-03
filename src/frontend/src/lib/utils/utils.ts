@@ -440,6 +440,14 @@ export const toBase64URL = (bytes: ArrayBuffer): string =>
 export const fromBase64 = (base64: string): Uint8Array =>
   Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0));
 
+export const fromBase64URL = (base64Url: string): Uint8Array =>
+  fromBase64(
+    base64Url
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
+  );
+
 // Utility to transform the signed delegation received from the backend into one that the frontend DelegationChain understands.
 export const transformSignedDelegation = (
   signed_delegation: SignedDelegation,
