@@ -54,7 +54,7 @@ pub struct AccountsCounter {
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct AccountReference {
-    pub account_number: Option<AccountNumber>, // None is the unreserved default account
+    pub account_number: Option<AccountNumber>, // None is the unreserved synthetic account
     pub last_used: Option<Timestamp>,
 }
 
@@ -69,7 +69,9 @@ pub struct Account {
 }
 
 impl Account {
-    /// A default account that is not meant to be stored.
+    /// A "synthetic" account, i.e., one that is not meant to be stored.
+    ///
+    /// One exception when it may be stored is to overwrite an existing stored account.
     pub fn synthetic(anchor_number: AnchorNumber, origin: FrontendHostname) -> Self {
         Self {
             anchor_number,

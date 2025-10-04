@@ -10,7 +10,7 @@ use std::borrow::Cow;
 #[cbor(map)]
 pub struct StorableAccountReference {
     #[n(0)]
-    pub account_number: Option<StorableAccountNumber>, // None is the unreserved default account
+    pub account_number: Option<StorableAccountNumber>, // None is the unreserved synthetic account
     #[n(1)]
     pub last_used: Option<Timestamp>,
 }

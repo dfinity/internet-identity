@@ -8,7 +8,7 @@ use std::borrow::Cow;
 #[cbor(map)]
 pub struct AnchorApplicationConfig {
     #[n(0)]
-    pub default_account_number: Option<StorableAccountNumber>, // None is the unreserved default account
+    pub default_account_number: Option<StorableAccountNumber>, // None is the unreserved synthetic account
 }
 
 impl Storable for AnchorApplicationConfig {
