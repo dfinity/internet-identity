@@ -18,12 +18,11 @@ import { test as base, expect } from "@playwright/test";
  */
 export const test = base.extend({
   page: async ({ page }, use) => {
-    // Safari doesn't support --host-resolver-rules, so we need page routing for Safari
-    // Chromium browsers will use host-resolver-rules which preserves Host headers better
     const browserName = page.context().browser()?.browserType().name();
 
+    // Safari doesn't support --host-resolver-rules, so we need page routing for Safari
+    // Chromium browsers will use host-resolver-rules which preserves Host headers better
     if (browserName === "webkit") {
-      // Apply routing for Safari since it doesn't support host-resolver-rules
       await page.context().route("**/*", (route) => {
         // Should map the config in `vite.config.ts`
         const hostToCanisterName: Record<string, string> = {
@@ -51,7 +50,6 @@ export const test = base.extend({
         if (canister_name === undefined) {
           return route.continue();
         }
-        // The vite server uses the Host header and the localhost subdomain to determine where the redirect the request.
         const newUrl = `https://${canister_name}.localhost:5173${url.pathname}${url.search}`;
         return route.continue({
           url: newUrl,
