@@ -36,7 +36,7 @@ export const test = base.extend({
         }
 
         const canister_name = hostToCanisterName[url.hostname];
-        if (!canister_name) {
+        if (canister_name === undefined) {
           return route.continue();
         }
         // The vite server uses the Host header and the localhost subdomain to determine where the redirect the request.

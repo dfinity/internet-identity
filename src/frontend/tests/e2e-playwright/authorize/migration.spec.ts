@@ -15,6 +15,11 @@ import { isNullish } from "@dfinity/utils";
 const TEST_USER_NAME = "Test User";
 
 test.describe("Migration from an app", () => {
+  test.skip(
+    ({ browserName }) => browserName === "webkit",
+    "Migration test not supported on Safari because it uses virtual authenticators which are not supported.",
+  );
+
   test("User can migrate a legacy identity", async ({ page }) => {
     const auth = dummyAuth();
     let credential: Protocol.WebAuthn.Credential | undefined;

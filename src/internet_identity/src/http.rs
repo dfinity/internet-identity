@@ -126,10 +126,10 @@ pub fn security_headers(
         // Content-Security-Policy (CSP)
         // Comprehensive policy to prevent XSS attacks and data injection
         // See content_security_policy_header() function for detailed explanation
-        // (
-        //     "Content-Security-Policy".to_string(),
-        //     content_security_policy_header(integrity_hashes, maybe_related_origins),
-        // ),
+        (
+            "Content-Security-Policy".to_string(),
+            content_security_policy_header(integrity_hashes, maybe_related_origins),
+        ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
         // max-age=31536000: Valid for 1 year (31,536,000 seconds)
