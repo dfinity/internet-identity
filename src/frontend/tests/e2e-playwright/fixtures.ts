@@ -3,6 +3,18 @@ import { test as base, expect } from "@playwright/test";
 /**
  * Custom test fixture that automatically applies host resolution routing
  * to redirect all non-localhost requests to localhost:5173
+ *
+ * ⚠️ IMPORTANT: All E2E test files MUST import { test, expect } from this file
+ * instead of from '@playwright/test' to ensure proper host routing for Safari/WebKit.
+ *
+ * @example
+ * // ✅ Correct
+ * import { test, expect } from "./fixtures";
+ * // or from subdirectories:
+ * import { test, expect } from "../fixtures";
+ *
+ * // ❌ Wrong - will fail ESLint
+ * import { test, expect } from "@playwright/test";
  */
 export const test = base.extend({
   page: async ({ page }, use) => {
