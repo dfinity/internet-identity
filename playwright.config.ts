@@ -30,6 +30,9 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
+
+    /* Ignore HTTPS errors, which is needed for the self-signed certificate. */
+    ignoreHTTPSErrors: true,
   },
   timeout: 60000,
 
