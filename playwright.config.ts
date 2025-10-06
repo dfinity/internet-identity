@@ -66,12 +66,18 @@ export default defineConfig({
       name: "safari-desktop",
       use: {
         ...devices["Desktop Safari"],
+        launchOptions: {
+          args: ["--ignore-certificate-errors"],
+        },
       },
     },
     {
       name: "safari-mobile",
       use: {
         ...devices["iPhone 12"],
+        launchOptions: {
+          args: ["--ignore-certificate-errors"],
+        },
       },
     },
   ],
