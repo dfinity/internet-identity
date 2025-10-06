@@ -57,7 +57,7 @@ jobs:
             II_FETCH_ROOT_KEY: 1
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 0
-            II_DEV_CSP: 0
+            II_DEV_CSP: 1
 
           # Everything disabled, used by third party developers who only care
           # about the login flow
