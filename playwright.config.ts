@@ -32,7 +32,8 @@ export default defineConfig({
     trace: "on-first-retry",
 
     /* Ignore HTTPS errors, which is needed for the self-signed certificate. */
-    ignoreHTTPSErrors: true,
+    // It doesn't seem to fix it
+    // ignoreHTTPSErrors: true,
   },
   timeout: 60000,
 
