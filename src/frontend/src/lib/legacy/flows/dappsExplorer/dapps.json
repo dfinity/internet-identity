@@ -120,12 +120,6 @@
     "logo": "rubaru_logo.png"
   },
   {
-    "name": "Boom DAO",
-    "oneLiner": "Powering the next generation of fully onchain games, and providing a collaborative hub for all things web3 gaming.",
-    "website": "https://boomdao.xyz/",
-    "logo": "boom-dao-logo.png"
-  },
-  {
     "name": "AutoRoyale",
     "website": "https://cm6iy-sqaaa-aaaam-abmxq-cai.icp0.io/",
     "logo": "autoroyale_logo.png",
@@ -159,17 +153,6 @@
     "name": "DSocial",
     "website": "https://DSocial.app",
     "logo": "dsocial_logo.webp"
-  },
-  {
-    "name": "UnfoldVR",
-    "oneLiner": "Decentralizing asset Creation and Discovery for the Metaverse",
-    "website": "https://jmorc-qiaaa-aaaam-aaeda-cai.ic0.app/",
-    "logo": "unfoldvr_logo.webp"
-  },
-  {
-    "name": "Seers",
-    "website": "https://seers.social/",
-    "logo": "seers_logo.webp"
   },
   {
     "name": "Water Neuron",
@@ -294,11 +277,6 @@
     "name": "Tipjar",
     "website": "https://tipjar.rocks",
     "logo": "tipjar_logo.webp"
-  },
-  {
-    "name": "FootballGod",
-    "website": "https://43loz-3yaaa-aaaal-qbxrq-cai.ic0.app/",
-    "logo": "football-god_logo.webp"
   },
   {
     "name": "One Block",
@@ -467,12 +445,6 @@
     "logo": "blendsafe.svg"
   },
   {
-    "name": "OpenFPL",
-    "oneLiner": "Decentralised Fantasy Football.",
-    "website": "https://openfpl.xyz/",
-    "logo": "openfpl_logo.png"
-  },
-  {
     "name": "Gitcoin Passport Client",
     "oneLiner": "A UI that securely retrieves anti-Sybil scoring data from Gitcoin Passport and stores it in a DB.",
     "website": "https://internet-computer.vporton.name/gitcoin-passport-client/",
@@ -542,12 +514,6 @@
     "oneLiner": "A fully on-chain decentralized exchange powered by the Proactive Market Maker (PMM) algorithm.",
     "website": "https://icpex.org/",
     "logo": "icpex_logo.png"
-  },
-  {
-    "name": "Personal DAO",
-    "oneLiner": "A web3 app that functions as a gated DAO, treasury, data storage solution, and more.",
-    "website": "https://fkkq7-siaaa-aaaap-qaaya-cai.ic0.app/",
-    "logo": "personal_dao_logo.png"
   },
   {
     "name": "IC Footprint",
