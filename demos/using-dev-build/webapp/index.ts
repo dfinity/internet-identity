@@ -90,7 +90,7 @@ document
     // We can either use the callback functions directly or wrap in a promise.
     await new Promise<void>((resolve, reject) => {
       authClient.loginWithIcrc29({
-        identityProvider: `${iiUrl}?openid=microsoft`,
+        identityProvider: iiUrl,
         onSuccess: resolve,
         onError: reject,
       });
