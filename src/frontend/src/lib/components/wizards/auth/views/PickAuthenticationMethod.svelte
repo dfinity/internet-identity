@@ -133,30 +133,15 @@
         </Button>
       </Tooltip>
     {/if}
-    {#if $AUTH_FLOW_UPDATES}
-      <div class="border-border-tertiary border-t"></div>
-      <div class="flex flex-row items-center justify-between gap-4">
-        <p class="text-text-secondary text-sm">
-          Still have an identity number?
-        </p>
-        <button
-          onclick={migrate}
-          class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-        >
-          Upgrade
-        </button>
-      </div>
-    {:else}
-      <Button
+    <div class="border-border-tertiary border-t"></div>
+    <div class="flex flex-row items-center justify-between gap-4">
+      <p class="text-text-secondary text-sm">Still have an identity number?</p>
+      <button
         onclick={migrate}
-        variant="tertiary"
-        size="xl"
-        disabled={!supportsPasskeys ||
-          nonNullish(authenticatingProviderId) ||
-          isGoogleAuthenticating}
+        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
       >
-        Upgrade from legacy identity
-      </Button>
-    {/if}
+        Upgrade
+      </button>
+    </div>
   </div>
 </div>
