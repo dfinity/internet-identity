@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://id.ai/sitemap.xml
+Host: https://id.ai
