@@ -26,9 +26,7 @@ const upgradeLegacyIdentity = async (
   identityNumber: string,
   auth: DummyAuthFn,
 ) => {
-  await page
-    .getByRole("button", { name: "Upgrade from legacy identity" })
-    .click();
+  await page.getByRole("button", { name: "Upgrade" }).click();
   await page.getByPlaceholder("Internet Identity number").fill(identityNumber);
   await page.getByRole("button", { name: "Continue" }).click();
 
