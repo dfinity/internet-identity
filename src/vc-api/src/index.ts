@@ -1,4 +1,4 @@
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish } from "@dfinity/utils";
 import { z } from "zod";
 import { ArgumentValue } from "./generated/vc_issuer_types";

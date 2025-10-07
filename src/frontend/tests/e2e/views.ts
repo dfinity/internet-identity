@@ -1,5 +1,5 @@
 import { zip } from "$lib/utils/utils";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { nonNullish } from "@dfinity/utils";
 import { assert } from "vitest";
 import { waitToClose } from "./util";

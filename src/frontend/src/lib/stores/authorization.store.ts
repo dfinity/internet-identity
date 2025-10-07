@@ -47,11 +47,16 @@ export type AuthorizationStatus =
   | "unverified-origin"
   | "failure";
 
+interface ProtocolOptions {
+  legacyProtocol?: boolean;
+  allowedOrigin?: string;
+}
+
 type AuthorizationStore = Readable<{
   context?: AuthorizationContext;
   status: AuthorizationStatus;
 }> & {
-  init: (rpc?: boolean) => Promise<void>;
+  init: (options: ProtocolOptions) => Promise<void>;
   authorize: (
     accountNumber: bigint | undefined,
     artificialDelay?: number,
@@ -69,10 +74,13 @@ let authorize: (
 ) => Promise<void>;
 
 export const authorizationStore: AuthorizationStore = {
-  init: async (rpc) => {
+  init: async (options) => {
     const status = await (
-      rpc === true ? rpcAuthenticationProtocol : authenticationProtocol
+      options.legacyProtocol === true
+        ? authenticationProtocol
+        : rpcAuthenticationProtocol
     )({
+      ...options,
       authenticate: async (context) => {
         const effectiveOrigin = remapToLegacyDomain(
           context.authRequest.derivationOrigin ?? context.requestOrigin,
@@ -105,16 +113,21 @@ export const authorizationStore: AuthorizationStore = {
               status: "authorizing",
             }));
             const { identityNumber, actor } = get(authenticatedStore);
-            const syncLastUsedAccountsPromise = actor
-              .get_accounts(identityNumber, effectiveOrigin)
-              .then(throwCanisterError)
-              .then((accounts) =>
-                lastUsedIdentitiesStore.syncLastUsedAccounts(
-                  identityNumber,
-                  effectiveOrigin,
-                  accounts,
-                ),
-              );
+            // Only fetch and sync accounts if identity is actually stored
+            const syncLastUsedAccountsPromise = nonNullish(
+              get(lastUsedIdentitiesStore).identities[`${identityNumber}`],
+            )
+              ? actor
+                  .get_accounts(identityNumber, effectiveOrigin)
+                  .then(throwCanisterError)
+                  .then((accounts) =>
+                    lastUsedIdentitiesStore.syncLastUsedAccounts(
+                      identityNumber,
+                      effectiveOrigin,
+                      accounts,
+                    ),
+                  )
+              : Promise.resolve().then(() => []);
             const artificialDelayPromise = waitFor(
               features.DUMMY_AUTH ||
                 nonNullish(canisterConfig.dummy_auth[0]?.[0])

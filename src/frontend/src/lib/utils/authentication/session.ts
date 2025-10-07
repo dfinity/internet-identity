@@ -2,7 +2,7 @@ import {
   DelegationChain,
   DelegationIdentity,
   ECDSAKeyIdentity,
-} from "@dfinity/identity";
+} from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 
 export const authenticateWithSession = async ({

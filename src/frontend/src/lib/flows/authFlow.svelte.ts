@@ -39,12 +39,16 @@ import {
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
 
+interface AuthFlowOptions {
+  trackLastUsed?: boolean;
+}
+
 export class AuthFlow {
+  #options: Required<AuthFlowOptions>;
   #view = $state<
     | "chooseMethod"
     | "setupOrUseExistingPasskey"
     | "setupNewPasskey"
-    | "infoPasskey"
     | "setupNewIdentity"
   >("chooseMethod");
   #captcha = $state<{
@@ -57,7 +61,6 @@ export class AuthFlow {
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
-  abTestGroup: "infoPasskey" | "default";
 
   get view() {
     return this.#view;
@@ -75,34 +78,28 @@ export class AuthFlow {
     return this.#confirmationCode;
   }
 
-  constructor() {
+  constructor(options?: AuthFlowOptions) {
+    this.#options = {
+      trackLastUsed: true,
+      ...options,
+    };
     this.chooseMethod();
-    const isE2E = nonNullish(canisterConfig.dummy_auth[0]?.[0]);
-    // No A/B test in E2E runs
-    const GROUP_INFO_PERCENTAGE = isE2E ? -1 : 0.2;
-    this.abTestGroup =
-      Math.random() < GROUP_INFO_PERCENTAGE ? "infoPasskey" : "default";
   }
 
   chooseMethod = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.SelectMethodScreen);
     this.#view = "chooseMethod";
   };
 
   setupOrUseExistingPasskey = (): void => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.ContinueWithPasskeyScreen,
-      { abTestGroup: this.abTestGroup },
     );
     this.#view = "setupOrUseExistingPasskey";
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.UseExistingPasskey);
     const { identity, identityNumber, credentialId } =
       await authenticateWithPasskey({
         canisterId,
@@ -111,40 +108,31 @@ export class AuthFlow {
     await authenticationStore.set({ identity, identityNumber });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-    lastUsedIdentitiesStore.addLastUsedIdentity({
-      identityNumber,
-      name: info.name[0],
-      authMethod: { passkey: { credentialId } },
-    });
+    if (this.#options.trackLastUsed) {
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber,
+        name: info.name[0],
+        authMethod: { passkey: { credentialId } },
+      });
+    }
     return identityNumber;
   };
 
   setupNewPasskey = (): void => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.EnterNameScreen);
     this.#view = "setupNewPasskey";
   };
 
   submitNameAndContinue = async (
     name: string,
-  ): Promise<undefined | { type: "created"; identityNumber: bigint }> => {
+  ): Promise<{ type: "created"; identityNumber: bigint }> => {
     this.#name = name;
-    if (this.abTestGroup === "infoPasskey") {
-      authenticationV2Funnel.trigger(AuthenticationV2Events.InfoPasskeyScreen, {
-        abTestGroup: this.abTestGroup,
-      });
-      this.#view = "infoPasskey";
-      return;
-    } else {
-      return { type: "created", identityNumber: await this.createPasskey() };
-    }
+    return { type: "created", identityNumber: await this.createPasskey() };
   };
 
   createPasskey = async (): Promise<bigint> => {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.StartWebauthnCreation,
-      { abTestGroup: this.abTestGroup },
     );
     if (isNullish(this.#name)) {
       throw new Error("Name is not set");
@@ -203,13 +191,15 @@ export class AuthFlow {
       const authnMethod = info.openid_credentials[0]?.find(
         (method) => method.iss === iss,
       );
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: {
-          openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
-        },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: info.name[0],
+          authMethod: {
+            openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
+          },
+        });
+      }
       return { identityNumber, type: "signIn" };
     } catch (error) {
       if (
@@ -235,6 +225,7 @@ export class AuthFlow {
 
   continueWithOpenId = async (
     config: OpenIdConfig,
+    existingJwt?: string,
   ): Promise<
     | {
         identityNumber: bigint;
@@ -245,7 +236,7 @@ export class AuthFlow {
         type: "signUp";
       }
   > => {
-    let jwt: string | undefined = undefined;
+    let jwt: string | undefined = existingJwt;
     // Convert OpenIdConfig to RequestConfig
     const requestConfig: RequestConfig = {
       clientId: config.client_id,
@@ -256,20 +247,24 @@ export class AuthFlow {
     authenticationV2Funnel.addProperties({
       provider: config.name,
     });
-    // Create two try-catch blocks to avoid double-triggering the analytics.
-    try {
-      this.#systemOverlay = true;
-      jwt = await requestJWT(requestConfig, {
-        nonce: get(sessionStore).nonce,
-        mediation: "required",
-      });
-    } catch (error) {
-      this.#view = "chooseMethod";
-      throw error;
-    } finally {
-      this.#systemOverlay = false;
-      // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
+    if (isNullish(jwt)) {
+      // Create two try-catch blocks to avoid double-triggering the analytics.
+      try {
+        this.#systemOverlay = true;
+        jwt = await requestJWT(requestConfig, {
+          nonce: get(sessionStore).nonce,
+          mediation: "required",
+        });
+      } catch (error) {
+        this.#view = "chooseMethod";
+        throw error;
+      } finally {
+        this.#systemOverlay = false;
+        // Moved after `requestJWT` to avoid Safari from blocking the popup.
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.ContinueWithOpenID,
+        );
+      }
     }
     try {
       const { iss, sub, loginHint } = decodeJWT(jwt);
@@ -289,13 +284,15 @@ export class AuthFlow {
       const authnMethod = info.openid_credentials[0]?.find(
         (method) => method.iss === iss,
       );
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: info.name[0],
-        authMethod: {
-          openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
-        },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: info.name[0],
+          authMethod: {
+            openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
+          },
+        });
+      }
       return { identityNumber, type: "signIn" };
     } catch (error) {
       if (
@@ -360,9 +357,7 @@ export class AuthFlow {
     passkeyIdentity: DiscoverablePasskeyIdentity,
     attempts = 0,
   ): Promise<bigint> => {
-    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey, {
-      abTestGroup: this.abTestGroup,
-    });
+    authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     const uaParser = loadUAParser();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
@@ -387,18 +382,19 @@ export class AuthFlow {
         .then(throwCanisterError);
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulPasskeyRegistration,
-        { abTestGroup: this.abTestGroup },
       );
       const credentialId = new Uint8Array(passkeyIdentity.getCredentialId()!);
       const identity = await authenticateWithSession({
         session: get(sessionStore),
       });
       await authenticationStore.set({ identity, identityNumber });
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name: passkeyIdentity.getName(),
-        authMethod: { passkey: { credentialId } },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name: passkeyIdentity.getName(),
+          authMethod: { passkey: { credentialId } },
+        });
+      }
       this.#captcha = undefined;
       return identityNumber;
     } catch (error) {
@@ -504,11 +500,13 @@ export class AuthFlow {
           }
         });
       }
-      lastUsedIdentitiesStore.addLastUsedIdentity({
-        identityNumber,
-        name,
-        authMethod: { openid: { iss, sub, loginHint, metadata } },
-      });
+      if (this.#options.trackLastUsed) {
+        lastUsedIdentitiesStore.addLastUsedIdentity({
+          identityNumber,
+          name,
+          authMethod: { openid: { iss, sub, loginHint, metadata } },
+        });
+      }
       this.#captcha = undefined;
       return identityNumber;
     } catch (error) {

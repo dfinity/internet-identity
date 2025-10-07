@@ -1,5 +1,5 @@
 import { hexToBytes } from "@noble/hashes/utils";
-import { Ed25519PublicKey } from "@dfinity/identity";
+import { Ed25519PublicKey } from "@icp-sdk/core/identity";
 import * as ed25519 from "./ed25519";
 
 type TestVector = {

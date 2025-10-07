@@ -1,5 +1,5 @@
-import { SignIdentity } from "@dfinity/agent";
-import { ECDSAKeyIdentity } from "@dfinity/identity";
+import { SignIdentity } from "@icp-sdk/core/agent";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { z } from "zod";
 
 /** This module defines the crypto operations for the browser storage Identity.

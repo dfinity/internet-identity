@@ -1,6 +1,6 @@
 import { resolveCanisterId as resolveCanisterIdFn } from "$lib/utils/canisterIdResolution";
 import { wrapError } from "$lib/utils/utils";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish } from "@dfinity/utils";
 
 const MAX_ALTERNATIVE_ORIGINS = 10;

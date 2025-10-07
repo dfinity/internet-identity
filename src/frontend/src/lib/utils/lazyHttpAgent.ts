@@ -1,4 +1,4 @@
-import { HttpAgent, HttpAgentOptions } from "@dfinity/agent";
+import { HttpAgent, HttpAgentOptions } from "@icp-sdk/core/agent";
 
 /**
  * Alternative to HttpAgent.create(), where the async initialization calls

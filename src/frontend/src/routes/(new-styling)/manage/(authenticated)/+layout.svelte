@@ -20,6 +20,7 @@
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { onMount } from "svelte";
+  import { sessionStore } from "$lib/stores/session.store";
 
   const { children } = $props();
 
@@ -79,6 +80,7 @@
   );
 
   const handleSwitchIdentity = async (identityNumber: bigint) => {
+    await sessionStore.reset();
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[Number(identityNumber)];
     await authLastUsedFlow.authenticate(chosenIdentity);

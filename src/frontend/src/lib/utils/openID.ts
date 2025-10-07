@@ -9,8 +9,8 @@ import {
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "$lib/legacy/flows/redirect";
-import { toBase64URL } from "$lib/utils/utils";
-import { Principal } from "@dfinity/principal";
+import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 
 export interface RequestConfig {
@@ -97,14 +97,14 @@ export const isOpenIdCancelError = (error: unknown) => {
 };
 
 /**
- * Request JWT through redirect flow in a popup
+ * Create JWT request redirect flow URL
  * @param config of the OpenID provider
  * @param options for the JWT request
  */
-const requestWithRedirect = async (
+export const createRedirectURL = (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
-): Promise<string> => {
+): URL => {
   const state = toBase64URL(
     window.crypto.getRandomValues(new Uint8Array(12)).buffer,
   );
@@ -129,11 +129,24 @@ const requestWithRedirect = async (
     authURL.searchParams.set("login_hint", options.loginHint);
   }
 
-  const callback = await redirectInPopup(authURL.href);
+  return authURL;
+};
+
+/**
+ * Request JWT through redirect flow in a popup
+ * @param config of the OpenID provider
+ * @param options for the JWT request
+ */
+const requestWithPopup = async (
+  config: Omit<RequestConfig, "configURL">,
+  options: RequestOptions,
+): Promise<string> => {
+  const redirectURL = createRedirectURL(config, options);
+  const callback = await redirectInPopup(redirectURL.href);
   const callbackURL = new URL(callback);
   const searchParams = new URLSearchParams(callbackURL.hash.slice(1));
   const id_token = searchParams.get("id_token");
-  if (searchParams.get("state") !== state) {
+  if (searchParams.get("state") !== redirectURL.searchParams.get("state")) {
     throw new Error("Invalid state");
   }
   if (isNullish(id_token)) {
@@ -293,7 +306,7 @@ export const requestJWT = async (
   const supportsFedCM = isFedCMSupported(navigator.userAgent, config);
   const jwt = supportsFedCM
     ? await requestWithCredentials(config, options)
-    : await requestWithRedirect(config, options);
+    : await requestWithPopup(config, options);
   return jwt;
 };
 
@@ -314,8 +327,12 @@ export const decodeJWT = (
   [key: string]: string | undefined;
 } => {
   const [_header, body, _signature] = token.split(".");
+
+  // JWT encodes the token using base64URL which is slightly different than base64.
+  const payload = new TextDecoder().decode(fromBase64URL(body));
+
   const { iss, sub, aud, name, email, preferred_username, ...rest } =
-    JSON.parse(atob(body));
+    JSON.parse(payload);
   return {
     iss,
     sub,

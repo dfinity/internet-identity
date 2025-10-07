@@ -1,7 +1,7 @@
 /* Everything related to storage of user flow data, like anchor numbers, last used anchor, etc. */
 
 import { parseUserNumber } from "$lib/utils/userNumber";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { ZodType, z } from "zod";

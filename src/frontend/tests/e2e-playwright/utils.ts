@@ -1,5 +1,5 @@
 import { CDPSession, Page, expect } from "@playwright/test";
-import { Principal } from "@dfinity/principal";
+import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
 import { isNullish } from "@dfinity/utils";
