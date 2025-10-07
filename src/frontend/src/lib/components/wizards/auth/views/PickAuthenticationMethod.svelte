@@ -60,7 +60,7 @@
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
 </script>
 
-<div class="flex flex-col items-stretch gap-6">
+<div class="flex flex-col items-stretch gap-5">
   {#if !supportsPasskeys}
     <Alert
       title="Passkeys not available here"
@@ -130,15 +130,15 @@
         </Button>
       </Tooltip>
     {/if}
-    <div class="border-border-tertiary border-t"></div>
-    <div class="flex flex-row items-center justify-between gap-4">
-      <p class="text-text-secondary text-sm">Still have an identity number?</p>
-      <button
-        onclick={migrate}
-        class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
-      >
-        Upgrade
-      </button>
-    </div>
+  </div>
+  <div class="border-border-tertiary border-t"></div>
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-secondary text-sm">Still have an identity number?</p>
+    <button
+      onclick={migrate}
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      Upgrade
+    </button>
   </div>
 </div>
