@@ -360,6 +360,8 @@ pub enum ContentType {
     PNG,
     SVG,
     WOFF2,
+    TXT,
+    XML,
 }
 
 impl ContentType {
@@ -375,6 +377,8 @@ impl ContentType {
             ContentType::PNG => "image/png".to_string(),
             ContentType::SVG => "image/svg+xml".to_string(),
             ContentType::WOFF2 => "application/font-woff2".to_string(),
+            ContentType::TXT => "text/plain".to_string(),
+            ContentType::XML => "application/xml".to_string(),
         }
     }
 }
@@ -505,6 +509,8 @@ fn content_type_and_encoding(asset_path: &Path) -> (ContentType, ContentEncoding
         "svg" => ContentType::SVG,
         "webp" => ContentType::WEBP,
         "woff2" => ContentType::WOFF2,
+        "txt" => ContentType::TXT,
+        "xml" => ContentType::XML,
         ext => panic!(
             "Unknown asset type '{}' for asset '{}'",
             ext,
