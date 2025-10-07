@@ -21,21 +21,24 @@
   };
 </script>
 
-<div class="flex flex-col">
-  <QrCode text={url.href} class="my-6 size-32 self-center" />
-  <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-    Continue from another device
-  </h1>
-  <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
-    Scan the above QR code with your
-    <b class="text-text-primary">existing device</b> or enter the URL manually.
-  </p>
+<div class="flex flex-col gap-8">
+  <div>
+    <h1 class="text-text-primary mb-3 text-xl font-medium sm:text-center">
+      Can't find your identity or passkey?
+    </h1>
+    <p
+      class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+    >
+      Use a device that already holds your identity to scan or open the URL.
+      This will link your ientity to the desired device.
+    </p>
+  </div>
+  <QrCode text={url.href} class="size-32 self-center" />
   <Tooltip label="Link copied to clipboard" hidden={!copied} manual>
     <Button
       onclick={handleCopyLink}
       variant="secondary"
       size="xl"
-      class="mt-6"
       aria-label="Pairing link"
     >
       <span>
