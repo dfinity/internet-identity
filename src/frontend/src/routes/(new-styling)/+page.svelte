@@ -67,7 +67,7 @@
   // Provides dynamic gradient colours for illustrations, reacting to theme changes.
   // Values are pulled from CSS variables so strokes update automatically in light/dark mode.
   let illustrationColours = $state({ start: "", end: "" });
-  let showFadeIn = $state(false);
+  let showFadeIn = true;
 
   $effect(() => {
     if ($themeStore !== null) {
