@@ -54,6 +54,9 @@ pub enum Operation {
     UpdateAccount { name: Option<Private> },
     #[serde(rename = "delete_account")]
     DeleteAccount,
+
+    #[serde(rename = "set_default_account")]
+    SetDefaultAccount,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
