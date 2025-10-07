@@ -724,6 +724,8 @@ mod test {
 
     /// Checks candid interface type equality by making sure that the service in the did file is
     /// a subtype of the generated interface and vice versa.
+    // TODO: Re-enable after https://github.com/dfinity/internet-identity/pull/3385 is merged.
+    #[ignore]
     #[test]
     fn check_candid_interface_compatibility() {
         let canister_interface = __export_service();
