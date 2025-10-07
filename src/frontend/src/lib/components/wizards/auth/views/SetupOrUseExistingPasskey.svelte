@@ -46,13 +46,8 @@
   </h1>
 
   <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
-    {#if $AUTH_FLOW_UPDATES}
-      Create an identity with a passkey, using biometrics or a security key.
-      Your data never leaves your device.
-    {:else}
-      With passkeys, you can now use your fingerprint, face, or screen lock to
-      quickly and securely confirm it’s really you.
-    {/if}
+    Create an identity with a passkey, using biometrics or a security key. Your
+    data never leaves your device.
   </p>
 </div>
 <div class="flex flex-col gap-3">
@@ -98,49 +93,45 @@
       Continue from another device
     </Button>
   {/if}
-  {#if $AUTH_FLOW_UPDATES}
-    <div class="flex flex-row items-center justify-between gap-4">
-      <p class="text-text-secondary text-sm">
-        Learn about privacy preservation
-      </p>
-      <div bind:this={popoverAnchorRef}>
-        <Button
-          variant="tertiary"
-          onclick={() => (showPrivacyPopover = !showPrivacyPopover)}
-        >
-          <HelpCircleIcon
-            size="20"
-            class="text-text-primary stroke-fg-tertiary"
-          />
-        </Button>
-      </div>
-    </div>
-    {#if showPrivacyPopover}
-      <Popover
-        anchor={popoverAnchorRef}
-        direction="up"
-        align="end"
-        distance="10px"
-        class="gap-0.5"
-        onClose={() => (showPrivacyPopover = false)}
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-secondary text-sm">Learn about privacy preservation</p>
+    <div bind:this={popoverAnchorRef}>
+      <Button
+        variant="tertiary"
+        onclick={() => (showPrivacyPopover = !showPrivacyPopover)}
       >
-        <p class="text-text-primary text-xs font-semibold">
-          Internet Identity protects your privacy
-        </p>
-        <p class="text-text-secondary text-xs font-medium">
-          Internet Identity never shares your personal data, such as email or
-          name, with apps or websites. Instead, it creates a unique pseudonym
-          for each app, so you can't be tracked across apps. All of this happens
-          automatically in the background. You don't need to manage anything.
-        </p>
-        <a
-          href={II_SUPPORT_PRIVACY_SECURITY}
-          target="_blank"
-          class="text-text-tertiary mt-2.5 self-end text-xs font-bold underline"
-        >
-          Learn More
-        </a>
-      </Popover>
-    {/if}
+        <HelpCircleIcon
+          size="20"
+          class="text-text-primary stroke-fg-tertiary"
+        />
+      </Button>
+    </div>
+  </div>
+  {#if showPrivacyPopover}
+    <Popover
+      anchor={popoverAnchorRef}
+      direction="up"
+      align="end"
+      distance="10px"
+      class="gap-0.5"
+      onClose={() => (showPrivacyPopover = false)}
+    >
+      <p class="text-text-primary text-xs font-semibold">
+        Internet Identity protects your privacy
+      </p>
+      <p class="text-text-secondary text-xs font-medium">
+        Internet Identity never shares your personal data, such as email or
+        name, with apps or websites. Instead, it creates a unique pseudonym for
+        each app, so you can't be tracked across apps. All of this happens
+        automatically in the background. You don't need to manage anything.
+      </p>
+      <a
+        href={II_SUPPORT_PRIVACY_SECURITY}
+        target="_blank"
+        class="text-text-tertiary mt-2.5 self-end text-xs font-bold underline"
+      >
+        Learn More
+      </a>
+    </Popover>
   {/if}
 </div>
