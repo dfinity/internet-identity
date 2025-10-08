@@ -21,8 +21,7 @@
   };
 </script>
 
-<div class="flex flex-col">
-  <QrCode text={url.href} class="my-6 size-32 self-center" />
+<div class="mt-4 flex flex-col">
   <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
     Continue on another device
   </h1>
@@ -30,6 +29,7 @@
     Scan the above QR code with your
     <b class="text-text-primary">new device</b> or enter the URL manually.
   </p>
+  <QrCode text={url.href} class="my-6 size-32 self-center" />
   <Tooltip label="Link copied to clipboard" hidden={!copied} manual>
     <Button
       onclick={handleCopyLink}

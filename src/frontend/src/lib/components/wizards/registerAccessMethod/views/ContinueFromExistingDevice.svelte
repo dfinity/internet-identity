@@ -21,7 +21,7 @@
   };
 </script>
 
-<div class="flex flex-col gap-8">
+<div class="mt-4 flex flex-col gap-8">
   <div>
     <h1 class="text-text-primary mb-3 text-xl font-medium sm:text-center">
       Can't find your identity or passkey?
