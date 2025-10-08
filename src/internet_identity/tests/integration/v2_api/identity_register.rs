@@ -315,7 +315,7 @@ fn should_not_require_captcha_when_disabled() {
 }
 
 #[test]
-fn should_register_new_identity_with_name() {
+fn should_register_new_identity_with_name_timestamp() {
     let env = env();
 
     let canister_id =
