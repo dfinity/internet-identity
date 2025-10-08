@@ -3,7 +3,6 @@
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { HelpCircleIcon } from "@lucide/svelte";
@@ -48,11 +47,7 @@
 </div>
 <div class="flex flex-col gap-3">
   <Button onclick={setupNew} size="lg" disabled={isAuthenticating}>
-    {#if $AUTH_FLOW_UPDATES}
-      Create new identity
-    {:else}
-      Set up a new Passkey
-    {/if}
+    Create new identity
   </Button>
   <Tooltip
     label="Interaction canceled. Please try again."
@@ -69,13 +64,7 @@
         <ProgressRing />
         <span>Authenticating...</span>
       {:else}
-        <span>
-          {#if $AUTH_FLOW_UPDATES}
-            Use existing identity
-          {:else}
-            Use an existing Passkey
-          {/if}
-        </span>
+        <span>Use existing identity</span>
       {/if}
     </Button>
   </Tooltip>
