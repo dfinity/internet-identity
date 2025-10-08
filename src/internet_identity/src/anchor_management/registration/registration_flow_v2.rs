@@ -154,6 +154,8 @@ pub async fn check_captcha(arg: CheckCaptchaArg) -> Result<IdRegNextStepResult, 
 pub fn identity_registration_finish(
     arg: CreateIdentityData,
 ) -> Result<IdRegFinishResult, IdRegFinishError> {
+    ic_cdk::print("AAA");
+
     let caller = caller();
     let Some(current_state) = state::with_flow_states(|s| s.registration_flow_state(&caller))
     else {
@@ -193,7 +195,8 @@ pub fn identity_registration_finish(
 }
 
 fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFinishError> {
-    let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor()) else {
+    let now = time();
+    let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor(now)) else {
         return Err(IdentityLimitReached);
     };
 

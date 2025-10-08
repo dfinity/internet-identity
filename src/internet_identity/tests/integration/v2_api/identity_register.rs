@@ -17,6 +17,7 @@ use internet_identity_interface::internet_identity::types::{
     StaticCaptchaTrigger,
 };
 use pocket_ic::RejectResponse;
+use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
@@ -316,13 +317,19 @@ fn should_not_require_captcha_when_disabled() {
 #[test]
 fn should_register_new_identity_with_name() {
     let env = env();
+
     let canister_id =
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((42, 44)));
     let authn_method = test_authn_method();
     let name = Some("John Doe".to_string());
     let identity_number =
         create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name.clone());
+
+    let identity_should_be_created_at = env.get_time().as_nanos_since_unix_epoch();
+
     let anchor_info =
         get_anchor_info(&env, canister_id, authn_method.principal(), identity_number).unwrap();
+
     assert_eq!(anchor_info.name, name);
+    assert_eq!(anchor_info.created_at, Some(identity_should_be_created_at));
 }

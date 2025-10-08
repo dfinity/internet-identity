@@ -2,7 +2,7 @@ use crate::storage::anchor::Device;
 use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
-use internet_identity_interface::internet_identity::types::MetadataEntry;
+use internet_identity_interface::internet_identity::types::{MetadataEntry, Timestamp};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -10,6 +10,7 @@ use std::collections::HashMap;
 pub struct StorableFixedAnchor {
     pub devices: Vec<Device>,
     pub metadata: Option<HashMap<String, MetadataEntry>>,
+    pub created_at: Option<Timestamp>,
 }
 
 impl Storable for StorableFixedAnchor {
