@@ -8,10 +8,14 @@
   import type { SVGAttributes } from "svelte/elements";
 
   type Props = SVGAttributes<SVGSVGElement> & {
-    colors: { start: string; end: string };
+    colors?: { start: string; end: string };
   };
 
-  const { class: className, colors, ...props }: Props = $props();
+  const {
+    class: className,
+    colors = { start: "currentColor", end: "currentColor" },
+    ...props
+  }: Props = $props();
 </script>
 
 <svg

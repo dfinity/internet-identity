@@ -1,5 +1,2 @@
-import type { PageLoad } from "./$types";
-
-export const load: PageLoad = ({ url }) => {
-  return { next: url.searchParams.get("next") };
-};
+export const ssr = true;
+export const prerender = true;

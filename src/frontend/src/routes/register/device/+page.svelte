@@ -11,6 +11,7 @@
   import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png?url";
   import { PreLoadImage } from "$lib/utils/preLoadImage";
   import { canisterConfig, canisterId } from "$lib/globals";
+  import { page } from "$app/state";
 
   analytics.event("page-add-new-device");
 
@@ -18,7 +19,7 @@
     undefined,
   );
 
-  const addDeviceAnchor = getAddDeviceAnchor(new URL(window.location.href))!;
+  const addDeviceAnchor = getAddDeviceAnchor(page.url)!;
   const connection = new Connection(canisterId.toText(), canisterConfig);
   const onResolve = async (
     registerDeviceResult: Awaited<ReturnType<typeof registerTentativeDevice>>,

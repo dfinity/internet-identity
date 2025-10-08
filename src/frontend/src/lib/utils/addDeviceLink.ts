@@ -13,7 +13,7 @@ export const addDeviceLink = ({
 
 /** When called from an "add device" URL, returns the anchor. Otherwise returns undefined */
 export const getAddDeviceAnchor = (url: URL): bigint | undefined => {
-  if (url.pathname === "/") {
+  if (url.pathname === "/" || url.pathname === "/register/device") {
     const action = url.searchParams.get("action");
     if (action !== "add-passkey") {
       return undefined;

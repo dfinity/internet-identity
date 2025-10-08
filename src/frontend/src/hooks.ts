@@ -5,6 +5,7 @@ import { nonNullish } from "@dfinity/utils";
 import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { building } from "$app/environment";
+import { goto, replaceState } from "$app/navigation";
 
 export const reroute: Reroute = ({ url }) => {
   if (nonNullish(getAddDeviceAnchor(url))) {
@@ -27,5 +28,29 @@ export const reroute: Reroute = ({ url }) => {
   }
   if (url.pathname === "/") {
     return get(DISCOVERABLE_PASSKEY_FLOW) || building ? "/" : "/legacy";
+  }
+};
+
+// SSG routes don't reroute by default anymore, so this method is used in
+// these routes to manually add the rerouting back as early as possible,
+// before hydration has even started (so intentionally outside onMount).
+export const manuallyReroute = async () => {
+  if (!building) {
+    const next = await reroute({
+      url: new URL(window.location.href),
+      fetch: window.fetch,
+    });
+    if (nonNullish(next)) {
+      // Capture current URL
+      const currentURL = new URL(window.location.href);
+      // Cast to string since `nonNullish` doesn't exclude `void` type
+      const nextURL = new URL(next as string, window.location.origin);
+      // Copy over the current query params
+      nextURL.search = currentURL.search;
+      // Reroute to destination
+      await goto(nextURL, { replaceState: true });
+      // After rerouting, change the URL back to what the user expects to see
+      replaceState(currentURL, {});
+    }
   }
 };
