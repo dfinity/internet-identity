@@ -30,6 +30,10 @@ export const dummyAuth = (): DummyAuthFn => {
   };
 };
 
+export const cancelDummyAuth = (page: Page) => {
+  page.once("dialog", (dialog) => dialog.dismiss());
+};
+
 /**
  * Authorize with test app
  * @param page The page that will load the test app
