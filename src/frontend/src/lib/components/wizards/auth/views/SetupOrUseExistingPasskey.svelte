@@ -48,7 +48,11 @@
 </div>
 <div class="flex flex-col gap-3">
   <Button onclick={setupNew} size="lg" disabled={isAuthenticating}>
-    Create new identity
+    {#if $AUTH_FLOW_UPDATES}
+      Create new identity
+    {:else}
+      Set up a new Passkey
+    {/if}
   </Button>
   <Tooltip
     label="Interaction canceled. Please try again."
@@ -65,7 +69,13 @@
         <ProgressRing />
         <span>Authenticating...</span>
       {:else}
-        <span>Use existing identity</span>
+        <span>
+          {#if $AUTH_FLOW_UPDATES}
+            Use existing identity
+          {:else}
+            Use an existing Passkey
+          {/if}
+        </span>
       {/if}
     </Button>
   </Tooltip>
