@@ -44,11 +44,11 @@ export const manuallyReroute = async () => {
       // Capture current URL
       const currentURL = new URL(window.location.href);
       // Cast to string since `nonNullish` doesn't exclude `void` type
-      const nextURL = new URL(next as string);
+      const nextURL = new URL(next as string, window.location.origin);
       // Copy over the current query params
       nextURL.search = currentURL.search;
       // Reroute to destination
-      await goto(next as string, { replaceState: true });
+      await goto(nextURL, { replaceState: true });
       // After rerouting, change the URL back to what the user expects to see
       replaceState(currentURL, {});
     }
