@@ -42,6 +42,7 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
         device_registration,
         openid_credentials,
         name,
+        created_at: None,
     }
 }
 
