@@ -1,4 +1,5 @@
-import { expect, Page, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import type { Page } from "@playwright/test";
 import {
   addVirtualAuthenticator,
   clearStorage,
@@ -36,6 +37,11 @@ const upgradeLegacyIdentity = async (
 };
 
 test.describe("Migration", () => {
+  test.skip(
+    ({ browserName }) => browserName === "webkit",
+    "Migration test not supported on Safari because it uses virtual authenticators which are not supported.",
+  );
+
   test("User can migrate a legacy identity", async ({ page }) => {
     // Step 1: Create a legacy identity
     await page.goto(LEGACY_II_URL);

@@ -30,13 +30,17 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
+
+    /* Ignore HTTPS errors, which is needed for the self-signed certificate. */
+    // It doesn't seem to fix it
+    // ignoreHTTPSErrors: true,
   },
   timeout: 60000,
 
   /* Configure projects for major browsers */
   projects: [
     {
-      name: "desktop",
+      name: "chrome-desktop",
       use: {
         ...devices["Desktop Chrome"],
         launchOptions: {
@@ -48,7 +52,7 @@ export default defineConfig({
       },
     },
     {
-      name: "mobile",
+      name: "chrome-mobile",
       use: {
         ...devices["Pixel 5"],
         launchOptions: {
@@ -56,6 +60,24 @@ export default defineConfig({
             "--ignore-certificate-errors",
             "--host-resolver-rules=MAP * localhost:5173, EXCLUDE localhost",
           ],
+        },
+      },
+    },
+    {
+      name: "safari-desktop",
+      use: {
+        ...devices["Desktop Safari"],
+        launchOptions: {
+          args: ["--ignore-certificate-errors"],
+        },
+      },
+    },
+    {
+      name: "safari-mobile",
+      use: {
+        ...devices["iPhone 12"],
+        launchOptions: {
+          args: ["--ignore-certificate-errors"],
         },
       },
     },

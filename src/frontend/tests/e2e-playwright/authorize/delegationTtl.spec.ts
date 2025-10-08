@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { dummyAuth, II_URL, TEST_APP_URL } from "../utils";
 
 test("Delegation maxTimeToLive: 1 min", async ({ page }) => {

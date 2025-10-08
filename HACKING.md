@@ -136,6 +136,22 @@ npx playwright test --ui
 > II_CAPTCHA=enabled npm run test:e2e
 > ```
 
+**Writing new Playwright E2E tests:**
+
+When creating new E2E Playwright tests, always import `test` and `expect` from the custom fixtures file:
+
+```typescript
+// ✅ Correct
+import { test, expect } from "./fixtures";
+// or from subdirectories:
+import { test, expect } from "../fixtures";
+
+// ❌ Wrong - will fail ESLint
+import { test, expect } from "@playwright/test";
+```
+
+The custom fixtures provide automatic host routing for Safari/WebKit tests, which don't support `--host-resolver-rules`. ESLint will enforce this pattern and show an error if you try to import directly from `@playwright/test`.
+
 We autoformat our code using `prettier`. Running `npm run format` formats all files in the frontend.
 If you open a PR that isn't formatted according to `prettier`, CI will automatically add a formatting commit to your PR.
 

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
 
 // This is chosen on purpose to exhibit a JWT token that is encoded in base64url but cannot

@@ -259,10 +259,19 @@ fn content_security_policy_header(
     };
 
     let connect_src = "'self' https:";
+    let script_src = format!("{strict_dynamic} 'unsafe-inline' 'unsafe-eval' https:");
+    let style_src = "'self' 'unsafe-inline'";
+    let img_src = "'self' data: https://*.googleusercontent.com";
 
-    // Allow connecting via http for development purposes
+    // Allow connecting via http and localhost (including subdomains) for development purposes
     #[cfg(feature = "dev_csp")]
-    let connect_src = format!("{connect_src} http:");
+    let connect_src = format!("{connect_src} http: http://localhost:* http://*.localhost:*");
+    #[cfg(feature = "dev_csp")]
+    let script_src = format!("{script_src} http: http://localhost:* http://*.localhost:*");
+    #[cfg(feature = "dev_csp")]
+    let style_src = format!("{style_src} http: http://localhost:* http://*.localhost:*");
+    #[cfg(feature = "dev_csp")]
+    let img_src = format!("{img_src} http: http://localhost:* http://*.localhost:*");
 
     // Allow related origins to embed one another for cross-domain WebAuthn
     let frame_src = maybe_related_origins
@@ -273,12 +282,12 @@ fn content_security_policy_header(
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
-         img-src 'self' data: https://*.googleusercontent.com;\
-         script-src {strict_dynamic} 'unsafe-inline' 'unsafe-eval' https:;\
+         img-src {img_src};\
+         script-src {script_src};\
          base-uri 'none';\
          form-action 'none';\
-         style-src 'self' 'unsafe-inline';\
-         style-src-elem 'self' 'unsafe-inline';\
+         style-src {style_src};\
+         style-src-elem {style_src};\
          font-src 'self';\
          frame-ancestors {frame_src};\
          frame-src {frame_src};"

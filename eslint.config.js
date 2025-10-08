@@ -60,4 +60,22 @@ export default ts.config(
   {
     ignores: ["src/frontend/src/lib/generated/*", "src/showcase/.astro/*"],
   },
+  {
+    files: ["src/frontend/tests/e2e-playwright/**/*.spec.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@playwright/test",
+              importNames: ["test", "expect"],
+              message:
+                "Import 'test' and 'expect' from './fixtures' or '../fixtures' instead to use custom test fixtures with host routing for Safari/WebKit.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

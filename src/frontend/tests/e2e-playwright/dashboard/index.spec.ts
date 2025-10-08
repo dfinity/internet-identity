@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { clearStorage, createIdentity, dummyAuth, II_URL } from "../utils";
 
 const TEST_USER_NAME = "Test User";
