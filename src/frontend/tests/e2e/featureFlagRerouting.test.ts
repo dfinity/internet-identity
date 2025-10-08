@@ -28,7 +28,7 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     const newAuthorizeView = new NewAuthorizeView(browser);
     await newAuthorizeView.waitForDisplay();
 
-    // Verify URL shows only "/authorize"
+    // Verify URL shows only "/#authorize"
     expect(await browser.getUrl()).toBe(`${II_URL}/#authorize`);
 
     // Check that app.css is loaded by verifying it's in the document
