@@ -11,7 +11,7 @@ const config = {
     adapter: adapter({
       pages: "dist",
       assets: "dist",
-      fallback: "fallback.html",
+      fallback: "200.html",
       precompress: true,
     }),
     files: {

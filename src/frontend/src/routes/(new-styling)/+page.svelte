@@ -20,6 +20,10 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { fade } from "svelte/transition";
+  import { manuallyReroute } from "../../hooks";
+
+  // Add rerouting back on this SSG route
+  manuallyReroute();
 
   const faq = [
     {
@@ -93,8 +97,7 @@
     }
   });
 
-  onMount(() => {
-    requestAnimationFrame(() => (showFadeIn = true));
+  onMount(async () => {
     setTimeout(
       async () =>
         await triggerDropWaveAnimation({ containerHeight: "h-[640px]" }),
