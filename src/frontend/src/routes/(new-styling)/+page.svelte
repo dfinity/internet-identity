@@ -1,12 +1,11 @@
 <script lang="ts">
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import {
     clearDropWaveAnimation,
     triggerDropWaveAnimation,
   } from "$lib/utils/animation-dispatcher";
   import Button from "$lib/components/ui/Button.svelte";
-  import { themeStore } from "$lib/stores/theme.store";
   import TextFade from "$lib/components/ui/TextFade.svelte";
   import FullControlIllustration from "$lib/components/illustrations/landing/FullControlIllustration.svelte";
   import EasyAccessIllustration from "$lib/components/illustrations/landing/EasyAccessIllustration.svelte";
@@ -19,7 +18,6 @@
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
-  import { fade } from "svelte/transition";
   import { manuallyReroute } from "../../hooks";
 
   // Add rerouting back on this SSG route
@@ -68,35 +66,6 @@
     },
   ];
 
-  // Provides dynamic gradient colours for illustrations, reacting to theme changes.
-  // Values are pulled from CSS variables so strokes update automatically in light/dark mode.
-  let illustrationColours = $state({ start: "", end: "" });
-  let showFadeIn = true;
-
-  $effect(() => {
-    if ($themeStore !== null) {
-      // Wait for hydration + media query CSS to apply
-      tick().then(() => {
-        requestAnimationFrame(() => {
-          const root = document.documentElement;
-
-          illustrationColours = $themeStore
-            ? {
-                start:
-                  getComputedStyle(root).getPropertyValue("--fg-quaternary"),
-                end: getComputedStyle(root).getPropertyValue(
-                  "--fg-quaternary_hover",
-                ),
-              }
-            : {
-                start: getComputedStyle(root).getPropertyValue("--fg-tertiary"),
-                end: getComputedStyle(root).getPropertyValue("--fg-primary"),
-              };
-        });
-      });
-    }
-  });
-
   onMount(async () => {
     setTimeout(
       async () =>
@@ -122,37 +91,34 @@
     </div>
   </LandingHeader>
   <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
-    {#if showFadeIn}
-      <div
-        in:fade={{ delay: 200, duration: 600 }}
-        class="flex w-full flex-col items-center justify-center gap-6"
-      >
-        <div class="flex w-full flex-col gap-2">
-          <h1
-            class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
-          >
-            Experience
-          </h1>
-          <TextFade
-            texts={[
-              "Real Privacy",
-              "Full Ownership",
-              "Seamless Access",
-              "Internet Identity",
-            ]}
-            duration={500}
-            delayBetween={2000}
-            startDelay={2800}
-            textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
-            containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
-          />
-        </div>
-        <p class="text-text-tertiary max-w-[534px] text-center text-base">
-          Internet Identity lets you access apps and services securely, without
-          creating passwords, sharing personal data, or giving up control.
-        </p>
+    <div
+      class="fade-in flex w-full flex-col items-center justify-center gap-6 opacity-0"
+    >
+      <div class="flex w-full flex-col gap-2">
+        <h1
+          class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
+        >
+          Experience
+        </h1>
+        <TextFade
+          texts={[
+            "Real Privacy",
+            "Full Ownership",
+            "Seamless Access",
+            "Internet Identity",
+          ]}
+          duration={500}
+          delayBetween={2000}
+          startDelay={2800}
+          textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
+          containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
+        />
       </div>
-    {/if}
+      <p class="text-text-tertiary max-w-[534px] text-center text-base">
+        Internet Identity lets you access apps and services securely, without
+        creating passwords, sharing personal data, or giving up control.
+      </p>
+    </div>
   </div>
   <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
     <div
@@ -164,8 +130,13 @@
         description="Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
       >
         <EasyAccessIllustration
-          class="max-w-[233px]"
-          colors={illustrationColours}
+          class={[
+            "max-w-[233px]",
+            "[&_stop:first-child]:[stop-color:var(--fg-tertiary)]",
+            "[&_stop:last-child]:[stop-color:var(--fg-primary)]",
+            "dark:[&_stop:first-child]:[stop-color:var(--fg-quaternary)]",
+            "dark:[&_stop:last-child]:[stop-color:var(--fg-quaternary_hover)]",
+          ]}
         />
       </LandingCard>
       <LandingCard
@@ -174,8 +145,13 @@
         description="Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
       >
         <PasswordFreeIllustration
-          colors={illustrationColours}
-          class="max-w-[264px]"
+          class={[
+            "max-w-[264px]",
+            "[&_stop:first-child]:[stop-color:var(--fg-tertiary)]",
+            "[&_stop:last-child]:[stop-color:var(--fg-primary)]",
+            "dark:[&_stop:first-child]:[stop-color:var(--fg-quaternary)]",
+            "dark:[&_stop:last-child]:[stop-color:var(--fg-quaternary_hover)]",
+          ]}
         />
       </LandingCard>
       <LandingCard
@@ -184,8 +160,13 @@
         description="Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
       >
         <FullControlIllustration
-          colors={illustrationColours}
-          class="max-w-[170px]"
+          class={[
+            "max-w-[170px]",
+            "[&_stop:first-child]:[stop-color:var(--fg-tertiary)]",
+            "[&_stop:last-child]:[stop-color:var(--fg-primary)]",
+            "dark:[&_stop:first-child]:[stop-color:var(--fg-quaternary)]",
+            "dark:[&_stop:last-child]:[stop-color:var(--fg-quaternary_hover)]",
+          ]}
         />
       </LandingCard>
     </div>
@@ -231,3 +212,18 @@
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+<style>
+  .fade-in {
+    animation: fadeIn 0.6s ease-in 0.2s forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+</style>
