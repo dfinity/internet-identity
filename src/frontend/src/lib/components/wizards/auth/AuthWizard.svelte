@@ -52,7 +52,8 @@
       onSignIn(await authFlow.continueWithExistingPasskey());
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        return "cancelled";
+        isContinueFromAnotherDeviceVisible = true;
+        return;
       }
       onError(error); // Propagate unhandled errors to parent component
     } finally {
@@ -137,8 +138,6 @@
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
-      continueFromAnotherDevice={() =>
-        (isContinueFromAnotherDeviceVisible = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey

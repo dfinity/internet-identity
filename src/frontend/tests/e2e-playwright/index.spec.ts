@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { clearStorage, createIdentity, dummyAuth, II_URL } from "./utils";
+import {
+  cancelDummyAuth,
+  clearStorage,
+  createIdentity,
+  dummyAuth,
+  II_URL,
+} from "./utils";
 
 // This is chosen on purpose to exhibit a JWT token that is encoded in base64url but cannot
 // be decoded as simply base64. Works as a regression test.
@@ -65,9 +71,16 @@ test.describe("First visit", () => {
     await newDevicePage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
+    cancelDummyAuth(newDevicePage);
     await newDevicePage
-      .getByRole("button", { name: "Continue from another device" })
+      .getByRole("button", { name: "Use an existing Passkey" })
       .click();
+    await newDevicePage
+      .getByRole("heading", {
+        level: 1,
+        name: "Can't find your identity or passkey?",
+      })
+      .waitFor();
     const linkToPair = `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`;
 
     // Switch to existing device and authenticate after visiting link

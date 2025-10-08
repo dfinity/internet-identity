@@ -8,6 +8,7 @@ import {
   TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   II_URL,
+  cancelDummyAuth,
 } from "../utils";
 
 const DEFAULT_USER_NAME = "John Doe";
@@ -62,9 +63,16 @@ test("Authorize by signing in from another device", async ({
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
+    cancelDummyAuth(authPage);
     await authPage
-      .getByRole("button", { name: "Continue from another device" })
+      .getByRole("button", { name: "Use an existing Passkey" })
       .click();
+    await authPage
+      .getByRole("heading", {
+        level: 1,
+        name: "Can't find your identity or passkey?",
+      })
+      .waitFor();
     const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
 
     // Switch to other device and authenticate after visiting link
