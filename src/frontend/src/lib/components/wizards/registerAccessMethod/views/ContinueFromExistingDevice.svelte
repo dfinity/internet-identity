@@ -30,7 +30,7 @@
       class="text-md text-text-tertiary font-medium text-balance sm:text-center"
     >
       Use a device that already holds your identity to scan or open the URL.
-      This will link your identity to the desired device.
+      This will link your identity to this device.
     </p>
   </div>
   <QrCode text={url.href} class="size-32 self-center" />
