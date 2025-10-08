@@ -20,6 +20,7 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { fade } from "svelte/transition";
+  import { intl } from "../../hooks.client";
 
   const faq = [
     {
@@ -128,13 +129,20 @@
           <h1
             class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
           >
-            Experience
+            {intl
+              .formatMessage(
+                {
+                  defaultMessage: "Experience {subject}",
+                },
+                { subject: "" },
+              )
+              .trim()}
           </h1>
           <TextFade
             texts={[
-              "Real Privacy",
-              "Full Ownership",
-              "Seamless Access",
+              intl.formatMessage({ defaultMessage: "Real Privacy" }),
+              intl.formatMessage({ defaultMessage: "Full Ownership" }),
+              intl.formatMessage({ defaultMessage: "Seamless Access" }),
               "Internet Identity",
             ]}
             duration={500}

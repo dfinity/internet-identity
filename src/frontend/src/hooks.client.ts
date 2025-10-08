@@ -10,6 +10,8 @@ import {
 } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
 import { isSameOrigin } from "$lib/utils/urlUtils";
+import { createIntl, createIntlCache } from "@formatjs/intl";
+import messages from "$lib/locales/en.json";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -61,6 +63,15 @@ const maybeSetDiscoverablePasskeyFlowFlag = () => {
   }
   featureFlags.DISCOVERABLE_PASSKEY_FLOW.set(true);
 };
+
+const cache = createIntlCache();
+export const intl = createIntl(
+  {
+    locale: "en-US",
+    messages,
+  },
+  cache,
+);
 
 export const init: ClientInit = async () => {
   initGlobals();
