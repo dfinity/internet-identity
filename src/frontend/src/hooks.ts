@@ -41,11 +41,16 @@ export const manuallyReroute = async () => {
       fetch: window.fetch,
     });
     if (nonNullish(next)) {
-      const before = window.location.href;
-      // Reroute to destination, `nonNullish` doesn't exclude `void` so we cast
+      // Capture current URL
+      const currentURL = new URL(window.location.href);
+      // Cast to string since `nonNullish` doesn't exclude `void` type
+      const nextURL = new URL(next as string);
+      // Copy over the current query params
+      nextURL.search = currentURL.search;
+      // Reroute to destination
       await goto(next as string, { replaceState: true });
       // After rerouting, change the URL back to what the user expects to see
-      replaceState(before, {});
+      replaceState(currentURL, {});
     }
   }
 };
