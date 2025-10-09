@@ -106,7 +106,7 @@ fn should_list_accounts() {
     let account_name = "account name".to_string();
 
     // 2. Save anchor to stable memory
-    let anchor = storage.allocate_anchor().unwrap();
+    let anchor = storage.allocate_anchor(0).unwrap();
     storage.create(anchor).unwrap();
 
     // 3. List accounts returns default account
@@ -172,7 +172,7 @@ fn should_list_all_identity_accounts() {
     let origin_2: FrontendHostname = "https://some-other.origin".to_string();
 
     // 2. Save anchor to stable memory
-    let anchor = storage.allocate_anchor().unwrap();
+    let anchor = storage.allocate_anchor(0).unwrap();
     storage.create(anchor).unwrap();
 
     // 3. List accounts returns default account
@@ -365,7 +365,7 @@ fn should_count_accounts_different_anchors() {
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
     // --- Anchor 1 ---
-    let anchor_1 = storage.allocate_anchor().unwrap();
+    let anchor_1 = storage.allocate_anchor(0).unwrap();
     storage.create(anchor_1.clone()).unwrap();
     let anchor_number_1 = anchor_1.anchor_number();
     let origin_1: FrontendHostname = "https://origin1.com".to_string();
@@ -429,7 +429,7 @@ fn should_count_accounts_different_anchors() {
     );
 
     // --- Anchor 2 ---
-    let anchor_2 = storage.allocate_anchor().unwrap();
+    let anchor_2 = storage.allocate_anchor(0).unwrap();
     storage.create(anchor_2.clone()).unwrap();
     let anchor_number_2 = anchor_2.anchor_number();
     let origin_2: FrontendHostname = "https://origin2.com".to_string();

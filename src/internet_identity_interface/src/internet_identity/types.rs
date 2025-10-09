@@ -167,14 +167,14 @@ pub enum VerifyTentativeDeviceResponse {
     NoDeviceToVerify,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DeviceRegistrationInfo {
     pub expiration: Timestamp,
     pub tentative_device: Option<DeviceData>,
     pub tentative_session: Option<Principal>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,

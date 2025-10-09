@@ -37,12 +37,14 @@ pub fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     let device_registration =
         tentative_device_registration::get_tentative_registration(anchor_number);
 
+    let created_at = anchor.created_at();
+
     IdentityAnchorInfo {
         devices,
         device_registration,
         openid_credentials,
         name,
-        created_at: None,
+        created_at,
     }
 }
 
@@ -254,8 +256,8 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
     use ic_stable_structures::VectorMemory;
 
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let mut anchor_0 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
-    let mut anchor_1 = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let mut anchor_0 = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
+    let mut anchor_1 = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
     let openid_credential = OpenIdCredential {
         iss: "https://example.com".into(),
         sub: "example-sub".into(),
@@ -310,7 +312,7 @@ fn should_set_name() {
     use internet_identity_interface::archive::types::Operation;
 
     storage_replace(Storage::new((0, 10000), VectorMemory::default()));
-    let mut anchor = storage_borrow_mut(|storage| storage.allocate_anchor().unwrap());
+    let mut anchor = storage_borrow_mut(|storage| storage.allocate_anchor(0).unwrap());
 
     // Verify operations/errors
     assert_eq!(
@@ -323,4 +325,20 @@ fn should_set_name() {
         Ok(Operation::UpdateName)
     );
     assert_eq!(set_name(&mut anchor, None), Ok(Operation::RemoveName));
+}
+
+#[test]
+fn should_set_timestamp() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    // Prepare the world
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+
+    // Run code under test
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(123456789).unwrap());
+
+    // Assert postcondition
+    assert_eq!(anchor.created_at(), Some(123456789));
 }

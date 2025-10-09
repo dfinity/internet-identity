@@ -193,7 +193,8 @@ pub fn identity_registration_finish(
 }
 
 fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFinishError> {
-    let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor()) else {
+    let now = time();
+    let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor(now)) else {
         return Err(IdentityLimitReached);
     };
 
