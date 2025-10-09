@@ -99,7 +99,7 @@
   onMount(() => {
     authenticationV2Funnel.init({
       origin: window.location.origin,
-      abTestGroup: get(LARGE_GOOGLE_BUTTON)
+      abTestGroup: $LARGE_GOOGLE_BUTTON
         ? "largeGoogleButton"
         : "smallGoogleButton",
     });
