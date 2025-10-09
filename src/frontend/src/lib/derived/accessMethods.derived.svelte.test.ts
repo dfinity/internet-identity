@@ -6,7 +6,6 @@ import type {
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
 import { toNullable } from "@dfinity/utils";
-import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 
 // Mock the canisterConfig
 vi.mock("$lib/globals", () => ({
@@ -47,7 +46,6 @@ const openIdCredential: OpenIdCredential = {
 describe("Access methods derived stores", () => {
   beforeEach(() => {
     canisterConfig.openid_configs = [];
-    ENABLE_GENERIC_OPEN_ID.set(false);
   });
 
   describe("lastUsedAccessMethod", () => {
@@ -87,85 +85,65 @@ describe("Access methods derived stores", () => {
   });
 
   describe("isMaxOpenIdCredentialsReached", () => {
-    describe("When ENABLE_GENERIC_OPEN_ID is false", () => {
-      beforeEach(() => {
-        ENABLE_GENERIC_OPEN_ID.set(false);
-      });
-      it("should return true if the max number of openId credentials is reached", () => {
-        identityInfo.openIdCredentials = [openIdCredential];
-        expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
-      });
-
-      it("should return false if the max number of openId credentials is not reached", () => {
-        identityInfo.openIdCredentials = [];
-        expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
-      });
+    it("should return true if the max number of openId credentials is reached", () => {
+      canisterConfig.openid_configs = [
+        [
+          {
+            auth_uri: "test",
+            jwks_uri: "test",
+            logo: "test",
+            name: "test",
+            fedcm_uri: [],
+            issuer: "test",
+            auth_scope: ["test"],
+            client_id: "test",
+          },
+          {
+            auth_uri: "test",
+            jwks_uri: "test",
+            logo: "test",
+            name: "test",
+            fedcm_uri: [],
+            issuer: "test",
+            auth_scope: ["test"],
+            client_id: "test",
+          },
+        ],
+      ];
+      identityInfo.openIdCredentials = [
+        openIdCredential,
+        { ...openIdCredential },
+      ];
+      expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
     });
 
-    describe("When ENABLE_GENERIC_OPEN_ID is true", () => {
-      beforeEach(() => {
-        ENABLE_GENERIC_OPEN_ID.set(true);
-      });
-      it("should return true if the max number of openId credentials is reached", () => {
-        canisterConfig.openid_configs = [
-          [
-            {
-              auth_uri: "test",
-              jwks_uri: "test",
-              logo: "test",
-              name: "test",
-              fedcm_uri: [],
-              issuer: "test",
-              auth_scope: ["test"],
-              client_id: "test",
-            },
-            {
-              auth_uri: "test",
-              jwks_uri: "test",
-              logo: "test",
-              name: "test",
-              fedcm_uri: [],
-              issuer: "test",
-              auth_scope: ["test"],
-              client_id: "test",
-            },
-          ],
-        ];
-        identityInfo.openIdCredentials = [
-          openIdCredential,
-          { ...openIdCredential },
-        ];
-        expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(true);
-      });
-
-      it("should return false if the max number of openId credentials is not reached", () => {
-        canisterConfig.openid_configs = [
-          [
-            {
-              auth_uri: "test",
-              jwks_uri: "test",
-              logo: "test",
-              name: "test",
-              fedcm_uri: [],
-              issuer: "test",
-              auth_scope: ["test"],
-              client_id: "test",
-            },
-            {
-              auth_uri: "test",
-              jwks_uri: "test",
-              logo: "test",
-              name: "test",
-              fedcm_uri: [],
-              issuer: "test",
-              auth_scope: ["test"],
-              client_id: "test",
-            },
-          ],
-        ];
-        identityInfo.openIdCredentials = [openIdCredential];
-        expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
-      });
+    it("should return false if the max number of openId credentials is not reached", () => {
+      canisterConfig.openid_configs = [
+        [
+          {
+            auth_uri: "test",
+            jwks_uri: "test",
+            logo: "test",
+            name: "test",
+            fedcm_uri: [],
+            issuer: "test",
+            auth_scope: ["test"],
+            client_id: "test",
+          },
+          {
+            auth_uri: "test",
+            jwks_uri: "test",
+            logo: "test",
+            name: "test",
+            fedcm_uri: [],
+            issuer: "test",
+            auth_scope: ["test"],
+            client_id: "test",
+          },
+        ],
+      ];
+      identityInfo.openIdCredentials = [openIdCredential];
+      expect(accessMethods.isMaxOpenIdCredentialsReached).toBe(false);
     });
   });
 });

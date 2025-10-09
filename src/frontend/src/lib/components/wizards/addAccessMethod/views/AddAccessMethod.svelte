@@ -4,19 +4,16 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { issuerMatches } from "$lib/utils/openID";
   import { nonNullish } from "@dfinity/utils";
   import { canisterConfig } from "$lib/globals";
-  import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
   import type {
     OpenIdConfig,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
 
   interface Props {
-    linkGoogleAccount: () => Promise<void>;
     linkOpenIdAccount: (config: OpenIdConfig) => Promise<void>;
     continueWithPasskey: () => void;
     openIdCredentials?: OpenIdCredential[];
@@ -24,7 +21,6 @@
   }
 
   const {
-    linkGoogleAccount,
     linkOpenIdAccount,
     continueWithPasskey,
     openIdCredentials = [],
@@ -39,15 +35,6 @@
 
   const isPasskeySupported = nonNullish(window.PublicKeyCredential);
 
-  const handleContinueWithGoogle = async () => {
-    authenticatingGoogle = true;
-    try {
-      await linkGoogleAccount();
-    } finally {
-      authenticatingGoogle = false;
-    }
-  };
-
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
     authenticatingProviderId = config.client_id;
     try {
@@ -57,8 +44,6 @@
     }
   };
 
-  const showGoogleButton =
-    canisterConfig.openid_google?.[0]?.[0] && !$ENABLE_GENERIC_OPEN_ID;
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
 
   const hasCredential = (configIssuer: string): boolean =>
@@ -102,53 +87,30 @@
         Continue with Passkey
       </Button>
     </Tooltip>
-    {#if $ENABLE_GENERIC_OPEN_ID}
-      <div class="flex flex-row flex-nowrap justify-stretch gap-3">
-        {#each openIdProviders as provider}
-          <Tooltip
-            label={`You already have a ${provider.name} account linked`}
-            hidden={!hasCredential(provider.issuer)}
-          >
-            <Button
-              onclick={() => handleContinueWithOpenId(provider)}
-              variant="secondary"
-              disabled={authenticating || hasCredential(provider.issuer)}
-              size="xl"
-              class="flex-1"
-            >
-              {#if authenticatingProviderId === provider.client_id}
-                <ProgressRing />
-              {:else if provider.logo}
-                <div class="size-6">
-                  {@html provider.logo}
-                </div>
-              {/if}
-            </Button>
-          </Tooltip>
-        {/each}
-      </div>
-    {:else if showGoogleButton}
-      <Tooltip
-        label="You already have a Google account linked"
-        hidden={!hasCredential("https://accounts.google.com")}
-      >
-        <Button
-          onclick={handleContinueWithGoogle}
-          variant="secondary"
-          disabled={authenticating ||
-            hasCredential("https://accounts.google.com")}
-          size="xl"
+    <div class="flex flex-row flex-nowrap justify-stretch gap-3">
+      {#each openIdProviders as provider}
+        <Tooltip
+          label={`You already have a ${provider.name} account linked`}
+          hidden={!hasCredential(provider.issuer)}
         >
-          {#if authenticatingGoogle}
-            <ProgressRing />
-            <span>Authenticating with Google...</span>
-          {:else}
-            <GoogleIcon />
-            <span>Continue with Google</span>
-          {/if}
-        </Button>
-      </Tooltip>
-    {/if}
+          <Button
+            onclick={() => handleContinueWithOpenId(provider)}
+            variant="secondary"
+            disabled={authenticating || hasCredential(provider.issuer)}
+            size="xl"
+            class="flex-1"
+          >
+            {#if authenticatingProviderId === provider.client_id}
+              <ProgressRing />
+            {:else if provider.logo}
+              <div class="size-6">
+                {@html provider.logo}
+              </div>
+            {/if}
+          </Button>
+        </Tooltip>
+      {/each}
+    </div>
   </div>
 </div>
 

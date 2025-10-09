@@ -130,7 +130,6 @@ pub struct PersistentState {
     pub dummy_auth: Option<DummyAuthConfig>,
     // Feature flags
     pub feature_flag_continue_from_another_device: Option<bool>,
-    pub feature_flag_enable_generic_open_id_fe: Option<bool>,
 }
 
 impl Default for PersistentState {
@@ -155,7 +154,6 @@ impl Default for PersistentState {
             is_production: None,
             dummy_auth: None,
             feature_flag_continue_from_another_device: None,
-            feature_flag_enable_generic_open_id_fe: None,
         }
     }
 }

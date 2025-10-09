@@ -543,8 +543,6 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         feature_flag_continue_from_another_device: persistent_state
             .feature_flag_continue_from_another_device,
-        feature_flag_enable_generic_open_id_fe: persistent_state
-            .feature_flag_enable_generic_open_id_fe,
     })
 }
 
@@ -674,11 +672,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(flag) = arg.feature_flag_continue_from_another_device {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.feature_flag_continue_from_another_device = Some(flag);
-            })
-        }
-        if let Some(flag) = arg.feature_flag_enable_generic_open_id_fe {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.feature_flag_enable_generic_open_id_fe = Some(flag);
             })
         }
     }

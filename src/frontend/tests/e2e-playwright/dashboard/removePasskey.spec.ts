@@ -22,7 +22,7 @@ test("User can remove a passkey when they have multiple access methods", async (
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
@@ -97,7 +97,7 @@ test("User cannot remove passkey if they only have one access method", async ({
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
@@ -123,7 +123,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
@@ -194,7 +194,7 @@ test("User can cancel passkey removal", async ({ page }) => {
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");

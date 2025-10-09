@@ -18,7 +18,6 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { vi } from "vitest";
 import { nonNullish } from "@dfinity/utils";
-import { ENABLE_GENERIC_OPEN_ID } from "$lib/state/featureFlags";
 
 // Mock the canisterConfig, including OpenID configs used by getOpenIdTitles via findConfig
 vi.mock("$lib/globals", () => ({
@@ -59,15 +58,8 @@ vi.mock("$lib/globals", () => ({
         },
       ],
     ],
-    // Provide feature flag defaults to satisfy optional initialization logic
-    feature_flag_enable_generic_open_id_fe: [false],
   },
 }));
-
-// Ensure deterministic default for tests that rely on Google-specific path
-beforeEach(() => {
-  ENABLE_GENERIC_OPEN_ID.set(false);
-});
 
 const makeAuthnMethodWithOrigin = (origin?: string): AuthnMethodData => {
   const metadata: MetadataMapV2 = nonNullish(origin)
