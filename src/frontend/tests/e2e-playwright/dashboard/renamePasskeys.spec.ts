@@ -22,7 +22,7 @@ test("User can rename the current passkey used for authentication", async ({
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
@@ -69,7 +69,7 @@ test("User can rename a newly added passkey from the same device", async ({
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
@@ -111,7 +111,7 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");

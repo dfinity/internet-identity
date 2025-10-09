@@ -18,7 +18,7 @@ test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
 
   // Create new identity and authenticate
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
-  await authPage.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
   auth(authPage);
   await authPage.getByRole("button", { name: "Create Passkey" }).click();
@@ -53,7 +53,7 @@ test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
 
   // Create new identity and authenticate
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
-  await authPage.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
   auth(authPage);
   await authPage.getByRole("button", { name: "Create Passkey" }).click();
@@ -87,7 +87,7 @@ test("Delegation maxTimeToLive: 2 months", async ({ page }) => {
 
   // Create new identity and authenticate
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
-  await authPage.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
   auth(authPage);
   await authPage.getByRole("button", { name: "Create Passkey" }).click();

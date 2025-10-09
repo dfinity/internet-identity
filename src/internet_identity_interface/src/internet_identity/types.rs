@@ -167,19 +167,20 @@ pub enum VerifyTentativeDeviceResponse {
     NoDeviceToVerify,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct DeviceRegistrationInfo {
     pub expiration: Timestamp,
     pub tentative_device: Option<DeviceData>,
     pub tentative_session: Option<Principal>,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct IdentityAnchorInfo {
     pub devices: Vec<DeviceWithUsage>,
     pub device_registration: Option<DeviceRegistrationInfo>,
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub name: Option<String>,
+    pub created_at: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -219,7 +220,6 @@ pub struct InternetIdentityInit {
     pub is_production: Option<bool>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
     pub feature_flag_continue_from_another_device: Option<bool>,
-    pub feature_flag_enable_generic_open_id_fe: Option<bool>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

@@ -60,7 +60,7 @@ fn should_recover_header_from_memory_v9() {
 fn should_read_previous_write() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((12345, 678910), memory);
-    let mut anchor = storage.allocate_anchor().unwrap();
+    let mut anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
 
     anchor.add_device(sample_device()).unwrap();
@@ -74,9 +74,9 @@ fn should_read_previous_write() {
 fn should_not_write_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory);
-    storage.allocate_anchor().unwrap();
+    storage.allocate_anchor(0).unwrap();
 
-    let anchor = Anchor::new(222);
+    let anchor = Anchor::new(222, 333);
 
     let result = storage.create(anchor);
     assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))))
@@ -86,7 +86,7 @@ fn should_not_write_using_anchor_number_outside_allocated_range() {
 fn should_not_read_using_anchor_number_outside_allocated_range() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory);
-    storage.allocate_anchor().unwrap();
+    storage.allocate_anchor(0).unwrap();
 
     let result = storage.read(222);
     assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))))
@@ -97,7 +97,7 @@ fn should_save_and_restore_persistent_state() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((123, 456), memory);
     storage.flush();
-    storage.allocate_anchor().unwrap();
+    storage.allocate_anchor(0).unwrap();
 
     let persistent_state = sample_persistent_state();
 
@@ -120,11 +120,11 @@ fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
     let mut storage = Storage::new((10_000, 3_784_873), memory.clone());
     storage.flush();
 
-    storage.allocate_anchor().unwrap();
+    storage.allocate_anchor(0).unwrap();
     storage.write_persistent_state(&sample_persistent_state());
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
 
-    let anchor = storage.allocate_anchor().unwrap();
+    let anchor = storage.allocate_anchor(0).unwrap();
     storage.create(anchor).unwrap();
 
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
@@ -135,7 +135,7 @@ fn should_write_and_update_openid_credential_lookup() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    let mut anchor = storage.allocate_anchor().unwrap();
+    let mut anchor = storage.allocate_anchor(0).unwrap();
     let openid_credential_0 = openid_credential(0);
     let openid_credential_1 = openid_credential(1);
     let openid_credential_2 = openid_credential(2);
@@ -206,7 +206,7 @@ fn should_write_and_update_device_credential_lookup() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    let mut anchor = storage.allocate_anchor().unwrap();
+    let mut anchor = storage.allocate_anchor(0).unwrap();
     let device_0 = Device {
         pubkey: ByteBuf::from(vec![0]),
         credential_id: Some(ByteBuf::from(vec![0])),
@@ -281,8 +281,8 @@ fn should_not_overwrite_device_credential_lookup() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
 
-    let mut anchor_0 = storage.allocate_anchor().unwrap();
-    let mut anchor_1 = storage.allocate_anchor().unwrap();
+    let mut anchor_0 = storage.allocate_anchor(0).unwrap();
+    let mut anchor_1 = storage.allocate_anchor(0).unwrap();
     let device_0 = Device {
         pubkey: ByteBuf::from(vec![0]),
         credential_id: Some(ByteBuf::from(vec![0])),

@@ -543,6 +543,10 @@ export interface IdentityAnchorInfo {
    */
   'name' : [] | [string],
   /**
+   * The timestamp at which the anchor was created
+   */
+  'created_at' : [] | [Timestamp],
+  /**
    * All devices that can authenticate to this anchor
    */
   'devices' : Array<DeviceWithUsage>,
@@ -672,7 +676,6 @@ export interface InternetIdentityInit {
    * Configuration for Web Analytics
    */
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
-  'feature_flag_enable_generic_open_id_fe' : [] | [boolean],
   /**
    * Configuration for Related Origins Requests.
    * If present, list of origins from where registration is allowed.

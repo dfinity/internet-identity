@@ -538,14 +538,15 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Returns None if the range of Identity Anchor assigned to this
     /// storage is exhausted.
-    pub fn allocate_anchor(&mut self) -> Option<Anchor> {
+    pub fn allocate_anchor(&mut self, now: Timestamp) -> Option<Anchor> {
         let anchor_number = self.header.id_range_lo + self.header.num_anchors as u64;
         if anchor_number >= self.header.id_range_hi {
             return None;
         }
         self.header.num_anchors += 1;
         self.flush();
-        Some(Anchor::new(anchor_number))
+
+        Some(Anchor::new(anchor_number, now))
     }
 
     /// This method can be replaced with `write` once `anchor_memory` is removed.

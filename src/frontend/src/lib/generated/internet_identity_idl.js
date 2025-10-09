@@ -55,7 +55,6 @@ export const idlFactory = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
-    'feature_flag_enable_generic_open_id_fe' : IDL.Opt(IDL.Bool),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'feature_flag_continue_from_another_device' : IDL.Opt(IDL.Bool),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
@@ -294,6 +293,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityAnchorInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
+    'created_at' : IDL.Opt(Timestamp),
     'devices' : IDL.Vec(DeviceWithUsage),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
@@ -880,7 +880,6 @@ export const init = ({ IDL }) => {
     'archive_config' : IDL.Opt(ArchiveConfig),
     'canister_creation_cycles_cost' : IDL.Opt(IDL.Nat64),
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
-    'feature_flag_enable_generic_open_id_fe' : IDL.Opt(IDL.Bool),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'feature_flag_continue_from_another_device' : IDL.Opt(IDL.Bool),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),

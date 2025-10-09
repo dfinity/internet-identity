@@ -8,7 +8,8 @@ const getSeedIndex = (): bigint => {
   if (canisterConfig.dummy_auth[0]?.[0]?.prompt_for_index === true) {
     const value = prompt("Enter seed index", "0")?.trim();
     if (isNullish(value)) {
-      throw new Error("Operation cancelled");
+      // We need to create the same error as WebAuthn for the E2E to behave the same.
+      throw new DOMException("Operation cancelled", "NotAllowedError");
     }
     const index = BigInt(value);
     if (index < BigInt(0)) {

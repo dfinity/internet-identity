@@ -24,6 +24,7 @@ pub struct Anchor {
     openid_credentials: Vec<OpenIdCredential>,
     metadata: Option<HashMap<String, MetadataEntry>>,
     name: Option<String>,
+    created_at: Option<Timestamp>,
 }
 
 impl Device {
@@ -130,18 +131,26 @@ impl From<OpenIdCredentialData> for OpenIdCredential {
 
 impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
     fn from(anchor: Anchor) -> Self {
+        let Anchor {
+            devices,
+            openid_credentials,
+            metadata,
+            name,
+            created_at,
+            anchor_number: _,
+        } = anchor;
+
+        let openid_credentials = openid_credentials.into_iter().map(Into::into).collect();
+
         (
             StorableFixedAnchor {
-                devices: anchor.devices,
-                metadata: anchor.metadata,
+                devices,
+                metadata,
+                created_at,
             },
             StorableAnchor {
-                openid_credentials: anchor
-                    .openid_credentials
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
-                name: anchor.name,
+                openid_credentials,
+                name,
             },
         )
     }
@@ -170,6 +179,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
                 .unwrap_or_default(),
             metadata: storable_anchor.metadata,
             name: stable_anchor.and_then(|anchor| anchor.name),
+            created_at: storable_anchor.created_at,
         }
     }
 }
@@ -177,9 +187,10 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
 impl Anchor {
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
-    pub(super) fn new(anchor_number: AnchorNumber) -> Anchor {
+    pub(super) fn new(anchor_number: AnchorNumber, created_at: Timestamp) -> Anchor {
         Self {
             anchor_number,
+            created_at: Some(created_at),
             devices: vec![],
             openid_credentials: vec![],
             metadata: None,
@@ -483,6 +494,10 @@ impl Anchor {
 
     pub fn name(&self) -> Option<String> {
         self.name.clone()
+    }
+
+    pub fn created_at(&self) -> Option<Timestamp> {
+        self.created_at
     }
 }
 

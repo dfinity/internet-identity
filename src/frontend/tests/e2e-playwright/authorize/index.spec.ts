@@ -8,6 +8,7 @@ import {
   TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   II_URL,
+  cancelDummyAuth,
 } from "../utils";
 
 const DEFAULT_USER_NAME = "John Doe";
@@ -18,9 +19,7 @@ test("Authorize by registering a new passkey", async ({ page }) => {
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
-    await authPage
-      .getByRole("button", { name: "Set up a new Passkey" })
-      .click();
+    await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     auth(authPage);
     await authPage.getByRole("button", { name: "Create Passkey" }).click();
@@ -37,7 +36,7 @@ test("Authorize by signing in with an existing passkey", async ({ page }) => {
       .click();
     auth(authPage);
     await authPage
-      .getByRole("button", { name: "Use an existing Passkey" })
+      .getByRole("button", { name: "Use existing identity" })
       .click();
     await authPage.getByRole("button", { name: "Primary account" }).click();
   });
@@ -62,9 +61,18 @@ test("Authorize by signing in from another device", async ({
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
+    cancelDummyAuth(authPage);
     await authPage
-      .getByRole("button", { name: "Continue from another device" })
+      .getByRole("button", {
+        name: "Use existing identity",
+      })
       .click();
+    await authPage
+      .getByRole("heading", {
+        level: 1,
+        name: "Can't find your identity or passkey?",
+      })
+      .waitFor();
     const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
 
     // Switch to other device and authenticate after visiting link
@@ -171,9 +179,7 @@ test("App logo appears when app is known", async ({ page }) => {
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
-    await authPage
-      .getByRole("button", { name: "Set up a new Passkey" })
-      .click();
+    await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill("John Doe");
     auth(authPage);
     await authPage.getByRole("button", { name: "Create Passkey" }).click();
@@ -194,7 +200,7 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
         .getByRole("button", { name: "Continue with Passkey" })
         .click();
       await authPage
-        .getByRole("button", { name: "Set up a new Passkey" })
+        .getByRole("button", { name: "Create new identity" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       auth(authPage);

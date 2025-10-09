@@ -45,7 +45,6 @@ pub struct StorablePersistentState {
 
     // Feature flags
     feature_flag_continue_from_another_device: Option<bool>,
-    feature_flag_enable_generic_open_id_fe: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -93,7 +92,6 @@ impl From<PersistentState> for StorablePersistentState {
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
             feature_flag_continue_from_another_device: s.feature_flag_continue_from_another_device,
-            feature_flag_enable_generic_open_id_fe: s.feature_flag_enable_generic_open_id_fe,
         }
     }
 }
@@ -119,7 +117,6 @@ impl From<StorablePersistentState> for PersistentState {
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
             feature_flag_continue_from_another_device: s.feature_flag_continue_from_another_device,
-            feature_flag_enable_generic_open_id_fe: s.feature_flag_enable_generic_open_id_fe,
         }
     }
 }
@@ -173,7 +170,6 @@ mod tests {
             is_production: None,
             dummy_auth: None,
             feature_flag_continue_from_another_device: None,
-            feature_flag_enable_generic_open_id_fe: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -203,7 +199,6 @@ mod tests {
             is_production: None,
             dummy_auth: None,
             feature_flag_continue_from_another_device: None,
-            feature_flag_enable_generic_open_id_fe: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

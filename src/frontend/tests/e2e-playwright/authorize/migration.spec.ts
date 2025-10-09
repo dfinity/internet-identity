@@ -54,9 +54,7 @@ test.describe("Migration from an app", () => {
           throw new Error("Credential or identity number not found");
         }
         // Step 3: Perform the migration
-        await authPage
-          .getByRole("button", { name: "Upgrade from legacy identity" })
-          .click();
+        await authPage.getByRole("button", { name: "Upgrade" }).click();
         const authAuthenticatorId = await addVirtualAuthenticator(authPage);
         await addCredentialToVirtualAuthenticator(
           authPage,

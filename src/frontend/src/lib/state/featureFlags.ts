@@ -19,7 +19,7 @@ const LOCALSTORAGE_FEATURE_FLAGS_PREFIX = "ii-localstorage-feature-flags__";
 const createFeatureFlagStore = (
   name: string,
   defaultValue: boolean,
-  getInitValue?: () => boolean | undefined,
+  initCallback?: (featureFlag: FeatureFlag) => void,
 ): FeatureFlagStore => {
   const { subscribe, set, update } = writable(defaultValue);
 
@@ -54,9 +54,9 @@ const createFeatureFlagStore = (
     return initializedFeatureFlag;
   };
   const initialize = (): void => {
-    // Override feature flag with init method if not already set
-    if (nonNullish(getInitValue) && !initializedFeatureFlag.isSet()) {
-      initializedFeatureFlag.temporaryOverride(getInitValue() ?? defaultValue);
+    // Call init callback if not already set
+    if (nonNullish(initCallback) && !initializedFeatureFlag.isSet()) {
+      initCallback?.(initializedFeatureFlag);
     }
   };
 
@@ -89,21 +89,28 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const ENABLE_GENERIC_OPEN_ID = createFeatureFlagStore(
-  "ENABLE_GENERIC_OPEN_ID",
-  false,
-  () => canisterConfig.feature_flag_enable_generic_open_id_fe[0],
-);
-
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   "CONTINUE_FROM_ANOTHER_DEVICE",
   true, // Enable temp key flow (until backend changes can be enabled)
-  () => canisterConfig.feature_flag_continue_from_another_device[0],
+  (featureFlag) => {
+    featureFlag.temporaryOverride(
+      canisterConfig.feature_flag_continue_from_another_device[0] ?? true,
+    );
+  },
 );
 
 export const AUTH_FLOW_UPDATES = createFeatureFlagStore(
   "AUTH_FLOW_UPDATES",
   false,
+);
+
+export const LARGE_GOOGLE_BUTTON = createFeatureFlagStore(
+  "LARGE_GOOGLE_BUTTON",
+  true,
+  (featureFlag) => {
+    // A/B Test with 50/50 user groups
+    featureFlag.set(Math.random() > 0.5);
+  },
 );
 
 export default {
@@ -112,6 +119,6 @@ export default {
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   CONTINUE_FROM_ANOTHER_DEVICE,
-  ENABLE_GENERIC_OPEN_ID,
   AUTH_FLOW_UPDATES,
+  LARGE_GOOGLE_BUTTON,
 } as Record<string, FeatureFlagStore>;

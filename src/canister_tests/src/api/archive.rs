@@ -98,6 +98,8 @@ pub mod compat {
         UpdateAccount { name: Option<Private> },
         #[serde(rename = "delete_account")]
         DeleteAccount,
+        #[serde(rename = "set_default_account")]
+        SetDefaultAccount,
     }
 
     impl From<Operation> for CompatOperation {
@@ -134,6 +136,7 @@ pub mod compat {
                 Operation::CreateAccount { name } => CompatOperation::CreateAccount { name },
                 Operation::UpdateAccount { name } => CompatOperation::UpdateAccount { name },
                 Operation::DeleteAccount => CompatOperation::DeleteAccount,
+                Operation::SetDefaultAccount => CompatOperation::SetDefaultAccount,
             }
         }
     }

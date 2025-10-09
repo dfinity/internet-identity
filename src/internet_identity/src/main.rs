@@ -1,6 +1,7 @@
 use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
 use anchor_management::registration;
@@ -12,7 +13,7 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use internet_identity_interface::archive::types::BufferedEntry;
+use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
@@ -402,19 +403,34 @@ fn get_default_account(
     Ok(default_account_info)
 }
 
+impl From<IdentityUpdateError> for SetDefaultAccountError {
+    fn from(src: IdentityUpdateError) -> Self {
+        match src {
+            IdentityUpdateError::Unauthorized(principal) => Self::Unauthorized(principal),
+            IdentityUpdateError::StorageError(anchor_number, storage_error) => {
+                Self::InternalCanisterError(format!(
+                    "Identity: {}, Error: {}",
+                    anchor_number, storage_error
+                ))
+            }
+        }
+    }
+}
+
 #[update]
 fn set_default_account(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     account_number: Option<AccountNumber>,
 ) -> Result<AccountInfo, SetDefaultAccountError> {
-    check_authorization(anchor_number)
-        .map_err(|err| SetDefaultAccountError::Unauthorized(err.principal))?;
-
-    let default_account_info =
-        account_management::set_default_account_for_origin(anchor_number, origin, account_number)?;
-
-    Ok(default_account_info)
+    anchor_operation_with_authz_check(anchor_number, |_| {
+        let result = account_management::set_default_account_for_origin(
+            anchor_number,
+            origin,
+            account_number,
+        )?;
+        Ok((result, Operation::SetDefaultAccount))
+    })
 }
 
 #[update]
@@ -527,8 +543,6 @@ fn config() -> InternetIdentityInit {
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         feature_flag_continue_from_another_device: persistent_state
             .feature_flag_continue_from_another_device,
-        feature_flag_enable_generic_open_id_fe: persistent_state
-            .feature_flag_enable_generic_open_id_fe,
     })
 }
 
@@ -658,11 +672,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(flag) = arg.feature_flag_continue_from_another_device {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.feature_flag_continue_from_another_device = Some(flag);
-            })
-        }
-        if let Some(flag) = arg.feature_flag_enable_generic_open_id_fe {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.feature_flag_enable_generic_open_id_fe = Some(flag);
             })
         }
     }

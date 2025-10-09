@@ -3,10 +3,6 @@
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import {
-    AUTH_FLOW_UPDATES,
-    CONTINUE_FROM_ANOTHER_DEVICE,
-  } from "$lib/state/featureFlags";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { HelpCircleIcon } from "@lucide/svelte";
@@ -16,10 +12,9 @@
   interface Props {
     setupNew: () => void;
     useExisting: () => Promise<void | "cancelled">;
-    continueFromAnotherDevice: () => void;
   }
 
-  const { setupNew, useExisting, continueFromAnotherDevice }: Props = $props();
+  const { setupNew, useExisting }: Props = $props();
 
   let popoverAnchorRef = $state<HTMLDivElement>();
   let isAuthenticating = $state(false);
@@ -46,22 +41,13 @@
   </h1>
 
   <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
-    {#if $AUTH_FLOW_UPDATES}
-      Create an identity with a passkey, using biometrics or a security key.
-      Your data never leaves your device.
-    {:else}
-      With passkeys, you can now use your fingerprint, face, or screen lock to
-      quickly and securely confirm it’s really you.
-    {/if}
+    Create an identity with a passkey, using biometrics or a security key. Your
+    data never leaves your device.
   </p>
 </div>
 <div class="flex flex-col gap-3">
   <Button onclick={setupNew} size="lg" disabled={isAuthenticating}>
-    {#if $AUTH_FLOW_UPDATES}
-      Create new identity
-    {:else}
-      Set up a new Passkey
-    {/if}
+    Create new identity
   </Button>
   <Tooltip
     label="Interaction canceled. Please try again."
@@ -78,42 +64,22 @@
         <ProgressRing />
         <span>Authenticating...</span>
       {:else}
-        <span>
-          {#if $AUTH_FLOW_UPDATES}
-            Use existing identity
-          {:else}
-            Use an existing Passkey
-          {/if}
-        </span>
+        <span>Use existing identity</span>
       {/if}
     </Button>
   </Tooltip>
-  {#if $CONTINUE_FROM_ANOTHER_DEVICE}
-    <Button
-      onclick={continueFromAnotherDevice}
-      variant="tertiary"
-      disabled={isAuthenticating}
-      size="lg"
-    >
-      Continue from another device
-    </Button>
-  {/if}
-  {#if $AUTH_FLOW_UPDATES}
-    <div class="flex flex-row items-center justify-between gap-4">
-      <p class="text-text-secondary text-sm">
-        Learn about privacy preservation
-      </p>
-      <div bind:this={popoverAnchorRef}>
-        <Button
-          variant="tertiary"
-          onclick={() => (showPrivacyPopover = !showPrivacyPopover)}
-        >
-          <HelpCircleIcon
-            size="20"
-            class="text-text-primary stroke-fg-tertiary"
-          />
-        </Button>
-      </div>
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-secondary text-sm">Learn about privacy preservation</p>
+    <div bind:this={popoverAnchorRef}>
+      <Button
+        variant="tertiary"
+        onclick={() => (showPrivacyPopover = !showPrivacyPopover)}
+      >
+        <HelpCircleIcon
+          size="20"
+          class="text-text-primary stroke-fg-tertiary"
+        />
+      </Button>
     </div>
     {#if showPrivacyPopover}
       <Popover
@@ -142,5 +108,5 @@
         </a>
       </Popover>
     {/if}
-  {/if}
+  </div>
 </div>

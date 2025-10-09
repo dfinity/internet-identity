@@ -52,7 +52,8 @@
       onSignIn(await authFlow.continueWithExistingPasskey());
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        return "cancelled";
+        isContinueFromAnotherDeviceVisible = true;
+        return;
       }
       onError(error); // Propagate unhandled errors to parent component
     } finally {
@@ -69,21 +70,6 @@
       onSignUp(result.identityNumber);
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
-        return "cancelled";
-      }
-      onError(error); // Propagate unhandled errors to parent component
-    } finally {
-      isAuthenticating = false;
-    }
-  };
-
-  const handleContinueWithGoogle = async (): Promise<void | "cancelled"> => {
-    isAuthenticating = true;
-    try {
-      const { identityNumber, type } = await authFlow.continueWithGoogle();
-      (type === "signUp" ? onSignUp : onSignIn)(identityNumber);
-    } catch (error) {
-      if (isOpenIdCancelError(error)) {
         return "cancelled";
       }
       onError(error); // Propagate unhandled errors to parent component
@@ -137,8 +123,6 @@
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
-      continueFromAnotherDevice={() =>
-        (isContinueFromAnotherDeviceVisible = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey
@@ -173,7 +157,6 @@
     {@render children?.()}
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
-      continueWithGoogle={handleContinueWithGoogle}
       continueWithOpenId={handleContinueWithOpenId}
       migrate={() => (isMigrating = true)}
     />

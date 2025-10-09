@@ -65,6 +65,7 @@ type Operation = variant {
         name : opt Private;
     };
     delete_account;
+    set_default_account;
 };
 
 type Entry = record {

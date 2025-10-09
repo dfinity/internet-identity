@@ -30,6 +30,10 @@ export const dummyAuth = (): DummyAuthFn => {
   };
 };
 
+export const cancelDummyAuth = (page: Page) => {
+  page.once("dialog", (dialog) => dialog.dismiss());
+};
+
 /**
  * Authorize with test app
  * @param page The page that will load the test app
@@ -110,7 +114,7 @@ export const createNewIdentityInII = async (
 
   // Create passkey identity
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
-  await page.getByRole("button", { name: "Set up a new Passkey" }).click();
+  await page.getByRole("button", { name: "Create new identity" }).click();
   await page.getByLabel("Identity name").fill(name);
   dummyAuth(page);
   await page.getByRole("button", { name: "Create Passkey" }).click();
