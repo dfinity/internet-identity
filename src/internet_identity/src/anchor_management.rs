@@ -326,3 +326,19 @@ fn should_set_name() {
     );
     assert_eq!(set_name(&mut anchor, None), Ok(Operation::RemoveName));
 }
+
+#[test]
+fn should_set_timestamp() {
+    use crate::state::{storage_borrow_mut, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+
+    // Prepare the world
+    storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+
+    // Run code under test
+    let anchor = storage_borrow_mut(|storage| storage.allocate_anchor(123456789).unwrap());
+
+    // Assert postcondition
+    assert_eq!(anchor.created_at(), Some(123456789));
+}
