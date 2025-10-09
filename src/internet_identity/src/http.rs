@@ -1,40 +1,44 @@
-use crate::state;
-use crate::{http::metrics::metrics, state::ASSET_ROUTER};
+use crate::http::metrics::metrics;
+use crate::state::{
+    self, CertifiedHttpResponse, HTTP_TREE, OPTIONS_REQUEST_PATH, OPTIONS_TREE_PATH, RESPONSES,
+};
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::data_certificate;
 use ic_cdk::trap;
 use ic_certification::{labeled_hash, pruned};
+use ic_http_certification::utils::add_v2_certificate_header;
+use ic_http_certification::HttpCertificationTreeEntry;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde_bytes::ByteBuf;
 
 mod metrics;
 
-fn http_options_request(request: HttpRequest) -> HttpResponse {
-    // TODO: Restrict origin to just the II-specific origins.
-    // let headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
+fn http_options_request() -> HttpResponse {
+    let Some(CertifiedHttpResponse {
+        mut response,
+        certification,
+    }) = RESPONSES.with_borrow(|responses| responses.get(*OPTIONS_REQUEST_PATH).cloned())
+    else {
+        trap("OPTIONS response not found");
+    };
 
-    // let x = HttpResponse {
-    //     // Indicates success without any additional content to be sent in the response content.
-    //     status_code: 204,
-    //     headers,
-    //     body: ByteBuf::from(vec![]),
-    //     upgrade: None,
-    //     streaming_strategy: None,
-    // };
-
-    let request = ic_http_certification::HttpRequest::try_from(request).unwrap_or_else(|err| {
-        trap(&format!("Failed to convert request for OPTIONS: {}", err));
-    });
-
-    let response = ASSET_ROUTER.with_borrow(|asset_router| {
-        asset_router
-            .serve_asset(
-                &data_certificate().expect("No data certificate available"),
-                &request,
-            )
-            .unwrap_or_else(|err| {
-                trap(&format!("Failed to serve OPTIONS response: {:?}", err));
-            })
+    HTTP_TREE.with_borrow(|http_tree| {
+        add_v2_certificate_header(
+            &data_certificate().expect("No data certificate available"),
+            &mut response,
+            &http_tree
+                .witness(
+                    &HttpCertificationTreeEntry::new(&*OPTIONS_TREE_PATH, certification),
+                    &*OPTIONS_REQUEST_PATH,
+                )
+                .unwrap_or_else(|err| {
+                    trap(&format!(
+                        "Failed to create witness for OPTIONS response: {:?}",
+                        err
+                    ))
+                }),
+            &*OPTIONS_TREE_PATH.to_expr_path(),
+        );
     });
 
     HttpResponse::from(response)
@@ -101,7 +105,7 @@ fn method_not_allowed(unsupported_method: &str) -> HttpResponse {
 
 pub fn http_request(req: HttpRequest) -> HttpResponse {
     match req.method.as_str() {
-        "OPTIONS" => http_options_request(req),
+        "OPTIONS" => http_options_request(),
         "GET" => http_get_request(req.url, req.certificate_version),
         unsupported_method => method_not_allowed(unsupported_method),
     }
