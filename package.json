@@ -34,7 +34,7 @@
     "lint:eslint": "eslint --max-warnings 0 --cache --cache-location node_modules/.cache/eslint 'src/frontend/**/*.ts*' 'src/showcase/**/*.ts'",
     "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
     "format": "prettier --write src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
-    "format-check": "prettier --check src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos --write"
+    "format-check": "prettier --check src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
