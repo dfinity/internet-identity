@@ -85,9 +85,9 @@ document
     // Find out which URL should be used for login.
     const iiUrl = document.querySelector<HTMLInputElement>("#iiUrl")!.value;
 
-    // Call authClient.login(...) to login with Internet Identity. This will open a new tab
-    // with the login prompt. The code has to wait for the login process to complete.
-    // We can either use the callback functions directly or wrap in a promise.
+    // Call authClient.loginWithIcrc29(...) to login with Internet Identity.
+    // It uses the ICRC-29 standard.
+    // https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_29_window_post_message_transport.md
     await new Promise<void>((resolve, reject) => {
       authClient.loginWithIcrc29({
         identityProvider: iiUrl,
