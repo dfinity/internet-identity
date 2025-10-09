@@ -325,6 +325,8 @@ type IdentityAnchorInfo = record {
     openid_credentials : opt vec OpenIdCredential;
     // The name of the Internet Identity
     name : opt text;
+    // The timestamp at which the anchor was created
+    created_at : opt Timestamp;
 };
 
 type AnchorCredentials = record {

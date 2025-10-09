@@ -294,6 +294,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const IdentityAnchorInfo = IDL.Record({
     'name' : IDL.Opt(IDL.Text),
+    'created_at' : IDL.Opt(Timestamp),
     'devices' : IDL.Vec(DeviceWithUsage),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),

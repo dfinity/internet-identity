@@ -180,6 +180,7 @@ pub struct IdentityAnchorInfo {
     pub device_registration: Option<DeviceRegistrationInfo>,
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub name: Option<String>,
+    pub created_at: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
