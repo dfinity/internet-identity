@@ -291,7 +291,6 @@ type InternetIdentityInit = record {
     dummy_auth : opt opt DummyAuthConfig;
     // Feature flags
     feature_flag_continue_from_another_device : opt bool;
-    feature_flag_enable_generic_open_id_fe : opt bool;
 };
 
 type ChallengeKey = text;

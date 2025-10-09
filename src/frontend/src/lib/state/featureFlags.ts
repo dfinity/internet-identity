@@ -89,12 +89,6 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const ENABLE_GENERIC_OPEN_ID = createFeatureFlagStore(
-  "ENABLE_GENERIC_OPEN_ID",
-  false,
-  () => canisterConfig.feature_flag_enable_generic_open_id_fe[0],
-);
-
 export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
   "CONTINUE_FROM_ANOTHER_DEVICE",
   true, // Enable temp key flow (until backend changes can be enabled)
@@ -112,6 +106,5 @@ export default {
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   CONTINUE_FROM_ANOTHER_DEVICE,
-  ENABLE_GENERIC_OPEN_ID,
   AUTH_FLOW_UPDATES,
 } as Record<string, FeatureFlagStore>;

@@ -82,7 +82,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
   new_flow_origins: [],
   dummy_auth: [],
   feature_flag_continue_from_another_device: [],
-  feature_flag_enable_generic_open_id_fe: [],
 };
 
 vi.mock("$lib/globals", () => ({
