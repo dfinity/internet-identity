@@ -8,6 +8,7 @@
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
+  import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
@@ -45,9 +46,9 @@
         another sign-in method to continue."
     />
   {/if}
-  <div class="flex flex-col items-stretch gap-3">
-    <div class="flex flex-row flex-nowrap justify-stretch gap-3">
-      {#each openIdProviders as provider}
+  {#if $LARGE_GOOGLE_BUTTON}
+    <div class="mb-3 flex flex-col items-stretch gap-3">
+      {#each openIdProviders.slice(0, 1) as provider}
         <Tooltip
           label="Interaction canceled. Please try again."
           hidden={cancelledProviderId !== provider.client_id}
@@ -58,31 +59,104 @@
             variant="secondary"
             disabled={nonNullish(authenticatingProviderId)}
             size="xl"
-            class="flex-1"
-            aria-label={`Continue with ${provider.name}`}
           >
             {#if authenticatingProviderId === provider.client_id}
               <ProgressRing />
+              <span>Authenticating...</span>
             {:else if provider.logo}
               <div class="size-6">
                 {@html provider.logo}
               </div>
+              <span>Continue with {provider.name}</span>
             {/if}
           </Button>
         </Tooltip>
       {/each}
+      <div class="flex flex-row flex-nowrap justify-stretch gap-3">
+        {#each openIdProviders.slice(1) as provider}
+          <Tooltip
+            label="Interaction canceled. Please try again."
+            hidden={cancelledProviderId !== provider.client_id}
+            manual
+          >
+            <Button
+              onclick={() => handleContinueWithOpenId(provider)}
+              variant="secondary"
+              disabled={nonNullish(authenticatingProviderId)}
+              size="xl"
+              class="flex-1"
+              aria-label={`Continue with ${provider.name}`}
+            >
+              {#if authenticatingProviderId === provider.client_id}
+                <ProgressRing />
+              {:else if provider.logo}
+                <div class="size-6">
+                  {@html provider.logo}
+                </div>
+              {/if}
+            </Button>
+          </Tooltip>
+        {/each}
+      </div>
+      <div class="flex flex-row items-center gap-2" aria-hidden="true">
+        <div
+          class="border-border-tertiary flex-1 translate-y-[100%] border-t"
+        ></div>
+        <div class="text-text-secondary text-sm">or</div>
+        <div
+          class="border-border-tertiary flex-1 translate-y-[100%] border-t"
+        ></div>
+      </div>
+      <Button
+        onclick={setupOrUseExistingPasskey}
+        disabled={!supportsPasskeys || nonNullish(authenticatingProviderId)}
+        size="xl"
+        variant={"secondary"}
+      >
+        <PasskeyIcon />
+        Continue with Passkey
+      </Button>
     </div>
-    <Button
-      onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || nonNullish(authenticatingProviderId)}
-      size="xl"
-      variant={"secondary"}
-    >
-      <PasskeyIcon />
-      Continue with Passkey
-    </Button>
-  </div>
-  <div class="border-border-tertiary border-t"></div>
+  {:else}
+    <div class="flex flex-col items-stretch gap-3">
+      <div class="flex flex-row flex-nowrap justify-stretch gap-3">
+        {#each openIdProviders as provider}
+          <Tooltip
+            label="Interaction canceled. Please try again."
+            hidden={cancelledProviderId !== provider.client_id}
+            manual
+          >
+            <Button
+              onclick={() => handleContinueWithOpenId(provider)}
+              variant="secondary"
+              disabled={nonNullish(authenticatingProviderId)}
+              size="xl"
+              class="flex-1"
+              aria-label={`Continue with ${provider.name}`}
+            >
+              {#if authenticatingProviderId === provider.client_id}
+                <ProgressRing />
+              {:else if provider.logo}
+                <div class="size-6">
+                  {@html provider.logo}
+                </div>
+              {/if}
+            </Button>
+          </Tooltip>
+        {/each}
+      </div>
+      <Button
+        onclick={setupOrUseExistingPasskey}
+        disabled={!supportsPasskeys || nonNullish(authenticatingProviderId)}
+        size="xl"
+        variant={"secondary"}
+      >
+        <PasskeyIcon />
+        Continue with Passkey
+      </Button>
+    </div>
+    <div class="border-border-tertiary border-t"></div>
+  {/if}
   <div class="flex flex-row items-center justify-between gap-4">
     <p class="text-text-secondary text-sm">Still have an identity number?</p>
     <button
