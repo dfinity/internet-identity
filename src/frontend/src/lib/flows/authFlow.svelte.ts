@@ -31,11 +31,9 @@ import {
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import {
-  createGoogleRequestConfig,
   requestJWT,
   RequestConfig,
   decodeJWT,
-  GOOGLE_ISSUER,
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
 

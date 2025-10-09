@@ -1,11 +1,7 @@
 import { canisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import {
-  createGoogleRequestConfig,
-  decodeJWT,
-  requestJWT,
-} from "$lib/utils/openID";
+import { decodeJWT, requestJWT } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import type {
