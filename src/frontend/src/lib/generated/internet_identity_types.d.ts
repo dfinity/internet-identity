@@ -543,6 +543,10 @@ export interface IdentityAnchorInfo {
    */
   'name' : [] | [string],
   /**
+   * The timestamp at which the anchor was created
+   */
+  'created_at' : [] | [Timestamp],
+  /**
    * All devices that can authenticate to this anchor
    */
   'devices' : Array<DeviceWithUsage>,
