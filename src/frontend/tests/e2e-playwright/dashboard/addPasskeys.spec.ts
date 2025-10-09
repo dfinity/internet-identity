@@ -25,7 +25,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
@@ -54,9 +54,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await newPage.getByRole("link", { name: "Manage Identity" }).click();
   await newPage.getByRole("button", { name: "Continue with Passkey" }).click();
   auth2(newPage);
-  await newPage
-    .getByRole("button", { name: "Use an existing Passkey" })
-    .click();
+  await newPage.getByRole("button", { name: "Use existing identity" }).click();
 
   await expect(
     newPage.getByText("Chrome").locator("..").getByLabel("Current Passkey"),
@@ -84,7 +82,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   await page.getByRole("link", { name: "Manage Identity" }).click();
   await page.getByRole("button", { name: "Continue with Passkey" }).click();
   auth(page);
-  await page.getByRole("button", { name: "Use an existing Passkey" }).click();
+  await page.getByRole("button", { name: "Use existing identity" }).click();
 
   // Verify we're at the dashboard and have one passkey
   await page.waitForURL(II_URL + "/manage");
