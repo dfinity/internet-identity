@@ -25,6 +25,6 @@
     "vite": "^5.4.19"
   },
   "dependencies": {
-    "@icp-sdk/auth": "^4.0.0"
+    "@icp-sdk/auth": "^4.1.0"
   }
 }
