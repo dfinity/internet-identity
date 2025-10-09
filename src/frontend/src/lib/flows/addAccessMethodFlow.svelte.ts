@@ -1,11 +1,7 @@
 import { canisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import {
-  createGoogleRequestConfig,
-  decodeJWT,
-  requestJWT,
-} from "$lib/utils/openID";
+import { decodeJWT, requestJWT } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import type {
@@ -52,46 +48,6 @@ export class AddAccessMethodFlow {
           mediation: "required",
         },
       );
-      const { iss, sub, aud, name, email } = decodeJWT(jwt);
-      this.#isSystemOverlayVisible = false;
-      await actor
-        .openid_credential_add(identityNumber, jwt, salt)
-        .then(throwCanisterError);
-
-      const metadata: MetadataMapV2 = [];
-      if (nonNullish(name)) {
-        metadata.push(["name", { String: name }]);
-      }
-      if (nonNullish(email)) {
-        metadata.push(["email", { String: email }]);
-      }
-      return {
-        aud,
-        iss,
-        sub,
-        metadata,
-        last_usage_timestamp: [],
-      };
-    } finally {
-      this.#isSystemOverlayVisible = false;
-    }
-  };
-
-  linkGoogleAccount = async (): Promise<OpenIdCredential> => {
-    const { actor, identityNumber, salt, nonce } = get(authenticatedStore);
-
-    const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
-    if (isNullish(clientId)) {
-      throw new Error("Google is not configured");
-    }
-
-    try {
-      const requestConfig = createGoogleRequestConfig(clientId);
-      this.#isSystemOverlayVisible = true;
-      const jwt = await requestJWT(requestConfig, {
-        nonce,
-        mediation: "required",
-      });
       const { iss, sub, aud, name, email } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
       await actor

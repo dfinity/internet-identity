@@ -41,15 +41,6 @@
 
   let isContinueOnAnotherDeviceVisible = $state(false);
 
-  const handleContinueWithGoogle = async () => {
-    try {
-      onOpenIDLinked(await addAccessMethodFlow.linkGoogleAccount());
-      onClose();
-    } catch (error) {
-      onError(error);
-    }
-  };
-
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
     try {
       onOpenIDLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
@@ -81,7 +72,6 @@
   {:else if addAccessMethodFlow.view === "chooseMethod"}
     <AddAccessMethod
       continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
-      linkGoogleAccount={handleContinueWithGoogle}
       linkOpenIdAccount={handleContinueWithOpenId}
       {maxPasskeysReached}
       {openIdCredentials}

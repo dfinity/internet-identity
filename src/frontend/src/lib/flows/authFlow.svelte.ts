@@ -31,11 +31,9 @@ import {
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
 import {
-  createGoogleRequestConfig,
   requestJWT,
   RequestConfig,
   decodeJWT,
-  GOOGLE_ISSUER,
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
 
@@ -143,84 +141,6 @@ export class AuthFlow {
         : await DiscoverablePasskeyIdentity.createNew(this.#name);
     await this.#startRegistration();
     return this.#registerWithPasskey(passkeyIdentity);
-  };
-
-  continueWithGoogle = async (): Promise<{
-    identityNumber: bigint;
-    type: "signIn" | "signUp";
-  }> => {
-    let jwt: string | undefined = undefined;
-    const clientId = canisterConfig.openid_google?.[0]?.[0]?.client_id;
-    if (isNullish(clientId)) {
-      throw new Error("Google is not configured");
-    }
-    authenticationV2Funnel.addProperties({
-      provider: "Google",
-    });
-    // Create two try-catch blocks to avoid double-triggering the analytics.
-    try {
-      const requestConfig = createGoogleRequestConfig(clientId);
-      this.#systemOverlay = true;
-      jwt = await requestJWT(requestConfig, {
-        nonce: get(sessionStore).nonce,
-        mediation: "required",
-      });
-    } catch (error) {
-      this.#view = "chooseMethod";
-      throw error;
-    } finally {
-      this.#systemOverlay = false;
-      // Moved after `requestJWT` to avoid Safari from blocking the popup.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueWithOpenID);
-    }
-    try {
-      const { iss, sub, loginHint } = decodeJWT(jwt);
-      const { identity, identityNumber } = await authenticateWithJWT({
-        canisterId,
-        session: get(sessionStore),
-        jwt,
-      });
-      // If the previous call succeeds, it means the Google user already exists in II.
-      // Therefore, they are logging in.
-      // If the call fails, it means the Google user does not exist in II.
-      // In that case, we register them.
-      authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
-      await authenticationStore.set({ identity, identityNumber });
-      const info =
-        await get(authenticatedStore).actor.get_anchor_info(identityNumber);
-      const authnMethod = info.openid_credentials[0]?.find(
-        (method) => method.iss === iss,
-      );
-      if (this.#options.trackLastUsed) {
-        lastUsedIdentitiesStore.addLastUsedIdentity({
-          identityNumber,
-          name: info.name[0],
-          authMethod: {
-            openid: { iss, sub, loginHint, metadata: authnMethod?.metadata },
-          },
-        });
-      }
-      return { identityNumber, type: "signIn" };
-    } catch (error) {
-      if (
-        isCanisterError<OpenIdDelegationError>(error) &&
-        error.type === "NoSuchAnchor" &&
-        nonNullish(jwt)
-      ) {
-        authenticationV2Funnel.trigger(
-          AuthenticationV2Events.RegisterWithOpenID,
-        );
-        await this.#startRegistration();
-        const { name } = decodeJWT(jwt); // Google JWT always has a name
-        const identityNumber = await this.#registerWithOpenId(
-          jwt,
-          name!,
-          GOOGLE_ISSUER,
-        );
-        return { identityNumber, type: "signUp" };
-      }
-      throw error;
-    }
   };
 
   continueWithOpenId = async (
