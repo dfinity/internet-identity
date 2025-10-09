@@ -2147,6 +2147,7 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "ic-cdk 0.16.0",
+ "ic-http-certification 3.0.3",
  "serde",
  "serde_bytes",
 ]

@@ -1,24 +1,43 @@
-use crate::http::metrics::metrics;
 use crate::state;
+use crate::{http::metrics::metrics, state::ASSET_ROUTER};
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
+use ic_cdk::api::data_certificate;
+use ic_cdk::trap;
 use ic_certification::{labeled_hash, pruned};
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest, HttpResponse};
 use serde_bytes::ByteBuf;
 
 mod metrics;
 
-fn http_options_request() -> HttpResponse {
+fn http_options_request(request: HttpRequest) -> HttpResponse {
     // TODO: Restrict origin to just the II-specific origins.
-    let headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
+    // let headers = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
 
-    HttpResponse {
-        // Indicates success without any additional content to be sent in the response content.
-        status_code: 204,
-        headers,
-        body: ByteBuf::from(vec![]),
-        upgrade: None,
-        streaming_strategy: None,
-    }
+    // let x = HttpResponse {
+    //     // Indicates success without any additional content to be sent in the response content.
+    //     status_code: 204,
+    //     headers,
+    //     body: ByteBuf::from(vec![]),
+    //     upgrade: None,
+    //     streaming_strategy: None,
+    // };
+
+    let request = ic_http_certification::HttpRequest::try_from(request).unwrap_or_else(|err| {
+        trap(&format!("Failed to convert request for OPTIONS: {}", err));
+    });
+
+    let response = ASSET_ROUTER.with_borrow(|asset_router| {
+        asset_router
+            .serve_asset(
+                &data_certificate().expect("No data certificate available"),
+                &request,
+            )
+            .unwrap_or_else(|err| {
+                trap(&format!("Failed to serve OPTIONS response: {:?}", err));
+            })
+    });
+
+    HttpResponse::from(response)
 }
 
 fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpResponse {
@@ -81,17 +100,9 @@ fn method_not_allowed(unsupported_method: &str) -> HttpResponse {
 }
 
 pub fn http_request(req: HttpRequest) -> HttpResponse {
-    let HttpRequest {
-        method,
-        url,
-        certificate_version,
-        headers: _,
-        body: _,
-    } = req;
-
-    match method.as_str() {
-        "OPTIONS" => http_options_request(),
-        "GET" => http_get_request(url, certificate_version),
+    match req.method.as_str() {
+        "OPTIONS" => http_options_request(req),
+        "GET" => http_get_request(req.url, req.certificate_version),
         unsupported_method => method_not_allowed(unsupported_method),
     }
 }
