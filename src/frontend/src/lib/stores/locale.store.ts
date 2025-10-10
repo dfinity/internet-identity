@@ -4,7 +4,7 @@ import { writableStored } from "./writable.store";
 import { building } from "$app/environment";
 import { generateMessageId } from "../../../../lingui-svelte/generateMessageId";
 import { i18n } from "@lingui/core";
-import { MacroMessageDescriptor } from "@lingui/core/macro";
+import { MacroMessageDescriptor, ChoiceOptions } from "@lingui/core/macro";
 import { nonNullish } from "@dfinity/utils";
 import { availableLocales } from "$lib/constants/locale.constants";
 
@@ -99,14 +99,14 @@ const processTaggedLiteral = (
 
   throw new Error("Unknown descriptor");
 };
-const processPlural = (num: number, variations: Record<string, string>) => {
+const processPlural = (value: number, options: ChoiceOptions) => {
   let pluralOptions = "";
-  Object.entries(variations).forEach(([key, value]) => {
+  Object.entries(options).forEach(([key, value]) => {
     pluralOptions += ` ${key} {${value}}`;
   });
   const message = `{num, plural,${pluralOptions}}`;
   const id = generateMessageId(message);
-  return i18n.t({ id, message, values: { num } });
+  return i18n.t({ id, message, values: { value } });
 };
 
 // Derives based on localeStore so that translations update when language updates
