@@ -1,6 +1,7 @@
 import { injectCanisterIdAndConfigPlugin } from "@dfinity/internet-identity-vite-plugins";
 import { nonNullish } from "@dfinity/utils";
-import type { Handle } from "@sveltejs/kit";
+import type { Handle, ServerInit } from "@sveltejs/kit";
+import { localeStore } from "$lib/stores/locale.store";
 
 const transformHtml =
   process.env.NODE_ENV === "development"
@@ -25,4 +26,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     });
   }
   return response;
+};
+
+export const init: ServerInit = async () => {
+  await localeStore.init();
 };

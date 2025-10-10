@@ -25,6 +25,7 @@
   import { page } from "$app/state";
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
+  import { t } from "$lib/stores/locale.store";
 
   const { children, data }: LayoutProps = $props();
 
@@ -108,6 +109,7 @@
         class="ml-auto gap-2.5 pr-3 md:-mr-3"
         aria-label="Switch identity"
       >
+        <span>{$t`Real Privacy`}</span>
         <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
         <ChevronDownIcon size="1rem" />
       </Button>
