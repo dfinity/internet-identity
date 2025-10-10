@@ -834,22 +834,18 @@ impl<M: Memory + Clone> Storage<M> {
     where
         F: FnOnce(&mut StorableAccountReference, &mut StorableAccount) -> T,
     {
-        let Some(account_number) = account_number else {
-            return None;
-        };
+        let account_number = account_number?;
 
-        let Some(mut storable_account) = self.stable_account_memory.get(&account_number) else {
-            return None;
-        };
+        let mut storable_account = self.stable_account_memory.get(&account_number)?;
 
         let (key, mut account_references) =
             self.find_account_references(anchor_number, application_number)?;
 
         let mut result = None;
 
-        for mut account_reference in &mut account_references {
+        for account_reference in &mut account_references {
             if account_reference.account_number == Some(account_number) {
-                result = Some(f(&mut account_reference, &mut storable_account));
+                result = Some(f(account_reference, &mut storable_account));
                 break;
             }
         }
