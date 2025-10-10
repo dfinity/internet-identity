@@ -791,21 +791,88 @@ impl<M: Memory + Clone> Storage<M> {
             .map(|list| list.into_vec())
     }
 
+    fn find_account_references(
+        &self,
+        anchor_number: AnchorNumber,
+        application_number: Option<ApplicationNumber>,
+    ) -> Option<(
+        (AnchorNumber, ApplicationNumber),
+        Vec<StorableAccountReference>,
+    )> {
+        let Some(application_number) = application_number else {
+            return None;
+        };
+
+        let key = (anchor_number, application_number);
+
+        let Some(account_references) = self.stable_account_reference_list_memory.get(&key) else {
+            return None;
+        };
+
+        Some((key, account_references.into_vec()))
+    }
+
     fn find_account_reference(
         &self,
         anchor_number: AnchorNumber,
         application_number: Option<ApplicationNumber>,
         account_number: Option<AccountNumber>,
     ) -> Option<StorableAccountReference> {
-        application_number.and_then(|app_num| {
-            self.lookup_account_references(anchor_number, app_num)
-                .and_then(|acc_ref_vec| {
-                    acc_ref_vec
-                        .iter()
-                        .find(|acc_ref| acc_ref.account_number == account_number)
-                        .cloned()
-                })
-        })
+        let (_, account_references) =
+            self.find_account_references(anchor_number, application_number)?;
+
+        for account_reference in account_references {
+            if account_reference.account_number == account_number {
+                return Some(account_reference);
+            }
+        }
+
+        None
+    }
+
+    /// Search for an account and applies the function `f` if found. Returns None if
+    /// not found and the result of `f` otherwise in the Some variant.
+    fn with_account_mut<T, F>(
+        &mut self,
+        anchor_number: AnchorNumber,
+        application_number: Option<ApplicationNumber>,
+        account_number: Option<AccountNumber>,
+        f: F,
+    ) -> Option<T>
+    where
+        F: FnOnce(&mut StorableAccountReference, &mut StorableAccount) -> T,
+    {
+        let Some(account_number) = account_number else {
+            return None;
+        };
+
+        let Some(mut storable_account) = self.stable_account_memory.get(&account_number) else {
+            return None;
+        };
+
+        let (key, mut account_references) =
+            self.find_account_references(anchor_number, application_number)?;
+
+        let mut result = None;
+
+        for mut account_reference in &mut account_references {
+            if account_reference.account_number == Some(account_number) {
+                result = Some(f(&mut account_reference, &mut storable_account));
+                break;
+            }
+        }
+
+        if result.is_none() {
+            return None;
+        }
+
+        let value = StorableAccountReferenceList::from_vec(account_references);
+
+        self.stable_account_memory
+            .insert(account_number, storable_account);
+        self.stable_account_reference_list_memory.insert(key, value);
+
+        result
     }
 
     pub fn lookup_anchor_application_config(
@@ -999,7 +1066,6 @@ impl<M: Memory + Clone> Storage<M> {
         let storable_account = StorableAccount {
             name: params.name.clone(),
             seed_from_anchor: None,
-            last_used: Some(now),
         };
         self.stable_account_memory
             .insert(account_number, storable_account);
@@ -1009,6 +1075,8 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Update counters with one more account.
         self.update_counters(app_num, anchor_number, AccountType::Account)?;
+
+        let last_used = Some(now);
 
         // Process account references
         match self
@@ -1024,11 +1092,11 @@ impl<M: Memory + Clone> Storage<M> {
                 // This is because we don't create default accounts explicitly.
                 let additional_account_reference = AccountReference {
                     account_number: Some(account_number),
-                    last_used: None,
+                    last_used,
                 };
                 let default_account_reference = AccountReference {
                     account_number: None,
-                    last_used: None,
+                    last_used: None, // We don't know when it was last used
                 };
                 self.stable_account_reference_list_memory.insert(
                     (anchor_number, app_num),
@@ -1041,7 +1109,7 @@ impl<M: Memory + Clone> Storage<M> {
                 let mut refs_vec: Vec<AccountReference> = existing_storable_list.into();
                 refs_vec.push(AccountReference {
                     account_number: Some(account_number),
-                    last_used: None,
+                    last_used,
                 });
                 self.stable_account_reference_list_memory
                     .insert((anchor_number, app_num), refs_vec.into());
@@ -1236,47 +1304,52 @@ impl<M: Memory + Clone> Storage<M> {
         params: UpdateExistingAccountParams,
         now: Timestamp,
     ) -> Result<Account, StorageError> {
+        let UpdateExistingAccountParams {
+            account_number,
+            anchor_number,
+            name,
+            origin,
+        } = params;
+
         // Check if account reference exists for given anchor number, origin and account number,
         // if the account refence exists for a given anchor, that means the anchor has access.
-        let application_number = self.lookup_application_number_with_origin(&params.origin);
-        let account_reference = self
-            .find_account_reference(
-                params.anchor_number,
-                application_number,
-                Some(params.account_number),
-            )
-            .ok_or(StorageError::AccountNotFound {
-                account_number: params.account_number,
-            })?;
-        // Check if the account reference has an account number,
-        // throw error if it doesn't since we only want to update
-        // accounts with an account number in this function.
-        let account_number =
-            account_reference
-                .account_number
-                .ok_or(StorageError::AccountNotFound {
-                    account_number: params.account_number,
-                })?;
-        // Read account from storage
-        let mut storable_account = self.stable_account_memory.get(&account_number).ok_or(
-            StorageError::AccountNotFound {
-                account_number: params.account_number,
-            },
-        )?;
-        // Update account and write back to storage
-        storable_account.name = params.name;
-        storable_account.last_used = Some(now);
-        self.stable_account_memory
-            .insert(params.account_number, storable_account.clone());
-        // Return updated account
-        Ok(Account::new_full(
-            params.anchor_number,
-            params.origin,
-            Some(storable_account.name),
+        let application_number = self.lookup_application_number_with_origin(&origin);
+
+        let account_update_result = self.with_account_mut(
+            anchor_number,
+            application_number,
             Some(account_number),
-            account_reference.last_used,
-            storable_account.seed_from_anchor,
-        ))
+            |account_reference, storable_account| {
+                // Check if the account reference has an account number,
+                // throw error if it doesn't since we only want to update
+                // accounts with an account number in this function.
+                let account_number = account_reference.account_number?;
+
+                // Update account and write back to storage
+                storable_account.name = name.clone();
+
+                let last_used = Some(now);
+
+                // Update last-used timestamp in account reference
+                account_reference.last_used = last_used;
+
+                // Return a user-facing account structure
+                Some(Account::new_full(
+                    anchor_number,
+                    origin,
+                    Some(name),
+                    Some(account_number),
+                    last_used,
+                    storable_account.seed_from_anchor,
+                ))
+            },
+        );
+
+        let Some(Some(account_update_result)) = account_update_result else {
+            return Err(StorageError::AccountNotFound { account_number });
+        };
+
+        Ok(account_update_result)
     }
 
     /// Used in `update_account` to create a default account.
@@ -1300,7 +1373,6 @@ impl<M: Memory + Clone> Storage<M> {
             name: name.clone(),
             // This was a default account which uses the anchor number for the seed.
             seed_from_anchor: Some(anchor_number),
-            last_used: Some(now),
         };
         self.stable_account_memory
             .insert(new_account_number, storable_account.clone());
@@ -1322,6 +1394,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.update_counters(application_number, anchor_number, AccountType::Account)?;
 
         // Update the account references list.
+        let last_used = Some(now);
         let account_references_key = (anchor_number, application_number);
         match self
             .stable_account_reference_list_memory
@@ -1333,7 +1406,7 @@ impl<M: Memory + Clone> Storage<M> {
                 // This is because we don't create default accounts explicitly.
                 let new_ref = AccountReference {
                     account_number: Some(new_account_number),
-                    last_used: None,
+                    last_used,
                 };
                 self.stable_account_reference_list_memory
                     .insert(account_references_key, vec![new_ref].into());
@@ -1352,6 +1425,7 @@ impl<M: Memory + Clone> Storage<M> {
                     if r_mut.account_number.is_none() {
                         // Found the default account reference.
                         r_mut.account_number = Some(new_account_number);
+                        r_mut.last_used = last_used;
                         found_and_updated = true;
                         break;
                     }
@@ -1375,7 +1449,7 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
             Some(storable_account.name),
             Some(new_account_number),
-            storable_account.last_used,
+            last_used,
             storable_account.seed_from_anchor,
         ))
     }

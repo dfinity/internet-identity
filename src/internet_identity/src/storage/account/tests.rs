@@ -56,7 +56,7 @@ fn should_create_additional_account() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account, 0_params, 0)
+        .create_additional_account(new_account_params, 0)
         .unwrap();
 
     // 5. Check that read_account returns additional account, creates application and updates counters.
@@ -186,7 +186,7 @@ fn should_list_all_identity_accounts() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account, 0_params, 0)
+        .create_additional_account(new_account_params, 0)
         .unwrap();
 
     // 5. List accounts returns default account
@@ -201,7 +201,7 @@ fn should_list_all_identity_accounts() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account, 0_params, 0)
+        .create_additional_account(new_account_params, 0)
         .unwrap();
 
     // 7. List accounts returns default account
@@ -248,7 +248,7 @@ fn should_update_default_account() {
         name: account_name.clone(),
         account_number: None,
     };
-    let new_account = storage.update_account(updated_account_params).unwrap();
+    let new_account = storage.update_account(updated_account_params, 0).unwrap();
 
     // 4. Check that the default account has been created with the updated values.
     assert_eq!(
@@ -317,7 +317,7 @@ fn should_update_additional_account() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account, 0_params, 0)
+        .create_additional_account(new_account_params, 0)
         .unwrap();
     assert!(storage.read_account(read_params.clone()).is_some());
 
@@ -328,7 +328,7 @@ fn should_update_additional_account() {
         name: new_account_name.clone(),
         account_number: Some(1),
     };
-    let updated_account = storage.update_account(updated_account_params).unwrap();
+    let updated_account = storage.update_account(updated_account_params, 0).unwrap();
 
     // 5. Check that the additional account has been created with the updated values.
     assert_eq!(
@@ -402,7 +402,9 @@ fn should_count_accounts_different_anchors() {
         origin: origin_1.clone(),
         name: account_name_1.clone(),
     };
-    storage.create_additional_account(create_params_1).unwrap();
+    storage
+        .create_additional_account(create_params_1, 0)
+        .unwrap();
 
     // List accounts for anchor 1 - should return 2
     let accounts_anchor_1_after_add = storage.list_accounts(anchor_number_1, &origin_1);
@@ -460,7 +462,9 @@ fn should_count_accounts_different_anchors() {
         origin: origin_2.clone(),
         name: account_name_2.clone(),
     };
-    storage.create_additional_account(create_params_2).unwrap();
+    storage
+        .create_additional_account(create_params_2, 0)
+        .unwrap();
 
     // List accounts for anchor 2 - should return 2
     let accounts_anchor_2_after_add = storage.list_accounts(anchor_number_2, &origin_2);
@@ -547,7 +551,7 @@ fn should_not_read_account_from_wrong_anchor() {
         origin: origin.clone(),
         name: account_name,
     };
-    storage.create_additional_account(create_params).unwrap();
+    storage.create_additional_account(create_params, 0).unwrap();
 
     // 3. Try to read the account with second anchor
     let read_params = ReadAccountParams {
