@@ -35,7 +35,8 @@
     "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
     "format": "prettier --write src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
     "format-check": "prettier --check src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
-    "extract": "lingui extract --clean"
+    "extract": "lingui extract --clean",
+    "compile": "echo \"Does nothing, compilation is handled by the Vite plugin\""
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
@@ -64,6 +65,7 @@
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-svelte": "^2.46.1",
+    "estree-walker": "^3.0.3",
     "fake-indexeddb": "^4.0.2",
     "globals": "^15.14.0",
     "jsdom": "^26.0.0",
@@ -103,7 +105,6 @@
     "plausible-tracker": "0.3.9",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
-    "svelte-i18n-lingui": "0.2.2",
     "ua-parser-js": "^1.0.35",
     "zod": "^3.22.3"
   },

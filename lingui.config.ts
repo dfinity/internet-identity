@@ -1,14 +1,15 @@
 import { defineConfig } from "@lingui/cli";
-import { jstsExtractor, svelteExtractor } from "svelte-i18n-lingui/extractor";
+import { svelteExtractor } from "./src/lingui-svelte/extractor";
+import { availableLocales } from "./src/frontend/src/lib/constants/locale.constants";
 
 export default defineConfig({
-  locales: ["en"],
-  sourceLocale: "en",
+  locales: availableLocales,
+  sourceLocale: availableLocales[0],
   catalogs: [
     {
       path: "src/frontend/src/lib/locales/{locale}",
       include: ["src/frontend/src/lib", "src/frontend/src/routes"],
     },
   ],
-  extractors: [jstsExtractor, svelteExtractor],
+  extractors: [svelteExtractor],
 });

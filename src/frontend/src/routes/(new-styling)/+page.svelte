@@ -19,7 +19,7 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { manuallyReroute } from "../../hooks";
-  import { t } from "svelte-i18n-lingui";
+  import { t } from "$lib/stores/locale.store";
 
   // Add rerouting back on this SSG route
   manuallyReroute();

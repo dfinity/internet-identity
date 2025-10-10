@@ -2,12 +2,15 @@ import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { derived, get, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
 import { building } from "$app/environment";
-import { locale as linguiLocaleStore } from "svelte-i18n-lingui";
+import { generateMessageId } from "../../../../lingui-svelte/generateMessageId";
+import { i18n } from "@lingui/core";
+import { MacroMessageDescriptor } from "@lingui/core/macro";
+import { nonNullish } from "@dfinity/utils";
+import { availableLocales } from "$lib/constants/locale.constants";
 
-export const availableLocales = ["en"];
 export const browserLocales = building
   ? [availableLocales[0]] // Fallback during SSG
-  : (navigator.languages ?? [navigator.language ?? "en"]);
+  : (navigator.languages ?? [navigator.language ?? availableLocales[0]]);
 export const availableBrowserLocale =
   // Exact match
   browserLocales.find((ul) => availableLocales.includes(ul)) ??
@@ -21,7 +24,7 @@ export const availableBrowserLocale =
 type LocaleStore = Readable<string> & {
   init: () => Promise<void>;
   set: (locale: string) => Promise<void>;
-  reset: () => Promise<void>;
+  reset: () => void;
 };
 
 const internalStore = writableStored<string | null>({
@@ -36,7 +39,10 @@ export const localeStore: LocaleStore = {
     if (availableLocales[0] !== locale && availableLocales.includes(locale)) {
       // Load locale if not default and it's available
       const { messages } = await import(`$lib/locales/${locale}.po`);
-      linguiLocaleStore.set(locale, messages);
+      i18n.loadAndActivate({ locale: locale, messages });
+    } else {
+      // Else use fallback (which are the "en" default)
+      i18n.loadAndActivate({ locale: availableLocales[0], messages: {} });
     }
   },
   subscribe: derived(
@@ -48,15 +54,54 @@ export const localeStore: LocaleStore = {
       // Return if locale isn't available
       return;
     }
-    internalStore.set(locale);
     const { messages } = await import(`$lib/locales/${locale}.po`);
-    linguiLocaleStore.set(locale, messages);
+    i18n.loadAndActivate({ locale: locale, messages });
+    internalStore.set(locale);
   },
-  reset: async () => {
+  reset: () => {
+    // const { messages } = await import(
+    //   `$lib/locales/${availableBrowserLocale}.po`
+    // );
+    i18n.loadAndActivate({ locale: availableLocales[0], messages: {} });
     internalStore.set(null);
-    const { messages } = await import(
-      `$lib/locales/${availableBrowserLocale}.po`
-    );
-    linguiLocaleStore.set(availableBrowserLocale, messages);
   },
 };
+
+// Copy from: https://github.com/HenryLie/svelte-i18n-lingui/blob/main/src/lib/index.js#L50
+const processTaggedLiteral = (
+  descriptor: string | MacroMessageDescriptor | TemplateStringsArray,
+  ...args: Array<string | number>
+) => {
+  // string
+  if (typeof descriptor === "string") {
+    const id = generateMessageId(descriptor);
+    return i18n.t({ id, message: descriptor });
+  }
+
+  // MacroMessageDescriptor
+  if (
+    typeof descriptor === "object" &&
+    "message" in descriptor &&
+    nonNullish(descriptor.message)
+  ) {
+    const id = generateMessageId(descriptor.message, descriptor.context);
+    return i18n.t({ id, ...descriptor });
+  }
+
+  // TemplateStringsArray
+  if (Array.isArray(descriptor)) {
+    let message = descriptor[0];
+    args.forEach((_arg, i) => {
+      message += `{${i}}` + descriptor[i + 1];
+    });
+    const id = generateMessageId(message);
+    const values = { ...args };
+
+    return i18n.t({ id, message, values });
+  }
+
+  throw new Error("Unknown descriptor");
+};
+
+// Derives based on localeStore so that translations update when language updates
+export const t = derived(localeStore, () => processTaggedLiteral);
