@@ -56,7 +56,7 @@ fn should_create_additional_account() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account_params)
+        .create_additional_account(new_account, 0_params, 0)
         .unwrap();
 
     // 5. Check that read_account returns additional account, creates application and updates counters.
@@ -124,7 +124,7 @@ fn should_list_accounts() {
     let expected_additional_account =
         Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
     let expected_default_account = Account::synthetic(anchor_number, origin.clone());
-    storage.create_additional_account(new_account).unwrap();
+    storage.create_additional_account(new_account, 0).unwrap();
 
     // 5. List accounts returns default account
     let listed_accounts = storage.list_accounts(anchor_number, &origin);
@@ -186,7 +186,7 @@ fn should_list_all_identity_accounts() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account_params)
+        .create_additional_account(new_account, 0_params, 0)
         .unwrap();
 
     // 5. List accounts returns default account
@@ -201,7 +201,7 @@ fn should_list_all_identity_accounts() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account_params)
+        .create_additional_account(new_account, 0_params, 0)
         .unwrap();
 
     // 7. List accounts returns default account
@@ -317,7 +317,7 @@ fn should_update_additional_account() {
         name: account_name.clone(),
     };
     storage
-        .create_additional_account(new_account_params)
+        .create_additional_account(new_account, 0_params, 0)
         .unwrap();
     assert!(storage.read_account(read_params.clone()).is_some());
 
