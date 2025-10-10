@@ -14,10 +14,6 @@
 
   let attachElement = $state<HTMLElement>();
 
-  const handleUpgradeAgain = () => {
-    onUpgradeAgain(attachElement);
-  };
-
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.AlreadyMigratedScreen);
   });
@@ -56,7 +52,11 @@
     >
       Help & FAQ
     </Button>
-    <Button onclick={handleUpgradeAgain} variant="tertiary" size="lg">
+    <Button
+      onclick={() => onUpgradeAgain(attachElement)}
+      variant="tertiary"
+      size="lg"
+    >
       Upgrade again
     </Button>
   </div>
