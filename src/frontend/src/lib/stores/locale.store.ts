@@ -99,6 +99,16 @@ const processTaggedLiteral = (
 
   throw new Error("Unknown descriptor");
 };
+const processPlural = (num: number, variations: Record<string, string>) => {
+  let pluralOptions = "";
+  Object.entries(variations).forEach(([key, value]) => {
+    pluralOptions += ` ${key} {${value}}`;
+  });
+  const message = `{num, plural,${pluralOptions}}`;
+  const id = generateMessageId(message);
+  return i18n.t({ id, message, values: { num } });
+};
 
 // Derives based on localeStore so that translations update when language updates
 export const t = derived(localeStore, () => processTaggedLiteral);
+export const plural = derived(localeStore, () => processPlural);
