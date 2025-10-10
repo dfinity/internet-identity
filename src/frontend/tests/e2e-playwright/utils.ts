@@ -59,10 +59,16 @@ export const authorizeWithUrl = async (
   appUrl: string,
   iiURL: string,
   authenticate: (page: Page) => Promise<void>,
+  useIcrc25?: boolean,
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(iiURL);
+  if (useIcrc25 === true) {
+    await page
+      .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
+      .setChecked(true);
+  }
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
 

@@ -171,6 +171,65 @@ test("Authorize by signing up with OpenID", async ({ page }) => {
   });
 });
 
+test("Authorize with ICRC-29", async ({ page }) => {
+  const auth = dummyAuth();
+  await authorizeWithUrl(
+    page,
+    TEST_APP_URL,
+    II_URL,
+    async (authPage) => {
+      await authPage
+        .getByRole("button", { name: "Continue with Passkey" })
+        .click();
+      await authPage
+        .getByRole("button", { name: "Create new identity" })
+        .click();
+      await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
+      auth(authPage);
+      await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    },
+    true,
+  );
+});
+
+test("Authorize with ICRC-29 (directly through OpenID)", async ({ page }) => {
+  const userId = crypto.randomUUID();
+
+  // Set name claim
+  await fetch(`http://localhost:11105/account/${userId}/claims`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: DEFAULT_USER_NAME }),
+  });
+
+  await authorizeWithUrl(
+    page,
+    TEST_APP_URL,
+    II_URL + "/authorize?openid=test%20openid",
+    async (openIdPage) => {
+      await expect(
+        openIdPage.getByRole("heading", {
+          name: "Sign-in",
+        }),
+      ).toBeVisible();
+      await openIdPage.getByPlaceholder("Enter any login").fill(userId);
+      await openIdPage
+        .getByPlaceholder("and password")
+        .fill("any-password-works");
+      await openIdPage.getByRole("button", { name: "Sign-in" }).click();
+      await expect(
+        openIdPage.getByRole("heading", {
+          name: "Authorize",
+        }),
+      ).toBeVisible();
+      await openIdPage.getByRole("button", { name: "Continue" }).click();
+    },
+    true,
+  );
+});
+
 test("App logo appears when app is known", async ({ page }) => {
   const auth = dummyAuth();
   await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
