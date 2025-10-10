@@ -196,6 +196,7 @@ pub fn update_account_for_origin(
     account_number: Option<AccountNumber>,
     origin: FrontendHostname,
     update: AccountUpdate,
+    now: Timestamp,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(new_name) => {
@@ -224,8 +225,6 @@ pub fn update_account_for_origin(
                             known_app_num: None
                         })
                         .expect("Updating an unreadable account should be impossible!");
-
-                    let now = time();
 
                     let updated_account = storage
                         .update_account(UpdateAccountParams {
@@ -454,6 +453,7 @@ fn should_fail_to_update_default_accounts_above_max() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
+        0,
     );
     assert_eq!(result, Err(UpdateAccountError::AccountLimitReached))
 }
@@ -593,7 +593,8 @@ fn should_update_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            }
+            },
+            0
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -675,7 +676,8 @@ fn should_update_default_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            }
+            },
+            0
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -802,6 +804,7 @@ fn should_properly_recalculate_faulty_account_counter_when_updating() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
+        0,
     );
     assert!(result.is_ok())
 }
@@ -836,6 +839,7 @@ fn should_increment_discrepancy_counter() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
+        0,
     );
     assert!(result.is_ok());
 
@@ -1043,6 +1047,7 @@ fn should_get_updated_default_account_after_modification() {
         AccountUpdate {
             name: Some("Default Account".to_string()),
         },
+        0,
     )
     .unwrap();
 
@@ -1054,7 +1059,7 @@ fn should_get_updated_default_account_after_modification() {
         Ok(AccountInfo {
             account_number: Some(1),
             origin: origin.clone(),
-            last_used: None,
+            last_used: Some(0),
             name: Some("Default Account".to_string()),
         })
     );

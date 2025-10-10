@@ -1,11 +1,11 @@
+use super::AccountsCounter;
 use crate::storage::account::Account;
 use crate::storage::storable::application::StorableApplication;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
 use ic_stable_structures::VectorMemory;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
-
-use super::AccountsCounter;
+use pretty_assertions::assert_eq;
 
 fn assert_empty_counters(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) {
     assert_eq!(
@@ -66,7 +66,7 @@ fn should_create_additional_account() {
         anchor_number,
         origin: origin.clone(),
         name: Some(account_name.clone()),
-        last_used: None,
+        last_used: Some(0),
         seed_from_anchor: None,
     };
     assert_eq!(additional_account, expected_account);
@@ -121,8 +121,14 @@ fn should_list_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    let expected_additional_account =
-        Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
+    let expected_additional_account = Account::new_full(
+        anchor_number,
+        origin.clone(),
+        Some(account_name),
+        Some(1),
+        Some(0),
+        None,
+    );
     let expected_default_account = Account::synthetic(anchor_number, origin.clone());
     storage.create_additional_account(new_account, 0).unwrap();
 
@@ -258,7 +264,7 @@ fn should_update_default_account() {
             origin,
             Some(account_name),
             new_account.account_number,
-            None,
+            Some(0),
             Some(anchor_number),
         )
     );
@@ -337,7 +343,7 @@ fn should_update_additional_account() {
             account_number: Some(1),
             anchor_number,
             origin: origin.clone(),
-            last_used: None,
+            last_used: Some(0),
             name: Some(new_account_name),
             seed_from_anchor: None,
         }
