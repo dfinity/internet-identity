@@ -10,6 +10,7 @@ import {
 } from "../utils";
 
 const TEST_USER_NAME = "Test User";
+const TEST_USER_NAME_2 = "Test User 2";
 
 const createLegacyIdentity = async (page: Page) => {
   await page.getByRole("button", { name: "Create Internet Identity" }).click();
@@ -112,6 +113,71 @@ test.describe("Migration", () => {
     await expect(
       page.getByRole("heading", {
         name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
+      }),
+    ).toBeVisible();
+  });
+
+  test("User can go through the upgrade flow again", async ({ page }) => {
+    // Step 1: Create a legacy identity
+    await page.goto(LEGACY_II_URL);
+
+    await addVirtualAuthenticator(page);
+    const identityNumber = await createLegacyIdentity(page);
+
+    // Step 2: Navigate to the new II_URL to start the migration
+    await page.goto(II_URL);
+    await page.getByRole("link", { name: "Manage Identity" }).click();
+
+    // Step 3: Perform the first migration
+    const auth = dummyAuth();
+    await upgradeLegacyIdentity(page, identityNumber, auth);
+
+    // Step 4: Verify the migration was successful
+    await page.waitForURL(II_URL + "/manage");
+    await expect(
+      page.getByRole("heading", {
+        name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
+      }),
+    ).toBeVisible();
+
+    // Step 5: Sign out
+    await signOut(page);
+
+    // Step 6: Navigate back to upgrade flow with the same identity number
+    await page.goto(II_URL);
+    const auth2 = dummyAuth();
+
+    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Use another identity" }).click();
+    await page.getByRole("button", { name: "Upgrade" }).click();
+    await page
+      .getByPlaceholder("Internet Identity number")
+      .fill(identityNumber);
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // Step 7: Verify "Identity already upgraded" screen appears
+    await expect(
+      page.getByRole("heading", { name: "Identity already upgraded" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        "This identity has already been upgraded to the new experience",
+      ),
+    ).toBeVisible();
+
+    // Step 8: Click "Upgrade again" button
+    await page.getByRole("button", { name: "Upgrade again" }).click();
+
+    // Step 9: Complete the upgrade flow again with a different name
+    await page.getByLabel("Identity name").fill(TEST_USER_NAME_2);
+    auth2(page);
+    await page.getByRole("button", { name: "Create Passkey" }).click();
+
+    // Step 10: Verify the second upgrade was successful
+    await page.waitForURL(II_URL + "/manage");
+    await expect(
+      page.getByRole("heading", {
+        name: new RegExp(`Welcome, ${TEST_USER_NAME_2}!`),
       }),
     ).toBeVisible();
   });

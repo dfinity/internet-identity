@@ -8,14 +8,18 @@
     UpgradeIdentityEvents,
   } from "$lib/utils/analytics/upgradeIdentityFunnel";
 
-  let { onUpgradeAgain }: { onUpgradeAgain: () => void } = $props();
+  let {
+    onUpgradeAgain,
+  }: { onUpgradeAgain: (attachElement?: HTMLElement) => void } = $props();
+
+  let attachElement = $state<HTMLElement>();
 
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.AlreadyMigratedScreen);
   });
 </script>
 
-<div class="flex flex-1 flex-col">
+<div class="flex flex-1 flex-col" bind:this={attachElement}>
   <div class="mb-8 flex flex-col">
     <div class="text-text-primary flex h-32 items-center justify-center py-5">
       <MigrationIllustration />
@@ -48,7 +52,11 @@
     >
       Help & FAQ
     </Button>
-    <Button onclick={onUpgradeAgain} variant="tertiary" size="lg">
+    <Button
+      onclick={() => onUpgradeAgain(attachElement)}
+      variant="tertiary"
+      size="lg"
+    >
       Upgrade again
     </Button>
   </div>

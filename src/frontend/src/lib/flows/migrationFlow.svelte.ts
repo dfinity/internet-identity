@@ -44,7 +44,6 @@ export class MigrationFlow {
   view = $state<"enterNumber" | "enterName" | "alreadyMigrated">("enterNumber");
   identityNumber: UserNumber | undefined;
   #webAuthFlows: { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
-  #attachElement?: HTMLElement;
   #devices: Omit<DeviceData, "alias">[] = [];
 
   constructor() {
@@ -56,7 +55,6 @@ export class MigrationFlow {
     attachElement?: HTMLElement,
   ): Promise<void> => {
     this.identityNumber = identityNumber;
-    this.#attachElement = attachElement;
     this.#devices = await this.#lookupAuthenticators(identityNumber);
     const alreadyMigrated = this.#devices.some(isNewOriginDevice);
     if (alreadyMigrated) {
@@ -71,17 +69,17 @@ export class MigrationFlow {
     });
   };
 
-  upgradeAgain = () => {
-    if (isNullish(this.identityNumber) || isNullish(this.#attachElement)) {
+  upgradeAgain = (attachElement?: HTMLElement) => {
+    if (isNullish(this.identityNumber)) {
       // This shouldn't happen because `authenticateWithIdentityNumber` is called, before.
-      // The identityNumber and attachElement are set in authenticateWithIdentityNumber from "enterNumber" view.
+      // The identityNumber is set in authenticateWithIdentityNumber from "enterNumber" view.
       this.view = "enterNumber";
       return;
     }
     return this.#authenticate({
       identityNumber: this.identityNumber,
       devices: this.#devices,
-      attachElement: this.#attachElement,
+      attachElement,
     });
   };
 
