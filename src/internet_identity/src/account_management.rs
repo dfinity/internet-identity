@@ -167,12 +167,17 @@ pub fn create_account_for_origin(
         )
         .map_err(Into::<CreateAccountError>::into)?;
 
+        let now = time();
+
         storage
-            .create_additional_account(CreateAccountParams {
-                anchor_number,
-                name: name.clone(),
-                origin,
-            })
+            .create_additional_account(
+                CreateAccountParams {
+                    anchor_number,
+                    name: name.clone(),
+                    origin,
+                },
+                now,
+            )
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })?;
 
@@ -220,13 +225,15 @@ pub fn update_account_for_origin(
                         })
                         .expect("Updating an unreadable account should be impossible!");
 
+                    let now = time();
+
                     let updated_account = storage
                         .update_account(UpdateAccountParams {
                             account_number,
                             anchor_number,
                             name: new_name.clone(),
                             origin: origin.clone(),
-                        })
+                        }, now)
                         .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
 
                     Ok((updated_account, old_account.name))
