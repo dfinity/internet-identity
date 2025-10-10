@@ -830,8 +830,9 @@ impl<M: Memory + Clone> Storage<M> {
         None
     }
 
-    /// Search for an account and applies the function `f` if found. Returns None if
-    /// not found and the result of `f` otherwise in the Some variant.
+    /// Searches for an account and applies the (mutating) function `f` if found.
+    ///
+    /// Returns None if not found, otherwise the result of `f` in the Some variant.
     fn with_account_mut<T, F>(
         &mut self,
         anchor_number: AnchorNumber,
@@ -873,6 +874,25 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_account_reference_list_memory.insert(key, value);
 
         result
+    }
+
+    pub fn set_account_last_used(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        now: Timestamp,
+    ) -> Option<()> {
+        let application_number = self.lookup_application_number_with_origin(&origin);
+
+        self.with_account_mut(
+            anchor_number,
+            application_number,
+            account_number,
+            |account_reference, _| {
+                account_reference.last_used = Some(now);
+            },
+        )
     }
 
     pub fn lookup_anchor_application_config(
