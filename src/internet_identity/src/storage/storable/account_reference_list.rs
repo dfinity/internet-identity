@@ -29,6 +29,10 @@ impl StorableAccountReferenceList {
     pub fn into_vec(self) -> Vec<StorableAccountReference> {
         self.0
     }
+
+    pub fn from_vec(vec: Vec<StorableAccountReference>) -> Self {
+        Self(vec)
+    }
 }
 
 impl From<StorableAccountReferenceList> for Vec<AccountReference> {
