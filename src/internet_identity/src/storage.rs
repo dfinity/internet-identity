@@ -799,15 +799,11 @@ impl<M: Memory + Clone> Storage<M> {
         (AnchorNumber, ApplicationNumber),
         Vec<StorableAccountReference>,
     )> {
-        let Some(application_number) = application_number else {
-            return None;
-        };
+        let application_number = application_number?;
 
         let key = (anchor_number, application_number);
 
-        let Some(account_references) = self.stable_account_reference_list_memory.get(&key) else {
-            return None;
-        };
+        let account_references = self.stable_account_reference_list_memory.get(&key)?;
 
         Some((key, account_references.into_vec()))
     }
@@ -821,13 +817,9 @@ impl<M: Memory + Clone> Storage<M> {
         let (_, account_references) =
             self.find_account_references(anchor_number, application_number)?;
 
-        for account_reference in account_references {
-            if account_reference.account_number == account_number {
-                return Some(account_reference);
-            }
-        }
-
-        None
+        account_references
+            .into_iter()
+            .find(|account_reference| account_reference.account_number == account_number)
     }
 
     /// Search for an account and applies the function `f` if found. Returns None if
@@ -862,9 +854,7 @@ impl<M: Memory + Clone> Storage<M> {
             }
         }
 
-        if result.is_none() {
-            return None;
-        }
+        result.as_ref()?;
 
         let value = StorableAccountReferenceList::from_vec(account_references);
 
