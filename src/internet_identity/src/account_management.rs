@@ -470,8 +470,8 @@ fn should_get_accounts_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 0);
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 0);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 222);
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -482,7 +482,7 @@ fn should_get_accounts_for_origin() {
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                None,
+                Some(111),
                 None
             ),
             Account::new_full(
@@ -490,7 +490,7 @@ fn should_get_accounts_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                None,
+                Some(222),
                 None
             ),
         ]
@@ -512,8 +512,8 @@ fn should_only_get_own_accounts_for_origin() {
     let anchor_number = anchor.anchor_number();
     let anchor_number_two = anchor_two.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 0);
-    let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone(), 0);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
+    let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone(), 222);
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -524,7 +524,7 @@ fn should_only_get_own_accounts_for_origin() {
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                None,
+                Some(111),
                 None
             ),
         ]
@@ -539,7 +539,7 @@ fn should_only_get_own_accounts_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                None,
+                Some(222),
                 None
             ),
         ]
@@ -642,8 +642,8 @@ fn should_update_default_account_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 0);
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 0);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 222);
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -654,7 +654,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                None,
+                Some(111),
                 None
             ),
             Account::new_full(
@@ -662,7 +662,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                None,
+                Some(222),
                 None
             ),
         ]
@@ -676,14 +676,14 @@ fn should_update_default_account_for_origin() {
             AccountUpdate {
                 name: Some("Becky".to_string())
             },
-            0
+            333,
         ),
         Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(3),
-            None,
+            Some(333),
             Some(anchor_number)
         ))
     );
@@ -696,7 +696,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(3),
-                None,
+                Some(333),
                 Some(anchor_number)
             ),
             Account::new_full(
@@ -704,7 +704,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                None,
+                Some(111),
                 None
             ),
             Account::new_full(
@@ -712,7 +712,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                None,
+                Some(222),
                 None
             ),
         ]
@@ -859,25 +859,29 @@ fn should_get_default_account_for_origin() {
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
-    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string(), 0).unwrap();
-    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string(), 0).unwrap();
+    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string(), 111).unwrap();
+    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string(), 222).unwrap();
 
     // Smoke test
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::synthetic(anchor_number, origin.clone()),
-            Account::new(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
-                Some(1)
+                Some(1),
+                Some(111),
+                None,
             ),
-            Account::new(
+            Account::new_full(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
-                Some(2)
+                Some(2),
+                Some(222),
+                None,
             ),
         ]
     );
@@ -900,14 +904,14 @@ fn should_get_default_account_for_origin() {
                 Ok(AccountInfo {
                     account_number: Some(1),
                     origin: origin.clone(),
-                    last_used: None,
+                    last_used: Some(111),
                     name: Some("Alice".to_string()),
                 }),
             )),
             Ok(AccountInfo {
                 account_number: Some(1),
                 origin: origin.clone(),
-                last_used: None,
+                last_used: Some(111),
                 name: Some("Alice".to_string()),
             }),
         ),
@@ -923,7 +927,7 @@ fn should_get_default_account_for_origin() {
             Ok(AccountInfo {
                 account_number: Some(1),
                 origin: origin.clone(),
-                last_used: None,
+                last_used: Some(111),
                 name: Some("Alice".to_string()),
             }),
         ),
@@ -939,7 +943,7 @@ fn should_get_default_account_for_origin() {
             Ok(AccountInfo {
                 account_number: Some(1),
                 origin: origin.clone(),
-                last_used: None,
+                last_used: Some(111),
                 name: Some("Alice".to_string()),
             }),
         ),
@@ -950,14 +954,14 @@ fn should_get_default_account_for_origin() {
                 Ok(AccountInfo {
                     account_number: Some(2),
                     origin: origin.clone(),
-                    last_used: None,
+                    last_used: Some(222),
                     name: Some("Bob".to_string()),
                 }),
             )),
             Ok(AccountInfo {
                 account_number: Some(2),
                 origin: origin.clone(),
-                last_used: None,
+                last_used: Some(222),
                 name: Some("Bob".to_string()),
             }),
         ),
