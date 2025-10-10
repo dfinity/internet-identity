@@ -10,8 +10,7 @@ import {
 } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
 import { isSameOrigin } from "$lib/utils/urlUtils";
-import { createIntl, createIntlCache } from "@formatjs/intl";
-import messages from "$lib/locales/en.json";
+import { localeStore } from "$lib/stores/locale.store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -64,21 +63,15 @@ const maybeSetDiscoverablePasskeyFlowFlag = () => {
   featureFlags.DISCOVERABLE_PASSKEY_FLOW.set(true);
 };
 
-const cache = createIntlCache();
-export const intl = createIntl(
-  {
-    locale: "en-US",
-    messages,
-  },
-  cache,
-);
-
 export const init: ClientInit = async () => {
   initGlobals();
   // Initialize them after globals so canister config can be used for defaults
   Object.values(featureFlags).forEach((flag) => flag.initialize());
   overrideFeatureFlags();
   maybeSetDiscoverablePasskeyFlowFlag();
-  await sessionStore.init({ canisterId, agentOptions });
+  await Promise.all([
+    localeStore.init(),
+    sessionStore.init({ canisterId, agentOptions }),
+  ]);
   authenticationStore.init({ canisterId, agentOptions });
 };

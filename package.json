@@ -35,8 +35,7 @@
     "lint:lit": "lit-analyzer -- --rules.no-incompatible-type-binding off --rules.no-invalid-directive-binding off --rules.no-noncallable-event-binding off ./src/showcase ./src/frontend",
     "format": "prettier --write src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
     "format-check": "prettier --check src/showcase src/frontend src/vc-api src/sig-verifier-js src/vite-plugins tsconfig.json tsconfig.all.json eslint.config.js vite.config.ts vitest.config.ts demos",
-    "intl:extract": "formatjs extract \".svelte-kit/**/*.js\" --out-file locales/en.json",
-    "intl:compile": "formatjs compile-folder \"locales\" \"src/frontend/src/lib/locales\""
+    "extract": "lingui extract --clean"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
@@ -44,8 +43,9 @@
     "@dfinity/internet-identity-vite-plugins": "*",
     "@eslint/compat": "^1.2.5",
     "@eslint/js": "^9.18.0",
-    "@formatjs/cli": "^6.7.3",
-    "@formatjs/ts-transformer": "^3.14.1",
+    "@lingui/cli": "^5.5.0",
+    "@lingui/format-json": "^5.5.0",
+    "@lingui/vite-plugin": "^5.5.0",
     "@playwright/test": "^1.52.0",
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.20.6",
@@ -88,9 +88,9 @@
   "dependencies": {
     "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/utils": "^3.1.0",
-    "@formatjs/intl": "^3.1.7",
     "@icp-sdk/auth": "^4.0.1",
     "@icp-sdk/core": "^4.0.4",
+    "@lingui/core": "^5.5.0",
     "@lucide/svelte": "^0.508.0",
     "@noble/hashes": "^1.8.0",
     "@slide-computer/signer": "^4.0.0",
@@ -105,6 +105,7 @@
     "plausible-tracker": "0.3.9",
     "qr-creator": "^1.0.0",
     "stream-browserify": "^3.0.0",
+    "svelte-i18n-lingui": "0.2.2",
     "ua-parser-js": "^1.0.35",
     "zod": "^3.22.3"
   },

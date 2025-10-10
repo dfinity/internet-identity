@@ -5,13 +5,7 @@ import { sveltekit } from "@sveltejs/kit/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 import { type AliasOptions, type UserConfig, defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
-import typescript from "rollup-plugin-typescript2";
-import { transform } from "@formatjs/ts-transformer";
-import { readFileSync } from "fs";
-import path from "path";
-import { writeFileSync } from "node:fs";
-
-const localeFile = path.join(__dirname, "locales/en.json");
+import { lingui } from "@lingui/vite-plugin";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -48,57 +42,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
     plugins: [
       tailwindcss(),
       sveltekit(),
-      ...(command === "build"
-        ? [
-            // See: https://formatjs.github.io/docs/guides/bundler-plugins
-            {
-              name: "reset-extracted-locale",
-              buildStart() {
-                // Reset extracted locale file before updating it below
-                writeFileSync(localeFile, JSON.stringify({}));
-              },
-              buildEnd() {
-                // Sort extracted locale file by keys
-                const json = readFileSync(localeFile, "utf8").trim();
-                const en = JSON.parse(json);
-                const sorted = Object.fromEntries(
-                  Object.entries(en).sort(([a], [b]) => a.localeCompare(b)),
-                );
-                writeFileSync(localeFile, JSON.stringify(sorted, null, 2));
-              },
-            },
-            typescript({
-              include: ["src/frontend/src/**/*.svelte"],
-              check: false, // We only intend to transform, not check syntax here
-              transformers: [
-                () => ({
-                  before: [
-                    transform({
-                      overrideIdFn: "[sha512:contenthash:base64:6]",
-                      removeDefaultMessage: true,
-                      onMsgExtracted: (_, msgs) => {
-                        // Update locale file with extracted message descriptors
-                        if (command === "build") {
-                          const json = readFileSync(localeFile, "utf8").trim();
-                          const en = json.length > 0 ? JSON.parse(json) : {};
-                          msgs.forEach(
-                            ({ id, defaultMessage, description }) => {
-                              en[id] = { defaultMessage, description };
-                            },
-                          );
-                          writeFileSync(
-                            localeFile,
-                            JSON.stringify(en, null, 2),
-                          );
-                        }
-                      },
-                    }),
-                  ],
-                }),
-              ],
-            }),
-          ]
-        : []),
+      lingui(),
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
       nodePolyfills({
         include: ["buffer"],

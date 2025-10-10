@@ -19,7 +19,7 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { manuallyReroute } from "../../hooks";
-  import { intl } from "../../hooks.client";
+  import { t } from "svelte-i18n-lingui";
 
   // Add rerouting back on this SSG route
   manuallyReroute();
@@ -99,21 +99,18 @@
         <h1
           class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
         >
-          {intl
-            .formatMessage(
-              {
-                defaultMessage: "Experience {subject}",
-              },
-              { subject: "" },
-            )
-            .trim()}
+          {$t({
+            message: "Experience",
+            context:
+              "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy",
+          })}
         </h1>
         <TextFade
           texts={[
-              intl.formatMessage({ defaultMessage: "Real Privacy" }),
-              intl.formatMessage({ defaultMessage: "Full Ownership" }),
-              intl.formatMessage({ defaultMessage: "Seamless Access" }),
-              "Internet Identity",
+            $t`Real Privacy`,
+            $t`Full Ownership`,
+            $t`Seamless Access`,
+            "Internet Identity",
           ]}
           duration={500}
           delayBetween={2000}
