@@ -44,7 +44,6 @@ export class MigrationFlow {
   view = $state<"enterNumber" | "enterName" | "alreadyMigrated">("enterNumber");
   identityNumber: UserNumber | undefined;
   #webAuthFlows: { flows: WebAuthnFlow[]; currentIndex: number } | undefined;
-  #attachElement?: HTMLElement;
   #devices: Omit<DeviceData, "alias">[] = [];
 
   constructor() {
