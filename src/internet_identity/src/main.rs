@@ -383,6 +383,7 @@ fn update_account(
             account_number,
             origin,
             update,
+            ic_cdk::api::time(),
         )
         .map(|acc| acc.to_info()),
         Err(err) => Err(UpdateAccountError::Unauthorized(err.principal)),
