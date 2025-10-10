@@ -59,9 +59,6 @@ export const localeStore: LocaleStore = {
     internalStore.set(locale);
   },
   reset: () => {
-    // const { messages } = await import(
-    //   `$lib/locales/${availableBrowserLocale}.po`
-    // );
     i18n.loadAndActivate({ locale: availableLocales[0], messages: {} });
     internalStore.set(null);
   },
