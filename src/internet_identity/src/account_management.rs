@@ -313,7 +313,7 @@ pub fn get_account_delegation(
 ) -> Result<SignedDelegation, AccountDelegationError> {
     check_frontend_length(origin);
 
-    storage_borrow(|storage| {
+    let signed_delegation = storage_borrow(|storage| {
         let account = storage
             .read_account(ReadAccountParams {
                 account_number,
@@ -341,7 +341,14 @@ pub fn get_account_delegation(
                 Err(_) => Err(AccountDelegationError::NoSuchDelegation),
             }
         })
-    })
+    })?;
+
+    // Update last used timestamp
+    storage_borrow_mut(|storage| {
+        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
+    });
+
+    Ok(signed_delegation)
 }
 
 /// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
