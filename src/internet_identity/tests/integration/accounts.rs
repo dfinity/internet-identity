@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use canister_tests::{
     api::internet_identity::{
         api_v2::{
@@ -17,9 +19,7 @@ use internet_identity_interface::internet_identity::types::{
     PrepareAccountDelegation,
 };
 use pocket_ic::RejectResponse;
-use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
-use std::time::Duration;
 
 /// Verifies that one account can be created
 #[test]
@@ -75,8 +75,6 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_first_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let second_created_account = create_account(
         &env,
         canister_id,
@@ -88,8 +86,6 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_second_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let third_created_account = create_account(
         &env,
         canister_id,
@@ -100,8 +96,6 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
     )
     .unwrap()
     .unwrap();
-
-    let expected_third_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
 
     let accounts_list = get_accounts(
         &env,
@@ -126,19 +120,19 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_first_last_used,
+                last_used: None,
                 name: Some(name)
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_second_last_used,
+                last_used: None,
                 name: Some(name_two)
             },
             AccountInfo {
                 account_number: third_created_account.account_number,
                 origin,
-                last_used: expected_third_last_used,
+                last_used: None,
                 name: Some(name_three)
             },
         ]
@@ -201,8 +195,6 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_first_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let second_created_account = create_account(
         &env,
         canister_id,
@@ -214,8 +206,6 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_second_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let another_identity_account = create_account(
         &env,
         canister_id,
@@ -226,8 +216,6 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     )
     .unwrap()
     .unwrap();
-
-    let expected_another_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
 
     let accounts_list = get_accounts(
         &env,
@@ -262,13 +250,13 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_first_last_used,
+                last_used: None,
                 name: Some(name)
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_second_last_used,
+                last_used: None,
                 name: Some(name_two)
             },
         ]
@@ -287,7 +275,7 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
             AccountInfo {
                 account_number: another_identity_account.account_number,
                 origin,
-                last_used: expected_another_last_used,
+                last_used: None,
                 name: Some(name_three)
             },
         ]
@@ -315,8 +303,6 @@ fn should_update_account() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let creation_time = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let new_name = Some("Laniakea".to_string());
 
     let update = AccountUpdate {
@@ -335,16 +321,11 @@ fn should_update_account() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let update_time = Some(env.get_time().as_nanos_since_unix_epoch());
-
-    // Smoke test
-    assert_ne!(update_time, creation_time);
-
     assert_eq!(
         updated_account,
         AccountInfo {
             account_number: created_account.account_number,
-            last_used: update_time,
+            last_used: None,
             origin,
             name: new_name
         }

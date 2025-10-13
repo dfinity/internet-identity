@@ -1,11 +1,11 @@
-use super::AccountsCounter;
 use crate::storage::account::Account;
 use crate::storage::storable::application::StorableApplication;
 use crate::storage::{CreateAccountParams, ReadAccountParams, UpdateAccountParams};
 use crate::Storage;
 use ic_stable_structures::VectorMemory;
 use internet_identity_interface::internet_identity::types::{AnchorNumber, FrontendHostname};
-use pretty_assertions::assert_eq;
+
+use super::AccountsCounter;
 
 fn assert_empty_counters(storage: &Storage<VectorMemory>, anchor_number: AnchorNumber) {
     assert_eq!(
@@ -121,14 +121,8 @@ fn should_list_accounts() {
         origin: origin.clone(),
         name: account_name.clone(),
     };
-    let expected_additional_account = Account::new_full(
-        anchor_number,
-        origin.clone(),
-        Some(account_name),
-        Some(1),
-        None,
-        None,
-    );
+    let expected_additional_account =
+        Account::new(anchor_number, origin.clone(), Some(account_name), Some(1));
     let expected_default_account = Account::synthetic(anchor_number, origin.clone());
     storage.create_additional_account(new_account).unwrap();
 
