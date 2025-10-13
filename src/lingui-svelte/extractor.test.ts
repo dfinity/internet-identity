@@ -17,7 +17,7 @@ describe("svelteExtractor", () => {
   describe("tagged template", () => {
     it("should extract filename, line and column number", async () => {
       const { origin } = await extract("<span>{$t`Hello World`}</span>");
-      expect(origin).toEqual([FILE_NAME, 1, 9]);
+      expect(origin).toEqual([FILE_NAME, 1, 7]);
     });
 
     it.each([
@@ -148,7 +148,7 @@ describe("svelteExtractor", () => {
       const { origin } = await extract(
         "<span><Trans>Hello world</Trans></span>",
       );
-      expect(origin).toEqual([FILE_NAME, 6, 32]);
+      expect(origin).toEqual([FILE_NAME, 1, 6]);
     });
 
     it("should extract explicit id", async () => {

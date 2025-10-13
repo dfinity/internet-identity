@@ -18,7 +18,7 @@ export const generateMessageId = (message: string, context = "") =>
     .digest("base64")
     .slice(0, 6);
 
-export interface FoundMessage extends ExtractedMessage {
+export interface FoundMessage extends Omit<ExtractedMessage, "origin"> {
   tag: string;
   start: number;
   end: number;
@@ -90,7 +90,6 @@ const processTemplateLiteral = (node: TemplateLiteral) => {
 export const findTransInTaggedTemplate = (
   tags: string[],
   node: Node,
-  filename: string,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
@@ -103,24 +102,21 @@ export const findTransInTaggedTemplate = (
     return;
   }
 
-  const { start } = node.quasi.loc;
   const { message, values } = processTemplateLiteral(node.quasi);
 
   onMessageFound({
     tag: node.tag.name,
     id: generateMessageId(message),
     message,
-    origin: [filename, start.line, start.column],
     values: Object.keys(values).length > 0 ? values : undefined,
     start: node.start,
     end: node.end,
   });
 };
 
-export const findTransInCall = (
+export const findTransInCallExpression = (
   tags: string[],
   node: Node,
-  filename: string,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
@@ -134,7 +130,6 @@ export const findTransInCall = (
     return;
   }
 
-  const { start } = node.loc;
   const { properties } = node.arguments[0];
 
   const messageNode =
@@ -157,17 +152,15 @@ export const findTransInCall = (
     message,
     context,
     comment,
-    origin: [filename, start.line, start.column],
     values: Object.keys(values).length > 0 ? values : undefined,
     start: node.start,
     end: node.end,
   });
 };
 
-export const findPluralInCall = (
+export const findPluralInCallExpression = (
   tags: string[],
   node: Node,
-  filename: string,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   if (
@@ -182,7 +175,6 @@ export const findPluralInCall = (
     return;
   }
 
-  const { start } = node.loc;
   const num =
     node.arguments[0].type === "Identifier" ? node.arguments[0].name : "num";
   let values: Record<string, { start: number; end: number }> = {
@@ -218,7 +210,6 @@ export const findPluralInCall = (
     tag: node.callee.name,
     id: generateMessageId(message),
     message,
-    origin: [filename, start.line, start.column],
     values: Object.keys(values).length > 0 ? values : undefined,
     start: node.start,
     end: node.end,
@@ -334,7 +325,6 @@ const textInNode = (
 export const findTransInComponent = (
   tags: string[],
   node: Node,
-  filename: string,
   onMessageFound: (msg: FoundMessage) => void,
 ) => {
   const component = node as unknown;
@@ -415,7 +405,6 @@ export const findTransInComponent = (
     message,
     context,
     comment,
-    origin: [filename, component.start, component.end],
     values: Object.keys(values).length > 0 ? values : undefined,
     nodes: nodes.length > 0 ? nodes : undefined,
     start: component.start,

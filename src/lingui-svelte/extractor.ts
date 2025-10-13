@@ -2,12 +2,13 @@ import { parse } from "svelte/compiler";
 import { walk, Node } from "estree-walker";
 import { ExtractorType } from "@lingui/conf";
 import {
-  findPluralInCall,
-  findTransInCall,
+  findPluralInCallExpression,
+  findTransInCallExpression,
   findTransInComponent,
   findTransInTaggedTemplate,
   FoundMessage,
 } from "./utils";
+import { LinesAndColumns } from "lines-and-columns";
 
 export const svelteExtractor: ExtractorType = {
   match(filename) {
@@ -16,29 +17,32 @@ export const svelteExtractor: ExtractorType = {
   async extract(filename, source, onMessageExtracted, _ctx) {
     try {
       const ast = parse(source, { filename, modern: true });
+      const lines = new LinesAndColumns(source);
       // Only forward properties defined in `ExtractedMessage`
       const onMessageFound = ({
         id,
         message,
         context,
-        origin,
         comment,
         placeholders,
-      }: FoundMessage) =>
+        start,
+      }: FoundMessage) => {
+        const { line, column } = lines.locationForIndex(start)!;
         onMessageExtracted({
           id,
           message,
           context,
-          origin,
+          origin: [filename, line + 1, column],
           comment,
           placeholders,
         });
+      };
       walk(ast as unknown as Node, {
         enter(node) {
-          findTransInTaggedTemplate(["$t"], node, filename, onMessageFound);
-          findTransInCall(["$t"], node, filename, onMessageFound);
-          findPluralInCall(["$plural"], node, filename, onMessageFound);
-          findTransInComponent(["Trans"], node, filename, onMessageFound);
+          findTransInTaggedTemplate(["$t"], node, onMessageFound);
+          findTransInCallExpression(["$t"], node, onMessageFound);
+          findPluralInCallExpression(["$plural"], node, onMessageFound);
+          findTransInComponent(["Trans"], node, onMessageFound);
         },
       });
     } catch (err) {

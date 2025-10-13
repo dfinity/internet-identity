@@ -3,9 +3,9 @@ import { Plugin } from "vite";
 import { walk, Node } from "estree-walker";
 import MagicString from "magic-string";
 import {
-  findTransInCall,
+  findTransInCallExpression,
   findTransInTaggedTemplate,
-  findPluralInCall,
+  findPluralInCallExpression,
   FoundMessage,
   findTransInComponent,
 } from "./utils";
@@ -97,16 +97,16 @@ export const sveltePreprocessor = (): Plugin => {
       walk(ast as unknown as Node, {
         // Modify bottom-up to avoid overlap
         leave(node) {
-          findTransInTaggedTemplate(["$t"], node, id, (msg) =>
+          findTransInTaggedTemplate(["$t"], node, (msg) =>
             overwriteCall(isBuild, magicString, msg),
           );
-          findTransInCall(["$t"], node, id, (msg) =>
+          findTransInCallExpression(["$t"], node, (msg) =>
             overwriteCall(isBuild, magicString, msg),
           );
-          findPluralInCall(["$plural"], node, id, (msg) =>
+          findPluralInCallExpression(["$plural"], node, (msg) =>
             overwriteCall(isBuild, magicString, msg),
           );
-          findTransInComponent(["Trans"], node, id, (msg) =>
+          findTransInComponent(["Trans"], node, (msg) =>
             overwriteComponent(isBuild, magicString, msg),
           );
         },
