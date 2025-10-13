@@ -42,7 +42,10 @@
     <script>
       // Hide page until it has fully loaded on legacy domains,
       // this avoids showing the SSG page on these domains.
-      if (window.location.hostname.startsWith("identity.")) {
+      if (
+        window.location.hostname.startsWith("identity.") ||
+        window.location.hostname.startsWith("beta.identity.")
+      ) {
         document.documentElement.setAttribute("data-temp-hide-ssg", "true");
       }
     </script>
