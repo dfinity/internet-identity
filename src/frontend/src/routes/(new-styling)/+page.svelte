@@ -66,15 +66,19 @@
     },
   ];
 
-  onMount(async () => {
-    setTimeout(
-      async () =>
-        await triggerDropWaveAnimation({ containerHeight: "h-[640px]" }),
-    );
-  });
-
-  onDestroy(() => {
-    void clearDropWaveAnimation();
+  // Only trigger the drop wave animation 100ms after the page has loaded,
+  // so we can cancel it if navigated to another route in that time window.
+  onMount(() => {
+    let cancelled = false;
+    setTimeout(() => {
+      if (!cancelled) {
+        void triggerDropWaveAnimation({ containerHeight: "h-[640px]" });
+      }
+    }, 100);
+    return () => {
+      cancelled = true;
+      void clearDropWaveAnimation();
+    };
   });
 </script>
 
