@@ -19,7 +19,8 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { manuallyReroute } from "../../hooks";
-  import { t } from "$lib/stores/locale.store";
+  import { plural, t } from "$lib/stores/locale.store";
+  import Trans from "$lib/components/locale/Trans.svelte";
 
   // Add rerouting back on this SSG route
   manuallyReroute();

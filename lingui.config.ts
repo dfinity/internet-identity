@@ -1,5 +1,5 @@
 import { defineConfig } from "@lingui/cli";
-import { svelteExtractor } from "./src/lingui-svelte/extractor";
+import { svelteExtractor } from "./src/lingui-svelte";
 import { availableLocales } from "./src/frontend/src/lib/constants/locale.constants";
 
 export default defineConfig({

@@ -13,20 +13,19 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:102
+#: src/frontend/src/routes/(new-styling)/+page.svelte:103
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Experience"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:111
+#: src/frontend/src/routes/(new-styling)/+page.svelte:112
 msgid "Full Ownership"
 msgstr "Full Ownership"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:110
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:112
+#: src/frontend/src/routes/(new-styling)/+page.svelte:111
 msgid "Real Privacy"
 msgstr "Real Privacy"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:112
+#: src/frontend/src/routes/(new-styling)/+page.svelte:113
 msgid "Seamless Access"
 msgstr "Seamless Access"

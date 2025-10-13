@@ -6,6 +6,7 @@ import basicSsl from "@vitejs/plugin-basic-ssl";
 import { type AliasOptions, type UserConfig, defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { lingui } from "@lingui/vite-plugin";
+import { sveltePreprocessor } from "./src/lingui-svelte";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -41,6 +42,7 @@ export default defineConfig(({ command, mode }): UserConfig => {
     },
     plugins: [
       tailwindcss(),
+      sveltePreprocessor(),
       sveltekit(),
       lingui(),
       // Needed to support WebAuthnIdentity in this repository due to borc dependency.
