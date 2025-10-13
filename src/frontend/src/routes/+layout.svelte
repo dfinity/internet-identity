@@ -6,6 +6,9 @@
   const { children } = $props();
 
   onMount(() => {
+    // Show page once it has fully loaded (see app.html)
+    document.documentElement.removeAttribute("data-temp-hide-ssg");
+
     initAnalytics(canisterConfig.analytics_config[0]?.[0]);
     analytics.pageView();
   });
