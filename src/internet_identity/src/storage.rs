@@ -1041,7 +1041,6 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn create_additional_account(
         &mut self,
         params: CreateAccountParams,
-        now: Timestamp,
     ) -> Result<Account, StorageError> {
         check_frontend_length(&params.origin);
         let anchor_number = params.anchor_number;
@@ -1062,7 +1061,8 @@ impl<M: Memory + Clone> Storage<M> {
         // Update counters with one more account.
         self.update_counters(app_num, anchor_number, AccountType::Account)?;
 
-        let last_used = Some(now);
+        // last_used will be set once the user signs in to the new account.
+        let last_used = None;
 
         // Process account references
         match self
@@ -1082,7 +1082,7 @@ impl<M: Memory + Clone> Storage<M> {
                 };
                 let default_account_reference = AccountReference {
                     account_number: None,
-                    last_used: None, // We don't know when it was last used
+                    last_used,
                 };
                 self.stable_account_reference_list_memory.insert(
                     (anchor_number, app_num),
@@ -1246,11 +1246,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// Updates an account.
     /// If the account number exists, then updates that account.
     /// If the account number doesn't exist, then gets or creates an application and creates and stores a default account.
-    pub fn update_account(
-        &mut self,
-        params: UpdateAccountParams,
-        now: Timestamp,
-    ) -> Result<Account, StorageError> {
+    pub fn update_account(&mut self, params: UpdateAccountParams) -> Result<Account, StorageError> {
         let UpdateAccountParams {
             account_number,
             anchor_number,
@@ -1260,26 +1256,20 @@ impl<M: Memory + Clone> Storage<M> {
 
         check_frontend_length(&origin);
         match account_number {
-            Some(account_number) => self.update_existing_account(
-                UpdateExistingAccountParams {
-                    account_number,
-                    anchor_number,
-                    name,
-                    origin,
-                },
-                now,
-            ),
+            Some(account_number) => self.update_existing_account(UpdateExistingAccountParams {
+                account_number,
+                anchor_number,
+                name,
+                origin,
+            }),
             None => {
                 // Default accounts are not stored by default.
                 // They are created only once they are updated.
-                self.create_default_account(
-                    CreateAccountParams {
-                        anchor_number,
-                        name,
-                        origin,
-                    },
-                    now,
-                )
+                self.create_default_account(CreateAccountParams {
+                    anchor_number,
+                    name,
+                    origin,
+                })
             }
         }
     }
@@ -1288,7 +1278,6 @@ impl<M: Memory + Clone> Storage<M> {
     fn update_existing_account(
         &mut self,
         params: UpdateExistingAccountParams,
-        now: Timestamp,
     ) -> Result<Account, StorageError> {
         let UpdateExistingAccountParams {
             account_number,
@@ -1314,7 +1303,8 @@ impl<M: Memory + Clone> Storage<M> {
                 // Update account and write back to storage
                 storable_account.name = name.clone();
 
-                let last_used = Some(now);
+                // The `last_used` field will be set when the user signs in.
+                let last_used = None;
 
                 // Update last-used timestamp in account reference
                 account_reference.last_used = last_used;
@@ -1345,7 +1335,6 @@ impl<M: Memory + Clone> Storage<M> {
     fn create_default_account(
         &mut self,
         params: CreateAccountParams,
-        now: Timestamp,
     ) -> Result<Account, StorageError> {
         let CreateAccountParams {
             anchor_number,
@@ -1379,8 +1368,9 @@ impl<M: Memory + Clone> Storage<M> {
         // Update counters with one more account.
         self.update_counters(application_number, anchor_number, AccountType::Account)?;
 
-        // Update the account references list.
-        let last_used = Some(now);
+        // The `last_used` field will be set when the user signs in.
+        let last_used = None;
+
         let account_references_key = (anchor_number, application_number);
         match self
             .stable_account_reference_list_memory
