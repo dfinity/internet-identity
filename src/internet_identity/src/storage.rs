@@ -1435,7 +1435,7 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
             Some(storable_account.name),
             Some(new_account_number),
-            last_used,
+            None,
             storable_account.seed_from_anchor,
         ))
     }
