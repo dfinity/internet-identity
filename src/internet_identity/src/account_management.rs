@@ -866,7 +866,7 @@ fn should_get_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
-                Some(1),
+                Some(1)
             ),
             Account::new(
                 anchor_number,
