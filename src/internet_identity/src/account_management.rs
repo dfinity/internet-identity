@@ -872,7 +872,7 @@ fn should_get_default_account_for_origin() {
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
-                Some(2),
+                Some(2)
             ),
         ]
     );
