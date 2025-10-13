@@ -484,7 +484,7 @@ fn should_get_accounts_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                Some(222),
+                None,
                 None
             ),
         ]
@@ -533,7 +533,7 @@ fn should_only_get_own_accounts_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                Some(222),
+                None,
                 None
             ),
         ]
@@ -688,7 +688,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(3),
-                Some(333),
+                None,
                 Some(anchor_number)
             ),
             Account::new_full(
@@ -870,7 +870,7 @@ fn should_get_default_account_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                Some(222),
+                None,
                 None,
             ),
         ]
@@ -944,14 +944,14 @@ fn should_get_default_account_for_origin() {
                 Ok(AccountInfo {
                     account_number: Some(2),
                     origin: origin.clone(),
-                    last_used: Some(222),
+                    last_used: None,
                     name: Some("Bob".to_string()),
                 }),
             )),
             Ok(AccountInfo {
                 account_number: Some(2),
                 origin: origin.clone(),
-                last_used: Some(222),
+                last_used: None,
                 name: Some("Bob".to_string()),
             }),
         ),
@@ -1051,7 +1051,7 @@ fn should_get_updated_default_account_after_modification() {
         Ok(AccountInfo {
             account_number: Some(1),
             origin: origin.clone(),
-            last_used: Some(0),
+            last_used: None,
             name: Some("Default Account".to_string()),
         })
     );
