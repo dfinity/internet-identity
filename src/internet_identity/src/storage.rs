@@ -861,6 +861,25 @@ impl<M: Memory + Clone> Storage<M> {
         result
     }
 
+    pub fn set_account_last_used(
+        &mut self,
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        now: Timestamp,
+    ) -> Option<()> {
+        let application_number = self.lookup_application_number_with_origin(&origin);
+
+        self.with_account_mut(
+            anchor_number,
+            application_number,
+            account_number,
+            |account_reference, _| {
+                account_reference.last_used = Some(now);
+            },
+        )
+    }
+
     pub fn lookup_anchor_application_config(
         &self,
         anchor_number: AnchorNumber,
@@ -1061,7 +1080,7 @@ impl<M: Memory + Clone> Storage<M> {
         // Update counters with one more account.
         self.update_counters(app_num, anchor_number, AccountType::Account)?;
 
-        // last_used will be set once the user signs in to the new account.
+        // last_used will be set once the user signs in to the respective account.
         let last_used = None;
 
         // Process account references
@@ -1303,19 +1322,13 @@ impl<M: Memory + Clone> Storage<M> {
                 // Update account and write back to storage
                 storable_account.name = name.clone();
 
-                // The `last_used` field will be set when the user signs in.
-                let last_used = None;
-
-                // Update last-used timestamp in account reference
-                account_reference.last_used = last_used;
-
                 // Return a user-facing account structure
                 Some(Account::new_full(
                     anchor_number,
                     origin,
                     Some(name),
                     Some(account_number),
-                    last_used,
+                    account_reference.last_used,
                     storable_account.seed_from_anchor,
                 ))
             },
@@ -1368,9 +1381,6 @@ impl<M: Memory + Clone> Storage<M> {
         // Update counters with one more account.
         self.update_counters(application_number, anchor_number, AccountType::Account)?;
 
-        // The `last_used` field will be set when the user signs in.
-        let last_used = None;
-
         let account_references_key = (anchor_number, application_number);
         match self
             .stable_account_reference_list_memory
@@ -1382,7 +1392,8 @@ impl<M: Memory + Clone> Storage<M> {
                 // This is because we don't create default accounts explicitly.
                 let new_ref = AccountReference {
                     account_number: Some(new_account_number),
-                    last_used,
+                    // The `last_used` field will be set when the user signs into this account.
+                    last_used: None,
                 };
                 self.stable_account_reference_list_memory
                     .insert(account_references_key, vec![new_ref].into());
@@ -1401,7 +1412,6 @@ impl<M: Memory + Clone> Storage<M> {
                     if r_mut.account_number.is_none() {
                         // Found the default account reference.
                         r_mut.account_number = Some(new_account_number);
-                        r_mut.last_used = last_used;
                         found_and_updated = true;
                         break;
                     }
@@ -1425,7 +1435,7 @@ impl<M: Memory + Clone> Storage<M> {
             origin,
             Some(storable_account.name),
             Some(new_account_number),
-            last_used,
+            None,
             storable_account.seed_from_anchor,
         ))
     }
