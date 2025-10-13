@@ -10,7 +10,7 @@ use authz_utils::{
 };
 use candid::Principal;
 use ic_canister_sig_creation::signature_map::LABEL_SIG;
-use ic_cdk::api::{caller, set_certified_data, time, trap};
+use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
@@ -360,11 +360,10 @@ fn create_account(
     origin: FrontendHostname,
     name: String,
 ) -> Result<AccountInfo, CreateAccountError> {
-    let now = time();
     match check_authorization(anchor_number) {
         Ok(_) => {
             // check if this anchor and acc are actually linked
-            account_management::create_account_for_origin(anchor_number, origin, name, now)
+            account_management::create_account_for_origin(anchor_number, origin, name)
                 .map(|acc| acc.to_info())
         }
         Err(err) => Err(CreateAccountError::Unauthorized(err.principal)),
@@ -378,14 +377,12 @@ fn update_account(
     account_number: Option<AccountNumber>,
     update: AccountUpdate,
 ) -> Result<AccountInfo, UpdateAccountError> {
-    let now = time();
     match check_authorization(anchor_number) {
         Ok(_) => account_management::update_account_for_origin(
             anchor_number,
             account_number,
             origin,
             update,
-            now,
         )
         .map(|acc| acc.to_info()),
         Err(err) => Err(UpdateAccountError::Unauthorized(err.principal)),

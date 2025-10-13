@@ -156,7 +156,6 @@ pub fn create_account_for_origin(
     anchor_number: AnchorNumber,
     origin: FrontendHostname,
     name: String,
-    now: Timestamp,
 ) -> Result<Account, CreateAccountError> {
     validate_account_name(&name).map_err(Into::<CreateAccountError>::into)?;
     let created_account = storage_borrow_mut(|storage| {
@@ -169,14 +168,11 @@ pub fn create_account_for_origin(
         .map_err(Into::<CreateAccountError>::into)?;
 
         storage
-            .create_additional_account(
-                CreateAccountParams {
-                    anchor_number,
-                    name: name.clone(),
-                    origin,
-                },
-                now,
-            )
+            .create_additional_account(CreateAccountParams {
+                anchor_number,
+                name: name.clone(),
+                origin,
+            })
             .map_err(|err| CreateAccountError::InternalCanisterError(format!("{err}")))
     })?;
 
@@ -195,7 +191,6 @@ pub fn update_account_for_origin(
     account_number: Option<AccountNumber>,
     origin: FrontendHostname,
     update: AccountUpdate,
-    now: Timestamp,
 ) -> Result<Account, UpdateAccountError> {
     match update.name {
         Some(new_name) => {
@@ -231,7 +226,7 @@ pub fn update_account_for_origin(
                             anchor_number,
                             name: new_name.clone(),
                             origin: origin.clone(),
-                        }, now)
+                        })
                         .map_err(|err| UpdateAccountError::InternalCanisterError(err.to_string()))?;
 
                     Ok((updated_account, old_account.name))
@@ -296,6 +291,11 @@ pub async fn prepare_account_delegation(
     });
     update_root_hash();
 
+    // Update last used timestamp
+    storage_borrow_mut(|storage| {
+        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
+    });
+
     delegation_bookkeeping(origin, ii_domain.clone(), session_duration_ns);
 
     Ok(PrepareAccountDelegation {
@@ -313,7 +313,7 @@ pub fn get_account_delegation(
 ) -> Result<SignedDelegation, AccountDelegationError> {
     check_frontend_length(origin);
 
-    let signed_delegation = storage_borrow(|storage| {
+    storage_borrow(|storage| {
         let account = storage
             .read_account(ReadAccountParams {
                 account_number,
@@ -341,14 +341,7 @@ pub fn get_account_delegation(
                 Err(_) => Err(AccountDelegationError::NoSuchDelegation),
             }
         })
-    })?;
-
-    // Update last used timestamp
-    storage_borrow_mut(|storage| {
-        storage.set_account_last_used(anchor_number, origin.clone(), account_number, time());
-    });
-
-    Ok(signed_delegation)
+    })
 }
 
 /// Checks whether the stored number of accounts as per the counter exceeds the maximum permitted number.
@@ -403,7 +396,7 @@ fn should_create_account_for_origin() {
     let name = "Alice".to_string();
 
     assert_eq!(
-        create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone(), 0),
+        create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone()),
         Ok(Account::new_full(
             anchor.anchor_number(),
             origin,
@@ -427,7 +420,7 @@ fn should_fail_to_create_accounts_above_max() {
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
         let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone(), 0);
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {
             assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
         } else {
@@ -448,7 +441,7 @@ fn should_fail_to_update_default_accounts_above_max() {
     for i in 0..MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
         let create_result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone(), 0);
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
 
         assert!(create_result.is_ok())
     }
@@ -459,7 +452,6 @@ fn should_fail_to_update_default_accounts_above_max() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
-        0,
     );
     assert_eq!(result, Err(UpdateAccountError::AccountLimitReached))
 }
@@ -477,8 +469,8 @@ fn should_get_accounts_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 222);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -489,7 +481,7 @@ fn should_get_accounts_for_origin() {
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                Some(111),
+                None,
                 None
             ),
             Account::new_full(
@@ -497,7 +489,7 @@ fn should_get_accounts_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                Some(222),
+                None,
                 None
             ),
         ]
@@ -519,8 +511,8 @@ fn should_only_get_own_accounts_for_origin() {
     let anchor_number = anchor.anchor_number();
     let anchor_number_two = anchor_two.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
-    let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone(), 222);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
+    let _ = create_account_for_origin(anchor_number_two, origin.clone(), name_two.clone());
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -566,8 +558,8 @@ fn should_update_account_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 222);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -600,14 +592,13 @@ fn should_update_account_for_origin() {
             AccountUpdate {
                 name: Some("Becky".to_string())
             },
-            333
         ),
         Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(1),
-            Some(333),
+            None,
             None
         ))
     );
@@ -621,7 +612,7 @@ fn should_update_account_for_origin() {
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(1),
-                Some(333),
+                None,
                 None
             ),
             Account::new_full(
@@ -629,7 +620,7 @@ fn should_update_account_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                Some(222),
+                None,
                 None
             ),
         ]
@@ -649,8 +640,8 @@ fn should_update_default_account_for_origin() {
     let name_two = "Bob".to_string();
     let anchor_number = anchor.anchor_number();
 
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone(), 111);
-    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone(), 222);
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name.clone());
+    let _ = create_account_for_origin(anchor_number, origin.clone(), name_two.clone());
 
     assert_eq!(
         get_accounts_for_origin(anchor_number, &origin),
@@ -683,14 +674,13 @@ fn should_update_default_account_for_origin() {
             AccountUpdate {
                 name: Some("Becky".to_string())
             },
-            333,
         ),
         Ok(Account::new_full(
             anchor_number,
             origin.clone(),
             Some("Becky".to_string()),
             Some(3),
-            Some(333),
+            None,
             Some(anchor_number)
         ))
     );
@@ -703,7 +693,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Becky".to_string()),
                 Some(3),
-                Some(333),
+                None,
                 Some(anchor_number)
             ),
             Account::new_full(
@@ -711,7 +701,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                Some(111),
+                None,
                 None
             ),
             Account::new_full(
@@ -719,7 +709,7 @@ fn should_update_default_account_for_origin() {
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                Some(222),
+                None,
                 None
             ),
         ]
@@ -776,7 +766,7 @@ fn should_properly_recalculate_faulty_account_counter() {
     for i in 0..=MAX_ANCHOR_ACCOUNTS {
         let origin = format!("https://example-{i}.com");
         let result =
-            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone(), 0);
+            create_account_for_origin(anchor.anchor_number(), origin.clone(), name.clone());
         if i == MAX_ANCHOR_ACCOUNTS {
             assert_eq!(result, Err(CreateAccountError::AccountLimitReached))
         } else {
@@ -810,7 +800,6 @@ fn should_properly_recalculate_faulty_account_counter_when_updating() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
-        0,
     );
     assert!(result.is_ok())
 }
@@ -845,7 +834,6 @@ fn should_increment_discrepancy_counter() {
         AccountUpdate {
             name: Some("Gabriel".to_string()),
         },
-        0,
     );
     assert!(result.is_ok());
 
@@ -866,8 +854,8 @@ fn should_get_default_account_for_origin() {
     let origin = "https://example.com".to_string();
     let anchor_number = anchor.anchor_number();
 
-    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string(), 111).unwrap();
-    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string(), 222).unwrap();
+    create_account_for_origin(anchor_number, origin.clone(), "Alice".to_string()).unwrap();
+    create_account_for_origin(anchor_number, origin.clone(), "Bob".to_string()).unwrap();
 
     // Smoke test
     assert_eq!(
@@ -911,14 +899,14 @@ fn should_get_default_account_for_origin() {
                 Ok(AccountInfo {
                     account_number: Some(1),
                     origin: origin.clone(),
-                    last_used: Some(111),
+                    last_used: None,
                     name: Some("Alice".to_string()),
                 }),
             )),
             Ok(AccountInfo {
                 account_number: Some(1),
                 origin: origin.clone(),
-                last_used: Some(111),
+                last_used: None,
                 name: Some("Alice".to_string()),
             }),
         ),
@@ -934,7 +922,7 @@ fn should_get_default_account_for_origin() {
             Ok(AccountInfo {
                 account_number: Some(1),
                 origin: origin.clone(),
-                last_used: Some(111),
+                last_used: None,
                 name: Some("Alice".to_string()),
             }),
         ),
@@ -950,7 +938,7 @@ fn should_get_default_account_for_origin() {
             Ok(AccountInfo {
                 account_number: Some(1),
                 origin: origin.clone(),
-                last_used: Some(111),
+                last_used: None,
                 name: Some("Alice".to_string()),
             }),
         ),
@@ -961,14 +949,14 @@ fn should_get_default_account_for_origin() {
                 Ok(AccountInfo {
                     account_number: Some(2),
                     origin: origin.clone(),
-                    last_used: Some(222),
+                    last_used: None,
                     name: Some("Bob".to_string()),
                 }),
             )),
             Ok(AccountInfo {
                 account_number: Some(2),
                 origin: origin.clone(),
-                last_used: Some(222),
+                last_used: None,
                 name: Some("Bob".to_string()),
             }),
         ),
@@ -1057,7 +1045,6 @@ fn should_get_updated_default_account_after_modification() {
         AccountUpdate {
             name: Some("Default Account".to_string()),
         },
-        0,
     )
     .unwrap();
 
@@ -1069,7 +1056,7 @@ fn should_get_updated_default_account_after_modification() {
         Ok(AccountInfo {
             account_number: Some(1),
             origin: origin.clone(),
-            last_used: Some(0),
+            last_used: None,
             name: Some("Default Account".to_string()),
         })
     );
@@ -1112,8 +1099,8 @@ fn should_get_default_account_for_different_origins() {
     let anchor_number = anchor.anchor_number();
 
     // Create accounts for both origins
-    create_account_for_origin(anchor_number, origin1.clone(), "Alice".to_string(), 0).unwrap();
-    create_account_for_origin(anchor_number, origin2.clone(), "Bob".to_string(), 0).unwrap();
+    create_account_for_origin(anchor_number, origin1.clone(), "Alice".to_string()).unwrap();
+    create_account_for_origin(anchor_number, origin2.clone(), "Bob".to_string()).unwrap();
 
     // Run code under test
     let result1 = get_default_account_for_origin(anchor_number, origin1.clone());

@@ -1060,7 +1060,6 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn create_additional_account(
         &mut self,
         params: CreateAccountParams,
-        now: Timestamp,
     ) -> Result<Account, StorageError> {
         check_frontend_length(&params.origin);
         let anchor_number = params.anchor_number;
@@ -1298,7 +1297,6 @@ impl<M: Memory + Clone> Storage<M> {
     fn update_existing_account(
         &mut self,
         params: UpdateExistingAccountParams,
-        now: Timestamp,
     ) -> Result<Account, StorageError> {
         let UpdateExistingAccountParams {
             account_number,
@@ -1355,7 +1353,6 @@ impl<M: Memory + Clone> Storage<M> {
     fn create_default_account(
         &mut self,
         params: CreateAccountParams,
-        now: Timestamp,
     ) -> Result<Account, StorageError> {
         let CreateAccountParams {
             anchor_number,
