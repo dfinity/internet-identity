@@ -1,49 +1,50 @@
 import { svelteExtractor } from "./extractor";
 import { describe, expect } from "vitest";
 import { ExtractedMessage } from "@lingui/conf";
+import { sveltePreprocessor } from "./preprocessor";
 
 const FILE_NAME = "test.svelte";
 
-const extract = (code: string): Promise<ExtractedMessage> =>
-  new Promise<ExtractedMessage>((resolve, reject) => {
-    try {
-      svelteExtractor.extract(FILE_NAME, code, resolve);
-    } catch (err) {
-      reject(err);
-    }
-  });
+const buildPreprocessor = sveltePreprocessor();
+// @ts-ignore Ignore `Plugin` typing, we know it a fn accepting an object
+buildPreprocessor.configResolved!({ command: "build" });
+const transformBuild = (code: string): string => {
+  // @ts-ignore Ignore `Plugin` typing, we know it a fn returning an object
+  return buildPreprocessor.transform(code, FILE_NAME).code;
+};
+const devPreprocessor = sveltePreprocessor();
+const transformDev = (code: string): string => {
+  // @ts-ignore Ignore `Plugin` typing, we know it a fn returning an object
+  return devPreprocessor.transform(code, FILE_NAME).code;
+};
 
-describe("svelteExtractor", () => {
+describe("sveltePreprocessor", () => {
   describe("tagged template", () => {
-    it("should extract filename, line and column number", async () => {
-      const { origin } = await extract("<span>{$t`Hello World`}</span>");
-      expect(origin).toEqual([FILE_NAME, 1, 7]);
-    });
-
     it.each([
       {
         case: "without variables",
-        code: "<span>{$t`Hello World`}</span>",
-        expected: "Hello World",
+        source: "<span>{$t`Hello World`}</span>",
+        build: '<span>{$t({ id: "mY42CM" })}</span>',
+        dev: '<span>{$t({ id: "mY42CM" })}</span>',
       },
-      {
-        case: "with named variable",
-        code: "<span>{$t`Hello {name}`}</span>",
-        expected: "Hello {name}",
-      },
-      {
-        case: "with positional variable",
-        code: '<span>{$t`Hello ${"John"}`}</span>',
-        expected: "Hello {0}",
-      },
-      {
-        case: "with named and positional variables",
-        code: '<span>{$t`Hello {name}, ${"John"}, {friend} and ${"Jack"}`}</span>',
-        expected: "Hello {name}, {0}, {friend} and {1}",
-      },
-    ])("should extract message $case", async ({ code, expected }) => {
-      const { message } = await extract(code);
-      expect(message).toEqual(expected);
+      // {
+      //   case: "with named variable",
+      //   code: "<span>{$t`Hello {name}`}</span>",
+      //   expected: "Hello {name}",
+      // },
+      // {
+      //   case: "with positional variable",
+      //   code: '<span>{$t`Hello ${"John"}`}</span>',
+      //   expected: "Hello {0}",
+      // },
+      // {
+      //   case: "with named and positional variables",
+      //   code: '<span>{$t`Hello {name}, ${"John"}, {friend} and ${"Jack"}`}</span>',
+      //   expected: "Hello {name}, {0}, {friend} and {1}",
+      // },
+    ])("should transform code $case", async ({ source, build, dev }) => {
+      expect(transformBuild(source)).toEqual(build);
+      expect(transformDev(source)).toEqual(dev);
     });
   });
 
