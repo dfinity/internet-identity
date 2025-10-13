@@ -591,7 +591,7 @@ fn should_update_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            },
+            }
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -673,7 +673,7 @@ fn should_update_default_account_for_origin() {
             origin.clone(),
             AccountUpdate {
                 name: Some("Becky".to_string())
-            },
+            }
         ),
         Ok(Account::new_full(
             anchor_number,
@@ -862,21 +862,17 @@ fn should_get_default_account_for_origin() {
         get_accounts_for_origin(anchor_number, &origin),
         vec![
             Account::synthetic(anchor_number, origin.clone()),
-            Account::new_full(
+            Account::new(
                 anchor_number,
                 origin.clone(),
                 Some("Alice".to_string()),
                 Some(1),
-                None,
-                None,
             ),
-            Account::new_full(
+            Account::new(
                 anchor_number,
                 origin.clone(),
                 Some("Bob".to_string()),
                 Some(2),
-                None,
-                None,
             ),
         ]
     );
