@@ -19,6 +19,7 @@
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { manuallyReroute } from "../../hooks";
+  import { t } from "$lib/stores/locale.store";
 
   // Add rerouting back on this SSG route
   manuallyReroute();
@@ -102,13 +103,17 @@
         <h1
           class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
         >
-          Experience
+          {$t({
+            message: "Experience",
+            context:
+              "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy",
+          })}
         </h1>
         <TextFade
           texts={[
-            "Real Privacy",
-            "Full Ownership",
-            "Seamless Access",
+            $t`Real Privacy`,
+            $t`Full Ownership`,
+            $t`Seamless Access`,
             "Internet Identity",
           ]}
           duration={500}

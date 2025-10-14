@@ -10,6 +10,7 @@ import {
 } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
 import { isSameOrigin } from "$lib/utils/urlUtils";
+import { localeStore } from "$lib/stores/locale.store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -68,6 +69,9 @@ export const init: ClientInit = async () => {
   Object.values(featureFlags).forEach((flag) => flag.initialize());
   overrideFeatureFlags();
   maybeSetDiscoverablePasskeyFlowFlag();
-  await sessionStore.init({ canisterId, agentOptions });
+  await Promise.all([
+    localeStore.init(),
+    sessionStore.init({ canisterId, agentOptions }),
+  ]);
   authenticationStore.init({ canisterId, agentOptions });
 };

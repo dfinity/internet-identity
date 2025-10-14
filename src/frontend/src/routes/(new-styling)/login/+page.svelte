@@ -26,7 +26,6 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
-  import { get } from "svelte/store";
   import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
