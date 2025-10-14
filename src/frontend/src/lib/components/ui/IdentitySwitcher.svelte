@@ -91,6 +91,8 @@
   </ul>
   <ButtonCard onclick={useAnotherIdentity}>
     <FeaturedIcon size="sm">
+      <!-- Design also uses smaller icon -->
+      <!-- It looks better than the same size as the others -->
       <UserPlusIcon size="1rem" />
     </FeaturedIcon>
     <span>Use another identity</span>
