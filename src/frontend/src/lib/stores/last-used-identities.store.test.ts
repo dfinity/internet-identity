@@ -47,10 +47,12 @@ describe("lastUsedIdentitiesStore", () => {
   });
 
   it("should add the first identity correctly", () => {
+    const createdAtMillis = 1690000000000;
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: identity1,
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
+      createdAtMillis,
     });
 
     const expected: LastUsedIdentities = {
@@ -59,6 +61,7 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1,
         authMethod: { passkey: { credentialId: credId1 } },
         lastUsedTimestampMillis: mockTimestamp1,
+        createdAtMillis,
       },
     };
     expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
@@ -176,10 +179,12 @@ describe("lastUsedIdentityStore (derived store)", () => {
   });
 
   it("should return the only identity when one is added", () => {
+    const createdAtMillis = 1690000000000;
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: identity1,
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
+      createdAtMillis,
     });
 
     const expected: LastUsedIdentity = {
@@ -187,6 +192,7 @@ describe("lastUsedIdentityStore (derived store)", () => {
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
       lastUsedTimestampMillis: mockTimestamp1,
+      createdAtMillis,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
   });

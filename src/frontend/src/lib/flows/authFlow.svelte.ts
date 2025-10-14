@@ -36,6 +36,7 @@ import {
   decodeJWT,
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
+import { createdAtMillis } from "$lib/utils/identityInfo";
 
 interface AuthFlowOptions {
   trackLastUsed?: boolean;
@@ -111,6 +112,7 @@ export class AuthFlow {
         identityNumber,
         name: info.name[0],
         authMethod: { passkey: { credentialId } },
+        createdAtMillis: createdAtMillis(info),
       });
     }
     return identityNumber;
@@ -211,6 +213,7 @@ export class AuthFlow {
           authMethod: {
             openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
           },
+          createdAtMillis: createdAtMillis(info),
         });
       }
       return { identityNumber, type: "signIn" };
@@ -313,6 +316,7 @@ export class AuthFlow {
           identityNumber,
           name: passkeyIdentity.getName(),
           authMethod: { passkey: { credentialId } },
+          createdAtMillis: Date.now(),
         });
       }
       this.#captcha = undefined;
@@ -425,6 +429,7 @@ export class AuthFlow {
           identityNumber,
           name,
           authMethod: { openid: { iss, sub, loginHint, metadata } },
+          createdAtMillis: Date.now(),
         });
       }
       this.#captcha = undefined;
