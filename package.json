@@ -61,7 +61,6 @@
     "@zag-js/svelte": "^1.12.0",
     "@zag-js/toast": "^1.12.0",
     "astro": "^5.5.4",
-    "dedent": "^1.7.0",
     "devtools-protocol": "^0.0.1502260",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.1.8",

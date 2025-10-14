@@ -1,216 +1,277 @@
-import { svelteExtractor } from "./extractor";
 import { describe, expect } from "vitest";
-import { ExtractedMessage } from "@lingui/conf";
-import { sveltePreprocessor } from "./preprocessor";
-
-const FILE_NAME = "test.svelte";
-
-const buildPreprocessor = sveltePreprocessor();
-// @ts-ignore Ignore `Plugin` typing, we know it a fn accepting an object
-buildPreprocessor.configResolved!({ command: "build" });
-const transformBuild = (code: string): string => {
-  // @ts-ignore Ignore `Plugin` typing, we know it a fn returning an object
-  return buildPreprocessor.transform(code, FILE_NAME).code;
-};
-const devPreprocessor = sveltePreprocessor();
-const transformDev = (code: string): string => {
-  // @ts-ignore Ignore `Plugin` typing, we know it a fn returning an object
-  return devPreprocessor.transform(code, FILE_NAME).code;
-};
+import { svelteTransform } from "./preprocessor";
 
 describe("sveltePreprocessor", () => {
   describe("tagged template", () => {
     it.each([
       {
         case: "without variables",
-        source: "<span>{$t`Hello World`}</span>",
-        build: '<span>{$t({ id: "mY42CM" })}</span>',
-        dev: '<span>{$t({ id: "mY42CM" })}</span>',
+        source: "{$t`Hello World`}",
+        build: '{$t({ id: "mY42CM" })}',
+        dev: '{$t({ id: "mY42CM", message: "Hello World" })}',
       },
-      // {
-      //   case: "with named variable",
-      //   code: "<span>{$t`Hello {name}`}</span>",
-      //   expected: "Hello {name}",
-      // },
-      // {
-      //   case: "with positional variable",
-      //   code: '<span>{$t`Hello ${"John"}`}</span>',
-      //   expected: "Hello {0}",
-      // },
-      // {
-      //   case: "with named and positional variables",
-      //   code: '<span>{$t`Hello {name}, ${"John"}, {friend} and ${"Jack"}`}</span>',
-      //   expected: "Hello {name}, {0}, {friend} and {1}",
-      // },
-    ])("should transform code $case", async ({ source, build, dev }) => {
-      expect(transformBuild(source)).toEqual(build);
-      expect(transformDev(source)).toEqual(dev);
+      {
+        case: "with named variable",
+        source: "{$t`Hello ${name}`}",
+        build: '{$t({ id: "OVaF9k", values: { name } })}',
+        dev: '{$t({ id: "OVaF9k", message: "Hello {name}", values: { name } })}',
+      },
+      {
+        case: "with positional variable",
+        source: '{$t`Hello ${"John"}`}',
+        build: '{$t({ id: "Y7riaK", values: { 0: "John" } })}',
+        dev: '{$t({ id: "Y7riaK", message: "Hello {0}", values: { 0: "John" } })}',
+      },
+      {
+        case: "with named and positional variables",
+        source: '{$t`Hello ${name}, ${"John"}, ${friend} and ${"Jack"}`}',
+        build:
+          '{$t({ id: "EvFFeo", values: { 0: "John", 1: "Jack", name, friend } })}',
+        dev: '{$t({ id: "EvFFeo", message: "Hello {name}, {0}, {friend} and {1}", values: { 0: "John", 1: "Jack", name, friend } })}',
+      },
+    ])("should transform code $case", ({ source, build, dev }) => {
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
   });
 
   describe("call expression", () => {
-    it("should extract filename, line and column number", async () => {
-      const { origin } = await extract(
-        '<span>{$t({ message: "Hello World" })}</span>',
-      );
-      expect(origin).toEqual([FILE_NAME, 1, 7]);
+    it("should retain explicit id", () => {
+      const source = '{$t({ id: "HELLO_WORLD", message: "Hello World" })}';
+      const build = '{$t({ id: "HELLO_WORLD" })}';
+      const dev = '{$t({ id: "HELLO_WORLD", message: "Hello World" })}';
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
 
-    it("should extract explicit id", async () => {
-      const { id } = await extract(
-        '<span>{$t({ message: "Hello World", id: "HELLO_WORLD" })}</span>',
-      );
-      expect(id).toEqual("HELLO_WORLD");
-    });
-
-    it("should extract optional context", async () => {
-      const { context } = await extract(
-        '<span>{$t({ message: "Hello World", context: "Greeting the world" })}</span>',
-      );
-      expect(context).toEqual("Greeting the world");
+    it("should omit optional context", () => {
+      const source =
+        '{$t({ message: "Hello World", context: "Greeting the world" })}';
+      const build = '{$t({ id: "8MlzJp" })}';
+      const dev = '{$t({ id: "8MlzJp", message: "Hello World" })}';
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
 
     it.each([
       {
         case: "without variables",
-        code: '<span>{$t({ message: "Hello World" })}</span>',
-        expected: "Hello World",
+        source: '{$t({ message: "Hello World" })}',
+        build: '{$t({ id: "mY42CM" })}',
+        dev: '{$t({ id: "mY42CM", message: "Hello World" })}',
       },
       {
         case: "with named variable",
-        code: "<span>{$t({ message: `Hello ${name}` })}</span>",
-        expected: "Hello {name}",
+        source: "{$t({ message: `Hello ${name}` })}",
+        build: '{$t({ id: "OVaF9k", values: { name } })}',
+        dev: '{$t({ id: "OVaF9k", message: "Hello {name}", values: { name } })}',
       },
       {
         case: "with positional variable",
-        code: '<span>{$t({ message: `Hello ${"John"}` })}</span>',
-        expected: "Hello {0}",
+        source: '{$t({ message: `Hello ${"John"}` })}',
+        build: '{$t({ id: "Y7riaK", values: { 0: "John" } })}',
+        dev: '{$t({ id: "Y7riaK", message: "Hello {0}", values: { 0: "John" } })}',
       },
       {
         case: "with named and positional variables",
-        code: '<span>{$t({ message: `Hello {name}, ${"John"}, {friend} and ${"Jack"}` })}</span>',
-        expected: "Hello {name}, {0}, {friend} and {1}",
+        source:
+          '{$t({ message: `Hello ${name}, ${"John"}, ${friend} and ${"Jack"}` })}',
+        build:
+          '{$t({ id: "EvFFeo", values: { 0: "John", 1: "Jack", name, friend } })}',
+        dev: '{$t({ id: "EvFFeo", message: "Hello {name}, {0}, {friend} and {1}", values: { 0: "John", 1: "Jack", name, friend } })}',
       },
-    ])("should extract message $case", async ({ code, expected }) => {
-      const { message } = await extract(code);
-      expect(message).toEqual(expected);
+    ])("should transform code $case", ({ source, build, dev }) => {
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
   });
 
   describe("plural call expression", () => {
-    it("should extract filename, line and column number", async () => {
-      const { origin } = await extract(
-        '<span>{$plural(1, { one: "One book", other: "# Books" })}</span>',
-      );
-      expect(origin).toEqual([FILE_NAME, 1, 7]);
-    });
-
     it.each([
       {
         case: "with num value",
-        code: '<span>{$plural(1, { one: "One book", other: "# Books" })}</span>',
-        expected: "{num, plural, one {One book} other {# Books}}",
+        source: '{$plural(1, { one: "One book", other: "# Books" })}',
+        build: '{$plural({ id: "MJ+EYH", values: { num: 1 } })}',
+        dev: '{$plural({ id: "MJ+EYH", message: "{num, plural, one {One book} other {# Books}}", values: { num: 1 } })}',
       },
       {
         case: "with num variable",
-        code: '<span>{$plural(numBooks, { one: "One book", other: "# Books" })}</span>',
-        expected: "{numBooks, plural, one {One book} other {# Books}}",
+        source: '{$plural(numBooks, { one: "One book", other: "# Books" })}',
+        build: '{$plural({ id: "lUlJTW", values: { numBooks } })}',
+        dev: '{$plural({ id: "lUlJTW", message: "{numBooks, plural, one {One book} other {# Books}}", values: { numBooks } })}',
       },
       {
         case: "with exact plural",
-        code: '<span>{$plural(0, { one: "One book", other: "# Books", "=0": "No books" })}</span>',
-        expected: "{num, plural, one {One book} other {# Books} =0 {No books}}",
+        source:
+          '{$plural(0, { one: "One book", other: "# Books", "=0": "No books" })}',
+        build: '{$plural({ id: "iNT1za", values: { num: 0 } })}',
+        dev: '{$plural({ id: "iNT1za", message: "{num, plural, one {One book} other {# Books} =0 {No books}}", values: { num: 0 } })}',
       },
       {
         case: "with named variable",
-        code: '<span>{$plural(1, { one: "One {genre} book", other: "# {genre} books" })}</span>',
-        expected:
-          "{num, plural, one {One {genre} book} other {# {genre} books}}",
+        source:
+          "{$plural(1, { one: `One ${genre} book`, other: `# ${genre} books` })}",
+        build: '{$plural({ id: "KLyifH", values: { num: 1, genre } })}',
+        dev: '{$plural({ id: "KLyifH", message: "{num, plural, one {One {genre} book} other {# {genre} books}}", values: { num: 1, genre } })}',
       },
       {
         case: "with positional variable",
-        code: '<span>{$plural(1, { one: `One ${"fantasy"} book`, other: `# ${"fantasy"} books` })}</span>',
-        expected: "{num, plural, one {One {0} book} other {# {0} books}}",
+        source:
+          '{$plural(1, { one: `One ${"fantasy"} book`, other: `# ${"fantasy"} books` })}',
+        build: '{$plural({ id: "ZCUu5z", values: { 0: "fantasy", num: 1 } })}',
+        dev: '{$plural({ id: "ZCUu5z", message: "{num, plural, one {One {0} book} other {# {0} books}}", values: { 0: "fantasy", num: 1 } })}',
       },
       {
         case: "with named and positional variables",
-        code: '<span>{$plural(1, { one: `One {genre} and ${"fantasy"} book`, other: `# {genre} and ${"fantasy"} books` })}</span>',
-        expected:
-          "{num, plural, one {One {genre} and {0} book} other {# {genre} and {0} books}}",
+        source:
+          '{$plural(1, { one: `One ${genre} and ${"fantasy"} book`, other: `# ${genre} and ${"fantasy"} books` })}',
+        build:
+          '{$plural({ id: "T8f71C", values: { 0: "fantasy", num: 1, genre } })}',
+        dev: '{$plural({ id: "T8f71C", message: "{num, plural, one {One {genre} and {0} book} other {# {genre} and {0} books}}", values: { 0: "fantasy", num: 1, genre } })}',
       },
-    ])("should extract message $case", async ({ code, expected }) => {
-      const { message } = await extract(code);
-      expect(message).toEqual(expected);
+    ])("should transform code $case", ({ source, build, dev }) => {
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
   });
 
   describe("<Trans> component", () => {
-    it("should extract filename, line and column number", async () => {
-      const { origin } = await extract(
-        "<span><Trans>Hello world</Trans></span>",
-      );
-      expect(origin).toEqual([FILE_NAME, 1, 6]);
+    it("should retain explicit id", () => {
+      const source = '<Trans id="HELLO_WORLD">Hello world</Trans>';
+      const build = '<Trans id="HELLO_WORLD"></Trans>';
+      const dev = '<Trans id="HELLO_WORLD" message={"Hello world"}></Trans>';
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
 
-    it("should extract explicit id", async () => {
-      const { id } = await extract(
-        '<span><Trans id="HELLO_WORLD">Hello world</Trans></span>',
-      );
-      expect(id).toEqual("HELLO_WORLD");
-    });
-
-    it("should extract optional context", async () => {
-      const { context } = await extract(
-        '<span><Trans context="Greeting the world">Hello world</Trans></span>',
-      );
-      expect(context).toEqual("Greeting the world");
+    it("should omit optional context", () => {
+      const source = '<Trans context="Greeting the world">Hello world</Trans>';
+      const build = '<Trans id="Yp3/Os"></Trans>';
+      const dev = '<Trans id="Yp3/Os" message={"Hello world"}></Trans>';
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
 
     it.each([
       {
         case: "without variables",
-        code: "<span><Trans>Hello world</Trans></span>",
-        expected: "Hello world",
+        source: "<Trans>Hello world</Trans>",
+        build: '<Trans id="1nGWAC"></Trans>',
+        dev: '<Trans id="1nGWAC" message={"Hello world"}></Trans>',
       },
       {
         case: "with named variable",
-        code: "<span><Trans>Hello {name}</Trans></span>",
-        expected: "Hello {name}",
+        source: "<Trans>Hello {name}</Trans>",
+        build: '<Trans id="OVaF9k" values={{ name }}></Trans>',
+        dev: '<Trans id="OVaF9k" message={"Hello {name}"} values={{ name }}></Trans>',
       },
       {
         case: "with positional variable",
-        code: '<span><Trans>Hello {"John"}</Trans></span>',
-        expected: "Hello {0}",
+        source: '<Trans>Hello {"John"}</Trans>',
+        build: '<Trans id="Y7riaK" values={{ 0: "John" }}></Trans>',
+        dev: '<Trans id="Y7riaK" message={"Hello {0}"} values={{ 0: "John" }}></Trans>',
       },
       {
         case: "with named and positional variables",
-        code: '<span><Trans>Hello {name}, {"John"}, {friend} and {"Jack"}</Trans></span>',
-        expected: "Hello {name}, {0}, {friend} and {1}",
+        source: '<Trans>Hello {name}, {"John"}, {friend} and {"Jack"}</Trans>',
+        build:
+          '<Trans id="EvFFeo" values={{ 0: "John", 1: "Jack", name, friend }}></Trans>',
+        dev: '<Trans id="EvFFeo" message={"Hello {name}, {0}, {friend} and {1}"} values={{ 0: "John", 1: "Jack", name, friend }}></Trans>',
       },
       {
         case: "with tag",
-        code: '<span><Trans>Click <a href="/upgrade">here</a> to upgrade</Trans></span>',
-        expected: "Click <0>here</0> to upgrade",
+        source: '<Trans>Click <a href="/upgrade">here</a> to upgrade</Trans>',
+        build:
+          '<Trans id="RUiQ7+">' +
+          "{#snippet renderNode(__children, __index)}" +
+          '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
+          "{/snippet}" +
+          "</Trans>",
+        dev:
+          '<Trans id="RUiQ7+" message={"Click <0>here</0> to upgrade"}>' +
+          "{#snippet renderNode(__children, __index)}" +
+          '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
+          "{/snippet}" +
+          "</Trans>",
       },
       {
         case: "with self closing tag",
-        code: "<span><Trans>Hello<br>World</Trans></span>",
-        expected: "Hello<0/>World",
+        source: "<Trans>Hello<br>World</Trans>",
+        build:
+          '<Trans id="yajsv9">' +
+          "{#snippet renderNode(__children, __index)}" +
+          "{#if __index === 0}<br>{/if}" +
+          "{/snippet}" +
+          "</Trans>",
+        dev:
+          '<Trans id="yajsv9" message={"Hello<0/>World"}>' +
+          "{#snippet renderNode(__children, __index)}" +
+          "{#if __index === 0}<br>{/if}" +
+          "{/snippet}" +
+          "</Trans>",
       },
       {
         case: "with nested tags",
-        code: "<span><Trans>To continue, <strong>please <em>confirm</em></strong> your choice.</Trans></span>",
-        expected: "To continue, <1>please <0>confirm</0></1> your choice.",
+        source:
+          "<Trans>To continue, <strong>please <em>confirm</em></strong> your choice.</Trans>",
+        build:
+          '<Trans id="iU3T6K">' +
+          "{#snippet renderNode(__children, __index)}" +
+          "{#if __index === 0}<em>{@render __children()}</em>{/if}" +
+          "{#if __index === 1}<strong>{@render __children()}</strong>{/if}" +
+          "{/snippet}" +
+          "</Trans>",
+        dev:
+          '<Trans id="iU3T6K" message={"To continue, <1>please <0>confirm</0></1> your choice."}>' +
+          "{#snippet renderNode(__children, __index)}" +
+          "{#if __index === 0}<em>{@render __children()}</em>{/if}" +
+          "{#if __index === 1}<strong>{@render __children()}</strong>{/if}" +
+          "{/snippet}" +
+          "</Trans>",
       },
       {
         case: "with tags and variables",
-        code: '<p><Trans>Hi {name}, please <a href="/profile"><strong>update</strong> your profile</a> or <em>contact {"support"}</em> for help.<br/>Thank you!</Trans></p>',
-        expected:
-          "Hi {name}, please <1><0>update</0> your profile</1> or <2>contact {0}</2> for help.<3/>Thank you!",
+        source:
+          '<Trans>Hi {name}, please <a href="/profile"><strong>update</strong> your profile</a> or <em>contact {"support"}</em> for help.<br/>Thank you!</Trans>',
+        build:
+          '<Trans id="+xfjDc" values={{ 0: "support", name }}>' +
+          "{#snippet renderNode(__children, __index)}" +
+          "{#if __index === 0}<strong>{@render __children()}</strong>{/if}" +
+          '{#if __index === 1}<a href="/profile">{@render __children()}</a>{/if}' +
+          "{#if __index === 2}<em>{@render __children()}</em>{/if}" +
+          "{#if __index === 3}<br/>{/if}" +
+          "{/snippet}" +
+          "</Trans>",
+        dev:
+          '<Trans id="+xfjDc" message={"Hi {name}, please <1><0>update</0> your profile</1> or <2>contact {0}</2> for help.<3/>Thank you!"} values={{ 0: "support", name }}>' +
+          "{#snippet renderNode(__children, __index)}" +
+          "{#if __index === 0}<strong>{@render __children()}</strong>{/if}" +
+          '{#if __index === 1}<a href="/profile">{@render __children()}</a>{/if}' +
+          "{#if __index === 2}<em>{@render __children()}</em>{/if}" +
+          "{#if __index === 3}<br/>{/if}" +
+          "{/snippet}" +
+          "</Trans>",
       },
-    ])("should extract message $case", async ({ code, expected }) => {
-      const { message } = await extract(code);
-      expect(message).toEqual(expected);
+      {
+        case: "with comments",
+        source:
+          '<Trans><!-- Comment -->Click <a href="/upgrade"><!-- Comment -->here<!-- Comment --></a> to upgrade</Trans>',
+        build:
+          '<Trans id="RUiQ7+">' +
+          "{#snippet renderNode(__children, __index)}" +
+          '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
+          "{/snippet}" +
+          "</Trans>",
+        dev:
+          '<Trans id="RUiQ7+" message={"Click <0>here</0> to upgrade"}>' +
+          "{#snippet renderNode(__children, __index)}" +
+          '{#if __index === 0}<a href="/upgrade">{@render __children()}</a>{/if}' +
+          "{/snippet}" +
+          "</Trans>",
+      },
+    ])("should transform code $case", ({ source, build, dev }) => {
+      expect(svelteTransform(true, source).code).toEqual(build);
+      expect(svelteTransform(false, source).code).toEqual(dev);
     });
   });
 });

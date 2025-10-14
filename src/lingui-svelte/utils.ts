@@ -25,7 +25,7 @@ export interface FoundMessage extends Omit<ExtractedMessage, "origin"> {
   values?: Record<string, { start: number; end: number }>;
   nodes?: Array<{
     node: { start: number; end: number };
-    text?: { start: number; end: number };
+    content?: { start: number; end: number };
   }>;
 }
 
@@ -232,7 +232,7 @@ const textInNode = (
   valueCount: { count: number },
   register: (entry: {
     node: { start: number; end: number };
-    text?: { start: number; end: number };
+    content?: { start: number; end: number };
   }) => number,
 ): {
   text: string;
@@ -241,13 +241,13 @@ const textInNode = (
   values: Record<string, { start: number; end: number }>;
   registered: boolean;
 } => {
-  // Text node
   if (node.type === "Text") {
+    const trimmed = node.data
+      .replace(/[\r\n]+/g, "")
+      .replace(/^\s+/, " ")
+      .replace(/\s+$/, " ");
     return {
-      text: node.data
-        .replace(/[\r\n]+/g, "")
-        .replace(/^\s+/, " ")
-        .replace(/\s+$/, " "),
+      text: trimmed,
       start: node.start,
       end: node.end,
       values: {},
@@ -255,7 +255,6 @@ const textInNode = (
     };
   }
 
-  // Expression tag (mustache)
   if (node.type === "ExpressionTag" && hasNumericStartEnd(node.expression)) {
     const key =
       node.expression.type === "Identifier"
@@ -263,8 +262,8 @@ const textInNode = (
         : valueCount.count++;
     return {
       text: `{${key}}`,
-      start: node.start,
-      end: node.end,
+      start: node.expression.start,
+      end: node.expression.end,
       values: {
         [key]: { start: node.expression.start, end: node.expression.end },
       },
@@ -272,7 +271,6 @@ const textInNode = (
     };
   }
 
-  // Non-fragment nodes
   if (
     !("fragment" in node) ||
     !node.fragment ||
@@ -287,7 +285,6 @@ const textInNode = (
     };
   }
 
-  // Recurse into children
   const childResults = node.fragment.nodes.map((child) =>
     textInNode(child, valueCount, register),
   );
@@ -298,25 +295,24 @@ const textInNode = (
     {},
   );
 
-  const firstChild = childResults[0];
-  const lastChild = childResults[childResults.length - 1];
-  const start = firstChild?.start ?? node.start;
-  const end = lastChild?.end ?? node.end;
-  const trimmedInner = combinedText.replace(/[\r\n]+/g, "").trim();
-
-  // Register this node
   const idx = register({
     node: { start: node.start, end: node.end },
-    text: trimmedInner.length > 0 ? { start, end } : undefined,
+    content:
+      node.fragment.nodes.length > 0
+        ? {
+            start: node.fragment.nodes[0].start,
+            end: node.fragment.nodes[node.fragment.nodes.length - 1].end,
+          }
+        : undefined,
   });
 
   return {
     text:
-      trimmedInner.length > 0
-        ? `<${idx}>${trimmedInner}</${idx}>`
+      combinedText.trim().length > 0
+        ? `<${idx}>${combinedText}</${idx}>`
         : `<${idx}/>`,
-    start,
-    end,
+    start: node.start,
+    end: node.end,
     values: combinedValues,
     registered: true,
   };
@@ -335,13 +331,13 @@ export const findTransInComponent = (
   const valueCount = { count: 0 };
   const nodes: Array<{
     node: { start: number; end: number };
-    text?: { start: number; end: number };
+    content?: { start: number; end: number };
   }> = [];
 
   // Helper to register a node and return its index
   const register = (entry: {
     node: { start: number; end: number };
-    text?: { start: number; end: number };
+    content?: { start: number; end: number };
   }) => nodes.push(entry) - 1;
 
   let message = "";

@@ -16,29 +16,29 @@ const extract = (code: string): Promise<ExtractedMessage> =>
 describe("svelteExtractor", () => {
   describe("tagged template", () => {
     it("should extract filename, line and column number", async () => {
-      const { origin } = await extract("<span>{$t`Hello World`}</span>");
-      expect(origin).toEqual([FILE_NAME, 1, 7]);
+      const { origin } = await extract("{$t`Hello World`}");
+      expect(origin).toEqual([FILE_NAME, 1, 1]);
     });
 
     it.each([
       {
         case: "without variables",
-        code: "<span>{$t`Hello World`}</span>",
+        code: "{$t`Hello World`}",
         expected: "Hello World",
       },
       {
         case: "with named variable",
-        code: "<span>{$t`Hello {name}`}</span>",
+        code: "{$t`Hello ${name}`}",
         expected: "Hello {name}",
       },
       {
         case: "with positional variable",
-        code: '<span>{$t`Hello ${"John"}`}</span>',
+        code: '{$t`Hello ${"John"}`}',
         expected: "Hello {0}",
       },
       {
         case: "with named and positional variables",
-        code: '<span>{$t`Hello {name}, ${"John"}, {friend} and ${"Jack"}`}</span>',
+        code: '{$t`Hello ${name}, ${"John"}, ${friend} and ${"Jack"}`}',
         expected: "Hello {name}, {0}, {friend} and {1}",
       },
     ])("should extract message $case", async ({ code, expected }) => {
@@ -49,22 +49,20 @@ describe("svelteExtractor", () => {
 
   describe("call expression", () => {
     it("should extract filename, line and column number", async () => {
-      const { origin } = await extract(
-        '<span>{$t({ message: "Hello World" })}</span>',
-      );
-      expect(origin).toEqual([FILE_NAME, 1, 7]);
+      const { origin } = await extract('{$t({ message: "Hello World" })}');
+      expect(origin).toEqual([FILE_NAME, 1, 1]);
     });
 
     it("should extract explicit id", async () => {
       const { id } = await extract(
-        '<span>{$t({ message: "Hello World", id: "HELLO_WORLD" })}</span>',
+        '{$t({ id: "HELLO_WORLD", message: "Hello World" })}',
       );
       expect(id).toEqual("HELLO_WORLD");
     });
 
     it("should extract optional context", async () => {
       const { context } = await extract(
-        '<span>{$t({ message: "Hello World", context: "Greeting the world" })}</span>',
+        '{$t({ message: "Hello World", context: "Greeting the world" })}',
       );
       expect(context).toEqual("Greeting the world");
     });
@@ -72,22 +70,22 @@ describe("svelteExtractor", () => {
     it.each([
       {
         case: "without variables",
-        code: '<span>{$t({ message: "Hello World" })}</span>',
+        code: '{$t({ message: "Hello World" })}',
         expected: "Hello World",
       },
       {
         case: "with named variable",
-        code: "<span>{$t({ message: `Hello ${name}` })}</span>",
+        code: "{$t({ message: `Hello ${name}` })}",
         expected: "Hello {name}",
       },
       {
         case: "with positional variable",
-        code: '<span>{$t({ message: `Hello ${"John"}` })}</span>',
+        code: '{$t({ message: `Hello ${"John"}` })}',
         expected: "Hello {0}",
       },
       {
         case: "with named and positional variables",
-        code: '<span>{$t({ message: `Hello {name}, ${"John"}, {friend} and ${"Jack"}` })}</span>',
+        code: '{$t({ message: `Hello ${name}, ${"John"}, ${friend} and ${"Jack"}` })}',
         expected: "Hello {name}, {0}, {friend} and {1}",
       },
     ])("should extract message $case", async ({ code, expected }) => {
@@ -99,41 +97,41 @@ describe("svelteExtractor", () => {
   describe("plural call expression", () => {
     it("should extract filename, line and column number", async () => {
       const { origin } = await extract(
-        '<span>{$plural(1, { one: "One book", other: "# Books" })}</span>',
+        '{$plural(1, { one: "One book", other: "# Books" })}',
       );
-      expect(origin).toEqual([FILE_NAME, 1, 7]);
+      expect(origin).toEqual([FILE_NAME, 1, 1]);
     });
 
     it.each([
       {
         case: "with num value",
-        code: '<span>{$plural(1, { one: "One book", other: "# Books" })}</span>',
+        code: '{$plural(1, { one: "One book", other: "# Books" })}',
         expected: "{num, plural, one {One book} other {# Books}}",
       },
       {
         case: "with num variable",
-        code: '<span>{$plural(numBooks, { one: "One book", other: "# Books" })}</span>',
+        code: '{$plural(numBooks, { one: "One book", other: "# Books" })}',
         expected: "{numBooks, plural, one {One book} other {# Books}}",
       },
       {
         case: "with exact plural",
-        code: '<span>{$plural(0, { one: "One book", other: "# Books", "=0": "No books" })}</span>',
+        code: '{$plural(0, { one: "One book", other: "# Books", "=0": "No books" })}',
         expected: "{num, plural, one {One book} other {# Books} =0 {No books}}",
       },
       {
         case: "with named variable",
-        code: '<span>{$plural(1, { one: "One {genre} book", other: "# {genre} books" })}</span>',
+        code: "{$plural(1, { one: `One ${genre} book`, other: `# ${genre} books` })}",
         expected:
           "{num, plural, one {One {genre} book} other {# {genre} books}}",
       },
       {
         case: "with positional variable",
-        code: '<span>{$plural(1, { one: `One ${"fantasy"} book`, other: `# ${"fantasy"} books` })}</span>',
+        code: '{$plural(1, { one: `One ${"fantasy"} book`, other: `# ${"fantasy"} books` })}',
         expected: "{num, plural, one {One {0} book} other {# {0} books}}",
       },
       {
         case: "with named and positional variables",
-        code: '<span>{$plural(1, { one: `One {genre} and ${"fantasy"} book`, other: `# {genre} and ${"fantasy"} books` })}</span>',
+        code: '{$plural(1, { one: `One ${genre} and ${"fantasy"} book`, other: `# ${genre} and ${"fantasy"} books` })}',
         expected:
           "{num, plural, one {One {genre} and {0} book} other {# {genre} and {0} books}}",
       },
@@ -145,22 +143,20 @@ describe("svelteExtractor", () => {
 
   describe("<Trans> component", () => {
     it("should extract filename, line and column number", async () => {
-      const { origin } = await extract(
-        "<span><Trans>Hello world</Trans></span>",
-      );
-      expect(origin).toEqual([FILE_NAME, 1, 6]);
+      const { origin } = await extract("<Trans>Hello world</Trans>");
+      expect(origin).toEqual([FILE_NAME, 1, 0]);
     });
 
     it("should extract explicit id", async () => {
       const { id } = await extract(
-        '<span><Trans id="HELLO_WORLD">Hello world</Trans></span>',
+        '<Trans id="HELLO_WORLD">Hello world</Trans>',
       );
       expect(id).toEqual("HELLO_WORLD");
     });
 
     it("should extract optional context", async () => {
       const { context } = await extract(
-        '<span><Trans context="Greeting the world">Hello world</Trans></span>',
+        '<Trans context="Greeting the world">Hello world</Trans>',
       );
       expect(context).toEqual("Greeting the world");
     });
@@ -168,44 +164,49 @@ describe("svelteExtractor", () => {
     it.each([
       {
         case: "without variables",
-        code: "<span><Trans>Hello world</Trans></span>",
+        code: "<Trans>Hello world</Trans>",
         expected: "Hello world",
       },
       {
         case: "with named variable",
-        code: "<span><Trans>Hello {name}</Trans></span>",
+        code: "<Trans>Hello {name}</Trans>",
         expected: "Hello {name}",
       },
       {
         case: "with positional variable",
-        code: '<span><Trans>Hello {"John"}</Trans></span>',
+        code: '<Trans>Hello {"John"}</Trans>',
         expected: "Hello {0}",
       },
       {
         case: "with named and positional variables",
-        code: '<span><Trans>Hello {name}, {"John"}, {friend} and {"Jack"}</Trans></span>',
+        code: '<Trans>Hello {name}, {"John"}, {friend} and {"Jack"}</Trans>',
         expected: "Hello {name}, {0}, {friend} and {1}",
       },
       {
         case: "with tag",
-        code: '<span><Trans>Click <a href="/upgrade">here</a> to upgrade</Trans></span>',
+        code: '<Trans>Click <a href="/upgrade">here</a> to upgrade</Trans>',
         expected: "Click <0>here</0> to upgrade",
       },
       {
         case: "with self closing tag",
-        code: "<span><Trans>Hello<br>World</Trans></span>",
+        code: "<Trans>Hello<br>World</Trans>",
         expected: "Hello<0/>World",
       },
       {
         case: "with nested tags",
-        code: "<span><Trans>To continue, <strong>please <em>confirm</em></strong> your choice.</Trans></span>",
+        code: "<Trans>To continue, <strong>please <em>confirm</em></strong> your choice.</Trans>",
         expected: "To continue, <1>please <0>confirm</0></1> your choice.",
       },
       {
         case: "with tags and variables",
-        code: '<p><Trans>Hi {name}, please <a href="/profile"><strong>update</strong> your profile</a> or <em>contact {"support"}</em> for help.<br/>Thank you!</Trans></p>',
+        code: '<Trans>Hi {name}, please <a href="/profile"><strong>update</strong> your profile</a> or <em>contact {"support"}</em> for help.<br/>Thank you!</Trans>',
         expected:
           "Hi {name}, please <1><0>update</0> your profile</1> or <2>contact {0}</2> for help.<3/>Thank you!",
+      },
+      {
+        case: "with comments",
+        code: '<Trans><!-- Comment -->Click <a href="/upgrade"><!-- Comment -->here<!-- Comment --></a> to upgrade</Trans>',
+        expected: "Click <0>here</0> to upgrade",
       },
     ])("should extract message $case", async ({ code, expected }) => {
       const { message } = await extract(code);
