@@ -174,18 +174,28 @@ describe("lastUsedIdentitiesStore", () => {
     });
 
     it("should update only the name of an existing identity", () => {
-      lastUsedIdentitiesStore.updateLastUsedIdentity(identity1, { name: newName });
+      lastUsedIdentitiesStore.updateLastUsedIdentity(identity1, {
+        name: newName,
+      });
 
-      const updatedIdentity = get(lastUsedIdentitiesStore).identities[identity1.toString()];
+      const updatedIdentity = get(lastUsedIdentitiesStore).identities[
+        identity1.toString()
+      ];
       expect(updatedIdentity.name).toBe(newName);
-      expect(updatedIdentity.authMethod).toEqual({ passkey: { credentialId: credId1 } });
+      expect(updatedIdentity.authMethod).toEqual({
+        passkey: { credentialId: credId1 },
+      });
       expect(updatedIdentity.lastUsedTimestampMillis).toBe(mockTimestamp1);
     });
 
     it("should update only the authMethod of an existing identity", () => {
-      lastUsedIdentitiesStore.updateLastUsedIdentity(identity1, { authMethod: newAuthMethod });
+      lastUsedIdentitiesStore.updateLastUsedIdentity(identity1, {
+        authMethod: newAuthMethod,
+      });
 
-      const updatedIdentity = get(lastUsedIdentitiesStore).identities[identity1.toString()];
+      const updatedIdentity = get(lastUsedIdentitiesStore).identities[
+        identity1.toString()
+      ];
       expect(updatedIdentity.name).toBe(name1);
       expect(updatedIdentity.authMethod).toEqual(newAuthMethod);
       expect(updatedIdentity.lastUsedTimestampMillis).toBe(mockTimestamp1);
@@ -196,7 +206,9 @@ describe("lastUsedIdentitiesStore", () => {
         createdAtMillis: newCreatedAtMillis,
       });
 
-      const updatedIdentity = get(lastUsedIdentitiesStore).identities[identity1.toString()];
+      const updatedIdentity = get(lastUsedIdentitiesStore).identities[
+        identity1.toString()
+      ];
       expect(updatedIdentity.createdAtMillis).toBe(newCreatedAtMillis);
       expect(updatedIdentity.name).toBe(name1);
       expect(updatedIdentity.lastUsedTimestampMillis).toBe(mockTimestamp1);
@@ -208,7 +220,9 @@ describe("lastUsedIdentitiesStore", () => {
         authMethod: newAuthMethod,
       });
 
-      const updatedIdentity = get(lastUsedIdentitiesStore).identities[identity1.toString()];
+      const updatedIdentity = get(lastUsedIdentitiesStore).identities[
+        identity1.toString()
+      ];
       expect(updatedIdentity.name).toBe(newName);
       expect(updatedIdentity.authMethod).toEqual(newAuthMethod);
       expect(updatedIdentity.lastUsedTimestampMillis).toBe(mockTimestamp1);
@@ -216,9 +230,13 @@ describe("lastUsedIdentitiesStore", () => {
 
     it("should not update the lastUsedTimestampMillis", () => {
       vi.setSystemTime(mockTimestamp2);
-      lastUsedIdentitiesStore.updateLastUsedIdentity(identity1, { name: newName });
+      lastUsedIdentitiesStore.updateLastUsedIdentity(identity1, {
+        name: newName,
+      });
 
-      const updatedIdentity = get(lastUsedIdentitiesStore).identities[identity1.toString()];
+      const updatedIdentity = get(lastUsedIdentitiesStore).identities[
+        identity1.toString()
+      ];
       expect(updatedIdentity.lastUsedTimestampMillis).toBe(mockTimestamp1);
     });
   });
