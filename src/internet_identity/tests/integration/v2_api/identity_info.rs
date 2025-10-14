@@ -41,6 +41,9 @@ fn should_get_identity_info() -> Result<(), RejectResponse> {
     );
     assert_eq!(identity_info.authn_methods[1].last_authentication, None);
 
+    // Millis match. Nanos is too much precision for the test.
+    assert_eq!(identity_info.created_at.map(|t| t / 1_000_000), Some(env.get_time().as_nanos_since_unix_epoch() / 1_000_000));
+
     Ok(())
 }
 

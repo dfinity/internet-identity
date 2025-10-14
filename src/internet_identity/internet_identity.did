@@ -574,6 +574,8 @@ type IdentityInfo = record {
     // Authentication method independent metadata
     metadata : MetadataMapV2;
     name : opt text;
+    // The timestamp at which the anchor was created
+    created_at : opt Timestamp;
 };
 
 type IdentityInfoError = variant {

@@ -822,6 +822,7 @@ mod v2_api {
             openid_credentials: anchor_info.openid_credentials,
             metadata,
             name: anchor_info.name,
+            created_at: anchor_info.created_at,
         };
         Ok(identity_info)
     }

@@ -570,6 +570,10 @@ export interface IdentityInfo {
    */
   'metadata' : MetadataMapV2,
   'name' : [] | [string],
+  /**
+   * The timestamp at which the anchor was created
+   */
+  'created_at' : [] | [Timestamp],
   'authn_method_registration' : [] | [AuthnMethodRegistrationInfo],
   'openid_credentials' : [] | [Array<OpenIdCredential>],
 }
