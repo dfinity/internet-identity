@@ -23,7 +23,7 @@
       }
 
       html[data-temp-hide-ssg="legacy"] body {
-        /* Make sure page background matches legacy */
+        /* Make sure page background matches legacy (--nvc-surface-dark in src/frontend/src/lib/legacy/styles/main.css) */
         background: oklch(0.15 0.0236 261.52) !important;
       }
     </style>
