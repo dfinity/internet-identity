@@ -154,7 +154,8 @@ jobs:
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: "Check canister size"
         run: |
-          max_size=2097152 # maximum canister size, in bytes
+          # maximum payload size is 2097152, in bytes
+          max_size=2096857 # 2096857 wasm size reached the payload size limit
           actual_size=${{ steps.record-size.outputs.size }}
           if (( actual_size > max_size ))
           then
