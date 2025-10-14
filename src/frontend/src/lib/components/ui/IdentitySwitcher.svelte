@@ -2,26 +2,20 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import {
     UserIcon,
-    PlusIcon,
-    ArrowUpRightIcon,
-    LifeBuoyIcon,
-    CodeSquareIcon,
     XIcon,
     LogOutIcon,
+    Settings,
+    UserPlusIcon,
   } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import type { HTMLAttributes } from "svelte/elements";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import {
-    INTERNET_COMPUTER_URL,
-    SOURCE_CODE_URL,
-    SUPPORT_URL,
-  } from "$lib/config";
   import { nonNullish } from "@dfinity/utils";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
+  import { canisterConfig } from "$lib/globals";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -41,23 +35,8 @@
     onLogout,
   }: Props = $props();
 
-  const links = [
-    {
-      href: INTERNET_COMPUTER_URL,
-      label: "Internet Computer",
-      icon: ArrowUpRightIcon,
-    },
-    {
-      href: SUPPORT_URL,
-      label: "Support",
-      icon: LifeBuoyIcon,
-    },
-    {
-      href: SOURCE_CODE_URL,
-      label: "Source code",
-      icon: CodeSquareIcon,
-    },
-  ];
+  const manageIdentityUrl: string | undefined =
+    canisterConfig?.new_flow_origins[0]?.[0];
 </script>
 
 <div class="mb-4 flex items-center">
@@ -75,7 +54,7 @@
     </Button>
   {/if}
 </div>
-<div class="mb-5 flex flex-col gap-1.5">
+<div class="mb-4 flex flex-col gap-1.5">
   <ul class="contents">
     {#each identities as identity}
       <li class="contents">
@@ -112,25 +91,17 @@
   </ul>
   <ButtonCard onclick={useAnotherIdentity}>
     <FeaturedIcon size="sm">
-      <PlusIcon size="1.25rem" />
+      <UserPlusIcon size="1rem" />
     </FeaturedIcon>
     <span>Use another identity</span>
   </ButtonCard>
-  {#if onLogout}
-    <Button onclick={onLogout} variant="tertiary"
-      ><LogOutIcon size="1.25rem" />Sign Out</Button
-    >
-  {/if}
 </div>
-<hr class="border-t-border-tertiary mb-4" />
-<div class="flex gap-4">
-  {#each links as { href, label }}
-    <a
-      {href}
-      target="_blank"
-      class="text-text-secondary text-sm font-medium outline-0 focus-visible:underline"
-    >
-      {label}
-    </a>
-  {/each}
-</div>
+{#if onLogout}
+  <Button onclick={onLogout} variant="tertiary"
+    ><LogOutIcon size="1.25rem" />Sign Out</Button
+  >
+{:else if nonNullish(manageIdentityUrl)}
+  <Button href={manageIdentityUrl} variant="tertiary"
+    ><Settings size="1.25rem" />Manage Identity</Button
+  >
+{/if}
