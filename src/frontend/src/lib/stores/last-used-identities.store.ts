@@ -49,6 +49,12 @@ type LastUsedIdentitiesStore = Readable<{
       "identityNumber" | "name" | "authMethod" | "createdAtMillis"
     >,
   ) => void;
+  updateLastUsedIdentity: (
+    identityNumber: bigint,
+    params: Partial<
+      Pick<LastUsedIdentity, "name" | "authMethod" | "createdAtMillis">
+    >,
+  ) => void;
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
   ) => void;
@@ -96,6 +102,19 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
           accounts: identity?.accounts,
           ...params,
           lastUsedTimestampMillis: Date.now(),
+        };
+        return lastUsedIdentities;
+      });
+    },
+    updateLastUsedIdentity: (identityNumber, params) => {
+      lastUsedStore.update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[identityNumber.toString()];
+        if (isNullish(identity)) {
+          return lastUsedIdentities;
+        }
+        lastUsedIdentities[identityNumber.toString()] = {
+          ...identity,
+          ...params,
         };
         return lastUsedIdentities;
       });
