@@ -25,7 +25,6 @@
   import { page } from "$app/state";
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
-  import { t } from "$lib/stores/locale.store";
 
   const { children, data }: LayoutProps = $props();
 

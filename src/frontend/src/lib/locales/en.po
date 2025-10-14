@@ -13,19 +13,23 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:102
+#: src/frontend/src/routes/(new-styling)/+page.svelte:100
+msgid "{num, plural, =0 {No books} one {One book} other {# books}}"
+msgstr "{num, plural, =0 {No books} one {One book} other {# books}}"
+
+#: src/frontend/src/routes/(new-styling)/+page.svelte:109
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Experience"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:111
+#: src/frontend/src/routes/(new-styling)/+page.svelte:118
 msgid "Full Ownership"
 msgstr "Full Ownership"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:110
+#: src/frontend/src/routes/(new-styling)/+page.svelte:117
 msgid "Real Privacy"
 msgstr "Real Privacy"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:112
+#: src/frontend/src/routes/(new-styling)/+page.svelte:119
 msgid "Seamless Access"
 msgstr "Seamless Access"
