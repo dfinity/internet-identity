@@ -598,34 +598,10 @@
     "logo": "doxa_logo.webp"
   },
   {
-    "name": "Motodex",
-    "oneLiner": "A hyper-casual, motorcycle race game where players develop their riders and improve high-speed tracks.",
-    "website": "https://motodex.dexstudios.games/",
-    "logo": "motodex_logo.png"
-  },
-  {
     "name": "Fomowell",
     "oneLiner": "The fairest Web3 project launch platform.",
     "website": "https://fomowell.com/",
     "logo": "fomowell_logo.png"
-  },
-  {
-    "name": "Metaviz",
-    "oneLiner": "A visual project collaboration workspace.",
-    "website": "https://www.metaviz.net/",
-    "logo": "metaviz_logo.png"
-  },
-  {
-    "name": "CYCLES-TRANSFER-STATION",
-    "oneLiner": "An onchain order-book market, where the market tokens trade against the stable CYCLES. Mint, hold, transfer, and trade the CYCLES at the CTS market.",
-    "website": "https://cycles-transfer-station.com",
-    "logo": "cyclestransferstation_logo.png"
-  },
-  {
-    "name": "Staex VTS",
-    "oneLiner": "A vehicle tracking system that serves as an infrastructure to track and invoice vehicles.",
-    "website": "https://staex.io",
-    "logo": "staex_logo.png"
   },
   {
     "name": "Zon Social Media",
@@ -663,12 +639,6 @@
     "logo": "bridge23_logo.svg"
   },
   {
-    "name": "Event Hub",
-    "oneLiner": "Event Hub Broadcaster is an event-driven system managed by Attention DAO for connecting ecosystem projects on ICP.",
-    "website": "https://attentiondao.app/dao",
-    "logo": "eventhub_logo.png"
-  },
-  {
     "name": "Gate23",
     "oneLiner": "Gate23 is an advanced point-of-sale (POS) and business software designed specifically for the food and beverage, e-commerce, and retail industries.",
     "website": "https://alpha-gate23.bridge23.app/",
@@ -703,12 +673,6 @@
     "logo": "upas_logo.png",
     "oneLiner": "A decentralized open-source reputation standard that utilizes ICP securely and autonomously verify user achievements and issue credentials.",
     "website": "https://5j4ti-jqaaa-aaaaj-qncma-cai.icp0.io/"
-  },
-  {
-    "name": "Civic Pass",
-    "logo": "civic_logo.png",
-    "oneLiner": "A leading provider of identity and access management solutions.",
-    "website": "https://www.civic.com"
   },
   {
     "name": "IC Toolkit",
