@@ -11,8 +11,6 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-import { createdAtMillis } from "$lib/utils/identityInfo";
-import { IdentityAnchorInfo } from "$lib/generated/internet_identity_types";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
 
