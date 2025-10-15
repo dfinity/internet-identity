@@ -432,6 +432,7 @@
           content-visibility 0.2s,
           height 0.2s ease;
         transition-behavior: allow-discrete;
+        /*noinspection CssUnknownProperty*/
         interpolate-size: allow-keywords;
         height: 0;
       }
