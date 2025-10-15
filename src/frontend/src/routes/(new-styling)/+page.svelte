@@ -19,8 +19,8 @@
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { manuallyReroute } from "../../hooks";
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
-  import { MinusCircle, PlusCircle } from "@lucide/svelte";
+  import { LanguageSelector, Trans } from "$lib/components/locale";
+  import { MinusCircleIcon, PlusCircleIcon } from "@lucide/svelte";
 
   // Add rerouting back on this SSG route
   manuallyReroute();
@@ -47,6 +47,7 @@
     <div
       class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
     >
+      <LanguageSelector />
       <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank">
         {$t`For developers`}
       </Button>
@@ -81,7 +82,9 @@
           containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
         />
       </div>
-      <p class="text-text-tertiary max-w-[534px] text-center text-base">
+      <p
+        class="text-text-tertiary max-w-[600px] text-center text-base text-balance"
+      >
         <Trans>
           Internet Identity lets you access apps and services securely, without
           creating passwords, sharing personal data, or giving up control.
@@ -188,8 +191,8 @@
       <details>
         <summary>
           {$t`What is Internet Identity?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -212,8 +215,8 @@
       <details>
         <summary>
           {$t`Is my Face ID or Fingerprint stored in Internet Identity?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -226,8 +229,8 @@
       <details>
         <summary>
           {$t`How do passkeys work?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -250,7 +253,7 @@
             Passkeys are phishing-resistant, hard to steal, and can sync across
             your devices through providers like Google, Apple, or Microsoft.
             <a
-              href="${FAQ_PASSKEY_URL}"
+              href={FAQ_PASSKEY_URL}
               class="text-text-primary underline"
               target="_blank">Learn more.</a
             >
@@ -260,8 +263,8 @@
       <details>
         <summary>
           {$t`What makes Internet Identity secure & easy to use?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -276,8 +279,8 @@
       <details>
         <summary>
           {$t`What makes Internet Identity privacy-preserving?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -292,8 +295,8 @@
       <details>
         <summary>
           {$t`How does Internet Identity compare to other Web3 authentication tools?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -307,8 +310,8 @@
       <details>
         <summary>
           {$t`How do Google, Microsoft and Apple integrations work with Internet Identity?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>
@@ -346,8 +349,8 @@
       <details>
         <summary>
           {$t`What's new in Internet Identity 2.0?`}
-          <MinusCircle />
-          <PlusCircle />
+          <MinusCircleIcon />
+          <PlusCircleIcon />
         </summary>
         <p>
           <Trans>

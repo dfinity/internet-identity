@@ -14,6 +14,7 @@
     direction?: Direction;
     align?: Align;
     distance?: string;
+    responsive?: boolean;
   };
 
   let {
@@ -25,6 +26,7 @@
     distance = "0px",
     children,
     class: className,
+    responsive = true,
     ...props
   }: Props = $props();
 
@@ -83,7 +85,7 @@
 
 <svelte:window bind:innerWidth={windowWidth} />
 
-{#if windowWidth >= MOBILE_BREAKPOINT}
+{#if windowWidth >= MOBILE_BREAKPOINT || !responsive}
   <div
     class="fixed inset-0 z-10"
     role="presentation"

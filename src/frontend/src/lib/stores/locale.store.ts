@@ -4,16 +4,24 @@ import { writableStored } from "./writable.store";
 import { building } from "$app/environment";
 import { i18n } from "@lingui/core";
 import { MacroMessageDescriptor, ChoiceOptions } from "@lingui/core/macro";
-import { availableLocales } from "$lib/constants/locale.constants";
+import {
+  availableLocales,
+  enabledLocales,
+} from "$lib/constants/locale.constants";
+import { ENABLE_ALL_LOCALES } from "$lib/state/featureFlags";
+
+export const locales = get(ENABLE_ALL_LOCALES)
+  ? availableLocales
+  : enabledLocales;
 
 export const browserLocales = building
-  ? [availableLocales[0]] // Fallback during SSG
+  ? [locales[0]] // Fallback during SSG
   : (navigator.languages ?? [navigator.language ?? availableLocales[0]]);
 export const availableBrowserLocale =
   // Exact match
-  browserLocales.find((ul) => availableLocales.includes(ul)) ??
+  browserLocales.find((ul) => locales.includes(ul)) ??
   // Language-only match
-  availableLocales.find((al) =>
+  locales.find((al) =>
     browserLocales.some((ul) => ul.split("-")[0] === al.split("-")[0]),
   ) ??
   // Fallback
@@ -37,7 +45,6 @@ export const localeStore: LocaleStore = {
     const validLocale = availableLocales.includes(locale)
       ? locale
       : availableLocales[0];
-    console.log("validLocale", validLocale, locale);
     const { messages } = await import(`$lib/locales/${validLocale}.po`);
     i18n.loadAndActivate({ locale: locale, messages });
   },
@@ -55,13 +62,13 @@ export const localeStore: LocaleStore = {
     internalStore.set(locale);
   },
   reset: async () => {
-    const { messages } = await import(`$lib/locales/${availableLocales[0]}.po`);
-    i18n.loadAndActivate({ locale: availableLocales[0], messages });
+    const { messages } = await import(
+      `$lib/locales/${availableBrowserLocale}.po`
+    );
+    i18n.loadAndActivate({ locale: availableBrowserLocale, messages });
     internalStore.set(null);
   },
 };
-
-console.log("local", localeStore);
 
 // Derives based on localeStore so that translations update on language change
 export const t = derived(
