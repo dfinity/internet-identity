@@ -242,10 +242,7 @@ const textInNode = (
   registered: boolean;
 } => {
   if (node.type === "Text") {
-    const trimmed = node.data
-      .replace(/[\r\n]+/g, "")
-      .replace(/^\s+/, " ")
-      .replace(/\s+$/, " ");
+    const trimmed = node.data.replace(/[\r\n]+/g, "").replace(/\s+/g, " ");
     return {
       text: trimmed,
       start: node.start,
@@ -278,8 +275,8 @@ const textInNode = (
   ) {
     return {
       text: "",
-      start: node.start ?? 0,
-      end: node.end ?? 0,
+      start: node.start,
+      end: node.end,
       values: {},
       registered: false,
     };
@@ -289,7 +286,10 @@ const textInNode = (
     textInNode(child, valueCount, register),
   );
 
-  const combinedText = childResults.map((c) => c.text).join("");
+  const combinedText = childResults
+    .map((c) => c.text)
+    .join("")
+    .trim();
   const combinedValues = childResults.reduce(
     (acc, c) => ({ ...acc, ...c.values }),
     {},
@@ -308,7 +308,7 @@ const textInNode = (
 
   return {
     text:
-      combinedText.trim().length > 0
+      combinedText.length > 0
         ? `<${idx}>${combinedText}</${idx}>`
         : `<${idx}/>`,
     start: node.start,
@@ -346,10 +346,7 @@ export const findTransInComponent = (
   for (const child of component.fragment.nodes) {
     // Text node
     if (child.type === "Text") {
-      message += child.data
-        .replace(/[\r\n]+/g, "")
-        .replace(/^\s+/, " ")
-        .replace(/\s+$/, " ");
+      message += child.data.replace(/[\r\n]+/g, "").replace(/\s+/g, " ");
       continue;
     }
 
