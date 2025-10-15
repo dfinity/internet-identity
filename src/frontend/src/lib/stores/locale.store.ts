@@ -10,18 +10,18 @@ import {
 } from "$lib/constants/locale.constants";
 import { ENABLE_ALL_LOCALES } from "$lib/state/featureFlags";
 
-export const locales = get(ENABLE_ALL_LOCALES)
-  ? availableLocales
-  : enabledLocales;
+export const locales = derived(ENABLE_ALL_LOCALES, () =>
+  get(ENABLE_ALL_LOCALES) ? availableLocales : enabledLocales,
+);
 
 export const browserLocales = building
-  ? [locales[0]] // Fallback during SSG
+  ? [get(locales)[0]] // Fallback during SSG
   : (navigator.languages ?? [navigator.language ?? availableLocales[0]]);
 export const availableBrowserLocale =
   // Exact match
-  browserLocales.find((ul) => locales.includes(ul)) ??
+  browserLocales.find((ul) => get(locales).includes(ul)) ??
   // Language-only match
-  locales.find((al) =>
+  get(locales).find((al) =>
     browserLocales.some((ul) => ul.split("-")[0] === al.split("-")[0]),
   ) ??
   // Fallback

@@ -12,7 +12,7 @@
   let isOpen = $state(false);
 </script>
 
-{#if locales.length > 1}
+{#if $locales.length > 1}
   <Button
     bind:element={buttonRef}
     onclick={() => (isOpen = true)}
@@ -33,7 +33,7 @@
     class="!w-18 !p-1.5"
   >
     <ul class="flex flex-col">
-      {#each locales as locale}
+      {#each $locales as locale}
         <li class="contents">
           <Button
             onclick={() => {
