@@ -30,6 +30,7 @@
     direction="down"
     align="start"
     distance="0.25rem"
+    responsive={false}
     class="!w-18 !p-1.5"
   >
     <ul class="flex flex-col">
