@@ -37,6 +37,7 @@ export const localeStore: LocaleStore = {
     const validLocale = availableLocales.includes(locale)
       ? locale
       : availableLocales[0];
+    console.log("validLocale", validLocale, locale);
     const { messages } = await import(`$lib/locales/${validLocale}.po`);
     i18n.loadAndActivate({ locale: locale, messages });
   },
@@ -59,6 +60,8 @@ export const localeStore: LocaleStore = {
     internalStore.set(null);
   },
 };
+
+console.log("local", localeStore);
 
 // Derives based on localeStore so that translations update on language change
 export const t = derived(
