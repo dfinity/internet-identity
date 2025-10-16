@@ -21,7 +21,7 @@ const overrideFeatureFlags = () => {
   // Example: ?feature_flag_openid_authentication=true
   const url = new URL(window.location.href);
   for (const [key, value] of url.searchParams.entries()) {
-    if (key.startsWith(FEATURE_FLAG_PREFIX)) {
+    if (key.toLowerCase().startsWith(FEATURE_FLAG_PREFIX)) {
       const flag = key.slice(FEATURE_FLAG_PREFIX.length).toUpperCase();
       if (!(flag in featureFlags)) {
         console.warn(`Invalid feature flag received '${flag}'`);

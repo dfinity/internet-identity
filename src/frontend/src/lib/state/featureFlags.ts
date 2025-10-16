@@ -113,6 +113,11 @@ export const LARGE_GOOGLE_BUTTON = createFeatureFlagStore(
   },
 );
 
+export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
+  "ENABLE_ALL_LOCALES",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   OPENID_AUTHENTICATION,
@@ -121,4 +126,5 @@ export default {
   CONTINUE_FROM_ANOTHER_DEVICE,
   AUTH_FLOW_UPDATES,
   LARGE_GOOGLE_BUTTON,
+  ENABLE_ALL_LOCALES,
 } as Record<string, FeatureFlagStore>;
