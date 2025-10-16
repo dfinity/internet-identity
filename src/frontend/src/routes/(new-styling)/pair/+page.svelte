@@ -8,21 +8,16 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { canisterConfig } from "$lib/globals";
   import { toaster } from "$lib/components/utils/toaster";
 
   let isUnableToComplete = $state(false);
 
   const onRegistered = (identityNumber: bigint) => {
-    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
-      toaster.success({
-        title: "You're all set. Your passkey has been registered.",
-      });
-      lastUsedIdentitiesStore.selectIdentity(identityNumber);
-      goto("/manage");
-    } else {
-      goto("/login");
-    }
+    toaster.success({
+      title: "You're all set. Your passkey has been registered.",
+    });
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    goto("/manage");
   };
 </script>
 

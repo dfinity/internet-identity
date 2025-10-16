@@ -16,7 +16,6 @@ const mockInternetIdentityInit = (
   canister_creation_cycles_cost: [],
   analytics_config: [],
   related_origins: [],
-  feature_flag_continue_from_another_device: [],
   openid_configs: [],
   captcha_config: [],
   dummy_auth: [],

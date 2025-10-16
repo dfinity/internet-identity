@@ -21,7 +21,6 @@
     isAuthenticating?: boolean;
     onSignIn: (identityNumber: bigint) => void;
     onSignUp: (identityNumber: bigint) => void;
-    onOtherDevice?: (identityNumber: bigint) => void; // TODO: Remove once we can sign in directly
     onMigration?: (identityNumber: bigint) => void;
     onError: (error: unknown) => void;
     withinDialog?: boolean;
@@ -32,7 +31,6 @@
     isAuthenticating = $bindable(),
     onSignIn,
     onSignUp,
-    onOtherDevice = () => {},
     onMigration = () => {},
     onError,
     withinDialog = false,
@@ -110,11 +108,7 @@
   };
 
   const handleRegistered = async (identityNumber: bigint) => {
-    if (canisterConfig.feature_flag_continue_from_another_device[0] === true) {
-      onSignIn(identityNumber);
-    } else {
-      onOtherDevice(identityNumber);
-    }
+    onSignIn(identityNumber);
   };
 </script>
 

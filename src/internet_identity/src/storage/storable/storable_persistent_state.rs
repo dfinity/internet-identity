@@ -42,9 +42,6 @@ pub struct StorablePersistentState {
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
     dummy_auth: Option<DummyAuthConfig>,
-
-    // Feature flags
-    feature_flag_continue_from_another_device: Option<bool>,
 }
 
 impl Storable for StorablePersistentState {
@@ -91,7 +88,6 @@ impl From<PersistentState> for StorablePersistentState {
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
-            feature_flag_continue_from_another_device: s.feature_flag_continue_from_another_device,
         }
     }
 }
@@ -116,7 +112,6 @@ impl From<StorablePersistentState> for PersistentState {
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
-            feature_flag_continue_from_another_device: s.feature_flag_continue_from_another_device,
         }
     }
 }
@@ -169,7 +164,6 @@ mod tests {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
-            feature_flag_continue_from_another_device: None,
         };
 
         assert_eq!(StorablePersistentState::default(), expected_defaults);
@@ -198,7 +192,6 @@ mod tests {
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
-            feature_flag_continue_from_another_device: None,
         };
         assert_eq!(PersistentState::default(), expected_defaults);
     }

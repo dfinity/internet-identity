@@ -244,7 +244,6 @@
             {onSignIn}
             {onSignUp}
             {onMigration}
-            onOtherDevice={() => (isAuthDialogOpen = false)}
             onError={(error) => {
               isAuthDialogOpen = false;
               handleError(error);

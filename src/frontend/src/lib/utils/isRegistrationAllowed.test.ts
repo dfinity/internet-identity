@@ -21,7 +21,6 @@ describe("isRegistrationAllowed", () => {
       is_production: [],
       new_flow_origins: [],
       dummy_auth: [],
-      feature_flag_continue_from_another_device: [],
     };
   };
 

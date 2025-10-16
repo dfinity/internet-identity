@@ -89,16 +89,6 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const CONTINUE_FROM_ANOTHER_DEVICE = createFeatureFlagStore(
-  "CONTINUE_FROM_ANOTHER_DEVICE",
-  true, // Enable temp key flow (until backend changes can be enabled)
-  (featureFlag) => {
-    featureFlag.temporaryOverride(
-      canisterConfig.feature_flag_continue_from_another_device[0] ?? true,
-    );
-  },
-);
-
 export const AUTH_FLOW_UPDATES = createFeatureFlagStore(
   "AUTH_FLOW_UPDATES",
   false,
@@ -123,7 +113,6 @@ export default {
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
-  CONTINUE_FROM_ANOTHER_DEVICE,
   AUTH_FLOW_UPDATES,
   LARGE_GOOGLE_BUTTON,
   ENABLE_ALL_LOCALES,

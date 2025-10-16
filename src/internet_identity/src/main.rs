@@ -541,8 +541,6 @@ fn config() -> InternetIdentityInit {
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
-        feature_flag_continue_from_another_device: persistent_state
-            .feature_flag_continue_from_another_device,
     })
 }
 
@@ -667,11 +665,6 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
         if let Some(dummy_auth) = arg.dummy_auth {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.dummy_auth = dummy_auth;
-            })
-        }
-        if let Some(flag) = arg.feature_flag_continue_from_another_device {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.feature_flag_continue_from_another_device = Some(flag);
             })
         }
     }
@@ -965,14 +958,6 @@ mod v2_api {
             authn_method,
             tentative_device_registration::get_confirmed_session(identity_number),
         ) {
-            // Exiting registration mode with a session is behind a feature flag
-            if !persistent_state(|state| {
-                state
-                    .feature_flag_continue_from_another_device
-                    .unwrap_or(false)
-            }) {
-                trap("feature_flag_continue_from_another_device is disabled");
-            }
             // Verify that caller matches confirmed session
             if confirmed_session != caller() {
                 return Err(AuthnMethodRegistrationModeExitError::Unauthorized(caller()));
@@ -1026,15 +1011,6 @@ mod v2_api {
     async fn authn_method_session_register(
         identity_number: IdentityNumber,
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
-        // Adding a session is behind a feature flag
-        if !persistent_state(|state| {
-            state
-                .feature_flag_continue_from_another_device
-                .unwrap_or(false)
-        }) {
-            trap("feature_flag_continue_from_another_device is disabled");
-        }
-
         tentative_device_registration::add_tentative_session(identity_number, caller()).await
     }
 
@@ -1042,15 +1018,6 @@ mod v2_api {
     fn authn_method_session_info(
         identity_number: IdentityNumber,
     ) -> Option<AuthnMethodSessionInfo> {
-        // Requesting session info is behind a feature flag
-        if !persistent_state(|state| {
-            state
-                .feature_flag_continue_from_another_device
-                .unwrap_or(false)
-        }) {
-            trap("feature_flag_continue_from_another_device is disabled");
-        }
-
         // Return session info if caller matches confirmed session
         tentative_device_registration::get_confirmed_session(identity_number)
             .is_some_and(|confirmed_session| confirmed_session == caller())
