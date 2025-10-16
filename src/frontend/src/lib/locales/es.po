@@ -19,7 +19,7 @@ msgstr "<0>Interfaz completamente rediseñada:</0> Hemos dado a Internet Identit
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:393
 msgid "<0>Google Integration:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated Google as an alternative authentication option."
-msgstr "<0>Integración con Google:</0> Aunque el uso de passkeys está creciendo, aún no son comunes para todos. Hemos observado una tasa de abandono del 50 % en nuestro flujo de registro, lo que indica la necesidad de métodos de autenticación alternativos. Para que Internet Identity sea accesible a un público aún más amplio, hemos integrado Google como opción de autenticación alternativa."
+msgstr "<0>Integración con Google:</0> Aunque el uso de passkeys está creciendo, aún no son comunes para todos. Hemos observado una tasa de abandono del 50 % en nuestro flujo de registro, lo que indica la necesidad de métodos de autenticación alternativos. Para que Internet Identity sea accesible a un público aún más amplio, hemos integrado Google como opción de autenticación alternativa."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:373
 msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
