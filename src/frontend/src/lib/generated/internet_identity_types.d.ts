@@ -686,10 +686,6 @@ export interface InternetIdentityInit {
    */
   'related_origins' : [] | [Array<string>],
   /**
-   * Feature flags
-   */
-  'feature_flag_continue_from_another_device' : [] | [boolean],
-  /**
    * Configurations for OpenID clients
    */
   'openid_configs' : [] | [Array<OpenIdConfig>],

@@ -4,7 +4,6 @@
   import {
     authorizationStore,
     authorizationStatusStore,
-    authorizationContextStore,
   } from "$lib/stores/authorization.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
@@ -64,16 +63,6 @@
     void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
     await authorizationStore.authorize(undefined, 4000);
-  };
-  const onOtherDevice = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    lastUsedIdentitiesStore.addLastUsedAccount({
-      origin: $authorizationContextStore.effectiveOrigin,
-      identityNumber,
-      accountNumber: undefined,
-    });
-    await goto("/authorize/continue");
-    isAuthDialogOpen = false;
   };
   const onMigration = async () => {
     await goto("/authorize/upgrade-success");
@@ -146,7 +135,6 @@
             bind:isAuthenticating
             {onSignIn}
             {onSignUp}
-            {onOtherDevice}
             {onMigration}
             onError={(error) => {
               isAuthDialogOpen = false;

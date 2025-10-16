@@ -4,11 +4,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { authenticateWithSession } from "$lib/utils/authentication";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
-import { bufferEqual } from "$lib/utils/iiConnection";
-import {
-  authenticatedStore,
-  authenticationStore,
-} from "$lib/stores/authentication.store";
+import { authenticationStore } from "$lib/stores/authentication.store";
 import { features } from "$lib/legacy/features";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
@@ -26,11 +22,6 @@ export class RegisterAccessMethodFlow {
   #identityName = $state<string>();
   #identityNumber = $state<bigint>();
   #existingDeviceLink = $state<URL>();
-  readonly #sessionAvailable: boolean;
-
-  constructor(sessionAvailable: boolean) {
-    this.#sessionAvailable = sessionAvailable;
-  }
 
   get view() {
     return this.#view;
@@ -65,59 +56,7 @@ export class RegisterAccessMethodFlow {
       )[0];
       if (nonNullish(identityNumber)) {
         this.#identityNumber = identityNumber;
-        if (this.#sessionAvailable) {
-          return this.#registerSession(identityNumber);
-        }
-        return this.#registerTempKey(identityNumber);
-      }
-      // Wait before retrying
-      await waitFor(POLL_INTERVAL);
-    }
-    throw new Error("Registration not completed within time window");
-  };
-
-  #registerTempKey = async (identityNumber: bigint): Promise<void> => {
-    const session = get(sessionStore);
-    const credentialId = crypto.getRandomValues(new Uint8Array(32));
-    const authnMethodData = passkeyAuthnMethodData({
-      alias: "temporary-key",
-      pubKey: session.identity.getPublicKey().toDer(),
-      credentialId,
-      origin: window.location.origin,
-    });
-    const confirmation = await anonymousActor
-      .authn_method_register(identityNumber, authnMethodData)
-      .then(throwCanisterError);
-    const expiration = confirmation.expiration;
-    this.#confirmationCode = confirmation.confirmation_code;
-    this.#view = "confirmDevice";
-
-    while (BigInt(Date.now()) * BigInt(1_000_000) < expiration) {
-      const { authn_methods } = await anonymousActor
-        .identity_authn_info(identityNumber)
-        .then(throwCanisterError);
-      // Show confirm sign-in view if session key has been registered
-      if (
-        authn_methods.some(
-          (authnMethod) =>
-            "WebAuthn" in authnMethod &&
-            bufferEqual(
-              new Uint8Array(authnMethod.WebAuthn.credential_id),
-              credentialId,
-            ),
-        )
-      ) {
-        const identity = await authenticateWithSession({ session });
-        await authenticationStore.set({
-          identity,
-          identityNumber,
-        });
-        const { name } = await get(authenticatedStore)
-          .actor.identity_info(identityNumber)
-          .then(throwCanisterError);
-        this.#identityName = name[0];
-        this.#view = "confirmSignIn";
-        return;
+        return this.#registerSession(identityNumber);
       }
       // Wait before retrying
       await waitFor(POLL_INTERVAL);
@@ -177,26 +116,16 @@ export class RegisterAccessMethodFlow {
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
     });
-    if (this.#sessionAvailable) {
-      await session.actor
-        .authn_method_registration_mode_exit(this.#identityNumber, [
-          authnMethodData,
-        ])
-        .then(throwCanisterError);
-      const identity = await authenticateWithSession({ session });
-      await authenticationStore.set({
-        identity,
-        identityNumber: this.#identityNumber,
-      });
-    } else {
-      await get(authenticatedStore)
-        .actor.authn_method_replace(
-          this.#identityNumber,
-          new Uint8Array(session.identity.getPublicKey().toDer()),
-          authnMethodData,
-        )
-        .then(throwCanisterError);
-    }
+    await session.actor
+      .authn_method_registration_mode_exit(this.#identityNumber, [
+        authnMethodData,
+      ])
+      .then(throwCanisterError);
+    const identity = await authenticateWithSession({ session });
+    await authenticationStore.set({
+      identity,
+      identityNumber: this.#identityNumber,
+    });
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: this.#identityNumber,
       name,
