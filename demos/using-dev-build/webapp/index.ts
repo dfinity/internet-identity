@@ -2,9 +2,9 @@
  * then calls the whoami canister to check the user's principal.
  */
 
+import { AuthClient } from "@icp-sdk/auth/client";
 import { Actor, ActorMethod, HttpAgent } from "@icp-sdk/core/agent";
 import type { Principal } from "@icp-sdk/core/principal";
-import { AuthClient } from "@icp-sdk/auth/client";
 
 const webapp_id = process.env.WHOAMI_CANISTER_ID;
 // The <canisterId>.localhost URL is used as opposed to setting the canister id as a parameter
@@ -24,8 +24,10 @@ export interface _SERVICE {
   whoami: ActorMethod<[], Principal>;
 }
 
+let authClient: AuthClient;
+
 // Autofills the <input> for the II Url to point to the correct canister.
-document.body.onload = () => {
+document.body.onload = async () => {
   let iiUrl;
 
   if (process.env.DFX_NETWORK === "local") {
@@ -37,13 +39,29 @@ document.body.onload = () => {
     iiUrl = local_ii_url;
   }
   document.querySelector<HTMLInputElement>("#iiUrl")!.value = iiUrl;
+
+  // Avoid creating the auth-client on click.
+  // Safari might block the log in if there are async operations before opening the new tab / window.
+  authClient = await AuthClient.create();
+};
+
+const renderPrincipal = async () => {
+  // At this point we're authenticated, and we can get the identity from the auth client:
+  const identity = authClient.getIdentity();
+  // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
+  const agent = await HttpAgent.create({ identity, shouldFetchRootKey: true });
+  // Using the interface description of our webapp, we create an actor that we use to call the service methods.
+  const webapp: _SERVICE = Actor.createActor(webapp_idl, {
+    agent,
+    canisterId: webapp_id!,
+  });
+  // Call whoami which returns the principal (user id) of the current user.
+  const principal = await webapp.whoami();
+  // show the principal on the page
+  document.getElementById("loginStatus")!.innerText = principal.toText();
 };
 
 document.getElementById("loginBtn")?.addEventListener("click", async () => {
-  // When the user clicks, we start the login process.
-  // First we have to create and AuthClient.
-  const authClient = await AuthClient.create();
-
   // Find out which URL should be used for login.
   const iiUrl = document.querySelector<HTMLInputElement>("#iiUrl")!.value;
 
@@ -58,17 +76,25 @@ document.getElementById("loginBtn")?.addEventListener("click", async () => {
     });
   });
 
-  // At this point we're authenticated, and we can get the identity from the auth client:
-  const identity = authClient.getIdentity();
-  // Using the identity obtained from the auth client, we can create an agent to interact with the IC.
-  const agent = await HttpAgent.create({ identity, shouldFetchRootKey: true });
-  // Using the interface description of our webapp, we create an actor that we use to call the service methods.
-  const webapp: _SERVICE = Actor.createActor(webapp_idl, {
-    agent,
-    canisterId: webapp_id!,
-  });
-  // Call whoami which returns the principal (user id) of the current user.
-  const principal = await webapp.whoami();
-  // show the principal on the page
-  document.getElementById("loginStatus")!.innerText = principal.toText();
+  renderPrincipal();
 });
+
+document
+  .getElementById("loginOpenIdBtn")
+  ?.addEventListener("click", async () => {
+    // Find out which URL should be used for login.
+    const iiUrl = document.querySelector<HTMLInputElement>("#iiUrl")!.value;
+
+    // Call authClient.loginWithIcrc29(...) to login with Internet Identity.
+    // It uses the ICRC-29 standard.
+    // https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_29_window_post_message_transport.md
+    await new Promise<void>((resolve, reject) => {
+      authClient.loginWithIcrc29({
+        identityProvider: iiUrl,
+        onSuccess: resolve,
+        onError: reject,
+      });
+    });
+
+    renderPrincipal();
+  });

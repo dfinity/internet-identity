@@ -10,6 +10,7 @@ import {
 } from "$lib/globals";
 import { isNullish } from "@dfinity/utils";
 import { isSameOrigin } from "$lib/utils/urlUtils";
+import { localeStore } from "$lib/stores/locale.store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -20,7 +21,7 @@ const overrideFeatureFlags = () => {
   // Example: ?feature_flag_openid_authentication=true
   const url = new URL(window.location.href);
   for (const [key, value] of url.searchParams.entries()) {
-    if (key.startsWith(FEATURE_FLAG_PREFIX)) {
+    if (key.toLowerCase().startsWith(FEATURE_FLAG_PREFIX)) {
       const flag = key.slice(FEATURE_FLAG_PREFIX.length).toUpperCase();
       if (!(flag in featureFlags)) {
         console.warn(`Invalid feature flag received '${flag}'`);
@@ -68,6 +69,9 @@ export const init: ClientInit = async () => {
   Object.values(featureFlags).forEach((flag) => flag.initialize());
   overrideFeatureFlags();
   maybeSetDiscoverablePasskeyFlowFlag();
-  await sessionStore.init({ canisterId, agentOptions });
+  await Promise.all([
+    localeStore.init(),
+    sessionStore.init({ canisterId, agentOptions }),
+  ]);
   authenticationStore.init({ canisterId, agentOptions });
 };

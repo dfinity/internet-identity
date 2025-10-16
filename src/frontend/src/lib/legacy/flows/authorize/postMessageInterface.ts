@@ -13,6 +13,8 @@ import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
+import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
+import { get } from "svelte/store";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -147,7 +149,12 @@ export async function authenticationProtocol({
     requestResult.request.derivationOrigin ?? requestResult.origin;
   loginFunnel.init({ origin: requestOrigin });
   registrationFunnel.init({ origin: requestOrigin });
-  authenticationV2Funnel.init({ origin: requestOrigin });
+  authenticationV2Funnel.init({
+    origin: requestOrigin,
+    abTestGroup: get(LARGE_GOOGLE_BUTTON)
+      ? "largeGoogleButton"
+      : "smallGoogleButton",
+  });
 
   const authContext = {
     authRequest: requestResult.request,

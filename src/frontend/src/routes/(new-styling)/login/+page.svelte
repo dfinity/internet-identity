@@ -26,6 +26,7 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
+  import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
 
   const { data }: PageProps = $props();
 
@@ -95,7 +96,12 @@
   };
 
   onMount(() => {
-    authenticationV2Funnel.init({ origin: window.location.origin });
+    authenticationV2Funnel.init({
+      origin: window.location.origin,
+      abTestGroup: $LARGE_GOOGLE_BUTTON
+        ? "largeGoogleButton"
+        : "smallGoogleButton",
+    });
   });
 </script>
 
