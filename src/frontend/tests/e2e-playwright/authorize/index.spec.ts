@@ -176,7 +176,7 @@ test("Authorize with ICRC-29", async ({ page }) => {
   await authorizeWithUrl(
     page,
     TEST_APP_URL,
-    II_URL,
+    II_URL + "/authorize",
     async (authPage) => {
       await authPage
         .getByRole("button", { name: "Continue with Passkey" })
@@ -209,6 +209,7 @@ test("Authorize with ICRC-29 (directly through OpenID)", async ({ page }) => {
     TEST_APP_URL,
     II_URL + "/authorize?openid=test%20openid",
     async (openIdPage) => {
+      await openIdPage.waitForURL("http://localhost:11105/interaction/*");
       await expect(
         openIdPage.getByRole("heading", {
           name: "Sign-in",
