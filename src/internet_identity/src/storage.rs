@@ -1080,7 +1080,7 @@ impl<M: Memory + Clone> Storage<M> {
         // Update counters with one more account.
         self.update_counters(app_num, anchor_number, AccountType::Account)?;
 
-        // last_used will be set once the user signs in to the respective account.
+        // last_used will be set once the user signs in with the account.
         let last_used = None;
 
         // Process account references
@@ -1392,7 +1392,7 @@ impl<M: Memory + Clone> Storage<M> {
                 // This is because we don't create default accounts explicitly.
                 let new_ref = AccountReference {
                     account_number: Some(new_account_number),
-                    // The `last_used` field will be set when the user signs into this account.
+                    // The `last_used` field will be set when the user signs with this account.
                     last_used: None,
                 };
                 self.stable_account_reference_list_memory

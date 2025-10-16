@@ -75,8 +75,6 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_first_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let second_created_account = create_account(
         &env,
         canister_id,
@@ -88,8 +86,6 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_second_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let third_created_account = create_account(
         &env,
         canister_id,
@@ -100,8 +96,6 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
     )
     .unwrap()
     .unwrap();
-
-    let expected_third_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
 
     let accounts_list = get_accounts(
         &env,
@@ -126,19 +120,19 @@ fn should_list_accounts() -> Result<(), RejectResponse> {
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_first_last_used,
+                last_used: None,
                 name: Some(name)
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_second_last_used,
+                last_used: None,
                 name: Some(name_two)
             },
             AccountInfo {
                 account_number: third_created_account.account_number,
                 origin,
-                last_used: expected_third_last_used,
+                last_used: None,
                 name: Some(name_three)
             },
         ]
@@ -201,8 +195,6 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_first_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let second_created_account = create_account(
         &env,
         canister_id,
@@ -214,8 +206,6 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let expected_second_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let another_identity_account = create_account(
         &env,
         canister_id,
@@ -226,8 +216,6 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
     )
     .unwrap()
     .unwrap();
-
-    let expected_another_last_used = Some(env.get_time().as_nanos_since_unix_epoch());
 
     let accounts_list = get_accounts(
         &env,
@@ -262,13 +250,13 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
             AccountInfo {
                 account_number: first_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_first_last_used,
+                last_used: None,
                 name: Some(name)
             },
             AccountInfo {
                 account_number: second_created_account.account_number,
                 origin: origin.clone(),
-                last_used: expected_second_last_used,
+                last_used: None,
                 name: Some(name_two)
             },
         ]
@@ -287,7 +275,7 @@ fn should_list_only_own_accounts() -> Result<(), RejectResponse> {
             AccountInfo {
                 account_number: another_identity_account.account_number,
                 origin,
-                last_used: expected_another_last_used,
+                last_used: None,
                 name: Some(name_three)
             },
         ]
@@ -1044,6 +1032,108 @@ fn should_issue_different_principals_for_different_accounts() -> Result<(), Reje
 
     // Verify that the principals are different
     assert_ne!(user_key_1, user_key_2);
+
+    Ok(())
+}
+
+/// Verifies that the last_used field is updated after prepare_account_delegation.
+#[test]
+fn should_update_last_used_after_prepare_account_delegation() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    // Create an account
+    let created_account = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        "Test Account".to_string(),
+    )
+    .unwrap()
+    .unwrap();
+
+    // Verify last_used is initially None
+    assert_eq!(created_account.last_used, None);
+
+    // Retrieve the account before prepare_account_delegation to verify last_used is None
+    let accounts_before = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    let account_before = accounts_before
+        .iter()
+        .find(|account| account.account_number == created_account.account_number)
+        .expect("Account should exist in the list");
+
+    assert_eq!(
+        account_before.last_used,
+        None,
+        "last_used should be None before prepare_account_delegation"
+    );
+
+    // Capture timestamp before prepare_account_delegation
+    let time_before = env.get_time().as_nanos_since_unix_epoch();
+
+    // Call prepare_account_delegation for the created account
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        created_account.account_number,
+        pub_session_key,
+    );
+
+    prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    // Capture timestamp after prepare_account_delegation
+    let time_after = env.get_time().as_nanos_since_unix_epoch();
+
+    // Retrieve the account again to check last_used
+    let accounts_list = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname,
+    )
+    .unwrap()
+    .unwrap();
+
+    // Find the created account in the list (it should be at index 1, after the default account)
+    let updated_account = accounts_list
+        .iter()
+        .find(|account| account.account_number == created_account.account_number)
+        .expect("Account should exist in the list");
+
+    // Verify last_used is now populated
+    assert!(
+        updated_account.last_used.is_some(),
+        "last_used should be populated after prepare_account_delegation"
+    );
+
+    let last_used = updated_account.last_used.unwrap();
+
+    // Verify the timestamp is within the expected range
+    assert!(
+        last_used >= time_before && last_used <= time_after,
+        "last_used timestamp should be between {} and {}, but was {}",
+        time_before,
+        time_after,
+        last_used
+    );
 
     Ok(())
 }
