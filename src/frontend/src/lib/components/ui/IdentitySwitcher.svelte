@@ -103,7 +103,7 @@
     ><LogOutIcon size="1.25rem" />Sign Out</Button
   >
 {:else if nonNullish(manageIdentityUrl)}
-  <Button href={manageIdentityUrl} target="_blank" variant="tertiary"
+  <Button href="/manage" target="_blank" variant="tertiary"
     ><Settings size="1.25rem" />Manage Identity</Button
   >
 {/if}
