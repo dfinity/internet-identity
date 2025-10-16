@@ -83,6 +83,7 @@ pub struct IdentityInfo {
     pub openid_credentials: Option<Vec<OpenIdCredentialData>>,
     pub metadata: HashMap<String, MetadataEntryV2>,
     pub name: Option<String>,
+    pub created_at: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
