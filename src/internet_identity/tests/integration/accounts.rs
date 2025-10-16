@@ -1137,3 +1137,166 @@ fn should_update_last_used_after_prepare_account_delegation() -> Result<(), Reje
 
     Ok(())
 }
+
+/// Verifies that last_used is tracked independently for different accounts.
+#[test]
+fn should_update_last_used_independently_for_different_accounts() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    // Create two different accounts
+    let account_1 = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        "Account 1".to_string(),
+    )
+    .unwrap()
+    .unwrap();
+
+    let account_2 = create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        "Account 2".to_string(),
+    )
+    .unwrap()
+    .unwrap();
+
+    // Verify both accounts have last_used = None initially
+    assert_eq!(account_1.last_used, None);
+    assert_eq!(account_2.last_used, None);
+
+    // Call prepare_account_delegation for account_1
+    let params_1 = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        account_1.account_number,
+        pub_session_key.clone(),
+    );
+
+    let time_before_account_1 = env.get_time().as_nanos_since_unix_epoch();
+    prepare_account_delegation(&params_1, None).unwrap().unwrap();
+    let time_after_account_1 = env.get_time().as_nanos_since_unix_epoch();
+
+    // Retrieve accounts and verify account_1 has last_used set, account_2 still has None
+    let accounts_after_first_delegation = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    let account_1_after_first = accounts_after_first_delegation
+        .iter()
+        .find(|account| account.account_number == account_1.account_number)
+        .expect("Account 1 should exist");
+
+    let account_2_after_first = accounts_after_first_delegation
+        .iter()
+        .find(|account| account.account_number == account_2.account_number)
+        .expect("Account 2 should exist");
+
+    assert!(
+        account_1_after_first.last_used.is_some(),
+        "account_1 last_used should be populated after prepare_account_delegation"
+    );
+    let account_1_last_used = account_1_after_first.last_used.unwrap();
+
+    assert_eq!(
+        account_2_after_first.last_used,
+        None,
+        "account_2 last_used should still be None after only account_1 delegation"
+    );
+
+    // Verify account_1's timestamp is within expected range
+    assert!(
+        account_1_last_used >= time_before_account_1 && account_1_last_used <= time_after_account_1,
+        "account_1 last_used should be between {} and {}",
+        time_before_account_1,
+        time_after_account_1
+    );
+
+    // Advance time to create clear separation
+    env.advance_time(Duration::from_secs(60));
+
+    // Call prepare_account_delegation for account_2
+    let params_2 = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        account_2.account_number,
+        pub_session_key,
+    );
+
+    let time_before_account_2 = env.get_time().as_nanos_since_unix_epoch();
+    prepare_account_delegation(&params_2, None).unwrap().unwrap();
+    let time_after_account_2 = env.get_time().as_nanos_since_unix_epoch();
+
+    // Retrieve accounts and verify both have last_used set, but account_1's hasn't changed
+    let accounts_after_second_delegation = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname,
+    )
+    .unwrap()
+    .unwrap();
+
+    let account_1_after_second = accounts_after_second_delegation
+        .iter()
+        .find(|account| account.account_number == account_1.account_number)
+        .expect("Account 1 should exist");
+
+    let account_2_after_second = accounts_after_second_delegation
+        .iter()
+        .find(|account| account.account_number == account_2.account_number)
+        .expect("Account 2 should exist");
+
+    assert!(
+        account_2_after_second.last_used.is_some(),
+        "account_2 last_used should be populated after prepare_account_delegation"
+    );
+    let account_2_last_used = account_2_after_second.last_used.unwrap();
+
+    // Verify account_1's last_used hasn't changed
+    assert_eq!(
+        account_1_after_second.last_used.unwrap(),
+        account_1_last_used,
+        "account_1 last_used should not change when account_2 is used"
+    );
+
+    // Verify account_2's timestamp is within expected range
+    assert!(
+        account_2_last_used >= time_before_account_2 && account_2_last_used <= time_after_account_2,
+        "account_2 last_used should be between {} and {}",
+        time_before_account_2,
+        time_after_account_2
+    );
+
+    // Verify that account_1's timestamp is earlier than account_2's
+    assert!(
+        account_1_last_used < account_2_last_used,
+        "account_1 last_used ({}) should be earlier than account_2 last_used ({})",
+        account_1_last_used,
+        account_2_last_used
+    );
+
+    Ok(())
+}
