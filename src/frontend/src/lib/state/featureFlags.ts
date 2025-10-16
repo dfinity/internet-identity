@@ -1,7 +1,6 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
 import { isNullish, nonNullish } from "@dfinity/utils";
-import { canisterConfig } from "$lib/globals";
 
 declare global {
   interface Window {

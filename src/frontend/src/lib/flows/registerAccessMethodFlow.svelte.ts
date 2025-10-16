@@ -4,11 +4,7 @@ import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { authenticateWithSession } from "$lib/utils/authentication";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
-import { bufferEqual } from "$lib/utils/iiConnection";
-import {
-  authenticatedStore,
-  authenticationStore,
-} from "$lib/stores/authentication.store";
+import { authenticationStore } from "$lib/stores/authentication.store";
 import { features } from "$lib/legacy/features";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
