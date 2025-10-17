@@ -1077,8 +1077,7 @@ fn should_update_last_used_after_prepare_account_delegation() -> Result<(), Reje
         .expect("Account should exist in the list");
 
     assert_eq!(
-        account_before.last_used,
-        None,
+        account_before.last_used, None,
         "last_used should be None before prepare_account_delegation"
     );
 
@@ -1186,7 +1185,9 @@ fn should_update_last_used_independently_for_different_accounts() -> Result<(), 
     );
 
     let time_before_account_1 = env.get_time().as_nanos_since_unix_epoch();
-    prepare_account_delegation(&params_1, None).unwrap().unwrap();
+    prepare_account_delegation(&params_1, None)
+        .unwrap()
+        .unwrap();
     let time_after_account_1 = env.get_time().as_nanos_since_unix_epoch();
 
     // Retrieve accounts and verify account_1 has last_used set, account_2 still has None
@@ -1217,8 +1218,7 @@ fn should_update_last_used_independently_for_different_accounts() -> Result<(), 
     let account_1_last_used = account_1_after_first.last_used.unwrap();
 
     assert_eq!(
-        account_2_after_first.last_used,
-        None,
+        account_2_after_first.last_used, None,
         "account_2 last_used should still be None after only account_1 delegation"
     );
 
@@ -1245,7 +1245,9 @@ fn should_update_last_used_independently_for_different_accounts() -> Result<(), 
     );
 
     let time_before_account_2 = env.get_time().as_nanos_since_unix_epoch();
-    prepare_account_delegation(&params_2, None).unwrap().unwrap();
+    prepare_account_delegation(&params_2, None)
+        .unwrap()
+        .unwrap();
     let time_after_account_2 = env.get_time().as_nanos_since_unix_epoch();
 
     // Retrieve accounts and verify both have last_used set, but account_1's hasn't changed

@@ -823,27 +823,27 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Search for an account and account_reference and applies the function `f` if found.
-    /// 
-    /// 
+    ///
+    ///
     /// The function `f` is called with a mutable reference to the account reference and an option to the mutable reference to the account.
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `anchor_number` - The anchor number of the account.
     /// * `application_number` - The application number of the account.
     /// * `account_number` - The account number of the account or None if synthetic account.
     /// * `f` - The function to apply to the account.
-    /// 
+    ///
     /// If the `account_number` is None, storable account doesn't exist and account reference might exist.
     /// * If the account reference exists, the function `f` is called with a mutable reference to the account reference and None as the second argument.
     /// * If the account reference does not exist, None is returned.
-    /// 
+    ///
     /// If the `account_number` is Some, storable and account references exist.
     /// * If the storable account exists, the function `f` is called with a mutable reference to the account reference and a mutable reference to the storable account.
     /// * If the storable account does not exist, None is returned.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `None` if both account and account_reference are not found
     /// * `Some(T)` if the account or account_reference are found where T is the result of the function `f`.
     fn with_account_mut<T, F>(
@@ -876,7 +876,7 @@ impl<M: Memory + Clone> Storage<M> {
                 self.stable_account_reference_list_memory.insert(key, value);
 
                 result
-            },
+            }
             Some(account_number) => {
                 // Account should be stored, otherwise, it was removed and we'll return `None`.
                 let mut storable_account = self.stable_account_memory.get(&account_number)?;
@@ -895,7 +895,8 @@ impl<M: Memory + Clone> Storage<M> {
                 let value = StorableAccountReferenceList::from_vec(account_references);
 
                 self.stable_account_reference_list_memory.insert(key, value);
-                self.stable_account_memory.insert(account_number, storable_account);
+                self.stable_account_memory
+                    .insert(account_number, storable_account);
 
                 result
             }
