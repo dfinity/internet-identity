@@ -303,8 +303,6 @@ fn should_update_account() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let creation_time = Some(env.get_time().as_nanos_since_unix_epoch());
-
     let new_name = Some("Laniakea".to_string());
 
     let update = AccountUpdate {
@@ -323,16 +321,11 @@ fn should_update_account() -> Result<(), RejectResponse> {
     .unwrap()
     .unwrap();
 
-    let update_time = Some(env.get_time().as_nanos_since_unix_epoch());
-
-    // Smoke test
-    assert_ne!(update_time, creation_time);
-
     assert_eq!(
         updated_account,
         AccountInfo {
             account_number: created_account.account_number,
-            last_used: update_time,
+            last_used: None,
             origin,
             name: new_name
         }
