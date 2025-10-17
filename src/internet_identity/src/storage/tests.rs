@@ -394,7 +394,36 @@ fn should_set_account_last_used() {
 }
 
 #[test]
-fn should_set_account_last_used_for_default_account() {
+fn should_set_account_last_used_for_synthethic_account() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    let origin = "https://example.com".to_string();
+
+    // Create an anchor
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.create(anchor).unwrap();
+
+    // Set last_used for the synthetic account (account_number = None)
+    let timestamp = 555555u64;
+    let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
+    assert!(result.is_none());
+
+    // Verify last_used was updated for the synthetic account
+    let read_account = storage
+        .read_account(ReadAccountParams {
+            anchor_number,
+            origin: &origin,
+            account_number: None,
+            known_app_num: None,
+        })
+        .unwrap();
+    // Because the account reference doesn't exist, the `last_used` is not updated.
+    assert_eq!(read_account.last_used, None);
+}
+
+#[test]
+fn should_set_account_last_used_for_synthetic_account_with_reference() {
     let memory = VectorMemory::default();
     let mut storage = Storage::new((10_000, 3_784_873), memory);
     let origin = "https://example.com".to_string();
@@ -413,12 +442,12 @@ fn should_set_account_last_used_for_default_account() {
         })
         .unwrap();
 
-    // Set last_used for the default account (account_number = None)
+    // Set last_used for the synthetic account (account_number = None)
     let timestamp = 555555u64;
     let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
     assert!(result.is_some());
 
-    // Verify last_used was updated for the default account
+    // Verify last_used was updated for the synthetic account
     let read_account = storage
         .read_account(ReadAccountParams {
             anchor_number,
