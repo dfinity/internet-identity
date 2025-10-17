@@ -832,13 +832,13 @@ impl<M: Memory + Clone> Storage<M> {
     /// * `anchor_number` - The anchor number of the account.
     /// * `application_number` - The application number of the account.
     /// * `account_number` - The account number of the account or None if synthetic account.
-    /// * `f` - The function to apply to the account.
+    /// * `f` - The function to apply to the accounts.
     ///
-    /// If the `account_number` is None, storable account doesn't exist and account reference might exist.
+    /// If the `account_number` is None, it means the storable account doesn't exist and account reference might exist.
     /// * If the account reference exists, the function `f` is called with a mutable reference to the account reference and None as the second argument.
     /// * If the account reference does not exist, None is returned.
     ///
-    /// If the `account_number` is Some, storable and account references exist.
+    /// If the `account_number` is Some, it means the storable account exists (or existed at some point) and account references exists (or existed at some point).
     /// * If the storable account exists, the function `f` is called with a mutable reference to the account reference and a mutable reference to the storable account.
     /// * If the storable account does not exist, None is returned.
     ///
@@ -1100,7 +1100,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Creates an account for that identity.
-    /// If the identity doesn't yet have accounts, it will create the account reference for the default account.
+    /// If the identity doesn't yet have accounts, it will create the account reference for the synthetic account.
     /// But not a storable account for the synthetic one.
     pub fn create_additional_account(
         &mut self,

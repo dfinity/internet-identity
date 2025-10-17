@@ -1130,6 +1130,76 @@ fn should_update_last_used_after_prepare_account_delegation() -> Result<(), Reje
     Ok(())
 }
 
+/// Verifies that the last_used field is not updated after prepare_account_delegation
+/// for synthetic accounts when the user doesn't have any other account.
+#[test]
+fn should_not_update_last_used_synthetic_account_after_prepare_account_delegation() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+    let frontend_hostname = "https://some-dapp.com".to_string();
+    let pub_session_key = ByteBuf::from("session public key");
+
+    // Retrieve the account before prepare_account_delegation to verify last_used is None
+    let accounts_before = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    let account_before = accounts_before
+        .iter()
+        .find(|account| account.account_number == None)
+        .expect("Account should exist in the list");
+
+    assert_eq!(
+        account_before.last_used, None,
+        "last_used should be None before prepare_account_delegation"
+    );
+
+    // Call prepare_account_delegation for the created account
+    let params = AccountDelegationParams::new(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname.clone(),
+        None,
+        pub_session_key,
+    );
+
+    prepare_account_delegation(&params, None).unwrap().unwrap();
+
+    // Retrieve the account again to check last_used
+    let accounts_list = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        frontend_hostname,
+    )
+    .unwrap()
+    .unwrap();
+
+    // Find the created account in the list (it should be at index 1, after the default account)
+    let updated_account = accounts_list
+        .iter()
+        .find(|account| account.account_number == None)
+        .expect("Account should exist in the list");
+
+    // Verify last_used is now populated
+    assert!(
+        updated_account.last_used.is_none(),
+        "last_used should not be populated after prepare_account_delegation for synthetic accounts"
+    );
+
+    Ok(())
+}
+
 /// Verifies that last_used is tracked independently for different accounts.
 #[test]
 fn should_update_last_used_independently_for_different_accounts() -> Result<(), RejectResponse> {
