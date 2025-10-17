@@ -1022,9 +1022,12 @@ mod v2_api {
         // Return session info if caller matches confirmed session
         tentative_device_registration::get_confirmed_session(identity_number)
             .is_some_and(|confirmed_session| confirmed_session == caller())
-            .then_some(AuthnMethodSessionInfo {
-                name: state::anchor(identity_number).name(),
-                created_at: state::anchor(identity_number).created_at(),
+            .then(|| {
+                let anchor = state::anchor(identity_number);
+                AuthnMethodSessionInfo {
+                    name: anchor.name(),
+                    created_at: anchor.created_at(),
+                }
             })
     }
 
