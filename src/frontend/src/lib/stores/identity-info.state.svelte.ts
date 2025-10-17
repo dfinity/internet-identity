@@ -58,7 +58,6 @@ export class IdentityInfo {
         this.authnMethodRegistration = authn_method_registration[0];
       }
       this.loaded = true;
-      // TODO: Update last used identity with created at and name.
     } catch (e) {
       this.reset();
       throw e;
