@@ -1133,7 +1133,8 @@ fn should_update_last_used_after_prepare_account_delegation() -> Result<(), Reje
 /// Verifies that the last_used field is not updated after prepare_account_delegation
 /// for synthetic accounts when the user doesn't have any other account.
 #[test]
-fn should_not_update_last_used_synthetic_account_after_prepare_account_delegation() -> Result<(), RejectResponse> {
+fn should_not_update_last_used_synthetic_account_after_prepare_account_delegation(
+) -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -1153,7 +1154,7 @@ fn should_not_update_last_used_synthetic_account_after_prepare_account_delegatio
 
     let account_before = accounts_before
         .iter()
-        .find(|account| account.account_number == None)
+        .find(|account| account.account_number.is_none())
         .expect("Account should exist in the list");
 
     assert_eq!(
@@ -1188,7 +1189,7 @@ fn should_not_update_last_used_synthetic_account_after_prepare_account_delegatio
     // Find the created account in the list (it should be at index 1, after the default account)
     let updated_account = accounts_list
         .iter()
-        .find(|account| account.account_number == None)
+        .find(|account| account.account_number.is_none())
         .expect("Account should exist in the list");
 
     // Verify last_used is now populated
