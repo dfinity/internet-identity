@@ -3,6 +3,7 @@ use crate::openid::OpenIdCredential;
 use crate::state::PersistentState;
 use crate::stats::activity_stats::activity_counter::active_anchor_counter::ActiveAnchorCounter;
 use crate::stats::activity_stats::{ActivityStats, CompletedActivityStats, OngoingActivityStats};
+use crate::storage::account::{CreateAccountParams, ReadAccountParams};
 use crate::storage::anchor::{Anchor, Device};
 use crate::storage::{Header, StorageError, MAX_ENTRIES};
 use crate::Storage;
@@ -314,6 +315,192 @@ fn should_not_overwrite_device_credential_lookup() {
             .unwrap(),
         anchor_0.anchor_number()
     );
+}
+
+#[test]
+fn should_set_account_last_used() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    let origin = "https://example.com".to_string();
+
+    // Create an anchor
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.create(anchor).unwrap();
+
+    // Create an additional account for this anchor and origin
+    let account = storage
+        .create_additional_account(CreateAccountParams {
+            anchor_number,
+            name: "Test Account".to_string(),
+            origin: origin.clone(),
+        })
+        .unwrap();
+
+    let account_number = account.account_number.unwrap();
+
+    // Initially, last_used should be None
+    let read_account = storage
+        .read_account(ReadAccountParams {
+            anchor_number,
+            origin: &origin,
+            account_number: Some(account_number),
+            known_app_num: None,
+        })
+        .unwrap();
+    assert_eq!(read_account.last_used, None);
+
+    // Set last_used for the additional account
+    let timestamp = 123456789u64;
+    let result = storage.set_account_last_used(
+        anchor_number,
+        origin.clone(),
+        Some(account_number),
+        timestamp,
+    );
+    assert!(result.is_some());
+
+    // Verify last_used was updated
+    let read_account = storage
+        .read_account(ReadAccountParams {
+            anchor_number,
+            origin: &origin,
+            account_number: Some(account_number),
+            known_app_num: None,
+        })
+        .unwrap();
+    assert_eq!(read_account.last_used, Some(timestamp));
+
+    // Update last_used again with a new timestamp
+    let new_timestamp = 987654321u64;
+    let result = storage.set_account_last_used(
+        anchor_number,
+        origin.clone(),
+        Some(account_number),
+        new_timestamp,
+    );
+    assert!(result.is_some());
+
+    // Verify last_used was updated to the new timestamp
+    let read_account = storage
+        .read_account(ReadAccountParams {
+            anchor_number,
+            origin: &origin,
+            account_number: Some(account_number),
+            known_app_num: None,
+        })
+        .unwrap();
+    assert_eq!(read_account.last_used, Some(new_timestamp));
+}
+
+#[test]
+fn should_set_account_last_used_for_synthethic_account() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    let origin = "https://example.com".to_string();
+
+    // Create an anchor
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.create(anchor).unwrap();
+
+    // Set last_used for the synthetic account (account_number = None)
+    let timestamp = 555555u64;
+    let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
+    assert!(result.is_none());
+
+    // Verify last_used was updated for the synthetic account
+    let read_account = storage
+        .read_account(ReadAccountParams {
+            anchor_number,
+            origin: &origin,
+            account_number: None,
+            known_app_num: None,
+        })
+        .unwrap();
+    // Because the account reference doesn't exist, the `last_used` is not updated.
+    assert_eq!(read_account.last_used, None);
+}
+
+#[test]
+fn should_set_account_last_used_for_synthetic_account_with_reference() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    let origin = "https://example.com".to_string();
+
+    // Create an anchor
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.create(anchor).unwrap();
+
+    // Create an additional account to force creation of account references
+    storage
+        .create_additional_account(CreateAccountParams {
+            anchor_number,
+            name: "Test Account".to_string(),
+            origin: origin.clone(),
+        })
+        .unwrap();
+
+    // Set last_used for the synthetic account (account_number = None)
+    let timestamp = 555555u64;
+    let result = storage.set_account_last_used(anchor_number, origin.clone(), None, timestamp);
+    assert!(result.is_some());
+
+    // Verify last_used was updated for the synthetic account
+    let read_account = storage
+        .read_account(ReadAccountParams {
+            anchor_number,
+            origin: &origin,
+            account_number: None,
+            known_app_num: None,
+        })
+        .unwrap();
+    assert_eq!(read_account.last_used, Some(timestamp));
+}
+
+#[test]
+fn should_return_none_when_setting_last_used_for_nonexistent_account() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+    let origin = "https://example.com".to_string();
+
+    // Create an anchor
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.create(anchor).unwrap();
+
+    // Try to set last_used for a non-existent account number
+    let nonexistent_account_number = 99999u64;
+    let timestamp = 123456u64;
+    let result = storage.set_account_last_used(
+        anchor_number,
+        origin,
+        Some(nonexistent_account_number),
+        timestamp,
+    );
+
+    // Should return None because the account doesn't exist
+    assert!(result.is_none());
+}
+
+#[test]
+fn should_return_none_when_setting_last_used_for_nonexistent_origin() {
+    let memory = VectorMemory::default();
+    let mut storage = Storage::new((10_000, 3_784_873), memory);
+
+    // Create an anchor
+    let anchor = storage.allocate_anchor(0).unwrap();
+    let anchor_number = anchor.anchor_number();
+    storage.create(anchor).unwrap();
+
+    // Try to set last_used for an origin that hasn't been registered
+    let nonexistent_origin = "https://nonexistent.com".to_string();
+    let timestamp = 123456u64;
+    let result = storage.set_account_last_used(anchor_number, nonexistent_origin, None, timestamp);
+
+    // Should return None because the origin/application doesn't exist
+    assert!(result.is_none());
 }
 
 fn sample_device() -> Device {
