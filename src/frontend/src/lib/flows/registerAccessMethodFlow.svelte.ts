@@ -11,6 +11,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+import { nanosToMillis } from "$lib/utils/time";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
 
@@ -20,6 +21,7 @@ export class RegisterAccessMethodFlow {
   >("continueFromExistingDevice");
   #confirmationCode = $state<string>();
   #identityName = $state<string>();
+  #createdAtMillis = $state<number>();
   #identityNumber = $state<bigint>();
   #existingDeviceLink = $state<URL>();
 
@@ -79,6 +81,7 @@ export class RegisterAccessMethodFlow {
       // Show confirm sign-in view if session has been confirmed
       if (nonNullish(info)) {
         this.#identityName = info.name[0] ?? identityNumber.toString(10);
+        this.#createdAtMillis = info.created_at.map(nanosToMillis)[0];
         this.#view = "confirmSignIn";
         return;
       }
@@ -134,7 +137,7 @@ export class RegisterAccessMethodFlow {
           credentialId: new Uint8Array(credentialId),
         },
       },
-      createdAtMillis: undefined,
+      createdAtMillis: this.#createdAtMillis,
     });
     return this.#identityNumber;
   };

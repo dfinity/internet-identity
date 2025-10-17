@@ -1024,6 +1024,7 @@ mod v2_api {
             .is_some_and(|confirmed_session| confirmed_session == caller())
             .then_some(AuthnMethodSessionInfo {
                 name: state::anchor(identity_number).name(),
+                created_at: state::anchor(identity_number).created_at(),
             })
     }
 

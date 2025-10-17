@@ -36,7 +36,7 @@ import {
   decodeJWT,
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
-import { createdAtMillis } from "$lib/utils/identityInfo";
+import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
   trackLastUsed?: boolean;
@@ -112,7 +112,7 @@ export class AuthFlow {
         identityNumber,
         name: info.name[0],
         authMethod: { passkey: { credentialId } },
-        createdAtMillis: createdAtMillis(info),
+        createdAtMillis: info.created_at.map(nanosToMillis)[0],
       });
     }
     return identityNumber;
@@ -213,7 +213,7 @@ export class AuthFlow {
           authMethod: {
             openid: { iss, sub, metadata: authnMethod?.metadata, loginHint },
           },
-          createdAtMillis: createdAtMillis(info),
+          createdAtMillis: info.created_at.map(nanosToMillis)[0],
         });
       }
       return { identityNumber, type: "signIn" };
