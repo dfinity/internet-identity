@@ -822,43 +822,84 @@ impl<M: Memory + Clone> Storage<M> {
             .find(|account_reference| account_reference.account_number == account_number)
     }
 
-    /// Search for an account and applies the function `f` if found. Returns None if
-    /// not found and the result of `f` otherwise in the Some variant.
+    /// Search for an account and account_reference and applies the function `f` if found.
+    /// 
+    /// 
+    /// The function `f` is called with a mutable reference to the account reference and an option to the mutable reference to the account.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `anchor_number` - The anchor number of the account.
+    /// * `application_number` - The application number of the account.
+    /// * `account_number` - The account number of the account or None if synthetic account.
+    /// * `f` - The function to apply to the account.
+    /// 
+    /// If the `account_number` is None, storable account doesn't exist and account reference might exist.
+    /// * If the account reference exists, the function `f` is called with a mutable reference to the account reference and None as the second argument.
+    /// * If the account reference does not exist, None is returned.
+    /// 
+    /// If the `account_number` is Some, storable and account references exist.
+    /// * If the storable account exists, the function `f` is called with a mutable reference to the account reference and a mutable reference to the storable account.
+    /// * If the storable account does not exist, None is returned.
+    /// 
+    /// # Returns
+    /// 
+    /// * `None` if both account and account_reference are not found
+    /// * `Some(T)` if the account or account_reference are found where T is the result of the function `f`.
     fn with_account_mut<T, F>(
         &mut self,
         anchor_number: AnchorNumber,
         application_number: Option<ApplicationNumber>,
-        account_number: Option<AccountNumber>,
+        maybe_account_number: Option<AccountNumber>,
         f: F,
     ) -> Option<T>
     where
-        F: FnOnce(&mut StorableAccountReference, &mut StorableAccount) -> T,
+        F: FnOnce(&mut StorableAccountReference, Option<&mut StorableAccount>) -> T,
     {
-        let account_number = account_number?;
+        match maybe_account_number {
+            None => {
+                // We are looking for a synthetic account
+                let (key, mut account_references) =
+                    self.find_account_references(anchor_number, application_number)?;
 
-        let mut storable_account = self.stable_account_memory.get(&account_number)?;
+                let mut result = None;
 
-        let (key, mut account_references) =
-            self.find_account_references(anchor_number, application_number)?;
+                for account_reference in &mut account_references {
+                    if account_reference.account_number == maybe_account_number {
+                        result = Some(f(account_reference, None));
+                        break;
+                    }
+                }
 
-        let mut result = None;
+                let value = StorableAccountReferenceList::from_vec(account_references);
 
-        for account_reference in &mut account_references {
-            if account_reference.account_number == Some(account_number) {
-                result = Some(f(account_reference, &mut storable_account));
-                break;
+                self.stable_account_reference_list_memory.insert(key, value);
+
+                result
+            },
+            Some(account_number) => {
+                // Account should be stored, otherwise, it was removed and we'll return `None`.
+                let mut storable_account = self.stable_account_memory.get(&account_number)?;
+                let (key, mut account_references) =
+                    self.find_account_references(anchor_number, application_number)?;
+
+                let mut result = None;
+
+                for account_reference in &mut account_references {
+                    if account_reference.account_number == maybe_account_number {
+                        result = Some(f(account_reference, Some(&mut storable_account)));
+                        break;
+                    }
+                }
+
+                let value = StorableAccountReferenceList::from_vec(account_references);
+
+                self.stable_account_reference_list_memory.insert(key, value);
+                self.stable_account_memory.insert(account_number, storable_account);
+
+                result
             }
         }
-
-        result.as_ref()?;
-
-        let value = StorableAccountReferenceList::from_vec(account_references);
-
-        self.stable_account_memory
-            .insert(account_number, storable_account);
-        self.stable_account_reference_list_memory.insert(key, value);
-
-        result
     }
 
     pub fn set_account_last_used(
@@ -1057,6 +1098,9 @@ impl<M: Memory + Clone> Storage<M> {
         self.stable_account_counter_discrepancy_counter_memory.get()
     }
 
+    /// Creates an account for that identity.
+    /// If the identity doesn't yet have accounts, it will create the account reference for the default account.
+    /// But not a storable account for the synthetic one.
     pub fn create_additional_account(
         &mut self,
         params: CreateAccountParams,
@@ -1313,11 +1357,15 @@ impl<M: Memory + Clone> Storage<M> {
             anchor_number,
             application_number,
             Some(account_number),
-            |account_reference, storable_account| {
+            |account_reference, maybe_storable_account| {
                 // Check if the account reference has an account number,
                 // throw error if it doesn't since we only want to update
                 // accounts with an account number in this function.
                 let account_number = account_reference.account_number?;
+                // Check if the storable_account exists.
+                // throw error if it doesn't since we only want to update
+                // existing accounts in this function.
+                let storable_account = maybe_storable_account?;
 
                 // Update account and write back to storage
                 storable_account.name = name.clone();
