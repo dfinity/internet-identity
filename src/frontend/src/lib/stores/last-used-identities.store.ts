@@ -34,6 +34,7 @@ export type LastUsedIdentity = {
       };
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
+  createdAtMillis?: number;
 };
 export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
@@ -43,7 +44,10 @@ type LastUsedIdentitiesStore = Readable<{
   selected?: LastUsedIdentity;
 }> & {
   addLastUsedIdentity: (
-    params: Pick<LastUsedIdentity, "identityNumber" | "name" | "authMethod">,
+    params: Pick<
+      LastUsedIdentity,
+      "identityNumber" | "name" | "authMethod" | "createdAtMillis"
+    >,
   ) => void;
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
