@@ -11,6 +11,8 @@ use std::borrow::Cow;
 pub struct StorableAccountReference {
     #[n(0)]
     pub account_number: Option<StorableAccountNumber>, // None is the unreserved synthetic account
+    // Only updated when the account is used to create a delegation.
+    // For example, it's not changed when the account is renamed.
     #[n(1)]
     pub last_used: Option<Timestamp>,
 }
