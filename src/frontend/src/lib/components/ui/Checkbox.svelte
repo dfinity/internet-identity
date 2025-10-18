@@ -24,7 +24,7 @@
     "border-border-primary text-fg-primary-inversed bg-bg-primary",
     "hover:bg-bg-primary_hover",
     "has-checked:bg-bg-brand-solid has-checked:hover:bg-bg-brand-solid_hover has-checked:border-none",
-    "has-disabled:border-border-disabled has-disabled:bg-bg-disabled_subtle has-disabled:text-fg-disabled_subtle",
+    "has-disabled:border-border-disabled has-disabled:bg-bg-disabled_subtle has-disabled:hover:bg-bg-disabled_subtle has-disabled:text-fg-disabled_subtle has-disabled:cursor-not-allowed",
     "has-focus-visible:ring-focus-ring has-focus-visible:ring-offset-bg-primary outline-none has-focus-visible:ring-2 has-focus-visible:ring-offset-2",
     {
       sm: "size-4",
