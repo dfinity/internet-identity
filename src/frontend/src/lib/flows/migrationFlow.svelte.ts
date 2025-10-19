@@ -170,6 +170,8 @@ export class MigrationFlow {
           credentialId: new Uint8Array(credentialId),
         },
       },
+      // Legacy identities do not have the `created_at` property
+      createdAtMillis: undefined,
     });
   };
 

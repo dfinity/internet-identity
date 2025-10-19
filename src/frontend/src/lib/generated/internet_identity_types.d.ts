@@ -225,7 +225,10 @@ export type AuthnMethodSecuritySettingsReplaceError = {
      */
     'AuthnMethodNotFound' : null
   };
-export interface AuthnMethodSessionInfo { 'name' : [] | [string] }
+export interface AuthnMethodSessionInfo {
+  'name' : [] | [string],
+  'created_at' : [] | [Timestamp],
+}
 export interface BufferedArchiveEntry {
   'sequence_number' : bigint,
   'entry' : Uint8Array | number[],
