@@ -69,9 +69,6 @@ test.describe("Migration from an app", () => {
         await authPage.getByLabel("Identity name").fill(TEST_USER_NAME);
         auth(authPage);
         await authPage.getByRole("button", { name: "Create Passkey" }).click();
-        await authPage
-          .getByRole("button", { name: "Continue", exact: true })
-          .click();
       },
     );
     expect(legacyPrincipal).toEqual(migratedPrincipal);
