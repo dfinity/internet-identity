@@ -39,7 +39,7 @@
 
   const anchorRef = $derived(
     anchor ??
-    ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined)
+      ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined),
   );
 
   $effect(() => {
@@ -56,28 +56,28 @@
           right: {
             start: `calc(${anchorRect.top}px - ${offset})`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`
+            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`,
           }[align],
           down: `calc(${anchorRect.bottom}px + ${distance})`,
           left: {
             start: `calc(${anchorRect.top}px - ${offset})`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`
-          }[align]
+            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`,
+          }[align],
         }[direction];
         tooltipRef.style.left = {
           up: {
             start: `calc(${anchorRect.left}px - ${offset})`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`
+            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`,
           }[align],
           right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
             start: `calc(${anchorRect.left}px - ${offset})`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`
+            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`,
           }[align],
-          left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`
+          left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`,
         }[direction];
       }
       if (tracking) {
