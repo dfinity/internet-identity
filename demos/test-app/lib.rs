@@ -143,7 +143,10 @@ fn not_found_response(path: &str) -> HttpResponse {
 }
 
 fn static_headers() -> Vec<HeaderField> {
-    vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())]
+    vec![
+        ("Access-Control-Allow-Origin".to_string(), "*".to_string()),
+        ("Referrer-Policy".to_string(), "strict-origin-when-cross-origin".to_string()),
+    ]
 }
 
 // Assets
