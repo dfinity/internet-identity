@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { PlusIcon } from "@lucide/svelte";
+  import { PencilIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import { t } from "$lib/stores/locale.store";
@@ -9,19 +9,29 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
-    create: (name: string, isDefaultSignIn: boolean) => void;
+    name: string;
+    isDefaultSignIn: boolean;
+    save: (update: { name?: string; isDefaultSignIn?: boolean }) => void;
   }
 
-  const { create }: Props = $props();
+  const { save, ...props }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let name = $state("");
-  let isDefaultSignIn = $state(false);
+  let name = $state(props.name);
+  let isDefaultSignIn = $state(props.isDefaultSignIn);
   let isSubmitting = $state(false);
+
+  const hasChanges = $derived(
+    props.name !== name.trim() || props.isDefaultSignIn !== isDefaultSignIn,
+  );
 
   const handleSubmit = () => {
     isSubmitting = true;
-    create(name.trim(), isDefaultSignIn);
+    save({
+      name: props.name !== name.trim() ? name.trim() : undefined,
+      isDefaultSignIn:
+        props.isDefaultSignIn !== isDefaultSignIn ? isDefaultSignIn : undefined,
+    });
   };
 
   onMount(() => {
@@ -32,13 +42,13 @@
 <form class="flex flex-1 flex-col">
   <div class="mb-8 flex flex-col">
     <FeaturedIcon size="lg" class="mb-4 self-start">
-      <PlusIcon class="size-6" />
+      <PencilIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Name account`}
+      {$t`Edit account`}
     </h1>
     <p class="text-md text-text-tertiary mb-6 font-medium">
-      {$t`You can edit this account later. Label it by use (e.g. 'Work' or 'Demo').`}
+      {$t`Rename or make this your default sign-in`}
     </p>
     <Input
       bind:element={inputRef}
@@ -56,12 +66,14 @@
       disabled={isSubmitting}
       aria-label={$t`Account name`}
     />
-    <div class="border-border-tertiary my-6 border-t"></div>
-    <Checkbox
-      bind:checked={isDefaultSignIn}
-      label={$t`Set as default sign-in`}
-      disabled={isSubmitting}
-    />
+    {#if !props.isDefaultSignIn}
+      <div class="border-border-tertiary my-6 border-t"></div>
+      <Checkbox
+        bind:checked={isDefaultSignIn}
+        label={$t`Set as default sign-in`}
+        disabled={isSubmitting}
+      />
+    {/if}
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">
     <Button
@@ -69,13 +81,16 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={name.length === 0 || name.length > 32 || isSubmitting}
+      disabled={name.length === 0 ||
+        name.length > 32 ||
+        !hasChanges ||
+        isSubmitting}
     >
       {#if isSubmitting}
         <ProgressRing />
-        <span>{$t`Creating account...`}</span>
+        <span>{$t`Saving changes...`}</span>
       {:else}
-        <span>{$t`Create account`}</span>
+        <span>{$t`Save changes`}</span>
       {/if}
     </Button>
   </div>

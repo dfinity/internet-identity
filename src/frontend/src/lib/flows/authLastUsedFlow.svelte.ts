@@ -18,6 +18,10 @@ import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
 import { isNullish } from "@dfinity/utils";
 import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
+import {
+  AuthenticationV2Events,
+  authenticationV2Funnel,
+} from "$lib/utils/analytics/authenticationV2Funnel";
 
 export class AuthLastUsedFlow {
   systemOverlay = $state(false);
@@ -48,6 +52,9 @@ export class AuthLastUsedFlow {
         });
         await authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
+        authenticationV2Funnel.trigger(
+          AuthenticationV2Events.ContinueAsPasskey,
+        );
       } else if ("openid" in lastUsedIdentity.authMethod) {
         this.systemOverlay = true;
         const issuer = lastUsedIdentity.authMethod.openid.iss;
@@ -82,6 +89,10 @@ export class AuthLastUsedFlow {
         });
         await authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
+        authenticationV2Funnel.addProperties({
+          provider: isOpenIdConfig(config) ? config.name : "Google",
+        });
+        authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);
       } else {
         throw new Error("Unrecognized authentication method");
       }
