@@ -9,18 +9,25 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
+    namesInUse: string[];
     create: (name: string, isDefaultSignIn: boolean) => void;
   }
 
-  const { create }: Props = $props();
+  const { namesInUse, create }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
   let isDefaultSignIn = $state(false);
   let isSubmitting = $state(false);
+  let isNameInUse = $state(false);
 
   const handleSubmit = () => {
     isSubmitting = true;
+    if (namesInUse.includes(name.trim())) {
+      isNameInUse = true;
+      isSubmitting = false;
+      return;
+    }
     create(name.trim(), isDefaultSignIn);
   };
 
@@ -52,7 +59,9 @@
       spellcheck="false"
       error={name.length > 32
         ? $t`Maximum length is 32 characters.`
-        : undefined}
+        : isNameInUse
+          ? $t`In use on another account.`
+          : undefined}
       disabled={isSubmitting}
       aria-label={$t`Account name`}
     />
@@ -69,7 +78,10 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={name.length === 0 || name.length > 32 || isSubmitting}
+      disabled={name.length === 0 ||
+        name.length > 32 ||
+        isNameInUse ||
+        isSubmitting}
     >
       {#if isSubmitting}
         <ProgressRing />

@@ -72,6 +72,9 @@
   const primaryAccountName = $derived(
     nonNullish(application) ? $t`My ${application} account` : $t`My account`,
   );
+  const namesInUse = $derived(
+    accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
+  );
   const authLastUsedFlow = new AuthLastUsedFlow();
   // Initialize the flow every time the identity changes
   $effect(() => {
@@ -366,7 +369,7 @@
 
 {#if isCreateAccountDialogVisible}
   <Dialog onClose={() => (isCreateAccountDialogVisible = false)}>
-    <CreateAccount create={handleCreateAccount} />
+    <CreateAccount {namesInUse} create={handleCreateAccount} />
   </Dialog>
 {/if}
 
@@ -376,6 +379,9 @@
       name={isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName}
       isDefaultSignIn={defaultAccountNumber ===
         isEditAccountDialogVisibleForNumber}
+      namesInUse={namesInUse.filter(
+        (name) => name !== isEditAccountDialogVisibleFor.name[0],
+      )}
       save={handleEditAccount}
     />
   </Dialog>

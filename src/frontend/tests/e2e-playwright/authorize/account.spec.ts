@@ -118,25 +118,27 @@ test("Rename secondary account and authorize with it", async ({ page }) => {
   expect(secondaryPrincipal).not.toEqual(primaryPrincipal);
 });
 
-// test("Can't create more than 5 accounts", async ({ page }) => {
-//   const auth = dummyAuth();
-//   await createIdentity(page, "John Doe", auth);
-//   await authorize(page, async (authPage) => {
-//     auth(authPage);
-//     await authPage
-//       .getByRole("button", { name: "Create or use another account" })
-//       .click();
-//     for (let i = 1; i <= 4; i++) {
-//       await authPage
-//         .getByRole("button", { name: "Create additional account" })
-//         .click();
-//       await authPage.getByLabel("Account name").fill(`Additional account ${i}`);
-//       await authPage.getByRole("button", { name: "Create account" }).click();
-//     }
-//     await expect(
-//       authPage.getByRole("button", { name: "Create additional account" }),
-//     ).toBeDisabled();
-//     // Authentication needs to complete in `authorize()` to pass the test
-//     await authPage.getByRole("button", { name: "Primary account" }).click();
-//   });
-// });
+test("Can't create more than 5 accounts", async ({ page }) => {
+  const auth = dummyAuth();
+  await createIdentity(page, "John Doe", auth);
+  await authorize(page, async (authPage) => {
+    auth(authPage);
+    await authPage
+      .getByRole("switch", { name: "Enable multiple accounts" })
+      .setChecked(true);
+    for (let i = 1; i <= 4; i++) {
+      await authPage
+        .getByRole("button", { name: "Add another account" })
+        .click();
+      await authPage.getByLabel("Account name").fill(`Additional account ${i}`);
+      await authPage.getByRole("button", { name: "Create account" }).click();
+    }
+    await expect(
+      authPage.getByRole("button", { name: "Add another account" }),
+    ).toBeDisabled();
+    // Authentication needs to complete in `authorize()` to pass the test
+    await authPage
+      .getByRole("button", { name: "Continue with My Test Dapp account" })
+      .click();
+  });
+});

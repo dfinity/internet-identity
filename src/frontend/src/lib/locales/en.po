@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:295
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:298
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 
@@ -33,14 +33,14 @@ msgstr "<0>No More Identity Numbers:</0> As explained above, discoverable passke
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:47
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:57
-#: src/frontend/src/lib/components/views/EditAccount.svelte:57
-#: src/frontend/src/lib/components/views/EditAccount.svelte:67
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:54
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:66
+#: src/frontend/src/lib/components/views/EditAccount.svelte:64
+#: src/frontend/src/lib/components/views/EditAccount.svelte:76
 msgid "Account name"
 msgstr "Account name"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:311
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:314
 msgid "Add another account"
 msgstr "Add another account"
 
@@ -48,11 +48,11 @@ msgstr "Add another account"
 msgid "Advanced identity management"
 msgstr "Advanced identity management"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:344
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:347
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:288
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:291
 msgid "Choose an account"
 msgstr "Choose an account"
 
@@ -60,23 +60,23 @@ msgstr "Choose an account"
 msgid "Choose method"
 msgstr "Choose method"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:326
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:329
 msgid "Continue"
 msgstr "Continue"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:246
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:249
 msgid "Continue with {name}"
 msgstr "Continue with {name}"
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:78
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:90
 msgid "Create account"
 msgstr "Create account"
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:76
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:88
 msgid "Creating account..."
 msgstr "Creating account..."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:254
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:257
 msgid "Default"
 msgstr "Default"
 
@@ -88,15 +88,15 @@ msgstr "Discoverable passkeys"
 msgid "Easy access"
 msgstr "Easy access"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:264
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:267
 msgid "Edit {name}"
 msgstr "Edit {name}"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:48
+#: src/frontend/src/lib/components/views/EditAccount.svelte:55
 msgid "Edit account"
 msgstr "Edit account"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:339
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:342
 msgid "Enable multiple accounts"
 msgstr "Enable multiple accounts"
 
@@ -145,6 +145,11 @@ msgstr "How do passkeys work?"
 msgid "How does Internet Identity compare to other Web3 authentication tools?"
 msgstr "How does Internet Identity compare to other Web3 authentication tools?"
 
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:63
+#: src/frontend/src/lib/components/views/EditAccount.svelte:73
+msgid "In use on another account."
+msgstr "In use on another account."
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:76
 msgid "Internet Identity"
 msgstr "Internet Identity"
@@ -177,7 +182,7 @@ msgstr "Internet Identity then bridges the authentication with those providers w
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Is my Face ID or Fingerprint stored in Internet Identity?"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:294
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:297
 msgid "Limit reached"
 msgstr "Limit reached"
 
@@ -193,16 +198,16 @@ msgstr "Manage Identity"
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:54
-#: src/frontend/src/lib/components/views/EditAccount.svelte:64
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:61
+#: src/frontend/src/lib/components/views/EditAccount.svelte:71
 msgid "Maximum length is 32 characters."
 msgstr "Maximum length is 32 characters."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:355
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:358
 msgid "More information about multiple accounts"
 msgstr "More information about multiple accounts"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
 msgid "Multiple accounts"
 msgstr "Multiple accounts"
 
@@ -214,7 +219,7 @@ msgstr "My {application} account"
 msgid "My account"
 msgstr "My account"
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:38
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:45
 msgid "Name account"
 msgstr "Name account"
 
@@ -242,15 +247,15 @@ msgstr "Password-free"
 msgid "Real Privacy"
 msgstr "Real Privacy"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:51
+#: src/frontend/src/lib/components/views/EditAccount.svelte:58
 msgid "Rename or make this your default sign-in"
 msgstr "Rename or make this your default sign-in"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+#: src/frontend/src/lib/components/views/EditAccount.svelte:103
 msgid "Save changes"
 msgstr "Save changes"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:91
+#: src/frontend/src/lib/components/views/EditAccount.svelte:101
 msgid "Saving changes..."
 msgstr "Saving changes..."
 
@@ -258,12 +263,12 @@ msgstr "Saving changes..."
 msgid "Seamless Access"
 msgstr "Seamless Access"
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:62
-#: src/frontend/src/lib/components/views/EditAccount.svelte:73
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:71
+#: src/frontend/src/lib/components/views/EditAccount.svelte:82
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:276
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:279
 msgid "Sign in"
 msgstr "Sign in"
 
@@ -311,10 +316,10 @@ msgstr "What's new in Internet Identity 2.0?"
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:279
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:282
 msgid "with your Internet Identity"
 msgstr "with your Internet Identity"
 
-#: src/frontend/src/lib/components/views/CreateAccount.svelte:41
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:48
 msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."

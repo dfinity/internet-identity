@@ -11,15 +11,17 @@
   interface Props {
     name: string;
     isDefaultSignIn: boolean;
+    namesInUse: string[];
     save: (update: { name?: string; isDefaultSignIn?: boolean }) => void;
   }
 
-  const { save, ...props }: Props = $props();
+  const { save, namesInUse, ...props }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state(props.name);
   let isDefaultSignIn = $state(props.isDefaultSignIn);
   let isSubmitting = $state(false);
+  let isNameInUse = $state(false);
 
   const hasChanges = $derived(
     props.name !== name.trim() || props.isDefaultSignIn !== isDefaultSignIn,
@@ -27,6 +29,11 @@
 
   const handleSubmit = () => {
     isSubmitting = true;
+    if (namesInUse.includes(name.trim())) {
+      isNameInUse = true;
+      isSubmitting = false;
+      return;
+    }
     save({
       name: props.name !== name.trim() ? name.trim() : undefined,
       isDefaultSignIn:
@@ -62,7 +69,9 @@
       spellcheck="false"
       error={name.length > 32
         ? $t`Maximum length is 32 characters.`
-        : undefined}
+        : isNameInUse
+          ? $t`In use on another account.`
+          : undefined}
       disabled={isSubmitting}
       aria-label={$t`Account name`}
     />
@@ -84,6 +93,7 @@
       disabled={name.length === 0 ||
         name.length > 32 ||
         !hasChanges ||
+        isNameInUse ||
         isSubmitting}
     >
       {#if isSubmitting}
