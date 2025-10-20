@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { fly } from "svelte/transition";
   import { onMount } from "svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   interface Props {
     create: (name: string) => Promise<void>;
@@ -28,43 +28,48 @@
   });
 </script>
 
-<form class="flex flex-1 flex-col" in:fly={{ duration: 200, x: 10 }}>
+<form class="flex flex-1 flex-col">
   <div
     class="text-text-primary mb-8 flex w-full flex-col items-center justify-center"
   >
-    <SmileyWritingIllustration class="my-5 h-22" />
+    <div class="illustration self-center">
+      <SmileyWritingIllustration class="my-5 h-22" />
+    </div>
     <div>
       <h1 class="mb-3 text-2xl font-medium sm:text-center">
-        Name your identity
+        {$t`What's your name?`}
       </h1>
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        {#if $AUTH_FLOW_UPDATES}
-          Internet Identity <b>does not</b> store your biometric data. It stays on
-          your device. Your Identity functions as a secure passkey manager for authentication.
-        {:else}
-          This will label your passkey, and you can't rename it later once set
-        {/if}
+        <Trans>
+          Give your identity a clear, simple, and memorable name you'll easily
+          recognize.
+        </Trans>
       </p>
     </div>
   </div>
-  <div class="flex flex-col items-stretch gap-4">
+  <div class="flex flex-col items-stretch gap-6">
     <Input
       bind:element={inputRef}
       bind:value={name}
       inputmode="text"
-      placeholder="Identity name"
-      hint="Pick something recognizable, like your name."
+      placeholder={$t`Identity name`}
       type="text"
       size="md"
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
       disabled={isCreating}
-      error={name.length > 64 ? "Maximum length is 64 characters." : undefined}
-      aria-label="Identity name"
-    />
+      error={name.length > 64
+        ? $t`Maximum length is 64 characters.`
+        : undefined}
+      aria-label={$t`Identity name`}
+    >
+      {#snippet hint()}
+        <Trans>You <b>cannot</b> rename this once it is set.</Trans>
+      {/snippet}
+    </Input>
     <Button
       onclick={handleCreate}
       variant="primary"
@@ -74,10 +79,19 @@
     >
       {#if isCreating}
         <ProgressRing />
-        <span>Creating identity...</span>
+        <span>{$t`Creating identity...`}</span>
       {:else}
-        <span>Create identity</span>
+        <span>{$t`Create identity`}</span>
       {/if}
     </Button>
   </div>
 </form>
+
+<style>
+  @media (max-height: 700px) {
+    /*noinspection CssUnusedSymbol*/
+    .illustration {
+      display: none !important;
+    }
+  }
+</style>

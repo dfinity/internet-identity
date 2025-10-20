@@ -88,11 +88,6 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const AUTH_FLOW_UPDATES = createFeatureFlagStore(
-  "AUTH_FLOW_UPDATES",
-  false,
-);
-
 export const LARGE_GOOGLE_BUTTON = createFeatureFlagStore(
   "LARGE_GOOGLE_BUTTON",
   true,
@@ -112,7 +107,6 @@ export default {
   OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
-  AUTH_FLOW_UPDATES,
   LARGE_GOOGLE_BUTTON,
   ENABLE_ALL_LOCALES,
 } as Record<string, FeatureFlagStore>;

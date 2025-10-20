@@ -23,7 +23,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("link", { name: "Manage Identity" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
@@ -52,7 +52,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
   await newPage.getByRole("link", { name: "Manage Identity" }).click();
-  await newPage.getByRole("button", { name: "Continue with Passkey" }).click();
+  await newPage.getByRole("button", { name: "Continue with passkey" }).click();
   auth2(newPage);
   await newPage.getByRole("button", { name: "Use existing identity" }).click();
 
@@ -80,7 +80,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("link", { name: "Manage Identity" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
@@ -90,7 +90,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
 
   // Start the "add passkey" flow
   await page.getByRole("button", { name: "Add" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   await page
     .getByRole("button", { name: "Continue on another device" })
     .click();
@@ -134,7 +134,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   // Create and register new passkey
   const authLinkPage = dummyAuth();
   authLinkPage(linkPage);
-  await linkPage.getByRole("button", { name: "Create passkey" }).click();
+  await linkPage.getByRole("button", { name: "Create identity" }).click();
 
   await linkPage
     .getByRole("heading", { level: 1, name: "Confirm your sign-in" })

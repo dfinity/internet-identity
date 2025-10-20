@@ -17,10 +17,11 @@
   import { t } from "$lib/stores/locale.store";
 
   interface Props {
-    create: (name: string) => Promise<void | "cancelled">;
+    upgrade: (name: string) => Promise<void | "cancelled">;
+    identityNumber: bigint;
   }
 
-  const { create }: Props = $props();
+  const { upgrade, identityNumber }: Props = $props();
 
   onMount(() => {
     upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.CreatePasskeyScreen);
@@ -28,13 +29,13 @@
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
-  let isCreating = $state(false);
+  let isUpgrading = $state(false);
   let isCancelled = $state(false);
 
   const handleCreate = async () => {
-    isCreating = true;
-    const result = await create(name.trim());
-    isCreating = false;
+    isUpgrading = true;
+    const result = await upgrade(name.trim());
+    isUpgrading = false;
 
     if (result === "cancelled") {
       isCancelled = true;
@@ -78,7 +79,7 @@
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
-      disabled={isCreating}
+      disabled={isUpgrading}
       error={name.length > 64
         ? $t`Maximum length is 64 characters.`
         : undefined}
@@ -98,45 +99,22 @@
         variant="primary"
         size="lg"
         type="submit"
-        disabled={name.length === 0 || name.length > 64 || isCreating}
+        disabled={name.length === 0 || name.length > 64 || isUpgrading}
       >
-        {#if isCreating}
+        {#if isUpgrading}
           <ProgressRing />
-          <span>{$t`Creating identity...`}</span>
+          <span>{$t`Upgrading identity...`}</span>
         {:else}
-          <span>{$t`Create identity`}</span>
+          <span>{$t`Upgrading identity`}</span>
         {/if}
       </Button>
     </Tooltip>
-    <div class="flex flex-row items-center">
-      <p class="text-text-secondary text-sm">
-        <Trans>
-          <a
-            href={II_SUPPORT_PASSKEY_URL}
-            target="_blank"
-            class="text-text-primary font-semibold hover:underline"
-          >
-            Learn more
-          </a> about passkeys
-        </Trans>
-      </p>
-      <Tooltip
-        label={$t`What are passkeys?`}
-        description={$t`Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared.`}
-        direction="up"
-        align="end"
-        offset="0rem"
-        class="max-w-80"
-      >
-        <Button
-          variant="tertiary"
-          iconOnly
-          class="ms-auto !cursor-default !rounded-full"
-        >
-          <HelpCircleIcon class="size-5" />
-        </Button>
-      </Tooltip>
-    </div>
+    <p class="text-text-secondary text-center text-xs">
+      <Trans>
+        You are upgrading ID
+        <Badge size="sm" class="ms-1">{identityNumber}</Badge>
+      </Trans>
+    </p>
   </div>
 </form>
 

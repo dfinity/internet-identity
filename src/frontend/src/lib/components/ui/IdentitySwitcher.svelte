@@ -99,11 +99,13 @@
   </ButtonCard>
 </div>
 {#if onLogout}
-  <Button onclick={onLogout} variant="tertiary"
-    ><LogOutIcon size="1.25rem" />Sign Out</Button
+  <Button onclick={onLogout} variant="tertiary">
+    <LogOutIcon size="1.25rem" />
+    Sign Out</Button
   >
 {:else if nonNullish(manageIdentityUrl)}
-  <Button href="/manage" target="_blank" variant="tertiary"
-    ><Settings size="1.25rem" />Manage Identity</Button
+  <Button href="/manage" target="_blank" variant="tertiary">
+    <Settings size="1.25rem" />
+    Manage Identity</Button
   >
 {/if}

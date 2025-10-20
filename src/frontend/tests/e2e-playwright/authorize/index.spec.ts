@@ -17,12 +17,12 @@ test("Authorize by registering a new passkey", async ({ page }) => {
   const auth = dummyAuth();
   await authorize(page, async (authPage) => {
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Continue with passkey" })
       .click();
     await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     auth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    await authPage.getByRole("button", { name: "Create identity" }).click();
   });
 });
 
@@ -32,7 +32,7 @@ test("Authorize by signing in with an existing passkey", async ({ page }) => {
   await clearStorage(page);
   await authorize(page, async (authPage) => {
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Continue with passkey" })
       .click();
     auth(authPage);
     await authPage
@@ -59,7 +59,7 @@ test("Authorize by signing in from another device", async ({
   const principal = await authorize(page, async (authPage) => {
     // Switch to current device and start "Continue from another device" flow to get link
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Continue with passkey" })
       .click();
     cancelDummyAuth(authPage);
     await authPage
@@ -70,7 +70,7 @@ test("Authorize by signing in from another device", async ({
     await authPage
       .getByRole("heading", {
         level: 1,
-        name: "Can't find your identity or passkey?",
+        name: "Can't find your identity?",
       })
       .waitFor();
     const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
@@ -179,14 +179,14 @@ test("Authorize with ICRC-29", async ({ page }) => {
     II_URL + "/authorize",
     async (authPage) => {
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
+        .getByRole("button", { name: "Continue with passkey" })
         .click();
       await authPage
         .getByRole("button", { name: "Create new identity" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       auth(authPage);
-      await authPage.getByRole("button", { name: "Create Passkey" }).click();
+      await authPage.getByRole("button", { name: "Create identity" }).click();
     },
     true,
   );
@@ -237,12 +237,12 @@ test("App logo appears when app is known", async ({ page }) => {
     await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
 
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Continue with passkey" })
       .click();
     await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill("John Doe");
     auth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    await authPage.getByRole("button", { name: "Create identity" }).click();
   });
 });
 
@@ -257,14 +257,14 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       await authPage
-        .getByRole("button", { name: "Continue with Passkey" })
+        .getByRole("button", { name: "Continue with passkey" })
         .click();
       await authPage
         .getByRole("button", { name: "Create new identity" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       auth(authPage);
-      await authPage.getByRole("button", { name: "Create Passkey" }).click();
+      await authPage.getByRole("button", { name: "Create identity" }).click();
     },
   );
 });

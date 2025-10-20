@@ -56,7 +56,7 @@ test("Authorize by signing in with a different passkey", async ({ page }) => {
       .getByRole("button", { name: "Use another identity" })
       .click();
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Continue with passkey" })
       .click();
     auth1(authPage);
     await authPage

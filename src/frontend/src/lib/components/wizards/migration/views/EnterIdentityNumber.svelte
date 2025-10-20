@@ -7,6 +7,8 @@
   import { onMount } from "svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   interface Props {
     onSubmit: (
@@ -53,12 +55,14 @@
     </div>
     <div>
       <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-        Let's get started
+        {$t`Let's get started`}
       </h1>
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        Upgrade your existing identity to the new experience in a few steps.
+        <Trans>
+          Upgrade your existing identity to the new experience in a few steps.
+        </Trans>
       </p>
     </div>
   </div>
@@ -69,18 +73,18 @@
         (value) => (identityNumber = value.replace(/\D/g, ""))
       }
       inputmode="numeric"
-      placeholder="Internet Identity number"
+      placeholder={$t`Internet Identity number`}
       size="md"
       bind:element={inputElement}
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
-      aria-label="Identity number"
+      aria-label={$t`Identity number`}
     />
     <Tooltip
       label={isWrongDomain
-        ? "Wrong domain was set. Please try again."
-        : "Interaction canceled. Please try again."}
+        ? $t`Wrong domain was set. Please try again.`
+        : $t`Interaction canceled. Please try again.`}
       hidden={!isCancelled && !isWrongDomain}
       manual
     >
@@ -93,9 +97,9 @@
       >
         {#if isSubmitting}
           <ProgressRing />
-          <span>Authenticating...</span>
+          <span>{$t`Authenticating...`}</span>
         {:else}
-          <span>Continue</span>
+          <span>{$t`Continue`}</span>
         {/if}
       </Button>
     </Tooltip>
@@ -106,7 +110,7 @@
       variant="tertiary"
       size="lg"
     >
-      Help & FAQ
+      {$t`Help & FAQ`}
     </Button>
   </div>
 </form>

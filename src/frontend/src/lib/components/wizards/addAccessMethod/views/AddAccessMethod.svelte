@@ -84,7 +84,7 @@
         size="xl"
       >
         <PasskeyIcon />
-        Continue with Passkey
+        Continue with passkey
       </Button>
     </Tooltip>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">

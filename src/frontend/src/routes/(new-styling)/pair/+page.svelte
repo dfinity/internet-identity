@@ -41,7 +41,7 @@
 {#if isUnableToComplete}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-      <CircleAlertIcon size="1.5rem" />
+      <CircleAlertIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
       Unable to complete setup
