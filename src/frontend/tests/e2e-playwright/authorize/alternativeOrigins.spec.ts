@@ -109,6 +109,7 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   const auth = dummyAuth();
   auth(authPage);
   await authPage.getByRole("button", { name: "Create Passkey" }).click();
+  await authPage.getByRole("button", { name: "Continue", exact: true }).click();
 
   // Wait for II window to close
   await authPage.waitForEvent("close");
@@ -245,6 +246,9 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await authPage1.getByLabel("Identity name").fill("Test User");
   auth(authPage1);
   await authPage1.getByRole("button", { name: "Create Passkey" }).click();
+  await authPage1
+    .getByRole("button", { name: "Continue", exact: true })
+    .click();
 
   // Wait for II window to close
   await authPage1.waitForEvent("close");
@@ -268,7 +272,9 @@ test("Should issue the same principal to nice url and canonical url", async ({
 
   // Use existing passkey
   auth(authPage2);
-  await authPage2.getByRole("button", { name: "Primary account" }).click();
+  await authPage2
+    .getByRole("button", { name: "Continue", exact: true })
+    .click();
 
   // Wait for II window to close
   await authPage2.waitForEvent("close");

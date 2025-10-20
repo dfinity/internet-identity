@@ -30,7 +30,12 @@
     className,
   ]}
 >
-  <input {...props} bind:checked type="checkbox" class="peer sr-only" />
+  <input
+    {...props}
+    bind:checked
+    type="checkbox"
+    class="peer absolute z-1 h-1 w-1 opacity-0"
+  />
   <div
     class={[
       "relative flex items-center justify-center rounded-sm border",

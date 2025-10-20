@@ -11,6 +11,7 @@
     direction?: Direction;
     align?: Align;
     distance?: string;
+    offset?: string;
     hidden?: boolean;
     manual?: boolean; // Always render tooltip, even when not hovered
     anchor?: HTMLElement;
@@ -23,6 +24,7 @@
     direction = "up",
     align = "center",
     distance = "0.5rem",
+    offset = "0.75rem",
     hidden = false,
     manual = false,
     anchor,
@@ -37,7 +39,7 @@
 
   const anchorRef = $derived(
     anchor ??
-      ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined),
+    ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined)
   );
 
   $effect(() => {
@@ -45,7 +47,6 @@
       return;
     }
     let tracking = true;
-    const padding = "0.75rem";
     const track = () => {
       if (nonNullish(anchorRef) && nonNullish(tooltipRef)) {
         const anchorRect = anchorRef.getBoundingClientRect();
@@ -53,30 +54,30 @@
         tooltipRef.style.top = {
           up: `calc(${anchorRect.top - tooltipRect.height}px - ${distance})`,
           right: {
-            start: `calc(${anchorRect.top}px - ${padding})`,
+            start: `calc(${anchorRect.top}px - ${offset})`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${padding})`,
+            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`
           }[align],
           down: `calc(${anchorRect.bottom}px + ${distance})`,
           left: {
-            start: `calc(${anchorRect.top}px - ${padding})`,
+            start: `calc(${anchorRect.top}px - ${offset})`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - tooltipRect.height * 0.5}px`,
-            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${padding})`,
-          }[align],
+            end: `calc(${anchorRect.bottom - tooltipRect.height}px + ${offset})`
+          }[align]
         }[direction];
         tooltipRef.style.left = {
           up: {
-            start: `calc(${anchorRect.left}px - ${padding})`,
+            start: `calc(${anchorRect.left}px - ${offset})`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - tooltipRect.width}px + ${padding})`,
+            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`
           }[align],
           right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
-            start: `calc(${anchorRect.left}px - ${padding})`,
+            start: `calc(${anchorRect.left}px - ${offset})`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
-            end: `calc(${anchorRect.right - tooltipRect.width}px + ${padding})`,
+            end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`
           }[align],
-          left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`,
+          left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`
         }[direction];
       }
       if (tracking) {
@@ -102,6 +103,10 @@
       isTooltipVisible = !hidden;
     }
   });
+
+  $effect(() => {
+    wrapperRef?.firstElementChild?.setAttribute("aria-describedby", id);
+  });
 </script>
 
 {#if !manual && hidden}
@@ -117,7 +122,6 @@
     onfocusout={() => !manual && (isTooltipVisible = false)}
     ontouchend={() => !manual && (isTooltipVisible = !isTooltipVisible)}
     class="contents"
-    aria-describedby={id}
   >
     {@render children?.()}
   </div>
@@ -133,7 +137,7 @@
     <!-- Tooltip inner container that animates -->
     <div
       class={[
-        "bg-bg-tertiary border-border-secondary relative flex max-w-80 flex-col items-start rounded-lg border px-3 py-2 drop-shadow-lg",
+        "bg-bg-tertiary border-border-secondary relative flex max-w-80 flex-col items-start rounded-lg border px-3 py-2 shadow-lg shadow-black/6",
         {
           up: {
             start: "origin-[1.6rem_100%]",

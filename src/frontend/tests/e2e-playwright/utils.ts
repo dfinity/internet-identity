@@ -139,6 +139,11 @@ export const createIdentity = (
 ): Promise<string> =>
   authorize(page, async (authPage) => {
     await createNewIdentityInII(authPage, name, dummyAuth);
+
+    // Continue to dapp
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 
 /**

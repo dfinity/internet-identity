@@ -12,7 +12,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
@@ -169,37 +169,42 @@
     name?: string;
     isDefaultSignIn?: boolean;
   }) => {
+    if (isNullish(accounts)) {
+      return;
+    }
     try {
       const { identityNumber, actor } = $authenticationStore!;
+      const index = accounts.findIndex(
+        (account) =>
+          account.account_number[0] === isEditAccountDialogVisibleForNumber,
+      );
       if (nonNullish(changes.name)) {
-        const updatedAccount = await actor
+        accounts[index] = await actor
           .update_account(
             identityNumber,
             $authorizationContextStore.effectiveOrigin,
-            nonNullish(isEditAccountDialogVisibleForNumber)
-              ? [isEditAccountDialogVisibleForNumber]
-              : [],
+            accounts[index].account_number,
             { name: [changes.name] },
           )
           .then(throwCanisterError);
-        accounts = accounts?.map((account) =>
-          account.account_number[0] === updatedAccount.account_number[0]
-            ? updatedAccount
-            : account,
-        );
+
+        // Updating a primary account could result in number assignment,
+        // so we should sync the default account number state if needed.
+        if (isEditAccountDialogVisibleForNumber === defaultAccountNumber) {
+          defaultAccountNumber = accounts[index].account_number[0];
+        }
       }
       if (nonNullish(changes.isDefaultSignIn) && changes.isDefaultSignIn) {
-        defaultAccountNumber = (
-          await actor
-            .set_default_account(
-              identityNumber,
-              $authorizationContextStore.effectiveOrigin,
-              nonNullish(isEditAccountDialogVisibleForNumber)
-                ? [isEditAccountDialogVisibleForNumber]
-                : [],
-            )
-            .then(throwCanisterError)
-        ).account_number[0];
+        // Account details could theoretically change when set it as default,
+        // so we make sure to update the state with latest account details.
+        accounts[index] = await actor
+          .set_default_account(
+            identityNumber,
+            $authorizationContextStore.effectiveOrigin,
+            accounts[index].account_number,
+          )
+          .then(throwCanisterError);
+        defaultAccountNumber = accounts[index].account_number[0];
       }
     } catch (error) {
       handleError(error);
@@ -214,48 +219,55 @@
 </script>
 
 {#snippet accountListItem(account: AccountInfo)}
-  <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
-    <div
-      in:scale={{ duration: 300, delay: 450, start: 0.95 }}
-      class={[
-        // Layout
-        "relative flex flex-row items-stretch gap-3",
-        // Styling
-        "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
-        // Animate scale and shadow
-        "transition-all duration-100 ease-out",
-        // Apply scale effect on hover
-        "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
-        // Also apply scale effect on keyboard focus besides hover
-        "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
-        // When cursor is between two items, we still want an item
-        // to be scaled and the cursor to be a pointer nonetheless.
-        "cursor-pointer after:absolute after:-inset-2 after:-z-1",
-      ]}
-    >
-      <button
-        onclick={() => handleContinueAs(account.account_number[0])}
-        class="flex flex-1 flex-row items-center text-start outline-0"
+  {@const name = account.name[0] ?? primaryAccountName}
+  <li class="contents">
+    <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
+      <div
+        in:scale={{ duration: 300, delay: 450, start: 0.95 }}
+        class={[
+          // Layout
+          "relative flex flex-row items-stretch gap-3",
+          // Styling
+          "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
+          // Animate scale and shadow
+          "transition-all duration-100 ease-out",
+          // Apply scale effect on hover
+          "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
+          // Also apply scale effect on keyboard focus besides hover
+          "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
+          // When cursor is between two items, we still want an item
+          // to be scaled and the cursor to be a pointer nonetheless.
+          "cursor-pointer after:absolute after:-inset-2 after:-z-1",
+        ]}
       >
-        <span class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold">
-          {account.name[0] ?? primaryAccountName}
-        </span>
-        {#if account.account_number[0] === defaultAccountNumber}
-          <Badge size="sm">{$t`Default`}</Badge>
-        {/if}
-      </button>
-      <Button
-        onclick={() =>
-          (isEditAccountDialogVisibleForNumber = account.account_number[0])}
-        variant="tertiary"
-        size="sm"
-        iconOnly
-        class="my-3 me-3 shrink-0"
-      >
-        <PencilIcon class="size-5" />
-      </Button>
+        <button
+          onclick={() => handleContinueAs(account.account_number[0])}
+          class="flex flex-1 flex-row items-center text-start outline-0"
+          aria-label={$t`Continue with ${name}`}
+        >
+          <span
+            class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold"
+          >
+            {name}
+          </span>
+          {#if account.account_number[0] === defaultAccountNumber}
+            <Badge size="sm">{$t`Default`}</Badge>
+          {/if}
+        </button>
+        <Button
+          onclick={() =>
+            (isEditAccountDialogVisibleForNumber = account.account_number[0])}
+          variant="tertiary"
+          size="sm"
+          iconOnly
+          class="my-3 me-3 shrink-0"
+          aria-label={$t`Edit ${name}`}
+        >
+          <PencilIcon class="size-5" />
+        </Button>
+      </div>
     </div>
-  </div>
+  </li>
 {/snippet}
 
 <div class="flex flex-1 flex-col">
@@ -273,9 +285,11 @@
           {#if nonNullish(accounts)}
             <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
               <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
-                {#each accounts as account (account.account_number[0])}
-                  {@render accountListItem(account)}
-                {/each}
+                <ul class="contents" aria-label={$t`Choose an account`}>
+                  {#each accounts as account (account.account_number[0])}
+                    {@render accountListItem(account)}
+                  {/each}
+                </ul>
                 <Tooltip
                   label={$t`Limit reached`}
                   description={$plural(MAX_ACCOUNTS, {
@@ -316,6 +330,7 @@
   </div>
   <div class="border-border-tertiary mb-6 border-t"></div>
   <div class="flex flex-row items-center">
+    <!-- Intentionally we use onclick here instead of onchange to make sure it's a user gesture-->
     <Toggle
       bind:checked={isMultipleAccountsEnabled}
       onclick={isMultipleAccountsEnabled
