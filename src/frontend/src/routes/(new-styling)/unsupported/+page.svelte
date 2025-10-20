@@ -10,6 +10,7 @@
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import { isNullish, nonNullish } from "@dfinity/utils";
 
   const { data }: { data: PageData } = $props();
 
@@ -55,7 +56,7 @@
       class="flex flex-1 flex-col items-stretch justify-end p-4 sm:max-w-100 sm:items-center sm:justify-center"
     >
       <div class="mb-8 flex flex-1 flex-col justify-center sm:flex-none">
-        {#if data.noRedirect}
+        {#if nonNullish(data.noRedirect) || isNullish(data.redirectUrl)}
           <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
             <TriangleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
           </FeaturedIcon>
@@ -74,11 +75,23 @@
             <ol
               class="text-md text-text-tertiary mb-5 list-decimal space-y-2 pl-6 text-left font-medium"
             >
+              {#if nonNullish(data.redirectUrl)}
+                <li>
+                  {$t`Long-press the link that opened this page.`}
+                </li>
+              {:else}
+                <li>
+                  <Trans>
+                    Tap the <span class="font-semibold">⋯</span> (three dots) or
+                    long-press the link that opened this page.
+                  </Trans>
+                </li>
+              {/if}
               <li>
-                {$t`Tap the ⋯ (three dots at the top of the page) or long-press the link that opened this page.`}
-              </li>
-              <li>
-                {$t`Select Open in Safari or Open in Chrome.`}
+                <Trans>
+                  Select <span class="font-semibold">Open in Safari</span> or
+                  <span class="font-semibold">Open in Chrome</span>.
+                </Trans>
               </li>
               <li>{$t`Sign in there.`}</li>
             </ol>

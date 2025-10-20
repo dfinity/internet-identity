@@ -1,3 +1,4 @@
+import { isNullish } from "@dfinity/utils";
 import { PageLoad } from "../$types";
 
 export const load: PageLoad = ({
@@ -14,7 +15,7 @@ export const load: PageLoad = ({
     };
   }
 
-  if (!encodedRedirect) {
+  if (isNullish(encodedRedirect) || encodedRedirect === "") {
     return {
       redirectUrl: null,
       noRedirect: false,
