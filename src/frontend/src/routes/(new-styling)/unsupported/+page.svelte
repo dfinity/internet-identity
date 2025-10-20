@@ -101,15 +101,6 @@
               {$t`You are being redirected to the app ${data.redirectUrl} for signin.`}
             </p>
           </div>
-        {:else if data.redirectUrl}
-          <div class="flex flex-col items-center justify-center gap-4">
-            <ProgressRing class="text-fg-primary size-14" />
-            <p
-              class="text-md text-text-tertiary text-center font-medium text-balance"
-            >
-              {$t`You are being redirected to the app ${data.redirectUrl} for signin.`}
-            </p>
-          </div>
         {:else}
           <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
             {$t`Browser Not Supported`}

@@ -75,9 +75,9 @@
 
   $effect(() => {
     // Use the same error message if we don't have a referrer.
-    if (status === "orphan" && document.referrer) {
+    if (status === "orphan") {
       const redirect = `redirect=${encodeURIComponent(document.referrer)}`;
-      const noRedirect = `noRedirect=${true}`;
+      const noRedirect = `noRedirect=true`;
       goto(`/unsupported?${redirect}&${noRedirect}`, {
         replaceState: true,
         invalidateAll: true,
