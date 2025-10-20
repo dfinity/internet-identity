@@ -202,6 +202,8 @@ msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
 msgid "Default"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:115
+msgid "Browser Not Supported"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
@@ -280,6 +282,10 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:60
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:113
 msgid "Help & FAQ"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:134
+msgid "Go to the app"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:312
@@ -402,6 +408,12 @@ msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
 msgid "Limit reached"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:68
+msgid "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:92
+msgid "Learn how to open links in your browser →"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:41
@@ -556,12 +568,12 @@ msgstr ""
 msgid "Seamless Access"
 msgstr "Acceso sin interrupciones"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:93
-msgid "Set as default sign-in"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:81
+msgid "Select Open in Safari or Open in Chrome."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
-msgid "Sign in"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:83
+msgid "Sign in there."
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
@@ -619,6 +631,8 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte:15
 msgid "The <0>new device</0> is preparing to continue."
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:78
+msgid "Tap the ⋯ (three dots at the top of the page) or long-press the link that opened this page."
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:317
@@ -651,6 +665,8 @@ msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:50
 msgid "to continue with this app"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:72
+msgid "To continue:"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:42
@@ -742,6 +758,8 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
 msgid "What are passkeys?"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:65
+msgid "Unsupported Browser"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:193
@@ -768,8 +786,9 @@ msgstr ""
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "Cuando creas un passkey, tu dispositivo genera dos claves coincidentes. Una permanece segura en tu dispositivo y la otra se envía a la aplicación o servicio. Trabajan juntas para confirmar que eres tú — sin compartir nunca tu información personal o contraseña."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
-msgid "with your Internet Identity"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:101
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:110
+msgid "You are being redirected to the app {0} for signin."
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:86
@@ -792,6 +811,8 @@ msgstr ""
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:68
 msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:120
+msgid "Your browser is not supported. Please visit our <0>support page</0> for more information and try again with a different browser."
 msgstr ""
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:51

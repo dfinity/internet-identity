@@ -6,6 +6,10 @@
   import type { PageData } from "../$types";
   import Header from "$lib/components/layout/Header.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { TriangleAlertIcon } from "@lucide/svelte";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   const { data }: { data: PageData } = $props();
 
@@ -50,35 +54,42 @@
     <div
       class="flex flex-1 flex-col items-stretch justify-end p-4 sm:max-w-100 sm:items-center sm:justify-center"
     >
-      <div class="mb-8 flex flex-1 flex-col justify-center gap-2 sm:flex-none">
+      <div class="mb-8 flex flex-1 flex-col justify-center sm:flex-none">
         {#if data.noRedirect}
-          <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
-            Unsupported Browser
-          </h1>
-          <p class="text-text-primary mb-4 text-center text-lg font-semibold">
-            To continue:
-          </p>
-          <ol
-            class="text-md text-text-tertiary mb-4 list-decimal space-y-2 pl-6 text-left font-medium"
+          <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
+            <TriangleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
+          </FeaturedIcon>
+          <h1
+            class="text-text-primary mb-3 text-center text-2xl font-medium sm:text-left"
           >
-            <li>
-              Tap the <strong>⋯</strong> or
-              <strong>long-press the link that opened this page</strong>.
-            </li>
-            <li>
-              Select "<strong>Open in Safari</strong>" or "<strong
-                >Open in Chrome</strong
-              >."
-            </li>
-            <li>Sign in there.</li>
-          </ol>
+            {$t`Unsupported Browser`}
+          </h1>
+          <p class="text-text-primary mb-5 text-center sm:text-left">
+            {$t`It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported.`}
+          </p>
+          <div>
+            <p class="text-text-primary mb-3 text-center sm:text-left">
+              <strong>{$t`To continue:`}</strong>
+            </p>
+            <ol
+              class="text-md text-text-tertiary mb-5 list-decimal space-y-2 pl-6 text-left font-medium"
+            >
+              <li>
+                {$t`Tap the ⋯ (three dots at the top of the page) or long-press the link that opened this page.`}
+              </li>
+              <li>
+                {$t`Select Open in Safari or Open in Chrome.`}
+              </li>
+              <li>{$t`Sign in there.`}</li>
+            </ol>
+          </div>
           <p class="text-center">
             <a
               href={SUPPORT_URL}
               target="_blank"
               rel="noopener noreferrer"
               class="text-text-primary underline hover:no-underline"
-              >Learn how to open links in your browser →</a
+              >{$t`Learn how to open links in your browser →`}</a
             >
           </p>
         {:else if data.redirectUrl}
@@ -87,31 +98,41 @@
             <p
               class="text-md text-text-tertiary text-center font-medium text-balance"
             >
-              You are being redirected to the app <span
-                class="text-text-primary">{data.redirectUrl}</span
-              > for signin.
+              {$t`You are being redirected to the app ${data.redirectUrl} for signin.`}
+            </p>
+          </div>
+        {:else if data.redirectUrl}
+          <div class="flex flex-col items-center justify-center gap-4">
+            <ProgressRing class="text-fg-primary size-14" />
+            <p
+              class="text-md text-text-tertiary text-center font-medium text-balance"
+            >
+              {$t`You are being redirected to the app ${data.redirectUrl} for signin.`}
             </p>
           </div>
         {:else}
           <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
-            Browser Not Supported
+            {$t`Browser Not Supported`}
           </h1>
           <p
             class="text-md text-text-tertiary text-center font-medium text-balance"
           >
-            Your browser is not supported. Please visit our <a
-              href={SUPPORT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-text-primary underline hover:no-underline"
-              >support page</a
-            > for more information and try again with a different browser.
+            <Trans
+              >Your browser is not supported. Please visit our <a
+                href={SUPPORT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-text-primary underline hover:no-underline"
+                >support page</a
+              > for more information and try again with a different browser.</Trans
+            >
           </p>
         {/if}
       </div>
       {#if data.redirectUrl && !data.noRedirect}
         <Button variant="primary" onclick={handleRedirect}>
-          Go to the app {#if countdown >= 0}
+          {$t`Go to the app`}
+          {#if countdown >= 0}
             - (<span class="tabular-nums">{countdown}</span>){/if}
         </Button>
       {/if}

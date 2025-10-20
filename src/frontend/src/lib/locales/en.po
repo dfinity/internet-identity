@@ -203,6 +203,9 @@ msgstr "Creating passkey..."
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
 msgid "Default"
 msgstr "Default"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:115
+msgid "Browser Not Supported"
+msgstr "Browser Not Supported"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
 msgid "Discoverable passkeys"
@@ -281,6 +284,10 @@ msgstr "Go to the app - (<0>{countdown}</0>)"
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:113
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:134
+msgid "Go to the app"
+msgstr "Go to the app"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:312
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
@@ -403,6 +410,13 @@ msgstr "Let's get started"
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
 msgid "Limit reached"
 msgstr "Limit reached"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:68
+msgid "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:92
+msgid "Learn how to open links in your browser →"
+msgstr "Learn how to open links in your browser →"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:41
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:41
@@ -556,13 +570,13 @@ msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manu
 msgid "Seamless Access"
 msgstr "Seamless Access"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:93
-msgid "Set as default sign-in"
-msgstr "Set as default sign-in"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:81
+msgid "Select Open in Safari or Open in Chrome."
+msgstr "Select Open in Safari or Open in Chrome."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
-msgid "Sign in"
-msgstr "Sign in"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:83
+msgid "Sign in there."
+msgstr "Sign in there."
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
@@ -620,6 +634,9 @@ msgstr "The <0>existing device</0> is preparing to continue."
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte:15
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "The <0>new device</0> is preparing to continue."
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:78
+msgid "Tap the ⋯ (three dots at the top of the page) or long-press the link that opened this page."
+msgstr "Tap the ⋯ (three dots at the top of the page) or long-press the link that opened this page."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:317
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
@@ -652,6 +669,9 @@ msgstr "to continue with <0>{application}</0>"
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:50
 msgid "to continue with this app"
 msgstr "to continue with this app"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:72
+msgid "To continue:"
+msgstr "To continue:"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:42
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
@@ -743,6 +763,9 @@ msgstr "We didn't recognize that activation code."
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
 msgid "What are passkeys?"
 msgstr "What are passkeys?"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:65
+msgid "Unsupported Browser"
+msgstr "Unsupported Browser"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:193
 msgid "What is Internet Identity?"
@@ -768,9 +791,10 @@ msgstr "What's your name?"
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
-msgid "with your Internet Identity"
-msgstr "with your Internet Identity"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:101
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:110
+msgid "You are being redirected to the app {0} for signin."
+msgstr "You are being redirected to the app {0} for signin."
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:86
 msgid "Wrong domain was set. Please try again."
@@ -827,3 +851,6 @@ msgstr "You're signing in as <0>{name}</0>."
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:87
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:120
+msgid "Your browser is not supported. Please visit our <0>support page</0> for more information and try again with a different browser."
+msgstr "Your browser is not supported. Please visit our <0>support page</0> for more information and try again with a different browser."
