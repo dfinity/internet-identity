@@ -4,6 +4,8 @@
   import { SUPPORT_URL } from "$lib/config";
   import { onMount } from "svelte";
   import type { PageData } from "../$types";
+    import Header from "$lib/components/layout/Header.svelte";
+    import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const { data }: { data: PageData } = $props();
 
@@ -33,19 +35,22 @@
   });
 </script>
 
-<div
-  class="flex flex-1 flex-col items-stretch justify-end p-4 sm:max-w-100 sm:items-center sm:justify-center"
->
-  <div
-    class="text-text-primary flex h-50 flex-1 items-center justify-center sm:flex-none"
+<div class="flex min-h-[100dvh] flex-col">
+  <div class="h-[env(safe-area-inset-top)]"></div>
+
+  <Header />
+  <div class="flex flex-1 flex-col items-center justify-center">
+    <div
+      class="flex flex-1 flex-col items-stretch justify-end p-4 sm:max-w-100 sm:items-center sm:justify-center"
+    >
+      <div
+        class="text-text-primary flex h-50 flex-1 items-center justify-center sm:flex-none"
   >
     <ShieldIllustration />
   </div>
   <div class="mb-8 flex flex-col gap-2">
     {#if data.redirectUrl}
-      <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
-        Browser Not Supported
-      </h1>
+      <ProgressRing class="text-fg-primary size-14" />
       <p
         class="text-md text-text-tertiary text-center font-medium text-balance"
       >
