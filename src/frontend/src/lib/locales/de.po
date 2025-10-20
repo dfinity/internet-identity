@@ -13,6 +13,10 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:281
+msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:363
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Völlig überarbeitetes Interface:</0> Wir haben Internet Identity ein frisches, modernes Erscheinungsbild verliehen. Das neue Design ist intuitiv und einfacher zu bedienen, wodurch die Nutzerführung reibungsloser wird."
@@ -29,9 +33,44 @@ msgstr "<0>Keine Identitätsnummern mehr:</0> Wie oben erklärt, bedeuten entdec
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Nahtlose Passkey-Integration:</0> Wir setzen weiterhin auf Passkeys als die Zukunft sicherer Authentifizierung. Internet Identity 2.0 nutzt die neuesten Passkey-Standards für erhöhte Sicherheit und Benutzerfreundlichkeit."
 
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:47
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:57
+#: src/frontend/src/lib/components/views/EditAccount.svelte:57
+#: src/frontend/src/lib/components/views/EditAccount.svelte:67
+msgid "Account name"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:297
+msgid "Add another account"
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:131
 msgid "Advanced identity management"
 msgstr "Fortgeschrittenes Identitäts-Management"
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:329
+msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:41
+msgid "Choose method"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:312
+msgid "Continue"
+msgstr ""
+
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:78
+msgid "Create account"
+msgstr ""
+
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:76
+msgid "Creating account..."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:244
+msgid "Default"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
 msgid "Discoverable passkeys"
@@ -40,6 +79,14 @@ msgstr "Entdeckbare Passkeys"
 #: src/frontend/src/routes/(new-styling)/+page.svelte:100
 msgid "Easy access"
 msgstr "Einfacher Zugang"
+
+#: src/frontend/src/lib/components/views/EditAccount.svelte:48
+msgid "Edit account"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:324
+msgid "Enable multiple accounts"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:163
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -118,6 +165,10 @@ msgstr "Internet Identity vermittelt dann die Authentifizierung zwischen diesen 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Wird mein Face ID oder Fingerabdruck in Internet Identity gespeichert?"
 
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:280
+msgid "Limit reached"
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Machen Sie die Anmeldung mit Google, Apple oder Microsoft einfach. Der Login, den Sie kennen, jetzt mit erhöhter Privatsphäre."
@@ -129,6 +180,31 @@ msgstr "Identität verwalten"
 #: src/frontend/src/routes/(new-styling)/+page.svelte:132
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Verwalten Sie Ihre Identitäten und behalten Sie die Kontrolle über Ihre Apps und Websites mit Ihrem Dashboard. Entdecken Sie Pro-Funktionen, um Ihre Erfahrung weiter anzupassen und zu sichern."
+
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:54
+#: src/frontend/src/lib/components/views/EditAccount.svelte:64
+msgid "Maximum length is 32 characters."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:340
+msgid "More information about multiple accounts"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:328
+msgid "Multiple accounts"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:73
+msgid "My {application} account"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:73
+msgid "My account"
+msgstr ""
+
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:38
+msgid "Name account"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:333
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
@@ -154,9 +230,30 @@ msgstr "Passwortfrei"
 msgid "Real Privacy"
 msgstr "Echte Privatsphäre"
 
+#: src/frontend/src/lib/components/views/EditAccount.svelte:51
+msgid "Rename or make this your default sign-in"
+msgstr ""
+
+#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+msgid "Save changes"
+msgstr ""
+
+#: src/frontend/src/lib/components/views/EditAccount.svelte:91
+msgid "Saving changes..."
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:75
 msgid "Seamless Access"
 msgstr "Nahtloser Zugriff"
+
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:62
+#: src/frontend/src/lib/components/views/EditAccount.svelte:73
+msgid "Set as default sign-in"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:264
+msgid "Sign in"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:101
 msgid "Sign in using familiar methods"
@@ -165,6 +262,14 @@ msgstr "Anmelden mit bekannten Methoden"
 #: src/frontend/src/routes/(new-styling)/+page.svelte:317
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Die Integration von Google, Microsoft und Apple verwendet ein standardisiertes Authentifizierungsprotokoll namens OpenID. Dies ist dasselbe Protokoll, das andere Anwendungen für die Anmeldung über Google nutzen."
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:46
+msgid "to continue with <0>{application}</0>"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:50
+msgid "to continue with this app"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:154
 msgid "Understanding Internet Identity"
@@ -193,3 +298,11 @@ msgstr "Was ist neu in Internet Identity 2.0?"
 #: src/frontend/src/routes/(new-styling)/+page.svelte:244
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "Wenn Sie einen Passkey erstellen, erzeugt Ihr Gerät zwei passende Schlüssel. Einer bleibt sicher auf Ihrem Gerät, der andere wird an die App oder den Dienst gesendet. Sie arbeiten zusammen, um zu bestätigen, dass Sie es sind – ohne jemals persönliche Informationen oder ein Passwort zu teilen."
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:267
+msgid "with your Internet Identity"
+msgstr ""
+
+#: src/frontend/src/lib/components/views/CreateAccount.svelte:41
+msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
+msgstr ""
