@@ -72,6 +72,18 @@
       replaceState(next, {});
     }
   });
+
+  $effect(() => {
+    // Use the same error message if we don't have a referrer.
+    if (status === "orphan" && document.referrer) {
+      const redirect = `redirect=${encodeURIComponent(document.referrer)}`;
+      const noRedirect = `noRedirect=${true}`;
+      goto(`/unsupported?${redirect}&${noRedirect}`, {
+        replaceState: true,
+        invalidateAll: true,
+      });
+    }
+  });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
