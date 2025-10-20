@@ -265,4 +265,5 @@ pub enum LookupByRegistrationIdError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct AuthnMethodSessionInfo {
     pub name: Option<String>,
+    pub created_at: Option<Timestamp>,
 }
