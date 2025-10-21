@@ -11,8 +11,6 @@
     upgradeIdentityFunnel,
     UpgradeIdentityEvents,
   } from "$lib/utils/analytics/upgradeIdentityFunnel";
-  import { HelpCircleIcon } from "@lucide/svelte";
-  import { II_SUPPORT_PASSKEY_URL } from "$lib/config";
   import { Trans } from "$lib/components/locale";
   import { t } from "$lib/stores/locale.store";
 
@@ -58,13 +56,15 @@
     </div>
     <div>
       <h1 class="mb-3 text-2xl font-medium sm:text-center">
-        Name your identity
+        {$t`Name your identity`}
       </h1>
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        Internet Identity <b>does not</b> store your biometric data. It stays on
-        your device. Your identity acts as a secure passkey manager.
+        <Trans>
+          Internet Identity <b>does not</b> store your biometric data. It stays on
+          your device. Your identity acts as a secure passkey manager.
+        </Trans>
       </p>
     </div>
   </div>
@@ -105,7 +105,7 @@
           <ProgressRing />
           <span>{$t`Upgrading identity...`}</span>
         {:else}
-          <span>{$t`Upgrading identity`}</span>
+          <span>{$t`Upgrade identity`}</span>
         {/if}
       </Button>
     </Tooltip>

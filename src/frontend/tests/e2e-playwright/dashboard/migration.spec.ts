@@ -33,7 +33,7 @@ const upgradeLegacyIdentity = async (
 
   await page.getByLabel("Identity name").fill(TEST_USER_NAME);
   auth(page);
-  await page.getByRole("button", { name: "Create identity" }).click();
+  await page.getByRole("button", { name: "Upgrade identity" }).click();
 };
 
 test.describe("Migration", () => {
@@ -171,7 +171,7 @@ test.describe("Migration", () => {
     // Step 9: Complete the upgrade flow again with a different name
     await page.getByLabel("Identity name").fill(TEST_USER_NAME_2);
     auth2(page);
-    await page.getByRole("button", { name: "Create identity" }).click();
+    await page.getByRole("button", { name: "Upgrade identity" }).click();
 
     // Step 10: Verify the second upgrade was successful
     await page.waitForURL(II_URL + "/manage");

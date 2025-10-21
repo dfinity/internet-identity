@@ -335,6 +335,10 @@ msgstr ""
 msgid "Interaction canceled. Please try again."
 msgstr ""
 
+#: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:64
+msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:356
 msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
 msgstr "Internet Identity 2.0 trae una serie de mejoras diseñadas para mejorar tu experiencia:"
@@ -459,6 +463,10 @@ msgstr ""
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:64
 msgid "Name account"
+msgstr ""
+
+#: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:59
+msgid "Name your identity"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:333
@@ -681,12 +689,12 @@ msgstr ""
 msgid "Upgrade again"
 msgstr ""
 
-#: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:63
-msgid "Upgrade your existing identity to the new experience in a few steps."
+#: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:108
+msgid "Upgrade identity"
 msgstr ""
 
-#: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:108
-msgid "Upgrading identity"
+#: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:63
+msgid "Upgrade your existing identity to the new experience in a few steps."
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:106
