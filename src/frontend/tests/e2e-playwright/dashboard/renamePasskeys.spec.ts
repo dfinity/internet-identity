@@ -82,7 +82,7 @@ test("User can rename a newly added passkey from the same device", async ({
   // Authenticate to add the new passkey
   const auth2 = dummyAuth();
   auth2(page);
-  await page.getByRole("button", { name: "Create identity" }).click();
+  await page.getByRole("button", { name: "Create Passkey" }).click();
 
   // Verify that we now have two passkeys
   await expect(page.getByText("Chrome")).toHaveCount(2);
