@@ -243,7 +243,29 @@ const readCanisterId = (): string => {
   return canIdEl.dataset.canisterId!;
 };
 
+// Not entirely reliable, it fails on Android
+function isTgInAppBrowser() {
+  if (typeof window === "undefined") return false;
+
+  // Telegram's webview bridge in mobile apps (Android & iOS)
+  const hasBridge =
+    typeof (window as any).TelegramWebviewProxy === "object" ||
+    typeof (window as any).TelegramWebviewProxyProto === "object";
+
+  // Useful but not guaranteed on iOS; often present on Android
+  const ua = navigator.userAgent || "";
+  const hasUA = /\bTelegram(?:Android|-Android)?\b/i.test(ua);
+
+  return hasBridge || hasUA;
+}
+
 const init = async () => {
+  const userAgentElement = document.getElementById("userAgent") as HTMLElement;
+  userAgentElement.innerText = navigator.userAgent;
+  const isTelegramElement = document.getElementById(
+    "isTelegram",
+  ) as HTMLElement;
+  isTelegramElement.innerText = isTgInAppBrowser() ? "Yes" : "No";
   signInBtn.onclick = async () => {
     const maxTimeToLive_ = BigInt(maxTimeToLiveEl.value);
     // The default max TTL set in the @icp-sdk/auth/client library
@@ -381,7 +403,7 @@ const init = async () => {
   await updateAlternativeOriginsView();
 };
 
-init();
+window.addEventListener("DOMContentLoaded", init);
 
 whoamiBtn.addEventListener("click", async () => {
   const canisterId = Principal.fromText(readCanisterId());

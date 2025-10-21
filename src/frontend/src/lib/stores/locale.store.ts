@@ -16,7 +16,9 @@ export const locales = derived(ENABLE_ALL_LOCALES, () =>
 
 export const browserLocales = building
   ? [get(locales)[0]] // Fallback during SSG
-  : (navigator.languages ?? [navigator.language ?? availableLocales[0]]);
+  : "navigator" in globalThis
+    ? (navigator.languages ?? [navigator.language ?? availableLocales[0]])
+    : [get(locales)[0]]; // Fallback if no navigator available
 export const availableBrowserLocale =
   // Exact match
   browserLocales.find((ul) => get(locales).includes(ul)) ??
