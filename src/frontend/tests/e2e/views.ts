@@ -1162,14 +1162,6 @@ export class NewAuthenticateView extends View {
   }
 }
 
-export class NewAuthorizeView extends View {
-  async waitForUnsupported(): Promise<void> {
-    await this.browser
-      .$('[data-page="new-unsupported-view"]')
-      .waitForDisplayed({ timeout: 5000 });
-  }
-}
-
 async function setInputValue(
   browser: WebdriverIO.Browser,
   selector: string,

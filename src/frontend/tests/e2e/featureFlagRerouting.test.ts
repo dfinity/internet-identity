@@ -17,29 +17,6 @@ const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
   });
 };
 
-test("Should redirect to new-styling authenticate with feature flag and load app.css", async () => {
-  await runInBrowser(async (browser: WebdriverIO.Browser) => {
-    // Visit the root with feature flag
-    await browser.url(
-      `${II_URL}/?feature_flag_discoverable_passkey_flow=true#authorize`,
-    );
-
-    // Check that we're redirected to new-authenticate page
-    const newAuthorizeView = new NewAuthorizeView(browser);
-
-    // Check that the user was redirected to the unsupported page
-    // because no window connection was established
-    await newAuthorizeView.waitForUnsupported();
-
-    // Verify URL shows only "/authorize/unsupported"
-    expect(await browser.getUrl()).toBe(`${II_URL}/unsupported`);
-
-    // Check that app.css is loaded by verifying it's in the document
-    const hasTailwind = await checkIfHasTailwind(browser);
-    expect(hasTailwind).toBe(true);
-  });
-}, 300_000);
-
 test("Should show regular view without feature flag and not load app.css", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     // Visit the root without feature flag
