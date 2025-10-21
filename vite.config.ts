@@ -36,7 +36,8 @@ export default defineConfig(({ command, mode }): UserConfig => {
         output: {
           manualChunks: (id) => {
             // Split translations into individual chunks
-            if (extname(id) === "po") {
+            console.log("hmm", extname(id));
+            if (extname(id) === ".po") {
               return basename(id);
             }
             // Keep everything else as is for now (single chunk)
