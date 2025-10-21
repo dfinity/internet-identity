@@ -223,54 +223,50 @@
 
 {#snippet accountListItem(account: AccountInfo)}
   {@const name = account.name[0] ?? primaryAccountName}
-  <li class="contents">
-    <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
-      <div
-        in:scale={{ duration: 300, delay: 450, start: 0.95 }}
-        class={[
-          // Layout
-          "relative flex flex-row items-stretch gap-3",
-          // Styling
-          "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
-          // Animate scale and shadow
-          "transition-all duration-100 ease-out",
-          // Apply scale effect on hover
-          "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
-          // Also apply scale effect on keyboard focus besides hover
-          "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
-          // When cursor is between two items, we still want an item
-          // to be scaled and the cursor to be a pointer nonetheless.
-          "cursor-pointer after:absolute after:-inset-2 after:-z-1",
-        ]}
+  <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
+    <div
+      in:scale={{ duration: 300, delay: 450, start: 0.95 }}
+      class={[
+        // Layout
+        "relative flex flex-row items-stretch gap-3",
+        // Styling
+        "border-border-secondary bg-bg-primary rounded-sm border shadow-xs",
+        // Animate scale and shadow
+        "transition-all duration-100 ease-out",
+        // Apply scale effect on hover
+        "hover:z-1 hover:scale-102 hover:shadow-md hover:shadow-black/5",
+        // Also apply scale effect on keyboard focus besides hover
+        "has-focus-visible:z-1 has-focus-visible:scale-102 has-focus-visible:shadow-md has-focus-visible:shadow-black/5",
+        // When cursor is between two items, we still want an item
+        // to be scaled and the cursor to be a pointer nonetheless.
+        "cursor-pointer after:absolute after:-inset-2 after:-z-1",
+      ]}
+    >
+      <button
+        onclick={() => handleContinueAs(account.account_number[0])}
+        class="flex flex-1 flex-row items-center text-start outline-0"
+        aria-label={$t`Continue with ${name}`}
       >
-        <button
-          onclick={() => handleContinueAs(account.account_number[0])}
-          class="flex flex-1 flex-row items-center text-start outline-0"
-          aria-label={$t`Continue with ${name}`}
-        >
-          <span
-            class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold"
-          >
-            {name}
-          </span>
-          {#if account.account_number[0] === defaultAccountNumber}
-            <Badge size="sm">{$t`Default`}</Badge>
-          {/if}
-        </button>
-        <Button
-          onclick={() =>
-            (isEditAccountDialogVisibleForNumber = account.account_number[0])}
-          variant="tertiary"
-          size="sm"
-          iconOnly
-          class="my-3 me-3 shrink-0"
-          aria-label={$t`Edit ${name}`}
-        >
-          <PencilIcon class="size-5" />
-        </Button>
-      </div>
+        <span class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold">
+          {name}
+        </span>
+        {#if account.account_number[0] === defaultAccountNumber}
+          <Badge size="sm">{$t`Default`}</Badge>
+        {/if}
+      </button>
+      <Button
+        onclick={() =>
+          (isEditAccountDialogVisibleForNumber = account.account_number[0])}
+        variant="tertiary"
+        size="sm"
+        iconOnly
+        class="my-3 me-3 shrink-0"
+        aria-label={$t`Edit ${name}`}
+      >
+        <PencilIcon class="size-5" />
+      </Button>
     </div>
-  </li>
+  </div>
 {/snippet}
 
 <div class="flex flex-1 flex-col">
@@ -290,7 +286,9 @@
               <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
                 <ul class="contents" aria-label={$t`Choose an account`}>
                   {#each accounts as account (account.account_number[0])}
-                    {@render accountListItem(account)}
+                    <li class="contents">
+                      {@render accountListItem(account)}
+                    </li>
                   {/each}
                 </ul>
                 <Tooltip
