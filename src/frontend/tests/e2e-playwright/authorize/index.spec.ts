@@ -22,7 +22,7 @@ test("Authorize by registering a new passkey", async ({ page }) => {
     await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     auth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
@@ -198,7 +198,7 @@ test("Authorize with ICRC-29", async ({ page }) => {
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       auth(authPage);
-      await authPage.getByRole("button", { name: "Create Passkey" }).click();
+      await authPage.getByRole("button", { name: "Create identity" }).click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
@@ -257,7 +257,7 @@ test("App logo appears when app is known", async ({ page }) => {
     await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill("John Doe");
     auth(authPage);
-    await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
@@ -282,7 +282,7 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
       auth(authPage);
-      await authPage.getByRole("button", { name: "Create Passkey" }).click();
+      await authPage.getByRole("button", { name: "Create identity" }).click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
