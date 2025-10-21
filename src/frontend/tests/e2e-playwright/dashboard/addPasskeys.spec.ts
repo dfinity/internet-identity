@@ -134,7 +134,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   // Create and register new passkey
   const authLinkPage = dummyAuth();
   authLinkPage(linkPage);
-  await linkPage.getByRole("button", { name: "Create identity" }).click();
+  await linkPage.getByRole("button", { name: "Create passkey" }).click();
 
   await linkPage
     .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
