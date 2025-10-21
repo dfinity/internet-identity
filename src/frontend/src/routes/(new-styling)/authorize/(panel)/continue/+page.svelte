@@ -72,7 +72,7 @@
   const primaryAccountName = $derived(
     nonNullish(application) ? $t`My ${application} account` : $t`My account`,
   );
-  const namesInUse = $derived(
+  const existingNames = $derived(
     accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
   );
   const authLastUsedFlow = new AuthLastUsedFlow();
@@ -137,20 +137,20 @@
       handleError(error);
     }
   };
-  const handleCreateAccount = async (
-    name: string,
-    isDefaultSignIn: boolean,
-  ) => {
+  const handleCreateAccount = async (account: {
+    name: string;
+    isDefaultSignIn: boolean;
+  }) => {
     try {
       const { identityNumber, actor } = $authenticationStore!;
       const createdAccount = await actor
         .create_account(
           identityNumber,
           $authorizationContextStore.effectiveOrigin,
-          name,
+          account.name,
         )
         .then(throwCanisterError);
-      if (isDefaultSignIn) {
+      if (account.isDefaultSignIn) {
         defaultAccountNumber = (
           await actor
             .set_default_account(
@@ -168,9 +168,9 @@
       isCreateAccountDialogVisible = false;
     }
   };
-  const handleEditAccount = async (changes: {
-    name?: string;
-    isDefaultSignIn?: boolean;
+  const handleEditAccount = async (account: {
+    name: string;
+    isDefaultSignIn: boolean;
   }) => {
     if (isNullish(accounts)) {
       return;
@@ -181,13 +181,13 @@
         (account) =>
           account.account_number[0] === isEditAccountDialogVisibleForNumber,
       );
-      if (nonNullish(changes.name)) {
+      if (account.name !== accounts[index].name[0]) {
         accounts[index] = await actor
           .update_account(
             identityNumber,
             $authorizationContextStore.effectiveOrigin,
             accounts[index].account_number,
-            { name: [changes.name] },
+            { name: [account.name] },
           )
           .then(throwCanisterError);
 
@@ -197,8 +197,11 @@
           defaultAccountNumber = accounts[index].account_number[0];
         }
       }
-      if (nonNullish(changes.isDefaultSignIn) && changes.isDefaultSignIn) {
-        // Account details could theoretically change when set it as default,
+      if (
+        account.isDefaultSignIn &&
+        defaultAccountNumber !== accounts[index].account_number[0]
+      ) {
+        // Account details could theoretically change when it's set as default,
         // so we make sure to update the state with latest account details.
         accounts[index] = await actor
           .set_default_account(
@@ -380,21 +383,20 @@
 
 {#if isCreateAccountDialogVisible}
   <Dialog onClose={() => (isCreateAccountDialogVisible = false)}>
-    <CreateAccount {namesInUse} create={handleCreateAccount} />
+    <EditAccount {existingNames} save={handleCreateAccount} />
   </Dialog>
 {/if}
 
 {#if nonNullish(isEditAccountDialogVisibleFor)}
+  {@const account = {
+    name: isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName,
+    isDefaultSignIn:
+      defaultAccountNumber === isEditAccountDialogVisibleForNumber,
+  }}
   <Dialog onClose={() => (isEditAccountDialogVisibleForNumber = null)}>
     <EditAccount
-      name={isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName}
-      isDefaultSignIn={defaultAccountNumber ===
-        isEditAccountDialogVisibleForNumber}
-      namesInUse={namesInUse.filter(
-        (name) =>
-          name !==
-          (isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName),
-      )}
+      {account}
+      existingNames={existingNames.filter((name) => name !== account.name)}
       save={handleEditAccount}
     />
   </Dialog>
