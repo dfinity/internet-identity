@@ -410,15 +410,17 @@ msgstr ""
 msgid "Limit reached"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:68
 msgid "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:92
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:53
 msgid "Learn how to open links in your browser →"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:41
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:41
 msgid "Link copied to clipboard"
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+msgid "Long-press the link that opened this page."
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
@@ -568,11 +570,11 @@ msgstr ""
 msgid "Seamless Access"
 msgstr "Acceso sin interrupciones"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:81
-msgid "Select Open in Safari or Open in Chrome."
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:39
+msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:83
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:44
 msgid "Sign in there."
 msgstr ""
 
@@ -666,6 +668,7 @@ msgstr ""
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:50
 msgid "to continue with this app"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:72
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:32
 msgid "To continue:"
 msgstr ""
 
@@ -759,6 +762,7 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
 msgid "What are passkeys?"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:65
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:25
 msgid "Unsupported Browser"
 msgstr ""
 
