@@ -163,7 +163,7 @@ export const addPasskeyCurrentDevice = async (
   await page.getByRole("button", { name: "Add" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   dummyAuth(page);
-  await page.getByRole("button", { name: "Create identity" }).click();
+  await page.getByRole("button", { name: "Create Passkey" }).click();
 };
 
 export const renamePasskey = async (
