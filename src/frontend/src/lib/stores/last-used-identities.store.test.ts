@@ -9,7 +9,6 @@ import type {
   LastUsedIdentities,
 } from "./last-used-identities.store";
 import { AccountInfo } from "$lib/generated/internet_identity_types";
-import { nanosToMillis } from "$lib/utils/time";
 
 // Mock the dependency: writableStored
 vi.mock("$app/environment", () => ({
