@@ -40,29 +40,17 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
 
-  const gotoAccounts = () =>
-    goto("/authorize/account", {
-      replaceState: true,
-      invalidateAll: true,
-      state: { disableNavigationAnimation: true },
-    });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
-
-    await gotoAccounts();
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
       title: "You're all set. Your identity has been created.",
       duration: 4000,
-      closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
-    await authorizationStore.authorize(undefined, 4000);
   };
   const onMigration = async () => {
     await goto("/authorize/upgrade-success");

@@ -23,6 +23,9 @@ test("Authorize by registering a new passkey", async ({ page }) => {
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
     auth(authPage);
     await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 });
 
@@ -38,7 +41,9 @@ test("Authorize by signing in with an existing passkey", async ({ page }) => {
     await authPage
       .getByRole("button", { name: "Use existing identity" })
       .click();
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 });
 
@@ -125,7 +130,9 @@ test("Authorize by signing in from another device", async ({
     await expect(otherDevicePage.getByText("Chrome")).toHaveCount(2);
 
     // Switch to current device and verify we can authorize
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
   expect(principal).toBe(expectedPrincipal);
 });
@@ -168,6 +175,11 @@ test("Authorize by signing up with OpenID", async ({ page }) => {
     ).toBeVisible();
     await openIdPage.getByRole("button", { name: "Continue" }).click();
     await openIdPage.waitForEvent("close", { timeout: 15_000 });
+
+    // Continue to dapp
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 });
 
@@ -187,6 +199,9 @@ test("Authorize with ICRC-29", async ({ page }) => {
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
       auth(authPage);
       await authPage.getByRole("button", { name: "Create Passkey" }).click();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
     },
     true,
   );
@@ -243,6 +258,9 @@ test("App logo appears when app is known", async ({ page }) => {
     await authPage.getByLabel("Identity name").fill("John Doe");
     auth(authPage);
     await authPage.getByRole("button", { name: "Create Passkey" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 });
 
@@ -265,6 +283,9 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await authPage.getByLabel("Identity name").fill("John Doe");
       auth(authPage);
       await authPage.getByRole("button", { name: "Create Passkey" }).click();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
     },
   );
 });

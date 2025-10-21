@@ -1,16 +1,17 @@
 <script lang="ts">
   import type { ClassValue, HTMLInputAttributes } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
+  import type { Snippet } from "svelte";
 
   type Size = "sm" | "md";
 
   type Props = Omit<HTMLInputAttributes, "size"> & {
     element?: HTMLInputElement;
     label?: string;
-    hint?: string;
+    hint?: string | Snippet;
     inputClass?: ClassValue;
     size?: Size;
-    error?: string;
+    error?: string | Snippet;
     errorBorder?: boolean;
   };
 
@@ -62,7 +63,19 @@
         nonNullish(error) ? "text-text-error-primary" : "text-text-tertiary",
       ]}
     >
-      {error ?? hint}
+      {#if nonNullish(error)}
+        {#if typeof error === "string"}
+          {error}
+        {:else}
+          {@render error()}
+        {/if}
+      {:else if nonNullish(hint)}
+        {#if typeof hint === "string"}
+          {hint}
+        {:else}
+          {@render hint()}
+        {/if}
+      {/if}
     </div>
   {/if}
 </div>

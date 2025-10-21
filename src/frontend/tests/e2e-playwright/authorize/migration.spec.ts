@@ -82,7 +82,9 @@ test.describe("Migration from an app", () => {
           throw new Error("Credential or identity number not found");
         }
         auth(authPage);
-        await authPage.getByRole("button", { name: "Primary account" }).click();
+        await authPage
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
       },
     );
     expect(legacyPrincipal).toEqual(secondAuthPrincipal);

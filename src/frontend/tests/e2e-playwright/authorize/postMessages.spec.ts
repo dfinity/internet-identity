@@ -30,6 +30,7 @@ test("Should allow valid message", async ({ page }) => {
 
   // Complete authentication in II popup
   await createNewIdentityInII(iiPage, "Test User", auth);
+  await iiPage.getByRole("button", { name: "Continue", exact: true }).click();
 
   // Wait for success notification in II
   await iiPage
