@@ -12,7 +12,6 @@ import {
   transformSignedDelegation,
   retryFor,
 } from "$lib/utils/utils";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { features } from "$lib/legacy/features";
 import { canisterConfig } from "$lib/globals";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
