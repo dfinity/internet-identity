@@ -74,7 +74,6 @@
   });
 
   $effect(() => {
-    // Use the same error message if we don't have a referrer.
     if (status === "orphan") {
       goto("/unsupported", {
         replaceState: true,

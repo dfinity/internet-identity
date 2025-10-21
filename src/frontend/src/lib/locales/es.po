@@ -397,6 +397,10 @@ msgstr "¿Se almacena mi Face ID o huella digital en Internet Identity?"
 msgid "It seems like an invalid authentication request was received."
 msgstr ""
 
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:28
+msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr "Parece que estás intentando iniciar sesión desde dentro de una aplicación (como X, Telegram o Instagram). El navegador integrado de esta aplicación no es compatible."
+
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:26
 #: src/frontend/src/routes/(new-styling)/direct-authorize-protocol/+page.svelte:66
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
@@ -413,7 +417,7 @@ msgid "It looks like you’re trying to sign in from inside an app (such as X, T
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:53
 msgid "Learn how to open links in your browser →"
-msgstr ""
+msgstr "Cómo abrir enlaces en tu navegador →"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:41
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:41
@@ -421,7 +425,7 @@ msgid "Link copied to clipboard"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
 msgid "Long-press the link that opened this page."
-msgstr ""
+msgstr "Manten presionada la tecla de la página que abrió esta página."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -572,11 +576,11 @@ msgstr "Acceso sin interrupciones"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:39
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
-msgstr ""
+msgstr "Selectiona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:44
 msgid "Sign in there."
-msgstr ""
+msgstr "Inicia sesión ahí."
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
