@@ -7,6 +7,7 @@ import { type AliasOptions, type UserConfig, defineConfig } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { lingui } from "@lingui/vite-plugin";
 import { sveltePreprocessor } from "./src/lingui-svelte";
+import { basename, extname } from "path";
 
 export const aliasConfig: AliasOptions = {
   // Polyfill stream for the browser. e.g. needed in "Recovery Phrase" features.
@@ -32,6 +33,17 @@ export default defineConfig(({ command, mode }): UserConfig => {
       assetsInlineLimit: 0,
       emptyOutDir: true,
       rollupOptions: {
+        output: {
+          manualChunks: (id) => {
+            // Split translations into individual chunks
+            console.log("hmm", extname(id));
+            if (extname(id) === ".po") {
+              return basename(id);
+            }
+            // Keep everything else as is for now (single chunk)
+            return "index";
+          },
+        },
         // Bundle only english words in bip39.
         external: /.*\/wordlists\/(?!english).*\.json/,
       },
