@@ -22,6 +22,7 @@ use sha2::{Digest, Sha256};
 #[cfg(test)]
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::Into;
 use std::rc::Rc;
@@ -158,7 +159,7 @@ impl Provider {
         let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
 
         #[cfg(not(test))]
-        schedule_fetch_certs(Rc::clone(&certs), None);
+        schedule_fetch_certs(Rc::clone(&certs), Some(0));
 
         Provider {
             client_id: config.client_id,
@@ -174,20 +175,26 @@ fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u6
     use std::cmp::min;
     use std::time::Duration;
 
-    set_timer(Duration::from_secs(delay.unwrap_or(0)), move || {
-        spawn(async move {
-            let new_delay = match fetch_certs().await {
-                Ok(google_certs) => {
-                    certs_reference.replace(google_certs);
-                    FETCH_CERTS_INTERVAL
-                }
-                // Try again earlier with backoff if fetch failed, the HTTP outcall responses
-                // aren't the same across nodes when we fetch at the moment of key rotation.
-                Err(_) => min(FETCH_CERTS_INTERVAL, delay.unwrap_or(60) * 2),
-            };
-            schedule_fetch_certs(certs_reference, Some(new_delay));
-        });
-    });
+    set_timer(
+        Duration::from_secs(delay.unwrap_or(FETCH_CERTS_INTERVAL)),
+        move || {
+            spawn(async move {
+                let new_delay = match fetch_certs().await {
+                    Ok(google_certs) => {
+                        certs_reference.replace(google_certs);
+                        // Reset delay to None so default `FETCH_CERTS_INTERVAL` delay is used.
+                        None
+                    }
+                    // Try again earlier with backoff if fetch failed, the HTTP outcall responses
+                    // aren't the same across nodes when we fetch at the moment of key rotation.
+                    //
+                    // The delay should be at most `FETCH_CERTS_INTERVAL` and at minimum 60 * 2.
+                    Err(_) => Some(min(FETCH_CERTS_INTERVAL, max(60, delay.unwrap_or(60)) * 2)),
+                };
+                schedule_fetch_certs(certs_reference, new_delay);
+            });
+        },
+    );
 }
 
 #[cfg(not(test))]
