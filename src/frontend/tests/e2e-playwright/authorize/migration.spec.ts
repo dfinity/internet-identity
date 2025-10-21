@@ -68,7 +68,9 @@ test.describe("Migration from an app", () => {
 
         await authPage.getByLabel("Identity name").fill(TEST_USER_NAME);
         auth(authPage);
-        await authPage.getByRole("button", { name: "Create identity" }).click();
+        await authPage
+          .getByRole("button", { name: "Upgrade identity" })
+          .click();
       },
     );
     expect(legacyPrincipal).toEqual(migratedPrincipal);
