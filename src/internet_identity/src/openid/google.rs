@@ -22,7 +22,6 @@ use sha2::{Digest, Sha256};
 #[cfg(test)]
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::Into;
 use std::rc::Rc;
@@ -172,7 +171,7 @@ impl Provider {
 fn schedule_fetch_certs(certs_reference: Rc<RefCell<Vec<Jwk>>>, delay: Option<u64>) {
     use ic_cdk::spawn;
     use ic_cdk_timers::set_timer;
-    use std::cmp::min;
+    use std::cmp::{max, min};
     use std::time::Duration;
 
     set_timer(
