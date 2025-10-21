@@ -1163,9 +1163,9 @@ export class NewAuthenticateView extends View {
 }
 
 export class NewAuthorizeView extends View {
-  async waitForDisplay(): Promise<void> {
+  async waitForUnsupported(): Promise<void> {
     await this.browser
-      .$('[data-page="new-authorize-view"]')
+      .$('[data-page="new-unsupported-view"]')
       .waitForDisplayed({ timeout: 5000 });
   }
 }

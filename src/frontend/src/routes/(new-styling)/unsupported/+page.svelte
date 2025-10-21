@@ -7,7 +7,7 @@
   import { Trans } from "$lib/components/locale";
 </script>
 
-<div class="flex min-h-[100dvh] flex-col">
+<div class="flex min-h-[100dvh] flex-col" data-page="new-unsupported-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
 
   <Header />
@@ -19,16 +19,14 @@
         <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
           <TriangleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
         </FeaturedIcon>
-        <h1
-          class="text-text-primary mb-3 text-center text-2xl font-medium sm:text-left"
-        >
+        <h1 class="text-text-primary mb-3 text-left text-2xl font-medium">
           {$t`Unsupported Browser`}
         </h1>
-        <p class="text-text-primary mb-5 text-center sm:text-left">
+        <p class="text-text-primary mb-5 text-left">
           {$t`It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported.`}
         </p>
         <div>
-          <p class="text-text-primary mb-3 text-center sm:text-left">
+          <p class="text-text-primary mb-3 text-left">
             <strong>{$t`To continue:`}</strong>
           </p>
           <ol
@@ -37,8 +35,13 @@
             <li>{$t`Long-press the link that opened this page.`}</li>
             <li>
               <Trans>
-                Select <span class="font-semibold">Open in Safari</span> or
-                <span class="font-semibold">Open in Chrome</span>.
+                Select <span class="text-text-primary font-semibold"
+                  >Open in Safari</span
+                >
+                or
+                <span class="text-text-primary font-semibold"
+                  >Open in Chrome</span
+                >.
               </Trans>
             </li>
             <li>{$t`Sign in there.`}</li>
