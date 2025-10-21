@@ -31,7 +31,6 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import CreateAccount from "$lib/components/views/CreateAccount.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
@@ -285,6 +284,59 @@
   </div>
 {/snippet}
 
+{#snippet accountList()}
+  <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
+    <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
+      {#if nonNullish(accounts)}
+        <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
+          <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
+            <ul class="contents" aria-label={$t`Choose an account`}>
+              {#each accounts as account (account.account_number[0])}
+                <li class="contents">
+                  {@render accountListItem(account)}
+                </li>
+              {/each}
+            </ul>
+            <Tooltip
+              label={$t`Limit reached`}
+              description={$plural(MAX_ACCOUNTS, {
+                one: `You have reached the maximum of # account for a single app.`,
+                other: `You have reached the maximum of # accounts for a single app.`,
+              })}
+              direction="up"
+              align="center"
+              hidden={!isAccountLimitReached}
+            >
+              <div class="mt-3 shrink-0">
+                <Button
+                  onclick={() => (isCreateAccountDialogVisible = true)}
+                  variant="tertiary"
+                  disabled={isAccountLimitReached}
+                  class="w-full"
+                >
+                  <PlusIcon class="size-5" />
+                  {$t`Add another account`}
+                </Button>
+              </div>
+            </Tooltip>
+          </div>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
+{#snippet continueDefault()}
+  <div
+    class="col-start-1 row-start-1 pb-6"
+    in:fade={{ duration: 200, delay: 100 }}
+  >
+    <Button onclick={handleContinueDefault} size="xl" class="w-full">
+      {$t`Continue`}
+    </Button>
+  </div>
+{/snippet}
+
 <div class="flex flex-1 flex-col">
   <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
@@ -295,54 +347,9 @@
   </p>
   <div class="grid">
     {#if isMultipleAccountsEnabled}
-      <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
-        <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
-          {#if nonNullish(accounts)}
-            <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
-              <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
-                <ul class="contents" aria-label={$t`Choose an account`}>
-                  {#each accounts as account (account.account_number[0])}
-                    <li class="contents">
-                      {@render accountListItem(account)}
-                    </li>
-                  {/each}
-                </ul>
-                <Tooltip
-                  label={$t`Limit reached`}
-                  description={$plural(MAX_ACCOUNTS, {
-                    one: `You have reached the maximum of # account for a single app.`,
-                    other: `You have reached the maximum of # accounts for a single app.`,
-                  })}
-                  direction="up"
-                  align="center"
-                  hidden={!isAccountLimitReached}
-                >
-                  <div class="mt-3 shrink-0">
-                    <Button
-                      onclick={() => (isCreateAccountDialogVisible = true)}
-                      variant="tertiary"
-                      disabled={isAccountLimitReached}
-                      class="w-full"
-                    >
-                      <PlusIcon class="size-5" />
-                      {$t`Add another account`}
-                    </Button>
-                  </div>
-                </Tooltip>
-              </div>
-            </div>
-          {/if}
-        </div>
-      </div>
+      {@render accountList()}
     {:else}
-      <div
-        class="col-start-1 row-start-1 pb-6"
-        in:fade={{ duration: 200, delay: 100 }}
-      >
-        <Button onclick={handleContinueDefault} size="xl" class="w-full">
-          {$t`Continue`}
-        </Button>
-      </div>
+      {@render continueDefault()}
     {/if}
   </div>
   <div class="border-border-tertiary mb-6 border-t"></div>
