@@ -96,12 +96,12 @@ msgstr ""
 msgid "Choose an account"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:107
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:106
 msgid "choose identity to continue"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:137
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:169
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
 msgid "choose method"
 msgstr ""
 
@@ -367,6 +367,10 @@ msgstr ""
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
 msgstr "Internet Identity vermittelt dann die Authentifizierung zwischen diesen Anbietern und dem Internet Computer. Durch die Authentifizierung bei einem dieser Dienste kann Internet Identity sicherstellen, dass Sie Sie sind, und anschließend eine weitere Authentifizierung für die Anwendungen erstellen, die auf dem Internet Computer laufen."
 
+#: src/frontend/src/routes/(new-styling)/activate/+page.svelte:20
+msgid "Invalid code link"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:78
 msgid "Invalid code. Please check and try again."
 msgstr ""
@@ -414,8 +418,8 @@ msgstr "Identität verwalten"
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Verwalten Sie Ihre Identitäten und behalten Sie die Kontrolle über Ihre Apps und Websites mit Ihrem Dashboard. Entdecken Sie Pro-Funktionen, um Ihre Erfahrung weiter anzupassen und zu sichern."
 
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:104
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:177
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:103
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:176
 msgid "Manage your Internet Identity"
 msgstr ""
 
@@ -427,6 +431,10 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:83
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:84
 msgid "Maximum length is 64 characters."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:38
+msgid "Migration completed successfully"
 msgstr ""
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:18
@@ -498,6 +506,10 @@ msgstr ""
 msgid "Password-free"
 msgstr "Passwortfrei"
 
+#: src/frontend/src/routes/(new-styling)/pair/+page.svelte:52
+msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:115
 msgid "Powered by Internet Identity"
 msgstr ""
@@ -544,7 +556,7 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:180
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
 msgstr ""
 
@@ -645,6 +657,10 @@ msgstr ""
 msgid "Type the characters exactly as shown below"
 msgstr ""
 
+#: src/frontend/src/routes/(new-styling)/pair/+page.svelte:49
+msgid "Unable to complete setup"
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:154
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity verstehen"
@@ -683,8 +699,8 @@ msgstr ""
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:99
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:134
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:143
-#: src/frontend/src/routes/(new-styling)/login/+page.svelte:166
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
 msgid "Use another identity"
 msgstr ""
 
@@ -710,6 +726,10 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte:12
 msgid "Waiting for your new device"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/activate/+page.svelte:21
+msgid "We didn't recognize that activation code."
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
@@ -784,7 +804,12 @@ msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:27
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:49
+#: src/frontend/src/routes/(new-styling)/login/+page.svelte:53
 msgid "You're all set. Your identity has been created."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/pair/+page.svelte:19
+msgid "You're all set. Your passkey has been registered."
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:34

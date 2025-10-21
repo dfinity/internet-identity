@@ -25,7 +25,6 @@
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
   import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
   import { t } from "$lib/stores/locale.store";
 
@@ -36,7 +35,7 @@
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
-      title: "Migration completed successfully",
+      title: $t`Migration completed successfully`,
       duration: 4000,
     });
     isAuthDialogOpen = false;
@@ -51,7 +50,7 @@
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
-      title: "You're all set. Your identity has been created.",
+      title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);

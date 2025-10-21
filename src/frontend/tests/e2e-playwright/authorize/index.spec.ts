@@ -75,7 +75,7 @@ test("Authorize by signing in from another device", async ({
     await authPage
       .getByRole("heading", {
         level: 1,
-        name: "Can't find your identity or passkey?",
+        name: "Can't find your identity?",
       })
       .waitFor();
     const linkToPair = `https://${await authPage.getByLabel("Pairing link").innerText()}`;
