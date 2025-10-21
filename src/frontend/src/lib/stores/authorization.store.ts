@@ -113,21 +113,6 @@ export const authorizationStore: AuthorizationStore = {
               status: "authorizing",
             }));
             const { identityNumber, actor } = get(authenticatedStore);
-            // Only fetch and sync accounts if identity is actually stored
-            const syncLastUsedAccountsPromise = nonNullish(
-              get(lastUsedIdentitiesStore).identities[`${identityNumber}`],
-            )
-              ? actor
-                  .get_accounts(identityNumber, effectiveOrigin)
-                  .then(throwCanisterError)
-                  .then((accounts) =>
-                    lastUsedIdentitiesStore.syncLastUsedAccounts(
-                      identityNumber,
-                      effectiveOrigin,
-                      accounts,
-                    ),
-                  )
-              : Promise.resolve().then(() => []);
             const artificialDelayPromise = waitFor(
               features.DUMMY_AUTH ||
                 nonNullish(canisterConfig.dummy_auth[0]?.[0])
@@ -158,7 +143,6 @@ export const authorizationStore: AuthorizationStore = {
                   .then(throwCanisterError)
                   .then(transformSignedDelegation),
               );
-              await syncLastUsedAccountsPromise;
               await artificialDelayPromise;
               resolve({
                 kind: "success",

@@ -216,6 +216,19 @@
     }
   };
 
+  // Keep local last used accounts in sync (we might need them later)
+  $effect(() => {
+    if (isNullish($authenticationStore) || isNullish(accounts)) {
+      return;
+    }
+    const { identityNumber } = $authenticationStore;
+    lastUsedIdentitiesStore.syncLastUsedAccounts(
+      identityNumber,
+      $authorizationContextStore.effectiveOrigin,
+      accounts,
+    );
+  });
+
   $effect(() => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
   });
