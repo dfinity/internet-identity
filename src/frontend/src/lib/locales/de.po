@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:298
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:296
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr ""
 
@@ -40,7 +40,7 @@ msgstr "<0>Nahtlose Passkey-Integration:</0> Wir setzen weiterhin auf Passkeys a
 msgid "Account name"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:314
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:312
 msgid "Add another account"
 msgstr ""
 
@@ -48,11 +48,11 @@ msgstr ""
 msgid "Advanced identity management"
 msgstr "Fortgeschrittenes Identitäts-Management"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:347
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:345
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:291
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:287
 msgid "Choose an account"
 msgstr ""
 
@@ -60,11 +60,11 @@ msgstr ""
 msgid "Choose method"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:329
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:327
 msgid "Continue"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:249
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:248
 msgid "Continue with {name}"
 msgstr ""
 
@@ -76,7 +76,7 @@ msgstr ""
 msgid "Creating account..."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:257
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:254
 msgid "Default"
 msgstr ""
 
@@ -88,7 +88,7 @@ msgstr "Entdeckbare Passkeys"
 msgid "Easy access"
 msgstr "Einfacher Zugang"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:267
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:264
 msgid "Edit {name}"
 msgstr ""
 
@@ -96,7 +96,7 @@ msgstr ""
 msgid "Edit account"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:342
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:340
 msgid "Enable multiple accounts"
 msgstr ""
 
@@ -182,7 +182,7 @@ msgstr "Internet Identity vermittelt dann die Authentifizierung zwischen diesen 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Wird mein Face ID oder Fingerabdruck in Internet Identity gespeichert?"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:297
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:295
 msgid "Limit reached"
 msgstr ""
 
@@ -203,11 +203,11 @@ msgstr "Verwalten Sie Ihre Identitäten und behalten Sie die Kontrolle über Ihr
 msgid "Maximum length is 32 characters."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:358
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:356
 msgid "More information about multiple accounts"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:344
 msgid "Multiple accounts"
 msgstr ""
 
@@ -268,7 +268,7 @@ msgstr "Nahtloser Zugriff"
 msgid "Set as default sign-in"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:279
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:275
 msgid "Sign in"
 msgstr ""
 
@@ -316,7 +316,7 @@ msgstr "Was ist neu in Internet Identity 2.0?"
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "Wenn Sie einen Passkey erstellen, erzeugt Ihr Gerät zwei passende Schlüssel. Einer bleibt sicher auf Ihrem Gerät, der andere wird an die App oder den Dienst gesendet. Sie arbeiten zusammen, um zu bestätigen, dass Sie es sind – ohne jemals persönliche Informationen oder ein Passwort zu teilen."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:282
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:278
 msgid "with your Internet Identity"
 msgstr ""
 
