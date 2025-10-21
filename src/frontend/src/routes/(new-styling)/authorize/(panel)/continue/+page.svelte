@@ -12,7 +12,7 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
@@ -31,7 +31,6 @@
   import Badge from "$lib/components/ui/Badge.svelte";
   import { slide, fade, scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import CreateAccount from "$lib/components/views/CreateAccount.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
@@ -71,6 +70,9 @@
   );
   const primaryAccountName = $derived(
     nonNullish(application) ? $t`My ${application} account` : $t`My account`,
+  );
+  const existingNames = $derived(
+    accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
   );
   const authLastUsedFlow = new AuthLastUsedFlow();
   // Initialize the flow every time the identity changes
@@ -134,20 +136,20 @@
       handleError(error);
     }
   };
-  const handleCreateAccount = async (
-    name: string,
-    isDefaultSignIn: boolean,
-  ) => {
+  const handleCreateAccount = async (account: {
+    name: string;
+    isDefaultSignIn: boolean;
+  }) => {
     try {
       const { identityNumber, actor } = $authenticationStore!;
       const createdAccount = await actor
         .create_account(
           identityNumber,
           $authorizationContextStore.effectiveOrigin,
-          name,
+          account.name,
         )
         .then(throwCanisterError);
-      if (isDefaultSignIn) {
+      if (account.isDefaultSignIn) {
         defaultAccountNumber = (
           await actor
             .set_default_account(
@@ -165,41 +167,49 @@
       isCreateAccountDialogVisible = false;
     }
   };
-  const handleEditAccount = async (changes: {
-    name?: string;
-    isDefaultSignIn?: boolean;
+  const handleEditAccount = async (account: {
+    name: string;
+    isDefaultSignIn: boolean;
   }) => {
+    if (isNullish(accounts)) {
+      return;
+    }
     try {
       const { identityNumber, actor } = $authenticationStore!;
-      if (nonNullish(changes.name)) {
-        const updatedAccount = await actor
+      const index = accounts.findIndex(
+        (account) =>
+          account.account_number[0] === isEditAccountDialogVisibleForNumber,
+      );
+      if (account.name !== accounts[index].name[0]) {
+        accounts[index] = await actor
           .update_account(
             identityNumber,
             $authorizationContextStore.effectiveOrigin,
-            nonNullish(isEditAccountDialogVisibleForNumber)
-              ? [isEditAccountDialogVisibleForNumber]
-              : [],
-            { name: [changes.name] },
+            accounts[index].account_number,
+            { name: [account.name] },
           )
           .then(throwCanisterError);
-        accounts = accounts?.map((account) =>
-          account.account_number[0] === updatedAccount.account_number[0]
-            ? updatedAccount
-            : account,
-        );
+
+        // Updating a primary account could result in number assignment,
+        // so we should sync the default account number state if needed.
+        if (isEditAccountDialogVisibleForNumber === defaultAccountNumber) {
+          defaultAccountNumber = accounts[index].account_number[0];
+        }
       }
-      if (nonNullish(changes.isDefaultSignIn) && changes.isDefaultSignIn) {
-        defaultAccountNumber = (
-          await actor
-            .set_default_account(
-              identityNumber,
-              $authorizationContextStore.effectiveOrigin,
-              nonNullish(isEditAccountDialogVisibleForNumber)
-                ? [isEditAccountDialogVisibleForNumber]
-                : [],
-            )
-            .then(throwCanisterError)
-        ).account_number[0];
+      if (
+        account.isDefaultSignIn &&
+        defaultAccountNumber !== accounts[index].account_number[0]
+      ) {
+        // Account details could theoretically change when it's set as default,
+        // so we make sure to update the state with latest account details.
+        accounts[index] = await actor
+          .set_default_account(
+            identityNumber,
+            $authorizationContextStore.effectiveOrigin,
+            accounts[index].account_number,
+          )
+          .then(throwCanisterError);
+        defaultAccountNumber = accounts[index].account_number[0];
       }
     } catch (error) {
       handleError(error);
@@ -208,12 +218,26 @@
     }
   };
 
+  // Keep local last used accounts in sync (we might need them later)
+  $effect(() => {
+    if (isNullish($authenticationStore) || isNullish(accounts)) {
+      return;
+    }
+    const { identityNumber } = $authenticationStore;
+    lastUsedIdentitiesStore.syncLastUsedAccounts(
+      identityNumber,
+      $authorizationContextStore.effectiveOrigin,
+      accounts,
+    );
+  });
+
   $effect(() => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsScreen);
   });
 </script>
 
 {#snippet accountListItem(account: AccountInfo)}
+  {@const name = account.name[0] ?? primaryAccountName}
   <div in:slide={{ duration: 300, delay: 300, axis: "y" }}>
     <div
       in:scale={{ duration: 300, delay: 450, start: 0.95 }}
@@ -236,9 +260,10 @@
       <button
         onclick={() => handleContinueAs(account.account_number[0])}
         class="flex flex-1 flex-row items-center text-start outline-0"
+        aria-label={$t`Continue with ${name}`}
       >
         <span class="text-text-primary flex-1 py-3 ps-5 text-sm font-semibold">
-          {account.name[0] ?? primaryAccountName}
+          {name}
         </span>
         {#if account.account_number[0] === defaultAccountNumber}
           <Badge size="sm">{$t`Default`}</Badge>
@@ -251,10 +276,64 @@
         size="sm"
         iconOnly
         class="my-3 me-3 shrink-0"
+        aria-label={$t`Edit ${name}`}
       >
         <PencilIcon class="size-5" />
       </Button>
     </div>
+  </div>
+{/snippet}
+
+{#snippet accountList()}
+  <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
+    <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
+      {#if nonNullish(accounts)}
+        <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
+          <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
+            <ul class="contents" aria-label={$t`Choose an account`}>
+              {#each accounts as account (account.account_number[0])}
+                <li class="contents">
+                  {@render accountListItem(account)}
+                </li>
+              {/each}
+            </ul>
+            <Tooltip
+              label={$t`Limit reached`}
+              description={$plural(MAX_ACCOUNTS, {
+                one: `You have reached the maximum of # account for a single app.`,
+                other: `You have reached the maximum of # accounts for a single app.`,
+              })}
+              direction="up"
+              align="center"
+              hidden={!isAccountLimitReached}
+            >
+              <div class="mt-3 shrink-0">
+                <Button
+                  onclick={() => (isCreateAccountDialogVisible = true)}
+                  variant="tertiary"
+                  disabled={isAccountLimitReached}
+                  class="w-full"
+                >
+                  <PlusIcon class="size-5" />
+                  {$t`Add another account`}
+                </Button>
+              </div>
+            </Tooltip>
+          </div>
+        </div>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
+{#snippet continueDefault()}
+  <div
+    class="col-start-1 row-start-1 pb-6"
+    in:fade={{ duration: 200, delay: 100 }}
+  >
+    <Button onclick={handleContinueDefault} size="xl" class="w-full">
+      {$t`Continue`}
+    </Button>
   </div>
 {/snippet}
 
@@ -268,54 +347,14 @@
   </p>
   <div class="grid">
     {#if isMultipleAccountsEnabled}
-      <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
-        <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
-          {#if nonNullish(accounts)}
-            <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
-              <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
-                {#each accounts as account (account.account_number[0])}
-                  {@render accountListItem(account)}
-                {/each}
-                <Tooltip
-                  label={$t`Limit reached`}
-                  description={$plural(MAX_ACCOUNTS, {
-                    one: `You have reached the maximum of # account for a single app.`,
-                    other: `You have reached the maximum of # accounts for a single app.`,
-                  })}
-                  direction="up"
-                  align="center"
-                  hidden={!isAccountLimitReached}
-                >
-                  <div class="mt-3 shrink-0">
-                    <Button
-                      onclick={() => (isCreateAccountDialogVisible = true)}
-                      variant="tertiary"
-                      disabled={isAccountLimitReached}
-                      class="w-full"
-                    >
-                      <PlusIcon class="size-5" />
-                      {$t`Add another account`}
-                    </Button>
-                  </div>
-                </Tooltip>
-              </div>
-            </div>
-          {/if}
-        </div>
-      </div>
+      {@render accountList()}
     {:else}
-      <div
-        class="col-start-1 row-start-1 pb-6"
-        in:fade={{ duration: 200, delay: 100 }}
-      >
-        <Button onclick={handleContinueDefault} size="xl" class="w-full">
-          {$t`Continue`}
-        </Button>
-      </div>
+      {@render continueDefault()}
     {/if}
   </div>
   <div class="border-border-tertiary mb-6 border-t"></div>
   <div class="flex flex-row items-center">
+    <!-- Intentionally we use onclick here instead of onchange to make sure it's a user gesture-->
     <Toggle
       bind:checked={isMultipleAccountsEnabled}
       onclick={isMultipleAccountsEnabled
@@ -351,16 +390,20 @@
 
 {#if isCreateAccountDialogVisible}
   <Dialog onClose={() => (isCreateAccountDialogVisible = false)}>
-    <CreateAccount create={handleCreateAccount} />
+    <EditAccount {existingNames} save={handleCreateAccount} />
   </Dialog>
 {/if}
 
 {#if nonNullish(isEditAccountDialogVisibleFor)}
+  {@const account = {
+    name: isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName,
+    isDefaultSignIn:
+      defaultAccountNumber === isEditAccountDialogVisibleForNumber,
+  }}
   <Dialog onClose={() => (isEditAccountDialogVisibleForNumber = null)}>
     <EditAccount
-      name={isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName}
-      isDefaultSignIn={defaultAccountNumber ===
-        isEditAccountDialogVisibleForNumber}
+      {account}
+      existingNames={existingNames.filter((name) => name !== account.name)}
       save={handleEditAccount}
     />
   </Dialog>

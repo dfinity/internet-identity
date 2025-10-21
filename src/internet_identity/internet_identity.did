@@ -516,6 +516,7 @@ type AuthnMethodConfirmationCode = record {
 
 type AuthnMethodSessionInfo = record {
     name : opt text;
+    created_at : opt Timestamp;
 };
 
 type RegistrationId = text;

@@ -6,6 +6,7 @@ import {
   AccountInfo,
   MetadataMapV2,
 } from "$lib/generated/internet_identity_types";
+import { nanosToMillis } from "$lib/utils/time";
 
 export type LastUsedAccount = {
   identityNumber: bigint;
@@ -34,6 +35,7 @@ export type LastUsedIdentity = {
       };
   accounts?: LastUsedAccounts;
   lastUsedTimestampMillis: number;
+  createdAtMillis?: number;
 };
 export type LastUsedIdentities = {
   [identityNumber: string]: LastUsedIdentity;
@@ -43,7 +45,10 @@ type LastUsedIdentitiesStore = Readable<{
   selected?: LastUsedIdentity;
 }> & {
   addLastUsedIdentity: (
-    params: Pick<LastUsedIdentity, "identityNumber" | "name" | "authMethod">,
+    params: Pick<
+      LastUsedIdentity,
+      "identityNumber" | "name" | "authMethod" | "createdAtMillis"
+    >,
   ) => void;
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
@@ -53,7 +58,7 @@ type LastUsedIdentitiesStore = Readable<{
     identityNumber: bigint,
     origin: string,
     accounts: AccountInfo[],
-  ) => AccountInfo[];
+  ) => void;
   selectIdentity: (identityNumber: bigint) => void;
   reset: () => void;
 };
@@ -125,10 +130,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         return lastUsedIdentities;
       });
     },
-    // TODO: Update this method once we store usage timestamps in the canister,
-    //       additionally the tests should be updated to include this method.
     syncLastUsedAccounts: (identityNumber, origin, accounts) => {
-      let sortedAccounts: AccountInfo[] = [];
       lastUsedStore.update((lastUsedIdentities) => {
         const identity = lastUsedIdentities[identityNumber.toString()];
         if (isNullish(identity)) {
@@ -140,31 +142,23 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         if (isNullish(identity.accounts[origin])) {
           identity.accounts[origin] = {};
         }
-        const originAccounts = identity.accounts[origin];
-        accounts.forEach((account) => {
-          const key = isNullish(account.account_number[0])
-            ? PRIMARY_ACCOUNT_KEY
-            : account.account_number[0].toString();
-          originAccounts[key] = {
-            identityNumber,
-            accountNumber: account.account_number[0],
-            origin: account.origin,
-            name: account.name[0],
-            lastUsedTimestampMillis:
-              originAccounts[key]?.lastUsedTimestampMillis ?? 0,
-          };
-        });
-        sortedAccounts = Object.values(originAccounts).map((account) => ({
-          name: nonNullish(account.name) ? [account.name] : [],
-          origin,
-          account_number: nonNullish(account.accountNumber)
-            ? [account.accountNumber]
-            : [],
-          last_used: [BigInt(account.lastUsedTimestampMillis)],
-        }));
+        identity.accounts[origin] = Object.fromEntries(
+          accounts.map((account) => [
+            isNullish(account.account_number[0])
+              ? PRIMARY_ACCOUNT_KEY
+              : account.account_number[0].toString(),
+            {
+              identityNumber,
+              accountNumber: account.account_number[0],
+              origin: account.origin,
+              name: account.name[0],
+              lastUsedTimestampMillis:
+                account.last_used.map(nanosToMillis)[0] ?? 0,
+            },
+          ]),
+        );
         return lastUsedIdentities;
       });
-      return sortedAccounts;
     },
     selectIdentity: (identityNumber: bigint) => {
       selectedStore.set(identityNumber);

@@ -31,7 +31,7 @@
     {...props}
     bind:checked
     type="checkbox"
-    class="peer sr-only"
+    class="peer absolute z-1 h-1 w-1 opacity-0"
     role="switch"
   />
   <div

@@ -8,6 +8,7 @@ import type {
   LastUsedIdentity,
   LastUsedIdentities,
 } from "./last-used-identities.store";
+import { AccountInfo } from "$lib/generated/internet_identity_types";
 
 // Mock the dependency: writableStored
 vi.mock("$app/environment", () => ({
@@ -47,10 +48,12 @@ describe("lastUsedIdentitiesStore", () => {
   });
 
   it("should add the first identity correctly", () => {
+    const createdAtMillis = 1690000000000;
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: identity1,
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
+      createdAtMillis,
     });
 
     const expected: LastUsedIdentities = {
@@ -59,6 +62,7 @@ describe("lastUsedIdentitiesStore", () => {
         name: name1,
         authMethod: { passkey: { credentialId: credId1 } },
         lastUsedTimestampMillis: mockTimestamp1,
+        createdAtMillis,
       },
     };
     expect(get(lastUsedIdentitiesStore).identities).toEqual(expected);
@@ -143,6 +147,51 @@ describe("lastUsedIdentitiesStore", () => {
     lastUsedIdentitiesStore.reset();
     expect(get(lastUsedIdentitiesStore).identities).toEqual({});
   });
+
+  it("should sync accounts", () => {
+    const origin = "https://example.com";
+    const accounts: AccountInfo[] = [
+      {
+        name: ["Primary account"],
+        origin,
+        account_number: [],
+        last_used: [],
+      },
+      {
+        name: ["Secondary account"],
+        origin,
+        account_number: [BigInt(234_453_098)],
+        last_used: [BigInt(3_230_000_000_000)],
+      },
+    ];
+    lastUsedIdentitiesStore.addLastUsedIdentity({
+      identityNumber: identity1,
+      name: name1,
+      authMethod: { passkey: { credentialId: credId1 } },
+      createdAtMillis: 1_690_000_000_000,
+    });
+    lastUsedIdentitiesStore.syncLastUsedAccounts(identity1, origin, accounts);
+    expect(
+      get(lastUsedIdentitiesStore).identities[identity1.toString()].accounts,
+    ).toEqual({
+      "https://example.com": {
+        "234453098": {
+          accountNumber: BigInt(234453098),
+          identityNumber: BigInt(111),
+          lastUsedTimestampMillis: 3230000,
+          name: "Secondary account",
+          origin: "https://example.com",
+        },
+        primary: {
+          accountNumber: undefined,
+          identityNumber: BigInt(111),
+          lastUsedTimestampMillis: 0,
+          name: "Primary account",
+          origin: "https://example.com",
+        },
+      },
+    });
+  });
 });
 
 describe("lastUsedIdentityStore (derived store)", () => {
@@ -176,10 +225,12 @@ describe("lastUsedIdentityStore (derived store)", () => {
   });
 
   it("should return the only identity when one is added", () => {
+    const createdAtMillis = 1690000000000;
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: identity1,
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
+      createdAtMillis,
     });
 
     const expected: LastUsedIdentity = {
@@ -187,6 +238,7 @@ describe("lastUsedIdentityStore (derived store)", () => {
       name: name1,
       authMethod: { passkey: { credentialId: credId1 } },
       lastUsedTimestampMillis: mockTimestamp1,
+      createdAtMillis,
     };
     expect(get(lastUsedIdentityStore)).toEqual(expected);
   });

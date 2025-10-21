@@ -7,30 +7,46 @@
   import { t } from "$lib/stores/locale.store";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { isNullish } from "@dfinity/utils";
 
-  interface Props {
+  interface Account {
     name: string;
     isDefaultSignIn: boolean;
-    save: (update: { name?: string; isDefaultSignIn?: boolean }) => void;
   }
 
-  const { save, ...props }: Props = $props();
+  interface Props {
+    account?: Account;
+    existingNames: string[];
+    save: (account: Account) => void;
+  }
+
+  const { account, existingNames, save }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let name = $state(props.name);
-  let isDefaultSignIn = $state(props.isDefaultSignIn);
+  let name = $state(account?.name ?? "");
+  let isDefaultSignIn = $state(account?.isDefaultSignIn ?? false);
   let isSubmitting = $state(false);
+  let nameExists = $state(false);
 
+  const showSetDefault = $derived(
+    isNullish(account) || !account.isDefaultSignIn,
+  );
   const hasChanges = $derived(
-    props.name !== name.trim() || props.isDefaultSignIn !== isDefaultSignIn,
+    isNullish(account) ||
+      account.name !== name.trim() ||
+      account.isDefaultSignIn !== isDefaultSignIn,
   );
 
   const handleSubmit = () => {
     isSubmitting = true;
+    if (existingNames.includes(name.trim())) {
+      nameExists = true;
+      isSubmitting = false;
+      return;
+    }
     save({
-      name: props.name !== name.trim() ? name.trim() : undefined,
-      isDefaultSignIn:
-        props.isDefaultSignIn !== isDefaultSignIn ? isDefaultSignIn : undefined,
+      name: name.trim(),
+      isDefaultSignIn,
     });
   };
 
@@ -45,10 +61,12 @@
       <PencilIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {$t`Edit account`}
+      {isNullish(account) ? $t`Name account` : $t`Edit account`}
     </h1>
     <p class="text-md text-text-tertiary mb-6 font-medium">
-      {$t`Rename or make this your default sign-in`}
+      {isNullish(account)
+        ? $t`You can edit this account later. Label it by use (e.g. 'Work' or 'Demo').`
+        : $t`Rename or make this your default sign-in`}
     </p>
     <Input
       bind:element={inputRef}
@@ -62,11 +80,13 @@
       spellcheck="false"
       error={name.length > 32
         ? $t`Maximum length is 32 characters.`
-        : undefined}
+        : nameExists
+          ? $t`In use on another account.`
+          : undefined}
       disabled={isSubmitting}
       aria-label={$t`Account name`}
     />
-    {#if !props.isDefaultSignIn}
+    {#if showSetDefault}
       <div class="border-border-tertiary my-6 border-t"></div>
       <Checkbox
         bind:checked={isDefaultSignIn}
@@ -84,13 +104,18 @@
       disabled={name.length === 0 ||
         name.length > 32 ||
         !hasChanges ||
+        nameExists ||
         isSubmitting}
     >
       {#if isSubmitting}
         <ProgressRing />
-        <span>{$t`Saving changes...`}</span>
+        <span>
+          {isNullish(account) ? $t`Creating account...` : $t`Saving changes...`}
+        </span>
       {:else}
-        <span>{$t`Save changes`}</span>
+        <span>
+          {isNullish(account) ? $t`Create account` : $t`Save changes`}
+        </span>
       {/if}
     </Button>
   </div>

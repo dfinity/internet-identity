@@ -28,3 +28,6 @@ export const formatLastUsage = (timestamp: Date): string => {
 
   return relativeTime;
 };
+
+export const nanosToMillis = (nanos: bigint): number =>
+  Number(nanos / BigInt(1_000_000));
