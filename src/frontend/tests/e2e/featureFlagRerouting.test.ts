@@ -32,7 +32,7 @@ test("Should redirect to new-styling authenticate with feature flag and load app
     await newAuthorizeView.waitForUnsupported();
 
     // Verify URL shows only "/authorize/unsupported"
-    expect(await browser.getUrl()).toBe(`${II_URL}/authorize/unsupported`);
+    expect(await browser.getUrl()).toBe(`${II_URL}/unsupported`);
 
     // Check that app.css is loaded by verifying it's in the document
     const hasTailwind = await checkIfHasTailwind(browser);

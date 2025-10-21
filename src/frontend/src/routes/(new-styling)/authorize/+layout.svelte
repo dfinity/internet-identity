@@ -75,7 +75,7 @@
 
   $effect(() => {
     if (status === "orphan") {
-      goto("/authorize/unsupported", {
+      goto("/unsupported", {
         replaceState: true,
         invalidateAll: true,
       });
