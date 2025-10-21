@@ -150,7 +150,6 @@ describe("lastUsedIdentitiesStore", () => {
 
   it("should sync accounts", () => {
     const origin = "https://example.com";
-    const createdAtMillis = 1690000000000;
     const accounts: AccountInfo[] = [
       {
         name: ["Primary account"],
