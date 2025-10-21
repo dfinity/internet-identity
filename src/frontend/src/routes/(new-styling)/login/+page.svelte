@@ -101,7 +101,7 @@
       <div class="flex-1"></div>
       {#if lastUsedIdentities.length > 0}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {$t`Manage your Internet Identity`}
+          {$t`Manage your Internet Identity`}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
           {$t`choose identity to continue`}
@@ -174,7 +174,7 @@
       {:else}
         <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
           <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-            {$t`Manage your Internet Identity`}
+            {$t`Manage your Internet Identity`}
           </h1>
           <p class="text-text-secondary mb-6 self-start text-sm">
             {$t`sign in to continue`}

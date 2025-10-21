@@ -150,7 +150,7 @@
           class="max-md:w-full"
         >
           <span>Add</span>
-          <PlusIcon size="1.25rem" />
+          <PlusIcon class="size-5" />
         </Button>
       </Tooltip>
     </div>
@@ -187,7 +187,7 @@
               iconOnly
               aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
             >
-              <EditIcon size="1.25rem" />
+              <EditIcon class="size-5" />
             </Button>
             {#if isRemoveAccessMethodVisible}
               <Button
@@ -197,7 +197,7 @@
                 aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
                 class="!text-fg-error-secondary"
               >
-                <Trash2Icon size="1.25rem" />
+                <Trash2Icon class="size-5" />
               </Button>
             {/if}
           </div>
@@ -240,7 +240,7 @@
               iconOnly
               class="!text-fg-error-secondary"
             >
-              <Link2OffIcon size="1.25rem" />
+              <Link2OffIcon class="size-5" />
             </Button>
           {/if}
         </div>

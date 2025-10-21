@@ -3,6 +3,8 @@
   import { authorizationStore } from "$lib/stores/authorization.store";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   const COUNTDOWN_SECONDS = 5;
   let countdown = $state(COUNTDOWN_SECONDS);
@@ -38,15 +40,22 @@
   </div>
   <div class="mb-8 flex flex-col gap-2">
     <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
-      Identity upgraded!
+      {$t`Identity upgraded!`}
     </h1>
     <p class="text-md text-text-tertiary text-center font-medium text-balance">
-      You no longer need to remember your identity number and can use your
-      fingerprint, face or screen lock instead.
+      <Trans>
+        You no longer need to remember your identity number and can use your
+        fingerprint, face or screen lock instead.
+      </Trans>
     </p>
   </div>
   <Button variant="primary" onclick={handleRedirect}>
-    Go to the app {#if countdown >= 0}
-      - (<span class="tabular-nums">{countdown}</span>){/if}
+    {#if countdown >= 0}
+      <Trans>
+        Go to the app - (<span class="tabular-nums">{countdown}</span>)
+      </Trans>
+    {:else}
+      <Trans>Go to the app</Trans>
+    {/if}
   </Button>
 </div>
