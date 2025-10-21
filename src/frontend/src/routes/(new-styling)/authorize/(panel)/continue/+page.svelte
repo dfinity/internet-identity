@@ -380,7 +380,9 @@
       isDefaultSignIn={defaultAccountNumber ===
         isEditAccountDialogVisibleForNumber}
       namesInUse={namesInUse.filter(
-        (name) => name !== isEditAccountDialogVisibleFor.name[0],
+        (name) =>
+          name !==
+          (isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName),
       )}
       save={handleEditAccount}
     />
