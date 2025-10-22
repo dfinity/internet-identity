@@ -95,3 +95,13 @@ export const plural = derived(
       return i18n.t(arguments[0]);
     },
 );
+export const formatDate = derived(
+  localeStore,
+  () => (value: string | Date, format?: Intl.DateTimeFormatOptions) =>
+    i18n.date(value, format),
+);
+export const formatNumber = derived(
+  localeStore,
+  () => (value: number, format?: Intl.NumberFormatOptions) =>
+    i18n.number(value, format),
+);
