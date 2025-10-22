@@ -1,6 +1,6 @@
 import { runInBrowser } from "./util";
 import { II_URL } from "./constants";
-import { NewAuthorizeView, AuthenticateView } from "./views";
+import { AuthenticateView } from "./views";
 
 const checkIfHasTailwind = (browser: WebdriverIO.Browser) => {
   return browser.execute(async () => {
