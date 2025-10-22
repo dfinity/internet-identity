@@ -398,7 +398,7 @@ msgstr "Parece que estás intentando iniciar sesión desde dentro de una aplicac
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:27
 msgid "It seems like an invalid authentication request was received."
-msgstr "Parece que se recibió una solicitud de autenticación no válida."
+msgstr "Parece que se recibió una solicitud de autenticación inválida."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:26
 #: src/frontend/src/routes/(new-styling)/direct-authorize-protocol/+page.svelte:66
@@ -460,7 +460,7 @@ msgstr "Migración completada con éxito"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:18
 msgid "Missing request"
-msgstr "Solicitud faltante"
+msgstr "Mensaje ausente"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:379
 msgid "More information about multiple accounts"
@@ -522,7 +522,7 @@ msgstr "Las passkeys no están disponibles en este dispositivo o navegador. Elig
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:45
 msgid "Passkeys not available here"
-msgstr "Passkeys no disponibles aquí"
+msgstr "Passkeys no disponibles"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:127
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
