@@ -206,6 +206,9 @@ msgstr "Default"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:115
 msgid "Browser Not Supported"
 msgstr "Browser Not Supported"
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
+msgid "Default"
+msgstr "Default"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
 msgid "Discoverable passkeys"
@@ -414,10 +417,11 @@ msgstr "Limit reached"
 msgid "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:28
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:53
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
 msgid "Learn how to open links in your browser →"
 msgstr "Learn how to open links in your browser →"
 
@@ -427,6 +431,11 @@ msgid "Link copied to clipboard"
 msgstr "Link copied to clipboard"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
+msgid "Limit reached"
+msgstr "Limit reached"
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
 msgid "Long-press the link that opened this page."
 msgstr "Long-press the link that opened this page."
 
@@ -577,11 +586,19 @@ msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manu
 msgid "Seamless Access"
 msgstr "Seamless Access"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:39
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:44
+#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+msgid "Set as default sign-in"
+msgstr "Set as default sign-in"
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
+msgid "Sign in"
+msgstr "Sign in"
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:47
 msgid "Sign in there."
 msgstr "Sign in there."
 
@@ -676,8 +693,8 @@ msgstr "to continue with <0>{application}</0>"
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:50
 msgid "to continue with this app"
 msgstr "to continue with this app"
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:72
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:32
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
 msgid "To continue:"
 msgstr "To continue:"
 
@@ -772,6 +789,7 @@ msgstr "We didn't recognize that activation code."
 msgid "What are passkeys?"
 msgstr "What are passkeys?"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:25
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
 msgid "Unsupported Browser"
 msgstr "Unsupported Browser"
 
@@ -821,6 +839,9 @@ msgstr "You are upgrading ID <0>{identityNumber}</0>"
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "You can continue with <0>Use existing Passkey</0> in the login process."
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
+msgid "with your Internet Identity"
+msgstr "with your Internet Identity"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:68
 msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."

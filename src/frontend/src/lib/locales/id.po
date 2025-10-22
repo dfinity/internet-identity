@@ -204,6 +204,8 @@ msgstr ""
 msgid "Default"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:115
 msgid "Browser Not Supported"
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
+msgid "Default"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
@@ -411,10 +413,11 @@ msgid "Limit reached"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:68
 msgid "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:28
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:53
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
 msgid "Learn how to open links in your browser →"
 msgstr ""
 
@@ -423,6 +426,11 @@ msgstr ""
 msgid "Link copied to clipboard"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
+msgid "Limit reached"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
 msgid "Long-press the link that opened this page."
 msgstr ""
 
@@ -573,11 +581,19 @@ msgstr ""
 msgid "Seamless Access"
 msgstr "Akses tanpa hambatan"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:39
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:44
+#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+msgid "Set as default sign-in"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
+msgid "Sign in"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:47
 msgid "Sign in there."
 msgstr ""
 
@@ -672,6 +688,9 @@ msgstr ""
 msgid "to continue with this app"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:72
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:32
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
 msgid "To continue:"
 msgstr ""
 
@@ -766,6 +785,7 @@ msgstr ""
 msgid "What are passkeys?"
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:65
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:25
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
 msgid "Unsupported Browser"
 msgstr ""
 
@@ -814,6 +834,8 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
+msgid "with your Internet Identity"
 msgstr ""
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:68
