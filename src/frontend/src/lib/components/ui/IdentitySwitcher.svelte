@@ -17,6 +17,7 @@
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { canisterConfig } from "$lib/globals";
   import { t } from "$lib/stores/locale.store";
+  import { toDate } from "$lib/utils/date";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -73,8 +74,14 @@
             <div class="text-text-primary font-semibold">
               {identity.name ?? identity.identityNumber}
             </div>
-            <div class="text-text-tertiary" aria-hidden="true">
-              {lastUsedIdentityTypeName(identity)}
+            <div
+              class="text-text-tertiary flex gap-1 font-normal"
+              aria-hidden="true"
+            >
+              <span>{lastUsedIdentityTypeName(identity)}</span>
+              {#if identity.createdAtMillis}
+                <span>| {$t`Created`} {toDate(identity.createdAtMillis)}</span>
+              {/if}
             </div>
           </div>
           {#if selected === identity.identityNumber}
