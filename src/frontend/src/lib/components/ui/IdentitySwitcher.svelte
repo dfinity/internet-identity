@@ -16,8 +16,7 @@
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { canisterConfig } from "$lib/globals";
-  import { t } from "$lib/stores/locale.store";
-  import { i18n } from "@lingui/core";
+  import { formatDate, t } from "$lib/stores/locale.store";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -61,7 +60,7 @@
     {#each identities as identity}
       {@const name = lastUsedIdentityTypeName(identity)}
       {@const date = nonNullish(identity.createdAtMillis)
-        ? i18n.date(new Date(identity.createdAtMillis), {
+        ? $formatDate(new Date(identity.createdAtMillis), {
             dateStyle: "short",
           })
         : undefined}
