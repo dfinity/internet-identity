@@ -33,7 +33,7 @@ msgstr "<0>Interfaz completamente rediseñada:</0> Hemos dado a Internet Identit
 msgid "<0>Google Integration:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated Google as an alternative authentication option."
 msgstr "<0>Integración con Google:</0> Aunque el uso de passkeys está creciendo, aún no son comunes para todos. Hemos observado una tasa de abandono del 50 % en nuestro flujo de registro, lo que indica la necesidad de métodos de autenticación alternativos. Para que Internet Identity sea accesible a un público aún más amplio, hemos integrado Google como opción de autenticación alternativa."
 
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:113
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:115
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Aprende más</0> sobre las passkeys"
 
@@ -179,7 +179,7 @@ msgid "Create an identity with a passkey, using biometrics or a security key. Yo
 msgstr "Crea una identidad con una passkey, usando datos biométricos o una llave de seguridad. Tus datos nunca salen de tu dispositivo."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:84
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:107
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:109
 msgid "Create identity"
 msgstr "Crear identidad"
 
@@ -196,7 +196,7 @@ msgid "Creating account..."
 msgstr "Creando cuenta..."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:82
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:105
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:107
 msgid "Creating identity..."
 msgstr "Creando identidad..."
 
@@ -308,8 +308,8 @@ msgstr "Identidad ya actualizada"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:57
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:67
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:75
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:85
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:77
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:87
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:76
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:86
 msgid "Identity name"
@@ -339,6 +339,7 @@ msgstr "Incorrecto. Inténtalo de nuevo con el nuevo código."
 msgid "Interaction canceled. Please try again."
 msgstr "Interacción cancelada. Por favor, inténtalo de nuevo."
 
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:65
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:64
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>no</0> almacena tus datos biométricos. Permanecen en tu dispositivo. Tu identidad actúa como un gestor seguro de passkeys."
@@ -448,7 +449,7 @@ msgid "Maximum length is 32 characters."
 msgstr "Longitud máxima de 32 caracteres."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:65
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:83
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:85
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:84
 msgid "Maximum length is 64 characters."
 msgstr "Longitud máxima de 64 caracteres."
@@ -481,6 +482,7 @@ msgstr "Mi cuenta"
 msgid "Name account"
 msgstr "Nombrar cuenta"
 
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:60
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:59
 msgid "Name your identity"
 msgstr "Nombra tu identidad"
@@ -522,7 +524,7 @@ msgstr "Las passkeys no están disponibles en este dispositivo o navegador. Elig
 msgid "Passkeys not available here"
 msgstr "Passkeys no disponibles aquí"
 
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:125
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:127
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
 msgstr "Las passkeys usan claves criptográficas almacenadas en tu dispositivo para inicios de sesión seguros y sin contraseña con Face ID, Touch ID o una llave de seguridad. Tus datos nunca se comparten."
 
@@ -772,7 +774,7 @@ msgstr "Esperando a tu nuevo dispositivo"
 msgid "We didn't recognize that activation code."
 msgstr "No reconocimos ese código de activación."
 
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:126
 msgid "What are passkeys?"
 msgstr "¿Qué son las passkeys?"
 
@@ -809,7 +811,7 @@ msgid "Wrong domain was set. Please try again."
 msgstr "Se estableció un dominio incorrecto. Por favor, inténtalo de nuevo."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:70
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:88
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:90
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:89
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Una vez establecido, <0>no puedes</0> cambiarle el nombre."

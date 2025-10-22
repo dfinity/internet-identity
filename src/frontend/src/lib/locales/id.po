@@ -33,7 +33,7 @@ msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Interne
 msgid "<0>Google Integration:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated Google as an alternative authentication option."
 msgstr "<0>Integrasi Google:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami melihat tingkat putus registrasi sebesar 50%, menunjukkan kebutuhan akan metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami menambahkan Google sebagai opsi autentikasi alternatif."
 
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:113
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:115
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Pelajari lebih lanjut</0> tentang passkey"
 
@@ -179,7 +179,7 @@ msgid "Create an identity with a passkey, using biometrics or a security key. Yo
 msgstr "Buat identitas dengan passkey, menggunakan biometrik atau kunci keamanan. Data Anda tidak pernah meninggalkan perangkat Anda."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:84
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:107
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:109
 msgid "Create identity"
 msgstr "Buat identitas"
 
@@ -196,7 +196,7 @@ msgid "Creating account..."
 msgstr "Membuat akun..."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:82
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:105
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:107
 msgid "Creating identity..."
 msgstr "Membuat identitas..."
 
@@ -308,8 +308,8 @@ msgstr "Identitas sudah ditingkatkan"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:57
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:67
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:75
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:85
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:77
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:87
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:76
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:86
 msgid "Identity name"
@@ -339,6 +339,7 @@ msgstr "Salah. Coba lagi dengan kode baru."
 msgid "Interaction canceled. Please try again."
 msgstr "Interaksi dibatalkan. Silakan coba lagi."
 
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:65
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:64
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>tidak</0> menyimpan data biometrik Anda. Data tersebut tetap ada di perangkat Anda. Identitas Anda berfungsi sebagai pengelola passkey yang aman."
@@ -448,7 +449,7 @@ msgid "Maximum length is 32 characters."
 msgstr "Panjang maksimum 32 karakter."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:65
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:83
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:85
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:84
 msgid "Maximum length is 64 characters."
 msgstr "Panjang maksimum 64 karakter."
@@ -481,6 +482,7 @@ msgstr "Akun saya"
 msgid "Name account"
 msgstr "Beri nama akun"
 
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:60
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:59
 msgid "Name your identity"
 msgstr "Beri nama identitas Anda"
@@ -522,7 +524,7 @@ msgstr "Passkey tidak tersedia di perangkat atau peramban ini. Silakan pilih met
 msgid "Passkeys not available here"
 msgstr "Passkey tidak tersedia di sini"
 
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:125
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:127
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
 msgstr "Passkey menggunakan kunci kriptografis yang disimpan di perangkat Anda untuk masuk dengan aman tanpa kata sandi, menggunakan Face ID, Touch ID, atau kunci keamanan. Data Anda tidak pernah dibagikan."
 
@@ -772,7 +774,7 @@ msgstr "Menunggu perangkat baru Anda"
 msgid "We didn't recognize that activation code."
 msgstr "Kami tidak mengenali kode aktivasi tersebut."
 
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:126
 msgid "What are passkeys?"
 msgstr "Apa itu passkey?"
 
@@ -809,7 +811,7 @@ msgid "Wrong domain was set. Please try again."
 msgstr "Domain yang salah diatur. Silakan coba lagi."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:70
-#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:88
+#: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:90
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:89
 msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Anda <0>tidak dapat</0> mengubah nama ini setelah diatur."
