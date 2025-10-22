@@ -17,6 +17,10 @@ msgstr ""
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr ""
 
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:85
+msgid "{name} | Created"
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:103
 msgid "{name} logo"
 msgstr ""
@@ -109,7 +113,7 @@ msgstr ""
 msgid "Choose method"
 msgstr ""
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:53
 msgid "Close"
 msgstr ""
 
@@ -387,7 +391,7 @@ msgstr ""
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Apakah Face ID atau sidik jari saya disimpan di Internet Identity?"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:27
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr ""
 
@@ -400,8 +404,8 @@ msgstr ""
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
-msgid "Learn how to open links in your browser →"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
+msgid "Learn how to open links in your browser"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
@@ -417,7 +421,7 @@ msgstr ""
 msgid "Link copied to clipboard"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
 msgstr ""
 
@@ -425,7 +429,7 @@ msgstr ""
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Permudah pendaftaran dan masuk dengan Google, Apple, atau Microsoft. Login yang Anda kenal, kini dengan privasi yang lebih baik."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:110
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:121
 #: src/frontend/src/routes/(new-styling)/+page.svelte:54
 msgid "Manage Identity"
 msgstr "Kelola identitas"
@@ -568,7 +572,7 @@ msgstr ""
 msgid "Seamless Access"
 msgstr "Akses tanpa hambatan"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr ""
 
@@ -580,7 +584,7 @@ msgstr ""
 msgid "Sign in"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:47
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:48
 msgid "Sign in there."
 msgstr ""
 
@@ -592,7 +596,7 @@ msgstr ""
 msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:105
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:116
 msgid "Sign Out"
 msgstr ""
 
@@ -629,7 +633,7 @@ msgstr ""
 msgid "Support"
 msgstr ""
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:45
 msgid "Switch identity"
 msgstr ""
 
@@ -677,7 +681,7 @@ msgstr ""
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:31
 msgid "To continue:"
 msgstr ""
 
@@ -701,7 +705,7 @@ msgstr "Memahami Internet Identity"
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Berbeda dengan banyak sistem autentikasi Web3 yang memerlukan tanda tangan manual untuk setiap aksi, Internet Identity membuat sesi autentikasi per aplikasi. Ini memberikan keamanan dan kenyamanan — tanpa tanda tangan berulang — sekaligus memberi setiap sesi identitasnya sendiri."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
 msgstr ""
 
@@ -733,7 +737,7 @@ msgstr ""
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr ""
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:99
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:110
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165

@@ -84,7 +84,7 @@
               {#if nonNullish(date)}
                 <span>{$t`${name} | Created`} {date}</span>
               {:else}
-                <span>{$t`${name}`}</span>
+                <span>{name}</span>
               {/if}
             </div>
           </div>
