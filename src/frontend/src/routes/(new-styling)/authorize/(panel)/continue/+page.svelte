@@ -180,7 +180,8 @@
         (account) =>
           account.account_number[0] === isEditAccountDialogVisibleForNumber,
       );
-      if (account.name !== accounts[index].name[0]) {
+      // Only update the name when it has changed
+      if (account.name !== (accounts[index].name[0] ?? primaryAccountName)) {
         accounts[index] = await actor
           .update_account(
             identityNumber,
@@ -196,6 +197,7 @@
           defaultAccountNumber = accounts[index].account_number[0];
         }
       }
+      // Only mark as default if it is set to true and wasn't true already.
       if (
         account.isDefaultSignIn &&
         defaultAccountNumber !== accounts[index].account_number[0]
