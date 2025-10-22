@@ -389,7 +389,7 @@ msgstr "Wird mein Face ID oder Fingerabdruck in Internet Identity gespeichert?"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:27
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr ""
+msgstr "Es scheint, als ob Sie versuchen, sich aus einer App heraus anzumelden (wie z. B. X, Telegram oder Instagram). Der in dieser App integrierte Browser wird nicht unterstützt."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:27
 msgid "It seems like an invalid authentication request was received."
@@ -402,7 +402,7 @@ msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
 msgid "Learn how to open links in your browser"
-msgstr ""
+msgstr "Erfahren Sie, wie Sie Links in Ihrem Browser öffnen"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
 msgid "Let's get started"
@@ -419,7 +419,7 @@ msgstr "Link in die Zwischenablage kopiert"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
-msgstr ""
+msgstr "Drücken Sie lange auf den Link, der diese Seite geöffnet hat."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -570,7 +570,7 @@ msgstr "Nahtloser Zugriff"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
-msgstr ""
+msgstr "Wählen Sie <0>In Safari öffnen</0> oder <1>In Chrome öffnen</1>."
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:93
 msgid "Set as default sign-in"
@@ -582,7 +582,7 @@ msgstr "Anmelden"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:48
 msgid "Sign in there."
-msgstr ""
+msgstr "Melden Sie sich dort an."
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
@@ -679,7 +679,7 @@ msgstr "Erstellen Sie zum Fortfahren einen Passkey, um Ihre Identität zu sicher
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:31
 msgid "To continue:"
-msgstr ""
+msgstr "So fahren Sie fort:"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:13
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
@@ -703,7 +703,7 @@ msgstr "Im Gegensatz zu vielen Web3-Auth-Systemen, die für jede Aktion eine man
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
-msgstr ""
+msgstr "Nicht unterstützter Browser"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:22
 msgid "Unverified origin"

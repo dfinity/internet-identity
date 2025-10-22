@@ -679,7 +679,7 @@ msgstr "Para continuar, crea una passkey para proteger tu identidad y simplifica
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:31
 msgid "To continue:"
-msgstr ""
+msgstr "Para continuar:"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:13
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
@@ -703,7 +703,7 @@ msgstr "A diferencia de muchos sistemas de autenticación Web3 que requieren fir
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
-msgstr ""
+msgstr "Navegador no compatible"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:22
 msgid "Unverified origin"

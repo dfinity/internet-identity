@@ -389,7 +389,7 @@ msgstr "Apakah Face ID atau sidik jari saya disimpan di Internet Identity?"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:27
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr ""
+msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Peramban bawaan aplikasi ini tidak didukung."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:27
 msgid "It seems like an invalid authentication request was received."
@@ -402,7 +402,7 @@ msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain;
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
 msgid "Learn how to open links in your browser"
-msgstr ""
+msgstr "Pelajari cara membuka tautan di peramban Anda"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
 msgid "Let's get started"
@@ -419,7 +419,7 @@ msgstr "Tautan disalin ke papan klip"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
-msgstr ""
+msgstr "Tekan lama tautan yang membuka halaman ini."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -570,7 +570,7 @@ msgstr "Akses tanpa hambatan"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
-msgstr ""
+msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:93
 msgid "Set as default sign-in"
@@ -582,7 +582,7 @@ msgstr "Masuk"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:48
 msgid "Sign in there."
-msgstr ""
+msgstr "Masuk di sana."
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
@@ -679,7 +679,7 @@ msgstr "Untuk melanjutkan, buat passkey untuk mengamankan identitas Anda dan men
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:31
 msgid "To continue:"
-msgstr ""
+msgstr "Untuk melanjutkan:"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:13
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
@@ -703,7 +703,7 @@ msgstr "Berbeda dengan banyak sistem autentikasi Web3 yang memerlukan tanda tang
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
-msgstr ""
+msgstr "Peramban Tidak Didukung"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:22
 msgid "Unverified origin"
