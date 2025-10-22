@@ -17,6 +17,10 @@ msgstr ""
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:85
+msgid "{name} | Created {date}"
+msgstr "{name} | Dibuat {date}"
+
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:103
 msgid "{name} logo"
 msgstr "Logo {name}"
@@ -109,7 +113,7 @@ msgstr "pilih metode"
 msgid "Choose method"
 msgstr "Pilih metode"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:53
 msgid "Close"
 msgstr "Tutup"
 
@@ -425,7 +429,7 @@ msgstr "Tekan lama tautan yang membuka halaman ini."
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Permudah pendaftaran dan masuk dengan Google, Apple, atau Microsoft. Login yang Anda kenal, kini dengan privasi yang lebih baik."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:110
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:121
 #: src/frontend/src/routes/(new-styling)/+page.svelte:54
 msgid "Manage Identity"
 msgstr "Kelola identitas"
@@ -592,7 +596,7 @@ msgstr "masuk untuk melanjutkan"
 msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:105
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:116
 msgid "Sign Out"
 msgstr "Keluar"
 
@@ -629,7 +633,7 @@ msgstr "Masih punya nomor identitas?"
 msgid "Support"
 msgstr "Dukungan"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:45
 msgid "Switch identity"
 msgstr "Ganti identitas"
 
@@ -733,7 +737,7 @@ msgstr "Meningkatkan identitas..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Gunakan perangkat yang sudah memiliki identitas Anda untuk memindai atau membuka URL. Ini akan menautkan identitas Anda ke perangkat ini."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:99
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:110
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165

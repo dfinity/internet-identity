@@ -19,7 +19,7 @@ msgstr "{MAX_ACCOUNTS, plural, one {Alcanzaste el máximo de # cuenta para una a
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:85
 msgid "{name} | Created {date}"
-msgstr ""
+msgstr "{name} | Creado {date}"
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:103
 msgid "{name} logo"
