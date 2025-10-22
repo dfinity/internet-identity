@@ -378,15 +378,15 @@ msgstr "Internet Identity luego conecta la autenticación de esos proveedores co
 
 #: src/frontend/src/routes/(new-styling)/activate/+page.svelte:20
 msgid "Invalid code link"
-msgstr "Enlace de código no válido"
+msgstr "Código de enlace inválido"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:78
 msgid "Invalid code. Please check and try again."
-msgstr "Código no válido. Por favor, comprueba y vuelve a intentarlo."
+msgstr "Código inválido. Por favor, comprueba y vuelve a intentarlo."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:20
 msgid "Invalid request"
-msgstr "Solicitud no válida"
+msgstr "Solicitud inválida"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:217
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
