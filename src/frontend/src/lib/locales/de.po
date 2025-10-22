@@ -387,7 +387,7 @@ msgstr "Ungültige Anfrage"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Wird mein Face ID oder Fingerabdruck in Internet Identity gespeichert?"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:27
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr ""
 
@@ -400,8 +400,8 @@ msgstr "Es scheint, als wäre eine ungültige Authentifizierungsanfrage eingegan
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
-msgid "Learn how to open links in your browser →"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
+msgid "Learn how to open links in your browser"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
@@ -417,7 +417,7 @@ msgstr "Limit erreicht"
 msgid "Link copied to clipboard"
 msgstr "Link in die Zwischenablage kopiert"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
 msgstr ""
 
@@ -568,7 +568,7 @@ msgstr "Scannen Sie den obigen QR-Code mit Ihrem <0>neuen Gerät</0> oder geben 
 msgid "Seamless Access"
 msgstr "Nahtloser Zugriff"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr ""
 
@@ -580,7 +580,7 @@ msgstr "Als Standardanmeldung festlegen"
 msgid "Sign in"
 msgstr "Anmelden"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:47
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:48
 msgid "Sign in there."
 msgstr ""
 
@@ -677,7 +677,7 @@ msgstr "um mit dieser App fortzufahren"
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Erstellen Sie zum Fortfahren einen Passkey, um Ihre Identität zu sichern und künftige Anmeldungen zu vereinfachen."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:31
 msgid "To continue:"
 msgstr ""
 
@@ -701,7 +701,7 @@ msgstr "Internet Identity verstehen"
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Im Gegensatz zu vielen Web3-Auth-Systemen, die für jede Aktion eine manuelle Signatur erfordern, erstellt Internet Identity für jede Anwendung authentifizierte Sitzungen. Dies bietet sowohl Sicherheit als auch Komfort – keine wiederholten Signaturen – und jede Sitzung erhält dennoch ihre eigene Identität."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
 msgstr ""
 

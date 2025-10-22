@@ -387,7 +387,7 @@ msgstr "Permintaan tidak valid"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Apakah Face ID atau sidik jari saya disimpan di Internet Identity?"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:27
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr ""
 
@@ -400,8 +400,8 @@ msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
-msgid "Learn how to open links in your browser →"
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
+msgid "Learn how to open links in your browser"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
@@ -417,7 +417,7 @@ msgstr "Batas tercapai"
 msgid "Link copied to clipboard"
 msgstr "Tautan disalin ke papan klip"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
 msgstr ""
 
@@ -568,7 +568,7 @@ msgstr "Pindai kode QR di atas dengan <0>perangkat baru</0> Anda atau masukkan U
 msgid "Seamless Access"
 msgstr "Akses tanpa hambatan"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr ""
 
@@ -580,7 +580,7 @@ msgstr "Atur sebagai metode masuk default"
 msgid "Sign in"
 msgstr "Masuk"
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:47
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:48
 msgid "Sign in there."
 msgstr ""
 
@@ -677,7 +677,7 @@ msgstr "untuk melanjutkan dengan aplikasi ini"
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Untuk melanjutkan, buat passkey untuk mengamankan identitas Anda dan menyederhanakan proses masuk di masa mendatang."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:31
 msgid "To continue:"
 msgstr ""
 
@@ -701,7 +701,7 @@ msgstr "Memahami Internet Identity"
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Berbeda dengan banyak sistem autentikasi Web3 yang memerlukan tanda tangan manual untuk setiap aksi, Internet Identity membuat sesi autentikasi per aplikasi. Ini memberikan keamanan dan kenyamanan — tanpa tanda tangan berulang — sekaligus memberi setiap sesi identitasnya sendiri."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
 msgstr ""
 
