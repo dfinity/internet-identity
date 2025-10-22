@@ -7,6 +7,8 @@
     upgradeIdentityFunnel,
     UpgradeIdentityEvents,
   } from "$lib/utils/analytics/upgradeIdentityFunnel";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   let {
     onUpgradeAgain,
@@ -26,19 +28,24 @@
     </div>
     <div>
       <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-        Identity already upgraded
+        {$t`Identity already upgraded`}
       </h1>
       <p
-        class="text-md text-text-tertiary mb-2 font-medium text-balance sm:text-center"
+        class="text-md text-text-tertiary mb-4 font-medium text-balance sm:text-center"
       >
-        This identity has already been upgraded to the new experience.
+        <Trans>
+          This identity has already been upgraded to the new experience.
+        </Trans>
       </p>
       <p
         class="text-md text-text-tertiary font-medium text-balance sm:text-center"
       >
-        You can continue with <b class="text-text-primary whitespace-nowrap"
-          >Use existing Passkey</b
-        > in the login process.
+        <Trans>
+          You can continue with
+          <b class="text-text-primary whitespace-nowrap">
+            Use existing Passkey
+          </b> in the login process.
+        </Trans>
       </p>
     </div>
   </div>
@@ -50,14 +57,14 @@
       variant="secondary"
       size="lg"
     >
-      Help & FAQ
+      {$t`Help & FAQ`}
     </Button>
     <Button
       onclick={() => onUpgradeAgain(attachElement)}
       variant="tertiary"
       size="lg"
     >
-      Upgrade again
+      {$t`Upgrade again`}
     </Button>
   </div>
 </div>

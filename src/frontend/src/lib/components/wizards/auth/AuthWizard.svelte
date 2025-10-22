@@ -9,13 +9,11 @@
   import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
-  import { canisterConfig } from "$lib/globals";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
-  import { AUTH_FLOW_UPDATES } from "$lib/state/featureFlags";
 
   interface Props {
     isAuthenticating?: boolean;
@@ -119,10 +117,7 @@
       useExisting={handleContinueWithExistingPasskey}
     />
   {:else if authFlow.view === "setupNewPasskey"}
-    <CreatePasskey
-      create={handleCreatePasskey}
-      buttonLabel={$AUTH_FLOW_UPDATES ? "Create Identity" : "Create Passkey"}
-    />
+    <CreatePasskey create={handleCreatePasskey} />
   {:else if authFlow.view === "setupNewIdentity"}
     <CreateIdentity create={handleCompleteOpenIdRegistration} />
   {/if}

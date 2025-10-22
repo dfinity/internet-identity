@@ -73,7 +73,7 @@
             $t`Real Privacy`,
             $t`Full Ownership`,
             $t`Seamless Access`,
-            $t`Internet Identity`,
+            "Internet Identity",
           ]}
           duration={500}
           delayBetween={2000}

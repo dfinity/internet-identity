@@ -25,8 +25,8 @@
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import { findConfig, isOpenIdConfig } from "$lib/utils/openID";
   import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
+  import { t } from "$lib/stores/locale.store";
 
   const { data }: PageProps = $props();
 
@@ -35,7 +35,7 @@
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
-      title: "Migration completed successfully",
+      title: $t`Migration completed successfully`,
       duration: 4000,
     });
     isAuthDialogOpen = false;
@@ -50,7 +50,7 @@
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
-      title: "You're all set. Your identity has been created.",
+      title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -100,10 +100,10 @@
       <div class="flex-1"></div>
       {#if lastUsedIdentities.length > 0}
         <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          Manage your Internet&nbsp;Identity
+          {$t`Manage your Internet Identity`}
         </h1>
         <p class="text-text-secondary mb-6 self-start text-sm">
-          choose identity to continue
+          {$t`choose identity to continue`}
         </p>
         <div class="flex flex-col gap-1.5">
           <ul class="contents">
@@ -117,7 +117,7 @@
                     {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
                       <ProgressRing />
                     {:else}
-                      <UserIcon size="1.25rem" />
+                      <UserIcon class="size-5" />
                     {/if}
                   </Avatar>
                   <div class="flex flex-col text-left text-sm">
@@ -137,9 +137,9 @@
             disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
           >
             <FeaturedIcon size="sm">
-              <PlusIcon size="1.25rem" />
+              <PlusIcon class="size-5" />
             </FeaturedIcon>
-            <span>Use another identity</span>
+            <span>{$t`Use another identity`}</span>
           </ButtonCard>
         </div>
         {#if isAuthDialogOpen}
@@ -162,10 +162,10 @@
               <h1
                 class="text-text-primary my-2 self-start text-2xl font-medium"
               >
-                Use another identity
+                {$t`Use another identity`}
               </h1>
               <p class="text-text-secondary mb-6 self-start text-sm">
-                choose method
+                {$t`choose method`}
               </p>
             </AuthWizard>
           </Dialog>
@@ -173,10 +173,10 @@
       {:else}
         <AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
           <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-            Manage your Internet&nbsp;Identity
+            {$t`Manage your Internet Identity`}
           </h1>
           <p class="text-text-secondary mb-6 self-start text-sm">
-            sign in to continue
+            {$t`sign in to continue`}
           </p>
         </AuthWizard>
       {/if}

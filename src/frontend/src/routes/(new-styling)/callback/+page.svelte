@@ -15,6 +15,7 @@
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { decodeJWT, findConfig, isOpenIdConfig } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
+  import { t } from "$lib/stores/locale.store";
 
   analytics.event("page-redirect-callback");
 
@@ -96,20 +97,23 @@
 {#if nonNullish(directAuthorizeOrigin)}
   <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
     {#if nonNullish(dapp?.logoSrc)}
+      {@const name = dapp?.name ?? directAuthorizeOrigin}
       <img
         src={dapp?.logoSrc}
-        alt={`${dapp?.name ?? directAuthorizeOrigin} logo`}
+        alt={$t`${name} logo`}
         class="mb-10 h-16 max-w-50 object-contain"
       />
     {/if}
     <p class="text-text-secondary mb-1 text-xl font-semibold">
-      Signing in securely
+      {$t`Signing in securely`}
     </p>
-    <p class="text-text-tertiary text-sm">This takes a few seconds.</p>
+    <p class="text-text-tertiary text-sm">{$t`This takes a few seconds.`}</p>
     <div class="bg-bg-quaternary my-6 h-0.5 w-full max-w-74 rounded-full">
       <div class="bg-fg-brand-primary animate-grow h-full rounded-full"></div>
     </div>
-    <p class="text-text-secondary text-md">Powered by Internet Identity</p>
+    <p class="text-text-secondary text-md">
+      {$t`Powered by Internet Identity`}
+    </p>
     <Button
       href={window.location.origin}
       target="_blank"
@@ -117,8 +121,8 @@
       class="mt-10"
       size="sm"
     >
-      How it works
-      <ArrowRightIcon size="1rem" />
+      <span>{$t`How it works`}</span>
+      <ArrowRightIcon class="size-4" />
     </Button>
   </div>
 {/if}

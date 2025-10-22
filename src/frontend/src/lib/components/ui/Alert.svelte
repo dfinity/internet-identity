@@ -39,13 +39,13 @@
 >
   <div class={[direction === "horizontal" && "row-span-2"]}>
     {#if variant === "info"}
-      <InfoIcon size="1.25rem" class="text-fg-brand-primary" />
+      <InfoIcon class="text-fg-brand-primary size-5" />
     {:else if variant === "success"}
-      <CircleCheckIcon size="1.25rem" class="text-fg-success-primary" />
+      <CircleCheckIcon class="text-fg-success-primary size-5" />
     {:else if variant === "warning"}
-      <CircleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
+      <CircleAlertIcon class="text-fg-warning-primary size-5" />
     {:else if variant === "error"}
-      <CircleAlertIcon size="1.25rem" class="text-fg-error-primary" />
+      <CircleAlertIcon class="text-fg-error-primary size-5" />
     {:else if variant === "loading"}
       <ProgressRing class="text-fg-brand-primary" />
     {/if}
@@ -61,7 +61,7 @@
         direction === "horizontal" && "row-span-2",
       ]}
     >
-      <XIcon size="1.25rem" />
+      <XIcon class="size-5" />
     </Button>
   {/if}
   <div

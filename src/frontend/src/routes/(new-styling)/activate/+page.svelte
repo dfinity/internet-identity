@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
+  import { t } from "$lib/stores/locale.store";
 
   // Confirming a passkey from another device is handled in the dashboard,
   // this can't be a load function since URL hash can't be read in there.
@@ -16,8 +17,8 @@
     );
     if (!isValid) {
       toaster.error({
-        title: "Invalid code link",
-        description: "We didn't recognize that activation code.",
+        title: $t`Invalid code link`,
+        description: $t`We didn't recognize that activation code.`,
       });
     }
   });

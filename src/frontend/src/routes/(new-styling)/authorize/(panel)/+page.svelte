@@ -24,7 +24,7 @@
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
-      title: "You're all set. Your identity has been created.",
+      title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);

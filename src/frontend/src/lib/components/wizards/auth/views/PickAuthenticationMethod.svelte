@@ -9,6 +9,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
   import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
+  import { t } from "$lib/stores/locale.store";
 
   interface Props {
     setupOrUseExistingPasskey: () => void;
@@ -41,16 +42,16 @@
 <div class="flex flex-col items-stretch gap-5">
   {#if !supportsPasskeys}
     <Alert
-      title="Passkeys not available here"
-      description="Passkeys are unavailable on this device or browser. Please choose
-        another sign-in method to continue."
+      title={$t`Passkeys not available here`}
+      description={$t`Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue.`}
     />
   {/if}
   {#if $LARGE_GOOGLE_BUTTON}
     <div class="mb-3 flex flex-col items-stretch gap-3">
       {#each openIdProviders.slice(0, 1) as provider}
+        {@const name = provider.name}
         <Tooltip
-          label="Interaction canceled. Please try again."
+          label={$t`Interaction canceled. Please try again.`}
           hidden={cancelledProviderId !== provider.client_id}
           manual
         >
@@ -62,20 +63,21 @@
           >
             {#if authenticatingProviderId === provider.client_id}
               <ProgressRing />
-              <span>Authenticating...</span>
-            {:else if provider.logo}
+              <span>{$t`Authenticating...`}</span>
+            {:else}
               <div class="size-6">
                 {@html provider.logo}
               </div>
-              <span>Continue with {provider.name}</span>
+              <span>{$t`Continue with ${name}`}</span>
             {/if}
           </Button>
         </Tooltip>
       {/each}
       <div class="flex flex-row flex-nowrap justify-stretch gap-3">
         {#each openIdProviders.slice(1) as provider}
+          {@const name = provider.name}
           <Tooltip
-            label="Interaction canceled. Please try again."
+            label={$t`Interaction canceled. Please try again.`}
             hidden={cancelledProviderId !== provider.client_id}
             manual
           >
@@ -85,11 +87,11 @@
               disabled={nonNullish(authenticatingProviderId)}
               size="xl"
               class="flex-1"
-              aria-label={`Continue with ${provider.name}`}
+              aria-label={$t`Continue with ${name}`}
             >
               {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
-              {:else if provider.logo}
+              {:else}
                 <div class="size-6">
                   {@html provider.logo}
                 </div>
@@ -102,7 +104,7 @@
         <div
           class="border-border-tertiary flex-1 translate-y-[100%] border-t"
         ></div>
-        <div class="text-text-secondary text-sm">or</div>
+        <div class="text-text-secondary text-sm">{$t`or`}</div>
         <div
           class="border-border-tertiary flex-1 translate-y-[100%] border-t"
         ></div>
@@ -114,15 +116,16 @@
         variant={"secondary"}
       >
         <PasskeyIcon />
-        Continue with Passkey
+        {$t`Continue with passkey`}
       </Button>
     </div>
   {:else}
     <div class="flex flex-col items-stretch gap-3">
       <div class="flex flex-row flex-nowrap justify-stretch gap-3">
         {#each openIdProviders as provider}
+          {@const name = provider.name}
           <Tooltip
-            label="Interaction canceled. Please try again."
+            label={$t`Interaction canceled. Please try again.`}
             hidden={cancelledProviderId !== provider.client_id}
             manual
           >
@@ -132,11 +135,11 @@
               disabled={nonNullish(authenticatingProviderId)}
               size="xl"
               class="flex-1"
-              aria-label={`Continue with ${provider.name}`}
+              aria-label={$t`Continue with ${name}`}
             >
               {#if authenticatingProviderId === provider.client_id}
                 <ProgressRing />
-              {:else if provider.logo}
+              {:else}
                 <div class="size-6">
                   {@html provider.logo}
                 </div>
@@ -152,18 +155,20 @@
         variant={"secondary"}
       >
         <PasskeyIcon />
-        Continue with Passkey
+        {$t`Continue with passkey`}
       </Button>
     </div>
     <div class="border-border-tertiary border-t"></div>
   {/if}
   <div class="flex flex-row items-center justify-between gap-4">
-    <p class="text-text-secondary text-sm">Still have an identity number?</p>
+    <p class="text-text-secondary text-sm">
+      {$t`Still have an identity number?`}
+    </p>
     <button
       onclick={migrate}
       class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      Upgrade
+      {$t`Upgrade`}
     </button>
   </div>
 </div>
