@@ -80,10 +80,7 @@
             <div class="text-text-primary font-semibold">
               {identity.name ?? identity.identityNumber}
             </div>
-            <div
-              class="text-text-tertiary flex gap-1 font-normal"
-              aria-hidden="true"
-            >
+            <div class="text-text-tertiary font-normal" aria-hidden="true">
               {#if nonNullish(date)}
                 <span>{$t`${name} | Created`} {date}</span>
               {:else}
