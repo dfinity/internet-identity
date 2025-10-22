@@ -22,7 +22,7 @@
     "prettier-plugin-organize-imports": "^3.2.2",
     "ts-node": "^10.9.1",
     "typescript": "^5.0.4",
-    "vite": "^5.4.19"
+    "vite": "^5.4.21"
   },
   "dependencies": {
     "@icp-sdk/auth": "^4.1.0"
