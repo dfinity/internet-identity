@@ -18,7 +18,7 @@ msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for
 msgstr ""
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:85
-msgid "{name} | Created"
+msgid "{name} | Created {date}"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:103
