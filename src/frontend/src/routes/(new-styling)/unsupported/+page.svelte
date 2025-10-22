@@ -48,7 +48,7 @@
             <li>{$t`Sign in there.`}</li>
           </ol>
         </div>
-        <p class="text-center">
+        <p class="self-center">
           <Button
             href={SUPPORT_URL}
             target="_blank"
