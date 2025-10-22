@@ -72,6 +72,15 @@
       replaceState(next, {});
     }
   });
+
+  $effect(() => {
+    if (status === "orphan") {
+      goto("/unsupported", {
+        replaceState: true,
+        invalidateAll: true,
+      });
+    }
+  });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
