@@ -17,7 +17,7 @@ msgstr ""
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Alcanzaste el máximo de # cuenta para una app.} other {Alcanzaste el máximo de # cuentas para una app.}}"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:85
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:84
 msgid "{name} | Created {date}"
 msgstr "{name} | Creado {date}"
 
@@ -113,7 +113,7 @@ msgstr "elige un método"
 msgid "Choose method"
 msgstr "Elige un método"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:53
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
 msgstr "Cerrar"
 
@@ -429,7 +429,7 @@ msgstr "Manten presionada la tecla de la página que abrió esta página."
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Haz que registrarse e iniciar sesión sea simple con Google, Apple o Microsoft. El inicio de sesión que conoces, ahora con mayor privacidad."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:121
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:120
 #: src/frontend/src/routes/(new-styling)/+page.svelte:54
 msgid "Manage Identity"
 msgstr "Administrar identidad"
@@ -596,7 +596,7 @@ msgstr "inicia sesión para continuar"
 msgid "Sign in using familiar methods"
 msgstr "Inicia sesión usando métodos conocidos"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:116
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:115
 msgid "Sign Out"
 msgstr "Cerrar sesión"
 
@@ -633,7 +633,7 @@ msgstr "¿Aún tienes un número de identidad?"
 msgid "Support"
 msgstr "Soporte"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:45
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
 msgid "Switch identity"
 msgstr "Cambiar de identidad"
 
@@ -737,7 +737,7 @@ msgstr "Actualizando identidad..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Usa un dispositivo que ya tenga tu identidad para escanear o abrir la URL. Esto vinculará tu identidad a este dispositivo."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:110
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:109
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165

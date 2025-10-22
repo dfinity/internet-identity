@@ -17,7 +17,7 @@ msgstr ""
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:85
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:84
 msgid "{name} | Created {date}"
 msgstr "{name} | Created {date}"
 
@@ -113,7 +113,7 @@ msgstr "choose method"
 msgid "Choose method"
 msgstr "Choose method"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:53
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
 msgstr "Close"
 
@@ -429,7 +429,7 @@ msgstr "Long-press the link that opened this page."
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:121
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:120
 #: src/frontend/src/routes/(new-styling)/+page.svelte:54
 msgid "Manage Identity"
 msgstr "Manage Identity"
@@ -596,7 +596,7 @@ msgstr "sign in to continue"
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:116
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:115
 msgid "Sign Out"
 msgstr "Sign Out"
 
@@ -633,7 +633,7 @@ msgstr "Still have an identity number?"
 msgid "Support"
 msgstr "Support"
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:45
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
 msgid "Switch identity"
 msgstr "Switch identity"
 
@@ -737,7 +737,7 @@ msgstr "Upgrading identity..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 
-#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:110
+#: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:109
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
