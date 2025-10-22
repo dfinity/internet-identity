@@ -11,15 +11,15 @@ msgstr ""
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
-"Plural-Forms: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:302
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
-msgstr ""
+msgstr "{MAX_ACCOUNTS, plural, one {Alcanzaste el máximo de # cuenta para una app.} other {Alcanzaste el máximo de # cuentas para una app.}}"
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:103
 msgid "{name} logo"
-msgstr ""
+msgstr "Logo de {name}"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:363
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
@@ -31,15 +31,15 @@ msgstr "<0>Integración con Google:</0> Aunque el uso de passkeys está creciend
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:113
 msgid "<0>Learn more</0> about passkeys"
-msgstr ""
+msgstr "<0>Aprende más</0> sobre las passkeys"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:74
 msgid "<0>Learn more</0> about privacy preservation"
-msgstr ""
+msgstr "<0>Aprende más</0> sobre la privacidad"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:68
 msgid "<0>Never</0> enter a code from another source."
-msgstr ""
+msgstr "<0>Nunca</0> introduzcas un código de otra fuente."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:373
 msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
@@ -52,11 +52,11 @@ msgstr "<0>Integración de Passkey sin interrupciones:</0> Seguimos adoptando la
 #: src/frontend/src/lib/components/views/EditAccount.svelte:75
 #: src/frontend/src/lib/components/views/EditAccount.svelte:87
 msgid "Account name"
-msgstr ""
+msgstr "Nombre de la cuenta"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:318
 msgid "Add another account"
-msgstr ""
+msgstr "Añadir otra cuenta"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:131
 msgid "Advanced identity management"
@@ -66,143 +66,143 @@ msgstr "Gestión avanzada de identidad"
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:66
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:100
 msgid "Authenticating..."
-msgstr ""
+msgstr "Autenticando..."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:48
 msgid "Authentication successful"
-msgstr ""
+msgstr "Autenticación correcta"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:54
 msgid "Authorize new device"
-msgstr ""
+msgstr "Autorizar nuevo dispositivo"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:368
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
-msgstr ""
+msgstr "Al activar esta función, puedes crear más de una cuenta por app. Cambia fácilmente entre cuentas (p. ej., trabajo, personal o demo)."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:29
 msgid "Can't find your identity?"
-msgstr ""
+msgstr "¿No encuentras tu identidad?"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:61
 msgid "CAPTCHA characters"
-msgstr ""
+msgstr "Caracteres del CAPTCHA"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:77
 msgid "Characters are case-sensitive"
-msgstr ""
+msgstr "Distingue mayúsculas y minúsculas"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:293
 msgid "Choose an account"
-msgstr ""
+msgstr "Elige una cuenta"
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:106
 msgid "choose identity to continue"
-msgstr ""
+msgstr "elige una identidad para continuar"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:137
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
 msgid "choose method"
-msgstr ""
+msgstr "elige un método"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:41
 msgid "Choose method"
-msgstr ""
+msgstr "Elige un método"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
-msgstr ""
+msgstr "Cerrar"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:44
 msgid "Code copied to clipboard"
-msgstr ""
+msgstr "Código copiado al portapapeles"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:95
 msgid "Confirm sign-in"
-msgstr ""
+msgstr "Confirmar inicio de sesión"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:33
 msgid "Confirm this device"
-msgstr ""
+msgstr "Confirmar este dispositivo"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:30
 msgid "Confirm your sign-in"
-msgstr ""
+msgstr "Confirma tu inicio de sesión"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:50
 msgid "Confirmation code"
-msgstr ""
+msgstr "Código de confirmación"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:93
 msgid "Confirming..."
-msgstr ""
+msgstr "Confirmando..."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:19
 msgid "Connection closed"
-msgstr ""
+msgstr "Conexión cerrada"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:102
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:335
 msgid "Continue"
-msgstr ""
+msgstr "Continuar"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:29
 msgid "Continue on another device"
-msgstr ""
+msgstr "Continuar en otro dispositivo"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:10
 msgid "Continue on your new device"
-msgstr ""
+msgstr "Continúa en tu nuevo dispositivo"
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:71
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:90
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:138
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:263
 msgid "Continue with {name}"
-msgstr ""
+msgstr "Continuar con {name}"
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:119
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:158
 msgid "Continue with passkey"
-msgstr ""
+msgstr "Continuar con passkey"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:117
 msgid "Create account"
-msgstr ""
+msgstr "Crear cuenta"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:43
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
-msgstr ""
+msgstr "Crea una identidad con una passkey, usando datos biométricos o una llave de seguridad. Tus datos nunca salen de tu dispositivo."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:84
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:107
 msgid "Create identity"
-msgstr ""
+msgstr "Crear identidad"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:51
 msgid "Create new identity"
-msgstr ""
+msgstr "Crear nueva identidad"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:52
 msgid "Create passkey"
-msgstr ""
+msgstr "Crear passkey"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:113
 msgid "Creating account..."
-msgstr ""
+msgstr "Creando cuenta..."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:82
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:105
 msgid "Creating identity..."
-msgstr ""
+msgstr "Creando identidad..."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:50
 msgid "Creating passkey..."
-msgstr ""
+msgstr "Creando passkey..."
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
 msgid "Default"
-msgstr ""
+msgstr "Predeterminada"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
 msgid "Discoverable passkeys"
@@ -214,19 +214,19 @@ msgstr "Fácil acceso"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:279
 msgid "Edit {name}"
-msgstr ""
+msgstr "Editar {name}"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:64
 msgid "Edit account"
-msgstr ""
+msgstr "Editar cuenta"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:363
 msgid "Enable multiple accounts"
-msgstr ""
+msgstr "Activar múltiples cuentas"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:71
 msgid "Enter characters"
-msgstr ""
+msgstr "Introduce los caracteres"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:163
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -263,24 +263,24 @@ msgstr "Propiedad completa"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:59
 msgid "Generating code..."
-msgstr ""
+msgstr "Generando código..."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:45
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
-msgstr ""
+msgstr "Dale a tu identidad un nombre claro, simple y memorable que reconozcas fácilmente."
 
 #: src/frontend/src/routes/(new-styling)/authorize/upgrade-success/+page.svelte:58
 msgid "Go to the app"
-msgstr ""
+msgstr "Ir a la app"
 
 #: src/frontend/src/routes/(new-styling)/authorize/upgrade-success/+page.svelte:54
 msgid "Go to the app - (<0>{countdown}</0>)"
-msgstr ""
+msgstr "Ir a la app - (<0>{countdown}</0>)"
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:60
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:113
 msgid "Help & FAQ"
-msgstr ""
+msgstr "Ayuda y preguntas frecuentes"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:312
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
@@ -296,11 +296,11 @@ msgstr "¿Cómo se compara Internet Identity con otras herramientas de autentica
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:124
 msgid "How it works"
-msgstr ""
+msgstr "Cómo funciona"
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:31
 msgid "Identity already upgraded"
-msgstr ""
+msgstr "Identidad ya actualizada"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:57
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:67
@@ -309,23 +309,23 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:76
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:86
 msgid "Identity name"
-msgstr ""
+msgstr "Nombre de la identidad"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:82
 msgid "Identity number"
-msgstr ""
+msgstr "Número de identidad"
 
 #: src/frontend/src/routes/(new-styling)/authorize/upgrade-success/+page.svelte:43
 msgid "Identity upgraded!"
-msgstr ""
+msgstr "¡Identidad actualizada!"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:84
 msgid "In use on another account."
-msgstr ""
+msgstr "En uso en otra cuenta."
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:78
 msgid "Incorrect. Try again with the new code."
-msgstr ""
+msgstr "Incorrecto. Inténtalo de nuevo con el nuevo código."
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:54
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:80
@@ -333,11 +333,11 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:54
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:87
 msgid "Interaction canceled. Please try again."
-msgstr ""
+msgstr "Interacción cancelada. Por favor, inténtalo de nuevo."
 
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:64
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
-msgstr ""
+msgstr "Internet Identity <0>no</0> almacena tus datos biométricos. Permanecen en tu dispositivo. Tu identidad actúa como un gestor seguro de passkeys."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:356
 msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
@@ -361,11 +361,11 @@ msgstr "Internet Identity nunca comparte tus datos personales, como tu correo el
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:76
 msgid "Internet Identity number"
-msgstr ""
+msgstr "Número de Internet Identity"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:86
 msgid "Internet Identity protects your privacy"
-msgstr ""
+msgstr "Internet Identity protege tu privacidad"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:324
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
@@ -373,15 +373,15 @@ msgstr "Internet Identity luego conecta la autenticación de esos proveedores co
 
 #: src/frontend/src/routes/(new-styling)/activate/+page.svelte:20
 msgid "Invalid code link"
-msgstr ""
+msgstr "Enlace de código no válido"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:78
 msgid "Invalid code. Please check and try again."
-msgstr ""
+msgstr "Código no válido. Por favor, comprueba y vuelve a intentarlo."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:20
 msgid "Invalid request"
-msgstr ""
+msgstr "Solicitud no válida"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:217
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
@@ -389,25 +389,25 @@ msgstr "¿Se almacena mi Face ID o huella digital en Internet Identity?"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:27
 msgid "It seems like an invalid authentication request was received."
-msgstr ""
+msgstr "Parece que se recibió una solicitud de autenticación no válida."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:26
 #: src/frontend/src/routes/(new-styling)/direct-authorize-protocol/+page.svelte:66
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
-msgstr ""
+msgstr "Parece que no se pudo establecer la conexión con el servicio. Prueba con otro navegador; si el problema persiste, contacta con el soporte."
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
 msgid "Let's get started"
-msgstr ""
+msgstr "Empecemos"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
 msgid "Limit reached"
-msgstr ""
+msgstr "Límite alcanzado"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:41
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:41
 msgid "Link copied to clipboard"
-msgstr ""
+msgstr "Enlace copiado al portapapeles"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -425,49 +425,49 @@ msgstr "Administra tus identidades y mantén el control de tus aplicaciones y si
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:103
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:176
 msgid "Manage your Internet Identity"
-msgstr ""
+msgstr "Administra tu Internet Identity"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:82
 msgid "Maximum length is 32 characters."
-msgstr ""
+msgstr "Longitud máxima de 32 caracteres."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:65
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:83
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:84
 msgid "Maximum length is 64 characters."
-msgstr ""
+msgstr "Longitud máxima de 64 caracteres."
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:38
 msgid "Migration completed successfully"
-msgstr ""
+msgstr "Migración completada con éxito"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:18
 msgid "Missing request"
-msgstr ""
+msgstr "Solicitud faltante"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:379
 msgid "More information about multiple accounts"
-msgstr ""
+msgstr "Más información sobre cuentas múltiples"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:367
 msgid "Multiple accounts"
-msgstr ""
+msgstr "Cuentas múltiples"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:72
 msgid "My {application} account"
-msgstr ""
+msgstr "Mi cuenta de {application}"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:72
 msgid "My account"
-msgstr ""
+msgstr "Mi cuenta"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:64
 msgid "Name account"
-msgstr ""
+msgstr "Nombrar cuenta"
 
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:59
 msgid "Name your identity"
-msgstr ""
+msgstr "Nombra tu identidad"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:333
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
@@ -479,16 +479,16 @@ msgstr "No. Tu Face ID o huella digital solo se usa para crear o desbloquear tu 
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:62
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
-msgstr ""
+msgstr "Introduce el código de ese dispositivo solo si iniciaste este proceso <0>tú mismo</0>."
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:107
 msgid "or"
-msgstr ""
+msgstr "o"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:46
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:46
 msgid "Pairing link"
-msgstr ""
+msgstr "Enlace de emparejamiento"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:236
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
@@ -500,15 +500,15 @@ msgstr "Las passkeys son resistentes al phishing, difíciles de robar y pueden s
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:46
 msgid "Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue."
-msgstr ""
+msgstr "Las passkeys no están disponibles en este dispositivo o navegador. Elige otro método de inicio de sesión para continuar."
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:45
 msgid "Passkeys not available here"
-msgstr ""
+msgstr "Passkeys no disponibles aquí"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:125
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
-msgstr ""
+msgstr "Las passkeys usan claves criptográficas almacenadas en tu dispositivo para inicios de sesión seguros y sin contraseña con Face ID, Touch ID o una llave de seguridad. Tus datos nunca se comparten."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:115
 msgid "Password-free"
@@ -516,11 +516,11 @@ msgstr "Sin contraseña"
 
 #: src/frontend/src/routes/(new-styling)/pair/+page.svelte:52
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
-msgstr ""
+msgstr "Vuelve a tu <0>dispositivo existente</0> y elige <1>Empezar de nuevo</1> para volver a intentarlo."
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:115
 msgid "Powered by Internet Identity"
-msgstr ""
+msgstr "Con la tecnología de Internet Identity"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:73
 msgid "Real Privacy"
@@ -528,29 +528,29 @@ msgstr "Privacidad real"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:151
 msgid "Redirecting to the app"
-msgstr ""
+msgstr "Redirigiendo a la app..."
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:69
 msgid "Rename or make this your default sign-in"
-msgstr ""
+msgstr "Renombrar o establecer como inicio de sesión predeterminado"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55
 #: src/frontend/src/routes/(new-styling)/direct-authorize-protocol/+page.svelte:73
 msgid "Return to app"
-msgstr ""
+msgstr "Volver a la app"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:117
 msgid "Save changes"
-msgstr ""
+msgstr "Guardar cambios"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:113
 msgid "Saving changes..."
-msgstr ""
+msgstr "Guardando cambios..."
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:34
 msgid "Scan the above QR code with your <0>new device</0> or enter the URL manually."
-msgstr ""
+msgstr "Escanea el código QR de arriba con tu <0>nuevo dispositivo</0> o introduce la URL manualmente."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:75
 msgid "Seamless Access"
@@ -558,15 +558,15 @@ msgstr "Acceso sin interrupciones"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:93
 msgid "Set as default sign-in"
-msgstr ""
+msgstr "Establecer como inicio de sesión predeterminado"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
 msgid "Sign in"
-msgstr ""
+msgstr "Iniciar sesión"
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
-msgstr ""
+msgstr "inicia sesión para continuar"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:101
 msgid "Sign in using familiar methods"
@@ -574,52 +574,52 @@ msgstr "Inicia sesión usando métodos conocidos"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:105
 msgid "Sign Out"
-msgstr ""
+msgstr "Cerrar sesión"
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:108
 msgid "Signing in securely"
-msgstr ""
+msgstr "Iniciando sesión de forma segura"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:39
 msgid "Simplify your sign-in"
-msgstr ""
+msgstr "Simplifica tu inicio de sesión"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:21
 #: src/frontend/src/routes/(new-styling)/direct-authorize-protocol/+page.svelte:63
 msgid "Something went wrong"
-msgstr ""
+msgstr "Algo salió mal"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:28
 msgid "Something went wrong during authentication. Authenticating service was notified and you may close this page."
-msgstr ""
+msgstr "Algo salió mal durante la autenticación. Se notificó al servicio y puedes cerrar esta página."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:34
 msgid "Source code"
-msgstr ""
+msgstr "Código fuente"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:105
 msgid "Start over"
-msgstr ""
+msgstr "Empezar de nuevo"
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:165
 msgid "Still have an identity number?"
-msgstr ""
+msgstr "¿Aún tienes un número de identidad?"
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:26
 msgid "Support"
-msgstr ""
+msgstr "Soporte"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
 msgid "Switch identity"
-msgstr ""
+msgstr "Cambiar de identidad"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/WaitingForExistingDevice.svelte:15
 msgid "The <0>existing device</0> is preparing to continue."
-msgstr ""
+msgstr "El <0>dispositivo existente</0> se está preparando para continuar."
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte:15
 msgid "The <0>new device</0> is preparing to continue."
-msgstr ""
+msgstr "El <0>nuevo dispositivo</0> se está preparando para continuar."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:317
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
@@ -627,47 +627,47 @@ msgstr "La integración con Google, Microsoft y Apple utiliza un protocolo de au
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:29
 msgid "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
-msgstr ""
+msgstr "Hubo un error al verificar el origen de la solicitud. Se notificó al servicio y puedes cerrar esta página."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:25
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
-msgstr ""
+msgstr "Hubo un problema al conectar con la aplicación. Prueba con otro navegador; si el problema persiste, contacta al desarrollador."
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:36
 msgid "This identity has already been upgraded to the new experience."
-msgstr ""
+msgstr "Esta identidad ya ha sido actualizada a la nueva experiencia."
 
 #: src/frontend/src/routes/(new-styling)/callback/+page.svelte:110
 msgid "This takes a few seconds."
-msgstr ""
+msgstr "Esto tarda unos segundos."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:38
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
-msgstr ""
+msgstr "Para confirmar que eres tú, introduce el siguiente código en tu <0>dispositivo existente</0>."
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:46
 msgid "to continue with <0>{application}</0>"
-msgstr ""
+msgstr "para continuar con <0>{application}</0>"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:50
 msgid "to continue with this app"
-msgstr ""
+msgstr "para continuar con esta app"
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:42
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
-msgstr ""
+msgstr "Para continuar, crea una passkey para proteger tu identidad y simplificar futuros inicios de sesión."
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:13
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
-msgstr ""
+msgstr "Para terminar de configurar tu passkey, sigue las instrucciones que aparecen en tu <0>nuevo dispositivo</0>."
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:52
 msgid "Type the characters exactly as shown below"
-msgstr ""
+msgstr "Escribe los caracteres exactamente como se muestran abajo"
 
 #: src/frontend/src/routes/(new-styling)/pair/+page.svelte:49
 msgid "Unable to complete setup"
-msgstr ""
+msgstr "No se pudo completar la configuración"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:154
 msgid "Understanding Internet Identity"
@@ -679,70 +679,70 @@ msgstr "A diferencia de muchos sistemas de autenticación Web3 que requieren fir
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:22
 msgid "Unverified origin"
-msgstr ""
+msgstr "Origen no verificado"
 
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:171
 msgid "Upgrade"
-msgstr ""
+msgstr "Actualizar"
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:67
 msgid "Upgrade again"
-msgstr ""
+msgstr "Actualizar de nuevo"
 
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:108
 msgid "Upgrade identity"
-msgstr ""
+msgstr "Actualizar identidad"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:63
 msgid "Upgrade your existing identity to the new experience in a few steps."
-msgstr ""
+msgstr "Actualiza tu identidad existente a la nueva experiencia en pocos pasos."
 
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:106
 msgid "Upgrading identity..."
-msgstr ""
+msgstr "Actualizando identidad..."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:34
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
-msgstr ""
+msgstr "Usa un dispositivo que ya tenga tu identidad para escanear o abrir la URL. Esto vinculará tu identidad a este dispositivo."
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:99
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:134
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
 msgid "Use another identity"
-msgstr ""
+msgstr "Usar otra identidad"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:68
 msgid "Use existing identity"
-msgstr ""
+msgstr "Usar identidad existente"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:90
 msgid "Verify"
-msgstr ""
+msgstr "Verificar"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:49
 msgid "Verify you are human"
-msgstr ""
+msgstr "Verifica que eres humano"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:88
 msgid "Verifying..."
-msgstr ""
+msgstr "Verificando..."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/WaitingForExistingDevice.svelte:12
 msgid "Waiting for your existing device"
-msgstr ""
+msgstr "Esperando a tu dispositivo existente"
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte:12
 msgid "Waiting for your new device"
-msgstr ""
+msgstr "Esperando a tu nuevo dispositivo"
 
 #: src/frontend/src/routes/(new-styling)/activate/+page.svelte:21
 msgid "We didn't recognize that activation code."
-msgstr ""
+msgstr "No reconocimos ese código de activación."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
 msgid "What are passkeys?"
-msgstr ""
+msgstr "¿Qué son las passkeys?"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:193
 msgid "What is Internet Identity?"
@@ -762,7 +762,7 @@ msgstr "¿Qué hay de nuevo en Internet Identity 2.0?"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:40
 msgid "What's your name?"
-msgstr ""
+msgstr "¿Cuál es tu nombre?"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:244
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
@@ -770,60 +770,60 @@ msgstr "Cuando creas un passkey, tu dispositivo genera dos claves coincidentes. 
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
 msgid "with your Internet Identity"
-msgstr ""
+msgstr "con tu Internet Identity"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:86
 msgid "Wrong domain was set. Please try again."
-msgstr ""
+msgstr "Se estableció un dominio incorrecto. Por favor, inténtalo de nuevo."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreateIdentity.svelte:70
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:88
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:89
 msgid "You <0>cannot</0> rename this once it is set."
-msgstr ""
+msgstr "Una vez establecido, <0>no puedes</0> cambiarle el nombre."
 
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:113
 msgid "You are upgrading ID <0>{identityNumber}</0>"
-msgstr ""
+msgstr "Estás actualizando el ID <0>{identityNumber}</0>"
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
-msgstr ""
+msgstr "Puedes continuar con <0>Usar Passkey existente</0> en el proceso de inicio de sesión."
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:68
 msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
-msgstr ""
+msgstr "Puedes editar esta cuenta más tarde. Etiquétala según su uso (p. ej., 'Trabajo' o 'Demo')."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:51
 msgid "You may close this page."
-msgstr ""
+msgstr "Puedes cerrar esta página."
 
 #: src/frontend/src/routes/(new-styling)/authorize/upgrade-success/+page.svelte:46
 msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
-msgstr ""
+msgstr "Ya no necesitas recordar tu número de identidad y puedes usar tu huella, rostro o bloqueo de pantalla en su lugar."
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:57
 msgid "You're about to sign in on a <0>new device</0>."
-msgstr ""
+msgstr "Estás a punto de iniciar sesión en un <0>nuevo dispositivo</0>."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:38
 msgid "You're about to sign in."
-msgstr ""
+msgstr "Estás a punto de iniciar sesión."
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:27
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:49
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:53
 msgid "You're all set. Your identity has been created."
-msgstr ""
+msgstr "Todo listo. Tu identidad ha sido creada."
 
 #: src/frontend/src/routes/(new-styling)/pair/+page.svelte:19
 msgid "You're all set. Your passkey has been registered."
-msgstr ""
+msgstr "Todo listo. Tu passkey ha sido registrada."
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:34
 msgid "You're signing in as <0>{name}</0>."
-msgstr ""
+msgstr "Estás iniciando sesión como <0>{name}</0>."
 
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:87
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
-msgstr ""
+msgstr "Tus datos personales, como tu nombre o email, nunca se comparten. Cada app obtiene un seudónimo único para evitar el rastreo automáticamente."
