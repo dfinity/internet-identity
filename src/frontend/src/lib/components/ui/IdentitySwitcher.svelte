@@ -17,6 +17,7 @@
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { canisterConfig } from "$lib/globals";
   import { t } from "$lib/stores/locale.store";
+  import { i18n } from "@lingui/core";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -58,6 +59,12 @@
 <div class="mb-4 flex flex-col gap-1.5">
   <ul class="contents">
     {#each identities as identity}
+      {@const name = lastUsedIdentityTypeName(identity)}
+      {@const date = nonNullish(identity.createdAtMillis)
+        ? i18n.date(new Date(identity.createdAtMillis), {
+            dateStyle: "short",
+          })
+        : undefined}
       <li class="contents">
         <ButtonCard
           onclick={() => switchIdentity(identity.identityNumber)}
@@ -73,8 +80,12 @@
             <div class="text-text-primary font-semibold">
               {identity.name ?? identity.identityNumber}
             </div>
-            <div class="text-text-tertiary" aria-hidden="true">
-              {lastUsedIdentityTypeName(identity)}
+            <div class="text-text-tertiary font-normal" aria-hidden="true">
+              {#if nonNullish(date)}
+                <span>{$t`${name} | Created ${date}`}</span>
+              {:else}
+                <span>{name}</span>
+              {/if}
             </div>
           </div>
           {#if selected === identity.identityNumber}
