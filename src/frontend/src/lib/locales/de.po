@@ -100,7 +100,7 @@ msgstr ""
 msgid "choose identity to continue"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:137
+#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
 msgid "choose method"
 msgstr ""
@@ -202,10 +202,6 @@ msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
 msgid "Default"
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:115
-msgid "Browser Not Supported"
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:269
-msgid "Default"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:116
@@ -284,10 +280,6 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:60
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:113
 msgid "Help & FAQ"
-msgstr ""
-
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:134
-msgid "Go to the app"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:312
@@ -395,6 +387,10 @@ msgstr ""
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Wird mein Face ID oder Fingerabdruck in Internet Identity gespeichert?"
 
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
+msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr ""
+
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:27
 msgid "It seems like an invalid authentication request was received."
 msgstr ""
@@ -404,29 +400,21 @@ msgstr ""
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr ""
 
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
+msgid "Learn how to open links in your browser →"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
 msgid "Let's get started"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
 msgid "Limit reached"
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:68
-msgid "It looks like you’re trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:28
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
-msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr ""
-
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
-msgid "Learn how to open links in your browser →"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:41
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:41
 msgid "Link copied to clipboard"
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
-msgid "Limit reached"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
@@ -550,7 +538,7 @@ msgstr ""
 msgid "Real Privacy"
 msgstr "Echte Privatsphäre"
 
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:151
+#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:160
 msgid "Redirecting to the app"
 msgstr ""
 
@@ -651,8 +639,6 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/WaitingForNewDevice.svelte:15
 msgid "The <0>new device</0> is preparing to continue."
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:78
-msgid "Tap the ⋯ (three dots at the top of the page) or long-press the link that opened this page."
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:317
@@ -687,12 +673,12 @@ msgstr ""
 msgid "to continue with this app"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
-msgid "To continue:"
-msgstr ""
-
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:42
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
+msgid "To continue:"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:13
@@ -714,6 +700,10 @@ msgstr "Internet Identity verstehen"
 #: src/frontend/src/routes/(new-styling)/+page.svelte:302
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Im Gegensatz zu vielen Web3-Auth-Systemen, die für jede Aktion eine manuelle Signatur erfordern, erstellt Internet Identity für jede Anwendung authentifizierte Sitzungen. Dies bietet sowohl Sicherheit als auch Komfort – keine wiederholten Signaturen – und jede Sitzung erhält dennoch ihre eigene Identität."
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
+msgid "Unsupported Browser"
+msgstr ""
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:22
 msgid "Unverified origin"
@@ -744,7 +734,7 @@ msgid "Use a device that already holds your identity to scan or open the URL. Th
 msgstr ""
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:99
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:134
+#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
 msgid "Use another identity"
@@ -780,9 +770,6 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:124
 msgid "What are passkeys?"
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:25
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
-msgid "Unsupported Browser"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:193
@@ -809,9 +796,8 @@ msgstr ""
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "Wenn Sie einen Passkey erstellen, erzeugt Ihr Gerät zwei passende Schlüssel. Einer bleibt sicher auf Ihrem Gerät, der andere wird an die App oder den Dienst gesendet. Sie arbeiten zusammen, um zu bestätigen, dass Sie es sind – ohne jemals persönliche Informationen oder ein Passwort zu teilen."
 
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:101
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:110
-msgid "You are being redirected to the app {0} for signin."
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
+msgid "with your Internet Identity"
 msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:86
@@ -830,14 +816,10 @@ msgstr ""
 
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:346
-msgid "with your Internet Identity"
 msgstr ""
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:68
 msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
-#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:120
-msgid "Your browser is not supported. Please visit our <0>support page</0> for more information and try again with a different browser."
 msgstr ""
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:51
