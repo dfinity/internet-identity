@@ -100,7 +100,7 @@ msgstr ""
 msgid "choose identity to continue"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:137
+#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
 msgid "choose method"
 msgstr ""
@@ -387,6 +387,10 @@ msgstr ""
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "¿Se almacena mi Face ID o huella digital en Internet Identity?"
 
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:26
+msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr "Parece que estás intentando iniciar sesión desde dentro de una aplicación (como X, Telegram o Instagram). El navegador integrado de esta aplicación no es compatible."
+
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:27
 msgid "It seems like an invalid authentication request was received."
 msgstr ""
@@ -395,6 +399,10 @@ msgstr ""
 #: src/frontend/src/routes/(new-styling)/direct-authorize-protocol/+page.svelte:66
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:56
+msgid "Learn how to open links in your browser →"
+msgstr "Cómo abrir enlaces en tu navegador →"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:58
 msgid "Let's get started"
@@ -408,6 +416,10 @@ msgstr ""
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:41
 msgid "Link copied to clipboard"
 msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:35
+msgid "Long-press the link that opened this page."
+msgstr "Manten presionada la tecla de la página que abrió esta página."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -526,7 +538,7 @@ msgstr ""
 msgid "Real Privacy"
 msgstr "Privacidad real"
 
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:151
+#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:160
 msgid "Redirecting to the app"
 msgstr ""
 
@@ -556,6 +568,10 @@ msgstr ""
 msgid "Seamless Access"
 msgstr "Acceso sin interrupciones"
 
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:37
+msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
+msgstr "Selectiona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
+
 #: src/frontend/src/lib/components/views/EditAccount.svelte:93
 msgid "Set as default sign-in"
 msgstr ""
@@ -563,6 +579,10 @@ msgstr ""
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:343
 msgid "Sign in"
 msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:47
+msgid "Sign in there."
+msgstr "Inicia sesión ahí."
 
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:179
 msgid "sign in to continue"
@@ -657,6 +677,10 @@ msgstr ""
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr ""
 
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:30
+msgid "To continue:"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/FinishOnNewDevice.svelte:13
 msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
 msgstr ""
@@ -676,6 +700,10 @@ msgstr "Entiende Internet Identity"
 #: src/frontend/src/routes/(new-styling)/+page.svelte:302
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "A diferencia de muchos sistemas de autenticación Web3 que requieren firma manual para cada acción, Internet Identity crea sesiones autenticadas por aplicación. Esto proporciona seguridad y conveniencia — sin firmas repetidas — mientras cada sesión mantiene su propia identidad."
+
+#: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:23
+msgid "Unsupported Browser"
+msgstr ""
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:22
 msgid "Unverified origin"
@@ -706,7 +734,7 @@ msgid "Use a device that already holds your identity to scan or open the URL. Th
 msgstr ""
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:99
-#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:134
+#: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
 msgid "Use another identity"
