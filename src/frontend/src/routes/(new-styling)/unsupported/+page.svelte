@@ -1,10 +1,11 @@
 <script lang="ts">
   import { SUPPORT_URL } from "$lib/config";
   import Header from "$lib/components/layout/Header.svelte";
-  import { TriangleAlertIcon } from "@lucide/svelte";
+  import { ArrowRightIcon, TriangleAlertIcon } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import Button from "$lib/components/ui/Button.svelte";
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-unsupported-view">
@@ -48,13 +49,16 @@
           </ol>
         </div>
         <p class="text-center">
-          <a
+          <Button
             href={SUPPORT_URL}
             target="_blank"
             rel="noopener noreferrer"
-            class="text-text-primary underline hover:no-underline"
-            >{$t`Learn how to open links in your browser →`}</a
+            variant="tertiary"
+            size="sm"
           >
+            <span>{$t`Learn how to open links in your browser`}</span>
+            <ArrowRightIcon class="size-4" />
+          </Button>
         </p>
       </div>
     </div>
