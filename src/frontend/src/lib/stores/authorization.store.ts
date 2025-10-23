@@ -57,7 +57,7 @@ type AuthorizationStore = Readable<{
 }> & {
   init: (options: ProtocolOptions) => Promise<void>;
   authorize: (
-    accountNumber: bigint | undefined,
+    accountNumber: Promise<bigint | undefined> | bigint | undefined,
     artificialDelay?: number,
   ) => Promise<void>;
 };
@@ -68,7 +68,7 @@ const internalStore = writable<{
 }>({ status: "init" });
 
 let authorize: (
-  accountNumber: bigint | undefined,
+  accountNumber: Promise<bigint | undefined> | bigint | undefined,
   artificialDelay?: number,
 ) => Promise<void>;
 
@@ -106,7 +106,10 @@ export const authorizationStore: AuthorizationStore = {
         }
 
         return new Promise((resolve) => {
-          authorize = async (accountNumber, artificialDelay = 0) => {
+          authorize = async (
+            accountNumberMaybePromise,
+            artificialDelay = 0,
+          ) => {
             internalStore.update((value) => ({
               ...value,
               status: "authorizing",
@@ -119,6 +122,7 @@ export const authorizationStore: AuthorizationStore = {
                 : artificialDelay,
             );
             try {
+              const accountNumber = await accountNumberMaybePromise;
               const { user_key, expiration } = await actor
                 .prepare_account_delegation(
                   identityNumber,
