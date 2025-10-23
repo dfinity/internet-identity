@@ -13,7 +13,6 @@ import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
 import { isNullish } from "@dfinity/utils";
-import { anonymousAgent, canisterId } from "$lib/globals";
 
 export interface Session {
   identity: SignIdentity;
