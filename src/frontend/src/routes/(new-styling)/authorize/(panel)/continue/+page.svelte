@@ -32,6 +32,7 @@
   import { slide, fade, scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
@@ -75,9 +76,12 @@
     accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
   );
   const authLastUsedFlow = new AuthLastUsedFlow();
+  const selectedIdentityNumber = $derived(
+    $lastUsedIdentitiesStore.selected!.identityNumber,
+  );
   // Initialize the flow every time the identity changes
   $effect(() => {
-    authLastUsedFlow.init([$lastUsedIdentitiesStore.selected!.identityNumber]);
+    authLastUsedFlow.init([selectedIdentityNumber]);
   });
 
   const handleContinueDefault = async () => {
@@ -123,7 +127,6 @@
           .get_default_account(identityNumber, effectiveOrigin)
           .then(throwCanisterError),
       ]);
-      await waitFor(1000);
       accounts = values[0].sort((a, b) => {
         // Undefined should come last (new/unused accounts at the bottom),
         // defined should sort descending (most recently used first).
@@ -287,46 +290,42 @@
   </div>
 {/snippet}
 
-{#snippet accountList()}
+{#snippet accountList(accounts: AccountInfo[])}
   <div class="col-start-1 row-start-1" out:fade={{ duration: 100 }}>
     <div class="!min-h-18" out:slide={{ axis: "y", duration: 300 }}>
-      {#if nonNullish(accounts)}
-        <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
-          <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
-            <ul class="contents" aria-label={$t`Choose an account`}>
-              {#each accounts as account (account.account_number[0])}
-                <li class="contents">
-                  {@render accountListItem(account)}
-                </li>
-              {/each}
-            </ul>
-            <Tooltip
-              label={$t`Limit reached`}
-              description={$plural(MAX_ACCOUNTS, {
-                one: `You have reached the maximum of # account for a single app.`,
-                other: `You have reached the maximum of # accounts for a single app.`,
-              })}
-              direction="up"
-              align="center"
-              hidden={!isAccountLimitReached}
-            >
-              <div class="mt-3 shrink-0">
-                <Button
-                  onclick={() => (isCreateAccountDialogVisible = true)}
-                  variant="tertiary"
-                  disabled={isAccountLimitReached}
-                  class="w-full"
-                >
-                  <PlusIcon class="size-5" />
-                  {$t`Add another account`}
-                </Button>
-              </div>
-            </Tooltip>
-          </div>
+      <div class="!min-h-18" in:slide={{ axis: "y", duration: 300 }}>
+        <div class="flex flex-col gap-2 pb-6" in:fade={{ duration: 300 }}>
+          <ul class="contents" aria-label={$t`Choose an account`}>
+            {#each accounts as account (account.account_number[0])}
+              <li class="contents">
+                {@render accountListItem(account)}
+              </li>
+            {/each}
+          </ul>
+          <Tooltip
+            label={$t`Limit reached`}
+            description={$plural(MAX_ACCOUNTS, {
+              one: `You have reached the maximum of # account for a single app.`,
+              other: `You have reached the maximum of # accounts for a single app.`,
+            })}
+            direction="up"
+            align="center"
+            hidden={!isAccountLimitReached}
+          >
+            <div class="mt-3 shrink-0">
+              <Button
+                onclick={() => (isCreateAccountDialogVisible = true)}
+                variant="tertiary"
+                disabled={isAccountLimitReached}
+                class="w-full"
+              >
+                <PlusIcon class="size-5" />
+                {$t`Add another account`}
+              </Button>
+            </div>
+          </Tooltip>
         </div>
-      {:else}
-        <div>Loading</div>
-      {/if}
+      </div>
     </div>
   </div>
 {/snippet}
@@ -351,8 +350,21 @@
     {$t`with your Internet Identity`}
   </p>
   <div class="grid">
-    {#if isMultipleAccountsEnabled}
-      {@render accountList()}
+    <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
+    {#if isMultipleAccountsEnabled && $isAuthenticatedStore && nonNullish(accounts)}
+      {@render accountList(accounts)}
+    {:else if isMultipleAccountsEnabled && $isAuthenticatedStore}
+      <!-- Display the progress ring if loading accounts takes longer than usual.
+      
+           This may happen the first time a user enables multiple accounts, 
+           as authentication might require an update call in case OpenID is used. -->
+      <div
+        class="col-start-1 row-start-1 flex min-h-18 items-center justify-center pb-6"
+        in:fade={{ duration: 100, delay: 300 }}
+        out:fade={{ duration: 100 }}
+      >
+        <ProgressRing class="text-fg-tertiary size-8" />
+      </div>
     {:else}
       {@render continueDefault()}
     {/if}
