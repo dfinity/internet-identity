@@ -11,7 +11,9 @@
   <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
     {$t`Waiting for your new device`}
   </h1>
-  <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
+  <p
+    class="text-text-tertiary text-base font-medium text-balance sm:text-center"
+  >
     <Trans>
       The <b class="text-text-primary">new device</b> is preparing to continue.
     </Trans>

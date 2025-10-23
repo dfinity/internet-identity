@@ -59,7 +59,7 @@
         {$t`Name your identity`}
       </h1>
       <p
-        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+        class="text-text-tertiary text-base font-medium text-balance sm:text-center"
       >
         <Trans>
           Internet Identity <b>does not</b> store your biometric data. It stays on

@@ -31,14 +31,14 @@
         {$t`Identity already upgraded`}
       </h1>
       <p
-        class="text-md text-text-tertiary mb-4 font-medium text-balance sm:text-center"
+        class="text-text-tertiary mb-4 text-base font-medium text-balance sm:text-center"
       >
         <Trans>
           This identity has already been upgraded to the new experience.
         </Trans>
       </p>
       <p
-        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+        class="text-text-tertiary text-base font-medium text-balance sm:text-center"
       >
         <Trans>
           You can continue with

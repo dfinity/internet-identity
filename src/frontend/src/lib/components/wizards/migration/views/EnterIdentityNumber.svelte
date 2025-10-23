@@ -58,7 +58,7 @@
         {$t`Let's get started`}
       </h1>
       <p
-        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+        class="text-text-tertiary text-base font-medium text-balance sm:text-center"
       >
         <Trans>
           Upgrade your existing identity to the new experience in a few steps.

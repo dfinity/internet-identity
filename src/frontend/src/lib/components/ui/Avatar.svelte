@@ -15,8 +15,8 @@
     {
       sm: "size-8 text-sm",
       md: "size-10 text-sm",
-      lg: "text-md size-12",
-      xl: "text-md size-14",
+      lg: "size-12 text-base",
+      xl: "size-14 text-base",
     }[size],
     className,
   ]}

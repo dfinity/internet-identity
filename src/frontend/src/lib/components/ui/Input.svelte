@@ -43,7 +43,7 @@
       bind:value
       {...restProps}
       class={[
-        "text-md bg-bg-primary text-text-primary placeholder:text-text-placeholder flex-1 rounded-lg border border-none p-0 opacity-100 ring outline-none ring-inset not-dark:shadow-xs",
+        "bg-bg-primary text-text-primary placeholder:text-text-placeholder flex-1 rounded-lg border border-none p-0 text-base opacity-100 ring outline-none ring-inset not-dark:shadow-xs",
         errorBorder ? "ring-border-error_subtle" : "ring-border-secondary",
         "focus:ring-2",
         errorBorder ? "focus:ring-border-error" : "focus:ring-border-brand",
