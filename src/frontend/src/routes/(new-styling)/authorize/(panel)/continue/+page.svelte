@@ -85,16 +85,16 @@
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
-      if (defaultAccountNumber === null) {
-        const { identityNumber, actor } = $authenticationStore!;
-        const { effectiveOrigin } = $authorizationContextStore;
-        defaultAccountNumber = (
-          await actor
-            .get_default_account(identityNumber, effectiveOrigin)
-            .then(throwCanisterError)
-        ).account_number[0];
-      }
-      await authorizationStore.authorize(defaultAccountNumber);
+      const { identityNumber, actor } = $authenticationStore!;
+      const { effectiveOrigin } = $authorizationContextStore;
+      await authorizationStore.authorize(
+        defaultAccountNumber === null
+          ? actor
+              .get_default_account(identityNumber, effectiveOrigin)
+              .then(throwCanisterError)
+              .then((account) => account.account_number[0])
+          : defaultAccountNumber,
+      );
     } catch (error) {
       handleError(error);
     }
