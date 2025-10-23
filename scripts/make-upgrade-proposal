@@ -309,6 +309,8 @@ test_release_candidate() {
   echo "Dummy relying party: https://l7rua-raaaa-aaaap-ahh6a-cai.icp0.io/"
   echo ""
   echo "Please, share the outcome of your testing in this thread and specify which device and browser you used."
+  echo ""
+  echo "Also verify that *all background animations* are working as expected in both the landing and authentication pages."
   echo "----------"
   echo ""
   echo "Perform some testing yourself and wait for feedback from the team before moving forward."
