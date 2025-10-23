@@ -23,7 +23,7 @@
     authenticationStore,
     isAuthenticatedStore,
   } from "$lib/stores/authentication.store";
-  import { throwCanisterError } from "$lib/utils/utils";
+  import { throwCanisterError, waitFor } from "$lib/utils/utils";
   import type {
     AccountInfo,
     AccountNumber,
@@ -123,6 +123,7 @@
           .get_default_account(identityNumber, effectiveOrigin)
           .then(throwCanisterError),
       ]);
+      await waitFor(1000);
       accounts = values[0].sort((a, b) => {
         // Undefined should come last (new/unused accounts at the bottom),
         // defined should sort descending (most recently used first).
@@ -323,6 +324,8 @@
             </Tooltip>
           </div>
         </div>
+      {:else}
+        <div>Loading</div>
       {/if}
     </div>
   </div>
