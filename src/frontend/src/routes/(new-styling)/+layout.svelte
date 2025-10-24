@@ -13,5 +13,8 @@
 </svelte:head>
 
 {@render children()}
-<WaveCanvas />
+<!-- Hide global wave canvas on mobile -->
+<div class="max-md:hidden">
+  <WaveCanvas />
+</div>
 <Toaster />

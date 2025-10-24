@@ -9,7 +9,10 @@
 
 <header
   {...props}
-  class={["flex items-center px-3 md:px-6 lg:px-8", className]}
+  class={[
+    "from-bg-primary flex items-center bg-gradient-to-b to-transparent px-3 md:px-6 lg:px-8",
+    className,
+  ]}
 >
   <div class="flex h-16 flex-1 items-center gap-4">
     <a href="/" class="flex items-center gap-4">

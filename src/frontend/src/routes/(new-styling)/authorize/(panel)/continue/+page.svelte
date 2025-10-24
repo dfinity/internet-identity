@@ -32,6 +32,7 @@
   import { slide, fade, scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
@@ -91,6 +92,7 @@
       }
       const { identityNumber, actor } = $authenticationStore!;
       const { effectiveOrigin } = $authorizationContextStore;
+      void triggerDropWaveAnimation();
       await authorizationStore.authorize(
         defaultAccountNumber === null
           ? actor
@@ -107,6 +109,7 @@
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
     try {
+      void triggerDropWaveAnimation();
       await authorizationStore.authorize(accountNumber);
     } catch (error) {
       handleError(error);

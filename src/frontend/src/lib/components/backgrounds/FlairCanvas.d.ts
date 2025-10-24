@@ -29,7 +29,6 @@ export interface FlairAnimationOptions {
   size: "large" | "medium" | "small" | number;
   nImpulses: "single" | "double";
   impulseEasing?: keyof typeof easingFunctions;
-  containerHeight?: "h-full" | "h-[640px]";
 }
 
 export interface FlairCanvasProps {
@@ -67,6 +66,7 @@ export interface FlairCanvasProps {
   maskWaveOneWay?: boolean;
   customColor?: string;
   customColorMode?: "all" | "moving";
+  containerHeight?: string;
   triggerAnimation?: (opts: FlairAnimationOptions) => Promise<void>;
   clearAnimation?: () => void;
 }
