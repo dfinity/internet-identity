@@ -171,19 +171,19 @@
         // Layout, spacing and dividers
         "divide-border-secondary mx-5 flex flex-1 flex-col divide-y-1",
         // Details padding
-        "[&_details]:pb-10",
+        "[&_details]:pb-6",
         // Summary layout
-        "[&_summary]:flex [&_summary]:flex-row [&_summary]:items-center [&_summary]:gap-4 [&_summary]:pt-10 [&_summary]:pb-1",
+        "[&_summary]:-mb-6 [&_summary]:flex [&_summary]:flex-row [&_summary]:items-center [&_summary]:gap-4 [&_summary]:py-10",
         // Summary styling
         "[&_summary]:text-text-primary [&_summary]:cursor-pointer [&_summary]:font-medium [&_summary]:select-none md:[&_summary]:text-xl",
         // Summary icons
         "[&_summary_svg]:text-text-placeholder [&_summary_svg]:ml-auto [&_summary_svg]:size-6 [&_summary_svg]:shrink-0",
         // Toggle summary icons
-        "[&_details:not(:open)_summary_svg:last-child]:hidden [&_details:open_summary_svg:first-child]:hidden",
+        "[&_details:not(:open)_summary_svg:first-child]:hidden [&_details:open_summary_svg:last-child]:hidden",
         // Paragraph styling and spacing
-        "[&_p]:text-text-md [&_p]:text-text-secondary [&_p_+_p]:mt-4",
+        "[&_p]:text-text-md [&_p]:text-text-secondary [&_p]:mb-4",
         // Paragraph + list spacing
-        "[&_p_+_ul]:mt-4",
+        "[&_ul]:mb-4",
         // List styling and spacing
         "[&_li]:text-text-md [&_li]:text-text-secondary [&_li_+_li]:mt-4",
       ]}
