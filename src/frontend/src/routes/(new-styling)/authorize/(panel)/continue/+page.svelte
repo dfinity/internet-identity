@@ -34,7 +34,6 @@
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
