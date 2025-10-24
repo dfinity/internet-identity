@@ -11,7 +11,6 @@ import { createAnonymousNonce } from "$lib/utils/openID";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
 import { isNullish } from "@dfinity/utils";
 
@@ -95,7 +94,10 @@ const read = async () => {
 export const sessionStore: SessionStore = {
   init: async ({ canisterId, agentOptions }) => {
     const { identity, nonce, salt } = (await read()) ?? (await create());
-    const agent = LazyHttpAgent.createLazy({ ...agentOptions, identity });
+    const agent = HttpAgent.createSync({ ...agentOptions, identity });
+    // Fetch subnet keys to speed up queries during authentication,
+    // this avoids having to fetch them later on user interaction.
+    void agent.fetchSubnetKeys(canisterId);
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,

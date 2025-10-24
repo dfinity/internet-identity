@@ -63,7 +63,7 @@
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
       {isNullish(account) ? $t`Name account` : $t`Edit account`}
     </h1>
-    <p class="text-md text-text-tertiary mb-6 font-medium">
+    <p class="text-text-tertiary mb-6 text-base font-medium">
       {isNullish(account)
         ? $t`You can edit this account later. Label it by use (e.g. 'Work' or 'Demo').`
         : $t`Rename or make this your default sign-in`}

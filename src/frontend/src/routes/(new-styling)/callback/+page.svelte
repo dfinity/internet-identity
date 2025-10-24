@@ -111,7 +111,7 @@
     <div class="bg-bg-quaternary my-6 h-0.5 w-full max-w-74 rounded-full">
       <div class="bg-fg-brand-primary animate-grow h-full rounded-full"></div>
     </div>
-    <p class="text-text-secondary text-md">
+    <p class="text-text-secondary text-base">
       {$t`Powered by Internet Identity`}
     </p>
     <Button

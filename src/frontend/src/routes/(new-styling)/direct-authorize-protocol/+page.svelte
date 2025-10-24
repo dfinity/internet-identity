@@ -62,7 +62,7 @@
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
       {$t`Something went wrong`}
     </h1>
-    <p class="text-md text-text-tertiary mb-6 font-medium">
+    <p class="text-text-tertiary mb-6 text-base font-medium">
       <Trans>
         It seems like the connection with the service could not be established.
         Try a different browser; if the issue persists, contact support.

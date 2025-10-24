@@ -69,8 +69,8 @@
     {
       sm: iconOnly ? "size-9" : "h-9 gap-1.5 px-3 text-sm",
       md: iconOnly ? "size-10" : "h-10 gap-1.5 px-3.5 text-sm",
-      lg: iconOnly ? "size-11" : "text-md h-11 gap-2.5 px-4",
-      xl: iconOnly ? "size-12" : "text-md h-12 gap-2.5 px-4.5",
+      lg: iconOnly ? "size-11" : "h-11 gap-2.5 px-4 text-base",
+      xl: iconOnly ? "size-12" : "h-12 gap-2.5 px-4.5 text-base",
     }[size],
     className,
   ]}

@@ -59,7 +59,9 @@
   <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
     Add access method
   </h1>
-  <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
+  <p
+    class="text-text-tertiary text-base font-medium text-balance sm:text-center"
+  >
     Add another way to sign in with a passkey or third-party account for secure
     access.
   </p>

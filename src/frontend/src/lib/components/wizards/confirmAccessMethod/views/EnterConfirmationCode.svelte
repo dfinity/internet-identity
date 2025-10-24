@@ -53,18 +53,18 @@
   <h1 class="text-text-primary mb-3 text-2xl font-medium">
     {$t`Authorize new device`}
   </h1>
-  <p class="text-md text-text-tertiary mb-4 font-medium">
+  <p class="text-text-tertiary mb-4 text-base font-medium">
     <Trans>
       You're about to sign in on a <b class="text-text-primary">new device</b>.
     </Trans>
   </p>
-  <p class="text-md text-text-tertiary mb-4 font-medium">
+  <p class="text-text-tertiary mb-4 text-base font-medium">
     <Trans>
       Only enter the code from that device if you initiated this process
       <b class="text-text-primary">yourself</b>.
     </Trans>
   </p>
-  <p class="text-md text-text-tertiary mb-8 font-medium">
+  <p class="text-text-tertiary mb-8 text-base font-medium">
     <Trans>
       <b class="text-text-primary">Never</b> enter a code from another source.
     </Trans>

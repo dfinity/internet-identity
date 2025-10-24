@@ -39,7 +39,9 @@
     {$t`Simplify your sign-in`}
   </h1>
 
-  <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
+  <p
+    class="text-text-tertiary text-base font-medium text-balance sm:text-center"
+  >
     <Trans>
       Create an identity with a passkey, using biometrics or a security key.
       Your data never leaves your device.

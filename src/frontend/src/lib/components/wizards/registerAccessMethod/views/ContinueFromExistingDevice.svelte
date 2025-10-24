@@ -29,7 +29,7 @@
       {$t`Can't find your identity?`}
     </h1>
     <p
-      class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+      class="text-text-tertiary text-base font-medium text-balance sm:text-center"
     >
       <Trans>
         Use a device that already holds your identity to scan or open the URL.

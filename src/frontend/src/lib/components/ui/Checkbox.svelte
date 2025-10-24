@@ -25,7 +25,7 @@
 
 <label
   class={[
-    "flex w-max flex-row items-start",
+    "flex w-max max-w-full flex-row items-start",
     { sm: "gap-2", md: "gap-3" }[size],
     className,
   ]}
@@ -38,7 +38,7 @@
   />
   <div
     class={[
-      "relative flex items-center justify-center rounded-sm border",
+      "relative flex shrink-0 items-center justify-center rounded-sm border",
       "border-border-primary text-fg-primary-inversed bg-bg-primary",
       "hover:bg-bg-primary_hover",
       "peer-checked:bg-bg-brand-solid peer-checked:hover:bg-bg-brand-solid_hover peer-checked:border-none",
@@ -48,6 +48,7 @@
         sm: "size-4",
         md: "size-5",
       }[size],
+      (nonNullish(label) || nonNullish(hint)) && "mt-0.5",
       className,
     ]}
   >
@@ -73,7 +74,7 @@
         <p
           class={[
             "text-text-secondary font-medium select-none",
-            { sm: "text-sm", md: "text-md" }[size],
+            { sm: "text-sm", md: "text-base" }[size],
           ]}
         >
           {label}
@@ -83,7 +84,7 @@
         <p
           class={[
             "text-text-tertiary select-none",
-            { sm: "text-sm", md: "text-md" }[size],
+            { sm: "text-sm", md: "text-base" }[size],
           ]}
         >
           {hint}
