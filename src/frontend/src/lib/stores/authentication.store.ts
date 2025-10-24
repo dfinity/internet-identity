@@ -10,7 +10,6 @@ import {
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import { LazyHttpAgent } from "$lib/utils/lazyHttpAgent";
 import { createAnonymousNonce } from "$lib/utils/openID";
 
 export interface Authenticated {
@@ -40,7 +39,10 @@ const internalStore = writable<{
 
 export const authenticationStore: AuthenticationStore = {
   init: ({ canisterId, agentOptions }) => {
-    const agent = LazyHttpAgent.createLazy(agentOptions);
+    const agent = HttpAgent.createSync(agentOptions);
+    // Fetch subnet keys to speed up queries during authentication,
+    // this avoids having to fetch them later on user interaction.
+    void agent.fetchSubnetKeys(canisterId);
     const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
       agent,
       canisterId,

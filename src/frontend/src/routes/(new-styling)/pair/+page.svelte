@@ -48,7 +48,7 @@
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
       {$t`Unable to complete setup`}
     </h1>
-    <p class="text-md text-text-tertiary font-medium">
+    <p class="text-text-tertiary text-base font-medium">
       <Trans>
         Please go back to your <b class="text-text-primary">existing device</b>
         and choose <b class="text-text-primary">Start over</b> to try again.

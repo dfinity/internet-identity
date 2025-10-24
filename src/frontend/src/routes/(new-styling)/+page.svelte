@@ -208,11 +208,11 @@
         // Toggle summary icons
         "[&_details:not(:open)_summary_svg:last-child]:hidden [&_details:open_summary_svg:first-child]:hidden",
         // Paragraph styling and spacing
-        "[&_p]:text-text-md [&_p]:text-text-secondary [&_p_+_p]:mt-4",
+        "[&_p]:text-text-base [&_p]:text-text-secondary [&_p_+_p]:mt-4",
         // Paragraph + list spacing
         "[&_p_+_ul]:mt-4",
         // List styling and spacing
-        "[&_li]:text-text-md [&_li]:text-text-secondary [&_li_+_li]:mt-4",
+        "[&_li]:text-text-base [&_li]:text-text-secondary [&_li_+_li]:mt-4",
       ]}
     >
       <details>

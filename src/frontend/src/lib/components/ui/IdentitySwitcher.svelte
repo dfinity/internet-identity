@@ -41,7 +41,7 @@
 </script>
 
 <div class="mb-4 flex items-center">
-  <h2 class="text-text-primary text-md font-medium">{$t`Switch identity`}</h2>
+  <h2 class="text-text-primary text-base font-medium">{$t`Switch identity`}</h2>
   {#if nonNullish(onClose)}
     <Button
       onclick={onClose}
