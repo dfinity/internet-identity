@@ -181,11 +181,11 @@
         // Toggle summary icons
         "[&_details:not(:open)_summary_svg:first-child]:hidden [&_details:open_summary_svg:last-child]:hidden",
         // Paragraph styling and spacing
-        "[&_p]:text-base [&_p]:text-text-secondary [&_p]:mb-4",
+        "[&_p]:text-text-secondary [&_p]:mb-4 [&_p]:text-base",
         // Paragraph + list spacing
         "[&_ul]:mb-4",
         // List styling and spacing
-        "[&_li]:text-base [&_li]:text-text-secondary [&_li_+_li]:mt-4",
+        "[&_li]:text-text-secondary [&_li]:text-base [&_li_+_li]:mt-4",
       ]}
     >
       <details>
