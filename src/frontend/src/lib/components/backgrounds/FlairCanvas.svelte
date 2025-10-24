@@ -23,7 +23,6 @@
   import type { FlairCanvasProps, NodeMotion } from "./FlairCanvas";
   import { onMount } from "svelte";
   import * as easingFunctions from "svelte/easing";
-  import { nonNullish } from "@dfinity/utils";
 
   let {
     bgType = "dots",
@@ -54,12 +53,12 @@
     maskWaveOneWay = false,
     customColor,
     customColorMode,
+    containerHeight,
     triggerAnimation = $bindable(),
     clearAnimation = $bindable(),
   }: FlairCanvasProps = $props();
 
   // State for dynamic height during animations
-  let animationHeight = $state<string | null>(null);
   let defaultHeight = "h-full"; // Default height
 
   let backgroundRef = $state<HTMLDivElement>();
@@ -271,13 +270,7 @@
       size,
       nImpulses,
       impulseEasing,
-      containerHeight,
     } = opts;
-
-    // Check whether the container height needs to change for this animation.
-    if (nonNullish(containerHeight)) {
-      animationHeight = containerHeight;
-    }
 
     let easingFunction = impulseEasing
       ? easingFunctions[impulseEasing]
@@ -588,8 +581,6 @@
       }
 
       await Promise.all(promises);
-      // Reset animation height to default after animation is done
-      animationHeight = null;
     }
   };
 
@@ -856,7 +847,7 @@
 </script>
 
 <div
-  class={`${animationHeight ?? defaultHeight} absolute inset-0
+  class={`${containerHeight ?? defaultHeight} absolute inset-0
     -z-50 w-full select-none`}
   aria-hidden="true"
   bind:this={backgroundRef}
