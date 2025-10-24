@@ -29,7 +29,7 @@
 <h1 class="text-text-primary mb-3 text-2xl font-medium">
   {$t`Confirm your sign-in`}
 </h1>
-<p class="text-md text-text-tertiary mb-4 font-medium text-balance">
+<p class="text-text-tertiary mb-4 text-base font-medium text-balance">
   {#if nonNullish(name)}
     <Trans>
       You're signing in as <b class="text-text-primary">{name}</b>.
@@ -38,7 +38,7 @@
     <Trans>You're about to sign in.</Trans>
   {/if}
 </p>
-<p class="text-md text-text-tertiary mb-8 font-medium text-balance">
+<p class="text-text-tertiary mb-8 text-base font-medium text-balance">
   <Trans>
     To continue, create a passkey to secure your identity and simplify future
     sign-ins.

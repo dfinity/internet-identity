@@ -33,7 +33,7 @@
       <CircleAlertIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">{title}</h1>
-    <p class="text-md text-text-tertiary mb-6 font-medium">{description}</p>
+    <p class="text-text-tertiary mb-6 text-base font-medium">{description}</p>
     <Button onclick={() => window.close()} variant="secondary">
       <RotateCcwIcon class="size-4" />
       <span>{$t`Return to app`}</span>
@@ -47,7 +47,7 @@
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
       {$t`Authentication successful`}
     </h1>
-    <p class="text-md text-text-tertiary mb-6 font-medium">
+    <p class="text-text-tertiary mb-6 text-base font-medium">
       {$t`You may close this page.`}
     </p>
     <Button onclick={() => window.close()} variant="secondary">

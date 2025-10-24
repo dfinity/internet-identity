@@ -42,7 +42,9 @@
     <h1 class="text-text-primary mb-3 text-center text-2xl font-medium">
       {$t`Identity upgraded!`}
     </h1>
-    <p class="text-md text-text-tertiary text-center font-medium text-balance">
+    <p
+      class="text-text-tertiary text-center text-base font-medium text-balance"
+    >
       <Trans>
         You no longer need to remember your identity number and can use your
         fingerprint, face or screen lock instead.

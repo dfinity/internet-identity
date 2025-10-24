@@ -29,7 +29,7 @@
       {$t`Continue on another device`}
     </h1>
     <p
-      class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+      class="text-text-tertiary text-base font-medium text-balance sm:text-center"
     >
       <Trans>
         Scan the above QR code with your

@@ -14,7 +14,7 @@
   <div class="flex h-16 flex-1 items-center gap-4">
     <a href="/" class="flex items-center gap-4">
       <Logo class="text-fg-primary h-5.5" />
-      <h1 class="text-md text-text-primary hidden font-semibold sm:block">
+      <h1 class="text-text-primary hidden text-base font-semibold sm:block">
         Internet Identity
       </h1>
     </a>

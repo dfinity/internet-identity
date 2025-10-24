@@ -40,7 +40,7 @@
         {$t`What's your name?`}
       </h1>
       <p
-        class="text-md text-text-tertiary font-medium text-balance sm:text-center"
+        class="text-text-tertiary text-base font-medium text-balance sm:text-center"
       >
         <Trans>
           Give your identity a clear, simple, and memorable name you'll easily

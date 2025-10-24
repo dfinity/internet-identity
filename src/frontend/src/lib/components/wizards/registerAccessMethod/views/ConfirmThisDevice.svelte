@@ -33,7 +33,7 @@
   {$t`Confirm this device`}
 </h1>
 <p
-  class="text-md text-text-tertiary mb-8 font-medium sm:text-center sm:text-balance"
+  class="text-text-tertiary mb-8 text-base font-medium sm:text-center sm:text-balance"
 >
   <Trans>
     To confirm it's you, enter below code on your
