@@ -146,8 +146,8 @@ fn should_retain_config() {
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id).unwrap().related_origins,
-            config.related_origins
+            api::config(&env, canister_id).unwrap().archive_config,
+            config.archive_config
         );
     }
 }
