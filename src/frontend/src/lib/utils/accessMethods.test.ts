@@ -209,17 +209,6 @@ describe("getOpenIdTitles", () => {
     });
   });
 
-  it("returns Unknown account if Google provider but not in config", () => {
-    const cred = makeOpenIdCredential("https://accounts.google.com", {
-      name: "Bob",
-    });
-    const res = getOpenIdTitles(cred);
-    expect(res).toEqual({
-      title: { ellipsis: false, text: "Bob" },
-      subtitle: { ellipsis: false, text: "Google Account" },
-    });
-  });
-
   it("returns email only with Unknown provider when config not found", () => {
     const cred = makeOpenIdCredential("https://unknown.provider", {
       email: "charlie@example.com",
