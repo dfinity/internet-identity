@@ -36,7 +36,7 @@
   />
   <div
     class={[
-      ":not(peer-disabled):cursor-pointer shrink-0 rounded-full p-0.5 transition-colors duration-200",
+      "shrink-0 rounded-full p-0.5 transition-colors duration-200 peer-not-disabled:cursor-pointer",
       "bg-bg-quaternary",
       "peer-checked:bg-bg-brand-solid peer-checked:hover:bg-bg-brand-solid",
       "after:block after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200",

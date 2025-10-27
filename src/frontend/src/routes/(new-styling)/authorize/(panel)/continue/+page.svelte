@@ -396,7 +396,7 @@
         : handleEnableMultipleAccounts}
       label={$t`Enable multiple accounts`}
       size="sm"
-      disabled={isAuthenticatingDefault}
+      disabled={true || isAuthenticatingDefault}
     />
     <Tooltip
       label={$t`Multiple accounts`}
