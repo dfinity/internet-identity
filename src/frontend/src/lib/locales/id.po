@@ -31,7 +31,7 @@ msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Interne
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:420
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
-msgstr ""
+msgstr "<0>Integrasi Google, Apple, dan Microsoft:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami melihat tingkat putus registrasi sebesar 50%, menunjukkan kebutuhan akan metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami telah berintegrasi dengan Google, Apple, dan Microsoft sebagai opsi autentikasi alternatif."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:115
 msgid "<0>Learn more</0> about passkeys"
@@ -53,8 +53,8 @@ msgstr "<0>Tidak Perlu Nomor Identitas Lagi:</0> Seperti dijelaskan sebelumnya, 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integrasi Passkey Tanpa Hambatan:</0> Kami terus mendukung passkey sebagai masa depan autentikasi yang aman. Internet Identity 2.0 memanfaatkan standar passkey terbaru untuk keamanan dan kemudahan penggunaan yang lebih baik."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:75
-#: src/frontend/src/lib/components/views/EditAccount.svelte:87
+#: src/frontend/src/lib/components/views/EditAccount.svelte:77
+#: src/frontend/src/lib/components/views/EditAccount.svelte:89
 msgid "Account name"
 msgstr "Nama akun"
 
@@ -170,7 +170,7 @@ msgstr "Lanjutkan dengan {name}"
 msgid "Continue with passkey"
 msgstr "Lanjutkan dengan passkey"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:117
+#: src/frontend/src/lib/components/views/EditAccount.svelte:119
 msgid "Create account"
 msgstr "Buat akun"
 
@@ -191,7 +191,7 @@ msgstr "Buat identitas baru"
 msgid "Create passkey"
 msgstr "Buat passkey"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:113
+#: src/frontend/src/lib/components/views/EditAccount.svelte:115
 msgid "Creating account..."
 msgstr "Membuat akun..."
 
@@ -323,7 +323,7 @@ msgstr "Nomor identitas"
 msgid "Identity upgraded!"
 msgstr "Identitas ditingkatkan!"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:84
+#: src/frontend/src/lib/components/views/EditAccount.svelte:86
 msgid "In use on another account."
 msgstr "Digunakan di akun lain."
 
@@ -405,6 +405,10 @@ msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
 
+#: src/frontend/src/lib/components/views/EditAccount.svelte:68
+msgid "Label it by use (e.g. 'Work' or 'Demo')."
+msgstr "Beri label sesuai penggunaan (misalnya, 'Kantor' atau 'Demo')."
+
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
 msgid "Learn how to open links in your browser"
 msgstr "Pelajari cara membuka tautan di peramban Anda"
@@ -444,7 +448,7 @@ msgstr "Kelola identitas Anda dan tetap kendalikan aplikasi serta situs web Anda
 msgid "Manage your Internet Identity"
 msgstr "Kelola Internet Identity Anda"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:82
+#: src/frontend/src/lib/components/views/EditAccount.svelte:84
 msgid "Maximum length is 32 characters."
 msgstr "Panjang maksimum 32 karakter."
 
@@ -548,9 +552,13 @@ msgstr "Privasi nyata"
 msgid "Redirecting to the app"
 msgstr "Mengalihkan ke aplikasi..."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:69
+#: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename or make this your default sign-in"
 msgstr "Ubah nama atau jadikan ini metode masuk default Anda"
+
+#: src/frontend/src/lib/components/views/EditAccount.svelte:71
+msgid "Rename this account"
+msgstr "Ubah nama akun ini"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55
@@ -558,11 +566,11 @@ msgstr "Ubah nama atau jadikan ini metode masuk default Anda"
 msgid "Return to app"
 msgstr "Kembali ke aplikasi"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:117
+#: src/frontend/src/lib/components/views/EditAccount.svelte:119
 msgid "Save changes"
 msgstr "Simpan perubahan"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:113
+#: src/frontend/src/lib/components/views/EditAccount.svelte:115
 msgid "Saving changes..."
 msgstr "Menyimpan perubahan..."
 
@@ -578,7 +586,7 @@ msgstr "Akses tanpa hambatan"
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+#: src/frontend/src/lib/components/views/EditAccount.svelte:95
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
 
@@ -823,10 +831,6 @@ msgstr "Anda sedang meningkatkan ID <0>{identityNumber}</0>"
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
-
-#: src/frontend/src/lib/components/views/EditAccount.svelte:68
-msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
-msgstr "Anda dapat mengedit akun ini nanti. Beri label sesuai penggunaan (misalnya, 'Kantor' atau 'Demo')."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:51
 msgid "You may close this page."

@@ -53,8 +53,8 @@ msgstr "<0>No More Identity Numbers:</0> As explained above, discoverable passke
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:75
-#: src/frontend/src/lib/components/views/EditAccount.svelte:87
+#: src/frontend/src/lib/components/views/EditAccount.svelte:77
+#: src/frontend/src/lib/components/views/EditAccount.svelte:89
 msgid "Account name"
 msgstr "Account name"
 
@@ -170,7 +170,7 @@ msgstr "Continue with {name}"
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:117
+#: src/frontend/src/lib/components/views/EditAccount.svelte:119
 msgid "Create account"
 msgstr "Create account"
 
@@ -191,7 +191,7 @@ msgstr "Create new identity"
 msgid "Create passkey"
 msgstr "Create passkey"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:113
+#: src/frontend/src/lib/components/views/EditAccount.svelte:115
 msgid "Creating account..."
 msgstr "Creating account..."
 
@@ -323,7 +323,7 @@ msgstr "Identity number"
 msgid "Identity upgraded!"
 msgstr "Identity upgraded!"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:84
+#: src/frontend/src/lib/components/views/EditAccount.svelte:86
 msgid "In use on another account."
 msgstr "In use on another account."
 
@@ -405,6 +405,10 @@ msgstr "It seems like an invalid authentication request was received."
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 
+#: src/frontend/src/lib/components/views/EditAccount.svelte:68
+msgid "Label it by use (e.g. 'Work' or 'Demo')."
+msgstr "Label it by use (e.g. 'Work' or 'Demo')."
+
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
 msgid "Learn how to open links in your browser"
 msgstr "Learn how to open links in your browser"
@@ -444,7 +448,7 @@ msgstr "Manage your identities and stay in control of your apps and websites wit
 msgid "Manage your Internet Identity"
 msgstr "Manage your Internet Identity"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:82
+#: src/frontend/src/lib/components/views/EditAccount.svelte:84
 msgid "Maximum length is 32 characters."
 msgstr "Maximum length is 32 characters."
 
@@ -548,9 +552,13 @@ msgstr "Real Privacy"
 msgid "Redirecting to the app"
 msgstr "Redirecting to the app"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:69
+#: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename or make this your default sign-in"
 msgstr "Rename or make this your default sign-in"
+
+#: src/frontend/src/lib/components/views/EditAccount.svelte:71
+msgid "Rename this account"
+msgstr "Rename this account"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55
@@ -558,11 +566,11 @@ msgstr "Rename or make this your default sign-in"
 msgid "Return to app"
 msgstr "Return to app"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:117
+#: src/frontend/src/lib/components/views/EditAccount.svelte:119
 msgid "Save changes"
 msgstr "Save changes"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:113
+#: src/frontend/src/lib/components/views/EditAccount.svelte:115
 msgid "Saving changes..."
 msgstr "Saving changes..."
 
@@ -578,7 +586,7 @@ msgstr "Seamless Access"
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+#: src/frontend/src/lib/components/views/EditAccount.svelte:95
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
@@ -823,10 +831,6 @@ msgstr "You are upgrading ID <0>{identityNumber}</0>"
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "You can continue with <0>Use existing Passkey</0> in the login process."
-
-#: src/frontend/src/lib/components/views/EditAccount.svelte:68
-msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
-msgstr "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:51
 msgid "You may close this page."

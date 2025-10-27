@@ -53,8 +53,8 @@ msgstr "<0>Sin números de identidad:</0> Como se explica más arriba, las passk
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integración de passkey sin interrupciones:</0> Seguimos adoptando las passkeys como el futuro de la autenticación segura. Internet Identity 2.0 aprovecha los últimos estándares de passkey para mayor seguridad y facilidad de uso."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:75
-#: src/frontend/src/lib/components/views/EditAccount.svelte:87
+#: src/frontend/src/lib/components/views/EditAccount.svelte:77
+#: src/frontend/src/lib/components/views/EditAccount.svelte:89
 msgid "Account name"
 msgstr "Nombre de la cuenta"
 
@@ -170,7 +170,7 @@ msgstr "Continuar con {name}"
 msgid "Continue with passkey"
 msgstr "Continuar con passkey"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:117
+#: src/frontend/src/lib/components/views/EditAccount.svelte:119
 msgid "Create account"
 msgstr "Crear cuenta"
 
@@ -191,7 +191,7 @@ msgstr "Crear nueva identidad"
 msgid "Create passkey"
 msgstr "Crear passkey"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:113
+#: src/frontend/src/lib/components/views/EditAccount.svelte:115
 msgid "Creating account..."
 msgstr "Creando cuenta..."
 
@@ -323,7 +323,7 @@ msgstr "Número de identidad"
 msgid "Identity upgraded!"
 msgstr "¡Identidad actualizada!"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:84
+#: src/frontend/src/lib/components/views/EditAccount.svelte:86
 msgid "In use on another account."
 msgstr "En uso en otra cuenta."
 
@@ -405,6 +405,10 @@ msgstr "Parece que se recibió una solicitud de autenticación inválida."
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Parece que no se pudo establecer la conexión con el servicio. Prueba con otro navegador; si el problema persiste, contacta con el soporte."
 
+#: src/frontend/src/lib/components/views/EditAccount.svelte:68
+msgid "Label it by use (e.g. 'Work' or 'Demo')."
+msgstr "Etiquétala según su uso (p. ej., 'Trabajo' o 'Demo')."
+
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:59
 msgid "Learn how to open links in your browser"
 msgstr "Cómo abrir enlaces en tu navegador"
@@ -424,7 +428,7 @@ msgstr "Enlace copiado al portapapeles"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
-msgstr "Manten presionada la tecla de la página que abrió esta página."
+msgstr "Mantén presionada la tecla de la página que abrió esta página."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:129
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -444,7 +448,7 @@ msgstr "Administra tus identidades y mantén el control de tus aplicaciones y si
 msgid "Manage your Internet Identity"
 msgstr "Administra tu Internet Identity"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:82
+#: src/frontend/src/lib/components/views/EditAccount.svelte:84
 msgid "Maximum length is 32 characters."
 msgstr "Longitud máxima de 32 caracteres."
 
@@ -548,9 +552,13 @@ msgstr "Privacidad Verdadera"
 msgid "Redirecting to the app"
 msgstr "Redirigiendo a la app..."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:69
+#: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename or make this your default sign-in"
 msgstr "Renombra o establece como inicio de sesión predeterminado"
+
+#: src/frontend/src/lib/components/views/EditAccount.svelte:71
+msgid "Rename this account"
+msgstr "Renombra esta cuenta"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55
@@ -558,11 +566,11 @@ msgstr "Renombra o establece como inicio de sesión predeterminado"
 msgid "Return to app"
 msgstr "Volver a la app"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:117
+#: src/frontend/src/lib/components/views/EditAccount.svelte:119
 msgid "Save changes"
 msgstr "Guardar cambios"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:113
+#: src/frontend/src/lib/components/views/EditAccount.svelte:115
 msgid "Saving changes..."
 msgstr "Guardando cambios..."
 
@@ -578,7 +586,7 @@ msgstr "Acceso Senzillo"
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Selectiona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:93
+#: src/frontend/src/lib/components/views/EditAccount.svelte:95
 msgid "Set as default sign-in"
 msgstr "Establecer como inicio de sesión predeterminado"
 
@@ -823,10 +831,6 @@ msgstr "Estás actualizando el ID <0>{identityNumber}</0>"
 #: src/frontend/src/lib/components/wizards/migration/views/AlreadyMigrated.svelte:43
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Puedes continuar con <0>Usar Passkey existente</0> en el proceso de inicio de sesión."
-
-#: src/frontend/src/lib/components/views/EditAccount.svelte:68
-msgid "You can edit this account later. Label it by use (e.g. 'Work' or 'Demo')."
-msgstr "Puedes editar esta cuenta más tarde. Etiquétala según su uso (p. ej., 'Trabajo' o 'Demo')."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:51
 msgid "You may close this page."
