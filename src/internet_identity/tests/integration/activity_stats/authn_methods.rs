@@ -301,68 +301,6 @@ fn should_report_active_openid_authn_methods() {
     );
 }
 
-/// Tests that active Google authn_methods are counted correctly.
-/// TODO: Remove this once we remove Google specific OpenID implementation
-#[test]
-fn should_report_active_google_authn_methods() {
-    // Create II instance that mocks Google certs
-    let env = env();
-    let canister_id = google::setup_canister(&env);
-    api::init_salt(&env, canister_id).unwrap();
-
-    // OpenID test data and fetch Google certs (mock)
-    let (jwt, salt, _claims, test_time, test_principal, _test_authn_method) =
-        google::openid_test_data();
-    env.advance_time(Duration::from_millis(test_time) - Duration::from_nanos(time(&env)));
-
-    // Ensure stats are initially absent
-    assert!(
-        !get_metrics(&env, canister_id).contains("internet_identity_daily_active_authn_methods")
-    );
-
-    // Create account with Google OpenID
-    let identity_number =
-        create_identity_with_openid_credential(&env, canister_id, &jwt, &salt, test_principal);
-
-    // Get OpenID delegation principal
-    let delegation_principal = Principal::self_authenticating(
-        api::openid_prepare_delegation(
-            &env,
-            canister_id,
-            test_principal,
-            &jwt,
-            &salt,
-            &ByteBuf::from([0u8; 32]),
-        )
-        .unwrap()
-        .unwrap()
-        .user_key,
-    );
-
-    // Repeated activity within the same period should not increase the counter
-    api_v2::identity_info(&env, canister_id, delegation_principal, identity_number)
-        .unwrap()
-        .unwrap();
-
-    // Check daily stats, some activity is required first to update the stats
-    env.advance_time(Duration::from_secs(DAY_SECONDS));
-    create_identity_with_authn_method(&env, canister_id, &test_authn_method());
-    assert_metric(
-        &get_metrics(&env, canister_id),
-        "internet_identity_daily_active_authn_methods{type=\"openid\",issuer=\"https://accounts.google.com\"}",
-        1f64,
-    );
-
-    // Check monthly stats, some activity is required first to update the stats
-    env.advance_time(Duration::from_secs(MONTH_SECONDS - DAY_SECONDS));
-    create_identity_with_authn_method(&env, canister_id, &test_authn_method());
-    assert_metric(
-        &get_metrics(&env, canister_id),
-        "internet_identity_monthly_active_authn_methods{type=\"openid\",issuer=\"https://accounts.google.com\"}",
-        1f64,
-    );
-}
-
 fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
     let webauthn_authn_method = AuthnMethod::WebAuthn(WebAuthn {
         pubkey: ByteBuf::from("example pubkey"),
