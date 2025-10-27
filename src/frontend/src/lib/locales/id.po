@@ -31,7 +31,7 @@ msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Interne
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:420
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
-msgstr ""
+msgstr "<0>Integrasi Google, Apple, dan Microsoft:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami melihat tingkat putus registrasi sebesar 50%, menunjukkan kebutuhan akan metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami telah berintegrasi dengan Google, Apple, dan Microsoft sebagai opsi autentikasi alternatif."
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:115
 msgid "<0>Learn more</0> about passkeys"
@@ -558,7 +558,7 @@ msgstr "Ubah nama atau jadikan ini metode masuk default Anda"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename this account"
-msgstr ""
+msgstr "Ubah nama akun ini"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55

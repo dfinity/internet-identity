@@ -428,7 +428,7 @@ msgstr "Enlace copiado al portapapeles"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:36
 msgid "Long-press the link that opened this page."
-msgstr "Manten presionada la tecla de la página que abrió esta página."
+msgstr "Mantén presionada la tecla de la página que abrió esta página."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:129
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
@@ -558,7 +558,7 @@ msgstr "Renombra o establece como inicio de sesión predeterminado"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename this account"
-msgstr ""
+msgstr "Renombrar esta cuenta"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55
