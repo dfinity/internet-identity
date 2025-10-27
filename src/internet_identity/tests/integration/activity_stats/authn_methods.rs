@@ -1,7 +1,7 @@
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_openid_credential, test_authn_method,
 };
-use crate::{google, openid};
+use crate::openid;
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2;
