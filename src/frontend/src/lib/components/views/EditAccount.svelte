@@ -65,8 +65,10 @@
     </h1>
     <p class="text-text-tertiary mb-6 text-base font-medium">
       {isNullish(account)
-        ? $t`You can edit this account later. Label it by use (e.g. 'Work' or 'Demo').`
-        : $t`Rename or make this your default sign-in`}
+        ? $t`Label it by use (e.g. 'Work' or 'Demo').`
+        : showSetDefault
+          ? $t`Rename this account`
+          : $t`Rename or make this your default sign-in`}
     </p>
     <Input
       bind:element={inputRef}
