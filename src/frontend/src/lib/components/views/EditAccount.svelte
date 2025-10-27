@@ -67,8 +67,8 @@
       {isNullish(account)
         ? $t`Label it by use (e.g. 'Work' or 'Demo').`
         : showSetDefault
-          ? $t`Rename this account`
-          : $t`Rename or make this your default sign-in`}
+          ? $t`Rename or make this your default sign-in`
+          : $t`Rename this account`}
     </p>
     <Input
       bind:element={inputRef}

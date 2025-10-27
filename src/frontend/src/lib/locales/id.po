@@ -552,11 +552,11 @@ msgstr "Privasi nyata"
 msgid "Redirecting to the app"
 msgstr "Mengalihkan ke aplikasi..."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:71
+#: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename or make this your default sign-in"
 msgstr "Ubah nama atau jadikan ini metode masuk default Anda"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:70
+#: src/frontend/src/lib/components/views/EditAccount.svelte:71
 msgid "Rename this account"
 msgstr "Ubah nama akun ini"
 

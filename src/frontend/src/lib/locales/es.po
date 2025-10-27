@@ -552,11 +552,11 @@ msgstr "Privacidad Verdadera"
 msgid "Redirecting to the app"
 msgstr "Redirigiendo a la app..."
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:71
+#: src/frontend/src/lib/components/views/EditAccount.svelte:70
 msgid "Rename or make this your default sign-in"
 msgstr "Renombra o establece como inicio de sesión predeterminado"
 
-#: src/frontend/src/lib/components/views/EditAccount.svelte:70
+#: src/frontend/src/lib/components/views/EditAccount.svelte:71
 msgid "Rename this account"
 msgstr "Renombrar esta cuenta"
 
