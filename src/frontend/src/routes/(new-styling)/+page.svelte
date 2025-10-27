@@ -419,13 +419,14 @@
           <li>
             <Trans>
               <span class="text-text-primary font-semibold">
-                Google Integration:
+                Google, Apple and Microsoft Integrations:
               </span>
               While passkeys are becoming more mature, they are not yet mainstream
               for everyone. We've observed a 50% drop-off rate in our registration
               flow, indicating a need for alternative authentication methods. To
               make Internet Identity accessible to an even wider audience, we've
-              integrated Google as an alternative authentication option.
+              integrated with Google, Apple and Microsoft as alternative authentication
+              options.
             </Trans>
           </li>
         </ul>
