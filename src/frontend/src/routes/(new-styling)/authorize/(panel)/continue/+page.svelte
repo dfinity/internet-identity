@@ -104,8 +104,9 @@
           : defaultAccountNumber,
       );
     } catch (error) {
-      isAuthenticatingDefault = false;
       handleError(error);
+    } finally {
+      isAuthenticatingDefault = false;
     }
   };
   const handleContinueAs = async (
