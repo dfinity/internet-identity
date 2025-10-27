@@ -42,6 +42,7 @@
     AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER | null
   >(null);
   let accounts = $state<AccountInfo[]>();
+  let isAuthenticatingDefault = $state(false);
   let isMultipleAccountsEnabled = $state(false);
   // Clear old accounts data when user toggles switch off
   $effect(() => {
@@ -87,6 +88,7 @@
 
   const handleContinueDefault = async () => {
     try {
+      isAuthenticatingDefault = true;
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
@@ -102,6 +104,7 @@
           : defaultAccountNumber,
       );
     } catch (error) {
+      isAuthenticatingDefault = false;
       handleError(error);
     }
   };
@@ -338,8 +341,18 @@
     class="col-start-1 row-start-1 pb-6"
     in:fade={{ duration: 200, delay: 100 }}
   >
-    <Button onclick={handleContinueDefault} size="xl" class="w-full">
-      {$t`Continue`}
+    <Button
+      onclick={handleContinueDefault}
+      size="xl"
+      class="w-full"
+      disabled={isAuthenticatingDefault}
+    >
+      {#if isAuthenticatingDefault}
+        <ProgressRing />
+        <span>{$t`Authenticating...`}</span>
+      {:else}
+        <span>{$t`Continue`}</span>
+      {/if}
     </Button>
   </div>
 {/snippet}
@@ -382,6 +395,7 @@
         : handleEnableMultipleAccounts}
       label={$t`Enable multiple accounts`}
       size="sm"
+      disabled={isAuthenticatingDefault}
     />
     <Tooltip
       label={$t`Multiple accounts`}
