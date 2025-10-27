@@ -1,20 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   findConfig,
-  GOOGLE_ISSUER,
   issuerMatches,
   extractIssuerTemplateClaims,
 } from "./openID";
-import {
-  GoogleOpenIdConfig,
-  OpenIdConfig,
-} from "$lib/generated/internet_identity_types";
+import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { canisterConfig } from "$lib/globals";
 
 vi.mock("$lib/globals", () => ({
   canisterConfig: {
     openid_configs: [],
-    openid_google: [],
   },
 }));
 
@@ -186,11 +181,9 @@ const createOpenIDConfig = (issuer: string): OpenIdConfig => ({
 
 describe("findConfig", () => {
   const appleIssuer = "https://appleid.apple.com";
-  const googleCfg: GoogleOpenIdConfig = { client_id: "gid-123" };
 
   beforeEach(() => {
     canisterConfig.openid_configs = [];
-    canisterConfig.openid_google = [];
   });
 
   it("returns OpenID config when issuer matches in openid_configs", () => {
@@ -224,29 +217,9 @@ describe("findConfig", () => {
   });
 
   it("returns Apple config if issuer is Apple (from openid_configs)", () => {
-    canisterConfig.openid_google = [[googleCfg]];
     const appleConfig = createOpenIDConfig(appleIssuer);
     canisterConfig.openid_configs = [[appleConfig]];
     expect(findConfig(appleIssuer, [])).toBe(appleConfig);
-  });
-
-  it("returns Google config if issuer is Google and no matching openid_configs", () => {
-    canisterConfig.openid_google = [[googleCfg]];
-    canisterConfig.openid_configs = [];
-    expect(findConfig(GOOGLE_ISSUER, [])).toBe(googleCfg);
-  });
-
-  it("prefers openid_configs over Google config for Google issuer when both present", () => {
-    const googleOpenIdCfg = createOpenIDConfig(GOOGLE_ISSUER);
-    canisterConfig.openid_configs = [[googleOpenIdCfg]];
-    canisterConfig.openid_google = [[googleCfg]];
-    expect(findConfig(GOOGLE_ISSUER, [])).toBe(googleOpenIdCfg);
-  });
-
-  it("returns undefined for Google issuer when no Google config and no matching openid_configs", () => {
-    canisterConfig.openid_google = [];
-    canisterConfig.openid_configs = [];
-    expect(findConfig(GOOGLE_ISSUER, [])).toBeUndefined();
   });
 
   it("returns undefined when no issuer matches", () => {

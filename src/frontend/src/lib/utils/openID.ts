@@ -1,5 +1,4 @@
 import type {
-  GoogleOpenIdConfig,
   MetadataMapV2,
   OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
@@ -33,7 +32,6 @@ export interface RequestOptions {
   mediation?: CredentialMediationRequirement;
 }
 
-export const GOOGLE_ISSUER = "https://accounts.google.com";
 export const createGoogleRequestConfig = (clientId: string): RequestConfig => ({
   clientId,
   authURL: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -267,29 +265,18 @@ export const issuerMatches = (
  * afterwards, the users that used the generic OpenID configurations will still be able to log in.
  *
  * @param issuer The issuer to find the configuration for.
- * @returns {OpenIdConfig | GoogleOpenIdConfig | undefined} The configuration for the issuer.
+ * @returns {OpenIdConfig | undefined} The configuration for the issuer.
  */
 export const findConfig = (
   issuer: string,
   metadata: MetadataMapV2,
-): OpenIdConfig | GoogleOpenIdConfig | undefined => {
-  // First, try to find a match in the generic OpenID configurations
-  const fromConfigs = canisterConfig.openid_configs[0]?.find((config) =>
+): OpenIdConfig | undefined =>
+  canisterConfig.openid_configs[0]?.find((config) =>
     issuerMatches(config.issuer, issuer, metadata),
   );
-  if (nonNullish(fromConfigs)) {
-    return fromConfigs;
-  }
-  // Fallback to the Google configuration if the issuer matches Google's issuer
-  const googleConfig = canisterConfig.openid_google?.[0]?.[0];
-  if (nonNullish(googleConfig) && issuer === GOOGLE_ISSUER) {
-    return googleConfig;
-  }
-  return undefined;
-};
 
 export const isOpenIdConfig = (
-  config: GoogleOpenIdConfig | OpenIdConfig,
+  config: OpenIdConfig,
 ): config is OpenIdConfig => {
   return "auth_scope" in config;
 };
@@ -360,14 +347,7 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
 export const openIdLogo = (
   issuer: string,
   metadata: MetadataMapV2,
-): string | undefined => {
-  const config = findConfig(issuer, metadata);
-  if (nonNullish(config) && isOpenIdConfig(config)) {
-    return config.logo;
-  }
-  // If it's a google config or not found, return `undefined`
-  return undefined;
-};
+): string | undefined => findConfig(issuer, metadata)?.logo;
 
 /**
  * Return the name of the OpenID provider from the config.
@@ -378,11 +358,4 @@ export const openIdLogo = (
 export const openIdName = (
   issuer: string,
   metadata: MetadataMapV2,
-): string | undefined => {
-  const config = findConfig(issuer, metadata);
-  if (nonNullish(config) && isOpenIdConfig(config)) {
-    return config.name;
-  }
-  // If it's a google config or not found, return `undefined`
-  return undefined;
-};
+): string | undefined => findConfig(issuer, metadata)?.name;

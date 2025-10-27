@@ -73,11 +73,6 @@ export const DOMAIN_COMPATIBILITY = createFeatureFlagStore(
   true,
 );
 
-export const OPENID_AUTHENTICATION = createFeatureFlagStore(
-  "OPENID_AUTHENTICATION",
-  false,
-);
-
 export const HARDWARE_KEY_TEST = createFeatureFlagStore(
   "HARDWARE_KEY_TEST",
   false,
@@ -104,7 +99,6 @@ export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
 
 export default {
   DOMAIN_COMPATIBILITY,
-  OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   LARGE_GOOGLE_BUTTON,

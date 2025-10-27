@@ -6,9 +6,7 @@ use internet_identity_interface::internet_identity::types::CaptchaTrigger::{Dyna
 use internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::{
     CaptchaDisabled, CaptchaEnabled,
 };
-use internet_identity_interface::internet_identity::types::{
-    CaptchaConfig, InternetIdentityInit, OpenIdGoogleConfig,
-};
+use internet_identity_interface::internet_identity::types::{CaptchaConfig, InternetIdentityInit};
 
 #[test]
 fn should_init_default() {
@@ -181,9 +179,7 @@ fn should_retain_config() {
             canister_id,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                openid_google: Some(Some(OpenIdGoogleConfig {
-                    client_id: "https://example.com".into(),
-                })),
+                related_origins: Some(vec!["https://example.com".into()]),
                 ..Default::default()
             }),
         )

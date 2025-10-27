@@ -25,14 +25,6 @@ vi.mock("$lib/globals", () => ({
     new_flow_origins: [
       ["https://id.ai", "https://rdmx6-jaaaa-aaaah-qdrqq-cai.ic0.app"],
     ],
-    // Shape matches access in findConfig: openid_google?.[0]?.[0]
-    openid_google: [
-      [
-        {
-          client_id: "test-google-client-id",
-        },
-      ],
-    ],
     // Shape matches access in findConfig: openid_configs?.[0]?.find(...)
     openid_configs: [
       [

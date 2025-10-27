@@ -455,7 +455,6 @@ export interface GetIdAliasRequest {
   'relying_party' : FrontendHostname,
   'identity_number' : IdentityNumber,
 }
-export interface GoogleOpenIdConfig { 'client_id' : string }
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -636,7 +635,7 @@ export type IdentityPropertiesReplaceError = {
  * Each field is wrapped is `opt` to indicate whether the field should
  * keep the previous value or update to a new value (e.g. `null` keeps the previous value).
  * 
- * Some fields, like `openid_google`, have an additional nested `opt`, this indicates
+ * Some fields, like `analytics_config`, have an additional nested `opt`, this indicates
  * enable/disable status (e.g. `opt null` disables a feature while `null` leaves it untouched).
  */
 export interface InternetIdentityInit {
@@ -644,10 +643,6 @@ export interface InternetIdentityInit {
    * Configuration to fetch root key or not from frontend assets
    */
   'fetch_root_key' : [] | [boolean],
-  /**
-   * Configuration for OpenID Google client
-   */
-  'openid_google' : [] | [[] | [GoogleOpenIdConfig]],
   /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.

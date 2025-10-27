@@ -247,7 +247,7 @@ type CaptchaConfig = record {
 // Each field is wrapped is `opt` to indicate whether the field should
 // keep the previous value or update to a new value (e.g. `null` keeps the previous value).
 //
-// Some fields, like `openid_google`, have an additional nested `opt`, this indicates
+// Some fields, like `analytics_config`, have an additional nested `opt`, this indicates
 // enable/disable status (e.g. `opt null` disables a feature while `null` leaves it untouched).
 type InternetIdentityInit = record {
     // Set lowest and highest anchor
@@ -274,8 +274,6 @@ type InternetIdentityInit = record {
     // Configuration for New Origin Flows.
     // If present, list of origins using the new authentication flow.
     new_flow_origins : opt vec text;
-    // Configuration for OpenID Google client
-    openid_google : opt opt GoogleOpenIdConfig;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
     // Configuration for Web Analytics
@@ -361,10 +359,6 @@ type Sub = text;
 type Aud = text;
 type JWT = text;
 type Salt = blob;
-
-type GoogleOpenIdConfig = record {
-    client_id : text;
-};
 
 type OpenIdConfig = record {
     name : text;
