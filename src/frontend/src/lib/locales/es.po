@@ -226,7 +226,7 @@ msgstr "Editar cuenta"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:383
 msgid "Enable multiple accounts"
-msgstr "Activar múltiples cuentas"
+msgstr "Activar cuentas múltiples"
 
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:71
 msgid "Enter characters"
@@ -480,7 +480,7 @@ msgstr "Mi cuenta"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:64
 msgid "Name account"
-msgstr "Nombrar cuenta"
+msgstr "Añade una cuenta"
 
 #: src/frontend/src/lib/components/wizards/auth/views/CreatePasskey.svelte:60
 #: src/frontend/src/lib/components/wizards/migration/views/UpgradePasskey.svelte:59
@@ -550,7 +550,7 @@ msgstr "Redirigiendo a la app..."
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:69
 msgid "Rename or make this your default sign-in"
-msgstr "Renombrar o establecer como inicio de sesión predeterminado"
+msgstr "Renombra o establece como inicio de sesión predeterminado"
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:39
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:55
