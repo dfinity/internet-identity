@@ -180,10 +180,9 @@ fn compute_next_certs_fetch_delay<T, E>(
     result: &Result<T, E>,
     current_delay: Option<u64>,
 ) -> Option<u64> {
-    use std::cmp::{max, min};
-
-    const MAX_DELAY: u64 = FETCH_CERTS_INTERVAL;
     const MIN_DELAY: u64 = 60;
+    const MAX_DELAY: u64 = FETCH_CERTS_INTERVAL;
+    const MULTIPLIER: u64 = 2;
 
     match result {
         // Reset delay to None so default (`FETCH_CERTS_INTERVAL`) delay is used.
@@ -191,11 +190,12 @@ fn compute_next_certs_fetch_delay<T, E>(
         // Try again earlier with backoff if fetch failed, the HTTP outcall responses
         // aren't the same across nodes when we fetch at the moment of key rotation.
         //
-        // The delay should be at most `MAX_DELAY` and at minimum `MIN_DELAY` * 2.
-        Err(_) => Some(min(
-            MAX_DELAY,
-            max(MIN_DELAY, current_delay.unwrap_or(MIN_DELAY)) * 2,
-        )),
+        // The delay should be at most `MAX_DELAY` and at minimum `MIN_DELAY`.
+        Err(_) => Some(
+            current_delay
+                .map_or(MIN_DELAY, |d| d * MULTIPLIER)
+                .clamp(MIN_DELAY, MAX_DELAY),
+        ),
     }
 }
 
@@ -663,16 +663,28 @@ fn should_return_error_when_name_too_long() {
 }
 #[test]
 fn should_compute_next_certs_fetch_delay() {
+    const MIN_DELAY: u64 = 60;
+    const MAX_DELAY: u64 = FETCH_CERTS_INTERVAL;
+
     let success: Result<(), ()> = Ok(());
     let error: Result<(), ()> = Err(());
 
     for (current_delay, expected_next_delay_on_error) in [
-        (None, Some(120)),
-        (Some(0), Some(120)),
+        // Should be at least `MIN_DELAY` (1 minute)
+        (None, Some(MIN_DELAY)),
+        (Some(0), Some(MIN_DELAY)),
+        (Some(1), Some(MIN_DELAY)),
+        (Some(MIN_DELAY / 2 - 1), Some(MIN_DELAY)),
+        // Should be multiplied by two
+        (Some(MIN_DELAY / 2), Some(MIN_DELAY)),
+        (Some(MIN_DELAY / 2 + 1), Some(MIN_DELAY + 2)),
+        (Some(120), Some(240)),
         (Some(120), Some(240)),
         (Some(240), Some(480)),
-        (Some(480), Some(FETCH_CERTS_INTERVAL)),
-        (Some(FETCH_CERTS_INTERVAL * 2), Some(FETCH_CERTS_INTERVAL)),
+        // Should be at most `MAX_DELAY` (15 minutes)
+        (Some(480), Some(MAX_DELAY)),
+        (Some(MAX_DELAY / 2 + 1), Some(MAX_DELAY)),
+        (Some(MAX_DELAY * 2), Some(MAX_DELAY)),
     ] {
         assert_eq!(
             compute_next_certs_fetch_delay(&success, current_delay),
