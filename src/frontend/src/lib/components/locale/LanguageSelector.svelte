@@ -20,7 +20,7 @@
     class="uppercase"
   >
     {$localeStore}
-    <ChevronDownIcon size="1.25rem" />
+    <ChevronDownIcon class="size-5" />
   </Button>
 {/if}
 {#if isOpen}

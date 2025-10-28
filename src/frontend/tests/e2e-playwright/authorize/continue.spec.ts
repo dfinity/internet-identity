@@ -15,7 +15,9 @@ test("Authorize with last used identity", async ({ page }) => {
   const expectedPrincipal = await createIdentity(page, "John Doe", auth);
   const principal = await authorize(page, async (authPage) => {
     auth(authPage);
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
   expect(principal).toBe(expectedPrincipal);
 });
@@ -29,7 +31,9 @@ test("Authorize by switching to another identity", async ({ page }) => {
     await authPage.getByRole("button", { name: "Switch identity" }).click();
     await authPage.getByRole("button", { name: "John Doe" }).click();
     auth1(authPage);
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
   expect(principal).toBe(expectedPrincipal);
   expect(principal).not.toBe(otherPrincipal);
@@ -41,6 +45,9 @@ test("Authorize by creating a new identity", async ({ page }) => {
   const initialPrincipal = await createIdentity(page, "John Doe", auth1);
   const newIdentityPrincipal = await authorize(page, async (authPage) => {
     await createNewIdentityInII(authPage, "Jane Doe", auth2);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
   expect(newIdentityPrincipal).not.toBe(initialPrincipal);
 });
@@ -56,13 +63,15 @@ test("Authorize by signing in with a different passkey", async ({ page }) => {
       .getByRole("button", { name: "Use another identity" })
       .click();
     await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
+      .getByRole("button", { name: "Continue with passkey" })
       .click();
     auth1(authPage);
     await authPage
       .getByRole("button", { name: "Use existing identity" })
       .click();
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
   expect(principal).toBe(expectedPrincipal);
   expect(principal).not.toBe(otherPrincipal);
@@ -75,7 +84,9 @@ test("App logo appears when app is known", async ({ page }) => {
     await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
 
     auth(authPage);
-    await authPage.getByRole("button", { name: "Primary account" }).click();
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 });
 
@@ -91,7 +102,9 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       auth(authPage);
-      await authPage.getByRole("button", { name: "Primary account" }).click();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
     },
   );
 });

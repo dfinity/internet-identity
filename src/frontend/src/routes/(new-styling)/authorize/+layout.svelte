@@ -20,10 +20,10 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { page } from "$app/state";
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
+  import { t } from "$lib/stores/locale.store";
 
   const { children, data }: LayoutProps = $props();
 
@@ -40,29 +40,17 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
 
-  const gotoAccounts = () =>
-    goto("/authorize/account", {
-      replaceState: true,
-      invalidateAll: true,
-      state: { disableNavigationAnimation: true },
-    });
   const onSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
-
-    await gotoAccounts();
   };
   const onSignUp = async (identityNumber: bigint) => {
     toaster.success({
-      title: "You're all set. Your identity has been created.",
+      title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
-      closable: false,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void triggerDropWaveAnimation();
     isAuthDialogOpen = false;
-    await authorizationStore.authorize(undefined, 4000);
   };
   const onMigration = async () => {
     await goto("/authorize/upgrade-success");
@@ -84,6 +72,15 @@
       replaceState(next, {});
     }
   });
+
+  $effect(() => {
+    if (status === "orphan") {
+      goto("/unsupported", {
+        replaceState: true,
+        invalidateAll: true,
+      });
+    }
+  });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
@@ -98,7 +95,7 @@
         aria-label="Switch identity"
       >
         <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
-        <ChevronDownIcon size="1rem" />
+        <ChevronDownIcon class="size-4" />
       </Button>
       {#if isIdentityPopoverOpen}
         <Popover
@@ -143,10 +140,10 @@
             withinDialog
           >
             <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              Use another identity
+              {$t`Use another identity`}
             </h1>
             <p class="text-text-secondary mb-6 self-start text-sm">
-              choose method
+              {$t`choose method`}
             </p>
           </AuthWizard>
         </Dialog>
@@ -160,7 +157,7 @@
       <!-- Spinner is not shown for other statuses to avoid flicker -->
       <div class="flex flex-col items-center justify-center gap-4">
         <ProgressRing class="text-fg-primary size-14" />
-        <p class="text-text-secondary text-lg">Redirecting to the app</p>
+        <p class="text-text-secondary text-lg">{$t`Redirecting to the app`}</p>
       </div>
     {/if}
   </div>

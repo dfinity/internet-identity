@@ -4,8 +4,6 @@ import {
   PinIdentityMaterial,
   constructPinIdentity,
 } from "$lib/legacy/crypto/pinIdentity";
-import { OPENID_AUTHENTICATION } from "$lib/state/featureFlags";
-import { get } from "svelte/store";
 import { anyFeatures } from "$lib/legacy/features";
 import { idbStorePinIdentityMaterial } from "$lib/legacy/flows/pin/idb";
 import { registerDisabled } from "$lib/legacy/flows/registerDisabled";
@@ -23,7 +21,6 @@ import {
   InvalidAuthnMethod,
   InvalidCaller,
   LoginSuccess,
-  MissingGoogleClientId,
   NoRegistrationFlow,
   RateLimitExceeded,
   RegisterNoSpace,
@@ -42,7 +39,7 @@ import { tempKeyWarningBox } from "../manage/tempKeys";
 import { setPinFlow } from "../pin/setPin";
 import { precomputeFirst, promptCaptcha } from "./captcha";
 import { displayUserNumberWarmup } from "./finish";
-import { savePasskeyPinOrOpenID } from "./passkey";
+import { savePasskeyPin } from "./passkey";
 import {
   RegistrationEvents,
   registrationFunnel,
@@ -57,8 +54,6 @@ export const registerFlow = async ({
   registrationAllowed,
   pinAllowed,
   uaParser,
-  googleAllowed,
-  openidIdentityRegistrationFinish,
 }: {
   identityRegistrationStart: () => Promise<
     | RegistrationFlowStepSuccess
@@ -97,16 +92,6 @@ export const registerFlow = async ({
   registrationAllowed: { isAllowed: boolean; allowedOrigins: string[] };
   pinAllowed: () => Promise<boolean>;
   uaParser: PreloadedUAParser;
-  googleAllowed: boolean;
-  openidIdentityRegistrationFinish: () => Promise<
-    | LoginSuccess
-    | ApiError
-    | NoRegistrationFlow
-    | UnexpectedCall
-    | RegisterNoSpace
-    | InvalidAuthnMethod
-    | MissingGoogleClientId
-  >;
 }): Promise<
   | (LoginSuccess & { authnMethod: "passkey" | "pin" })
   | ApiError
@@ -117,7 +102,6 @@ export const registerFlow = async ({
   | InvalidCaller
   | AlreadyInProgress
   | RateLimitExceeded
-  | MissingGoogleClientId
   | "canceled"
 > => {
   if (!registrationAllowed.isAllowed) {
@@ -135,9 +119,8 @@ export const registerFlow = async ({
   // If we want to change it, we need to change this line.
   const deviceOrigin = window.location.origin;
   registrationFunnel.trigger(RegistrationEvents.Trigger);
-  const savePasskeyResult = await savePasskeyPinOrOpenID({
+  const savePasskeyResult = await savePasskeyPin({
     pinAllowed: await pinAllowed(),
-    googleAllowed,
     origin: deviceOrigin,
   });
   if (savePasskeyResult === "canceled") {
@@ -172,26 +155,6 @@ export const registerFlow = async ({
         finishSlot: tempKeyWarningBox({ i18n: new I18n() }),
         authnMethod: "pin" as const,
       };
-    } else if (savePasskeyResult === "google") {
-      const _startResult = await captchaIfNecessary(flowStart, checkCaptcha);
-      if (_startResult === "canceled") {
-        return "canceled";
-      } else if (_startResult.kind !== "registrationFlowStepSuccess") {
-        return _startResult;
-      }
-
-      const openIdResult = await withLoader(() => {
-        return openidIdentityRegistrationFinish();
-      });
-
-      if (openIdResult.kind === "loginSuccess") {
-        return {
-          ...openIdResult,
-          authnMethod: "google",
-        };
-      } else {
-        return openIdResult;
-      }
     } else {
       const identity = savePasskeyResult;
       // TODO: Return something meaningful if getting the passkey identity fails
@@ -221,22 +184,6 @@ export const registerFlow = async ({
 
   if (result_ === "canceled") {
     return "canceled";
-  } else if (
-    // if we have successfully authenticated with google
-    // the reason we have to return earlier is we don't actually
-    // get any authnMethodData - jwt etc is
-    "kind" in result_ &&
-    result_.kind === "loginSuccess" &&
-    result_.authnMethod === "google"
-  ) {
-    // for now we switch to passkey here so dapps don't know it's google
-    return { ...result_, authnMethod: "passkey" as const };
-  } else if ("kind" in result_ && result_.kind === "loginSuccess") {
-    // this branch is needed for typescript
-    return { ...result_, authnMethod: "passkey" as const };
-  } else if ("kind" in result_) {
-    // if openid returned some error
-    return result_;
   }
 
   const {
@@ -250,7 +197,7 @@ export const registerFlow = async ({
     authnMethodData: AuthnMethodData;
     finalizeIdentity?: (userNumber: bigint) => Promise<void>;
     finishSlot?: TemplateResult;
-    authnMethod: "pin" | "passkey" | "google";
+    authnMethod: "pin" | "passkey";
   } = result_;
 
   const startOrCaptchaResult = await captchaIfNecessary(
@@ -300,11 +247,9 @@ export type RegisterFlowOpts = Parameters<typeof registerFlow>[0];
 export const getRegisterFlowOpts = async ({
   connection,
   allowPinRegistration,
-  getGoogleClientId,
 }: {
   connection: Connection;
   allowPinRegistration: boolean;
-  getGoogleClientId: () => string | undefined;
 }): Promise<RegisterFlowOpts> => {
   // Kick-off fetching "ua-parser-js";
   const uaParser = loadUAParser();
@@ -336,14 +281,6 @@ export const getRegisterFlowOpts = async ({
       }),
     uaParser,
     storePinIdentity: idbStorePinIdentityMaterial,
-    googleAllowed:
-      get(OPENID_AUTHENTICATION) &&
-      (connection.canisterConfig?.openid_google?.[0]?.length ?? 0) > 0,
-    openidIdentityRegistrationFinish: () =>
-      connection.openid_identity_registration_finish(
-        getGoogleClientId,
-        tempIdentity,
-      ),
   };
 };
 

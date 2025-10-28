@@ -23,30 +23,28 @@
   });
 </script>
 
-{#if !$isMobile}
-  <FlairCanvas
-    spacing="medium"
-    aspect="ultrawide"
-    dotSize="small"
-    vignette="none"
-    visibility="maskwave"
-    maskWaveRampIn={0.001}
-    maskWaveRampOut={0.5}
-    maskWaveThickness="large"
-    maskWaveMinValue={0}
-    maskWaveSpeedMultiplier={2}
-    maskWavePauseValue={0.25}
-    maskWaveOneWay={true}
-    enableRandomPointSize
-    enableRandomOpacity={false}
-    pointSizeNoiseScale="medium"
-    pointSizeNoiseMultiplier="medium"
-    springOrTween={{
-      type: "spring",
-      stiffness: "medium",
-      dampening: "medium",
-    }}
-    bind:triggerAnimation
-    bind:clearAnimation
-  />
-{/if}
+<FlairCanvas
+  spacing="medium"
+  aspect="ultrawide"
+  dotSize="small"
+  vignette="none"
+  visibility="maskwave"
+  maskWaveRampIn={0.001}
+  maskWaveRampOut={0.5}
+  maskWaveThickness="large"
+  maskWaveMinValue={0}
+  maskWaveSpeedMultiplier={2}
+  maskWavePauseValue={0.25}
+  maskWaveOneWay={true}
+  enableRandomPointSize
+  enableRandomOpacity={false}
+  pointSizeNoiseScale="medium"
+  pointSizeNoiseMultiplier="medium"
+  springOrTween={{
+    type: "spring",
+    stiffness: "medium",
+    dampening: "medium",
+  }}
+  bind:triggerAnimation
+  bind:clearAnimation
+/>

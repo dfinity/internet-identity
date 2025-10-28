@@ -12,7 +12,6 @@ import {
   transformSignedDelegation,
   retryFor,
 } from "$lib/utils/utils";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { features } from "$lib/legacy/features";
 import { canisterConfig } from "$lib/globals";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
@@ -58,7 +57,7 @@ type AuthorizationStore = Readable<{
 }> & {
   init: (options: ProtocolOptions) => Promise<void>;
   authorize: (
-    accountNumber: bigint | undefined,
+    accountNumber: Promise<bigint | undefined> | bigint | undefined,
     artificialDelay?: number,
   ) => Promise<void>;
 };
@@ -69,7 +68,7 @@ const internalStore = writable<{
 }>({ status: "init" });
 
 let authorize: (
-  accountNumber: bigint | undefined,
+  accountNumber: Promise<bigint | undefined> | bigint | undefined,
   artificialDelay?: number,
 ) => Promise<void>;
 
@@ -107,27 +106,15 @@ export const authorizationStore: AuthorizationStore = {
         }
 
         return new Promise((resolve) => {
-          authorize = async (accountNumber, artificialDelay = 0) => {
+          authorize = async (
+            accountNumberMaybePromise,
+            artificialDelay = 0,
+          ) => {
             internalStore.update((value) => ({
               ...value,
               status: "authorizing",
             }));
             const { identityNumber, actor } = get(authenticatedStore);
-            // Only fetch and sync accounts if identity is actually stored
-            const syncLastUsedAccountsPromise = nonNullish(
-              get(lastUsedIdentitiesStore).identities[`${identityNumber}`],
-            )
-              ? actor
-                  .get_accounts(identityNumber, effectiveOrigin)
-                  .then(throwCanisterError)
-                  .then((accounts) =>
-                    lastUsedIdentitiesStore.syncLastUsedAccounts(
-                      identityNumber,
-                      effectiveOrigin,
-                      accounts,
-                    ),
-                  )
-              : Promise.resolve().then(() => []);
             const artificialDelayPromise = waitFor(
               features.DUMMY_AUTH ||
                 nonNullish(canisterConfig.dummy_auth[0]?.[0])
@@ -135,6 +122,7 @@ export const authorizationStore: AuthorizationStore = {
                 : artificialDelay,
             );
             try {
+              const accountNumber = await accountNumberMaybePromise;
               const { user_key, expiration } = await actor
                 .prepare_account_delegation(
                   identityNumber,
@@ -158,7 +146,6 @@ export const authorizationStore: AuthorizationStore = {
                   .then(throwCanisterError)
                   .then(transformSignedDelegation),
               );
-              await syncLastUsedAccountsPromise;
               await artificialDelayPromise;
               resolve({
                 kind: "success",

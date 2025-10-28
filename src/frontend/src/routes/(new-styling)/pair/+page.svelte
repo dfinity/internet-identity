@@ -9,12 +9,14 @@
   import { RegisterAccessMethodWizard } from "$lib/components/wizards/registerAccessMethod";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { toaster } from "$lib/components/utils/toaster";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   let isUnableToComplete = $state(false);
 
   const onRegistered = (identityNumber: bigint) => {
     toaster.success({
-      title: "You're all set. Your passkey has been registered.",
+      title: $t`You're all set. Your passkey has been registered.`,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     goto("/manage");
@@ -41,14 +43,16 @@
 {#if isUnableToComplete}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
-      <CircleAlertIcon size="1.5rem" />
+      <CircleAlertIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      Unable to complete setup
+      {$t`Unable to complete setup`}
     </h1>
-    <p class="text-md text-text-tertiary font-medium">
-      Please go back to your <b class="text-text-primary">existing device</b>
-      and choose <b class="text-text-primary">Start over</b> to try again.
+    <p class="text-text-tertiary text-base font-medium">
+      <Trans>
+        Please go back to your <b class="text-text-primary">existing device</b>
+        and choose <b class="text-text-primary">Start over</b> to try again.
+      </Trans>
     </p>
   </Dialog>
 {/if}

@@ -12,7 +12,6 @@ import {
 import {
   ActorSubclass,
   DerEncodedPublicKey,
-  SignIdentity,
   Signature,
 } from "@icp-sdk/core/agent";
 import { DelegationIdentity } from "@icp-sdk/core/identity";
@@ -66,7 +65,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
   assigned_user_number_range: [],
   canister_creation_cycles_cost: [],
   captcha_config: [],
-  openid_google: [],
   openid_configs: [],
   register_rate_limit: [],
   related_origins: [
@@ -817,149 +815,6 @@ describe("Connection.login", () => {
   });
 });
 
-// First define the mock values at the top level
-const mockJwt = "mock.jwt.token";
-const mockSalt = [1, 2, 3];
-const mockNonce = "mock-nonce";
-const mockName = "John Doe";
-
-// Mock the openID utilities
-vi.mock("$lib/utils/openID", () => ({
-  createAnonymousNonce: () =>
-    Promise.resolve({ nonce: mockNonce, salt: mockSalt }),
-  createGoogleRequestConfig: () => ({}),
-  requestJWT: () => Promise.resolve(mockJwt),
-  decodeJWT: () => ({ name: mockName }),
-}));
-
 vi.mock("$lib/templates/loader", () => ({
   withLoader: <T>(fn: () => Promise<T>) => fn(),
 }));
-
-describe("openid_identity_registration_finish", () => {
-  const mockIdentity = {
-    getPrincipal: () => ({ toString: () => "mock-principal" }),
-    getPublicKey: () => ({
-      toDer: () => new Uint8Array([1, 2, 3]).buffer,
-    }),
-    sign: () => Promise.resolve(new Uint8Array([4, 5, 6]).buffer),
-  } as unknown as SignIdentity;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should return MissingGoogleClientId when client ID is not provided", async () => {
-    const mockActor = {} as unknown as ActorSubclass<_SERVICE>;
-    const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
-    const getGoogleClientId = () => undefined;
-
-    const result = await connection.openid_identity_registration_finish(
-      getGoogleClientId,
-      mockIdentity,
-    );
-
-    expect(result).toEqual({ kind: "missingGoogleClientId" });
-  });
-
-  it("should handle successful registration", async () => {
-    const mockUserNumber = BigInt(12345);
-    const mockActor = {
-      openid_identity_registration_finish: vi.fn().mockResolvedValue({
-        Ok: { identity_number: mockUserNumber },
-      }),
-    } as unknown as ActorSubclass<_SERVICE>;
-
-    // Mock createActor to return our mockActor
-    const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
-    vi.spyOn(connection, "createActor").mockResolvedValue(mockActor);
-
-    const getGoogleClientId = () => "mock-client-id";
-
-    // Mock the fromJwt method
-    const mockAuthConnection = {} as AuthenticatedConnection;
-    vi.spyOn(connection, "fromJwt").mockResolvedValue(mockAuthConnection);
-
-    const result = await connection.openid_identity_registration_finish(
-      getGoogleClientId,
-      mockIdentity,
-    );
-
-    expect(result).toEqual({
-      kind: "loginSuccess",
-      connection: mockAuthConnection,
-      userNumber: mockUserNumber,
-      showAddCurrentDevice: false,
-    });
-    expect(mockActor.openid_identity_registration_finish).toHaveBeenCalledWith({
-      jwt: mockJwt,
-      salt: mockSalt,
-      name: mockName,
-    });
-  });
-
-  it("should handle API errors", async () => {
-    const mockError = new Error("API Error");
-    const mockActor = {
-      openid_identity_registration_finish: vi.fn().mockRejectedValue(mockError),
-    } as unknown as ActorSubclass<_SERVICE>;
-
-    const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
-    vi.spyOn(connection, "createActor").mockResolvedValue(mockActor);
-
-    const getGoogleClientId = () => "mock-client-id";
-
-    const result = await connection.openid_identity_registration_finish(
-      getGoogleClientId,
-      mockIdentity,
-    );
-
-    expect(result).toEqual({
-      kind: "apiError",
-      error: mockError,
-    });
-  });
-
-  it("should handle unknown errors", async () => {
-    const mockActor = {
-      openid_identity_registration_finish: vi
-        .fn()
-        .mockRejectedValue("Unknown error"),
-    } as unknown as ActorSubclass<_SERVICE>;
-
-    const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
-    vi.spyOn(connection, "createActor").mockResolvedValue(mockActor);
-
-    const getGoogleClientId = () => "mock-client-id";
-
-    const result = await connection.openid_identity_registration_finish(
-      getGoogleClientId,
-      mockIdentity,
-    );
-
-    expect(result).toEqual({
-      kind: "apiError",
-      error: new Error("Unknown error when registering"),
-    });
-  });
-
-  it("should handle registration errors", async () => {
-    const mockActor = {
-      openid_identity_registration_finish: vi.fn().mockResolvedValue({
-        Err: { NoRegistrationFlow: null },
-      }),
-    } as unknown as ActorSubclass<_SERVICE>;
-
-    const connection = new Connection("aaaaa-aa", DEFAULT_INIT, mockActor);
-    vi.spyOn(connection, "createActor").mockResolvedValue(mockActor);
-
-    const getGoogleClientId = () => "mock-client-id";
-
-    const result = await connection.openid_identity_registration_finish(
-      getGoogleClientId,
-      mockIdentity,
-    );
-
-    expect(result).toEqual({ kind: "noRegistrationFlow" });
-  });
-});

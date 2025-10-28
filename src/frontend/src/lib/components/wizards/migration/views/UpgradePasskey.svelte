@@ -1,26 +1,45 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import SmileyWritingIllustration from "$lib/components/illustrations/SmileyWritingIllustration.svelte";
+  import Badge from "$lib/components/ui/Badge.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { t } from "$lib/stores/locale.store";
+  import { waitFor } from "$lib/utils/utils";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import {
+    upgradeIdentityFunnel,
+    UpgradeIdentityEvents,
+  } from "$lib/utils/analytics/upgradeIdentityFunnel";
   import { Trans } from "$lib/components/locale";
+  import { t } from "$lib/stores/locale.store";
 
   interface Props {
-    create: (name: string) => Promise<void>;
+    upgrade: (name: string) => Promise<void | "cancelled">;
+    identityNumber: bigint;
   }
 
-  const { create }: Props = $props();
+  const { upgrade, identityNumber }: Props = $props();
+
+  onMount(() => {
+    upgradeIdentityFunnel.trigger(UpgradeIdentityEvents.CreatePasskeyScreen);
+  });
 
   let inputRef = $state<HTMLInputElement>();
   let name = $state("");
-  let isCreating = $state(false);
+  let isUpgrading = $state(false);
+  let isCancelled = $state(false);
 
   const handleCreate = async () => {
-    isCreating = true;
-    await create(name.trim());
-    isCreating = false;
+    isUpgrading = true;
+    const result = await upgrade(name.trim());
+    isUpgrading = false;
+
+    if (result === "cancelled") {
+      isCancelled = true;
+      await waitFor(4000);
+      isCancelled = false;
+    }
   };
 
   onMount(() => {
@@ -37,14 +56,14 @@
     </div>
     <div>
       <h1 class="mb-3 text-2xl font-medium sm:text-center">
-        {$t`What's your name?`}
+        {$t`Name your identity`}
       </h1>
       <p
         class="text-text-tertiary text-base font-medium text-balance sm:text-center"
       >
         <Trans>
-          Give your identity a clear, simple, and memorable name you'll easily
-          recognize.
+          Internet Identity <b>does not</b> store your biometric data. It stays on
+          your device. Your identity acts as a secure passkey manager.
         </Trans>
       </p>
     </div>
@@ -60,7 +79,7 @@
       autocomplete="off"
       autocorrect="off"
       spellcheck="false"
-      disabled={isCreating}
+      disabled={isUpgrading}
       error={name.length > 64
         ? $t`Maximum length is 64 characters.`
         : undefined}
@@ -70,20 +89,32 @@
         <Trans>You <b>cannot</b> rename this once it is set.</Trans>
       {/snippet}
     </Input>
-    <Button
-      onclick={handleCreate}
-      variant="primary"
-      size="lg"
-      type="submit"
-      disabled={name.length === 0 || name.length > 64 || isCreating}
+    <Tooltip
+      label="Interaction canceled. Please try again."
+      hidden={!isCancelled}
+      manual
     >
-      {#if isCreating}
-        <ProgressRing />
-        <span>{$t`Creating identity...`}</span>
-      {:else}
-        <span>{$t`Create identity`}</span>
-      {/if}
-    </Button>
+      <Button
+        onclick={handleCreate}
+        variant="primary"
+        size="lg"
+        type="submit"
+        disabled={name.length === 0 || name.length > 64 || isUpgrading}
+      >
+        {#if isUpgrading}
+          <ProgressRing />
+          <span>{$t`Upgrading identity...`}</span>
+        {:else}
+          <span>{$t`Upgrade identity`}</span>
+        {/if}
+      </Button>
+    </Tooltip>
+    <p class="text-text-secondary text-center text-xs">
+      <Trans>
+        You are upgrading ID
+        <Badge size="sm" class="ms-1">{identityNumber}</Badge>
+      </Trans>
+    </p>
   </div>
 </form>
 

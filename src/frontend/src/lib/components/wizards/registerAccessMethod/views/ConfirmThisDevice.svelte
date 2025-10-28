@@ -6,6 +6,8 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   interface Props {
     confirmationCode?: string;
@@ -28,31 +30,33 @@
 
 <ConfirmDeviceIllustration class="text-text-primary mt-4 mb-8 h-32" />
 <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-  Confirm this device
+  {$t`Confirm this device`}
 </h1>
 <p
-  class="text-md text-text-tertiary mb-8 font-medium sm:text-center sm:text-balance"
+  class="text-text-tertiary mb-8 text-base font-medium sm:text-center sm:text-balance"
 >
-  To confirm it's you, enter below code on your
-  <b class="text-text-primary">existing device</b>.
+  <Trans>
+    To confirm it's you, enter below code on your
+    <b class="text-text-primary">existing device</b>.
+  </Trans>
 </p>
 
-<Tooltip label="Code copied to clipboard" hidden={!copied} manual>
+<Tooltip label={$t`Code copied to clipboard`} hidden={!copied} manual>
   <Button
     onclick={handleCopyCode}
     variant="secondary"
     size="xl"
     disabled={isNullish(confirmationCode)}
-    aria-label="Confirmation code"
+    aria-label={$t`Confirmation code`}
   >
     {#if nonNullish(confirmationCode)}
       <span>
         {confirmationCode}
       </span>
-      <CopyIcon size="1.25rem" />
+      <CopyIcon class="size-5" />
     {:else}
       <ProgressRing />
-      <span>Generating code...</span>
+      <span>{$t`Generating code...`}</span>
     {/if}
   </Button>
 </Tooltip>

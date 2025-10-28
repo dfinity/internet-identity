@@ -30,6 +30,7 @@ test("Should allow valid message", async ({ page }) => {
 
   // Complete authentication in II popup
   await createNewIdentityInII(iiPage, "Test User", auth);
+  await iiPage.getByRole("button", { name: "Continue", exact: true }).click();
 
   // Wait for success notification in II
   await iiPage
@@ -98,6 +99,6 @@ test("Should show error after manually navigating to authorize url", async ({
 
   // Check for specific error message in II popup
   await expect(
-    page.getByRole("heading", { name: "Missing request" }),
+    page.getByRole("heading", { name: "Unsupported Browser" }),
   ).toBeVisible();
 });

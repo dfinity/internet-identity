@@ -1,16 +1,17 @@
 <script lang="ts">
   import type { ClassValue, HTMLInputAttributes } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
+  import type { Snippet } from "svelte";
 
   type Size = "sm" | "md";
 
   type Props = Omit<HTMLInputAttributes, "size"> & {
     element?: HTMLInputElement;
     label?: string;
-    hint?: string;
+    hint?: string | Snippet;
     inputClass?: ClassValue;
     size?: Size;
-    error?: string;
+    error?: string | Snippet;
     errorBorder?: boolean;
   };
 
@@ -42,7 +43,7 @@
       bind:value
       {...restProps}
       class={[
-        "text-md bg-bg-primary text-text-primary placeholder:text-text-placeholder flex-1 rounded-lg border border-none p-0 opacity-100 ring outline-none ring-inset not-dark:shadow-xs",
+        "bg-bg-primary text-text-primary placeholder:text-text-placeholder flex-1 rounded-lg border border-none p-0 text-base opacity-100 ring outline-none ring-inset not-dark:shadow-xs",
         errorBorder ? "ring-border-error_subtle" : "ring-border-secondary",
         "focus:ring-2",
         errorBorder ? "focus:ring-border-error" : "focus:ring-border-brand",
@@ -62,7 +63,19 @@
         nonNullish(error) ? "text-text-error-primary" : "text-text-tertiary",
       ]}
     >
-      {error ?? hint}
+      {#if nonNullish(error)}
+        {#if typeof error === "string"}
+          {error}
+        {:else}
+          {@render error()}
+        {/if}
+      {:else if nonNullish(hint)}
+        {#if typeof hint === "string"}
+          {hint}
+        {:else}
+          {@render hint()}
+        {/if}
+      {/if}
     </div>
   {/if}
 </div>

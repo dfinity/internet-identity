@@ -20,7 +20,7 @@ test("User can remove a passkey when they have multiple access methods", async (
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("link", { name: "Manage Identity" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
@@ -95,7 +95,7 @@ test("User cannot remove passkey if they only have one access method", async ({
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("link", { name: "Manage Identity" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
@@ -121,7 +121,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("link", { name: "Manage Identity" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
@@ -172,7 +172,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
 
   // Verify we're back at the login screen without selectable identity
   await expect(
-    page.getByRole("button", { name: "Continue with Passkey" }),
+    page.getByRole("button", { name: "Continue with passkey" }),
   ).toBeVisible();
 
   // Verify we're no longer at the dashboard
@@ -192,7 +192,7 @@ test("User can cancel passkey removal", async ({ page }) => {
   await clearStorage(page);
   await page.goto(II_URL);
   await page.getByRole("link", { name: "Manage Identity" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 

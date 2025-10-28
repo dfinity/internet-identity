@@ -134,7 +134,7 @@
         class="absolute top-2 right-2 z-2 !rounded-full"
         onclick={onClose}
       >
-        <XIcon size="1.25rem" />
+        <XIcon class="size-5" />
       </Button>
     {/if}
   </div>

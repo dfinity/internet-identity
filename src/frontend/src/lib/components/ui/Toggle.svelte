@@ -1,22 +1,19 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from "svelte/elements";
-  import { CheckIcon, MinusIcon } from "@lucide/svelte";
   import { nonNullish } from "@dfinity/utils";
 
   type Size = "sm" | "md";
 
   type Props = Omit<HTMLInputAttributes, "type" | "size"> & {
     size?: Size;
-    indeterminate?: boolean;
     label?: string;
     hint?: string;
   };
 
   let {
-    class: className,
     checked = $bindable(),
+    class: className,
     size = "md",
-    indeterminate,
     label,
     hint,
     ...props
@@ -35,39 +32,23 @@
     bind:checked
     type="checkbox"
     class="peer absolute z-1 h-1 w-1 opacity-0"
+    role="switch"
   />
   <div
     class={[
-      "relative flex shrink-0 items-center justify-center rounded-sm border",
-      "border-border-primary text-fg-primary-inversed bg-bg-primary",
-      "hover:bg-bg-primary_hover",
-      "peer-checked:bg-bg-brand-solid peer-checked:hover:bg-bg-brand-solid_hover peer-checked:border-none",
-      "peer-disabled:border-border-disabled peer-disabled:bg-bg-disabled_subtle peer-disabled:text-fg-disabled_subtle",
+      "shrink-0 rounded-full p-0.5 transition-colors duration-200 peer-not-disabled:cursor-pointer",
+      "bg-bg-quaternary",
+      "peer-checked:bg-bg-brand-solid peer-checked:hover:bg-bg-brand-solid",
+      "after:block after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200",
+      "dark:peer-checked:after:bg-fg-primary-inversed peer-checked:after:translate-x-[100%]",
+      "peer-disabled:bg-bg-disabled peer-disabled:after:bg-surface-light-50  dark:peer-disabled:after:bg-surface-dark-600",
       "peer-focus-visible:ring-focus-ring peer-focus-visible:ring-offset-bg-primary outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2",
       {
-        sm: "size-4",
-        md: "size-5",
+        sm: "h-5 w-9 after:size-4",
+        md: "h-6 w-11 after:size-5",
       }[size],
-      (nonNullish(label) || nonNullish(hint)) && "mt-0.5",
-      className,
     ]}
-  >
-    {#if checked}
-      {#if indeterminate}
-        <MinusIcon
-          size={{ sm: "0.75rem", md: "1rem" }[size]}
-          strokeWidth="0.2rem"
-          class="absolute top-1/2 left-1/2 -translate-1/2"
-        />
-      {:else}
-        <CheckIcon
-          size={{ sm: "0.75rem", md: "1rem" }[size]}
-          strokeWidth="0.2rem"
-          class="absolute top-1/2 left-1/2 -translate-1/2"
-        />
-      {/if}
-    {/if}
-  </div>
+  ></div>
   {#if nonNullish(label) || nonNullish(hint)}
     <div class="flex flex-col">
       {#if nonNullish(label)}

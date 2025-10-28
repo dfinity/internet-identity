@@ -104,13 +104,13 @@ export const createNewIdentityInII = async (
 ): Promise<void> => {
   // Wait for page to load
   await Promise.any([
-    page.getByRole("button", { name: "Continue with Passkey" }).waitFor(),
+    page.getByRole("button", { name: "Continue with passkey" }).waitFor(),
     page.getByRole("button", { name: "Switch identity" }).waitFor(),
   ]);
 
   // Check if we're on the continue screen or not
   const onContinueScreen = await page
-    .getByRole("button", { name: "Continue with Passkey" })
+    .getByRole("button", { name: "Continue with passkey" })
     .isHidden();
   if (onContinueScreen) {
     // If we're on the continue screen, go through the identity switcher
@@ -119,11 +119,11 @@ export const createNewIdentityInII = async (
   }
 
   // Create passkey identity
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   await page.getByRole("button", { name: "Create new identity" }).click();
   await page.getByLabel("Identity name").fill(name);
   dummyAuth(page);
-  await page.getByRole("button", { name: "Create Passkey" }).click();
+  await page.getByRole("button", { name: "Create identity" }).click();
 };
 
 /**
@@ -139,6 +139,11 @@ export const createIdentity = (
 ): Promise<string> =>
   authorize(page, async (authPage) => {
     await createNewIdentityInII(authPage, name, dummyAuth);
+
+    // Continue to dapp
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
   });
 
 /**
@@ -156,7 +161,7 @@ export const addPasskeyCurrentDevice = async (
   dummyAuth: DummyAuthFn,
 ): Promise<void> => {
   await page.getByRole("button", { name: "Add" }).click();
-  await page.getByRole("button", { name: "Continue with Passkey" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
   dummyAuth(page);
   await page.getByRole("button", { name: "Create Passkey" }).click();
 };

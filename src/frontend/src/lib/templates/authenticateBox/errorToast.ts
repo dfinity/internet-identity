@@ -77,14 +77,6 @@ const clarifyError: {
     title: "Unexpected call",
     message: `Unexpected call: expected next step "${err.nextStep.step}"`,
   }),
-  missingGoogleClientId: () => ({
-    title: "Google Sign-in unavailable",
-    message: "Sign in with Google accounts is currently unavailable.",
-  }),
-  googleLoginFailed: () => ({
-    title: "Google Sign-in failed",
-    message: "Failed to sign in with Google. Please try again.",
-  }),
 };
 
 export const flowErrorToastTemplate = <K extends FlowError["kind"]>(

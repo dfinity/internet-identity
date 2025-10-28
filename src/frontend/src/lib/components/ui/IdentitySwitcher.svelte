@@ -16,6 +16,7 @@
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
   import { canisterConfig } from "$lib/globals";
+  import { formatDate, t } from "$lib/stores/locale.store";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -40,7 +41,7 @@
 </script>
 
 <div class="mb-4 flex items-center">
-  <h2 class="text-text-primary text-md font-medium">Switch identity</h2>
+  <h2 class="text-text-primary text-base font-medium">{$t`Switch identity`}</h2>
   {#if nonNullish(onClose)}
     <Button
       onclick={onClose}
@@ -48,15 +49,21 @@
       size="sm"
       iconOnly
       class="ml-auto !rounded-full"
-      aria-label="Close"
+      aria-label={$t`Close`}
     >
-      <XIcon size="1.25rem" />
+      <XIcon class="size-5" />
     </Button>
   {/if}
 </div>
 <div class="mb-4 flex flex-col gap-1.5">
   <ul class="contents">
     {#each identities as identity}
+      {@const name = lastUsedIdentityTypeName(identity)}
+      {@const date = nonNullish(identity.createdAtMillis)
+        ? $formatDate(new Date(identity.createdAtMillis), {
+            dateStyle: "short",
+          })
+        : undefined}
       <li class="contents">
         <ButtonCard
           onclick={() => switchIdentity(identity.identityNumber)}
@@ -66,14 +73,18 @@
           ]}
         >
           <Avatar size="sm">
-            <UserIcon size="1.25rem" />
+            <UserIcon class="size-5" />
           </Avatar>
           <div class="flex flex-col text-left text-sm">
             <div class="text-text-primary font-semibold">
               {identity.name ?? identity.identityNumber}
             </div>
-            <div class="text-text-tertiary" aria-hidden="true">
-              {lastUsedIdentityTypeName(identity)}
+            <div class="text-text-tertiary font-normal" aria-hidden="true">
+              {#if nonNullish(date)}
+                <span>{$t`${name} | Created ${date}`}</span>
+              {:else}
+                <span>{name}</span>
+              {/if}
             </div>
           </div>
           {#if selected === identity.identityNumber}
@@ -93,17 +104,19 @@
     <FeaturedIcon size="sm">
       <!-- Design also uses smaller icon -->
       <!-- It looks better than the same size as the others -->
-      <UserPlusIcon size="1rem" />
+      <UserPlusIcon class="size-4" />
     </FeaturedIcon>
-    <span>Use another identity</span>
+    <span>{$t`Use another identity`}</span>
   </ButtonCard>
 </div>
 {#if onLogout}
-  <Button onclick={onLogout} variant="tertiary"
-    ><LogOutIcon size="1.25rem" />Sign Out</Button
-  >
+  <Button onclick={onLogout} variant="tertiary">
+    <LogOutIcon class="size-5" />
+    <span>{$t`Sign Out`}</span>
+  </Button>
 {:else if nonNullish(manageIdentityUrl)}
-  <Button href="/manage" target="_blank" variant="tertiary"
-    ><Settings size="1.25rem" />Manage Identity</Button
-  >
+  <Button href="/manage" target="_blank" variant="tertiary">
+    <Settings class="size-5" />
+    <span>{$t`Manage Identity`}</span>
+  </Button>
 {/if}

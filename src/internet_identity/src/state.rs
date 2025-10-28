@@ -113,8 +113,6 @@ pub struct PersistentState {
     pub related_origins: Option<Vec<String>>,
     // Configuration for New Flow Origins
     pub new_flow_origins: Option<Vec<String>>,
-    // Configuration for OpenID Google client
-    pub openid_google: Option<OpenIdGoogleConfig>,
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     // Configuration for Web Analytics tool
@@ -143,7 +141,6 @@ impl Default for PersistentState {
             captcha_config: DEFAULT_CAPTCHA_CONFIG,
             related_origins: None,
             new_flow_origins: None,
-            openid_google: None,
             openid_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,

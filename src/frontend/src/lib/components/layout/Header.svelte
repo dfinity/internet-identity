@@ -9,12 +9,15 @@
 
 <header
   {...props}
-  class={["flex items-center px-3 md:px-6 lg:px-8", className]}
+  class={[
+    "from-bg-primary flex items-center bg-gradient-to-b to-transparent px-3 md:px-6 lg:px-8",
+    className,
+  ]}
 >
   <div class="flex h-16 flex-1 items-center gap-4">
     <a href="/" class="flex items-center gap-4">
       <Logo class="text-fg-primary h-5.5" />
-      <h1 class="text-md text-text-primary hidden font-semibold sm:block">
+      <h1 class="text-text-primary hidden text-base font-semibold sm:block">
         Internet Identity
       </h1>
     </a>

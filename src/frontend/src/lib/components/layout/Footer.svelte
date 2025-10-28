@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
+  import { t } from "$lib/stores/locale.store";
 
   type Props = HTMLAttributes<HTMLElement>;
 
@@ -22,7 +23,7 @@
       rel="noopener"
       class="outline-0 focus-visible:underline"
     >
-      Support
+      {$t`Support`}
     </a>
     <a
       href={SOURCE_CODE_URL}
@@ -30,7 +31,7 @@
       rel="noopener"
       class="outline-0 focus-visible:underline"
     >
-      Source code
+      {$t`Source code`}
     </a>
   </nav>
 </footer>

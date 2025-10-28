@@ -1,10 +1,5 @@
 <script lang="ts">
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { onMount } from "svelte";
-  import {
-    clearDropWaveAnimation,
-    triggerDropWaveAnimation,
-  } from "$lib/utils/animation-dispatcher";
   import Button from "$lib/components/ui/Button.svelte";
   import TextFade from "$lib/components/ui/TextFade.svelte";
   import FullControlIllustration from "$lib/components/illustrations/landing/FullControlIllustration.svelte";
@@ -21,27 +16,59 @@
   import { t } from "$lib/stores/locale.store";
   import { LanguageSelector, Trans } from "$lib/components/locale";
   import { MinusCircleIcon, PlusCircleIcon } from "@lucide/svelte";
+  import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
+  import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
+  import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
 
   // Add rerouting back on this SSG route
   manuallyReroute();
 
-  // Only trigger the drop wave animation 100ms after the page has loaded,
-  // so we can cancel it if navigated to another route in that time window.
-  onMount(() => {
-    let cancelled = false;
-    setTimeout(() => {
-      if (!cancelled) {
-        void triggerDropWaveAnimation({ containerHeight: "h-[640px]" });
-      }
-    }, 100);
+  let triggerAnimation =
+    $state<(opts: FlairAnimationOptions) => Promise<void>>();
+  let clearAnimation = $state<() => void>();
+
+  $effect(() => {
+    triggerAnimation?.(DROP_WAVE_ANIMATION);
     return () => {
-      cancelled = true;
-      void clearDropWaveAnimation();
+      clearAnimation?.();
     };
   });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col">
+  <div class="sm absolute top-0 right-0 left-0 -z-1 h-[640px] max-md:hidden">
+    <!-- Render animation specific to landing page here instead of using global instance -->
+    <FlairCanvas
+      spacing="medium"
+      aspect="ultrawide"
+      dotSize="small"
+      vignette="none"
+      visibility="maskwave"
+      maskWaveRampIn={0.001}
+      maskWaveRampOut={0.5}
+      maskWaveThickness="large"
+      maskWaveMinValue={0}
+      maskWaveSpeedMultiplier={2}
+      maskWavePauseValue={0.25}
+      maskWaveOneWay={true}
+      enableRandomPointSize
+      enableRandomOpacity={false}
+      pointSizeNoiseScale="medium"
+      pointSizeNoiseMultiplier="medium"
+      springOrTween={{
+        type: "spring",
+        stiffness: "medium",
+        dampening: "medium",
+      }}
+      containerHeight="h-[640px]"
+      bind:triggerAnimation
+      bind:clearAnimation
+    />
+    <!-- This div fades out the bottom end of the background wave animation -->
+    <div
+      class="from-bg-primary pointer-events-none absolute right-0 bottom-0 left-0 h-[200px] bg-gradient-to-t to-transparent"
+    ></div>
+  </div>
   <div class="h-[env(safe-area-inset-top)]"></div>
   <LandingHeader class="w-full flex-col md:flex-row">
     <div
@@ -73,7 +100,7 @@
             $t`Real Privacy`,
             $t`Full Ownership`,
             $t`Seamless Access`,
-            $t`Internet Identity`,
+            "Internet Identity",
           ]}
           duration={500}
           delayBetween={2000}
@@ -171,21 +198,21 @@
         // Layout, spacing and dividers
         "divide-border-secondary mx-5 flex flex-1 flex-col divide-y-1",
         // Details padding
-        "[&_details]:pb-10",
+        "[&_details]:pb-6",
         // Summary layout
-        "[&_summary]:flex [&_summary]:flex-row [&_summary]:items-center [&_summary]:gap-4 [&_summary]:pt-10 [&_summary]:pb-1",
+        "[&_summary]:-mb-6 [&_summary]:flex [&_summary]:flex-row [&_summary]:items-center [&_summary]:gap-4 [&_summary]:py-10",
         // Summary styling
         "[&_summary]:text-text-primary [&_summary]:cursor-pointer [&_summary]:font-medium [&_summary]:select-none md:[&_summary]:text-xl",
         // Summary icons
         "[&_summary_svg]:text-text-placeholder [&_summary_svg]:ml-auto [&_summary_svg]:size-6 [&_summary_svg]:shrink-0",
         // Toggle summary icons
-        "[&_details:not(:open)_summary_svg:last-child]:hidden [&_details:open_summary_svg:first-child]:hidden",
+        "[&_details:not(:open)_summary_svg:first-child]:hidden [&_details:open_summary_svg:last-child]:hidden",
         // Paragraph styling and spacing
-        "[&_p]:text-text-md [&_p]:text-text-secondary [&_p_+_p]:mt-4",
+        "[&_p]:text-text-secondary [&_p]:mb-4 [&_p]:text-base",
         // Paragraph + list spacing
-        "[&_p_+_ul]:mt-4",
+        "[&_ul]:mb-4",
         // List styling and spacing
-        "[&_li]:text-text-md [&_li]:text-text-secondary [&_li_+_li]:mt-4",
+        "[&_li]:text-text-secondary [&_li]:text-base [&_li_+_li]:mt-4",
       ]}
     >
       <details>
@@ -392,13 +419,14 @@
           <li>
             <Trans>
               <span class="text-text-primary font-semibold">
-                Google Integration:
+                Google, Apple and Microsoft Integrations:
               </span>
               While passkeys are becoming more mature, they are not yet mainstream
               for everyone. We've observed a 50% drop-off rate in our registration
               flow, indicating a need for alternative authentication methods. To
               make Internet Identity accessible to an even wider audience, we've
-              integrated Google as an alternative authentication option.
+              integrated with Google, Apple and Microsoft as alternative authentication
+              options.
             </Trans>
           </li>
         </ul>

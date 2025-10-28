@@ -33,7 +33,9 @@
       Add a passkey
     {/if}
   </h1>
-  <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
+  <p
+    class="text-text-tertiary text-base font-medium text-balance sm:text-center"
+  >
     With passkeys, you can now use your fingerprint, face, or screen lock to
     quickly and securely confirm it’s really you.
   </p>

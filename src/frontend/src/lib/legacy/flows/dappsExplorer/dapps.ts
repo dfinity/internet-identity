@@ -6,7 +6,7 @@ import { features } from "$lib/legacy/features";
 import dappsJson from "./dapps.json" with { type: "json" };
 
 // This path should point to internet-identity/src/frontend/src/assets/icons/*
-const iconFiles = import.meta.glob("$lib/icons/*", {
+export const iconFiles = import.meta.glob("$lib/icons/*", {
   eager: true,
   query: "?url",
   import: "default",

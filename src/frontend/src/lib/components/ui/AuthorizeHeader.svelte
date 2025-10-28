@@ -17,32 +17,33 @@
   const dapp = $derived(dapps.find((dapp) => dapp.hasOrigin(origin)));
 </script>
 
-<div {...props} class={["flex flex-1 flex-col", className]}>
-  <div class="flex flex-1 flex-col items-center justify-center pt-5 pb-6">
-    <div
-      class={[
-        "mb-6 flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-        isNullish(dapp?.logoSrc) &&
-          "border-border-tertiary text-fg-primary bg-bg-primary border",
-      ]}
-    >
-      {#if nonNullish(dapp?.logoSrc)}
-        <img
-          src={dapp?.logoSrc}
-          alt={`${dapp?.name ?? origin} logo`}
-          class="h-16 max-w-50 object-contain"
-        />
-      {:else}
-        <div
-          class="flex size-16 items-center justify-center"
-          aria-hidden="true"
-        >
-          <GlobeIcon size="1.5rem" />
-        </div>
-      {/if}
-    </div>
-    <Badge size="sm" class="max-w-[75%]">
-      <Ellipsis text={hostname} position="middle" />
-    </Badge>
+<div
+  {...props}
+  class={[
+    "flex flex-1 flex-col items-center justify-center gap-6 py-5",
+    className,
+  ]}
+>
+  <div
+    class={[
+      "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
+      isNullish(dapp?.logoSrc) &&
+        "border-border-tertiary text-fg-primary bg-bg-primary border",
+    ]}
+  >
+    {#if nonNullish(dapp?.logoSrc)}
+      <img
+        src={dapp?.logoSrc}
+        alt={`${dapp?.name ?? origin} logo`}
+        class="h-16 max-w-50 object-contain"
+      />
+    {:else}
+      <div class="flex size-16 items-center justify-center" aria-hidden="true">
+        <GlobeIcon class="size-6" />
+      </div>
+    {/if}
   </div>
+  <Badge size="sm" class="max-w-[75%]">
+    <Ellipsis text={hostname} position="middle" />
+  </Badge>
 </div>

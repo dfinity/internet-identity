@@ -3,8 +3,6 @@ import type {
   DeviceWithUsage,
   IdentityAnchorInfo,
   OpenIdCredential,
-  OpenIdCredentialAddError,
-  OpenIdCredentialRemoveError,
 } from "$lib/generated/internet_identity_types";
 import identityCardBackground from "$lib/legacy/assets/identityCardBackground.png?url";
 import {
@@ -18,10 +16,7 @@ import { logoutSection } from "$lib/templates/logout";
 import { mainWindow } from "$lib/templates/mainWindow";
 import { toast } from "$lib/templates/toast";
 import { ENABLE_PIN_QUERY_PARAM_KEY, LEGACY_II_URL } from "$lib/config";
-import {
-  DOMAIN_COMPATIBILITY,
-  OPENID_AUTHENTICATION,
-} from "$lib/state/featureFlags";
+import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { addDevice } from "$lib/legacy/flows/addDevice/manage/addDevice";
 import { dappsExplorer } from "$lib/legacy/flows/dappsExplorer";
@@ -30,9 +25,6 @@ import {
   dappsHeader,
   dappsTeaser,
 } from "$lib/legacy/flows/dappsExplorer/teaser";
-import { confirmUnlinkAccount } from "$lib/legacy/flows/manage/confirmUnlinkAccount";
-import { linkedAccountsSection } from "$lib/legacy/flows/manage/linkedAccountsSection";
-import copyJson from "$lib/legacy/flows/manage/linkedAccountsSection.json";
 import {
   TempKeyWarningAction,
   tempKeyWarningBox,
@@ -54,13 +46,6 @@ import {
   bufferEqual,
 } from "$lib/utils/iiConnection";
 import { TemplateElement, renderPage } from "$lib/utils/lit-html";
-import {
-  createAnonymousNonce,
-  createGoogleRequestConfig,
-  decodeJWT,
-  isOpenIdCancelError,
-  requestJWT,
-} from "$lib/utils/openID";
 import { PreLoadImage } from "$lib/utils/preLoadImage";
 import {
   isProtected,
@@ -68,12 +53,7 @@ import {
   isRecoveryPhrase,
 } from "$lib/utils/recoveryDevice";
 import { userSupportsWebauthRoR } from "$lib/utils/rorSupport";
-import {
-  OmitParams,
-  isCanisterError,
-  shuffleArray,
-  unreachable,
-} from "$lib/utils/utils";
+import { OmitParams, shuffleArray, unreachable } from "$lib/utils/utils";
 import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
@@ -205,14 +185,10 @@ const displayManageTemplate = ({
   onRemoveDevice,
   addRecoveryPhrase,
   addRecoveryKey,
-  credentials,
-  onLinkAccount,
-  onUnlinkAccount,
   dapps,
   exploreDapps,
   identityBackground,
   tempKeysWarning,
-  currentCredential,
 }: {
   userNumber: bigint;
   devices: Devices;
@@ -220,14 +196,10 @@ const displayManageTemplate = ({
   onRemoveDevice: (device: DeviceWithUsage) => void;
   addRecoveryPhrase: () => void;
   addRecoveryKey: () => void;
-  credentials: OpenIdCredential[];
-  onLinkAccount: () => void;
-  onUnlinkAccount: (credential: OpenIdCredential) => void;
   dapps: KnownDapp[];
   exploreDapps?: () => void;
   identityBackground: PreLoadImage;
   tempKeysWarning?: TempKeyWarningAction;
-  currentCredential?: Pick<OpenIdCredential, "iss" | "sub">;
 }): TemplateResult => {
   // Nudge the user to add a passkey if there is none
   const warnNoPasskeys = authenticators.length === 0;
@@ -260,15 +232,6 @@ const displayManageTemplate = ({
       cleanupRecommended,
       i18n,
     })}
-    ${get(OPENID_AUTHENTICATION)
-      ? linkedAccountsSection({
-          credentials,
-          onLinkAccount,
-          onUnlinkAccount,
-          hasOtherAuthMethods: authenticators.length > 0,
-          currentCredential,
-        })
-      : ""}
     ${recoveryMethodsSection({
       recoveries,
       addRecoveryPhrase,
@@ -386,7 +349,7 @@ function isPinAuthenticated(
   );
 }
 
-export const displayManage = async (
+export const displayManage = (
   userNumber: bigint,
   connection: AuthenticatedConnection,
   devices_: DeviceWithUsage[],
@@ -394,19 +357,10 @@ export const displayManage = async (
   identityBackground: PreLoadImage,
 ): Promise<void | AuthenticatedConnection> => {
   const i18n = new I18n();
-  const copy = i18n.i18n(copyJson);
 
   // Fetch the dapps used in the teaser & explorer
   // (dapps are suffled to encourage discovery of new dapps)
   const dapps = shuffleArray(getDapps());
-
-  // Create anonymous nonce and salt for calling principal from connection
-  const { nonce, salt } = await createAnonymousNonce(
-    connection.delegationIdentity.getPrincipal(),
-  );
-
-  const googleClientId =
-    connection.canisterConfig.openid_google[0]?.[0]?.client_id;
 
   return new Promise((resolve) => {
     const devices = devicesFromDevicesWithUsage({
@@ -500,112 +454,6 @@ export const displayManage = async (
       resolve();
     };
 
-    const onLinkAccount = async () => {
-      if (isNullish(googleClientId)) {
-        toast.error(copy.linking_google_accounts_is_unavailable);
-        return;
-      }
-      try {
-        const jwt = await withLoader(() =>
-          requestJWT(createGoogleRequestConfig(googleClientId), {
-            mediation: "required",
-            nonce,
-          }),
-        );
-        const { iss, sub } = decodeJWT(jwt);
-        if (credentials.find((c) => c.iss === iss && c.sub === sub)) {
-          toast.error(copy.account_already_linked);
-          return;
-        }
-        await connection.addOpenIdCredential(jwt, salt);
-        resolve();
-      } catch (error) {
-        if (isOpenIdCancelError(error)) {
-          toast.error(copy.third_party_sign_in_permission_required);
-          return;
-        }
-        if (isCanisterError<OpenIdCredentialAddError>(error)) {
-          switch (error.type) {
-            case "Unauthorized":
-              toast.error(copy.authentication_failed);
-              console.error(
-                `Authentication unexpectedly failed: ${error
-                  .value(error.type)
-                  .toText()}`,
-              );
-              break;
-            case "JwtVerificationFailed":
-              toast.error(copy.jwt_signature_invalid);
-              break;
-            case "JwtExpired":
-              toast.error(copy.jwt_signature_invalid);
-              break;
-            case "OpenIdCredentialAlreadyRegistered":
-              toast.error(copy.account_already_linked);
-              break;
-            case "InternalCanisterError":
-              toast.error(`Unexpected error: ${error.value(error.type)}`);
-              break;
-            default: {
-              // Make sure all error cases are covered,
-              // else this will throw a TS error here.
-              const _ = error.type satisfies never;
-            }
-          }
-          return;
-        }
-        throw error;
-      }
-    };
-    const onUnlinkAccount = async (credential: OpenIdCredential) => {
-      const isCurrentCredential =
-        nonNullish(connection.credential) &&
-        credential.iss === connection.credential.iss &&
-        credential.sub === connection.credential.sub;
-      const action = await confirmUnlinkAccount({
-        i18n,
-        credential,
-        isCurrentCredential,
-      });
-      if (action === "cancelled") {
-        resolve();
-        return;
-      }
-      try {
-        await connection.removeOpenIdCredential(credential.iss, credential.sub);
-        if (isCurrentCredential) {
-          location.reload(); // Reload page to go back to sign in
-          return;
-        } else {
-          resolve();
-        }
-      } catch (error) {
-        if (isCanisterError<OpenIdCredentialRemoveError>(error)) {
-          switch (error.type) {
-            case "Unauthorized":
-              toast.error(copy.authentication_failed);
-              console.error(
-                `Authentication unexpectedly failed: ${error
-                  .value(error.type)
-                  .toText()}`,
-              );
-              break;
-            case "OpenIdCredentialNotFound":
-              toast.error(copy.account_not_found);
-              break;
-            case "InternalCanisterError":
-              toast.error(`Unexpected error: ${error.value(error.type)}`);
-              break;
-            default: {
-              // Make sure all error cases are covered,
-              // else this will throw a TS error here.
-              const _ = error.type satisfies never;
-            }
-          }
-        }
-      }
-    };
-
     // Function to figure out what temp keys warning should be shown, if any.
     const determineTempKeysWarning = (): TempKeyWarningAction | undefined => {
       if (!isPinAuthenticated(devices_, connection)) {
@@ -652,14 +500,10 @@ export const displayManage = async (
           await setupKey({ connection });
           resolve();
         },
-        credentials,
-        onLinkAccount,
-        onUnlinkAccount,
         dapps,
         exploreDapps: dappsExplorerEnabled ? onExploreDapps : undefined,
         identityBackground,
         tempKeysWarning: determineTempKeysWarning(),
-        currentCredential: connection.credential,
       });
 
     display();

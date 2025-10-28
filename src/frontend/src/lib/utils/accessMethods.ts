@@ -8,7 +8,7 @@ import { isSameOrigin } from "./urlUtils";
 import { canisterConfig } from "$lib/globals";
 import { authnMethodEqual } from "./webAuthn";
 import { LEGACY_II_URL } from "$lib/config";
-import { findConfig, getMetadataString, isOpenIdConfig } from "./openID";
+import { findConfig, getMetadataString } from "./openID";
 
 /**
  * Check if a `AuthnMethodData` or `OpenIdCredential` is a WebAuthn method
@@ -174,11 +174,7 @@ export const getOpenIdTitles = (
   const name = getOpenIdCredentialName(credential);
   const email = getOpenIdCredentialEmail(credential);
   const config = findConfig(credential.iss, credential.metadata);
-  const accountProvider = nonNullish(config)
-    ? isOpenIdConfig(config)
-      ? config.name
-      : "Google"
-    : "Unknown";
+  const accountProvider = nonNullish(config) ? config.name : "Unknown";
   if (nonNullish(name) && nonNullish(email)) {
     return {
       title: { ellipsis: false, text: name },

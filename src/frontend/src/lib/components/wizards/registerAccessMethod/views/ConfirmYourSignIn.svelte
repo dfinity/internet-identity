@@ -3,6 +3,8 @@
   import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   interface Props {
     name?: string;
@@ -25,22 +27,28 @@
 
 <PasskeyIllustration class="text-text-primary mt-4 mb-8 h-32" />
 <h1 class="text-text-primary mb-3 text-2xl font-medium">
-  Confirm your sign-in
+  {$t`Confirm your sign-in`}
 </h1>
-<p class="text-md text-text-tertiary mb-8 font-medium text-balance">
+<p class="text-text-tertiary mb-4 text-base font-medium text-balance">
   {#if nonNullish(name)}
-    You're signing in as <b class="text-text-primary">{name}</b>.
+    <Trans>
+      You're signing in as <b class="text-text-primary">{name}</b>.
+    </Trans>
   {:else}
-    You're about to sign in.
+    <Trans>You're about to sign in.</Trans>
   {/if}
-  <br /><br />
-  To continue, create a passkey to secure your identity and simplify future sign-ins.
+</p>
+<p class="text-text-tertiary mb-8 text-base font-medium text-balance">
+  <Trans>
+    To continue, create a passkey to secure your identity and simplify future
+    sign-ins.
+  </Trans>
 </p>
 <Button onclick={handleCreatePasskey} size="xl" disabled={isCreatingPasskey}>
   {#if isCreatingPasskey}
     <ProgressRing />
-    <span>Creating passkey...</span>
+    <span>{$t`Creating passkey...`}</span>
   {:else}
-    <span>Create passkey</span>
+    <span>{$t`Create passkey`}</span>
   {/if}
 </Button>

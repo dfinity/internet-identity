@@ -73,11 +73,6 @@ export const DOMAIN_COMPATIBILITY = createFeatureFlagStore(
   true,
 );
 
-export const OPENID_AUTHENTICATION = createFeatureFlagStore(
-  "OPENID_AUTHENTICATION",
-  false,
-);
-
 export const HARDWARE_KEY_TEST = createFeatureFlagStore(
   "HARDWARE_KEY_TEST",
   false,
@@ -85,11 +80,6 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
 
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
-  false,
-);
-
-export const AUTH_FLOW_UPDATES = createFeatureFlagStore(
-  "AUTH_FLOW_UPDATES",
   false,
 );
 
@@ -109,10 +99,8 @@ export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
 
 export default {
   DOMAIN_COMPATIBILITY,
-  OPENID_AUTHENTICATION,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
-  AUTH_FLOW_UPDATES,
   LARGE_GOOGLE_BUTTON,
   ENABLE_ALL_LOCALES,
 } as Record<string, FeatureFlagStore>;

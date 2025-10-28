@@ -1,5 +1,7 @@
 <script lang="ts">
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 </script>
 
 <div class="flex flex-col">
@@ -7,9 +9,13 @@
     <ProgressRing class="text-fg-primary size-14" />
   </div>
   <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-    Waiting for your existing device
+    {$t`Waiting for your existing device`}
   </h1>
-  <p class="text-md text-text-tertiary font-medium text-balance sm:text-center">
-    The <b class="text-text-primary">existing device</b> is preparing to continue.
+  <p
+    class="text-text-tertiary text-base font-medium text-balance sm:text-center"
+  >
+    <Trans>
+      The <b class="text-text-primary">existing device</b> is preparing to continue.
+    </Trans>
   </p>
 </div>

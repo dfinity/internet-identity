@@ -21,7 +21,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
   assigned_user_number_range: [],
   canister_creation_cycles_cost: [],
   captcha_config: [],
-  openid_google: [],
   openid_configs: [],
   register_rate_limit: [],
   related_origins: [],
@@ -130,17 +129,6 @@ const registerFlowOpts: RegisterFlowOpts = {
   },
   pinAllowed: () => Promise.resolve(false),
   uaParser: Promise.resolve(undefined),
-  googleAllowed: true,
-  openidIdentityRegistrationFinish: async () => {
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    return {
-      kind: "loginSuccess",
-      userNumber: BigInt(12356),
-      connection: mockConnection,
-      showAddCurrentDevice: false,
-      authnMethod: "google",
-    };
-  },
 } as const;
 
 export const iiFlows: Record<string, () => void> = {

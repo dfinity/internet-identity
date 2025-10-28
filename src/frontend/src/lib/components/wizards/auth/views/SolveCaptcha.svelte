@@ -3,6 +3,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { t } from "$lib/stores/locale.store";
 
   interface Props {
     image: string;
@@ -44,9 +45,11 @@
 
 <form class="flex flex-1 flex-col">
   <div class="mt-auto mb-6 flex flex-col gap-2">
-    <h1 class="text-text-primary text-2xl font-medium">Verify you are human</h1>
+    <h1 class="text-text-primary text-2xl font-medium">
+      {$t`Verify you are human`}
+    </h1>
     <p class="text-text-tertiary text-sm">
-      Type the characters exactly as shown below
+      {$t`Type the characters exactly as shown below`}
     </p>
   </div>
   <div
@@ -55,7 +58,7 @@
     <img
       src={image}
       class="h-30 w-55 mix-blend-darken dark:mix-blend-lighten dark:invert"
-      alt="CAPTCHA Characters"
+      alt={$t`CAPTCHA characters`}
     />
     <div
       class={"bg-text-primary absolute inset-0 mix-blend-lighten dark:mix-blend-darken"}
@@ -65,14 +68,14 @@
     bind:element={inputRef}
     bind:value={solution}
     disabled={loading}
-    placeholder="Enter characters"
+    placeholder={$t`Enter characters`}
     type="text"
     autocapitalize="none"
     autocomplete="off"
     spellcheck="false"
     class="mb-6"
-    hint="Characters are case-sensitive"
-    error={error ? "Incorrect. Try again with the new code." : undefined}
+    hint={$t`Characters are case-sensitive`}
+    error={error ? $t`Incorrect. Try again with the new code.` : undefined}
   />
   <Button
     onclick={handleSubmit}
@@ -82,9 +85,9 @@
   >
     {#if loading}
       <ProgressRing />
-      <span>Verifying...</span>
+      <span>{$t`Verifying...`}</span>
     {:else}
-      <span>Verify</span>
+      <span>{$t`Verify`}</span>
     {/if}
   </Button>
 </form>

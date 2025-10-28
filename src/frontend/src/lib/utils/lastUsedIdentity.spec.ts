@@ -7,7 +7,6 @@ const mockInternetIdentityInit = (
   overrides: Partial<InternetIdentityInit> = {},
 ): InternetIdentityInit => ({
   fetch_root_key: [],
-  openid_google: [],
   is_production: [],
   enable_dapps_explorer: [],
   assigned_user_number_range: [],
@@ -72,28 +71,10 @@ describe("lastUsedIdentityTypeName", () => {
     expect(result).toBe("Example Provider");
   });
 
-  it("returns 'Google' for OpenID when config found is GoogleConfig", () => {
-    // Arrange: provide Google config (GoogleOpenIdConfig) via canisterConfig
-    mockCanisterConfig = mockInternetIdentityInit({
-      openid_google: [[{ client_id: "google-client-id" }]],
-    });
-
-    const identity: LastUsedIdentity = {
-      identityNumber: BigInt(2),
-      authMethod: {
-        openid: { iss: "https://accounts.google.com", sub: "sub-2" },
-      },
-      lastUsedTimestampMillis: baseTimestamp,
-    };
-
-    const result = lastUsedIdentityTypeName(identity);
-    expect(result).toBe("Google");
-  });
-
   it("returns 'Unknown' for OpenID when issuer is not found", () => {
     // Arrange: no matching config in canisterConfig
     mockCanisterConfig = mockInternetIdentityInit({
-      // No openid_google and no openid_configs matching issuer
+      // No openid_configs matching issuer
       openid_configs: [
         [
           {

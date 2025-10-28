@@ -4,7 +4,7 @@
     MigrationFlow,
     WrongDomainError,
   } from "$lib/flows/migrationFlow.svelte";
-  import CreatePasskey from "$lib/components/wizards/auth/views/CreatePasskey.svelte";
+  import UpgradePasskey from "./views/UpgradePasskey.svelte";
   import EnterIdentityNumber from "./views/EnterIdentityNumber.svelte";
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import AlreadyMigrated from "./views/AlreadyMigrated.svelte";
@@ -47,7 +47,7 @@
     }
   };
 
-  const handleCreate = async (name: string): Promise<void | "cancelled"> => {
+  const handleUpgrade = async (name: string): Promise<void | "cancelled"> => {
     if (isNullish(migrationFlow.identityNumber)) {
       // Button is disabled if identityNumber is null or undefined so no need to manage that case.
       throw new Error("Identity number is undefined");
@@ -73,8 +73,8 @@
   <EnterIdentityNumber onSubmit={handleSubmit} />
   <!-- User can't move to this step if identityNumber is null or undefined so no need to manage that case. -->
 {:else if migrationFlow.view === "enterName" && nonNullish(migrationFlow.identityNumber)}
-  <CreatePasskey
-    create={handleCreate}
+  <UpgradePasskey
+    upgrade={handleUpgrade}
     identityNumber={migrationFlow.identityNumber}
   />
 {/if}

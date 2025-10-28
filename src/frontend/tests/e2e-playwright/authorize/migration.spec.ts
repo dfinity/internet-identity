@@ -68,7 +68,9 @@ test.describe("Migration from an app", () => {
 
         await authPage.getByLabel("Identity name").fill(TEST_USER_NAME);
         auth(authPage);
-        await authPage.getByRole("button", { name: "Create Passkey" }).click();
+        await authPage
+          .getByRole("button", { name: "Upgrade identity" })
+          .click();
       },
     );
     expect(legacyPrincipal).toEqual(migratedPrincipal);
@@ -82,7 +84,9 @@ test.describe("Migration from an app", () => {
           throw new Error("Credential or identity number not found");
         }
         auth(authPage);
-        await authPage.getByRole("button", { name: "Primary account" }).click();
+        await authPage
+          .getByRole("button", { name: "Continue", exact: true })
+          .click();
       },
     );
     expect(legacyPrincipal).toEqual(secondAuthPrincipal);
