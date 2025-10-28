@@ -686,10 +686,12 @@ fn should_compute_next_certs_fetch_delay() {
         (Some(MAX_DELAY / 2 + 1), Some(MAX_DELAY)),
         (Some(MAX_DELAY * 2), Some(MAX_DELAY)),
     ] {
+        // Should return `None` on success so default (`FETCH_CERTS_INTERVAL`) delay is used.
         assert_eq!(
             compute_next_certs_fetch_delay(&success, current_delay),
             None
         );
+        // Should return `expected_next_delay_on_error` on error as specified above.
         assert_eq!(
             compute_next_certs_fetch_delay(&error, current_delay),
             expected_next_delay_on_error
