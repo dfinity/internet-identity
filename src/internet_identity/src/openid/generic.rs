@@ -38,7 +38,6 @@ const HTTP_STATUS_OK: u8 = 200;
 
 // Fetch the certs every fifteen minutes, the responses are always
 // valid for a couple of hours so that should be enough margin.
-#[cfg(not(test))]
 const FETCH_CERTS_INTERVAL: u64 = 60 * 15; // 15 minutes in seconds
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
@@ -177,6 +176,29 @@ impl Provider {
     }
 }
 
+fn compute_next_certs_fetch_delay<T, E>(
+    result: &Result<T, E>,
+    current_delay: Option<u64>,
+) -> Option<u64> {
+    use std::cmp::{max, min};
+
+    const MAX_DELAY: u64 = FETCH_CERTS_INTERVAL;
+    const MIN_DELAY: u64 = 60;
+
+    match result {
+        // Reset delay to None so default (`FETCH_CERTS_INTERVAL`) delay is used.
+        Ok(_) => None,
+        // Try again earlier with backoff if fetch failed, the HTTP outcall responses
+        // aren't the same across nodes when we fetch at the moment of key rotation.
+        //
+        // The delay should be at most `MAX_DELAY` and at minimum `MIN_DELAY` * 2.
+        Err(_) => Some(min(
+            MAX_DELAY,
+            max(MIN_DELAY, current_delay.unwrap_or(MIN_DELAY)) * 2,
+        )),
+    }
+}
+
 #[cfg(not(test))]
 fn schedule_fetch_certs(
     jwks_uri: String,
@@ -185,26 +207,18 @@ fn schedule_fetch_certs(
 ) {
     use ic_cdk::spawn;
     use ic_cdk_timers::set_timer;
-    use std::cmp::{max, min};
     use std::time::Duration;
 
     set_timer(
         Duration::from_secs(delay.unwrap_or(FETCH_CERTS_INTERVAL)),
         move || {
             spawn(async move {
-                let new_delay = match fetch_certs(jwks_uri.clone()).await {
-                    Ok(certs) => {
-                        certs_reference.replace(certs);
-                        // Reset delay to None so default `FETCH_CERTS_INTERVAL` delay is used.
-                        None
-                    }
-                    // Try again earlier with backoff if fetch failed, the HTTP outcall responses
-                    // aren't the same across nodes when we fetch at the moment of key rotation.
-                    //
-                    // The delay should be at most `FETCH_CERTS_INTERVAL` and at minimum 60 * 2.
-                    Err(_) => Some(min(FETCH_CERTS_INTERVAL, max(60, delay.unwrap_or(60)) * 2)),
-                };
-                schedule_fetch_certs(jwks_uri, certs_reference, new_delay);
+                let result = fetch_certs(jwks_uri.clone()).await;
+                let next_delay = compute_next_certs_fetch_delay(&result, delay);
+                if let Ok(certs) = result {
+                    certs_reference.replace(certs);
+                }
+                schedule_fetch_certs(jwks_uri, certs_reference, next_delay);
             });
         },
     );
@@ -646,4 +660,27 @@ fn should_return_error_when_name_too_long() {
             "Name too long".into()
         ))
     );
+}
+#[test]
+fn should_compute_next_certs_fetch_delay() {
+    let success: Result<(), ()> = Ok(());
+    let error: Result<(), ()> = Err(());
+
+    for (current_delay, expected_next_delay_on_error) in [
+        (None, Some(120)),
+        (Some(0), Some(120)),
+        (Some(120), Some(240)),
+        (Some(240), Some(480)),
+        (Some(480), Some(FETCH_CERTS_INTERVAL)),
+        (Some(FETCH_CERTS_INTERVAL * 2), Some(FETCH_CERTS_INTERVAL)),
+    ] {
+        assert_eq!(
+            compute_next_certs_fetch_delay(&success, current_delay),
+            None
+        );
+        assert_eq!(
+            compute_next_certs_fetch_delay(&error, current_delay),
+            expected_next_delay_on_error
+        );
+    }
 }
