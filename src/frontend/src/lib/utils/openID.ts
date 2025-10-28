@@ -275,12 +275,6 @@ export const findConfig = (
     issuerMatches(config.issuer, issuer, metadata),
   );
 
-export const isOpenIdConfig = (
-  config: OpenIdConfig,
-): config is OpenIdConfig => {
-  return "auth_scope" in config;
-};
-
 /**
  * Request JWT token through FedCM with redirect in a popup as fallback
  * @param config of the OpenID provider
