@@ -20,17 +20,13 @@ import type {
   IdentityMetadataReplaceError,
   IdRegFinishError,
   InternetIdentityInit,
-  JWT,
   KeyType,
   MetadataMapV2,
-  OpenIdCredential,
   PreparedIdAlias,
   PublicKey,
   Purpose,
   RegistrationFlowNextStep,
-  Salt,
   SessionKey,
-  SignedDelegation,
   Timestamp,
   UserNumber,
   VerifyTentativeDeviceResponse,
@@ -43,18 +39,7 @@ import {
   IdentityMetadata,
   IdentityMetadataRepository,
 } from "$lib/legacy/repositories/identityMetadata";
-import {
-  createAnonymousNonce,
-  createGoogleRequestConfig,
-  decodeJWT,
-  requestJWT,
-} from "$lib/utils/openID";
-import {
-  CanisterError,
-  diagnosticInfo,
-  transformSignedDelegation,
-  unknownToString,
-} from "$lib/utils/utils";
+import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
 import {
   Actor,
   ActorSubclass,
@@ -146,8 +131,6 @@ export type RateLimitExceeded = { kind: "rateLimitExceeded" };
 export type AlreadyInProgress = { kind: "alreadyInProgress" };
 export type ApiError = { kind: "apiError"; error: Error };
 export type RegisterNoSpace = { kind: "registerNoSpace" };
-export type MissingGoogleClientId = { kind: "missingGoogleClientId" };
-export type GoogleLoginFailed = { kind: "googleLoginFailed" };
 export type NoSeedPhrase = { kind: "noSeedPhrase" };
 export type SeedPhraseFail = { kind: "seedPhraseFail" };
 export type WebAuthnFailed = { kind: "webAuthnFailed" };
@@ -355,65 +338,6 @@ export class Connection {
           userNumber,
           actor,
         ),
-        userNumber,
-        showAddCurrentDevice: false,
-      };
-    }
-
-    return this.handleIdentityFinishErrors(finishResponse);
-  };
-
-  openid_identity_registration_finish = async (
-    getGoogleClientId: () => string | undefined,
-    identity: SignIdentity,
-  ): Promise<
-    | LoginSuccess
-    | ApiError
-    | NoRegistrationFlow
-    | UnexpectedCall
-    | RegisterNoSpace
-    | InvalidAuthnMethod
-    | MissingGoogleClientId
-  > => {
-    const delegationIdentity = await this.requestFEDelegation(identity);
-    const actor = await this.createActor(delegationIdentity);
-    const googleClientId = getGoogleClientId();
-    const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
-
-    if (isNullish(googleClientId)) return { kind: "missingGoogleClientId" };
-
-    const googleRequestConfig = createGoogleRequestConfig(googleClientId);
-
-    const jwt = await requestJWT(googleRequestConfig, {
-      mediation: "required",
-      nonce,
-    });
-    const { name } = decodeJWT(jwt);
-
-    let finishResponse;
-    try {
-      finishResponse = await actor.openid_identity_registration_finish({
-        jwt,
-        salt,
-        name: name!, // Google JWT always has a name
-      });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        return { kind: "apiError", error };
-      } else {
-        return {
-          kind: "apiError",
-          error: new Error("Unknown error when registering"),
-        };
-      }
-    }
-
-    if ("Ok" in finishResponse) {
-      const userNumber = finishResponse.Ok.identity_number;
-
-      return {
-        kind: "loginSuccess",
-        connection: await this.fromJwt(jwt, salt, identity),
         userNumber,
         showAddCurrentDevice: false,
       };
@@ -796,90 +720,6 @@ export class Connection {
     );
     return DelegationIdentity.fromDelegation(sessionKey, chain);
   };
-
-  fromJwt = async (
-    jwt: JWT,
-    salt: Salt,
-    sessionIdentity: SignIdentity,
-  ): Promise<AuthenticatedConnection> => {
-    const retryGetJwtDelegation = async (
-      jwt: JWT,
-      salt: Salt,
-      sessionKey: SessionKey,
-      expiration: bigint,
-      actor: ActorSubclass<_SERVICE>,
-      maxRetries = 5,
-    ): Promise<SignedDelegation> => {
-      for (let i = 0; i < maxRetries; i++) {
-        // Linear backoff
-        await new Promise((resolve) => {
-          setInterval(resolve, 1000 * i);
-        });
-        const res = await actor.openid_get_delegation(
-          jwt,
-          salt,
-          sessionKey,
-          expiration,
-        );
-        if ("Err" in res) {
-          console.error(res.Err);
-          continue;
-        }
-
-        return res.Ok;
-      }
-      throw new Error(
-        `Failed to retrieve a delegation after ${maxRetries} retries.`,
-      );
-    };
-
-    let actor = await this.createActor(sessionIdentity);
-    const sessionKey = new Uint8Array(sessionIdentity.getPublicKey().toDer());
-
-    const prepareDelegationResponse = await actor.openid_prepare_delegation(
-      jwt,
-      salt,
-      sessionKey,
-    );
-
-    if ("Err" in prepareDelegationResponse)
-      throw new CanisterError(prepareDelegationResponse.Err);
-
-    const { anchor_number, expiration, user_key } =
-      prepareDelegationResponse.Ok;
-
-    const signedDelegation = await retryGetJwtDelegation(
-      jwt,
-      salt,
-      sessionKey,
-      expiration,
-      actor,
-    );
-
-    const transformedDelegation = transformSignedDelegation(signedDelegation);
-
-    const chain = DelegationChain.fromDelegations(
-      [transformedDelegation],
-      new Uint8Array(user_key),
-    );
-
-    const jwtSignedIdentity = DelegationIdentity.fromDelegation(
-      sessionIdentity,
-      chain,
-    );
-
-    actor = await this.createActor(jwtSignedIdentity);
-
-    return new AuthenticatedConnection(
-      this.canisterId,
-      this.canisterConfig,
-      sessionIdentity,
-      jwtSignedIdentity,
-      anchor_number,
-      actor,
-      decodeJWT(jwt),
-    );
-  };
 }
 
 export class AuthenticatedConnection extends Connection {
@@ -892,7 +732,6 @@ export class AuthenticatedConnection extends Connection {
     public delegationIdentity: DelegationIdentity,
     public userNumber: bigint,
     public actor?: ActorSubclass<_SERVICE>,
-    public credential?: Pick<OpenIdCredential, "iss" | "sub">,
   ) {
     super(canisterId, canisterConfig);
     const metadataGetter = async () => {
@@ -1182,21 +1021,6 @@ export class AuthenticatedConnection extends Connection {
 
     console.error("Unknown error", err);
     return { error: "internal_error" };
-  };
-
-  addOpenIdCredential = async (jwt: JWT, salt: Salt): Promise<void> => {
-    const actor = await this.getActor();
-    const res = await actor.openid_credential_add(this.userNumber, jwt, salt);
-    if ("Err" in res) throw new CanisterError(res.Err);
-  };
-
-  removeOpenIdCredential = async (iss: string, sub: string): Promise<void> => {
-    const actor = await this.getActor();
-    const res = await actor.openid_credential_remove(this.userNumber, [
-      iss,
-      sub,
-    ]);
-    if ("Err" in res) throw new CanisterError(res.Err);
   };
 
   getSignIdentityPubKey = (): DerEncodedPublicKey => {

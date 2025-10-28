@@ -1,6 +1,5 @@
 import { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-import { isNullish, nonNullish } from "@dfinity/utils";
-import { findConfig, isOpenIdConfig } from "./openID";
+import { findConfig } from "./openID";
 
 export const lastUsedIdentityTypeName = (
   lastUsedIdentity: LastUsedIdentity,
@@ -10,13 +9,7 @@ export const lastUsedIdentityTypeName = (
       lastUsedIdentity.authMethod.openid.iss,
       lastUsedIdentity.authMethod.openid.metadata ?? [],
     );
-    if (nonNullish(config) && isOpenIdConfig(config)) {
-      return config.name;
-    }
-    if (isNullish(config)) {
-      return "Unknown";
-    }
-    return "Google";
+    return config?.name ?? "Unknown";
   }
   if ("passkey" in lastUsedIdentity.authMethod) {
     return "Passkey";

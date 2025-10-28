@@ -13,7 +13,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { ArrowRightIcon } from "@lucide/svelte";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
-  import { decodeJWT, findConfig, isOpenIdConfig } from "$lib/utils/openID";
+  import { decodeJWT, findConfig } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import { t } from "$lib/stores/locale.store";
 
@@ -55,7 +55,7 @@
             { String: value! },
           ]),
         );
-        if (isNullish(config) || !isOpenIdConfig(config)) {
+        if (isNullish(config)) {
           return;
         }
         const result = await authFlow.continueWithOpenId(config, jwt);

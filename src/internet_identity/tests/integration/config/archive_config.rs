@@ -2,9 +2,7 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
-use internet_identity_interface::internet_identity::types::{
-    ArchiveConfig, InternetIdentityInit, OpenIdGoogleConfig,
-};
+use internet_identity_interface::internet_identity::types::{ArchiveConfig, InternetIdentityInit};
 
 #[test]
 fn should_init_default() {
@@ -142,16 +140,14 @@ fn should_retain_config() {
             canister_id,
             II_WASM.clone(),
             Some(InternetIdentityInit {
-                openid_google: Some(Some(OpenIdGoogleConfig {
-                    client_id: "https://example.com".into(),
-                })),
+                related_origins: Some(vec!["https://example.com".into()]),
                 ..Default::default()
             }),
         )
         .unwrap();
         assert_eq!(
-            api::config(&env, canister_id).unwrap().related_origins,
-            config.related_origins
+            api::config(&env, canister_id).unwrap().archive_config,
+            config.archive_config
         );
     }
 }

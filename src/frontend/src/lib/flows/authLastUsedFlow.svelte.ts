@@ -8,12 +8,7 @@ import {
   lastUsedIdentitiesStore,
   type LastUsedIdentity,
 } from "$lib/stores/last-used-identities.store";
-import {
-  createGoogleRequestConfig,
-  findConfig,
-  isOpenIdConfig,
-  requestJWT,
-} from "$lib/utils/openID";
+import { findConfig, requestJWT } from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
 import { isNullish } from "@dfinity/utils";
@@ -67,15 +62,13 @@ export class AuthLastUsedFlow {
             "OpenID authentication is not available for this account.",
           );
         }
-        const requestConfig = isOpenIdConfig(config)
-          ? {
-              issuer,
-              clientId: config.client_id,
-              configURL: config.fedcm_uri[0],
-              authURL: config.auth_uri,
-              authScope: config.auth_scope.join(" "),
-            }
-          : createGoogleRequestConfig(config.client_id);
+        const requestConfig = {
+          issuer,
+          clientId: config.client_id,
+          configURL: config.fedcm_uri[0],
+          authURL: config.auth_uri,
+          authScope: config.auth_scope.join(" "),
+        };
         const jwt = await requestJWT(requestConfig, {
           nonce: get(sessionStore).nonce,
           mediation: "optional",
@@ -90,7 +83,7 @@ export class AuthLastUsedFlow {
         await authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({
-          provider: isOpenIdConfig(config) ? config.name : "Google",
+          provider: config.name,
         });
         authenticationV2Funnel.trigger(AuthenticationV2Events.ContinueAsOpenID);
       } else {

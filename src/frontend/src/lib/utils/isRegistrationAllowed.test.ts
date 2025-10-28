@@ -16,7 +16,6 @@ describe("isRegistrationAllowed", () => {
       captcha_config: [],
       register_rate_limit: [],
       analytics_config: [],
-      openid_google: [],
       openid_configs: [],
       is_production: [],
       new_flow_origins: [],

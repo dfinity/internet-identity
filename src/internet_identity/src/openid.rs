@@ -12,15 +12,14 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, OpenIdGoogleConfig,
-    PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
+    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, PublicKey,
+    SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
 use std::{cell::RefCell, collections::HashMap};
 
 mod generic;
-mod google;
 
 const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
@@ -188,11 +187,6 @@ struct PartialClaims {
 
 thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
-}
-
-pub fn setup_google(config: OpenIdGoogleConfig) {
-    PROVIDERS
-        .with_borrow_mut(|providers| providers.push(Box::new(google::Provider::create(config))));
 }
 
 pub fn setup(configs: Vec<OpenIdConfig>) {
