@@ -115,7 +115,16 @@ test.describe("First visit", () => {
       .getByRole("heading", { level: 1, name: "Continue on your new device" })
       .waitFor();
 
-    // Switch to new device and register new passkey
+    // Switch to new device and navigate to access methods
+    const newMenuButton = newDevicePage.getByRole("button", {
+      name: "Open menu",
+    });
+    if (await newMenuButton.isVisible()) {
+      await newMenuButton.click();
+    }
+    await newDevicePage.getByRole("link", { name: "Access methods" }).click();
+
+    // Register new passkey
     await newDevicePage
       .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
       .waitFor();
@@ -126,10 +135,19 @@ test.describe("First visit", () => {
       .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
       .waitFor({ state: "hidden" });
 
-    // Switch to existing device and verify we have two passkeys
+    // Switch to existing device, navigate to access methods and verify we have two passkeys
     await existingDevicePage
       .getByRole("heading", { level: 1, name: "Continue on your new device" })
       .waitFor({ state: "hidden" });
+    const existingMenuButton = existingDevicePage.getByRole("button", {
+      name: "Open menu",
+    });
+    if (await existingMenuButton.isVisible()) {
+      await existingMenuButton.click();
+    }
+    await existingDevicePage
+      .getByRole("link", { name: "Access methods" })
+      .click();
     await expect(existingDevicePage.getByText("Chrome")).toHaveCount(2);
 
     // Switch to new device and verify we are signed in
