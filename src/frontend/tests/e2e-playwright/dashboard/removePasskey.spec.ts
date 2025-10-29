@@ -85,12 +85,7 @@ test("User can remove a passkey when they have multiple access methods", async (
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Verify we're still logged in and at the dashboard
-  await expect(page).toHaveURL(II_URL + "/manage");
-  await expect(
-    page.getByRole("heading", {
-      name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
-    }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(II_URL + "/manage/access");
 });
 
 test("User cannot remove passkey if they only have one access method", async ({
@@ -272,10 +267,5 @@ test("User can cancel passkey removal", async ({ page }) => {
   await expect(page.getByText("Chrome")).toHaveCount(2);
 
   // Verify we're still logged in and at the dashboard
-  await expect(page).toHaveURL(II_URL + "/manage");
-  await expect(
-    page.getByRole("heading", {
-      name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
-    }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(II_URL + "/manage/access");
 });

@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:310
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:314
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
@@ -53,12 +53,17 @@ msgstr "<0>Tidak Perlu Nomor Identitas Lagi:</0> Seperti dijelaskan sebelumnya, 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integrasi Passkey Tanpa Hambatan:</0> Kami terus mendukung passkey sebagai masa depan autentikasi yang aman. Internet Identity 2.0 memanfaatkan standar passkey terbaru untuk keamanan dan kemudahan penggunaan yang lebih baik."
 
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:207
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:8
+msgid "Access methods"
+msgstr ""
+
 #: src/frontend/src/lib/components/views/EditAccount.svelte:77
 #: src/frontend/src/lib/components/views/EditAccount.svelte:89
 msgid "Account name"
 msgstr "Nama akun"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:326
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:330
 msgid "Add another account"
 msgstr "Tambah akun lain"
 
@@ -69,6 +74,7 @@ msgstr "Manajemen identitas tingkat lanjut"
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:66
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:68
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:100
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:353
 msgid "Authenticating..."
 msgstr "Mengautentikasi..."
 
@@ -80,7 +86,7 @@ msgstr "Autentikasi berhasil"
 msgid "Authorize new device"
 msgstr "Otorisasi perangkat baru"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:388
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:403
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Dengan mengaktifkan fitur ini, Anda dapat membuat lebih dari satu akun untuk satu aplikasi. Beralih antar akun dengan mudah (misalnya, kantor, pribadi, atau demo)."
 
@@ -96,7 +102,7 @@ msgstr "Karakter CAPTCHA"
 msgid "Characters are case-sensitive"
 msgstr "Karakter membedakan huruf besar/kecil"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:305
 msgid "Choose an account"
 msgstr "Pilih akun"
 
@@ -106,6 +112,7 @@ msgstr "pilih identitas untuk melanjutkan"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:148
 msgid "choose method"
 msgstr "pilih metode"
 
@@ -116,6 +123,10 @@ msgstr "Pilih metode"
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
 msgstr "Tutup"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:175
+msgid "Close menu"
+msgstr ""
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:44
 msgid "Code copied to clipboard"
@@ -146,7 +157,7 @@ msgid "Connection closed"
 msgstr "Koneksi terputus"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:102
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:342
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:355
 msgid "Continue"
 msgstr "Lanjutkan"
 
@@ -161,7 +172,7 @@ msgstr "Lanjutkan di perangkat baru Anda"
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:71
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:90
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:138
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:272
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:276
 msgid "Continue with {name}"
 msgstr "Lanjutkan dengan {name}"
 
@@ -204,7 +215,7 @@ msgstr "Membuat identitas..."
 msgid "Creating passkey..."
 msgstr "Membuat passkey..."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:278
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:282
 msgid "Default"
 msgstr "Default"
 
@@ -216,7 +227,7 @@ msgstr "Passkey yang dapat ditemukan"
 msgid "Easy access"
 msgstr "Akses mudah"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:288
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:292
 msgid "Edit {name}"
 msgstr "Edit {name}"
 
@@ -224,7 +235,7 @@ msgstr "Edit {name}"
 msgid "Edit account"
 msgstr "Edit akun"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:383
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:397
 msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
 
@@ -285,6 +296,10 @@ msgstr "Buka aplikasi - (<0>{countdown}</0>)"
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:113
 msgid "Help & FAQ"
 msgstr "Bantuan & FAQ"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
+msgid "Home"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:339
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
@@ -417,7 +432,7 @@ msgstr "Pelajari cara membuka tautan di peramban Anda"
 msgid "Let's get started"
 msgstr "Mari mulai"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:309
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:313
 msgid "Limit reached"
 msgstr "Batas tercapai"
 
@@ -466,19 +481,19 @@ msgstr "Migrasi berhasil diselesaikan"
 msgid "Missing request"
 msgstr "Permintaan tidak ditemukan"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:399
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:414
 msgid "More information about multiple accounts"
 msgstr "Informasi lebih lanjut tentang banyak akun"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:387
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:402
 msgid "Multiple accounts"
 msgstr "Banyak akun"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:74
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:75
 msgid "My {application} account"
 msgstr "Akun {application} saya"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:74
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:75
 msgid "My account"
 msgstr "Akun saya"
 
@@ -503,9 +518,17 @@ msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau m
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
 
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:255
+msgid "Open menu"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:107
 msgid "or"
 msgstr "atau"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:10
+msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
+msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:46
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:46
@@ -590,7 +613,7 @@ msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:350
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:364
 msgid "Sign in"
 msgstr "Masuk"
 
@@ -628,6 +651,7 @@ msgid "Something went wrong during authentication. Authenticating service was no
 msgstr "Terjadi kesalahan saat autentikasi. Layanan autentikasi telah diberi tahu dan Anda dapat menutup halaman ini."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:34
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:224
 msgid "Source code"
 msgstr "Kode sumber"
 
@@ -640,10 +664,12 @@ msgid "Still have an identity number?"
 msgstr "Masih punya nomor identitas?"
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:26
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:218
 msgid "Support"
 msgstr "Dukungan"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:244
 msgid "Switch identity"
 msgstr "Ganti identitas"
 
@@ -751,6 +777,7 @@ msgstr "Gunakan perangkat yang sudah memiliki identitas Anda untuk memindai atau
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:145
 msgid "Use another identity"
 msgstr "Gunakan identitas lain"
 
@@ -810,7 +837,7 @@ msgstr "Siapa nama Anda?"
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "Saat Anda membuat passkey, perangkat Anda membuat dua kunci yang cocok. Satu tetap aman di perangkat Anda, dan yang lain dikirim ke aplikasi atau layanan. Keduanya bekerja sama untuk memastikan itu Anda — tanpa pernah membagikan info pribadi atau kata sandi."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:353
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:367
 msgid "with your Internet Identity"
 msgstr "dengan Internet Identity Anda"
 
