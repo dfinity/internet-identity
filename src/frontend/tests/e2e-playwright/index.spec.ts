@@ -115,16 +115,7 @@ test.describe("First visit", () => {
       .getByRole("heading", { level: 1, name: "Continue on your new device" })
       .waitFor();
 
-    // Switch to new device and navigate to access methods
-    const newMenuButton = newDevicePage.getByRole("button", {
-      name: "Open menu",
-    });
-    if (await newMenuButton.isVisible()) {
-      await newMenuButton.click();
-    }
-    await newDevicePage.getByRole("link", { name: "Access methods" }).click();
-
-    // Register new passkey
+    // Switch to new device and register new passkey
     await newDevicePage
       .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
       .waitFor();

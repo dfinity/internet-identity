@@ -129,11 +129,13 @@ test("Authorize by signing in from another device", async ({
       .waitFor({ state: "hidden" });
 
     // Navigate to access methods
-    const menuButton = page.getByRole("button", { name: "Open menu" });
+    const menuButton = otherDevicePage.getByRole("button", {
+      name: "Open menu",
+    });
     if (await menuButton.isVisible()) {
       await menuButton.click();
     }
-    await page.getByRole("link", { name: "Access methods" }).click();
+    await otherDevicePage.getByRole("link", { name: "Access methods" }).click();
 
     // Verify we have two passkeys
     await expect(otherDevicePage.getByText("Chrome")).toHaveCount(2);
