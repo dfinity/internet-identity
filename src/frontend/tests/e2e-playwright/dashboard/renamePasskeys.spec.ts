@@ -24,8 +24,17 @@ test("User can rename the current passkey used for authentication", async ({
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
-  // Verify we're at the dashboard and have one passkey
+  // Verify we're at the dashboard
   await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Click the rename button for the passkey
@@ -71,8 +80,17 @@ test("User can rename a newly added passkey from the same device", async ({
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
-  // Verify we're at the dashboard and have one passkey
+  // Verify we're at the dashboard
   await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Start the "add passkey" flow
@@ -113,8 +131,17 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
-  // Verify we're at the dashboard and have one passkey
+  // Verify we're at the dashboard
   await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Click the rename button for the passkey

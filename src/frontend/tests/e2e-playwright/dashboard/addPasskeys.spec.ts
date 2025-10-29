@@ -27,8 +27,17 @@ test("User can log into the dashboard and add a new passkey from the same device
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
-  // Verify we're at the dashboard and have one passkey
+  // Verify we're at the dashboard
   await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Start the "add passkey" flow
@@ -84,8 +93,17 @@ test("User can log in the dashboard and add a new passkey from another device", 
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
 
-  // Verify we're at the dashboard and have one passkey
+  // Verify we're at the dashboard
   await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Start the "add passkey" flow
@@ -158,7 +176,17 @@ test("User can add a new passkey and use it with cached identity without clearin
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
 
-  // Verify we're at the dashboard and have one passkey
+  // Verify we're at the dashboard
+  await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Start the "add passkey" flow

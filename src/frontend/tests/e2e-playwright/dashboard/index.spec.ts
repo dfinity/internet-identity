@@ -35,6 +35,13 @@ test.describe("Dashboard Navigation", () => {
       }),
     ).toBeVisible();
 
+    // Navigate to access methods
+    const menuButton = page.getByRole("button", { name: "Open menu" });
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+    }
+    await page.getByRole("link", { name: "Access methods" }).click();
+
     // Check that we have one passkey listed
     const passkey = await page.getByText("Chrome");
     await expect(passkey).toBeVisible();

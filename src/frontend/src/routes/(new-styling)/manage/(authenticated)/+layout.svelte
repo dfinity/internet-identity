@@ -172,6 +172,7 @@
         variant="tertiary"
         iconOnly
         class="ml-2 sm:hidden"
+        aria-label={$t`Close menu`}
       >
         <XIcon class="size-5" />
       </Button>
@@ -251,6 +252,7 @@
         variant="tertiary"
         iconOnly
         class="ml-2 sm:hidden"
+        aria-label={$t`Open menu`}
       >
         <MenuIcon class="size-5" />
       </Button>
