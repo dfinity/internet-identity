@@ -94,6 +94,10 @@ msgstr "Al activar esta función, puedes crear más de una cuenta por app. Cambi
 msgid "Can't find your identity?"
 msgstr "¿No encuentras tu identidad?"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+msgid "Cancel"
+msgstr "Cancelar"
+
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:61
 msgid "CAPTCHA characters"
 msgstr "Caracteres del CAPTCHA"
@@ -119,6 +123,10 @@ msgstr "elige un método"
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:41
 msgid "Choose method"
 msgstr "Elige un método"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+msgid "Clear all"
+msgstr "Borrar todo"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
@@ -242,6 +250,10 @@ msgstr "Activar cuentas múltiples"
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:71
 msgid "Enter characters"
 msgstr "Introduce los caracteres"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
+msgid "Enter your recovery phrases in each box, spelled correctly and in order."
+msgstr "Introduce tus palabras de recuperación en cada caja, escritas correctamente y en orden."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -604,6 +616,10 @@ msgstr "Escanea el código QR de arriba con tu <0>nuevo dispositivo</0> o introd
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Seamless Access"
 msgstr "Acceso Senzillo"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+msgid "Secure recovery"
+msgstr "Recuperación Segura"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."

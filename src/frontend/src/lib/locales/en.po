@@ -94,6 +94,10 @@ msgstr "By enabling this feature, you can create more than one account for a sin
 msgid "Can't find your identity?"
 msgstr "Can't find your identity?"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+msgid "Cancel"
+msgstr "Cancel"
+
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:61
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA characters"
@@ -119,6 +123,10 @@ msgstr "choose method"
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:41
 msgid "Choose method"
 msgstr "Choose method"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+msgid "Clear all"
+msgstr "Clear all"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
@@ -242,6 +250,10 @@ msgstr "Enable multiple accounts"
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:71
 msgid "Enter characters"
 msgstr "Enter characters"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
+msgid "Enter your recovery phrases in each box, spelled correctly and in order."
+msgstr "Enter your recovery phrases in each box, spelled correctly and in order."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -604,6 +616,10 @@ msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manu
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Seamless Access"
 msgstr "Seamless Access"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+msgid "Secure recovery"
+msgstr "Secure recovery"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."

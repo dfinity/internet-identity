@@ -94,6 +94,10 @@ msgstr "Wenn Sie diese Funktion aktivieren, können Sie mehr als ein Konto für 
 msgid "Can't find your identity?"
 msgstr "Finden Sie Ihre Identität nicht?"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+msgid "Cancel"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:61
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-Zeichen"
@@ -119,6 +123,10 @@ msgstr "Methode auswählen"
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:41
 msgid "Choose method"
 msgstr "Methode auswählen"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+msgid "Clear all"
+msgstr ""
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
@@ -242,6 +250,10 @@ msgstr "Mehrere Konten aktivieren"
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:71
 msgid "Enter characters"
 msgstr "Zeichen eingeben"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
+msgid "Enter your recovery phrases in each box, spelled correctly and in order."
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -604,6 +616,10 @@ msgstr "Scannen Sie den obigen QR-Code mit Ihrem <0>neuen Gerät</0> oder geben 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:102
 msgid "Seamless Access"
 msgstr "Nahtloser Zugriff"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+msgid "Secure recovery"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
