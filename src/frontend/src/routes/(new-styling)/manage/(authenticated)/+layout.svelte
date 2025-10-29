@@ -101,57 +101,6 @@
   });
 </script>
 
-<!-- Identity switcher & dialog -->
-{#snippet identitySwitcher()}
-  {#if isIdentityPopoverOpen}
-    <Popover
-      anchor={identityButtonRef}
-      onClose={() => (isIdentityPopoverOpen = false)}
-      direction="down"
-      align="end"
-      distance="0.75rem"
-    >
-      <IdentitySwitcher
-        selected={$authenticatedStore.identityNumber}
-        identities={lastUsedIdentities}
-        switchIdentity={handleSwitchIdentity}
-        useAnotherIdentity={() => {
-          isIdentityPopoverOpen = false;
-          isAuthDialogOpen = true;
-        }}
-        onClose={() => (isIdentityPopoverOpen = false)}
-        onLogout={identityInfo.logout}
-      />
-    </Popover>
-  {/if}
-  {#if isAuthDialogOpen}
-    <Dialog
-      onClose={() => (isAuthDialogOpen = false)}
-      showCloseButton={!isAuthenticating}
-      closeOnOutsideClick={!isAuthenticating}
-    >
-      <AuthWizard
-        bind:isAuthenticating
-        {onSignIn}
-        {onSignUp}
-        {onMigration}
-        onError={(error) => {
-          isAuthDialogOpen = false;
-          handleError(error);
-        }}
-        withinDialog
-      >
-        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-          {$t`Use another identity`}
-        </h1>
-        <p class="text-text-secondary mb-6 self-start text-sm">
-          {$t`choose method`}
-        </p>
-      </AuthWizard>
-    </Dialog>
-  {/if}
-{/snippet}
-
 <!-- Layout -->
 <div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
   <!-- Sidebar -->
@@ -265,4 +214,51 @@
   </div>
 </div>
 
-{@render identitySwitcher()}
+{#if isIdentityPopoverOpen}
+  <Popover
+    anchor={identityButtonRef}
+    onClose={() => (isIdentityPopoverOpen = false)}
+    direction="down"
+    align="end"
+    distance="0.75rem"
+  >
+    <IdentitySwitcher
+      selected={$authenticatedStore.identityNumber}
+      identities={lastUsedIdentities}
+      switchIdentity={handleSwitchIdentity}
+      useAnotherIdentity={() => {
+        isIdentityPopoverOpen = false;
+        isAuthDialogOpen = true;
+      }}
+      onClose={() => (isIdentityPopoverOpen = false)}
+      onLogout={identityInfo.logout}
+    />
+  </Popover>
+{/if}
+
+{#if isAuthDialogOpen}
+  <Dialog
+    onClose={() => (isAuthDialogOpen = false)}
+    showCloseButton={!isAuthenticating}
+    closeOnOutsideClick={!isAuthenticating}
+  >
+    <AuthWizard
+      bind:isAuthenticating
+      {onSignIn}
+      {onSignUp}
+      {onMigration}
+      onError={(error) => {
+        isAuthDialogOpen = false;
+        handleError(error);
+      }}
+      withinDialog
+    >
+      <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+        {$t`Use another identity`}
+      </h1>
+      <p class="text-text-secondary mb-6 self-start text-sm">
+        {$t`choose method`}
+      </p>
+    </AuthWizard>
+  </Dialog>
+{/if}
