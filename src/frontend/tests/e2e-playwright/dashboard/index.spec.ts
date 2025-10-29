@@ -27,13 +27,12 @@ test.describe("Dashboard Navigation", () => {
       page.getByRole("heading", { level: 5, name: TEST_USER_NAME }),
     ).toBeVisible();
 
-    await expect(
-      page.getByRole("heading", {
-        level: 2,
-        exact: true,
-        name: "Access methods",
-      }),
-    ).toBeVisible();
+    // Navigate to access methods
+    const menuButton = page.getByRole("button", { name: "Open menu" });
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+    }
+    await page.getByRole("link", { name: "Access methods" }).click();
 
     // Check that we have one passkey listed
     const passkey = await page.getByText("Chrome");

@@ -13,7 +13,7 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:310
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:314
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Sie haben das Maximum von # Konto für eine einzelne App erreicht.} other {Sie haben das Maximum von # Konten für eine einzelne App erreicht.}}"
 
@@ -53,12 +53,17 @@ msgstr "<0>Keine Identitätsnummern mehr:</0> Wie oben erklärt, bedeuten entdec
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Nahtlose Passkey-Integration:</0> Wir setzen weiterhin auf Passkeys als die Zukunft sicherer Authentifizierung. Internet Identity 2.0 nutzt die neuesten Passkey-Standards für erhöhte Sicherheit und Benutzerfreundlichkeit."
 
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:207
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:8
+msgid "Access methods"
+msgstr ""
+
 #: src/frontend/src/lib/components/views/EditAccount.svelte:77
 #: src/frontend/src/lib/components/views/EditAccount.svelte:89
 msgid "Account name"
 msgstr "Kontoname"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:326
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:330
 msgid "Add another account"
 msgstr "Weiteres Konto hinzufügen"
 
@@ -69,6 +74,7 @@ msgstr "Fortgeschrittenes Identitäts-Management"
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:66
 #: src/frontend/src/lib/components/wizards/auth/views/SetupOrUseExistingPasskey.svelte:68
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:100
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:353
 msgid "Authenticating..."
 msgstr "Authentifizierung..."
 
@@ -80,7 +86,7 @@ msgstr "Authentifizierung erfolgreich"
 msgid "Authorize new device"
 msgstr "Neues Gerät autorisieren"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:388
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:403
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Wenn Sie diese Funktion aktivieren, können Sie mehr als ein Konto für eine einzelne App erstellen. Wechseln Sie einfach zwischen den Konten (z. B. Arbeit, Privat oder Demo)."
 
@@ -96,7 +102,7 @@ msgstr "CAPTCHA-Zeichen"
 msgid "Characters are case-sensitive"
 msgstr "Groß- und Kleinschreibung beachten"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:301
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:305
 msgid "Choose an account"
 msgstr "Wählen Sie ein Konto aus"
 
@@ -106,6 +112,7 @@ msgstr "Identität auswählen, um fortzufahren"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:148
 msgid "choose method"
 msgstr "Methode auswählen"
 
@@ -116,6 +123,10 @@ msgstr "Methode auswählen"
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
 msgstr "Schließen"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:175
+msgid "Close menu"
+msgstr ""
 
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmThisDevice.svelte:44
 msgid "Code copied to clipboard"
@@ -146,7 +157,7 @@ msgid "Connection closed"
 msgstr "Verbindung geschlossen"
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:102
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:342
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:355
 msgid "Continue"
 msgstr "Weiter"
 
@@ -161,7 +172,7 @@ msgstr "Auf Ihrem neuen Gerät fortfahren"
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:71
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:90
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:138
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:272
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:276
 msgid "Continue with {name}"
 msgstr "Mit {name} fortfahren"
 
@@ -204,7 +215,7 @@ msgstr "Identität wird erstellt..."
 msgid "Creating passkey..."
 msgstr "Passkey wird erstellt..."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:278
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:282
 msgid "Default"
 msgstr "Standard"
 
@@ -216,7 +227,7 @@ msgstr "Entdeckbare Passkeys"
 msgid "Easy access"
 msgstr "Einfacher Zugang"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:288
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:292
 msgid "Edit {name}"
 msgstr "{name} bearbeiten"
 
@@ -224,7 +235,7 @@ msgstr "{name} bearbeiten"
 msgid "Edit account"
 msgstr "Konto bearbeiten"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:383
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:397
 msgid "Enable multiple accounts"
 msgstr "Mehrere Konten aktivieren"
 
@@ -285,6 +296,10 @@ msgstr "Zur App gehen - (<0>{countdown}</0>)"
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:113
 msgid "Help & FAQ"
 msgstr "Hilfe & FAQ"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
+msgid "Home"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:339
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
@@ -417,7 +432,7 @@ msgstr "Erfahren Sie, wie Sie Links in Ihrem Browser öffnen"
 msgid "Let's get started"
 msgstr "Legen wir los"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:309
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:313
 msgid "Limit reached"
 msgstr "Limit erreicht"
 
@@ -466,19 +481,19 @@ msgstr "Migration erfolgreich abgeschlossen"
 msgid "Missing request"
 msgstr "Fehlende Anfrage"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:399
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:414
 msgid "More information about multiple accounts"
 msgstr "Weitere Informationen zu mehreren Konten"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:387
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:402
 msgid "Multiple accounts"
 msgstr "Mehrere Konten"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:74
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:75
 msgid "My {application} account"
 msgstr "Mein {application}-Konto"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:74
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:75
 msgid "My account"
 msgstr "Mein Konto"
 
@@ -503,9 +518,17 @@ msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passke
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Geben Sie den Code von diesem Gerät nur ein, wenn Sie diesen Vorgang <0>selbst</0> gestartet haben."
 
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:255
+msgid "Open menu"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:107
 msgid "or"
 msgstr "oder"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:10
+msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
+msgstr ""
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:46
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ContinueFromExistingDevice.svelte:46
@@ -590,7 +613,7 @@ msgstr "Wählen Sie <0>In Safari öffnen</0> oder <1>In Chrome öffnen</1>."
 msgid "Set as default sign-in"
 msgstr "Als Standardanmeldung festlegen"
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:350
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:364
 msgid "Sign in"
 msgstr "Anmelden"
 
@@ -628,6 +651,7 @@ msgid "Something went wrong during authentication. Authenticating service was no
 msgstr "Fehler bei der Authentifizierung. Der Dienst wurde informiert. Sie können diese Seite schließen."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:34
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:224
 msgid "Source code"
 msgstr "Quellcode"
 
@@ -640,10 +664,12 @@ msgid "Still have an identity number?"
 msgstr "Haben Sie noch eine Identitätsnummer?"
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:26
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:218
 msgid "Support"
 msgstr "Support"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:244
 msgid "Switch identity"
 msgstr "Identität wechseln"
 
@@ -751,6 +777,7 @@ msgstr "Nutzen Sie ein Gerät mit Ihrer Identität, um die URL zu scannen oder z
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:145
 msgid "Use another identity"
 msgstr "Andere Identität verwenden"
 
@@ -810,7 +837,7 @@ msgstr "Wie ist Ihr Name?"
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "Wenn Sie einen Passkey erstellen, erzeugt Ihr Gerät zwei passende Schlüssel. Einer bleibt sicher auf Ihrem Gerät, der andere wird an die App oder den Dienst gesendet. Sie arbeiten zusammen, um zu bestätigen, dass Sie es sind – ohne jemals persönliche Informationen oder ein Passwort zu teilen."
 
-#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:353
+#: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:367
 msgid "with your Internet Identity"
 msgstr "mit Ihrer Internet Identity"
 

@@ -1,7 +1,6 @@
 <script lang="ts">
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
-  import AccessMethods from "$lib/components/views/AccessMethodsPanel.svelte";
   import IdentityInfoPanel from "$lib/components/views/IdentityInfoPanel.svelte";
   import { fade } from "svelte/transition";
   import type { PageProps } from "./$types";
@@ -12,6 +11,7 @@
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
+  import AccessMethodsPanel from "$lib/components/views/AccessMethodsPanel.svelte";
 
   const { data }: PageProps = $props();
 
@@ -33,8 +33,8 @@
 </script>
 
 <div>
-  <div class="mh-9 mb-4">
-    <h1 class="text-text-primary text-3xl font-semibold">
+  <div class="mh-9 mb-3">
+    <h1 class="text-text-primary text-3xl font-medium">
       Welcome,
       {#if !identityInfo.name}
         <PlaceHolder class="mt-0.5 inline-block h-6 w-40 md:w-64" />
@@ -45,14 +45,17 @@
       {/if}
     </h1>
   </div>
-  <h2 class="text-text-tertiary mb-12">
-    Manage your identity and access methods below.
+  <h2 class="text-text-tertiary mb-12 text-base">
+    Manage your identity and access methods.
   </h2>
 
-  <div class="flex flex-col gap-6">
-    <IdentityInfoPanel />
-
-    <AccessMethods />
+  <div class="flex flex-col gap-6 lg:flex-row">
+    <div class="flex-1">
+      <IdentityInfoPanel />
+    </div>
+    <div class="flex-1">
+      <AccessMethodsPanel />
+    </div>
   </div>
 </div>
 

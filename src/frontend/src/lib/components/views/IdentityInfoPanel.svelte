@@ -10,7 +10,7 @@
 <Panel>
   <div class="p-4">
     <h3 class="text-text-primary mb-2 text-lg font-semibold">My Identity</h3>
-    <h4 class="text-text-tertiary text-sm">
+    <h4 class="text-text-tertiary min-h-10 text-sm">
       Internet Identity is used to sign in securely and connect to apps with
       passkeys.
     </h4>
