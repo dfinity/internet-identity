@@ -64,6 +64,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await newPage.getByRole("button", { name: "Continue with passkey" }).click();
   auth2(newPage);
   await newPage.getByRole("button", { name: "Use existing identity" }).click();
+  await newPage.waitForURL(II_URL + "/manage");
 
   // Navigate to access methods
   const newMenuButton = newPage.getByRole("button", { name: "Open menu" });
