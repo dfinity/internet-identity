@@ -65,6 +65,13 @@ test("User can log into the dashboard and add a new passkey from the same device
   auth2(newPage);
   await newPage.getByRole("button", { name: "Use existing identity" }).click();
 
+  // Navigate to access methods
+  const newMenuButton = newPage.getByRole("button", { name: "Open menu" });
+  if (await newMenuButton.isVisible()) {
+    await newMenuButton.click();
+  }
+  await newPage.getByRole("link", { name: "Access methods" }).click();
+
   await expect(
     newPage.getByText("Chrome").locator("..").getByLabel("Current Passkey"),
   ).toHaveCount(0);
