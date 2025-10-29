@@ -1,11 +1,15 @@
 <script lang="ts">
-  import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
-  import { ChevronDownIcon } from "@lucide/svelte";
-  import { fade, fly } from "svelte/transition";
+  import {
+    ChevronDownIcon,
+    HomeIcon,
+    KeyRoundIcon,
+    MenuIcon,
+    XIcon,
+    LifeBuoyIcon,
+    CodeIcon,
+  } from "@lucide/svelte";
   import { page } from "$app/state";
-  import { beforeNavigate, goto } from "$app/navigation";
-  import { isDesktopViewport } from "$lib/utils/UI/deviceDetection";
-  import { expoIn, expoOut } from "svelte/easing";
+  import { goto } from "$app/navigation";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -14,24 +18,24 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import MainContent from "$lib/components/layout/MainContent.svelte";
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
-  import Footer from "$lib/components/layout/Footer.svelte";
-  import { onMount } from "svelte";
+  import type { Snippet } from "svelte";
   import { sessionStore } from "$lib/stores/session.store";
+  import { t } from "$lib/stores/locale.store";
+  import Logo from "$lib/components/ui/Logo.svelte";
+  import NavItem from "$lib/components/ui/NavItem.svelte";
+  import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
 
-  const { children } = $props();
+  interface Props {
+    children: Snippet;
+  }
 
-  let divRef = $state<HTMLDivElement>();
+  const { children }: Props = $props();
 
-  // let sideBarGroupRef = $state<HTMLDivElement>();
-  // let tabsGroupRef = $state<HTMLDivElement>();
   let identityButtonRef = $state<HTMLElement>();
-
-  let animationDirection = $state<"up" | "down" | "left" | "right">("up");
-
+  let isMobileSidebarOpen = $state(false);
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
@@ -46,7 +50,7 @@
   const onSignIn = async (identityNumber: bigint) => {
     identityInfo.reset();
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    identityInfo.fetch();
+    void identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
@@ -57,11 +61,10 @@
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    identityInfo.fetch();
+    void identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
-
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
@@ -86,182 +89,178 @@
     await authLastUsedFlow.authenticate(chosenIdentity);
     identityInfo.reset();
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    identityInfo.fetch();
+    void identityInfo.fetch();
     await gotoManage();
     isIdentityPopoverOpen = false;
   };
 
-  const flyInX = $derived(
-    animationDirection === "left"
-      ? -200
-      : animationDirection === "right"
-        ? 200
-        : undefined,
-  );
-
-  const flyInY = $derived(
-    animationDirection === "up"
-      ? -200
-      : animationDirection === "down"
-        ? 200
-        : undefined,
-  );
-
-  const flyOutX = $derived(
-    animationDirection === "left"
-      ? 160
-      : animationDirection === "right"
-        ? -160
-        : undefined,
-  );
-
-  const flyOutY = $derived(
-    animationDirection === "up"
-      ? 160
-      : animationDirection === "down"
-        ? -160
-        : undefined,
-  );
-
-  // Commented for now since we don't want up or left and right animations if we have only one page.
-  // beforeNavigate((nav) => {
-  // const fromPathName = nav.from?.url.pathname;
-  // const toPathName = nav.to?.url.pathname;
-  // let anchors;
-  // if (isDesktopViewport()) {
-  //   if (!sideBarGroupRef) return;
-  //   anchors = Array.from(sideBarGroupRef.querySelectorAll("a"));
-  // } else {
-  //   if (!tabsGroupRef) return;
-  //   anchors = Array.from(tabsGroupRef.querySelectorAll("a"));
-  // }
-  // const fromElement = anchors.find(
-  //   (a) => a.getAttribute("href") === fromPathName,
-  // );
-  // if (!fromElement) return;
-  // const fromPosition = anchors.indexOf(fromElement);
-  // const toElement = anchors.find(
-  //   (a) => a.getAttribute("href") === toPathName,
-  // );
-  // if (!toElement) return;
-  // const toPosition = anchors.indexOf(toElement);
-  // if (fromPosition > toPosition) {
-  //   if (isDesktopViewport()) {
-  //     animationDirection = "up";
-  //   } else {
-  //     animationDirection = "left";
-  //   }
-  // } else {
-  //   if (isDesktopViewport()) {
-  //     animationDirection = "down";
-  //   } else {
-  //     animationDirection = "right";
-  //   }
-  // }
-  // });
+  // Hide mobile sidebar on navigation
+  $effect(() => {
+    page.route.id;
+    isMobileSidebarOpen = false;
+  });
 </script>
 
-<!-- TODO: Reenable with SideBarOrTabs once we support multiple dashboard pages -->
-<!-- {#snippet sidebarElements()}
-  <SideBarElementGroup bind:bindableGroupRef={sideBarGroupRef}>
-    <SideBarElement href="/manage">
-      <LucideHome size="1rem" class="stroke-fg-quaternary" />
-      <h1>Home</h1>
-    </SideBarElement>
-    <SideBarElement class="text-text-primary" href="/manage/security">
-      <Shield size="1rem" class="stroke-fg-quaternary" />
-      <h1>Security</h1>
-    </SideBarElement>
-  </SideBarElementGroup>
+<!-- Identity switcher & dialog -->
+{#snippet identitySwitcher()}
+  {#if isIdentityPopoverOpen}
+    <Popover
+      anchor={identityButtonRef}
+      onClose={() => (isIdentityPopoverOpen = false)}
+      direction="down"
+      align="end"
+      distance="0.75rem"
+    >
+      <IdentitySwitcher
+        selected={$authenticatedStore.identityNumber}
+        identities={lastUsedIdentities}
+        switchIdentity={handleSwitchIdentity}
+        useAnotherIdentity={() => {
+          isIdentityPopoverOpen = false;
+          isAuthDialogOpen = true;
+        }}
+        onClose={() => (isIdentityPopoverOpen = false)}
+        onLogout={identityInfo.logout}
+      />
+    </Popover>
+  {/if}
+  {#if isAuthDialogOpen}
+    <Dialog
+      onClose={() => (isAuthDialogOpen = false)}
+      showCloseButton={!isAuthenticating}
+      closeOnOutsideClick={!isAuthenticating}
+    >
+      <AuthWizard
+        bind:isAuthenticating
+        {onSignIn}
+        {onSignUp}
+        {onMigration}
+        onError={(error) => {
+          isAuthDialogOpen = false;
+          handleError(error);
+        }}
+        withinDialog
+      >
+        <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+          {$t`Use another identity`}
+        </h1>
+        <p class="text-text-secondary mb-6 self-start text-sm">
+          {$t`choose method`}
+        </p>
+      </AuthWizard>
+    </Dialog>
+  {/if}
 {/snippet}
 
-{#snippet tabElements()}
-  <TabElementGroup bind:bindableGroupRef={tabsGroupRef}>
-    <TabElement class="text-text-primary" href="/manage">
-      <h1>Home</h1>
-    </TabElement>
-    <TabElement class="text-text-primary" href="/manage/security">
-      <h1>Security</h1>
-    </TabElement>
-  </TabElementGroup>
-{/snippet} -->
-
-<MainContent>
-  {#snippet content()}
+<!-- Layout -->
+<div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
+  <!-- Sidebar -->
+  <aside
+    class={[
+      "bg-bg-primary border-border-secondary flex w-74 flex-col sm:border-r sm:max-md:w-19",
+      "max-sm:invisible max-sm:absolute max-sm:inset-0 max-sm:z-1 max-sm:w-full",
+      isMobileSidebarOpen && "max-sm:visible",
+    ]}
+  >
+    <div class="h-[env(safe-area-inset-top)]"></div>
+    <!-- Mobile close button -->
     <div
-      bind:this={divRef}
-      in:fade={{ duration: 500 }}
-      out:fade={{ duration: 500 }}
-      onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
-      class="nth-2:hidden"
+      class="mb-3 flex flex-row items-center justify-end px-4 py-3 sm:hidden"
     >
-      {@render children?.()}
+      <Button
+        onclick={() => (isMobileSidebarOpen = false)}
+        variant="tertiary"
+        iconOnly
+        class="ml-2 sm:hidden"
+      >
+        <XIcon class="size-5" />
+      </Button>
     </div>
-  {/snippet}
-
-  {#snippet header()}
-    <div class="flex">
-      <div class="flex-1"></div>
+    <!-- Desktop logo -->
+    <div
+      class={[
+        "mt-5 mb-6 flex h-6 flex-row items-center gap-4 max-md:justify-center md:px-7",
+        "max-sm:hidden",
+      ]}
+    >
+      <Logo class="text-fg-primary h-4" />
+      <div class="text-text-primary text-base font-semibold max-md:hidden">
+        Internet Identity Hub
+      </div>
+    </div>
+    <!-- Navigation -->
+    <nav class="flex flex-col gap-0.5 px-4">
+      <ul class="contents">
+        <li class="contents">
+          <NavItem href="/manage" current={page.url.pathname === "/manage"}>
+            <HomeIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Home`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem
+            href="/manage/access"
+            current={page.url.pathname === "/manage/access"}
+          >
+            <KeyRoundIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Access methods`}</span>
+          </NavItem>
+        </li>
+      </ul>
+    </nav>
+    <!-- Footer navigation -->
+    <div class="mt-auto mb-5 flex flex-col gap-0.5 px-4">
+      <ul class="contents">
+        <li class="contents">
+          <NavItem href={SUPPORT_URL} target="_blank" rel="noopener">
+            <LifeBuoyIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Support`}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
+          <NavItem href={SOURCE_CODE_URL} target="_blank" rel="noopener">
+            <CodeIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="sm:max-md:hidden">{$t`Source code`}</span>
+          </NavItem>
+        </li>
+      </ul>
+    </div>
+    <div class="h-[env(safe-area-inset-bottom)]"></div>
+  </aside>
+  <!-- Main content -->
+  <div class="flex flex-1 flex-col">
+    <div class="h-[env(safe-area-inset-top)]"></div>
+    <!-- Header -->
+    <header class="flex h-16 flex-row items-center px-4 sm:px-8 md:px-12">
+      <!-- Mobile logo -->
+      <Logo class="text-fg-primary h-4 sm:hidden" />
+      <!-- Identity button-->
       <Button
         bind:element={identityButtonRef}
         onclick={() => (isIdentityPopoverOpen = true)}
         variant="tertiary"
-        class="ml-auto gap-2.5 pr-3 md:-mr-3"
-        aria-label="Switch identity"
+        class="ml-auto gap-2.5 pr-3 sm:-mr-3"
+        aria-label={$t`Switch identity`}
       >
         <span>{identityInfo.name ?? $authenticatedStore.identityNumber}</span>
         <ChevronDownIcon size="1rem" />
       </Button>
-      {#if isIdentityPopoverOpen}
-        <Popover
-          anchor={identityButtonRef}
-          onClose={() => (isIdentityPopoverOpen = false)}
-          direction="down"
-          align="end"
-          distance="0.75rem"
-        >
-          <IdentitySwitcher
-            selected={$authenticatedStore.identityNumber}
-            identities={lastUsedIdentities}
-            switchIdentity={handleSwitchIdentity}
-            useAnotherIdentity={() => {
-              isIdentityPopoverOpen = false;
-              isAuthDialogOpen = true;
-            }}
-            onClose={() => (isIdentityPopoverOpen = false)}
-            onLogout={identityInfo.logout}
-          />
-        </Popover>
-      {/if}
-      {#if isAuthDialogOpen}
-        <Dialog
-          onClose={() => (isAuthDialogOpen = false)}
-          showCloseButton={!isAuthenticating}
-          closeOnOutsideClick={!isAuthenticating}
-        >
-          <AuthWizard
-            bind:isAuthenticating
-            {onSignIn}
-            {onSignUp}
-            {onMigration}
-            onError={(error) => {
-              isAuthDialogOpen = false;
-              handleError(error);
-            }}
-            withinDialog
-          >
-            <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              Use another identity
-            </h1>
-            <p class="text-text-secondary mb-6 self-start text-sm">
-              choose method
-            </p>
-          </AuthWizard>
-        </Dialog>
-      {/if}
-    </div>
-  {/snippet}
-  {#snippet footer()}
-    <Footer />
-  {/snippet}
-</MainContent>
+      <!-- Mobile menu button -->
+      <Button
+        onclick={() => (isMobileSidebarOpen = true)}
+        variant="tertiary"
+        iconOnly
+        class="ml-2 sm:hidden"
+      >
+        <MenuIcon class="size-5" />
+      </Button>
+    </header>
+    <!-- Page content -->
+    <main class="flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12">
+      {@render children()}
+    </main>
+    <div class="h-[env(safe-area-inset-bottom)]"></div>
+  </div>
+</div>
+
+{@render identitySwitcher()}

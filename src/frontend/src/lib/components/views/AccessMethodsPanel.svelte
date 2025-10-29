@@ -1,290 +1,42 @@
 <script lang="ts">
-  import Button from "$lib/components/ui/Button.svelte";
   import Panel from "$lib/components/ui/Panel.svelte";
-  import { EditIcon, Link2OffIcon, PlusIcon, Trash2Icon } from "@lucide/svelte";
-  import GoogleIcon from "$lib/components/icons/GoogleIcon.svelte";
   import identityInfo from "$lib/stores/identity-info.state.svelte";
-  import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
-  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-  import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
-  import { invalidateAll } from "$app/navigation";
-  import type {
-    AuthnMethodData,
-    OpenIdCredential,
-  } from "$lib/generated/internet_identity_types";
-  import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
-  import RenamePasskeyDialog from "$lib/components/views/RenamePasskeyDialog.svelte";
-  import { nonNullish } from "@dfinity/utils";
-  import { handleError } from "$lib/components/utils/error";
-  import {
-    isLegacyAuthnMethod,
-    isWebAuthnMetaData,
-    haveMultipleOrigins,
-    isSameAccessMethod,
-  } from "$lib/utils/accessMethods";
-  import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
-  import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
-  import { toaster } from "$lib/components/utils/toaster";
-  import { openIdLogo, openIdName } from "$lib/utils/openID";
-  import Tooltip from "../ui/Tooltip.svelte";
-  import { accessMethods } from "$lib/derived/accessMethods.derived.svelte";
-
-  let isAddAccessMethodWizardOpen = $state(false);
-  let removableAuthnMethod = $state<AuthnMethodData | null>(null);
-  let removableOpenIdCredential = $state<OpenIdCredential | null>(null);
-  let renamableAuthnMethod = $state<AuthnMethodData | null>(null);
-
-  const openIdCredentials = $derived(identityInfo.openIdCredentials);
-  const authnMethods = $derived(identityInfo.authnMethods);
-  const isUsingPasskeys = $derived(authnMethods.length > 0);
-  const isRemoveAccessMethodVisible = $derived(
-    authnMethods.length + openIdCredentials.length > 1,
-  );
-  const isRemovableAuthnMethodCurrentAccessMethod = $derived(
-    nonNullish(removableAuthnMethod) &&
-      nonNullish(accessMethods.lastUsedAccessMethod) &&
-      isSameAccessMethod(
-        removableAuthnMethod,
-        accessMethods.lastUsedAccessMethod,
-      ),
-  );
-  const isRemovableOpenIdCredentialCurrentAccessMethod = $derived(
-    nonNullish(removableOpenIdCredential) &&
-      nonNullish(accessMethods.lastUsedAccessMethod) &&
-      isSameAccessMethod(
-        removableOpenIdCredential,
-        accessMethods.lastUsedAccessMethod,
-      ),
-  );
-
-  const handleOpenIDLinked = (credential: OpenIdCredential) => {
-    openIdCredentials.push(credential);
-    invalidateAll();
-  };
-  const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
-    authnMethods.push(authnMethod);
-    invalidateAll();
-  };
-  const handleOtherDeviceRegistered = () => {
-    toaster.success({
-      title: "Passkey has been registered from another device.",
-    });
-    invalidateAll();
-  };
-  const handleRemoveOpenIdCredential = async () => {
-    if (!removableOpenIdCredential) return;
-
-    try {
-      const credential = removableOpenIdCredential;
-      const isCurrent = isRemovableOpenIdCredentialCurrentAccessMethod;
-      // Optimistically remove the passkey
-      removableOpenIdCredential = null;
-      await identityInfo.removeGoogle({
-        credential,
-        isCurrent,
-      });
-    } catch (error) {
-      handleError(error);
-    }
-  };
-  const handleRemovePasskey = async () => {
-    if (!removableAuthnMethod) return;
-
-    try {
-      const authnMethod = removableAuthnMethod;
-      const isCurrent = isRemovableAuthnMethodCurrentAccessMethod;
-      // Optimistically remove the passkey
-      removableAuthnMethod = null;
-      await identityInfo.removePasskey({
-        authnMethod,
-        isCurrent,
-      });
-    } catch (error) {
-      handleError(error);
-    }
-  };
-
-  const handleRenamePasskey = async (newName: string) => {
-    if (!renamableAuthnMethod) return;
-
-    try {
-      await identityInfo.renamePasskey({
-        authnMethod: renamableAuthnMethod,
-        newName,
-      });
-      renamableAuthnMethod = null;
-    } catch (error) {
-      handleError(error);
-    }
-  };
-
-  const isCurrentAccessMethod = (accessMethod: AuthnMethodData) => {
-    return (
-      nonNullish(accessMethods.lastUsedAccessMethod) &&
-      isSameAccessMethod(accessMethod, accessMethods.lastUsedAccessMethod)
-    );
-  };
-
-  const showPasskeyOrigin = $derived(haveMultipleOrigins(authnMethods));
+  import { ChevronRightIcon } from "@lucide/svelte";
+  import Button from "$lib/components/ui/Button.svelte";
 </script>
 
 <Panel>
-  <div class="flex flex-col justify-between gap-5 p-4 pb-5 md:flex-row">
-    <div>
-      <h2 class="text-text-primary mb-2 text-lg font-semibold">
-        Access methods
-      </h2>
-      <p class="text-text-tertiary text-sm">
-        Manage your passkeys, security keys, and linked accounts.
-      </p>
-    </div>
-
-    <div>
-      <Tooltip
-        label="You have reached the maximum number of access methods"
-        hidden={!accessMethods.accessMethodsMaxReached}
-      >
-        <Button
-          onclick={() => (isAddAccessMethodWizardOpen = true)}
-          disabled={accessMethods.accessMethodsMaxReached}
-          class="max-md:w-full"
-        >
-          <span>Add</span>
-          <PlusIcon class="size-5" />
-        </Button>
-      </Tooltip>
-    </div>
+  <div class="p-4">
+    <h3 class="text-text-primary mb-2 text-lg font-semibold">Access methods</h3>
+    <h4 class="text-text-tertiary min-h-10 text-sm">
+      See how many access methods are within your identity and activate your
+      recovery seed phrase.
+    </h4>
   </div>
-  <div
-    class={`grid grid-cols-[min-content_1fr_min-content] grid-rows-[${identityInfo.totalAccessMethods}]`}
-  >
-    {#each authnMethods as authnMethod}
-      <div
-        class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
+  <div class="grid grid-cols-[1fr_2fr_min-content]">
+    <div
+      class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-1.5 ps-4 pe-1.5"
+    >
+      <h5
+        class="text-text-tertiary flex min-w-30 items-center pr-2 text-sm md:pr-4"
       >
-        <div
-          class={[
-            "flex min-w-8 items-center justify-center px-4 pr-4",
-            isLegacyAuthnMethod(authnMethod)
-              ? "text-text-disabled"
-              : "text-text-primary",
-          ]}
-        >
-          <PasskeyIcon />
-        </div>
-        <!-- TODO: Create Design's ListItem -->
-        <AccessMethod
-          accessMethod={authnMethod}
-          isDisabled={isLegacyAuthnMethod(authnMethod)}
-          isCurrent={isCurrentAccessMethod(authnMethod)}
-          showOrigin={showPasskeyOrigin}
-        />
-        {#if !isLegacyAuthnMethod(authnMethod)}
-          <div class="flex items-center justify-end gap-2 px-4">
-            <Button
-              onclick={() => (renamableAuthnMethod = authnMethod)}
-              variant="tertiary"
-              iconOnly
-              aria-label={`Rename ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
-            >
-              <EditIcon class="size-5" />
-            </Button>
-            {#if isRemoveAccessMethodVisible}
-              <Button
-                onclick={() => (removableAuthnMethod = authnMethod)}
-                variant="tertiary"
-                iconOnly
-                aria-label={`Remove ${isCurrentAccessMethod(authnMethod) ? "current" : ""} passkey`}
-                class="!text-fg-error-secondary"
-              >
-                <Trash2Icon class="size-5" />
-              </Button>
-            {/if}
-          </div>
-        {:else}
-          <!-- Necessary to keep the same height as iconOnly buttons -->
-          <!-- TODO: Align with design what should set the height? -->
-          <div class="size-10"></div>
-        {/if}
+        Total methods
+      </h5>
+      <div class="flex items-center">
+        <h5 class="text-text-primary text-sm font-semibold nth-[2]:hidden">
+          {identityInfo.totalAccessMethods}
+        </h5>
       </div>
-    {/each}
-    {#each openIdCredentials as credential}
-      {@const logo = openIdLogo(credential.iss, credential.metadata)}
-      <div
-        class="border-border-tertiary col-span-3 grid grid-cols-subgrid border-t py-4"
-      >
-        <div
-          class="text-text-primary flex min-w-8 items-center justify-center px-4 pr-4"
+      <div class="flex items-center justify-center">
+        <Button
+          href="/manage/access"
+          variant="tertiary"
+          iconOnly
+          class="!rounded-full"
         >
-          {#if nonNullish(logo)}
-            <div class="size-6">
-              {@html logo}
-            </div>
-          {:else}
-            <GoogleIcon />
-          {/if}
-        </div>
-
-        <AccessMethod
-          accessMethod={credential}
-          isCurrent={nonNullish(accessMethods.lastUsedAccessMethod) &&
-            !isWebAuthnMetaData(accessMethods.lastUsedAccessMethod) &&
-            accessMethods.lastUsedAccessMethod.sub === credential.sub}
-        />
-
-        <div class="flex items-center justify-end px-4">
-          {#if isRemoveAccessMethodVisible}
-            <Button
-              onclick={() => (removableOpenIdCredential = credential)}
-              variant="tertiary"
-              iconOnly
-              class="!text-fg-error-secondary"
-            >
-              <Link2OffIcon class="size-5" />
-            </Button>
-          {/if}
-        </div>
+          <ChevronRightIcon class="size-5" />
+        </Button>
       </div>
-    {/each}
+    </div>
   </div>
 </Panel>
-
-{#if removableOpenIdCredential}
-  <RemoveOpenIdCredential
-    onRemove={handleRemoveOpenIdCredential}
-    onClose={() => (removableOpenIdCredential = null)}
-    openIDName={openIdName(
-      removableOpenIdCredential.iss,
-      removableOpenIdCredential.metadata,
-    ) ?? "Google"}
-    isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
-  />
-{/if}
-
-{#if removableAuthnMethod}
-  <RemovePasskeyDialog
-    onRemove={handleRemovePasskey}
-    onClose={() => (removableAuthnMethod = null)}
-    isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
-  />
-{/if}
-
-{#if renamableAuthnMethod}
-  <RenamePasskeyDialog
-    currentName={getAuthnMethodAlias(renamableAuthnMethod)}
-    onRename={handleRenamePasskey}
-    onClose={() => (renamableAuthnMethod = null)}
-  />
-{/if}
-
-{#if isAddAccessMethodWizardOpen}
-  <AddAccessMethodWizard
-    onOpenIDLinked={handleOpenIDLinked}
-    onPasskeyRegistered={handlePasskeyRegistered}
-    onOtherDeviceRegistered={handleOtherDeviceRegistered}
-    onClose={() => (isAddAccessMethodWizardOpen = false)}
-    maxPasskeysReached={accessMethods.isMaxPasskeysReached}
-    {openIdCredentials}
-    {isUsingPasskeys}
-  />
-{/if}
