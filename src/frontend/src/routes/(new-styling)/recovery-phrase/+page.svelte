@@ -4,16 +4,16 @@
   import { t } from "$lib/stores/locale.store";
   import { nonNullish } from "@dfinity/utils";
 
-  const handleKeyDownInput = (
-    event: KeyboardEvent,
-    currentTabIndex: number,
-  ) => {
+  let inputContainerRef: HTMLDivElement | null = null;
+
+  const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      const nextTabIndex = currentTabIndex + 1;
-      const nextElement = document.querySelector(
-        `[tabindex="${nextTabIndex}"]`,
-      ) as HTMLElement;
+      const nextTabIndex = currentIndex + 1;
+      const inputElements = inputContainerRef?.querySelectorAll(
+        "input",
+      ) as NodeListOf<HTMLInputElement>;
+      const nextElement = inputElements?.[nextTabIndex];
       if (nonNullish(nextElement)) {
         nextElement.focus();
       }
@@ -36,15 +36,14 @@
         </p>
       </div>
       <div class="flex flex-col gap-3">
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-3 gap-3" bind:this={inputContainerRef}>
           {#each Array.from({ length: 24 }) as _, i}
             <label class="relative h-8">
               <!-- Text input -->
               <input
                 type="text"
                 id={`recovery-phrase-${i}`}
-                tabindex={i + 1}
-                on:keydown={(e) => handleKeyDownInput(e, i + 1)}
+                on:keydown={(e) => handleKeyDownInput(e, i)}
                 class="peer text-text-primary ring-border-secondary focus:ring-border-brand h-8 w-full rounded-full border-none bg-transparent pl-10 text-base ring outline-none ring-inset focus:ring-2"
               />
               <!-- Left slot -->
@@ -58,15 +57,11 @@
           {/each}
         </div>
         <div class="flex flex-row gap-2">
-          <Button class="w-full" variant="tertiary" tabindex={25}
-            >{$t`Show all`}</Button
-          >
-          <Button class="w-full" variant="tertiary" tabindex={26}
-            >{$t`Clear all`}</Button
-          >
+          <Button class="w-full" variant="tertiary">{$t`Show all`}</Button>
+          <Button class="w-full" variant="tertiary">{$t`Clear all`}</Button>
         </div>
       </div>
-      <Button size="xl" variant="secondary" tabindex={27}>{$t`Cancel`}</Button>
+      <Button size="xl" variant="secondary">{$t`Cancel`}</Button>
     </div>
   </AuthPanel>
 </div>
