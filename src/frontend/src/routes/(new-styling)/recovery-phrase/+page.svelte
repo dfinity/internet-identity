@@ -23,7 +23,6 @@
 
 <div
   class="flex flex-1 flex-row items-end justify-center sm:max-w-120 sm:items-center"
-  style="--keyboard-inset-height: env(keyboard-inset-height);"
 >
   <AuthPanel>
     <div class="flex flex-col gap-6">
@@ -64,9 +63,4 @@
       <Button size="xl" variant="secondary">{$t`Cancel`}</Button>
     </div>
   </AuthPanel>
-</div>
-<!-- Element that pushes container away from mobile keyboard or gesture navigation -->
-<div class="flex max-sm:hidden">
-  <div class="h-[var(--keyboard-inset-height)]"></div>
-  <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
