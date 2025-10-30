@@ -53,7 +53,7 @@ msgstr "<0>Sin números de identidad:</0> Como se explica más arriba, las passk
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integración de passkey sin interrupciones:</0> Seguimos adoptando las passkeys como el futuro de la autenticación segura. Internet Identity 2.0 aprovecha los últimos estándares de passkey para mayor seguridad y facilidad de uso."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:207
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:156
 #: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:8
 msgid "Access methods"
 msgstr ""
@@ -94,6 +94,10 @@ msgstr "Al activar esta función, puedes crear más de una cuenta por app. Cambi
 msgid "Can't find your identity?"
 msgstr "¿No encuentras tu identidad?"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:63
+msgid "Cancel"
+msgstr "Cancelar"
+
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:61
 msgid "CAPTCHA characters"
 msgstr "Caracteres del CAPTCHA"
@@ -112,7 +116,7 @@ msgstr "elige una identidad para continuar"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:148
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:260
 msgid "choose method"
 msgstr "elige un método"
 
@@ -120,11 +124,15 @@ msgstr "elige un método"
 msgid "Choose method"
 msgstr "Elige un método"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:60
+msgid "Clear all"
+msgstr "Borrar todo"
+
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
 msgstr "Cerrar"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:175
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:124
 msgid "Close menu"
 msgstr ""
 
@@ -243,6 +251,10 @@ msgstr "Activar cuentas múltiples"
 msgid "Enter characters"
 msgstr "Introduce los caracteres"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:34
+msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
+msgstr "Escribe tus palabras de recuperación en cada campo, escritas correctamente y en orden."
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Todo lo que necesitas saber sobre Internet Identity, tu forma privada, segura y sencilla de iniciar sesión en aplicaciones de Internet Computer."
@@ -297,7 +309,7 @@ msgstr "Ir a la app - (<0>{countdown}</0>)"
 msgid "Help & FAQ"
 msgstr "Ayuda y preguntas frecuentes"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:147
 msgid "Home"
 msgstr ""
 
@@ -518,7 +530,7 @@ msgstr "No. Tu Face ID o huella digital solo se usa para crear o desbloquear tu 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Introduce el código de ese dispositivo solo si iniciaste este proceso <0>tú mismo</0>."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:255
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:204
 msgid "Open menu"
 msgstr ""
 
@@ -605,6 +617,10 @@ msgstr "Escanea el código QR de arriba con tu <0>nuevo dispositivo</0> o introd
 msgid "Seamless Access"
 msgstr "Acceso Senzillo"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:31
+msgid "Secure recovery"
+msgstr "Recuperación Segura"
+
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Selectiona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
@@ -612,6 +628,10 @@ msgstr "Selectiona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
 #: src/frontend/src/lib/components/views/EditAccount.svelte:95
 msgid "Set as default sign-in"
 msgstr "Establecer como inicio de sesión predeterminado"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:59
+msgid "Show all"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:364
 msgid "Sign in"
@@ -651,7 +671,7 @@ msgid "Something went wrong during authentication. Authenticating service was no
 msgstr "Algo salió mal durante la autenticación. Se notificó al servicio y puedes cerrar esta página."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:34
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:224
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:173
 msgid "Source code"
 msgstr "Código fuente"
 
@@ -664,12 +684,12 @@ msgid "Still have an identity number?"
 msgstr "¿Aún tienes un número de identidad?"
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:26
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:218
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:167
 msgid "Support"
 msgstr "Soporte"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:244
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:193
 msgid "Switch identity"
 msgstr "Cambiar de identidad"
 
@@ -777,7 +797,7 @@ msgstr "Usa un dispositivo que ya tenga tu identidad para escanear o abrir la UR
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:145
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:257
 msgid "Use another identity"
 msgstr "Usar otra identidad"
 

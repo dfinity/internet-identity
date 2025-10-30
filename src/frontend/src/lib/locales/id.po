@@ -53,7 +53,7 @@ msgstr "<0>Tidak Perlu Nomor Identitas Lagi:</0> Seperti dijelaskan sebelumnya, 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integrasi Passkey Tanpa Hambatan:</0> Kami terus mendukung passkey sebagai masa depan autentikasi yang aman. Internet Identity 2.0 memanfaatkan standar passkey terbaru untuk keamanan dan kemudahan penggunaan yang lebih baik."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:207
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:156
 #: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:8
 msgid "Access methods"
 msgstr ""
@@ -94,6 +94,10 @@ msgstr "Dengan mengaktifkan fitur ini, Anda dapat membuat lebih dari satu akun u
 msgid "Can't find your identity?"
 msgstr "Tidak dapat menemukan identitas Anda?"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:63
+msgid "Cancel"
+msgstr ""
+
 #: src/frontend/src/lib/components/wizards/auth/views/SolveCaptcha.svelte:61
 msgid "CAPTCHA characters"
 msgstr "Karakter CAPTCHA"
@@ -112,7 +116,7 @@ msgstr "pilih identitas untuk melanjutkan"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:148
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:260
 msgid "choose method"
 msgstr "pilih metode"
 
@@ -120,11 +124,15 @@ msgstr "pilih metode"
 msgid "Choose method"
 msgstr "Pilih metode"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:60
+msgid "Clear all"
+msgstr ""
+
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:52
 msgid "Close"
 msgstr "Tutup"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:175
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:124
 msgid "Close menu"
 msgstr ""
 
@@ -243,6 +251,10 @@ msgstr "Aktifkan banyak akun"
 msgid "Enter characters"
 msgstr "Masukkan karakter"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:34
+msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang pribadi, aman, dan mudah untuk masuk ke aplikasi di Internet Computer."
@@ -297,7 +309,7 @@ msgstr "Buka aplikasi - (<0>{countdown}</0>)"
 msgid "Help & FAQ"
 msgstr "Bantuan & FAQ"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:147
 msgid "Home"
 msgstr ""
 
@@ -518,7 +530,7 @@ msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau m
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:255
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:204
 msgid "Open menu"
 msgstr ""
 
@@ -605,6 +617,10 @@ msgstr "Pindai kode QR di atas dengan <0>perangkat baru</0> Anda atau masukkan U
 msgid "Seamless Access"
 msgstr "Akses tanpa hambatan"
 
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:31
+msgid "Secure recovery"
+msgstr ""
+
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:38
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
@@ -612,6 +628,10 @@ msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
 #: src/frontend/src/lib/components/views/EditAccount.svelte:95
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:59
+msgid "Show all"
+msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:364
 msgid "Sign in"
@@ -651,7 +671,7 @@ msgid "Something went wrong during authentication. Authenticating service was no
 msgstr "Terjadi kesalahan saat autentikasi. Layanan autentikasi telah diberi tahu dan Anda dapat menutup halaman ini."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:34
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:224
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:173
 msgid "Source code"
 msgstr "Kode sumber"
 
@@ -664,12 +684,12 @@ msgid "Still have an identity number?"
 msgstr "Masih punya nomor identitas?"
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:26
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:218
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:167
 msgid "Support"
 msgstr "Dukungan"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:244
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:193
 msgid "Switch identity"
 msgstr "Ganti identitas"
 
@@ -777,7 +797,7 @@ msgstr "Gunakan perangkat yang sudah memiliki identitas Anda untuk memindai atau
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:145
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:257
 msgid "Use another identity"
 msgstr "Gunakan identitas lain"
 
