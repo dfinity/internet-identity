@@ -7,7 +7,7 @@
   let inputContainerRef: HTMLDivElement | null = null;
 
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === "Enter" || event.code === "Space") {
       event.preventDefault();
       const nextTabIndex = currentIndex + 1;
       const inputElements = inputContainerRef?.querySelectorAll(

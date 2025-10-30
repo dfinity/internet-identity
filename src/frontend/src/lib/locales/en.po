@@ -53,7 +53,7 @@ msgstr "<0>No More Identity Numbers:</0> As explained above, discoverable passke
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:207
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:156
 #: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:8
 msgid "Access methods"
 msgstr "Access methods"
@@ -94,7 +94,7 @@ msgstr "By enabling this feature, you can create more than one account for a sin
 msgid "Can't find your identity?"
 msgstr "Can't find your identity?"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:51
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:63
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -116,7 +116,7 @@ msgstr "choose identity to continue"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:168
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:148
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:260
 msgid "choose method"
 msgstr "choose method"
 
@@ -124,7 +124,7 @@ msgstr "choose method"
 msgid "Choose method"
 msgstr "Choose method"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:47
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:60
 msgid "Clear all"
 msgstr "Clear all"
 
@@ -132,7 +132,7 @@ msgstr "Clear all"
 msgid "Close"
 msgstr "Close"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:175
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:124
 msgid "Close menu"
 msgstr "Close menu"
 
@@ -251,7 +251,7 @@ msgstr "Enable multiple accounts"
 msgid "Enter characters"
 msgstr "Enter characters"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:18
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:34
 msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
 msgstr "Enter your recovery phrase words in each box, spelled correctly and in order."
 
@@ -309,7 +309,7 @@ msgstr "Go to the app - (<0>{countdown}</0>)"
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:147
 msgid "Home"
 msgstr "Home"
 
@@ -530,7 +530,7 @@ msgstr "No. Your face ID or fingerprint is only used to create or unlock your pa
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Only enter the code from that device if you initiated this process <0>yourself</0>."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:255
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:204
 msgid "Open menu"
 msgstr "Open menu"
 
@@ -617,7 +617,7 @@ msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manu
 msgid "Seamless Access"
 msgstr "Seamless Access"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:15
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:31
 msgid "Secure recovery"
 msgstr "Secure recovery"
 
@@ -628,6 +628,10 @@ msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 #: src/frontend/src/lib/components/views/EditAccount.svelte:95
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
+
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:59
+msgid "Show all"
+msgstr "Show all"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:364
 msgid "Sign in"
@@ -667,7 +671,7 @@ msgid "Something went wrong during authentication. Authenticating service was no
 msgstr "Something went wrong during authentication. Authenticating service was notified and you may close this page."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:34
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:224
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:173
 msgid "Source code"
 msgstr "Source code"
 
@@ -680,12 +684,12 @@ msgid "Still have an identity number?"
 msgstr "Still have an identity number?"
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:26
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:218
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:167
 msgid "Support"
 msgstr "Support"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:244
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:193
 msgid "Switch identity"
 msgstr "Switch identity"
 
@@ -793,7 +797,7 @@ msgstr "Use a device that already holds your identity to scan or open the URL. T
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:142
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:165
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:145
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:257
 msgid "Use another identity"
 msgstr "Use another identity"
 
