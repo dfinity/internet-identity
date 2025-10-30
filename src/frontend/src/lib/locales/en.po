@@ -94,7 +94,7 @@ msgstr "By enabling this feature, you can create more than one account for a sin
 msgid "Can't find your identity?"
 msgstr "Can't find your identity?"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:51
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -124,7 +124,7 @@ msgstr "choose method"
 msgid "Choose method"
 msgstr "Choose method"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:47
 msgid "Clear all"
 msgstr "Clear all"
 
@@ -251,9 +251,9 @@ msgstr "Enable multiple accounts"
 msgid "Enter characters"
 msgstr "Enter characters"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
-msgid "Enter your recovery phrases in each box, spelled correctly and in order."
-msgstr "Enter your recovery phrases in each box, spelled correctly and in order."
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:18
+msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
+msgstr "Enter your recovery phrase words in each box, spelled correctly and in order."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -617,7 +617,7 @@ msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manu
 msgid "Seamless Access"
 msgstr "Seamless Access"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:15
 msgid "Secure recovery"
 msgstr "Secure recovery"
 

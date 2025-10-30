@@ -94,7 +94,7 @@ msgstr "Al activar esta función, puedes crear más de una cuenta por app. Cambi
 msgid "Can't find your identity?"
 msgstr "¿No encuentras tu identidad?"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:51
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -124,7 +124,7 @@ msgstr "elige un método"
 msgid "Choose method"
 msgstr "Elige un método"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:47
 msgid "Clear all"
 msgstr "Borrar todo"
 
@@ -251,9 +251,9 @@ msgstr "Activar cuentas múltiples"
 msgid "Enter characters"
 msgstr "Introduce los caracteres"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
-msgid "Enter your recovery phrases in each box, spelled correctly and in order."
-msgstr "Introduce tus palabras de recuperación en cada caja, escritas correctamente y en orden."
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:18
+msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
+msgstr "Escribe tus palabras de recuperación en cada campo, escritas correctamente y en orden."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
@@ -617,7 +617,7 @@ msgstr "Escanea el código QR de arriba con tu <0>nuevo dispositivo</0> o introd
 msgid "Seamless Access"
 msgstr "Acceso Senzillo"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:15
 msgid "Secure recovery"
 msgstr "Recuperación Segura"
 

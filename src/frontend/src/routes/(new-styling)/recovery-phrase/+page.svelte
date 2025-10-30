@@ -6,6 +6,7 @@
 
 <div
   class="flex flex-1 flex-row items-end justify-center sm:max-w-120 sm:items-center"
+  style="--keyboard-inset-height: env(keyboard-inset-height);"
 >
   <AuthPanel>
     <div class="flex flex-col gap-6">
@@ -14,17 +15,18 @@
           {$t`Secure recovery`}
         </h1>
         <p class="text-text-tertiary text-sm">
-          {$t`Enter your recovery phrases in each box, spelled correctly and in order.`}
+          {$t`Enter your recovery phrase words in each box, spelled correctly and in order.`}
         </p>
       </div>
       <div class="flex flex-col gap-3">
         <div class="grid grid-cols-3 gap-3">
-          {#each Array(24) as _, i}
+          {#each Array.from({ length: 24 }) as _, i}
             <label class="relative h-8">
               <!-- Text input -->
               <input
                 type="text"
                 id={`recovery-phrase-${i}`}
+                tabindex={i + 1}
                 class="peer text-text-primary ring-border-secondary focus:ring-border-brand h-8 w-full rounded-full border-none bg-transparent pl-10 text-base ring outline-none ring-inset focus:ring-2"
               />
               <!-- Left slot -->
@@ -38,11 +40,20 @@
           {/each}
         </div>
         <div class="flex flex-row gap-2">
-          <Button class="w-full" variant="tertiary">{$t`Show all`}</Button>
-          <Button class="w-full" variant="tertiary">{$t`Clear all`}</Button>
+          <Button class="w-full" variant="tertiary" tabindex={25}
+            >{$t`Show all`}</Button
+          >
+          <Button class="w-full" variant="tertiary" tabindex={26}
+            >{$t`Clear all`}</Button
+          >
         </div>
       </div>
-      <Button size="xl" variant="secondary">{$t`Cancel`}</Button>
+      <Button size="xl" variant="secondary" tabindex={27}>{$t`Cancel`}</Button>
     </div>
   </AuthPanel>
+</div>
+<!-- Element that pushes container away from mobile keyboard or gesture navigation -->
+<div class="flex max-sm:hidden">
+  <div class="h-[var(--keyboard-inset-height)]"></div>
+  <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>

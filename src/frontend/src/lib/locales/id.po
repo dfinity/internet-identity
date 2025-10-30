@@ -94,7 +94,7 @@ msgstr "Dengan mengaktifkan fitur ini, Anda dapat membuat lebih dari satu akun u
 msgid "Can't find your identity?"
 msgstr "Tidak dapat menemukan identitas Anda?"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:51
 msgid "Cancel"
 msgstr ""
 
@@ -124,7 +124,7 @@ msgstr "pilih metode"
 msgid "Choose method"
 msgstr "Pilih metode"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:47
 msgid "Clear all"
 msgstr ""
 
@@ -251,8 +251,8 @@ msgstr "Aktifkan banyak akun"
 msgid "Enter characters"
 msgstr "Masukkan karakter"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
-msgid "Enter your recovery phrases in each box, spelled correctly and in order."
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:18
+msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
@@ -617,7 +617,7 @@ msgstr "Pindai kode QR di atas dengan <0>perangkat baru</0> Anda atau masukkan U
 msgid "Seamless Access"
 msgstr "Akses tanpa hambatan"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:15
 msgid "Secure recovery"
 msgstr ""
 

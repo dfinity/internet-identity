@@ -94,7 +94,7 @@ msgstr "Wenn Sie diese Funktion aktivieren, können Sie mehr als ein Konto für 
 msgid "Can't find your identity?"
 msgstr "Finden Sie Ihre Identität nicht?"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:45
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:51
 msgid "Cancel"
 msgstr ""
 
@@ -124,7 +124,7 @@ msgstr "Methode auswählen"
 msgid "Choose method"
 msgstr "Methode auswählen"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:42
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:47
 msgid "Clear all"
 msgstr ""
 
@@ -251,8 +251,8 @@ msgstr "Mehrere Konten aktivieren"
 msgid "Enter characters"
 msgstr "Zeichen eingeben"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:17
-msgid "Enter your recovery phrases in each box, spelled correctly and in order."
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:18
+msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:190
@@ -617,7 +617,7 @@ msgstr "Scannen Sie den obigen QR-Code mit Ihrem <0>neuen Gerät</0> oder geben 
 msgid "Seamless Access"
 msgstr "Nahtloser Zugriff"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:14
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:15
 msgid "Secure recovery"
 msgstr ""
 
