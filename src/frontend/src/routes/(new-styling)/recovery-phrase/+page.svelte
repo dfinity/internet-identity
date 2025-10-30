@@ -2,6 +2,20 @@
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
+  import { nonNullish } from "@dfinity/utils";
+
+  const handleKeyDown = (event: KeyboardEvent, currentTabIndex: number) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      const nextTabIndex = currentTabIndex + 1;
+      const nextElement = document.querySelector(
+        `[tabindex="${nextTabIndex}"]`,
+      ) as HTMLElement;
+      if (nonNullish(nextElement)) {
+        nextElement.focus();
+      }
+    }
+  };
 </script>
 
 <div
@@ -27,6 +41,7 @@
                 type="text"
                 id={`recovery-phrase-${i}`}
                 tabindex={i + 1}
+                on:keydown={(e) => handleKeyDown(e, i + 1)}
                 class="peer text-text-primary ring-border-secondary focus:ring-border-brand h-8 w-full rounded-full border-none bg-transparent pl-10 text-base ring outline-none ring-inset focus:ring-2"
               />
               <!-- Left slot -->
