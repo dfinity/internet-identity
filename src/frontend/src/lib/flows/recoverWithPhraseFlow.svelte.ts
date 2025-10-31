@@ -3,7 +3,6 @@ import {
   IdentityInfo,
 } from "$lib/generated/internet_identity_types";
 import { agentOptions, anonymousActor } from "$lib/globals";
-import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   fromMnemonicWithoutValidation,
   IC_DERIVATION_PATH,
