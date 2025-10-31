@@ -76,19 +76,6 @@
     />
   {/if}
   <div class="flex flex-col items-stretch gap-3">
-    <Tooltip
-      label="You have reached the maximum number of passkeys."
-      hidden={!maxPasskeysReached}
-    >
-      <Button
-        onclick={continueWithPasskey}
-        disabled={!isPasskeySupported || authenticating || maxPasskeysReached}
-        size="xl"
-      >
-        <PasskeyIcon />
-        Continue with passkey
-      </Button>
-    </Tooltip>
     <div class="flex flex-row flex-nowrap justify-stretch gap-3">
       {#each openIdProviders as provider}
         <Tooltip
@@ -113,6 +100,20 @@
         </Tooltip>
       {/each}
     </div>
+    <Tooltip
+      label="You have reached the maximum number of passkeys."
+      hidden={!maxPasskeysReached}
+    >
+      <Button
+        onclick={continueWithPasskey}
+        variant="secondary"
+        disabled={!isPasskeySupported || authenticating || maxPasskeysReached}
+        size="xl"
+      >
+        <PasskeyIcon />
+        Continue with passkey
+      </Button>
+    </Tooltip>
   </div>
 </div>
 

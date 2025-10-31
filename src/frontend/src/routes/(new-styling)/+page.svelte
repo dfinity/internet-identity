@@ -20,12 +20,14 @@
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
   import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
 
-  // Add rerouting back on this SSG route
-  manuallyReroute();
-
   let triggerAnimation =
     $state<(opts: FlairAnimationOptions) => Promise<void>>();
   let clearAnimation = $state<() => void>();
+
+  // Add rerouting back on this SSG route
+  $effect(() => {
+    manuallyReroute();
+  });
 
   $effect(() => {
     triggerAnimation?.(DROP_WAVE_ANIMATION);

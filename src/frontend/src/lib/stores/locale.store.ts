@@ -1,5 +1,5 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
-import { derived, get, Readable } from "svelte/store";
+import { derived, get, readable, Readable } from "svelte/store";
 import { writableStored } from "./writable.store";
 import { building } from "$app/environment";
 import { i18n } from "@lingui/core";
@@ -104,4 +104,40 @@ export const formatNumber = derived(
   localeStore,
   () => (value: number, format?: Intl.NumberFormatOptions) =>
     i18n.number(value, format),
+);
+const now = readable(Date.now(), (set) => {
+  const interval = setInterval(() => set(Date.now()), 1000);
+  return () => clearInterval(interval);
+});
+export const formatRelative = derived(
+  [localeStore, now],
+  ([locale, now]) =>
+    (
+      value: string | Date,
+      format?: Intl.RelativeTimeFormatOptions,
+      {
+        units = [
+          { unit: "year", ms: 1000 * 60 * 60 * 24 * 365 },
+          { unit: "month", ms: 1000 * 60 * 60 * 24 * 30 },
+          { unit: "day", ms: 1000 * 60 * 60 * 24 },
+          { unit: "hour", ms: 1000 * 60 * 60 },
+          { unit: "minute", ms: 1000 * 60 },
+          { unit: "second", ms: 1000 },
+        ],
+      } = {},
+    ) => {
+      const diffMs = new Date(value).getTime() - now;
+      const rtf = new Intl.RelativeTimeFormat(locale, format);
+
+      // Pick unit within threshold
+      for (const { unit, ms } of units) {
+        if (Math.abs(diffMs) >= ms || unit === "second") {
+          const value = Math.round(diffMs / ms);
+          return rtf.format(value, unit as Intl.RelativeTimeFormatUnit);
+        }
+      }
+
+      // Fallback
+      return i18n.date(value);
+    },
 );

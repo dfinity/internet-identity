@@ -13,7 +13,7 @@
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
 
   interface Props {
-    onOpenIDLinked: (credential: OpenIdCredential) => void;
+    onOpenIdLinked: (credential: OpenIdCredential) => void;
     onPasskeyRegistered: (credential: AuthnMethodData) => void;
     onOtherDeviceRegistered: () => void;
     onClose: () => void;
@@ -24,7 +24,7 @@
   }
 
   const {
-    onOpenIDLinked,
+    onOpenIdLinked,
     onPasskeyRegistered,
     onOtherDeviceRegistered,
     onClose,
@@ -43,7 +43,7 @@
 
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
     try {
-      onOpenIDLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
+      onOpenIdLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
       onClose();
     } catch (error) {
       onError(error);

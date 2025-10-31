@@ -8,8 +8,9 @@
     LifeBuoyIcon,
     CodeIcon,
   } from "@lucide/svelte";
+  import type { LayoutProps } from "./$types";
   import { page } from "$app/state";
-  import { goto } from "$app/navigation";
+  import { goto, invalidateAll, replaceState } from "$app/navigation";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -21,19 +22,19 @@
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
-  import type { Snippet } from "svelte";
   import { sessionStore } from "$lib/stores/session.store";
   import { t } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
+  import { nonNullish } from "@dfinity/utils";
+  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
 
-  interface Props {
-    children: Snippet;
-  }
+  const { children, data }: LayoutProps = $props();
 
-  const { children }: Props = $props();
+  const authLastUsedFlow = new AuthLastUsedFlow();
 
+  let pendingRegistrationId = $state(data.pendingRegistrationId);
   let identityButtonRef = $state<HTMLElement>();
   let isMobileSidebarOpen = $state(false);
   let isIdentityPopoverOpen = $state(false);
@@ -47,41 +48,36 @@
   );
 
   const gotoManage = () => goto("/manage", { replaceState: true });
-  const onSignIn = async (identityNumber: bigint) => {
-    identityInfo.reset();
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void identityInfo.fetch();
-    await gotoManage();
+  const handleSignIn = async (identityNumber: bigint) => {
     isAuthDialogOpen = false;
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    await invalidateAll();
   };
-  const onSignUp = async (identityNumber: bigint) => {
-    identityInfo.reset();
+  const handleSignUp = async (identityNumber: bigint) => {
+    isAuthDialogOpen = false;
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
       title: "You're all set. Your identity has been created.",
       duration: 2000,
     });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void identityInfo.fetch();
-    await gotoManage();
-    isAuthDialogOpen = false;
+    await invalidateAll();
   };
-  const onMigration = async (identityNumber: bigint) => {
+  const handleMigration = async (identityNumber: bigint) => {
+    isAuthDialogOpen = false;
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
       title: "Migration completed successfully",
       duration: 4000,
     });
-    isAuthDialogOpen = false;
-    await gotoManage();
+    await invalidateAll();
   };
-
-  const authLastUsedFlow = new AuthLastUsedFlow();
-  $effect(() =>
-    authLastUsedFlow.init(
-      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
-    ),
-  );
-
+  const handleConfirmAccessMethod = async () => {
+    pendingRegistrationId = null;
+    toaster.success({
+      title: "Passkey has been registered from another device.",
+    });
+    await invalidateAll();
+  };
   const handleSwitchIdentity = async (identityNumber: bigint) => {
     await sessionStore.reset();
     const chosenIdentity =
@@ -94,10 +90,22 @@
     isIdentityPopoverOpen = false;
   };
 
+  // Initialize the flow every time the identity changes
+  $effect(() => {
+    authLastUsedFlow.init([$authenticatedStore.identityNumber]);
+  });
+
   // Hide mobile sidebar on navigation
   $effect(() => {
     page.route.id;
     isMobileSidebarOpen = false;
+  });
+
+  // Remove registration id from URL bar after assigning it to state
+  $effect(() => {
+    if (page.url.searchParams.has("activate")) {
+      // replaceState("/manage", {});
+    }
   });
 </script>
 
@@ -192,7 +200,9 @@
         class="ml-auto gap-2.5 pr-3 sm:-mr-3"
         aria-label={$t`Switch identity`}
       >
-        <span>{identityInfo.name ?? $authenticatedStore.identityNumber}</span>
+        <span
+          >{data.identityInfo.name ?? $authenticatedStore.identityNumber}</span
+        >
         <ChevronDownIcon size="1rem" />
       </Button>
       <!-- Mobile menu button -->
@@ -244,9 +254,9 @@
   >
     <AuthWizard
       bind:isAuthenticating
-      {onSignIn}
-      {onSignUp}
-      {onMigration}
+      onSignIn={handleSignIn}
+      onSignUp={handleSignUp}
+      onMigration={handleMigration}
       onError={(error) => {
         isAuthDialogOpen = false;
         handleError(error);
@@ -260,5 +270,18 @@
         {$t`choose method`}
       </p>
     </AuthWizard>
+  </Dialog>
+{/if}
+
+{#if nonNullish(pendingRegistrationId)}
+  <Dialog onClose={() => (pendingRegistrationId = null)}>
+    <ConfirmAccessMethodWizard
+      registrationId={pendingRegistrationId}
+      onConfirm={handleConfirmAccessMethod}
+      onError={(error) => {
+        handleError(error);
+        pendingRegistrationId = null;
+      }}
+    />
   </Dialog>
 {/if}

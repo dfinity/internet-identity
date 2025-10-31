@@ -15,7 +15,7 @@
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import { goto } from "$app/navigation";
+  import { goto, preloadData } from "$app/navigation";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import type { PageProps } from "./$types";
@@ -31,6 +31,7 @@
   const { data }: PageProps = $props();
 
   const gotoNext = () => goto(data.next ?? "/manage", { replaceState: true });
+  let redirectingIdentity = $state<bigint>();
 
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -39,6 +40,8 @@
       duration: 4000,
     });
     isAuthDialogOpen = false;
+    redirectingIdentity = identityNumber;
+    await preloadData("/manage");
     await goto("/manage");
   };
   const onSignIn = async (identityNumber: bigint) => {
@@ -46,6 +49,8 @@
     isAuthDialogOpen = false;
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
+    redirectingIdentity = identityNumber;
+    await preloadData("/manage");
     await gotoNext();
   };
   const onSignUp = async (identityNumber: bigint) => {
@@ -57,6 +62,8 @@
     isAuthDialogOpen = false;
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
+    redirectingIdentity = identityNumber;
+    await preloadData("/manage");
     await gotoNext();
   };
 
@@ -111,10 +118,13 @@
               <li class="contents">
                 <ButtonCard
                   onclick={() => handleContinueAs(identity)}
-                  disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+                  disabled={nonNullish(
+                    authLastUsedFlow.authenticatingIdentity ??
+                      redirectingIdentity,
+                  )}
                 >
                   <Avatar size="sm">
-                    {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity}
+                    {#if identity.identityNumber === authLastUsedFlow.authenticatingIdentity || identity.identityNumber === redirectingIdentity}
                       <ProgressRing />
                     {:else}
                       <UserIcon class="size-5" />
@@ -134,7 +144,9 @@
           </ul>
           <ButtonCard
             onclick={() => (isAuthDialogOpen = true)}
-            disabled={nonNullish(authLastUsedFlow.authenticatingIdentity)}
+            disabled={nonNullish(
+              authLastUsedFlow.authenticatingIdentity ?? redirectingIdentity,
+            )}
           >
             <FeaturedIcon size="sm">
               <PlusIcon class="size-5" />

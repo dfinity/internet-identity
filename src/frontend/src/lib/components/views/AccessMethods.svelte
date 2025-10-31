@@ -268,7 +268,7 @@
 
 {#if isAddAccessMethodWizardOpen}
   <AddAccessMethodWizard
-    onOpenIDLinked={handleOpenIDLinked}
+    onOpenIdLinked={handleOpenIDLinked}
     onPasskeyRegistered={handlePasskeyRegistered}
     onOtherDeviceRegistered={handleOtherDeviceRegistered}
     onClose={() => (isAddAccessMethodWizardOpen = false)}
