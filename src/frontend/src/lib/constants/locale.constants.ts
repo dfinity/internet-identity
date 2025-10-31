@@ -2,4 +2,4 @@
 export const availableLocales = ["en", "de", "es", "id"];
 
 // List of languages that are actually enabled
-export const enabledLocales = ["en"];
+export const enabledLocales = ["en", "es"];

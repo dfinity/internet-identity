@@ -9,33 +9,28 @@
   import { ChevronDownIcon } from "@lucide/svelte";
   import type { HTMLAttributes } from "svelte/elements";
 
-  const { class: className, ...props }: HTMLAttributes<HTMLElement> = $props();
-
   let buttonRef = $state<HTMLElement>();
   let isOpen = $state(false);
 </script>
 
 {#if $locales.length > 1}
-  <Button
-    {...props}
-    bind:element={buttonRef}
+  <button
+    bind:this={buttonRef}
     onclick={() => (isOpen = true)}
-    variant="tertiary"
-    class="uppercase"
+    class="uppercase outline-0 focus-visible:underline"
   >
     {$localeStore}
-    <ChevronDownIcon class="size-4" />
-  </Button>
+  </button>
 {/if}
 {#if isOpen}
   <Popover
     anchor={buttonRef}
     onClose={() => (isOpen = false)}
-    direction="down"
+    direction="up"
     align="start"
-    distance="0.25rem"
+    distance="0.5rem"
     responsive={false}
-    class="!w-18 !p-1.5"
+    class="-ml-5 !w-18 !p-1.5"
   >
     <ul class="flex flex-col">
       {#each $locales as locale}
@@ -51,6 +46,7 @@
               }
             }}
             variant="tertiary"
+            size="sm"
             class={[
               "justify-start text-start uppercase",
               locale === $localeStore &&
