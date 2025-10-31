@@ -1,6 +1,5 @@
-// ALREADY COPIED OUT OF LEGACY folder in `utils/recoveryPhrase.ts`
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
-import { mnemonicToSeedSync, validateMnemonic } from "bip39";
+import { mnemonicToSeedSync } from "bip39";
 
 // A constant used for xor-ing derived paths to make them hardened.
 const HARDENED = 0x80000000;
