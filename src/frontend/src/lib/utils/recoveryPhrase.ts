@@ -1,9 +1,14 @@
-// ALREADY COPIED OUT OF LEGACY folder in `utils/recoveryPhrase.ts`
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { mnemonicToSeedSync, validateMnemonic } from "bip39";
 
+export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
+
 // A constant used for xor-ing derived paths to make them hardened.
 const HARDENED = 0x80000000;
+
+export const isValidMnemonic = (mnemonic: string): boolean => {
+  return validateMnemonic(mnemonic);
+};
 
 /**
  * Create an Ed25519 according to SLIP 0010:
@@ -40,13 +45,10 @@ export async function fromSeedWithSlip0010(
  * @param derivationPath an array that is always interpreted as a hardened path.
  * e.g. to generate m/44'/223’/0’/0’/0' the derivation path should be [44, 223, 0, 0, 0]
  */
-export function fromMnemonic(
+export function fromMnemonicWithoutValidation(
   mnemonic: string,
   derivationPath: number[] = [],
 ): Promise<Ed25519KeyIdentity> {
-  if (!validateMnemonic(mnemonic)) {
-    throw new Error("Invalid mnemonic");
-  }
   const seed = mnemonicToSeedSync(mnemonic);
   return fromSeedWithSlip0010(seed, derivationPath);
 }

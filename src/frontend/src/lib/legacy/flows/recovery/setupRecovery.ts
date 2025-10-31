@@ -1,6 +1,6 @@
 import type { DeviceData } from "$lib/generated/internet_identity_types";
 import { withLoader } from "$lib/templates/loader";
-import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
+import { fromMnemonic } from "$lib/legacy/crypto/ed25519";
 import { generate } from "$lib/legacy/crypto/mnemonic";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
@@ -107,10 +107,7 @@ export const phraseWizard = async ({
   uploadPhrase: (pubkey: DerEncodedPublicKey) => Promise<void>;
 }): Promise<{ ok: SignIdentity } | { error: unknown } | { canceled: void }> => {
   const seedPhrase = generate().trim();
-  const recoverIdentity = await fromMnemonicWithoutValidation(
-    seedPhrase,
-    IC_DERIVATION_PATH,
-  );
+  const recoverIdentity = await fromMnemonic(seedPhrase, IC_DERIVATION_PATH);
 
   const phrase = userNumber.toString(10) + " " + seedPhrase;
   const res = await displayAndConfirmPhrase({ phrase, operation });
