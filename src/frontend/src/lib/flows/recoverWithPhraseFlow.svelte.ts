@@ -2,7 +2,7 @@ import {
   DeviceKey,
   IdentityInfo,
 } from "$lib/generated/internet_identity_types";
-import { anonymousActor } from "$lib/globals";
+import { agentOptions, anonymousActor } from "$lib/globals";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   fromMnemonicWithoutValidation,
@@ -78,7 +78,10 @@ export const recoverWithPhrase = async (
       identity: delegationIdentity,
       identityNumber: BigInt(userNumber),
     });
-    const agent = HttpAgent.createSync({ identity: delegationIdentity });
+    const agent = HttpAgent.createSync({
+      ...agentOptions,
+      identity: delegationIdentity,
+    });
     // Make call to lookup endpoint
     const identityInfo = await anonymousActor.identity_info
       .withOptions({ agent })(BigInt(userNumber))

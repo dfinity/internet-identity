@@ -16,12 +16,21 @@
   );
 
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
+    // Submit with "Enter" if in the last element and all words are filled.
+    if (
+      event.key === "Enter" &&
+      currentIndex === words.length - 1 &&
+      submitEnabled
+    ) {
+      handleRecoverWithPhrase();
+      return;
+    }
     if (event.key === "Enter" || event.code === "Space") {
       event.preventDefault();
-      const nextTabIndex = currentIndex + 1;
-      if (nextTabIndex < words.length) {
+      const nextInputIndex = currentIndex + 1;
+      if (nextInputIndex < words.length) {
         const nextElement = document.getElementById(
-          `recovery-phrase-${nextTabIndex}`,
+          `recovery-phrase-${nextInputIndex}`,
         );
         if (nonNullish(nextElement)) {
           nextElement.focus();
@@ -71,8 +80,12 @@
     const nextElement = document.getElementById(
       `recovery-phrase-${focusIndex}`,
     );
-    if (nonNullish(nextElement)) {
+    // Don't set focus somewhere if all words are filled.
+    if (nonNullish(nextElement) && focusIndex < words.length - 1) {
       nextElement.focus();
+    } else {
+      // This might trigger the recovery flow if all words are filled.
+      (event.currentTarget as HTMLElement)?.blur();
     }
   };
 
