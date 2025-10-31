@@ -1,7 +1,7 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import { RecoverWithPhraseFlow } from "$lib/flows/recoverWithPhraseFlow.svelte";
+  import { recoverWithPhrase } from "$lib/flows/recoverWithPhraseFlow.svelte";
   import { t } from "$lib/stores/locale.store";
   import { nonNullish } from "@dfinity/utils";
 
@@ -14,8 +14,6 @@
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0),
   );
-
-  const recoveryFlow = new RecoverWithPhraseFlow();
 
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
     if (event.key === "Enter" || event.code === "Space") {
@@ -34,7 +32,7 @@
 
   const handleRecoverWithPhrase = async () => {
     const phraseWords = words.map((word) => word.value);
-    const result = await recoveryFlow.recoverWithPhrase(phraseWords);
+    const result = await recoverWithPhrase(phraseWords);
     // TODO: Handle success and error
     if (result.success) {
       console.log("success", result.info);
