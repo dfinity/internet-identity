@@ -41,6 +41,41 @@
     }
   };
 
+  const handlePaste = (event: ClipboardEvent, currentIndex: number) => {
+    event.preventDefault();
+
+    // Get pasted text from clipboard
+    const pastedText = event.clipboardData?.getData("text");
+    if (!pastedText) return;
+
+    // Split by whitespace and filter out empty strings
+    const pastedWords = pastedText.split(" ");
+
+    // Fill inputs starting from current index
+    pastedWords.forEach((word, i) => {
+      const targetIndex = currentIndex + i;
+      if (targetIndex < words.length) {
+        words[targetIndex].value = word;
+      }
+    });
+
+    // Focus on the next empty input or the last filled input
+    const nextEmptyIndex = words.findIndex(
+      (word, i) => i > currentIndex && word.value.trim() === "",
+    );
+    const focusIndex =
+      nextEmptyIndex !== -1
+        ? nextEmptyIndex
+        : Math.min(currentIndex + pastedWords.length, words.length - 1);
+
+    const nextElement = document.getElementById(
+      `recovery-phrase-${focusIndex}`,
+    );
+    if (nonNullish(nextElement)) {
+      nextElement.focus();
+    }
+  };
+
   const handleBlur = () => {
     // Auto-submit when all 24 words are complete
     if (submitEnabled) {
@@ -72,6 +107,7 @@
                 id={`recovery-phrase-${i}`}
                 bind:value={word.value}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
+                onpaste={(e) => handlePaste(e, i)}
                 onblur={handleBlur}
                 class="peer text-text-primary ring-border-secondary focus:ring-border-brand h-8 w-full rounded-full border-none bg-transparent pl-10 text-base ring outline-none ring-inset focus:ring-2"
               />
