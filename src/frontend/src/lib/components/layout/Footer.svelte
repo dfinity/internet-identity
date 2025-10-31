@@ -2,6 +2,9 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import { t } from "$lib/stores/locale.store";
+  import Header from "$lib/components/layout/Header.svelte";
+  import { LanguageSelector } from "$lib/components/locale";
+  import LanguageSelectorFooter from "$lib/components/locale/LanguageSelectorFooter.svelte";
 
   type Props = HTMLAttributes<HTMLElement>;
 
@@ -17,6 +20,7 @@
 >
   <div class="text-text-tertiary text-xs font-medium">© Internet Identity</div>
   <nav class="text-text-primary flex gap-4 text-xs font-semibold">
+    <LanguageSelectorFooter />
     <a
       href={SUPPORT_URL}
       target="_blank"

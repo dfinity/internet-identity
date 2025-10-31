@@ -74,7 +74,8 @@
     <div
       class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
     >
-      <LanguageSelector />
+      <!-- TODO: Re-position language selector for now on mobile till updated design is implemented -->
+      <LanguageSelector class="max-md:absolute max-md:top-3 max-md:right-3" />
       <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank">
         {$t`For developers`}
       </Button>
