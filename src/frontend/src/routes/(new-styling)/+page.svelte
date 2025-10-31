@@ -206,8 +206,8 @@
         "[&_summary]:text-text-primary [&_summary]:cursor-pointer [&_summary]:font-medium [&_summary]:select-none md:[&_summary]:text-xl",
         // Summary icons
         "[&_summary_svg]:text-text-placeholder [&_summary_svg]:ml-auto [&_summary_svg]:size-6 [&_summary_svg]:shrink-0",
-        // Toggle summary icons
-        "[&_details:not(:open)_summary_svg:first-child]:hidden [&_details:open_summary_svg:last-child]:hidden",
+        // Toggle summary icons, uses [open] instead of :open due to Safari not supporting the latter
+        "[&_details:not([open])_summary_svg:first-child]:hidden [&_details[open]_summary_svg:last-child]:hidden",
         // Paragraph styling and spacing
         "[&_p]:text-text-secondary [&_p]:mb-4 [&_p]:text-base",
         // Paragraph + list spacing
