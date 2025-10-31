@@ -30,7 +30,7 @@ const authenticateWithRecoveryPhrase = async (
   return DelegationIdentity.fromDelegation(sessionKey, chain);
 };
 
-export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
+const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   if (buf1.byteLength != buf2.byteLength) return false;
   const dv1 = new Int8Array(buf1);
   const dv2 = new Int8Array(buf2);
@@ -74,10 +74,6 @@ export const recoverWithPhrase = async (
       return { success: false, error: new Error("Invalid phrase") };
     }
     const delegationIdentity = await authenticateWithRecoveryPhrase(identity);
-    await authenticationStore.set({
-      identity: delegationIdentity,
-      identityNumber: BigInt(userNumber),
-    });
     const agent = HttpAgent.createSync({
       ...agentOptions,
       identity: delegationIdentity,

@@ -31,7 +31,7 @@ import type {
   UserNumber,
   VerifyTentativeDeviceResponse,
 } from "$lib/generated/internet_identity_types";
-import { fromMnemonic } from "$lib/legacy/crypto/ed25519";
+import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { get } from "svelte/store";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { features } from "$lib/legacy/features";
@@ -599,7 +599,10 @@ export class Connection {
       };
     }
 
-    const identity = await fromMnemonic(seedPhrase, IC_DERIVATION_PATH);
+    const identity = await fromMnemonicWithoutValidation(
+      seedPhrase,
+      IC_DERIVATION_PATH,
+    );
     if (
       !pubkeys.some((pubkey) =>
         bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),

@@ -16,12 +16,8 @@
   );
 
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
-    // Submit with "Enter" if in the last element and all words are filled.
-    if (
-      event.key === "Enter" &&
-      currentIndex === words.length - 1 &&
-      submitEnabled
-    ) {
+    const isLastIndex = currentIndex === words.length - 1;
+    if (event.key === "Enter" && isLastIndex && submitEnabled) {
       handleRecoverWithPhrase();
       return;
     }
@@ -57,10 +53,8 @@
     const pastedText = event.clipboardData?.getData("text");
     if (!pastedText) return;
 
-    // Split by whitespace and filter out empty strings
-    const pastedWords = pastedText.split(" ");
-
     // Fill inputs starting from current index
+    const pastedWords = pastedText.split(" ");
     pastedWords.forEach((word, i) => {
       const targetIndex = currentIndex + i;
       if (targetIndex < words.length) {
@@ -84,7 +78,7 @@
     if (nonNullish(nextElement) && focusIndex < words.length - 1) {
       nextElement.focus();
     } else {
-      // This might trigger the recovery flow if all words are filled.
+      // This will trigger the recovery flow if all words are filled.
       (event.currentTarget as HTMLElement)?.blur();
     }
   };

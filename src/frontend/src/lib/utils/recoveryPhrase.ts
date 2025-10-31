@@ -6,9 +6,14 @@ export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 // A constant used for xor-ing derived paths to make them hardened.
 const HARDENED = 0x80000000;
 
-export const isValidMnemonic = (mnemonic: string): boolean => {
-  return validateMnemonic(mnemonic);
-};
+/**
+ * Validates a mnemonic phrase using BIP-39.
+ *
+ * @param mnemonic A BIP-39 mnemonic phrase.
+ * @returns {boolean} True if the mnemonic is valid, false otherwise.
+ */
+export const isValidMnemonic = (mnemonic: string): boolean =>
+  validateMnemonic(mnemonic);
 
 /**
  * Create an Ed25519 according to SLIP 0010:
