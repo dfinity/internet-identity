@@ -29,7 +29,7 @@
     authnMethodEqual,
     authnMethodToPublicKey,
   } from "$lib/utils/webAuthn";
-  import { goto, invalidateAll } from "$app/navigation";
+  import { invalidateAll } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
@@ -39,7 +39,8 @@
   import { OpenIdDelegationIdentity } from "$lib/utils/authentication";
   import UnlinkOpenIdCredential from "$lib/components/views/UnlinkOpenIdCredential.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { get } from "svelte/store";
+  import OpenIdItem from "$lib/components/ui/OpenIdItem.svelte";
+  import PasskeyItem from "$lib/components/ui/PasskeyItem.svelte";
 
   const MAX_PASSKEYS = 8;
 
@@ -220,176 +221,10 @@
     }
   };
   const logoutAndForgetIdentity = () => {
-    lastUsedIdentitiesStore.removeIdentity(
-      get(authenticatedStore).identityNumber,
-    );
+    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
     location.replace("/login");
   };
 </script>
-
-{#snippet passkeyListItem(item: AuthnMethodData)}
-  <div class="mb-3 flex h-9 flex-row items-center justify-between">
-    <div class="relative">
-      <PasskeyIcon class="text-fg-primary size-6" />
-      {#if passkeyInUse(item)}
-        <div
-          class="bg-bg-success-secondary border-bg-primary absolute top-0 -right-0.25 size-2.5 rounded-full border-2"
-        ></div>
-      {/if}
-    </div>
-    <Select
-      options={[
-        {
-          label: $t`Rename`,
-          icon: PencilIcon,
-          onClick: () => (renamablePasskey = item),
-        },
-        ...(accessMethods.length > 1
-          ? [
-              {
-                label: $t`Remove`,
-                icon: Trash2Icon,
-                onClick: () => (removablePasskey = item),
-              },
-            ]
-          : []),
-      ]}
-      align="end"
-    >
-      <Button variant="tertiary" size="sm" iconOnly>
-        <EllipsisVerticalIcon class="size-5" />
-      </Button>
-    </Select>
-  </div>
-  <div class="text-text-primary mb-1 text-base font-semibold">
-    {getMetadataString(item.metadata, "alias")}
-  </div>
-  <div class="text-text-tertiary text-sm">
-    {$t`Passkey`}
-  </div>
-  <div class="border-border-tertiary my-5 border-t"></div>
-  <div class="mb-4 flex flex-row">
-    <div class="flex flex-1 flex-col gap-1">
-      <div class="text-text-primary text-xs font-semibold">
-        {$t`Last used`}
-      </div>
-      <div class="text-text-primary cursor-default text-xs">
-        {#if passkeyInUse(item)}
-          <Tooltip
-            label={$t`Currently signed in with this passkey`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`Right now`}</span>
-          </Tooltip>
-        {:else if nonNullish(item.last_authentication[0])}
-          {@const date = new Date(nanosToMillis(item.last_authentication[0]))}
-          <Tooltip
-            label={$formatDate(date, {
-              timeStyle: "short",
-              dateStyle: "medium",
-            })}
-            direction="up"
-            align="start"
-          >
-            <span>{$formatRelative(date, { style: "long" })}</span>
-          </Tooltip>
-        {:else}
-          <Tooltip
-            label={$t`Has not been used yet`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`n/a`}</span>
-          </Tooltip>
-        {/if}
-      </div>
-    </div>
-  </div>
-  <div class="text-text-primary text-xs">
-    {$t`Stored securely on your device, in your password manager, or on a security key.`}
-  </div>
-{/snippet}
-
-{#snippet openIdListItem(item: OpenIdCredential)}
-  {@const name = openIdName(item.iss, item.metadata)}
-  {@const email = getMetadataString(item.metadata, "email")}
-
-  <div class="mb-3 flex h-9 flex-row items-center justify-between">
-    <div class="text-fg-primary relative size-6">
-      {@html openIdLogo(item.iss, item.metadata)}
-      {#if openIdInUse(item)}
-        <div
-          class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
-        ></div>
-      {/if}
-    </div>
-    {#if accessMethods.length > 1}
-      <Select
-        options={[
-          {
-            label: $t`Unlink`,
-            icon: Link2OffIcon,
-            onClick: () => (unlinkableOpenIdCredential = item),
-          },
-        ]}
-        align="end"
-      >
-        <Button variant="tertiary" size="sm" iconOnly>
-          <EllipsisVerticalIcon class="size-5" />
-        </Button>
-      </Select>
-    {/if}
-  </div>
-  <div class="text-text-primary mb-1 text-base font-semibold">
-    {$t`${name} account`}
-  </div>
-  <div class="text-text-tertiary text-sm">
-    {email ?? $t`Hidden email`}
-  </div>
-  <div class="border-border-tertiary my-5 border-t"></div>
-  <div class="mb-4 flex flex-row">
-    <div class="flex flex-1 flex-col gap-1">
-      <div class="text-text-primary text-xs font-semibold">
-        {$t`Last used`}
-      </div>
-      <div class="text-text-primary cursor-default text-xs">
-        {#if openIdInUse(item)}
-          <Tooltip
-            label={$t`Currently signed in with this account`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`Right now`}</span>
-          </Tooltip>
-        {:else if nonNullish(item.last_usage_timestamp[0])}
-          {@const date = new Date(nanosToMillis(item.last_usage_timestamp[0]))}
-          <Tooltip
-            label={$formatDate(date, {
-              timeStyle: "short",
-              dateStyle: "medium",
-            })}
-            direction="up"
-            align="start"
-          >
-            <span>{$formatRelative(date, { style: "long" })}</span>
-          </Tooltip>
-        {:else}
-          <Tooltip
-            label={$t`Has not been used yet`}
-            direction="up"
-            align="start"
-          >
-            <span>{$t`n/a`}</span>
-          </Tooltip>
-        {/if}
-      </div>
-    </div>
-  </div>
-  <div class="text-text-primary text-xs">
-    {$t`Sign in with your ${name} account from any device.`}
-  </div>
-{/snippet}
 
 <header class="flex flex-col gap-3">
   <h1 class="text-text-primary text-3xl font-medium">{$t`Access methods`}</h1>
@@ -425,9 +260,22 @@
         ]}
       >
         {#if accessMethod.type === "passkey"}
-          {@render passkeyListItem(accessMethod.data)}
+          <PasskeyItem
+            data={accessMethod.data}
+            onRename={() => (renamablePasskey = accessMethod.data)}
+            onRemove={accessMethods.length > 1
+              ? () => (removablePasskey = accessMethod.data)
+              : undefined}
+            inUse={passkeyInUse(accessMethod.data)}
+          />
         {:else if accessMethod.type === "openid"}
-          {@render openIdListItem(accessMethod.data)}
+          <OpenIdItem
+            credential={accessMethod.data}
+            onUnlink={accessMethods.length > 1
+              ? () => (unlinkableOpenIdCredential = accessMethod.data)
+              : undefined}
+            inUse={openIdInUse(accessMethod.data)}
+          />
         {/if}
       </div>
     {/each}
