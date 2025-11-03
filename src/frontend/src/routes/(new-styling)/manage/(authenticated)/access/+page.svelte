@@ -28,6 +28,7 @@
   import {
     authnMethodEqual,
     authnMethodToPublicKey,
+    getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
   import { invalidateAll } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
@@ -302,7 +303,7 @@
 {#if renamablePasskey}
   <Dialog onClose={() => (renamablePasskey = undefined)}>
     <RenamePasskey
-      name={getMetadataString(renamablePasskey.metadata, "alias") ?? ""}
+      name={getAuthnMethodAlias(renamablePasskey)}
       onRename={handleRenamePasskey}
       onCancel={() => (renamablePasskey = undefined)}
     />
