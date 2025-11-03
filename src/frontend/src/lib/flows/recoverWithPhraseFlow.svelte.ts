@@ -30,11 +30,11 @@ const authenticateWithRecoveryPhrase = async (
 };
 
 const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
-  if (buf1.byteLength != buf2.byteLength) return false;
+  if (buf1.byteLength !== buf2.byteLength) return false;
   const dv1 = new Int8Array(buf1);
   const dv2 = new Int8Array(buf2);
-  for (let i = 0; i != buf1.byteLength; i++) {
-    if (dv1[i] != dv2[i]) return false;
+  for (let i = 0; i !== buf1.byteLength; i++) {
+    if (dv1[i] !== dv2[i]) return false;
   }
   return true;
 };
@@ -79,7 +79,7 @@ export const recoverWithPhrase = async (
     });
     // Make call to lookup endpoint
     const identityInfo = await anonymousActor.identity_info
-      .withOptions({ agent })(BigInt(userNumber))
+      .withOptions({ agent })(userNumber)
       .then(throwCanisterError);
     return {
       success: true,

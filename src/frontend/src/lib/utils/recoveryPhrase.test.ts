@@ -9,7 +9,7 @@ type TestVector = {
   derivationPath?: number[];
 };
 
-// Test vectors consist of taken from
+// Test vectors are taken from
 // https://github.com/satoshilabs/slips/blob/master/slip-0010.md
 // The public key vectors contained a leading 0-byte for no obvious reason.
 // These were removed.

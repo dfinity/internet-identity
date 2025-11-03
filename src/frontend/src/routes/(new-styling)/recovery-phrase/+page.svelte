@@ -10,6 +10,9 @@
     Array.from({ length: 24 }, () => ({ value: "" })),
   );
 
+  // Flag to prevent double-triggering recovery on multiple blur events
+  let recoveryInProgress = $state(false);
+
   // TODO: Use word validation instead of presence.
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0),
@@ -36,13 +39,26 @@
   };
 
   const handleRecoverWithPhrase = async () => {
+    if (recoveryInProgress) {
+      return;
+    }
+    recoveryInProgress = true;
+
     const phraseWords = words.map((word) => word.value);
-    const result = await recoverWithPhrase(phraseWords);
-    // TODO: Handle success and error
-    if (result.success) {
-      console.log("success", result.info);
-    } else {
-      console.log("error", result.error);
+    try {
+      const result = await recoverWithPhrase(phraseWords);
+      // TODO: Handle success and error
+      if (result.success) {
+        console.log("success", result.info);
+      } else {
+        console.log("error", result.error);
+      }
+    } catch (error) {
+      // TODO: Manage error
+      console.error("error", error);
+    } finally {
+      // Reset flag on error to allow retry
+      recoveryInProgress = false;
     }
   };
 
@@ -53,8 +69,9 @@
     const pastedText = event.clipboardData?.getData("text");
     if (!pastedText) return;
 
-    // Fill inputs starting from current index
-    const pastedWords = pastedText.split(" ");
+    // Uses might paste text with multiple spaces, tabs, or newlines between words.
+    const pastedWords = pastedText.trim().split(/\s+/);
+    // Fill inputs starting from current index.
     pastedWords.forEach((word, i) => {
       const targetIndex = currentIndex + i;
       if (targetIndex < words.length) {
@@ -85,7 +102,7 @@
 
   const handleBlur = () => {
     // Auto-submit when all 24 words are complete
-    if (submitEnabled) {
+    if (submitEnabled && !recoveryInProgress) {
       handleRecoverWithPhrase();
     }
   };
