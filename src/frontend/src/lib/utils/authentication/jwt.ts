@@ -8,20 +8,6 @@ import {
 } from "$lib/utils/utils";
 import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
-import { decodeJWT } from "$lib/utils/openID";
-import { SignIdentity } from "@dfinity/agent";
-
-export class OpenIdDelegationIdentity extends DelegationIdentity {
-  iss?: string;
-  sub?: string;
-
-  static fromDelegation(
-    key: Pick<SignIdentity, "sign">,
-    delegation: DelegationChain,
-  ): OpenIdDelegationIdentity {
-    return new this(key, delegation);
-  }
-}
 
 export const authenticateWithJWT = async ({
   canisterId,
@@ -55,14 +41,9 @@ export const authenticateWithJWT = async ({
     [transformedDelegation],
     new Uint8Array(user_key),
   );
-  // Use `OpenIdDelegationIdentity` class so we can add OpenID metadata
-  const identity = OpenIdDelegationIdentity.fromDelegation(
+  const identity = DelegationIdentity.fromDelegation(
     session.identity,
     delegationChain,
   );
-  // Add OpenID metadata to delegation identity instance
-  const { iss, sub } = decodeJWT(jwt);
-  identity.iss = iss;
-  identity.sub = sub;
   return { identity, identityNumber };
 };

@@ -37,22 +37,33 @@ test("User can log into the dashboard and add a new passkey from the same device
   }
   await page.getByRole("link", { name: "Access methods" }).click();
 
-  // Verify we have one passkey
+  // Verify we have one passkey and rename it
   await expect(page.getByText("Chrome")).toHaveCount(1);
+  await renamePasskey(page, "Chrome", "Old passkey");
 
   // Start the "add passkey" flow
   const auth2 = dummyAuth();
   await addPasskeyCurrentDevice(page, auth2);
-  await expect(page.getByText("Chrome")).toHaveCount(2);
-  await renamePasskey(page, "New Passkey");
+  await renamePasskey(page, "Chrome", "New passkey");
 
-  // Verify that the new passkey is not the current one
+  // Verify we have two passkeys
   await expect(
-    page.getByText("Chrome").locator("..").getByLabel("Current Passkey"),
-  ).toHaveCount(1);
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
+
+  // Verify that the new passkey is not the one currently in use
   await expect(
-    page.getByText("New Passkey").locator("..").getByLabel("Current Passkey"),
-  ).toHaveCount(0);
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Old passkey" })
+      .getByText("Right now"),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "New passkey" })
+      .getByText("Right now"),
+  ).toBeHidden();
 
   await signOut(page);
 
@@ -73,15 +84,19 @@ test("User can log into the dashboard and add a new passkey from the same device
   }
   await newPage.getByRole("link", { name: "Access methods" }).click();
 
-  await expect(
-    newPage.getByText("Chrome").locator("..").getByLabel("Current Passkey"),
-  ).toHaveCount(0);
+  // Verify that new passkey is the one currently in use
   await expect(
     newPage
-      .getByText("New Passkey")
-      .locator("..")
-      .getByLabel("Current Passkey"),
-  ).toHaveCount(1);
+      .getByRole("listitem")
+      .filter({ hasText: "Old passkey" })
+      .getByText("Right now"),
+  ).toBeHidden();
+  await expect(
+    newPage
+      .getByRole("listitem")
+      .filter({ hasText: "New passkey" })
+      .getByText("Right now"),
+  ).toBeVisible();
   await newPage.close();
 });
 
@@ -115,7 +130,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   await expect(page.getByText("Chrome")).toHaveCount(1);
 
   // Start the "add passkey" flow
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add new" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   await page
     .getByRole("button", { name: "Continue on another device" })
@@ -171,7 +186,9 @@ test("User can log in the dashboard and add a new passkey from another device", 
     .waitFor({ state: "hidden" });
 
   // Verify that we now have two passkeys
-  await expect(page.getByText("Chrome")).toHaveCount(2);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
 });
 
 test("User can add a new passkey and use it with cached identity without clearing storage", async ({
@@ -194,22 +211,33 @@ test("User can add a new passkey and use it with cached identity without clearin
   }
   await page.getByRole("link", { name: "Access methods" }).click();
 
-  // Verify we have one passkey
+  // Verify we have one passkey and rename it
   await expect(page.getByText("Chrome")).toHaveCount(1);
+  await renamePasskey(page, "Chrome", "Old passkey");
 
   // Start the "add passkey" flow
   const auth2 = dummyAuth();
   await addPasskeyCurrentDevice(page, auth2);
-  await expect(page.getByText("Chrome")).toHaveCount(2);
-  await renamePasskey(page, "New Passkey");
+  await renamePasskey(page, "Chrome", "New Passkey");
 
-  // Verify that the new passkey is not the current one
+  // Verify we have two passkeys
   await expect(
-    page.getByText("Chrome").locator("..").getByLabel("Current Passkey"),
-  ).toHaveCount(1);
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
+
+  // Verify that the new passkey is not the one currently in use
   await expect(
-    page.getByText("New Passkey").locator("..").getByLabel("Current Passkey"),
-  ).toHaveCount(0);
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Old passkey" })
+      .getByText("Right now"),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "New passkey" })
+      .getByText("Right now"),
+  ).toBeHidden();
 
   await signOut(page);
 

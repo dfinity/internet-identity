@@ -49,7 +49,7 @@
       bind:element={inputRef}
       bind:value={name}
       inputmode="text"
-      placeholder={$t`Passkey label`}
+      placeholder={$t`Passkey name`}
       type="text"
       autocomplete="off"
       autocorrect="off"
@@ -58,7 +58,7 @@
         ? $t`Maximum length is 32 characters.`
         : undefined}
       disabled={isSubmitting}
-      aria-label={$t`Passkey label`}
+      aria-label={$t`Passkey name`}
     />
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">

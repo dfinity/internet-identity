@@ -10,7 +10,12 @@
   } from "@lucide/svelte";
   import type { LayoutProps } from "./$types";
   import { page } from "$app/state";
-  import { goto, invalidateAll, replaceState } from "$app/navigation";
+  import {
+    afterNavigate,
+    goto,
+    invalidateAll,
+    replaceState,
+  } from "$app/navigation";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -26,8 +31,6 @@
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import { nonNullish } from "@dfinity/utils";
-  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
 
   const { children, data }: LayoutProps = $props();
 
@@ -70,13 +73,6 @@
     });
     await invalidateAll();
   };
-  const handleConfirmAccessMethod = async () => {
-    pendingRegistrationId = null;
-    toaster.success({
-      title: "Passkey has been registered from another device.",
-    });
-    await invalidateAll();
-  };
   const handleSwitchIdentity = async (identityNumber: bigint) => {
     await sessionStore.reset();
     const chosenIdentity =
@@ -99,7 +95,7 @@
   });
 
   // Remove registration id from URL bar after assigning it to state
-  $effect(() => {
+  afterNavigate(() => {
     if (page.url.searchParams.has("activate")) {
       replaceState("/manage", {});
     }
@@ -267,18 +263,5 @@
         {$t`choose method`}
       </p>
     </AuthWizard>
-  </Dialog>
-{/if}
-
-{#if nonNullish(pendingRegistrationId)}
-  <Dialog onClose={() => (pendingRegistrationId = null)}>
-    <ConfirmAccessMethodWizard
-      registrationId={pendingRegistrationId}
-      onConfirm={handleConfirmAccessMethod}
-      onError={(error) => {
-        handleError(error);
-        pendingRegistrationId = null;
-      }}
-    />
   </Dialog>
 {/if}

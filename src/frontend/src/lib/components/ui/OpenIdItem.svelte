@@ -10,16 +10,16 @@
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
 
   interface Props {
-    credential: OpenIdCredential;
+    openid: OpenIdCredential;
     onUnlink?: () => void;
     inUse?: boolean;
   }
 
-  const { credential, onUnlink, inUse }: Props = $props();
+  const { openid, onUnlink, inUse }: Props = $props();
 
-  const name = $derived(openIdName(credential.iss, credential.metadata));
-  const email = $derived(getMetadataString(credential.metadata, "email"));
-  const logo = $derived(openIdLogo(credential.iss, credential.metadata));
+  const name = $derived(openIdName(openid.iss, openid.metadata));
+  const email = $derived(getMetadataString(openid.metadata, "email"));
+  const logo = $derived(openIdLogo(openid.iss, openid.metadata));
   const options = $derived(
     nonNullish(onUnlink)
       ? [
@@ -79,10 +79,8 @@
         >
           <span>{$t`Right now`}</span>
         </Tooltip>
-      {:else if nonNullish(credential.last_usage_timestamp[0])}
-        {@const date = new Date(
-          nanosToMillis(credential.last_usage_timestamp[0]),
-        )}
+      {:else if nonNullish(openid.last_usage_timestamp[0])}
+        {@const date = new Date(nanosToMillis(openid.last_usage_timestamp[0]))}
         <Tooltip
           label={$formatDate(date, {
             timeStyle: "short",

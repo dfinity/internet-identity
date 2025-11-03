@@ -11,15 +11,15 @@
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
 
   interface Props {
-    data: AuthnMethodData;
+    passkey: AuthnMethodData;
     onRename?: () => void;
     onRemove?: () => void;
     inUse?: boolean;
   }
 
-  const { data, onRename, onRemove, inUse }: Props = $props();
+  const { passkey, onRename, onRemove, inUse }: Props = $props();
 
-  const alias = $derived(getAuthnMethodAlias(data));
+  const alias = $derived(getAuthnMethodAlias(passkey));
   const options = $derived([
     ...(nonNullish(onRename)
       ? [
@@ -86,8 +86,8 @@
         >
           <span>{$t`Right now`}</span>
         </Tooltip>
-      {:else if nonNullish(data.last_authentication[0])}
-        {@const date = new Date(nanosToMillis(data.last_authentication[0]))}
+      {:else if nonNullish(passkey.last_authentication[0])}
+        {@const date = new Date(nanosToMillis(passkey.last_authentication[0]))}
         <Tooltip
           label={$formatDate(date, {
             timeStyle: "short",

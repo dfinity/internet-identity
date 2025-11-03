@@ -73,7 +73,7 @@
   >
     <ul class="flex flex-col">
       {#each options as option, index}
-        <li class="contents">
+        <li class="contents" aria-label={option.label}>
           <Button
             onclick={() => handleClick(option, index)}
             variant="tertiary"

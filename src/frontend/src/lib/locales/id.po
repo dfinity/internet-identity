@@ -57,8 +57,8 @@ msgstr "<0>Tidak Perlu Nomor Identitas Lagi:</0> Seperti dijelaskan sebelumnya, 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integrasi Passkey Tanpa Hambatan:</0> Kami terus mendukung passkey sebagai masa depan autentikasi yang aman. Internet Identity 2.0 memanfaatkan standar passkey terbaru untuk keamanan dan kemudahan penggunaan yang lebih baik."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:161
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:231
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:157
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:230
 msgid "Access methods"
 msgstr ""
 
@@ -87,7 +87,7 @@ msgstr ""
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:250
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:249
 msgid "Add new"
 msgstr ""
 
@@ -155,7 +155,7 @@ msgstr "pilih identitas untuk melanjutkan"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:180
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:267
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:263
 msgid "choose method"
 msgstr "pilih metode"
 
@@ -171,7 +171,7 @@ msgstr ""
 msgid "Close"
 msgstr "Tutup"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:129
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:125
 msgid "Close menu"
 msgstr ""
 
@@ -360,7 +360,7 @@ msgstr "Buka aplikasi"
 msgid "Go to the app - (<0>{countdown}</0>)"
 msgstr "Buka aplikasi - (<0>{countdown}</0>)"
 
-#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:97
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:95
 #: src/frontend/src/lib/components/ui/PasskeyItem.svelte:102
 msgid "Has not been used yet"
 msgstr ""
@@ -374,7 +374,7 @@ msgstr "Bantuan & FAQ"
 msgid "Hidden email"
 msgstr ""
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:152
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:148
 msgid "Home"
 msgstr ""
 
@@ -474,7 +474,7 @@ msgstr "Internet Identity melindungi privasi Anda"
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
 msgstr "Internet Identity kemudian menghubungkan autentikasi dari penyedia tersebut dengan Internet Computer. Dengan autentikasi melalui salah satu layanan tersebut, Internet Identity dapat memastikan Anda adalah diri Anda, dan kemudian membuat autentikasi lain untuk aplikasi yang berjalan di Internet Computer."
 
-#: src/frontend/src/routes/(new-styling)/activate/+page.svelte:20
+#: src/frontend/src/routes/(new-styling)/activate/+page.svelte:22
 msgid "Invalid code link"
 msgstr "Tautan kode tidak valid"
 
@@ -599,7 +599,7 @@ msgstr "Akun {application} saya"
 msgid "My account"
 msgstr "Akun saya"
 
-#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:98
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:96
 #: src/frontend/src/lib/components/ui/PasskeyItem.svelte:103
 msgid "n/a"
 msgstr ""
@@ -625,7 +625,7 @@ msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau m
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:211
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:207
 msgid "Open menu"
 msgstr ""
 
@@ -633,7 +633,7 @@ msgstr ""
 msgid "or"
 msgstr "atau"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:233
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:232
 msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
 msgstr ""
 
@@ -644,6 +644,10 @@ msgstr "Tautan penyambungan"
 
 #: src/frontend/src/lib/components/ui/PasskeyItem.svelte:72
 msgid "Passkey"
+msgstr ""
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:219
+msgid "Passkey has been registered from another device."
 msgstr ""
 
 #: src/frontend/src/lib/components/views/RenamePasskey.svelte:52
@@ -789,7 +793,7 @@ msgstr "masuk untuk melanjutkan"
 msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
 
-#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:105
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:103
 msgid "Sign in with your {name} account from any device."
 msgstr ""
 
@@ -815,7 +819,7 @@ msgid "Something went wrong during authentication. Authenticating service was no
 msgstr "Terjadi kesalahan saat autentikasi. Layanan autentikasi telah diberi tahu dan Anda dapat menutup halaman ini."
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:38
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:178
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:174
 msgid "Source code"
 msgstr "Kode sumber"
 
@@ -832,12 +836,12 @@ msgid "Stored securely on your device, in your password manager, or on a securit
 msgstr ""
 
 #: src/frontend/src/lib/components/layout/Footer.svelte:30
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:172
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:168
 msgid "Support"
 msgstr "Dukungan"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:194
 msgid "Switch identity"
 msgstr "Ganti identitas"
 
@@ -905,7 +909,7 @@ msgstr "Tidak dapat menyelesaikan pengaturan"
 msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:331
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:332
 msgid "Unknown"
 msgstr ""
 
@@ -961,7 +965,7 @@ msgstr "Gunakan perangkat yang sudah memiliki identitas Anda untuk memindai atau
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:154
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:177
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:264
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:260
 msgid "Use another identity"
 msgstr "Gunakan identitas lain"
 
@@ -989,7 +993,7 @@ msgstr "Menunggu perangkat Anda yang ada"
 msgid "Waiting for your new device"
 msgstr "Menunggu perangkat baru Anda"
 
-#: src/frontend/src/routes/(new-styling)/activate/+page.svelte:21
+#: src/frontend/src/routes/(new-styling)/activate/+page.svelte:23
 msgid "We didn't recognize that activation code."
 msgstr "Kami tidak mengenali kode aktivasi tersebut."
 

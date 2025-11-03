@@ -1,25 +1,14 @@
 <script lang="ts">
   import type { PageProps } from "./$types";
-  import { formatRelative, formatDate, t } from "$lib/stores/locale.store";
+  import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import {
-    PlusIcon,
-    EllipsisVerticalIcon,
-    PencilIcon,
-    Trash2Icon,
-    Link2OffIcon,
-  } from "@lucide/svelte";
-  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
-  import { getMetadataString, openIdLogo, openIdName } from "$lib/utils/openID";
-  import { nanosToMillis } from "$lib/utils/time";
-  import Tooltip from "$lib/components/ui/Tooltip.svelte";
+  import { PlusIcon } from "@lucide/svelte";
+  import { openIdName } from "$lib/utils/openID";
   import type {
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import Select from "$lib/components/ui/Select.svelte";
   import RenamePasskey from "$lib/components/views/RenamePasskey.svelte";
   import RemovePasskey from "$lib/components/views/RemovePasskey.svelte";
   import { handleError } from "$lib/components/utils/error";
@@ -27,6 +16,7 @@
   import { throwCanisterError } from "$lib/utils/utils";
   import {
     authnMethodEqual,
+    authnMethodToCredentialId,
     authnMethodToPublicKey,
     getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
@@ -36,18 +26,18 @@
   import { scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { bytesToHex } from "@noble/hashes/utils";
-  import { Principal } from "@icp-sdk/core/principal";
-  import { OpenIdDelegationIdentity } from "$lib/utils/authentication";
   import UnlinkOpenIdCredential from "$lib/components/views/UnlinkOpenIdCredential.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import OpenIdItem from "$lib/components/ui/OpenIdItem.svelte";
   import PasskeyItem from "$lib/components/ui/PasskeyItem.svelte";
+  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
+  import { toaster } from "$lib/components/utils/toaster";
 
   const MAX_PASSKEYS = 8;
 
   type AccessMethod =
-    | { type: "passkey"; data: AuthnMethodData }
-    | { type: "openid"; data: OpenIdCredential };
+    | { passkey: AuthnMethodData }
+    | { openid: OpenIdCredential };
 
   const { data }: PageProps = $props();
 
@@ -55,21 +45,21 @@
   let renamablePasskey = $state<AuthnMethodData>();
   let removablePasskey = $state<AuthnMethodData>();
   let unlinkableOpenIdCredential = $state<OpenIdCredential>();
+  let pendingRegistrationId = $state(data.pendingRegistrationId);
 
   const sortAccessMethods = (a: AccessMethod, b: AccessMethod) => {
     const aVal =
-      a.type === "passkey"
-        ? a.data.last_authentication[0]
-        : a.data.last_usage_timestamp[0];
+      "passkey" in a
+        ? a.passkey.last_authentication[0]
+        : a.openid.last_usage_timestamp[0];
     const bVal =
-      b.type === "passkey"
-        ? b.data.last_authentication[0]
-        : b.data.last_usage_timestamp[0];
+      "passkey" in b
+        ? b.passkey.last_authentication[0]
+        : b.openid.last_usage_timestamp[0];
     // If items are equal (either undefined or same timestamp),
     // the OpenID items should come first before the passkeys.
     if (aVal === bVal) {
-      if (a.type === b.type) return 0;
-      return a.type === "openid" ? -1 : 1;
+      return "openid" in a ? -1 : 1;
     }
     // Undefined should come first (new/unused access methods at the top),
     // defined should sort descending (most recently used first).
@@ -78,52 +68,54 @@
     return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
   };
   const accessMethodKey = (accessMethod: AccessMethod) =>
-    accessMethod.type +
-    (accessMethod.type === "passkey"
-      ? bytesToHex(authnMethodToPublicKey(accessMethod.data))
-      : accessMethod.data.sub);
+    "passkey" in accessMethod
+      ? bytesToHex(authnMethodToPublicKey(accessMethod.passkey))
+      : accessMethod.openid.iss + accessMethod.openid.sub;
   const passkeyInUse = (data: AuthnMethodData) =>
-    $authenticatedStore.identity.getPrincipal().toText() ===
-    Principal.selfAuthenticating(authnMethodToPublicKey(data)).toText();
+    "passkey" in $authenticatedStore.authMethod &&
+    bytesToHex($authenticatedStore.authMethod.passkey.credentialId) ===
+      bytesToHex(authnMethodToCredentialId(data));
   const openIdInUse = (credential: OpenIdCredential) =>
-    $authenticatedStore.identity instanceof OpenIdDelegationIdentity &&
-    $authenticatedStore.identity.iss === credential.iss &&
-    $authenticatedStore.identity.sub === credential.sub;
+    "openid" in $authenticatedStore.authMethod &&
+    $authenticatedStore.authMethod.openid.iss === credential.iss &&
+    $authenticatedStore.authMethod.openid.sub === credential.sub;
 
   let accessMethods = $derived(
     [
       // Reverse to put the latest unused first
       ...(data.identityInfo.openid_credentials[0] ?? [])
-        .map((data) => ({ type: "openid", data }) as const)
+        .map((openid) => ({ openid }) as const)
         .reverse(),
       ...data.identityInfo.authn_methods
-        .map((data) => ({ type: "passkey", data }) as const)
+        // Filter out anything that isn't a passkey e.g. recovery phrase
+        .filter((passkey) => "WebAuthn" in passkey.authn_method)
+        .map((passkey) => ({ passkey }) as const)
         .reverse(),
     ].sort(sortAccessMethods),
   );
   const isUsingPasskeys = $derived(
-    accessMethods.some(({ type }) => type === "passkey"),
+    accessMethods.some((accessMethod) => "passkey" in accessMethod),
   );
   const maxPasskeysReached = $derived(
-    accessMethods.filter(({ type }) => type === "passkey").length >=
+    accessMethods.filter((accessMethod) => "passkey" in accessMethod).length >=
       MAX_PASSKEYS,
   );
   const openIdCredentials = $derived(
     accessMethods
-      .filter((accessMethod) => accessMethod.type === "openid")
-      .map(({ data }) => data),
+      .filter((accessMethod) => "openid" in accessMethod)
+      .map(({ openid }) => openid),
   );
 
-  const handleOpenIdLinked = async (data: OpenIdCredential) => {
+  const handleOpenIdLinked = async (openid: OpenIdCredential) => {
     isAddAccessMethodWizardOpen = false;
-    accessMethods = [{ type: "openid", data } as const, ...accessMethods].sort(
+    accessMethods = [{ openid } as const, ...accessMethods].sort(
       sortAccessMethods,
     );
     void invalidateAll();
   };
-  const handlePasskeyRegistered = async (data: AuthnMethodData) => {
+  const handlePasskeyRegistered = async (passkey: AuthnMethodData) => {
     isAddAccessMethodWizardOpen = false;
-    accessMethods = [{ type: "passkey", data } as const, ...accessMethods].sort(
+    accessMethods = [{ passkey } as const, ...accessMethods].sort(
       sortAccessMethods,
     );
     void invalidateAll();
@@ -151,9 +143,9 @@
       renamablePasskey = undefined;
       accessMethods = accessMethods
         .map((accessMethod) =>
-          accessMethod.type === "passkey" &&
-          authnMethodEqual(accessMethod.data, passkey)
-            ? ({ type: "passkey", data: passkey } as const)
+          "passkey" in accessMethod &&
+          authnMethodEqual(accessMethod.passkey, passkey)
+            ? ({ passkey } as const)
             : accessMethod,
         )
         .sort(sortAccessMethods);
@@ -182,8 +174,8 @@
       accessMethods = accessMethods
         .filter(
           (accessMethod) =>
-            accessMethod.type !== "passkey" ||
-            !authnMethodEqual(accessMethod.data, passkey),
+            !("passkey" in accessMethod) ||
+            !authnMethodEqual(accessMethod.passkey, passkey),
         )
         .sort(sortAccessMethods);
       void invalidateAll();
@@ -211,15 +203,22 @@
       accessMethods = accessMethods
         .filter(
           (accessMethod) =>
-            accessMethod.type !== "openid" ||
-            accessMethod.data.iss !== credential.iss ||
-            accessMethod.data.sub !== credential.sub,
+            !("openid" in accessMethod) ||
+            accessMethod.openid.iss !== credential.iss ||
+            accessMethod.openid.sub !== credential.sub,
         )
         .sort(sortAccessMethods);
       void invalidateAll();
     } catch (error) {
       handleError(error);
     }
+  };
+  const handleConfirmAccessMethod = async () => {
+    pendingRegistrationId = null;
+    toaster.success({
+      title: $t`Passkey has been registered from another device.`,
+    });
+    await invalidateAll();
   };
   const logoutAndForgetIdentity = () => {
     lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
@@ -249,38 +248,40 @@
     <PlusIcon class="text-fg-secondary size-5" />
     <span class="text-text-primary text-sm font-semibold">{$t`Add new`}</span>
   </button>
-  {#key data.identityNumber}
-    {#each accessMethods as accessMethod (accessMethodKey(accessMethod))}
-      <div
-        animate:flip={{ duration: 300, delay: 300 }}
-        in:scale={{ duration: 300, delay: 500, start: 0.95 }}
-        out:scale={{ duration: 300, delay: 300, start: 0.95 }}
-        class={[
-          "flex flex-col",
-          "bg-bg-primary border-border-secondary rounded-sm p-6 not-dark:shadow-sm dark:border",
-        ]}
-      >
-        {#if accessMethod.type === "passkey"}
-          <PasskeyItem
-            data={accessMethod.data}
-            onRename={() => (renamablePasskey = accessMethod.data)}
-            onRemove={accessMethods.length > 1
-              ? () => (removablePasskey = accessMethod.data)
-              : undefined}
-            inUse={passkeyInUse(accessMethod.data)}
-          />
-        {:else if accessMethod.type === "openid"}
-          <OpenIdItem
-            credential={accessMethod.data}
-            onUnlink={accessMethods.length > 1
-              ? () => (unlinkableOpenIdCredential = accessMethod.data)
-              : undefined}
-            inUse={openIdInUse(accessMethod.data)}
-          />
-        {/if}
-      </div>
-    {/each}
-  {/key}
+  <ul class="contents">
+    {#key data.identityNumber}
+      {#each accessMethods as accessMethod (accessMethodKey(accessMethod))}
+        <li
+          animate:flip={{ duration: 300, delay: 300 }}
+          in:scale={{ duration: 300, delay: 500, start: 0.95 }}
+          out:scale={{ duration: 300, delay: 300, start: 0.95 }}
+          class={[
+            "flex flex-col",
+            "bg-bg-primary border-border-secondary rounded-sm p-6 not-dark:shadow-sm dark:border",
+          ]}
+        >
+          {#if "passkey" in accessMethod}
+            <PasskeyItem
+              passkey={accessMethod.passkey}
+              onRename={() => (renamablePasskey = accessMethod.passkey)}
+              onRemove={accessMethods.length > 1
+                ? () => (removablePasskey = accessMethod.passkey)
+                : undefined}
+              inUse={passkeyInUse(accessMethod.passkey)}
+            />
+          {:else if "openid" in accessMethod}
+            <OpenIdItem
+              openid={accessMethod.openid}
+              onUnlink={accessMethods.length > 1
+                ? () => (unlinkableOpenIdCredential = accessMethod.openid)
+                : undefined}
+              inUse={openIdInUse(accessMethod.openid)}
+            />
+          {/if}
+        </li>
+      {/each}
+    {/key}
+  </ul>
 </div>
 
 {#if isAddAccessMethodWizardOpen}
@@ -330,6 +331,19 @@
         unlinkableOpenIdCredential.metadata,
       ) ?? $t`Unknown`}
       isCurrentAccessMethod={openIdInUse(unlinkableOpenIdCredential)}
+    />
+  </Dialog>
+{/if}
+
+{#if nonNullish(pendingRegistrationId)}
+  <Dialog onClose={() => (pendingRegistrationId = null)}>
+    <ConfirmAccessMethodWizard
+      registrationId={pendingRegistrationId}
+      onConfirm={handleConfirmAccessMethod}
+      onError={(error) => {
+        handleError(error);
+        pendingRegistrationId = null;
+      }}
     />
   </Dialog>
 {/if}

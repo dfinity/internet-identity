@@ -8,7 +8,7 @@ import {
   HttpAgentOptions,
 } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
+import { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { createAnonymousNonce } from "$lib/utils/openID";
 
@@ -19,6 +19,9 @@ export interface Authenticated {
   identity: DelegationIdentity;
   agent: HttpAgent;
   actor: ActorSubclass<_SERVICE>;
+  authMethod:
+    | { passkey: { credentialId: Uint8Array } }
+    | { openid: { iss: string; sub: string } };
 }
 
 type AuthenticationStore = Readable<Authenticated | undefined> & {

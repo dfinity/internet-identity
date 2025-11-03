@@ -108,6 +108,17 @@ export const authnMethodToPublicKey = (
   );
 };
 
+export const authnMethodToCredentialId = (
+  authnMethod: AuthnMethodData,
+): Uint8Array => {
+  if ("WebAuthn" in authnMethod.authn_method) {
+    return new Uint8Array(authnMethod.authn_method.WebAuthn.credential_id);
+  }
+  throw new Error(
+    `Unknown authentication method: ${JSON.stringify(authnMethod.authn_method)}`,
+  );
+};
+
 export const getAuthnMethodAlias = (authnMethod: AuthnMethodData): string => {
   const metadataAlias = authnMethod.metadata.find(
     ([key, _val]) => key === "alias",
