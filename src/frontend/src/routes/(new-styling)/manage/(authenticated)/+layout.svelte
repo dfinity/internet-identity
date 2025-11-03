@@ -15,7 +15,6 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Button from "$lib/components/ui/Button.svelte";
-  import identityInfo from "$lib/stores/identity-info.state.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
@@ -83,11 +82,9 @@
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[Number(identityNumber)];
     await authLastUsedFlow.authenticate(chosenIdentity);
-    identityInfo.reset();
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void identityInfo.fetch();
-    await gotoManage();
     isIdentityPopoverOpen = false;
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    await invalidateAll();
   };
 
   // Initialize the flow every time the identity changes
@@ -104,7 +101,7 @@
   // Remove registration id from URL bar after assigning it to state
   $effect(() => {
     if (page.url.searchParams.has("activate")) {
-      // replaceState("/manage", {});
+      replaceState("/manage", {});
     }
   });
 </script>
@@ -241,7 +238,7 @@
         isAuthDialogOpen = true;
       }}
       onClose={() => (isIdentityPopoverOpen = false)}
-      onLogout={identityInfo.logout}
+      onLogout={() => location.replace("/login")}
     />
   </Popover>
 {/if}

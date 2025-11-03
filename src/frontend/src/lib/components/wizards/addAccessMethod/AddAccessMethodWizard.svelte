@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { handleError } from "$lib/components/utils/error";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
   import SystemOverlayBackdrop from "$lib/components/utils/SystemOverlayBackdrop.svelte";
   import { AddAccessMethodFlow } from "$lib/flows/addAccessMethodFlow.svelte.js";
   import type {
@@ -11,13 +9,14 @@
   import AddAccessMethod from "$lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte";
   import AddPasskey from "$lib/components/wizards/addAccessMethod/views/AddPasskey.svelte";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
+  import { isOpenIdCancelError } from "$lib/utils/openID";
+  import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 
   interface Props {
     onOpenIdLinked: (credential: OpenIdCredential) => void;
     onPasskeyRegistered: (credential: AuthnMethodData) => void;
     onOtherDeviceRegistered: () => void;
-    onClose: () => void;
-    onError?: (error: unknown) => void;
+    onError: (error: unknown) => void;
     isUsingPasskeys?: boolean;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
@@ -27,11 +26,7 @@
     onOpenIdLinked,
     onPasskeyRegistered,
     onOtherDeviceRegistered,
-    onClose,
-    onError = (error) => {
-      onClose();
-      handleError(error);
-    },
+    onError,
     isUsingPasskeys,
     openIdCredentials,
     maxPasskeysReached,
@@ -44,48 +39,48 @@
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
     try {
       onOpenIdLinked(await addAccessMethodFlow.linkOpenIdAccount(config));
-      onClose();
     } catch (error) {
-      onError(error);
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error); // Propagate unhandled errors to parent component
     }
   };
   const handleCreatePasskey = async () => {
     try {
       onPasskeyRegistered(await addAccessMethodFlow.createPasskey());
-      onClose();
     } catch (error) {
+      if (isWebAuthnCancelError(error)) {
+        return "cancelled";
+      }
       onError(error);
     }
   };
   const handleOtherDeviceRegistered = async () => {
     onOtherDeviceRegistered();
-    onClose();
   };
 </script>
 
-<Dialog {onClose}>
-  {#if isContinueOnAnotherDeviceVisible}
-    <ConfirmAccessMethodWizard
-      onConfirm={handleOtherDeviceRegistered}
-      {onError}
-    />
-  {:else if addAccessMethodFlow.view === "chooseMethod"}
-    <AddAccessMethod
-      continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
-      linkOpenIdAccount={handleContinueWithOpenId}
-      {maxPasskeysReached}
-      {openIdCredentials}
-    />
-  {:else if addAccessMethodFlow.view === "addPasskey"}
-    <AddPasskey
-      createPasskey={handleCreatePasskey}
-      continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
-      {isUsingPasskeys}
-    />
-  {/if}
+{#if isContinueOnAnotherDeviceVisible}
+  <ConfirmAccessMethodWizard
+    onConfirm={handleOtherDeviceRegistered}
+    {onError}
+  />
+{:else if addAccessMethodFlow.view === "chooseMethod"}
+  <AddAccessMethod
+    continueWithPasskey={addAccessMethodFlow.continueWithPasskey}
+    linkOpenIdAccount={handleContinueWithOpenId}
+    {maxPasskeysReached}
+    {openIdCredentials}
+  />
+{:else if addAccessMethodFlow.view === "addPasskey"}
+  <AddPasskey
+    createPasskey={handleCreatePasskey}
+    continueOnAnotherDevice={() => (isContinueOnAnotherDeviceVisible = true)}
+    {isUsingPasskeys}
+  />
+{/if}
 
-  <!-- Rendered within dialog to be on top of it -->
-  {#if addAccessMethodFlow.isSystemOverlayVisible}
-    <SystemOverlayBackdrop />
-  {/if}
-</Dialog>
+{#if addAccessMethodFlow.isSystemOverlayVisible}
+  <SystemOverlayBackdrop />
+{/if}

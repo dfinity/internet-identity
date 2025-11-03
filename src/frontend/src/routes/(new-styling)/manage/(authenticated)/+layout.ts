@@ -29,5 +29,9 @@ export const load: LayoutLoad = async ({ url }) => {
   const identityInfo = await authentication.actor
     .identity_info(selectedIdentity.identityNumber)
     .then(throwCanisterError);
-  return { identityInfo, pendingRegistrationId };
+  return {
+    identityInfo,
+    identityNumber: selectedIdentity.identityNumber,
+    pendingRegistrationId,
+  };
 };

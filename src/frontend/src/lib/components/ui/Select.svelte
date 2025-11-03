@@ -84,7 +84,9 @@
           >
             {#if nonNullish(option.icon)}
               {@const Icon = option.icon}
-              <div class="text-fg-quaternary [&_svg]:size-4">
+              <div
+                class="text-fg-quaternary dark:text-fg-tertiary [&_svg]:size-4"
+              >
                 <Icon />
               </div>
             {/if}

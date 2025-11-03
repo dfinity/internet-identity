@@ -48,7 +48,7 @@ export class AddAccessMethodFlow {
           mediation: "required",
         },
       );
-      const { iss, sub, aud, name, email } = decodeJWT(jwt);
+      const { iss, sub, aud, name, email, tid } = decodeJWT(jwt);
       this.#isSystemOverlayVisible = false;
       await actor
         .openid_credential_add(identityNumber, jwt, salt)
@@ -60,6 +60,9 @@ export class AddAccessMethodFlow {
       }
       if (nonNullish(email)) {
         metadata.push(["email", { String: email }]);
+      }
+      if (nonNullish(tid)) {
+        metadata.push(["tid", { String: tid }]);
       }
       return {
         aud,
