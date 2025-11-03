@@ -76,7 +76,8 @@
     <div
       class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
     >
-      <LanguageSelector />
+      <!-- TODO: Re-position language selector for now on mobile till updated design is implemented -->
+      <LanguageSelector class="max-md:absolute max-md:top-3 max-md:right-3" />
       <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank">
         {$t`For developers`}
       </Button>
@@ -207,8 +208,8 @@
         "[&_summary]:text-text-primary [&_summary]:cursor-pointer [&_summary]:font-medium [&_summary]:select-none md:[&_summary]:text-xl",
         // Summary icons
         "[&_summary_svg]:text-text-placeholder [&_summary_svg]:ml-auto [&_summary_svg]:size-6 [&_summary_svg]:shrink-0",
-        // Toggle summary icons
-        "[&_details:not(:open)_summary_svg:first-child]:hidden [&_details:open_summary_svg:last-child]:hidden",
+        // Toggle summary icons, uses [open] instead of :open due to Safari not supporting the latter
+        "[&_details:not([open])_summary_svg:first-child]:hidden [&_details[open]_summary_svg:last-child]:hidden",
         // Paragraph styling and spacing
         "[&_p]:text-text-secondary [&_p]:mb-4 [&_p]:text-base",
         // Paragraph + list spacing

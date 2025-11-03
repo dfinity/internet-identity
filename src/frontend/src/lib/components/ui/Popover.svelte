@@ -60,7 +60,7 @@
         popoverRef.style.left = {
           up: {
             start: `${anchorRect.left}px`,
-            center: `${anchorRect.right + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
+            center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
           }[align],
           right: `calc(${anchorRect.right}px + ${distance})`,

@@ -13,7 +13,7 @@
     "build": "npm run extract && tsc --noEmit && vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "check": "tsc --project ./tsconfig.all.json --noEmit",
+    "check": "tsc --project ./tsconfig.all.json --noEmit && svelte-check check",
     "check:showcase": "astro check --root ./src/showcase --tsconfig ../../tsconfig.all.json",
     "watch": "npm run check -- --watch",
     "opts": "TS_NODE_PROJECT=tsconfig.base.json NODE_OPTIONS='--loader ts-node/esm --experimental-specifier-resolution=node' \"$@\"",
