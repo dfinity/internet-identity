@@ -652,7 +652,7 @@ msgstr ""
 
 #: src/frontend/src/lib/components/views/RenamePasskey.svelte:52
 #: src/frontend/src/lib/components/views/RenamePasskey.svelte:61
-msgid "Passkey label"
+msgid "Passkey name"
 msgstr ""
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:266

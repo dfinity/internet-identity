@@ -652,8 +652,8 @@ msgstr "Passkey has been registered from another device."
 
 #: src/frontend/src/lib/components/views/RenamePasskey.svelte:52
 #: src/frontend/src/lib/components/views/RenamePasskey.svelte:61
-msgid "Passkey label"
-msgstr "Passkey label"
+msgid "Passkey name"
+msgstr "Passkey name"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:266
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
