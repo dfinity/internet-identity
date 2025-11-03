@@ -197,9 +197,9 @@
         class="ml-auto gap-2.5 pr-3 sm:-mr-3"
         aria-label={$t`Switch identity`}
       >
-        <span
-          >{data.identityInfo.name ?? $authenticatedStore.identityNumber}</span
-        >
+        <span>
+          {data.identityInfo.name ?? $authenticatedStore.identityNumber}
+        </span>
         <ChevronDownIcon size="1rem" />
       </Button>
       <!-- Mobile menu button -->
