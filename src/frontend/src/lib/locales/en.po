@@ -21,7 +21,7 @@ msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account fo
 msgid "{name} | Created {date}"
 msgstr "{name} | Created {date}"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:254
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:345
 msgid "{name} account"
 msgstr "{name} account"
 
@@ -29,11 +29,11 @@ msgstr "{name} account"
 msgid "{name} logo"
 msgstr "{name} logo"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:392
+#: src/frontend/src/routes/(new-styling)/+page.svelte:393
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:422
+#: src/frontend/src/routes/(new-styling)/+page.svelte:423
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
 msgstr "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
 
@@ -49,16 +49,16 @@ msgstr "<0>Learn more</0> about privacy preservation"
 msgid "<0>Never</0> enter a code from another source."
 msgstr "<0>Never</0> enter a code from another source."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:402
+#: src/frontend/src/routes/(new-styling)/+page.svelte:403
 msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
 msgstr "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:412
+#: src/frontend/src/routes/(new-styling)/+page.svelte:413
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:162
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:296
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:161
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:395
 msgid "Access methods"
 msgstr "Access methods"
 
@@ -66,6 +66,10 @@ msgstr "Access methods"
 #: src/frontend/src/lib/components/views/EditAccount.svelte:89
 msgid "Account name"
 msgstr "Account name"
+
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:41
+msgid "Add a passkey"
+msgstr "Add a passkey"
 
 #: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte:63
 msgid "Add access method"
@@ -75,21 +79,30 @@ msgstr "Add access method"
 msgid "Add another account"
 msgstr "Add another account"
 
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:39
+msgid "Add another passkey"
+msgstr "Add another passkey"
+
 #: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte:68
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Add another way to sign in with a passkey or third-party account for secure access."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:315
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:414
 msgid "Add new"
 msgstr "Add new"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:160
+#: src/frontend/src/routes/(new-styling)/+page.svelte:161
 msgid "Advanced identity management"
 msgstr "Advanced identity management"
 
 #: src/frontend/src/lib/components/views/RemovePasskey.svelte:35
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:41
 msgid "Are you sure?"
 msgstr "Are you sure?"
+
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:63
+msgid "As you are currently signed in with this Account, you will be signed out."
+msgstr "As you are currently signed in with this Account, you will be signed out."
 
 #: src/frontend/src/lib/components/views/RemovePasskey.svelte:54
 msgid "As you are currently signed in with this passkey, you will be signed out."
@@ -119,8 +132,8 @@ msgid "Can't find your identity?"
 msgstr "Can't find your identity?"
 
 #: src/frontend/src/lib/components/views/RemovePasskey.svelte:77
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:91
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:63
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:87
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:167
 msgid "Cancel"
 msgstr "Cancel"
 
@@ -142,7 +155,7 @@ msgstr "choose identity to continue"
 
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:146
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:180
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:268
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:267
 msgid "choose method"
 msgstr "choose method"
 
@@ -150,7 +163,7 @@ msgstr "choose method"
 msgid "Choose method"
 msgstr "Choose method"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:60
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:164
 msgid "Clear all"
 msgstr "Clear all"
 
@@ -158,7 +171,7 @@ msgstr "Clear all"
 msgid "Close"
 msgstr "Close"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:130
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:129
 msgid "Close menu"
 msgstr "Close menu"
 
@@ -195,6 +208,7 @@ msgstr "Connection closed"
 msgid "Continue"
 msgstr "Continue"
 
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:78
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/ContinueOnNewDevice.svelte:29
 msgid "Continue on another device"
 msgstr "Continue on another device"
@@ -234,6 +248,7 @@ msgstr "Create identity"
 msgid "Create new identity"
 msgstr "Create new identity"
 
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:68
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:52
 msgid "Create passkey"
 msgstr "Create passkey"
@@ -247,19 +262,28 @@ msgstr "Creating account..."
 msgid "Creating identity..."
 msgstr "Creating identity..."
 
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:66
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:50
 msgid "Creating passkey..."
 msgstr "Creating passkey..."
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:359
+msgid "Currently signed in with this account"
+msgstr "Currently signed in with this account"
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:279
+msgid "Currently signed in with this passkey"
+msgstr "Currently signed in with this passkey"
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:282
 msgid "Default"
 msgstr "Default"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:145
+#: src/frontend/src/routes/(new-styling)/+page.svelte:146
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:129
+#: src/frontend/src/routes/(new-styling)/+page.svelte:130
 msgid "Easy access"
 msgstr "Easy access"
 
@@ -279,40 +303,40 @@ msgstr "Enable multiple accounts"
 msgid "Enter characters"
 msgstr "Enter characters"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:34
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:136
 msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
 msgstr "Enter your recovery phrase words in each box, spelled correctly and in order."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:192
+#: src/frontend/src/routes/(new-styling)/+page.svelte:193
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:94
+#: src/frontend/src/routes/(new-styling)/+page.svelte:95
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Experience"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:188
+#: src/frontend/src/routes/(new-styling)/+page.svelte:189
 msgid "FAQs"
 msgstr "FAQs"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:81
+#: src/frontend/src/routes/(new-styling)/+page.svelte:82
 msgid "For developers"
 msgstr "For developers"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:368
+#: src/frontend/src/routes/(new-styling)/+page.svelte:369
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:146
+#: src/frontend/src/routes/(new-styling)/+page.svelte:147
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:159
+#: src/frontend/src/routes/(new-styling)/+page.svelte:160
 msgid "Full control"
 msgstr "Full control"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:103
+#: src/frontend/src/routes/(new-styling)/+page.svelte:104
 msgid "Full Ownership"
 msgstr "Full Ownership"
 
@@ -324,7 +348,7 @@ msgstr "Generating code..."
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
 msgstr "Give your identity a clear, simple, and memorable name you'll easily recognize."
 
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:50
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:46
 msgid "Give your passkey a memorable name to help you identify it."
 msgstr "Give your passkey a memorable name to help you identify it."
 
@@ -336,8 +360,8 @@ msgstr "Go to the app"
 msgid "Go to the app - (<0>{countdown}</0>)"
 msgstr "Go to the app - (<0>{countdown}</0>)"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:227
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:280
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:299
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:379
 msgid "Has not been used yet"
 msgstr "Has not been used yet"
 
@@ -346,23 +370,23 @@ msgstr "Has not been used yet"
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:257
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:348
 msgid "Hidden email"
 msgstr "Hidden email"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:153
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:152
 msgid "Home"
 msgstr "Home"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:341
+#: src/frontend/src/routes/(new-styling)/+page.svelte:342
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 msgstr "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:260
+#: src/frontend/src/routes/(new-styling)/+page.svelte:261
 msgid "How do passkeys work?"
 msgstr "How do passkeys work?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:326
+#: src/frontend/src/routes/(new-styling)/+page.svelte:327
 msgid "How does Internet Identity compare to other Web3 authentication tools?"
 msgstr "How does Internet Identity compare to other Web3 authentication tools?"
 
@@ -391,6 +415,10 @@ msgstr "Identity number"
 msgid "Identity upgraded!"
 msgstr "Identity upgraded!"
 
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:55
+msgid "If you proceed, you will no longer be able to sign-in to your identity or dapps using your {name} account."
+msgstr "If you proceed, you will no longer be able to sign-in to your identity or dapps using your {name} account."
+
 #: src/frontend/src/lib/components/views/EditAccount.svelte:86
 msgid "In use on another account."
 msgstr "In use on another account."
@@ -400,6 +428,7 @@ msgid "Incorrect. Try again with the new code."
 msgstr "Incorrect. Try again with the new code."
 
 #: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte:87
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:55
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:54
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:80
 #: src/frontend/src/lib/components/wizards/auth/views/PickAuthenticationMethod.svelte:128
@@ -413,23 +442,23 @@ msgstr "Interaction canceled. Please try again."
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 msgstr "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:385
+#: src/frontend/src/routes/(new-styling)/+page.svelte:386
 msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
 msgstr "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:227
+#: src/frontend/src/routes/(new-styling)/+page.svelte:228
 msgid "Internet Identity is an authentication system for applications running on the <0>Internet Computer</0>. Instead of traditional usernames and passwords, it uses keys created via <1>passkeys</1> or other authentication systems like Google, Microsoft or Apple."
 msgstr "Internet Identity is an authentication system for applications running on the <0>Internet Computer</0>. Instead of traditional usernames and passwords, it uses keys created via <1>passkeys</1> or other authentication systems like Google, Microsoft or Apple."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:299
+#: src/frontend/src/routes/(new-styling)/+page.svelte:300
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 msgstr "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:117
+#: src/frontend/src/routes/(new-styling)/+page.svelte:118
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:315
+#: src/frontend/src/routes/(new-styling)/+page.svelte:316
 msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background — you don't need to manage anything."
 msgstr "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background — you don't need to manage anything."
 
@@ -441,7 +470,7 @@ msgstr "Internet Identity number"
 msgid "Internet Identity protects your privacy"
 msgstr "Internet Identity protects your privacy"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:353
+#: src/frontend/src/routes/(new-styling)/+page.svelte:354
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
 msgstr "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
 
@@ -457,7 +486,7 @@ msgstr "Invalid code. Please check and try again."
 msgid "Invalid request"
 msgstr "Invalid request"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:246
+#: src/frontend/src/routes/(new-styling)/+page.svelte:247
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Is my Face ID or Fingerprint stored in Internet Identity?"
 
@@ -478,12 +507,16 @@ msgstr "It seems like the connection with the service could not be established. 
 msgid "It won't be removed from your device or password manager."
 msgstr "It won't be removed from your device or password manager."
 
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:86
+msgid "Keep linked"
+msgstr "Keep linked"
+
 #: src/frontend/src/lib/components/views/EditAccount.svelte:68
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "Label it by use (e.g. 'Work' or 'Demo')."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:210
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:263
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:274
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:354
 msgid "Last used"
 msgstr "Last used"
 
@@ -508,16 +541,16 @@ msgstr "Link copied to clipboard"
 msgid "Long-press the link that opened this page."
 msgstr "Long-press the link that opened this page."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:131
+#: src/frontend/src/routes/(new-styling)/+page.svelte:132
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:120
-#: src/frontend/src/routes/(new-styling)/+page.svelte:83
+#: src/frontend/src/routes/(new-styling)/+page.svelte:84
 msgid "Manage Identity"
 msgstr "Manage Identity"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:161
+#: src/frontend/src/routes/(new-styling)/+page.svelte:162
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 
@@ -527,7 +560,7 @@ msgid "Manage your Internet Identity"
 msgstr "Manage your Internet Identity"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:84
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:62
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:58
 msgid "Maximum length is 32 characters."
 msgstr "Maximum length is 32 characters."
 
@@ -561,8 +594,8 @@ msgstr "My {application} account"
 msgid "My account"
 msgstr "My account"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:231
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:284
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:303
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:383
 msgid "n/a"
 msgstr "n/a"
 
@@ -575,11 +608,11 @@ msgstr "Name account"
 msgid "Name your identity"
 msgstr "Name your identity"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:362
+#: src/frontend/src/routes/(new-styling)/+page.svelte:363
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:251
+#: src/frontend/src/routes/(new-styling)/+page.svelte:252
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 
@@ -587,7 +620,7 @@ msgstr "No. Your face ID or fingerprint is only used to create or unlock your pa
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Only enter the code from that device if you initiated this process <0>yourself</0>."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:212
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:211
 msgid "Open menu"
 msgstr "Open menu"
 
@@ -595,7 +628,7 @@ msgstr "Open menu"
 msgid "or"
 msgstr "or"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:298
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:397
 msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
 msgstr "Overview of access methods (dates created, recent usage). Add a new method or remove them."
 
@@ -604,20 +637,20 @@ msgstr "Overview of access methods (dates created, recent usage). Add a new meth
 msgid "Pairing link"
 msgstr "Pairing link"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:204
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:268
 msgid "Passkey"
 msgstr "Passkey"
 
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:56
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:65
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:52
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:61
 msgid "Passkey label"
 msgstr "Passkey label"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:265
+#: src/frontend/src/routes/(new-styling)/+page.svelte:266
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 msgstr "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:281
+#: src/frontend/src/routes/(new-styling)/+page.svelte:282
 msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
 msgstr "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
 
@@ -638,7 +671,7 @@ msgstr "Passkeys not available here"
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
 msgstr "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:144
+#: src/frontend/src/routes/(new-styling)/+page.svelte:145
 msgid "Password-free"
 msgstr "Password-free"
 
@@ -650,7 +683,7 @@ msgstr "Please go back to your <0>existing device</0> and choose <1>Start over</
 msgid "Powered by Internet Identity"
 msgstr "Powered by Internet Identity"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:102
+#: src/frontend/src/routes/(new-styling)/+page.svelte:103
 msgid "Real Privacy"
 msgstr "Real Privacy"
 
@@ -658,7 +691,7 @@ msgstr "Real Privacy"
 msgid "Redirecting to the app"
 msgstr "Redirecting to the app"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:188
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:250
 msgid "Remove"
 msgstr "Remove"
 
@@ -674,7 +707,7 @@ msgstr "Removing passkey..."
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:183
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:243
 msgid "Rename"
 msgstr "Rename"
 
@@ -682,7 +715,7 @@ msgstr "Rename"
 msgid "Rename or make this your default sign-in"
 msgstr "Rename or make this your default sign-in"
 
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:47
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:43
 msgid "Rename passkey"
 msgstr "Rename passkey"
 
@@ -696,13 +729,18 @@ msgstr "Rename this account"
 msgid "Return to app"
 msgstr "Return to app"
 
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:283
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:363
+msgid "Right now"
+msgstr "Right now"
+
 #: src/frontend/src/lib/components/views/EditAccount.svelte:119
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:82
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:78
 msgid "Save changes"
 msgstr "Save changes"
 
 #: src/frontend/src/lib/components/views/EditAccount.svelte:115
-#: src/frontend/src/lib/components/views/RenamePasskey.svelte:80
+#: src/frontend/src/lib/components/views/RenamePasskey.svelte:76
 msgid "Saving changes..."
 msgstr "Saving changes..."
 
@@ -710,11 +748,11 @@ msgstr "Saving changes..."
 msgid "Scan the above QR code with your <0>new device</0> or enter the URL manually."
 msgstr "Scan the above QR code with your <0>new device</0> or enter the URL manually."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:104
+#: src/frontend/src/routes/(new-styling)/+page.svelte:105
 msgid "Seamless Access"
 msgstr "Seamless Access"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:31
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:133
 msgid "Secure recovery"
 msgstr "Secure recovery"
 
@@ -726,7 +764,7 @@ msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
-#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:59
+#: src/frontend/src/routes/(new-styling)/recovery-phrase/+page.svelte:163
 msgid "Show all"
 msgstr "Show all"
 
@@ -742,11 +780,11 @@ msgstr "Sign in there."
 msgid "sign in to continue"
 msgstr "sign in to continue"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:130
+#: src/frontend/src/routes/(new-styling)/+page.svelte:131
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:291
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:390
 msgid "Sign in with your {name} account from any device."
 msgstr "Sign in with your {name} account from any device."
 
@@ -771,8 +809,8 @@ msgstr "Something went wrong"
 msgid "Something went wrong during authentication. Authenticating service was notified and you may close this page."
 msgstr "Something went wrong during authentication. Authenticating service was notified and you may close this page."
 
-#: src/frontend/src/lib/components/layout/Footer.svelte:34
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:179
+#: src/frontend/src/lib/components/layout/Footer.svelte:38
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:178
 msgid "Source code"
 msgstr "Source code"
 
@@ -784,17 +822,17 @@ msgstr "Start over"
 msgid "Still have an identity number?"
 msgstr "Still have an identity number?"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:238
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:310
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Stored securely on your device, in your password manager, or on a security key."
 
-#: src/frontend/src/lib/components/layout/Footer.svelte:26
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:173
+#: src/frontend/src/lib/components/layout/Footer.svelte:30
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:172
 msgid "Support"
 msgstr "Support"
 
 #: src/frontend/src/lib/components/ui/IdentitySwitcher.svelte:44
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:199
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:198
 msgid "Switch identity"
 msgstr "Switch identity"
 
@@ -806,7 +844,7 @@ msgstr "The <0>existing device</0> is preparing to continue."
 msgid "The <0>new device</0> is preparing to continue."
 msgstr "The <0>new device</0> is preparing to continue."
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:346
+#: src/frontend/src/routes/(new-styling)/+page.svelte:347
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 
@@ -858,13 +896,29 @@ msgstr "Type the characters exactly as shown below"
 msgid "Unable to complete setup"
 msgstr "Unable to complete setup"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:183
+#: src/frontend/src/routes/(new-styling)/+page.svelte:184
 msgid "Understanding Internet Identity"
 msgstr "Understanding Internet Identity"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:331
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:482
+msgid "Unknown"
+msgstr "Unknown"
+
+#: src/frontend/src/routes/(new-styling)/+page.svelte:332
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
+
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:331
+msgid "Unlink"
+msgstr "Unlink"
+
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:77
+msgid "Unlink {name} account"
+msgstr "Unlink {name} account"
+
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:75
+msgid "Unlinking {name} account..."
+msgstr "Unlinking {name} account..."
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:24
 msgid "Unsupported Browser"
@@ -902,7 +956,7 @@ msgstr "Use a device that already holds your identity to scan or open the URL. T
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:143
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:154
 #: src/frontend/src/routes/(new-styling)/login/+page.svelte:177
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:265
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:264
 msgid "Use another identity"
 msgstr "Use another identity"
 
@@ -938,19 +992,19 @@ msgstr "We didn't recognize that activation code."
 msgid "What are passkeys?"
 msgstr "What are passkeys?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:222
+#: src/frontend/src/routes/(new-styling)/+page.svelte:223
 msgid "What is Internet Identity?"
 msgstr "What is Internet Identity?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:310
+#: src/frontend/src/routes/(new-styling)/+page.svelte:311
 msgid "What makes Internet Identity privacy-preserving?"
 msgstr "What makes Internet Identity privacy-preserving?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:294
+#: src/frontend/src/routes/(new-styling)/+page.svelte:295
 msgid "What makes Internet Identity secure & easy to use?"
 msgstr "What makes Internet Identity secure & easy to use?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:380
+#: src/frontend/src/routes/(new-styling)/+page.svelte:381
 msgid "What's new in Internet Identity 2.0?"
 msgstr "What's new in Internet Identity 2.0?"
 
@@ -958,9 +1012,13 @@ msgstr "What's new in Internet Identity 2.0?"
 msgid "What's your name?"
 msgstr "What's your name?"
 
-#: src/frontend/src/routes/(new-styling)/+page.svelte:273
+#: src/frontend/src/routes/(new-styling)/+page.svelte:274
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
 msgstr "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
+
+#: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:47
+msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
+msgstr "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:367
 msgid "with your Internet Identity"
@@ -1007,6 +1065,10 @@ msgstr "You're about to sign in on a <0>new device</0>."
 #: src/frontend/src/lib/components/wizards/registerAccessMethod/views/ConfirmYourSignIn.svelte:38
 msgid "You're about to sign in."
 msgstr "You're about to sign in."
+
+#: src/frontend/src/lib/components/views/UnlinkOpenIdCredential.svelte:50
+msgid "You're about to unlink your {name} account."
+msgstr "You're about to unlink your {name} account."
 
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/+page.svelte:27
 #: src/frontend/src/routes/(new-styling)/authorize/+layout.svelte:49
