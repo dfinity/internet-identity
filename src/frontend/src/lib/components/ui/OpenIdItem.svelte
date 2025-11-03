@@ -6,7 +6,7 @@
   import Select from "$lib/components/ui/Select.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import { OpenIdCredential } from "$lib/generated/internet_identity_types";
+  import type { OpenIdCredential } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
 
   interface Props {

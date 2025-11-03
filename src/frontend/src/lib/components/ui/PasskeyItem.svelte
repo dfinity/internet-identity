@@ -5,7 +5,7 @@
   import Select from "$lib/components/ui/Select.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
-  import { AuthnMethodData } from "$lib/generated/internet_identity_types";
+  import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
