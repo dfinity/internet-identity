@@ -38,7 +38,9 @@ test("User can log into the dashboard and add a new passkey from the same device
   await page.getByRole("link", { name: "Access methods" }).click();
 
   // Verify we have one passkey and rename it
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
   await renamePasskey(page, "Chrome", "Old passkey");
 
   // Start the "add passkey" flow
@@ -212,7 +214,9 @@ test("User can add a new passkey and use it with cached identity without clearin
   await page.getByRole("link", { name: "Access methods" }).click();
 
   // Verify we have one passkey and rename it
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
   await renamePasskey(page, "Chrome", "Old passkey");
 
   // Start the "add passkey" flow
@@ -261,4 +265,49 @@ test("User can add a new passkey and use it with cached identity without clearin
   ).toBeVisible();
 
   await newPage.close();
+});
+
+test("User can log into the dashboard and up to 7 additional passkeys", async ({
+  page,
+  context,
+}) => {
+  const auth = dummyAuth();
+  await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await createNewIdentityInII(page, TEST_USER_NAME, auth);
+  await page.waitForURL(II_URL + "/manage");
+  await clearStorage(page);
+  await page.goto(II_URL);
+  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Continue with passkey" }).click();
+  auth(page);
+  await page.getByRole("button", { name: "Use existing identity" }).click();
+
+  // Verify we're at the dashboard
+  await page.waitForURL(II_URL + "/manage");
+
+  // Navigate to access methods
+  const menuButton = page.getByRole("button", { name: "Open menu" });
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+  }
+  await page.getByRole("link", { name: "Access methods" }).click();
+
+  // Verify we have one passkey
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
+
+  // Add 7 more passkeys
+  for (let i = 0; i < 7; i++) {
+    await addPasskeyCurrentDevice(page, dummyAuth);
+  }
+
+  // Verify we have 8 passkeys
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(8);
+
+  // Verify we cannot add more passkeys
+  await expect(page.getByRole("button", { name: "Add new" })).toBeDisabled();
 });
