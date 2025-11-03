@@ -269,7 +269,6 @@ test("User can add a new passkey and use it with cached identity without clearin
 
 test("User can log into the dashboard and up to 7 additional passkeys", async ({
   page,
-  context,
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
@@ -300,7 +299,7 @@ test("User can log into the dashboard and up to 7 additional passkeys", async ({
 
   // Add 7 more passkeys
   for (let i = 0; i < 7; i++) {
-    await addPasskeyCurrentDevice(page, dummyAuth);
+    await addPasskeyCurrentDevice(page, dummyAuth());
   }
 
   // Verify we have 8 passkeys
