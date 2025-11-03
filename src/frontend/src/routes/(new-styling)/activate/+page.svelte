@@ -10,7 +10,9 @@
     const code = window.location.hash.slice(1);
     const isValid = code.length === 5;
     await goto(
-      isValid ? `/manage?activate=${window.location.hash.slice(1)}` : "/manage",
+      isValid
+        ? `/manage/access?activate=${window.location.hash.slice(1)}`
+        : "/manage",
       {
         replaceState: true,
       },
