@@ -21,7 +21,7 @@ msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account fo
 msgid "{name} | Created {date}"
 msgstr "{name} | Created {date}"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:345
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:62
 msgid "{name} account"
 msgstr "{name} account"
 
@@ -58,7 +58,7 @@ msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as t
 msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 
 #: src/frontend/src/routes/(new-styling)/manage/(authenticated)/+layout.svelte:161
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:395
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:231
 msgid "Access methods"
 msgstr "Access methods"
 
@@ -87,7 +87,7 @@ msgstr "Add another passkey"
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Add another way to sign in with a passkey or third-party account for secure access."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:414
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:250
 msgid "Add new"
 msgstr "Add new"
 
@@ -267,11 +267,11 @@ msgstr "Creating identity..."
 msgid "Creating passkey..."
 msgstr "Creating passkey..."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:359
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:76
 msgid "Currently signed in with this account"
 msgstr "Currently signed in with this account"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:279
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:83
 msgid "Currently signed in with this passkey"
 msgstr "Currently signed in with this passkey"
 
@@ -360,8 +360,8 @@ msgstr "Go to the app"
 msgid "Go to the app - (<0>{countdown}</0>)"
 msgstr "Go to the app - (<0>{countdown}</0>)"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:299
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:379
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:97
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:102
 msgid "Has not been used yet"
 msgstr "Has not been used yet"
 
@@ -370,7 +370,7 @@ msgstr "Has not been used yet"
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:348
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:65
 msgid "Hidden email"
 msgstr "Hidden email"
 
@@ -515,8 +515,8 @@ msgstr "Keep linked"
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "Label it by use (e.g. 'Work' or 'Demo')."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:274
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:354
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:71
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:78
 msgid "Last used"
 msgstr "Last used"
 
@@ -582,6 +582,11 @@ msgstr "Missing request"
 msgid "More information about multiple accounts"
 msgstr "More information about multiple accounts"
 
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:54
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:61
+msgid "More options"
+msgstr "More options"
+
 #: src/frontend/src/routes/(new-styling)/authorize/(panel)/continue/+page.svelte:402
 msgid "Multiple accounts"
 msgstr "Multiple accounts"
@@ -594,8 +599,8 @@ msgstr "My {application} account"
 msgid "My account"
 msgstr "My account"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:303
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:383
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:98
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:103
 msgid "n/a"
 msgstr "n/a"
 
@@ -628,7 +633,7 @@ msgstr "Open menu"
 msgid "or"
 msgstr "or"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:397
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:233
 msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
 msgstr "Overview of access methods (dates created, recent usage). Add a new method or remove them."
 
@@ -637,7 +642,7 @@ msgstr "Overview of access methods (dates created, recent usage). Add a new meth
 msgid "Pairing link"
 msgstr "Pairing link"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:268
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:72
 msgid "Passkey"
 msgstr "Passkey"
 
@@ -691,7 +696,7 @@ msgstr "Real Privacy"
 msgid "Redirecting to the app"
 msgstr "Redirecting to the app"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:250
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:36
 msgid "Remove"
 msgstr "Remove"
 
@@ -707,7 +712,7 @@ msgstr "Removing passkey..."
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 msgstr "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:243
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:27
 msgid "Rename"
 msgstr "Rename"
 
@@ -729,8 +734,8 @@ msgstr "Rename this account"
 msgid "Return to app"
 msgstr "Return to app"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:283
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:363
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:80
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:87
 msgid "Right now"
 msgstr "Right now"
 
@@ -784,7 +789,7 @@ msgstr "sign in to continue"
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:390
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:105
 msgid "Sign in with your {name} account from any device."
 msgstr "Sign in with your {name} account from any device."
 
@@ -822,7 +827,7 @@ msgstr "Start over"
 msgid "Still have an identity number?"
 msgstr "Still have an identity number?"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:310
+#: src/frontend/src/lib/components/ui/PasskeyItem.svelte:110
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Stored securely on your device, in your password manager, or on a security key."
 
@@ -900,7 +905,7 @@ msgstr "Unable to complete setup"
 msgid "Understanding Internet Identity"
 msgstr "Understanding Internet Identity"
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:482
+#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:331
 msgid "Unknown"
 msgstr "Unknown"
 
@@ -908,7 +913,7 @@ msgstr "Unknown"
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 
-#: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/+page.svelte:331
+#: src/frontend/src/lib/components/ui/OpenIdItem.svelte:27
 msgid "Unlink"
 msgstr "Unlink"
 
