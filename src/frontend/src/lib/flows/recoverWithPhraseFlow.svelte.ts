@@ -50,43 +50,35 @@ export class InvalidMnemonicError extends Error {
 
 export const recoverWithPhrase = async (
   words: string[],
-): Promise<
-  | { success: true; info: IdentityInfo; identity: DelegationIdentity }
-  | { success: false; error: Error }
-> => {
-  try {
-    const recoveryPhrase = words.join(" ");
-    if (!isValidMnemonic(recoveryPhrase)) {
-      return { success: false, error: new InvalidMnemonicError() };
-    }
-    const identity = await fromMnemonicWithoutValidation(
-      recoveryPhrase,
-      IC_DERIVATION_PATH,
-    );
-    // TODO: Use lookup endpoint of recovery phrase to user number.
-    const userNumber = BigInt(window.prompt("Identity number")!);
-    const devices = await anonymousActor.get_anchor_credentials(userNumber);
-    const isCorrectPhrase = devices.recovery_phrases.some((pubkey) =>
-      bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
-    );
-    if (!isCorrectPhrase) {
-      return { success: false, error: new Error("Invalid phrase") };
-    }
-    const delegationIdentity = await authenticateWithRecoveryPhrase(identity);
-    const agent = HttpAgent.createSync({
-      ...agentOptions,
-      identity: delegationIdentity,
-    });
-    // Make call to lookup endpoint
-    const identityInfo = await anonymousActor.identity_info
-      .withOptions({ agent })(userNumber)
-      .then(throwCanisterError);
-    return {
-      success: true,
-      info: identityInfo,
-      identity: delegationIdentity,
-    };
-  } catch (error: unknown) {
-    return { success: false, error: error as Error };
+): Promise<{ info: IdentityInfo; identity: DelegationIdentity }> => {
+  const recoveryPhrase = words.join(" ");
+  if (!isValidMnemonic(recoveryPhrase)) {
+    throw new InvalidMnemonicError();
   }
+  const identity = await fromMnemonicWithoutValidation(
+    recoveryPhrase,
+    IC_DERIVATION_PATH,
+  );
+  // TODO: Use lookup endpoint of recovery phrase to user number.
+  const userNumber = BigInt(window.prompt("Identity number")!);
+  const devices = await anonymousActor.get_anchor_credentials(userNumber);
+  const isCorrectPhrase = devices.recovery_phrases.some((pubkey) =>
+    bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
+  );
+  if (!isCorrectPhrase) {
+    throw new Error("Invalid phrase");
+  }
+  const delegationIdentity = await authenticateWithRecoveryPhrase(identity);
+  const agent = HttpAgent.createSync({
+    ...agentOptions,
+    identity: delegationIdentity,
+  });
+  // Make call to lookup endpoint
+  const identityInfo = await anonymousActor.identity_info
+    .withOptions({ agent })(userNumber)
+    .then(throwCanisterError);
+  return {
+    info: identityInfo,
+    identity: delegationIdentity,
+  };
 };

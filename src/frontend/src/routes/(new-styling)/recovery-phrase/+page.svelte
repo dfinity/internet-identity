@@ -67,12 +67,8 @@
     const phraseWords = words.map((word) => word.value);
     try {
       const result = await recoverWithPhrase(phraseWords);
-      // TODO: Handle success and error
-      if (result.success) {
-        console.log("success", result.info);
-      } else {
-        console.log("error", result.error);
-      }
+      // TODO: Handle success
+      console.log("success", result.info);
     } catch (error) {
       // TODO: Manage error
       console.error("error", error);
