@@ -85,7 +85,7 @@
 
   const handleContinueAs = async (identity: LastUsedIdentity) => {
     await authLastUsedFlow.authenticate(identity).catch(handleError);
-    await gotoNext(identity.identityNumber);
+    await onSignIn(identity.identityNumber);
   };
 
   onMount(() => {
