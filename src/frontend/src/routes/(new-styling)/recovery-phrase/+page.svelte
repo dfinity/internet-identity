@@ -139,7 +139,7 @@
     pastedWords.forEach((word, i) => {
       const targetIndex = currentIndex + i;
       if (targetIndex < words.length) {
-        words[targetIndex].value = word.trim();
+        words[targetIndex].value = word.trim().toLowerCase();
         words[targetIndex].isValid = true;
       }
     });
@@ -202,7 +202,12 @@
                 autocapitalize="off"
                 spellcheck="false"
                 id={`recovery-phrase-${i}`}
-                bind:value={word.value}
+                value={word.value}
+                oninput={(event) => {
+                  const target = event.currentTarget as HTMLInputElement;
+                  word.value = target.value.toLowerCase();
+                  target.value = word.value;
+                }}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
                 onpaste={(e) => handlePaste(e, i)}
                 data-lpignore="true"
