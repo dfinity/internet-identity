@@ -2,7 +2,7 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { fade } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { nonNullish } from "@dfinity/utils";
+  import { isNullish, nonNullish } from "@dfinity/utils";
 
   type Direction = "up" | "right" | "down" | "left";
   type Align = "start" | "center" | "end";
@@ -15,6 +15,7 @@
     align?: Align;
     distance?: string;
     responsive?: boolean;
+    flip?: boolean;
   };
 
   let {
@@ -27,6 +28,7 @@
     children,
     class: className,
     responsive = true,
+    flip = true,
     ...props
   }: Props = $props();
 
@@ -37,49 +39,105 @@
 
   $effect(() => {
     let tracking = true;
+
     const track = () => {
       if (nonNullish(anchorRef) && nonNullish(popoverRef)) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
 
+        // Available space around the anchor
+        const spaceAbove = anchorRect.top;
+        const spaceBelow = window.innerHeight - anchorRect.bottom;
+        const spaceLeft = anchorRect.left;
+        const spaceRight = window.innerWidth - anchorRect.right;
+
+        // Determine flipped direction if needed
+        let finalDirection = direction;
+
+        // Vertical flip
+        if (
+          flip &&
+          direction === "down" &&
+          spaceBelow < popoverRect.height &&
+          spaceAbove > spaceBelow
+        ) {
+          finalDirection = "up";
+        } else if (
+          flip &&
+          direction === "up" &&
+          spaceAbove < popoverRect.height &&
+          spaceBelow > spaceAbove
+        ) {
+          finalDirection = "down";
+        }
+
+        // Horizontal flip
+        if (
+          flip &&
+          direction === "right" &&
+          spaceRight < popoverRect.width &&
+          spaceLeft > spaceRight
+        ) {
+          finalDirection = "left";
+        } else if (
+          flip &&
+          direction === "left" &&
+          spaceLeft < popoverRect.width &&
+          spaceRight > spaceLeft
+        ) {
+          finalDirection = "right";
+        }
+
+        // Compute top position
         popoverRef.style.top = {
           up: `calc(${anchorRect.top - popoverRect.height}px - ${distance})`,
-          right: {
-            start: `${anchorRect.top}px`,
-            center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
-            end: `${anchorRect.bottom - popoverRect.height}px`,
-          }[align],
           down: `calc(${anchorRect.bottom}px + ${distance})`,
           left: {
             start: `${anchorRect.top}px`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
             end: `${anchorRect.bottom - popoverRect.height}px`,
           }[align],
-        }[direction];
+          right: {
+            start: `${anchorRect.top}px`,
+            center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
+            end: `${anchorRect.bottom - popoverRect.height}px`,
+          }[align],
+        }[finalDirection];
 
+        // Compute left position
         popoverRef.style.left = {
           up: {
             start: `${anchorRect.left}px`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
           }[align],
-          right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
             start: `${anchorRect.left}px`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
           }[align],
           left: `calc(${anchorRect.left - popoverRect.width}px - ${distance})`,
-        }[direction];
+          right: `calc(${anchorRect.right}px + ${distance})`,
+        }[finalDirection];
       }
-      if (tracking) {
-        requestAnimationFrame(track);
-      }
+
+      if (tracking) requestAnimationFrame(track);
     };
+
     requestAnimationFrame(track);
+
     return () => {
       tracking = false;
     };
+  });
+
+  // Scroll into view if out of view e.g. mobile
+  $effect(() => {
+    popoverRef?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "smooth",
+    });
   });
 </script>
 
