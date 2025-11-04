@@ -167,3 +167,23 @@ export const formatRelative = derived(
       return i18n.date(value);
     },
 );
+
+/**
+ * Usage:
+ * <Select option={$localeOptions}>
+ *   <button>{$localeStore}<button>
+ * </Select>
+ */
+export const localeOptions = derived(locales, (locales) =>
+  locales.map((locale) => ({
+    label: locale.toUpperCase(),
+    onClick: () => {
+      // Switch back to locale auto-detection if locale matches browser
+      if (locale === availableBrowserLocale) {
+        void localeStore.reset();
+      } else {
+        void localeStore.set(locale);
+      }
+    },
+  })),
+);

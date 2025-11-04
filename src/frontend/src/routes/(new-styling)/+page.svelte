@@ -12,13 +12,18 @@
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
-  import { t } from "$lib/stores/locale.store";
-  import { LanguageSelector, Trans } from "$lib/components/locale";
-  import { MinusCircleIcon, PlusCircleIcon } from "@lucide/svelte";
+  import { manuallyReroute } from "$lib/utils/reroute";
+  import { localeOptions, localeStore, t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
+  import {
+    ChevronDownIcon,
+    MinusCircleIcon,
+    PlusCircleIcon,
+  } from "@lucide/svelte";
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
   import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import { manuallyReroute } from "$lib/utils/reroute";
+  import Select from "$lib/components/ui/Select.svelte";
 
   // Add rerouting back on this SSG route
   $effect(() => {
@@ -77,7 +82,21 @@
       class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
     >
       <!-- TODO: Re-position language selector for now on mobile till updated design is implemented -->
-      <LanguageSelector class="max-md:absolute max-md:top-3 max-md:right-3" />
+      <Select
+        options={$localeOptions}
+        direction="down"
+        align="start"
+        distance="0.25rem"
+        class="!w-18"
+      >
+        <Button
+          variant="tertiary"
+          class="uppercase max-md:absolute max-md:top-3 max-md:right-3"
+        >
+          {$localeStore}
+          <ChevronDownIcon class="size-4" />
+        </Button>
+      </Select>
       <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank">
         {$t`For developers`}
       </Button>
