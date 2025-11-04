@@ -155,8 +155,9 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
   const input = page.getByRole("textbox");
   const saveButton = page.getByRole("button", { name: "Save" });
 
-  // Initially, the Save button should be enabled with the pre-filled name
-  await expect(saveButton).toBeEnabled();
+  // Initially, the Save button should be disabled with the pre-filled name
+  // since it's unchanged.
+  await expect(saveButton).toBeDisabled();
 
   // Clear the input field (make it empty)
   await input.clear();
