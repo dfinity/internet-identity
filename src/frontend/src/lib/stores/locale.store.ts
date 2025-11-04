@@ -105,3 +105,17 @@ export const formatNumber = derived(
   () => (value: number, format?: Intl.NumberFormatOptions) =>
     i18n.number(value, format),
 );
+
+export const localeOptions = derived(locales, (locales) =>
+  locales.map((locale) => ({
+    label: locale.toUpperCase(),
+    onClick: () => {
+      // Switch back to locale auto-detection if locale matches browser
+      if (locale === availableBrowserLocale) {
+        void localeStore.reset();
+      } else {
+        void localeStore.set(locale);
+      }
+    },
+  })),
+);
