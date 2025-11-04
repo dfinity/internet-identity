@@ -57,14 +57,17 @@
   );
 
   const handleOpenIDLinked = (credential: OpenIdCredential) => {
+    isAddAccessMethodWizardOpen = false;
     openIdCredentials.push(credential);
     invalidateAll();
   };
   const handlePasskeyRegistered = (authnMethod: AuthnMethodData) => {
+    isAddAccessMethodWizardOpen = false;
     authnMethods.push(authnMethod);
     invalidateAll();
   };
   const handleOtherDeviceRegistered = () => {
+    isAddAccessMethodWizardOpen = false;
     toaster.success({
       title: "Passkey has been registered from another device.",
     });
@@ -268,11 +271,14 @@
 
 {#if isAddAccessMethodWizardOpen}
   <AddAccessMethodWizard
-    onOpenIDLinked={handleOpenIDLinked}
+    onOpenIdLinked={handleOpenIDLinked}
     onPasskeyRegistered={handlePasskeyRegistered}
     onOtherDeviceRegistered={handleOtherDeviceRegistered}
-    onClose={() => (isAddAccessMethodWizardOpen = false)}
     maxPasskeysReached={accessMethods.isMaxPasskeysReached}
+    onError={(error) => {
+      isAddAccessMethodWizardOpen = false;
+      handleError(error);
+    }}
     {openIdCredentials}
     {isUsingPasskeys}
   />
