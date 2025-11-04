@@ -121,7 +121,9 @@
         }[finalDirection];
       }
 
-      if (tracking) requestAnimationFrame(track);
+      if (tracking) {
+        requestAnimationFrame(track);
+      }
     };
 
     requestAnimationFrame(track);
