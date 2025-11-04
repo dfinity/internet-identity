@@ -12,16 +12,18 @@
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
-  import { manuallyReroute } from "../../hooks";
   import { t } from "$lib/stores/locale.store";
   import { LanguageSelector, Trans } from "$lib/components/locale";
   import { MinusCircleIcon, PlusCircleIcon } from "@lucide/svelte";
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
   import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
+  import { manuallyReroute } from "$lib/utils/reroute";
 
   // Add rerouting back on this SSG route
-  manuallyReroute();
+  $effect(() => {
+    manuallyReroute();
+  });
 
   let triggerAnimation =
     $state<(opts: FlairAnimationOptions) => Promise<void>>();
