@@ -8,7 +8,7 @@ import {
   lastUsedIdentitiesStore,
   type LastUsedIdentity,
 } from "$lib/stores/last-used-identities.store";
-import { findConfig, requestJWT } from "$lib/utils/openID";
+import { decodeJWT, findConfig, requestJWT } from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
 import { isNullish } from "@dfinity/utils";
@@ -40,12 +40,17 @@ export class AuthLastUsedFlow {
         const credentialIds = (await this.#identityCredentials.get(
           lastUsedIdentity.identityNumber,
         )) ?? [lastUsedIdentity.authMethod.passkey.credentialId];
-        const { identity, identityNumber } = await authenticateWithPasskey({
-          canisterId,
-          session: get(sessionStore),
-          credentialIds,
+        const { identity, identityNumber, credentialId } =
+          await authenticateWithPasskey({
+            canisterId,
+            session: get(sessionStore),
+            credentialIds,
+          });
+        await authenticationStore.set({
+          identity,
+          identityNumber,
+          authMethod: { passkey: { credentialId } },
         });
-        await authenticationStore.set({ identity, identityNumber });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.ContinueAsPasskey,
@@ -74,13 +79,18 @@ export class AuthLastUsedFlow {
           mediation: "optional",
           loginHint: lastUsedIdentity.authMethod.openid.loginHint,
         });
+        const { iss, sub } = decodeJWT(jwt);
         this.systemOverlay = false;
         const { identity, identityNumber } = await authenticateWithJWT({
           canisterId,
           session: get(sessionStore),
           jwt,
         });
-        await authenticationStore.set({ identity, identityNumber });
+        await authenticationStore.set({
+          identity,
+          identityNumber,
+          authMethod: { openid: { iss, sub } },
+        });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({
           provider: config.name,
