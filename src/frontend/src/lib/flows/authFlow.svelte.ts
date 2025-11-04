@@ -56,7 +56,6 @@ export class AuthFlow {
     solve: (solution: string) => void;
   }>();
   #systemOverlay = $state(false);
-  #confirmationCode = $state<string>();
   #name = $state<string>();
   #jwt = $state<string>();
   #configIssuer = $state<string>();
@@ -71,10 +70,6 @@ export class AuthFlow {
 
   get systemOverlay() {
     return this.#systemOverlay;
-  }
-
-  get confirmationCode() {
-    return this.#confirmationCode;
   }
 
   constructor(options?: AuthFlowOptions) {
@@ -104,14 +99,15 @@ export class AuthFlow {
         canisterId,
         session: get(sessionStore),
       });
-    await authenticationStore.set({ identity, identityNumber });
+    const authMethod = { passkey: { credentialId } };
+    await authenticationStore.set({ identity, identityNumber, authMethod });
     const info =
       await get(authenticatedStore).actor.get_anchor_info(identityNumber);
     if (this.#options.trackLastUsed) {
       lastUsedIdentitiesStore.addLastUsedIdentity({
         identityNumber,
         name: info.name[0],
-        authMethod: { passkey: { credentialId } },
+        authMethod,
         createdAtMillis: info.created_at.map(nanosToMillis)[0],
       });
     }
@@ -200,7 +196,11 @@ export class AuthFlow {
       // If the call fails, it means the OpenID user does not exist in II.
       // In that case, we register them.
       authenticationV2Funnel.trigger(AuthenticationV2Events.LoginWithOpenID);
-      await authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({
+        identity,
+        identityNumber,
+        authMethod: { openid: { iss, sub } },
+      });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
       const authnMethod = info.openid_credentials[0]?.find(
@@ -310,7 +310,11 @@ export class AuthFlow {
       const identity = await authenticateWithSession({
         session: get(sessionStore),
       });
-      await authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({
+        identity,
+        identityNumber,
+        authMethod: { passkey: { credentialId } },
+      });
       if (this.#options.trackLastUsed) {
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber,
@@ -403,7 +407,11 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );
-      await authenticationStore.set({ identity, identityNumber });
+      await authenticationStore.set({
+        identity,
+        identityNumber,
+        authMethod: { openid: { iss, sub } },
+      });
       const metadata: MetadataMapV2 = [];
       if (nonNullish(jwtName)) {
         metadata.push(["name", { String: jwtName }]);
