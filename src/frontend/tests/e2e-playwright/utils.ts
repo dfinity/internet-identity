@@ -178,7 +178,7 @@ export const renamePasskey = async (
     .filter({ hasText: currentName })
     .getByRole("button", { name: "More options" })
     .click();
-  await page.getByRole("listitem", { name: "Rename" }).click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
 
   // Wait for the rename dialog to open
   await expect(
@@ -189,7 +189,7 @@ export const renamePasskey = async (
   await expect(input).toHaveValue(currentName);
   await input.clear();
   await input.fill(nextName);
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save changes" }).click();
 
   // Wait for the rename dialog to close
   await expect(
@@ -208,7 +208,7 @@ export const removePasskey = async (
     .filter({ hasText: name })
     .getByRole("button", { name: "More options" })
     .click();
-  await page.getByRole("listitem", { name: "Remove" }).click();
+  await page.getByRole("menuitem", { name: "Remove" }).click();
 
   // Wait for the remove dialog to open with the correct message
   await expect(

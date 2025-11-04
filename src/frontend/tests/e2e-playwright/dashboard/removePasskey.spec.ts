@@ -213,7 +213,7 @@ test("User can cancel passkey removal", async ({ page }) => {
     .filter({ hasText: "Current passkey" })
     .getByRole("button", { name: "More options" })
     .click();
-  await page.getByRole("listitem", { name: "Remove" }).click();
+  await page.getByRole("menuitem", { name: "Remove" }).click();
 
   // Wait for the remove dialog to open
   await expect(

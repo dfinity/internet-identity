@@ -152,7 +152,7 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
     .filter({ hasText: "Chrome" })
     .getByRole("button", { name: "More options" })
     .click();
-  await page.getByRole("listitem", { name: "Rename" }).click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
 
   // Wait for the rename dialog to open
   await expect(

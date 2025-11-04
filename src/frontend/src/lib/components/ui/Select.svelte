@@ -71,29 +71,29 @@
     onClose={() => (isOpen = false)}
     class={["!w-max !p-1.5 !shadow-lg", className]}
   >
-    <ul class="flex flex-col">
+    <div class="flex flex-col" role="menu">
       {#each options as option, index}
-        <li class="contents" aria-label={option.label}>
-          <Button
-            onclick={() => handleClick(option, index)}
-            variant="tertiary"
-            class={[
-              "justify-start gap-2.5 !px-3 text-start",
-              option.selected && "[ul:not(:hover)_&]:bg-bg-primary_hover",
-            ]}
-          >
-            {#if nonNullish(option.icon)}
-              {@const Icon = option.icon}
-              <div
-                class="text-fg-quaternary dark:text-fg-tertiary [&_svg]:size-4"
-              >
-                <Icon />
-              </div>
-            {/if}
-            <span>{option.label}</span>
-          </Button>
-        </li>
+        <Button
+          onclick={() => handleClick(option, index)}
+          variant="tertiary"
+          class={[
+            "justify-start gap-2.5 !px-3 text-start",
+            option.selected && "[ul:not(:hover)_&]:bg-bg-primary_hover",
+          ]}
+          role="menuitem"
+          aria-label={option.label}
+        >
+          {#if nonNullish(option.icon)}
+            {@const Icon = option.icon}
+            <div
+              class="text-fg-quaternary dark:text-fg-tertiary [&_svg]:size-4"
+            >
+              <Icon />
+            </div>
+          {/if}
+          <span>{option.label}</span>
+        </Button>
       {/each}
-    </ul>
+    </div>
   </Popover>
 {/if}
