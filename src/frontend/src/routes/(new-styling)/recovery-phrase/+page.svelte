@@ -27,6 +27,8 @@
     })),
   );
 
+  let showAll = $state(false);
+
   // Flag to prevent double-triggering recovery on multiple blur events
   let recoveryInProgress = $state(false);
 
@@ -162,6 +164,30 @@
     }
   };
 
+  const handleShowAll = () => {
+    showAll = true;
+  };
+
+  const handleClearAll = () => {
+    if (submitTimeoutId !== undefined) {
+      clearTimeout(submitTimeoutId);
+      submitTimeoutId = undefined;
+    }
+
+    showAll = false;
+
+    words.forEach((word) => {
+      word.value = "";
+      word.isValid = true;
+      word.showContent = false;
+    });
+
+    const firstElement = document.getElementById("recovery-phrase-0");
+    if (nonNullish(firstElement)) {
+      firstElement.focus();
+    }
+  };
+
   // Cleanup timeout on component unmount
   $effect(() => {
     return () => {
@@ -195,7 +221,7 @@
               <!-- "data-bwignore" Bitwarden ignore -->
               <!-- "data-form-type=other" Non-standard hint to password managers -->
               <input
-                type={word.showContent ? "text" : "password"}
+                type={showAll || word.showContent ? "text" : "password"}
                 inputmode="text"
                 autocorrect="off"
                 autocomplete="off"
@@ -255,8 +281,12 @@
           {/each}
         </div>
         <div class="flex flex-row gap-2">
-          <Button class="w-full" variant="tertiary">{$t`Show all`}</Button>
-          <Button class="w-full" variant="tertiary">{$t`Clear all`}</Button>
+          <Button class="w-full" variant="tertiary" onclick={handleShowAll}>
+            {$t`Show all`}
+          </Button>
+          <Button class="w-full" variant="tertiary" onclick={handleClearAll}>
+            {$t`Clear all`}
+          </Button>
         </div>
       </div>
       <Button size="xl" variant="secondary">{$t`Cancel`}</Button>
