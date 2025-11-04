@@ -11,6 +11,7 @@
   type RecoveryWord = {
     value: string;
     isValid: boolean;
+    showContent: boolean;
   };
 
   const englishWordList = (wordlists.english as string[]) ?? [];
@@ -22,6 +23,7 @@
     Array.from({ length: 24 }, () => ({
       value: "",
       isValid: true,
+      showContent: false,
     })),
   );
 
@@ -188,17 +190,30 @@
           {#each words as word, i}
             <label class="relative h-8">
               <!-- Text input -->
+              <!-- "data-lpignore" Last pass ignore -->
+              <!-- "data-1p-ignore" 1Password ignore -->
+              <!-- "data-bwignore" Bitwarden ignore -->
+              <!-- "data-form-type=other" Non-standard hint to password managers -->
               <input
-                type="text"
+                type={word.showContent ? "text" : "password"}
                 inputmode="text"
-                autocomplete="off"
                 autocorrect="off"
+                autocomplete="off"
+                autocapitalize="off"
                 spellcheck="false"
                 id={`recovery-phrase-${i}`}
                 bind:value={word.value}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
                 onpaste={(e) => handlePaste(e, i)}
-                onblur={() => validateWord(i)}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-bwignore="true"
+                data-form-type="other"
+                onfocus={() => (word.showContent = true)}
+                onblur={() => {
+                  validateWord(i);
+                  word.showContent = false;
+                }}
                 aria-invalid={!word.isValid}
                 class={`peer text-text-primary h-8 w-full rounded-full border-none pr-10 pl-10 text-base ring outline-none ring-inset focus:ring-2 ${
                   word.isValid
