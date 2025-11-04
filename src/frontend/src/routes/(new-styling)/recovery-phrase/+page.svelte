@@ -70,7 +70,7 @@
       return;
     }
 
-    // Fcus next input if not last index
+    // Focus next input if not last index
     if (event.key === "Enter" || event.code === "Space") {
       event.preventDefault();
       const nextInputIndex = currentIndex + 1;
