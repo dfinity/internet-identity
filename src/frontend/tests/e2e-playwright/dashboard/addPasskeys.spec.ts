@@ -308,5 +308,8 @@ test("User can log into the dashboard and up to 7 additional passkeys", async ({
   ).toHaveCount(8);
 
   // Verify we cannot add more passkeys
-  await expect(page.getByRole("button", { name: "Add new" })).toBeDisabled();
+  await page.getByRole("button", { name: "Add new" }).click();
+  await expect(
+    page.getByRole("button", { name: "Continue with passkey" }),
+  ).toBeDisabled();
 });
