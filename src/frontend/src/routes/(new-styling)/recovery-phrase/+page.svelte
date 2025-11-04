@@ -1,13 +1,28 @@
 <script lang="ts">
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import Button from "$lib/components/ui/Button.svelte";
+  import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { recoverWithPhrase } from "$lib/flows/recoverWithPhraseFlow.svelte";
   import { t } from "$lib/stores/locale.store";
   import { nonNullish } from "@dfinity/utils";
+  import { InfoIcon } from "@lucide/svelte";
+  import { wordlists } from "bip39";
 
-  // TODO: Add word validation.
-  let words = $state<Array<{ value: string }>>(
-    Array.from({ length: 24 }, () => ({ value: "" })),
+  type RecoveryWord = {
+    value: string;
+    isValid: boolean;
+  };
+
+  const englishWordList = (wordlists.english as string[]) ?? [];
+  const bip39EnglishWords = new Set(
+    englishWordList.map((word) => word.toLowerCase()),
+  );
+
+  let words = $state<Array<RecoveryWord>>(
+    Array.from({ length: 24 }, () => ({
+      value: "",
+      isValid: true,
+    })),
   );
 
   // Flag to prevent double-triggering recovery on multiple blur events
@@ -16,15 +31,36 @@
   // Timeout ID for debounced submission
   let submitTimeoutId = $state<number | undefined>(undefined);
 
-  // TODO: Use word validation instead of presence.
   const submitEnabled = $derived(
-    words.every((word) => word.value.trim().length > 0),
+    words.every((word) => word.value.trim().length > 0 && word.isValid),
   );
 
+  const validateWord = (index: number) => {
+    const entry = words[index];
+    if (!entry) {
+      return;
+    }
+
+    const normalized = entry.value.trim().toLowerCase();
+    entry.isValid =
+      normalized.length === 0 || bip39EnglishWords.has(normalized);
+  };
+
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
+    const currentWord = words[currentIndex];
+    // Reset validity state when typing
+    if (currentWord && event.key !== "Enter") {
+      currentWord.isValid = true;
+    }
+
+    // Validate word when entering
+    if (event.key === "Enter") {
+      validateWord(currentIndex);
+    }
+
+    // Clear any pending timeout and submit immediately if last index and submit is enabled
     const isLastIndex = currentIndex === words.length - 1;
     if (event.key === "Enter" && isLastIndex && submitEnabled) {
-      // Clear any pending timeout and submit immediately
       if (submitTimeoutId !== undefined) {
         clearTimeout(submitTimeoutId);
         submitTimeoutId = undefined;
@@ -32,6 +68,8 @@
       handleRecoverWithPhrase();
       return;
     }
+
+    // Focus next input if not last index
     if (event.key === "Enter" || event.code === "Space") {
       event.preventDefault();
       const nextInputIndex = currentIndex + 1;
@@ -62,9 +100,17 @@
     if (recoveryInProgress) {
       return;
     }
+    // We need to validate all words because it might be triggered by a timeout when the isInvalid state is not yet updated.
+    words.forEach((_, index) => validateWord(index));
+
+    if (!submitEnabled) {
+      return;
+    }
+
+    // Set the flag to prevent multiple submissions
     recoveryInProgress = true;
 
-    const phraseWords = words.map((word) => word.value);
+    const phraseWords = words.map((word) => word.value.trim());
     try {
       const result = await recoverWithPhrase(phraseWords);
       // TODO: Handle success
@@ -91,7 +137,8 @@
     pastedWords.forEach((word, i) => {
       const targetIndex = currentIndex + i;
       if (targetIndex < words.length) {
-        words[targetIndex].value = word;
+        words[targetIndex].value = word.trim();
+        words[targetIndex].isValid = true;
       }
     });
 
@@ -147,12 +194,36 @@
                 bind:value={word.value}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
                 onpaste={(e) => handlePaste(e, i)}
-                class="peer text-text-primary ring-border-secondary focus:ring-border-brand h-8 w-full rounded-full border-none bg-transparent pl-10 text-base ring outline-none ring-inset focus:ring-2"
+                onblur={() => validateWord(i)}
+                aria-invalid={!word.isValid}
+                class={`peer text-text-primary h-8 w-full rounded-full border-none pr-10 pl-10 text-base ring outline-none ring-inset focus:ring-2 ${
+                  word.isValid
+                    ? "ring-border-secondary focus:ring-border-brand bg-transparent"
+                    : "bg-bg-error-primary/30 ring-border-error focus:ring-border-error"
+                }`}
               />
+              {#if !word.isValid}
+                <Tooltip
+                  label={$t`Incorrect spelling`}
+                  direction="up"
+                  distance="0.5rem"
+                >
+                  <span
+                    class="text-text-error-primary focus:ring-border-error absolute top-1/2 right-3 flex size-5 -translate-y-1/2 items-center justify-center rounded-full focus:ring-2 focus:outline-none"
+                    aria-label={$t`Incorrect spelling`}
+                  >
+                    <InfoIcon class="size-4" />
+                  </span>
+                </Tooltip>
+              {/if}
               <!-- Left slot -->
               <!-- Reverse order to use "peer" class to change the border color when peer is focused -->
               <span
-                class="peer peer-focus:border-border-brand text-text-secondary border-border-secondary absolute top-0 left-0 flex h-8 w-8 items-center border-r-1 px-2 text-center text-sm font-semibold peer-focus:border-r-2"
+                class={`peer absolute top-0 left-0 flex h-8 w-8 items-center border-r-1 px-2 text-center text-sm font-semibold peer-focus:border-r-2 ${
+                  word.isValid
+                    ? "border-border-secondary text-text-secondary peer-focus:border-border-brand"
+                    : "border-border-error text-text-error-primary peer-focus:border-border-error"
+                }`}
               >
                 {String(i + 1).padStart(2, "0")}
               </span>
