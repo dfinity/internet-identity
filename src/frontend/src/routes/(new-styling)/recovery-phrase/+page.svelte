@@ -190,6 +190,10 @@
               <!-- Text input -->
               <input
                 type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
                 id={`recovery-phrase-${i}`}
                 bind:value={word.value}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
