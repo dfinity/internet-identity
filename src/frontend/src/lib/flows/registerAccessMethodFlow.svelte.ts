@@ -125,18 +125,20 @@ export class RegisterAccessMethodFlow {
       ])
       .then(throwCanisterError);
     const identity = await authenticateWithSession({ session });
+    const authMethod = {
+      passkey: {
+        credentialId: new Uint8Array(credentialId),
+      },
+    };
     await authenticationStore.set({
       identity,
       identityNumber: this.#identityNumber,
+      authMethod,
     });
     lastUsedIdentitiesStore.addLastUsedIdentity({
       identityNumber: this.#identityNumber,
       name,
-      authMethod: {
-        passkey: {
-          credentialId: new Uint8Array(credentialId),
-        },
-      },
+      authMethod,
       createdAtMillis: this.#createdAtMillis,
     });
     return this.#identityNumber;

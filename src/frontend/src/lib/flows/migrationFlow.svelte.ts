@@ -244,6 +244,10 @@ export class MigrationFlow {
       await authenticationStore.set({
         identity,
         identityNumber,
+        // Credential ID is currently missing, so we assign a dummy value.
+        // This placeholder will be replaced with the newly created passkey
+        // anyway once the user has completed the whole migration process.
+        authMethod: { passkey: { credentialId: new Uint8Array() } },
       });
       upgradeIdentityFunnel.trigger(
         UpgradeIdentityEvents.AuthenticationSuccessful,
