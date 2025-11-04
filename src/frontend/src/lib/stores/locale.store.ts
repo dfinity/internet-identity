@@ -166,7 +166,6 @@ export const formatRelative = derived(
       // Fallback
       return i18n.date(value);
     },
-
 );
 
 /**
