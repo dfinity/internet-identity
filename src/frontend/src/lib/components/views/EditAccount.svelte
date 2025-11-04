@@ -103,7 +103,7 @@
       variant="primary"
       size="lg"
       type="submit"
-      disabled={name.length === 0 ||
+      disabled={name.trim().length === 0 ||
         name.length > 32 ||
         !hasChanges ||
         nameExists ||

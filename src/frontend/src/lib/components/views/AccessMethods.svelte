@@ -5,14 +5,14 @@
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-  import RemoveOpenIdCredential from "$lib/components/views/RemoveOpenIdCredential.svelte";
+  import UnlinkOpenIdCredential from "$lib/components/views/UnlinkOpenIdCredential.svelte";
   import { invalidateAll } from "$app/navigation";
   import type {
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import RemovePasskeyDialog from "$lib/components/views/RemovePasskeyDialog.svelte";
-  import RenamePasskeyDialog from "$lib/components/views/RenamePasskeyDialog.svelte";
+  import RemovePasskey from "$lib/components/views/RemovePasskey.svelte";
+  import RenamePasskey from "$lib/components/views/RenamePasskey.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
   import {
@@ -27,6 +27,7 @@
   import { openIdLogo, openIdName } from "$lib/utils/openID";
   import Tooltip from "../ui/Tooltip.svelte";
   import { accessMethods } from "$lib/derived/accessMethods.derived.svelte";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
 
   let isAddAccessMethodWizardOpen = $state(false);
   let removableAuthnMethod = $state<AuthnMethodData | null>(null);
@@ -239,31 +240,37 @@
 </div>
 
 {#if removableOpenIdCredential}
-  <RemoveOpenIdCredential
-    onRemove={handleRemoveOpenIdCredential}
-    onClose={() => (removableOpenIdCredential = null)}
-    openIDName={openIdName(
-      removableOpenIdCredential.iss,
-      removableOpenIdCredential.metadata,
-    ) ?? "Google"}
-    isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
-  />
+  <Dialog onClose={() => (removableOpenIdCredential = null)}>
+    <UnlinkOpenIdCredential
+      onUnlink={handleRemoveOpenIdCredential}
+      onCancel={() => (removableOpenIdCredential = null)}
+      providerName={openIdName(
+        removableOpenIdCredential.iss,
+        removableOpenIdCredential.metadata,
+      ) ?? "Google"}
+      isCurrentAccessMethod={isRemovableOpenIdCredentialCurrentAccessMethod}
+    />
+  </Dialog>
 {/if}
 
 {#if removableAuthnMethod}
-  <RemovePasskeyDialog
-    onRemove={handleRemovePasskey}
-    onClose={() => (removableAuthnMethod = null)}
-    isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
-  />
+  <Dialog onClose={() => (removableAuthnMethod = null)}>
+    <RemovePasskey
+      onRemove={handleRemovePasskey}
+      onCancel={() => (removableAuthnMethod = null)}
+      isCurrentAccessMethod={isRemovableAuthnMethodCurrentAccessMethod}
+    />
+  </Dialog>
 {/if}
 
 {#if renamableAuthnMethod}
-  <RenamePasskeyDialog
-    currentName={getAuthnMethodAlias(renamableAuthnMethod)}
-    onRename={handleRenamePasskey}
-    onClose={() => (renamableAuthnMethod = null)}
-  />
+  <Dialog onClose={() => (renamableAuthnMethod = null)}>
+    <RenamePasskey
+      name={getAuthnMethodAlias(renamableAuthnMethod)}
+      onRename={handleRenamePasskey}
+      onCancel={() => (renamableAuthnMethod = null)}
+    />
+  </Dialog>
 {/if}
 
 {#if isAddAccessMethodWizardOpen}
