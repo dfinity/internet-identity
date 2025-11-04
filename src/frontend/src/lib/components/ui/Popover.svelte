@@ -91,13 +91,13 @@
         // Compute top position
         popoverRef.style.top = {
           up: `calc(${anchorRect.top - popoverRect.height}px - ${distance})`,
-          down: `calc(${anchorRect.bottom}px + ${distance})`,
-          left: {
+          right: {
             start: `${anchorRect.top}px`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
             end: `${anchorRect.bottom - popoverRect.height}px`,
           }[align],
-          right: {
+          down: `calc(${anchorRect.bottom}px + ${distance})`,
+          left: {
             start: `${anchorRect.top}px`,
             center: `${anchorRect.top + anchorRect.height * 0.5 - popoverRect.height * 0.5}px`,
             end: `${anchorRect.bottom - popoverRect.height}px`,
@@ -111,13 +111,13 @@
             center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
           }[align],
+          right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
             start: `${anchorRect.left}px`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
           }[align],
           left: `calc(${anchorRect.left - popoverRect.width}px - ${distance})`,
-          right: `calc(${anchorRect.right}px + ${distance})`,
         }[finalDirection];
       }
 
