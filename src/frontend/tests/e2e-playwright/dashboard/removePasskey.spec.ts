@@ -101,10 +101,10 @@ test("User cannot remove passkey if they only have one access method", async ({
     .filter({ hasText: "Chrome" })
     .getByRole("button", { name: "More options" })
     .click();
-  await expect(page.getByRole("listitem", { name: "Remove" })).toBeHidden();
+  await expect(page.getByRole("menuitem", { name: "Remove" })).toBeHidden();
 
   // Verify that the rename button is still visible (to ensure we're looking at the right area)
-  await expect(page.getByRole("listitem", { name: "Rename" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Rename" })).toBeVisible();
 });
 
 test("User is logged out after removing the passkey they used to authenticate", async ({

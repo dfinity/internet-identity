@@ -84,10 +84,7 @@
 
   // Scroll into view if out of view e.g. mobile
   $effect(() => {
-    if (isNullish(popoverRef)) {
-      return;
-    }
-    popoverRef.scrollIntoView({
+    popoverRef?.scrollIntoView({
       block: "nearest",
       inline: "nearest",
       behavior: "smooth",
