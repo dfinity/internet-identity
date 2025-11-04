@@ -2,7 +2,7 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { fade } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { isNullish, nonNullish } from "@dfinity/utils";
+  import { nonNullish } from "@dfinity/utils";
 
   type Direction = "up" | "right" | "down" | "left";
   type Align = "start" | "center" | "end";
@@ -129,15 +129,6 @@
     return () => {
       tracking = false;
     };
-  });
-
-  // Scroll into view if out of view e.g. mobile
-  $effect(() => {
-    popoverRef?.scrollIntoView({
-      block: "nearest",
-      inline: "nearest",
-      behavior: "smooth",
-    });
   });
 </script>
 
