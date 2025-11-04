@@ -47,7 +47,6 @@
   };
 
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
-    console.log("in da handleKeyDownInput");
     const currentWord = words[currentIndex];
     // Reset validity state when typing
     if (currentWord && event.key !== "Enter") {
