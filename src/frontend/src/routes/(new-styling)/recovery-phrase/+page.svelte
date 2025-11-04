@@ -164,8 +164,13 @@
     }
   };
 
-  const handleShowAll = () => {
-    showAll = true;
+  const toggleAll = () => {
+    showAll = !showAll;
+    if (!showAll) {
+      words.forEach((word) => {
+        word.showContent = false;
+      });
+    }
   };
 
   const handleClearAll = () => {
@@ -221,7 +226,9 @@
               <!-- "data-bwignore" Bitwarden ignore -->
               <!-- "data-form-type=other" Non-standard hint to password managers -->
               <input
-                type={showAll || word.showContent ? "text" : "password"}
+                type={showAll || word.showContent || !word.isValid
+                  ? "text"
+                  : "password"}
                 inputmode="text"
                 autocorrect="off"
                 autocomplete="off"
@@ -281,8 +288,12 @@
           {/each}
         </div>
         <div class="flex flex-row gap-2">
-          <Button class="w-full" variant="tertiary" onclick={handleShowAll}>
-            {$t`Show all`}
+          <Button class="w-full" variant="tertiary" onclick={toggleAll}>
+            {#if showAll}
+              {$t`Hide all`}
+            {:else}
+              {$t`Show all`}
+            {/if}
           </Button>
           <Button class="w-full" variant="tertiary" onclick={handleClearAll}>
             {$t`Clear all`}
