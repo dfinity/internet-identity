@@ -27,6 +27,7 @@
   import { openIdLogo, openIdName } from "$lib/utils/openID";
   import Tooltip from "../ui/Tooltip.svelte";
   import { accessMethods } from "$lib/derived/accessMethods.derived.svelte";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
 
   let isAddAccessMethodWizardOpen = $state(false);
   let removableAuthnMethod = $state<AuthnMethodData | null>(null);
@@ -270,16 +271,18 @@
 {/if}
 
 {#if isAddAccessMethodWizardOpen}
-  <AddAccessMethodWizard
-    onOpenIdLinked={handleOpenIDLinked}
-    onPasskeyRegistered={handlePasskeyRegistered}
-    onOtherDeviceRegistered={handleOtherDeviceRegistered}
-    maxPasskeysReached={accessMethods.isMaxPasskeysReached}
-    onError={(error) => {
-      isAddAccessMethodWizardOpen = false;
-      handleError(error);
-    }}
-    {openIdCredentials}
-    {isUsingPasskeys}
-  />
+  <Dialog onClose={() => (isAddAccessMethodWizardOpen = false)}>
+    <AddAccessMethodWizard
+      onOpenIdLinked={handleOpenIDLinked}
+      onPasskeyRegistered={handlePasskeyRegistered}
+      onOtherDeviceRegistered={handleOtherDeviceRegistered}
+      maxPasskeysReached={accessMethods.isMaxPasskeysReached}
+      onError={(error) => {
+        isAddAccessMethodWizardOpen = false;
+        handleError(error);
+      }}
+      {openIdCredentials}
+      {isUsingPasskeys}
+    />
+  </Dialog>
 {/if}
