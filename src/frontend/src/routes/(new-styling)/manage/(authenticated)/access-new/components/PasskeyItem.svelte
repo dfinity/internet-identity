@@ -1,6 +1,5 @@
 <script lang="ts">
   import { EllipsisVerticalIcon, PencilIcon, Trash2Icon } from "@lucide/svelte";
-  import { nonNullish } from "@dfinity/utils";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -23,7 +22,7 @@
 
   const alias = $derived(getAuthnMethodAlias(passkey));
   const options = $derived([
-    ...(nonNullish(onRename)
+    ...(onRename
       ? [
           {
             label: $t`Rename`,
@@ -32,7 +31,7 @@
           },
         ]
       : []),
-    ...(nonNullish(onRemove)
+    ...(onRemove
       ? [
           {
             label: $t`Remove`,
@@ -90,7 +89,7 @@
           >
             <span>{$t`Right now`}</span>
           </Tooltip>
-        {:else if nonNullish(passkey.last_authentication[0])}
+        {:else if passkey.last_authentication[0]}
           {@const date = new Date(
             nanosToMillis(passkey.last_authentication[0]),
           )}

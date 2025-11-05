@@ -1,7 +1,6 @@
 <script lang="ts">
   import { getMetadataString, openIdLogo, openIdName } from "$lib/utils/openID";
   import { EllipsisVerticalIcon, Link2OffIcon } from "@lucide/svelte";
-  import { nonNullish } from "@dfinity/utils";
   import { nanosToMillis } from "$lib/utils/time";
   import Select from "$lib/components/ui/Select.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -21,7 +20,7 @@
   const email = $derived(getMetadataString(openid.metadata, "email"));
   const logo = $derived(openIdLogo(openid.iss, openid.metadata));
   const options = $derived(
-    nonNullish(onUnlink)
+    onUnlink !== undefined
       ? [
           {
             label: $t`Unlink`,
@@ -34,7 +33,7 @@
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">
-  {#if nonNullish(logo)}
+  {#if logo}
     <div class="text-fg-primary relative size-6">
       {@html logo}
       {#if isCurrentAccessMethod}
@@ -79,7 +78,7 @@
         >
           <span>{$t`Right now`}</span>
         </Tooltip>
-      {:else if nonNullish(openid.last_usage_timestamp[0])}
+      {:else if openid.last_usage_timestamp[0]}
         {@const date = new Date(nanosToMillis(openid.last_usage_timestamp[0]))}
         <Tooltip
           label={$formatDate(date, {
