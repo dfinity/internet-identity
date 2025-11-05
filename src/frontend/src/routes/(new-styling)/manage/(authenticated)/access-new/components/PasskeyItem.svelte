@@ -15,10 +15,11 @@
     passkey: AuthnMethodData;
     onRename?: () => void;
     onRemove?: () => void;
-    inUse?: boolean;
+    isCurrentAccessMethod?: boolean;
   }
 
-  const { passkey, onRename, onRemove, inUse }: Props = $props();
+  const { passkey, onRename, onRemove, isCurrentAccessMethod }: Props =
+    $props();
 
   const alias = $derived(getAuthnMethodAlias(passkey));
   const options = $derived([
@@ -48,7 +49,7 @@
   <div class="mb-3 flex h-9 flex-row items-center">
     <div class="relative">
       <PasskeyIcon class="text-fg-primary size-6" />
-      {#if inUse}
+      {#if isCurrentAccessMethod}
         <div
           class="bg-bg-success-secondary border-bg-primary absolute top-0 -right-0.25 size-2.5 rounded-full border-2"
         ></div>
@@ -81,7 +82,7 @@
         {$t`Last used`}
       </div>
       <div class="text-text-primary cursor-default text-xs">
-        {#if inUse}
+        {#if isCurrentAccessMethod}
           <Tooltip
             label={$t`Currently signed in with this passkey`}
             direction="up"

@@ -12,10 +12,10 @@
   interface Props {
     openid: OpenIdCredential;
     onUnlink?: () => void;
-    inUse?: boolean;
+    isCurrentAccessMethod?: boolean;
   }
 
-  const { openid, onUnlink, inUse }: Props = $props();
+  const { openid, onUnlink, isCurrentAccessMethod }: Props = $props();
 
   const name = $derived(openIdName(openid.iss, openid.metadata));
   const email = $derived(getMetadataString(openid.metadata, "email"));
@@ -37,7 +37,7 @@
   {#if nonNullish(logo)}
     <div class="text-fg-primary relative size-6">
       {@html logo}
-      {#if inUse}
+      {#if isCurrentAccessMethod}
         <div
           class="bg-bg-success-secondary border-bg-primary absolute -top-0.25 -right-0.5 size-2.5 rounded-full border-2"
         ></div>
@@ -71,7 +71,7 @@
       {$t`Last used`}
     </div>
     <div class="text-text-primary cursor-default text-xs">
-      {#if inUse}
+      {#if isCurrentAccessMethod}
         <Tooltip
           label={$t`Currently signed in with this account`}
           direction="up"

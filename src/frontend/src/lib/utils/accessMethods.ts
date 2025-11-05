@@ -119,6 +119,7 @@ const hasSomeOrigin = (
  * @returns {boolean}
  */
 export const isLegacyAuthnMethod = (accessMethod: AuthnMethodData): boolean => {
+  return false;
   return (
     !hasSomeOrigin(accessMethod, canisterConfig.new_flow_origins[0] ?? []) ||
     "Recovery" in accessMethod.security_settings.purpose

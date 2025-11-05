@@ -2,20 +2,19 @@
   import type { PageProps } from "./$types";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import { PlusIcon } from "@lucide/svelte";
   import { openIdName } from "$lib/utils/openID";
   import type {
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import RenamePasskey from "$lib/components/views/RenamePasskey.svelte";
-  import RemovePasskey from "$lib/components/views/RemovePasskey.svelte";
+  import RenamePasskey from "./components/RenamePasskey.svelte";
+  import RemovePasskey from "./components/RemovePasskey.svelte";
+  import RemoveOpenIdCredential from "./components/RemoveOpenIdCredential.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { throwCanisterError } from "$lib/utils/utils";
   import {
-    authnMethodEqual,
     authnMethodToPublicKey,
     getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
@@ -24,71 +23,33 @@
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { bytesToHex } from "@noble/hashes/utils";
-  import UnlinkOpenIdCredential from "$lib/components/views/UnlinkOpenIdCredential.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import OpenIdItem from "$lib/components/ui/OpenIdItem.svelte";
-  import PasskeyItem from "$lib/components/ui/PasskeyItem.svelte";
+  import OpenIdItem from "./components/OpenIdItem.svelte";
+  import PasskeyItem from "./components/PasskeyItem.svelte";
+  import {
+    compareAccessMethods,
+    toAccessMethods,
+    toKey,
+    isCurrentAccessMethod,
+    AccessMethod,
+  } from "./utils";
 
   const MAX_PASSKEYS = 8;
 
-  type AccessMethod =
-    | { passkey: AuthnMethodData }
-    | { openid: OpenIdCredential };
-
   const { data }: PageProps = $props();
 
-  let isAddAccessMethodWizardOpen = $state(false);
-  let renamablePasskey = $state<AuthnMethodData>();
-  let removablePasskey = $state<AuthnMethodData>();
-  let unlinkableOpenIdCredential = $state<OpenIdCredential>();
+  // State
+  let isAddingAccessMethod = $state(false);
+  let renamingAccessMethodKey = $state<string>();
+  let removingAccessMethodKey = $state<string>();
+  let accessMethods = $derived(toAccessMethods(data.identityInfo));
 
-  const sortAccessMethods = (a: AccessMethod, b: AccessMethod) => {
-    const aVal =
-      "passkey" in a
-        ? a.passkey.last_authentication[0]
-        : a.openid.last_usage_timestamp[0];
-    const bVal =
-      "passkey" in b
-        ? b.passkey.last_authentication[0]
-        : b.openid.last_usage_timestamp[0];
-    // If items are equal (either undefined or same timestamp),
-    // the OpenID items should come first before the passkeys.
-    if (aVal === bVal) {
-      return "openid" in a ? -1 : 1;
-    }
-    // Undefined should come first (new/unused access methods at the top),
-    // defined should sort descending (most recently used first).
-    if (isNullish(bVal)) return 1;
-    if (isNullish(aVal)) return -1;
-    return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
-  };
-  const accessMethodKey = (accessMethod: AccessMethod) =>
-    "passkey" in accessMethod
-      ? bytesToHex(authnMethodToPublicKey(accessMethod.passkey))
-      : accessMethod.openid.iss + accessMethod.openid.sub;
-  const passkeyInUse = (data: AuthnMethodData) =>
-    "passkey" in $authenticatedStore.authMethod &&
-    "WebAuthn" in data.authn_method &&
-    bytesToHex($authenticatedStore.authMethod.passkey.credentialId) ===
-      bytesToHex(new Uint8Array(data.authn_method.WebAuthn.credential_id));
-  const openIdInUse = (credential: OpenIdCredential) =>
-    "openid" in $authenticatedStore.authMethod &&
-    $authenticatedStore.authMethod.openid.iss === credential.iss &&
-    $authenticatedStore.authMethod.openid.sub === credential.sub;
-
-  let accessMethods = $derived(
-    [
-      // Reverse to put the latest unused first
-      ...(data.identityInfo.openid_credentials[0] ?? [])
-        .map((openid) => ({ openid }) as const)
-        .reverse(),
-      ...data.identityInfo.authn_methods
-        // Filter out anything that isn't a passkey e.g. recovery phrase
-        .filter((passkey) => "WebAuthn" in passkey.authn_method)
-        .map((passkey) => ({ passkey }) as const)
-        .reverse(),
-    ].sort(sortAccessMethods),
+  // Derived
+  const renamingAccessMethod = $derived(
+    accessMethods.find((m) => renamingAccessMethodKey === toKey(m)),
+  );
+  const removingAccessMethod = $derived(
+    accessMethods.find((m) => removingAccessMethodKey === toKey(m)),
   );
   const isUsingPasskeys = $derived(
     accessMethods.some((accessMethod) => "passkey" in accessMethod),
@@ -103,116 +64,94 @@
       .map(({ openid }) => openid),
   );
 
+  // Handlers
   const handleOpenIdLinked = async (openid: OpenIdCredential) => {
-    isAddAccessMethodWizardOpen = false;
+    isAddingAccessMethod = false;
     accessMethods = [{ openid } as const, ...accessMethods].sort(
-      sortAccessMethods,
+      compareAccessMethods,
     );
     void invalidateAll();
   };
   const handlePasskeyRegistered = async (passkey: AuthnMethodData) => {
-    isAddAccessMethodWizardOpen = false;
+    isAddingAccessMethod = false;
     accessMethods = [{ passkey } as const, ...accessMethods].sort(
-      sortAccessMethods,
+      compareAccessMethods,
     );
     void invalidateAll();
   };
   const handleOtherDeviceRegistered = async () => {
-    isAddAccessMethodWizardOpen = false;
+    isAddingAccessMethod = false;
     void invalidateAll();
   };
-  const handleRenamePasskey = async (name: string) => {
-    if (isNullish(renamablePasskey)) {
+  const handleNameChanged = async (name: string) => {
+    if (
+      renamingAccessMethod === undefined ||
+      !("passkey" in renamingAccessMethod)
+    ) {
       return;
     }
     try {
-      const passkey = renamablePasskey;
-      const metadata = Object.fromEntries(passkey.metadata);
+      // Replace passkey metadata
+      const metadata = Object.fromEntries(
+        renamingAccessMethod.passkey.metadata,
+      );
       metadata["alias"] = { String: name };
-      passkey.metadata = Object.entries(metadata);
       await $authenticatedStore.actor
         .authn_method_metadata_replace(
           $authenticatedStore.identityNumber,
-          authnMethodToPublicKey(passkey),
-          passkey.metadata,
+          authnMethodToPublicKey(renamingAccessMethod.passkey),
+          Object.entries(metadata),
         )
         .then(throwCanisterError);
-      renamablePasskey = undefined;
-      accessMethods = accessMethods
-        .map((accessMethod) =>
-          "passkey" in accessMethod &&
-          authnMethodEqual(accessMethod.passkey, passkey)
-            ? ({ passkey } as const)
-            : accessMethod,
-        )
-        .sort(sortAccessMethods);
+      // Optimistic update
+      renamingAccessMethod.passkey.metadata = Object.entries(metadata);
+      accessMethods = [...accessMethods];
+      // Close dialog and update
+      renamingAccessMethodKey = undefined;
       void invalidateAll();
     } catch (error) {
       handleError(error);
     }
   };
-  const handleRemovePasskey = async () => {
-    if (isNullish(removablePasskey)) {
+  const handleRemoveConfirmed = async () => {
+    if (removingAccessMethod === undefined) {
       return;
     }
     try {
-      const passkey = removablePasskey;
-      await $authenticatedStore.actor
-        .authn_method_remove(
+      if ("passkey" in removingAccessMethod) {
+        await $authenticatedStore.actor
+          .authn_method_remove(
+            $authenticatedStore.identityNumber,
+            authnMethodToPublicKey(removingAccessMethod.passkey),
+          )
+          .then(throwCanisterError);
+      }
+      if ("openid" in removingAccessMethod) {
+        await $authenticatedStore.actor
+          .openid_credential_remove($authenticatedStore.identityNumber, [
+            removingAccessMethod.openid.iss,
+            removingAccessMethod.openid.sub,
+          ])
+          .then(throwCanisterError);
+      }
+      // Logout and forget identity if it's the current access method
+      if (isCurrentAccessMethod($authenticatedStore, removingAccessMethod)) {
+        lastUsedIdentitiesStore.removeIdentity(
           $authenticatedStore.identityNumber,
-          authnMethodToPublicKey(passkey),
-        )
-        .then(throwCanisterError);
-      if (passkeyInUse(passkey)) {
-        logoutAndForgetIdentity();
+        );
+        location.replace("/login");
         return;
       }
-      removablePasskey = undefined;
+      // Optimistic update
       accessMethods = accessMethods
-        .filter(
-          (accessMethod) =>
-            !("passkey" in accessMethod) ||
-            !authnMethodEqual(accessMethod.passkey, passkey),
-        )
-        .sort(sortAccessMethods);
+        .filter((m) => toKey(m) !== removingAccessMethodKey)
+        .sort(compareAccessMethods);
+      // Close dialog and fetch update
+      removingAccessMethodKey = undefined;
       void invalidateAll();
     } catch (error) {
       handleError(error);
     }
-  };
-  const handleUnlinkOpenIdCredential = async () => {
-    if (isNullish(unlinkableOpenIdCredential)) {
-      return;
-    }
-    try {
-      const credential = unlinkableOpenIdCredential;
-      await $authenticatedStore.actor
-        .openid_credential_remove($authenticatedStore.identityNumber, [
-          credential.iss,
-          credential.sub,
-        ])
-        .then(throwCanisterError);
-      if (openIdInUse(credential)) {
-        logoutAndForgetIdentity();
-        return;
-      }
-      unlinkableOpenIdCredential = undefined;
-      accessMethods = accessMethods
-        .filter(
-          (accessMethod) =>
-            !("openid" in accessMethod) ||
-            accessMethod.openid.iss !== credential.iss ||
-            accessMethod.openid.sub !== credential.sub,
-        )
-        .sort(sortAccessMethods);
-      void invalidateAll();
-    } catch (error) {
-      handleError(error);
-    }
-  };
-  const logoutAndForgetIdentity = () => {
-    lastUsedIdentitiesStore.removeIdentity($authenticatedStore.identityNumber);
-    location.replace("/login");
   };
 </script>
 
@@ -227,7 +166,7 @@
 </header>
 <div class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-5">
   <button
-    onclick={() => (isAddAccessMethodWizardOpen = true)}
+    onclick={() => (isAddingAccessMethod = true)}
     class={[
       "flex flex-col items-center justify-center gap-2",
       "bg-bg-primary border-border-tertiary rounded-sm border transition-colors duration-200 outline-none",
@@ -240,7 +179,7 @@
   </button>
   <ul class="contents">
     {#key data.identityNumber}
-      {#each accessMethods as accessMethod (accessMethodKey(accessMethod))}
+      {#each accessMethods as accessMethod (toKey(accessMethod))}
         <li
           animate:flip={{ duration: 300, delay: 300 }}
           in:scale={{ duration: 300, delay: 500, start: 0.95 }}
@@ -253,19 +192,25 @@
           {#if "passkey" in accessMethod}
             <PasskeyItem
               passkey={accessMethod.passkey}
-              onRename={() => (renamablePasskey = accessMethod.passkey)}
+              onRename={() => (renamingAccessMethodKey = toKey(accessMethod))}
               onRemove={accessMethods.length > 1
-                ? () => (removablePasskey = accessMethod.passkey)
+                ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
-              inUse={passkeyInUse(accessMethod.passkey)}
+              isCurrentAccessMethod={isCurrentAccessMethod(
+                $authenticatedStore,
+                accessMethod,
+              )}
             />
           {:else if "openid" in accessMethod}
             <OpenIdItem
               openid={accessMethod.openid}
               onUnlink={accessMethods.length > 1
-                ? () => (unlinkableOpenIdCredential = accessMethod.openid)
+                ? () => (removingAccessMethodKey = toKey(accessMethod))
                 : undefined}
-              inUse={openIdInUse(accessMethod.openid)}
+              isCurrentAccessMethod={isCurrentAccessMethod(
+                $authenticatedStore,
+                accessMethod,
+              )}
             />
           {/if}
         </li>
@@ -274,14 +219,14 @@
   </ul>
 </div>
 
-{#if isAddAccessMethodWizardOpen}
-  <Dialog onClose={() => (isAddAccessMethodWizardOpen = false)}>
+{#if isAddingAccessMethod}
+  <Dialog onClose={() => (isAddingAccessMethod = false)}>
     <AddAccessMethodWizard
       onOpenIdLinked={handleOpenIdLinked}
       onPasskeyRegistered={handlePasskeyRegistered}
       onOtherDeviceRegistered={handleOtherDeviceRegistered}
       onError={(error) => {
-        isAddAccessMethodWizardOpen = false;
+        isAddingAccessMethod = false;
         handleError(error);
       }}
       {maxPasskeysReached}
@@ -291,36 +236,41 @@
   </Dialog>
 {/if}
 
-{#if renamablePasskey}
-  <Dialog onClose={() => (renamablePasskey = undefined)}>
+{#if renamingAccessMethod !== undefined && "passkey" in renamingAccessMethod}
+  <Dialog onClose={() => (renamingAccessMethodKey = undefined)}>
     <RenamePasskey
-      name={getAuthnMethodAlias(renamablePasskey)}
-      onRename={handleRenamePasskey}
-      onCancel={() => (renamablePasskey = undefined)}
+      name={getAuthnMethodAlias(renamingAccessMethod.passkey)}
+      onRename={handleNameChanged}
+      onCancel={() => (renamingAccessMethodKey = undefined)}
     />
   </Dialog>
 {/if}
 
-{#if removablePasskey}
-  <Dialog onClose={() => (removablePasskey = undefined)}>
-    <RemovePasskey
-      onRemove={handleRemovePasskey}
-      onCancel={() => (removablePasskey = undefined)}
-      isCurrentAccessMethod={passkeyInUse(removablePasskey)}
-    />
-  </Dialog>
-{/if}
-
-{#if unlinkableOpenIdCredential}
-  <Dialog onClose={() => (unlinkableOpenIdCredential = undefined)}>
-    <UnlinkOpenIdCredential
-      onUnlink={handleUnlinkOpenIdCredential}
-      onCancel={() => (unlinkableOpenIdCredential = undefined)}
-      providerName={openIdName(
-        unlinkableOpenIdCredential.iss,
-        unlinkableOpenIdCredential.metadata,
-      ) ?? $t`Unknown`}
-      isCurrentAccessMethod={openIdInUse(unlinkableOpenIdCredential)}
-    />
+{#if removingAccessMethod !== undefined}
+  <Dialog onClose={() => (removingAccessMethodKey = undefined)}>
+    {#if "passkey" in removingAccessMethod}
+      <RemovePasskey
+        onRemove={handleRemoveConfirmed}
+        onCancel={() => (removingAccessMethodKey = undefined)}
+        isCurrentAccessMethod={isCurrentAccessMethod(
+          $authenticatedStore,
+          removingAccessMethod,
+        )}
+      />
+    {/if}
+    {#if "openid" in removingAccessMethod}
+      <RemoveOpenIdCredential
+        onRemove={handleRemoveConfirmed}
+        onCancel={() => (removingAccessMethodKey = undefined)}
+        providerName={openIdName(
+          removingAccessMethod.openid.iss,
+          removingAccessMethod.openid.metadata,
+        ) ?? $t`Unknown`}
+        isCurrentAccessMethod={isCurrentAccessMethod(
+          $authenticatedStore,
+          removingAccessMethod,
+        )}
+      />
+    {/if}
   </Dialog>
 {/if}

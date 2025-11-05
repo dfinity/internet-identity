@@ -5,14 +5,14 @@
   import identityInfo from "$lib/stores/identity-info.state.svelte";
   import AccessMethod from "$lib/components/ui/AccessMethod.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-  import UnlinkOpenIdCredential from "$lib/components/views/UnlinkOpenIdCredential.svelte";
   import { invalidateAll } from "$app/navigation";
   import type {
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import RemovePasskey from "$lib/components/views/RemovePasskey.svelte";
-  import RenamePasskey from "$lib/components/views/RenamePasskey.svelte";
+  import RemovePasskey from "../../../routes/(new-styling)/manage/(authenticated)/access-new/components/RemovePasskey.svelte";
+  import RenamePasskey from "../../../routes/(new-styling)/manage/(authenticated)/access-new/components/RenamePasskey.svelte";
+  import RemoveOpenIdCredential from "../../../routes/(new-styling)/manage/(authenticated)/access-new/components/RemoveOpenIdCredential.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
   import {
@@ -244,8 +244,8 @@
 
 {#if removableOpenIdCredential}
   <Dialog onClose={() => (removableOpenIdCredential = null)}>
-    <UnlinkOpenIdCredential
-      onUnlink={handleRemoveOpenIdCredential}
+    <RemoveOpenIdCredential
+      onRemove={handleRemoveOpenIdCredential}
       onCancel={() => (removableOpenIdCredential = null)}
       providerName={openIdName(
         removableOpenIdCredential.iss,
