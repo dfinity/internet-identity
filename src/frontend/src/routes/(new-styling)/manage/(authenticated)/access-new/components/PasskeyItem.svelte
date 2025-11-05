@@ -22,7 +22,7 @@
 
   const alias = $derived(getAuthnMethodAlias(passkey));
   const options = $derived([
-    ...(onRename
+    ...(onRename !== undefined
       ? [
           {
             label: $t`Rename`,
@@ -31,7 +31,7 @@
           },
         ]
       : []),
-    ...(onRemove
+    ...(onRemove !== undefined
       ? [
           {
             label: $t`Remove`,
@@ -89,7 +89,7 @@
           >
             <span>{$t`Right now`}</span>
           </Tooltip>
-        {:else if passkey.last_authentication[0]}
+        {:else if passkey.last_authentication[0] !== undefined}
           {@const date = new Date(
             nanosToMillis(passkey.last_authentication[0]),
           )}

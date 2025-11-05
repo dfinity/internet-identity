@@ -33,7 +33,7 @@
 </script>
 
 <div class="mb-3 flex h-9 flex-row items-center">
-  {#if logo}
+  {#if logo !== undefined}
     <div class="text-fg-primary relative size-6">
       {@html logo}
       {#if isCurrentAccessMethod}
@@ -78,7 +78,7 @@
         >
           <span>{$t`Right now`}</span>
         </Tooltip>
-      {:else if openid.last_usage_timestamp[0]}
+      {:else if openid.last_usage_timestamp[0] !== undefined}
         {@const date = new Date(nanosToMillis(openid.last_usage_timestamp[0]))}
         <Tooltip
           label={$formatDate(date, {
