@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SUPPORT_URL } from "$lib/config";
+  import { SUPPORT_URL, UNSUPPORTED_BROWSER_SUPPORT_URL } from "$lib/config";
   import Header from "$lib/components/layout/Header.svelte";
   import { ArrowRightIcon, TriangleAlertIcon } from "@lucide/svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -50,7 +50,7 @@
         </div>
         <p class="self-center">
           <Button
-            href={SUPPORT_URL}
+            href={UNSUPPORTED_BROWSER_SUPPORT_URL}
             target="_blank"
             rel="noopener noreferrer"
             variant="tertiary"

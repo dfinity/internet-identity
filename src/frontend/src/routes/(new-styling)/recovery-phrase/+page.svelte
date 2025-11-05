@@ -11,6 +11,7 @@
   type RecoveryWord = {
     value: string;
     isValid: boolean;
+    showContent: boolean;
   };
 
   const englishWordList = (wordlists.english as string[]) ?? [];
@@ -22,8 +23,11 @@
     Array.from({ length: 24 }, () => ({
       value: "",
       isValid: true,
+      showContent: false,
     })),
   );
+
+  let showAll = $state(false);
 
   // Flag to prevent double-triggering recovery on multiple blur events
   let recoveryInProgress = $state(false);
@@ -137,7 +141,7 @@
     pastedWords.forEach((word, i) => {
       const targetIndex = currentIndex + i;
       if (targetIndex < words.length) {
-        words[targetIndex].value = word.trim();
+        words[targetIndex].value = word.trim().toLowerCase();
         words[targetIndex].isValid = true;
       }
     });
@@ -157,6 +161,35 @@
     // Don't set focus somewhere if all words are filled.
     if (nonNullish(nextElement) && focusIndex === words.length - 1) {
       nextElement.focus();
+    }
+  };
+
+  const toggleAll = () => {
+    showAll = !showAll;
+    if (!showAll) {
+      words.forEach((word) => {
+        word.showContent = false;
+      });
+    }
+  };
+
+  const handleClearAll = () => {
+    if (submitTimeoutId !== undefined) {
+      clearTimeout(submitTimeoutId);
+      submitTimeoutId = undefined;
+    }
+
+    showAll = false;
+
+    words.forEach((word) => {
+      word.value = "";
+      word.isValid = true;
+      word.showContent = false;
+    });
+
+    const firstElement = document.getElementById("recovery-phrase-0");
+    if (nonNullish(firstElement)) {
+      firstElement.focus();
     }
   };
 
@@ -188,13 +221,36 @@
           {#each words as word, i}
             <label class="relative h-8">
               <!-- Text input -->
+              <!-- "data-lpignore" Last pass ignore -->
+              <!-- "data-1p-ignore" 1Password ignore -->
+              <!-- "data-bwignore" Bitwarden ignore -->
+              <!-- "data-form-type=other" Non-standard hint to password managers -->
               <input
-                type="text"
+                type={showAll || word.showContent || !word.isValid
+                  ? "text"
+                  : "password"}
+                inputmode="text"
+                autocorrect="off"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
                 id={`recovery-phrase-${i}`}
-                bind:value={word.value}
+                value={word.value}
+                oninput={(event) => {
+                  const target = event.currentTarget as HTMLInputElement;
+                  word.value = target.value.toLowerCase();
+                }}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
                 onpaste={(e) => handlePaste(e, i)}
-                onblur={() => validateWord(i)}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-bwignore="true"
+                data-form-type="other"
+                onfocus={() => (word.showContent = true)}
+                onblur={() => {
+                  validateWord(i);
+                  word.showContent = false;
+                }}
                 aria-invalid={!word.isValid}
                 class={`peer text-text-primary h-8 w-full rounded-full border-none pr-10 pl-10 text-base ring outline-none ring-inset focus:ring-2 ${
                   word.isValid
@@ -231,8 +287,16 @@
           {/each}
         </div>
         <div class="flex flex-row gap-2">
-          <Button class="w-full" variant="tertiary">{$t`Show all`}</Button>
-          <Button class="w-full" variant="tertiary">{$t`Clear all`}</Button>
+          <Button class="w-full" variant="tertiary" onclick={toggleAll}>
+            {#if showAll}
+              {$t`Hide all`}
+            {:else}
+              {$t`Show all`}
+            {/if}
+          </Button>
+          <Button class="w-full" variant="tertiary" onclick={handleClearAll}>
+            {$t`Clear all`}
+          </Button>
         </div>
       </div>
       <Button size="xl" variant="secondary">{$t`Cancel`}</Button>
