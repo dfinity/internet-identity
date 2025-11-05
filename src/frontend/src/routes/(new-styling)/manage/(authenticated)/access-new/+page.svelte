@@ -31,7 +31,6 @@
     toAccessMethods,
     toKey,
     isCurrentAccessMethod,
-    AccessMethod,
   } from "./utils";
 
   const MAX_PASSKEYS = 8;
