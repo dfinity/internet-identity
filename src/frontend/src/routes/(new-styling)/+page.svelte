@@ -12,7 +12,7 @@
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
   import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
-  import { manuallyReroute } from "../../hooks";
+  import { manuallyReroute } from "$lib/utils/reroute";
   import { localeOptions, localeStore, t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import {
@@ -26,7 +26,9 @@
   import Select from "$lib/components/ui/Select.svelte";
 
   // Add rerouting back on this SSG route
-  manuallyReroute();
+  $effect(() => {
+    manuallyReroute();
+  });
 
   let triggerAnimation =
     $state<(opts: FlairAnimationOptions) => Promise<void>>();

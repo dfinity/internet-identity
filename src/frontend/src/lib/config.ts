@@ -15,10 +15,13 @@ export const PORTAL_II_URL = "https://internetcomputer.org/internet-identity";
 export const SUPPORT_URL = "https://identitysupport.dfinity.org";
 
 // Default support page URL for when error is shown to user
-export const ERROR_SUPPORT_URL = `${SUPPORT_URL}/hc/en-us/articles/32301362727188`;
+export const ERROR_SUPPORT_URL = `${SUPPORT_URL}/hc/articles/32301362727188`;
 
-// Default support page URL for when error is shown to user
-export const UPGRADE_SUPPORT_URL = `${SUPPORT_URL}/hc/en-us/articles/40276570234132`;
+// Default support page URL for upgrade to II 2.0 flow
+export const UPGRADE_SUPPORT_URL = `${SUPPORT_URL}/hc/articles/40276570234132`;
+
+// Default support page URL for when unsupported browser page is shown to user
+export const UNSUPPORTED_BROWSER_SUPPORT_URL = `${SUPPORT_URL}/hc/articles/42455518048532`;
 
 // Default source code URL
 export const SOURCE_CODE_URL = "https://github.com/dfinity/internet-identity";
@@ -35,7 +38,7 @@ export const FAQ_PASSKEY_URL = "https://www.passkeys.com/";
 
 // Passkey Support URL
 export const II_SUPPORT_PASSKEY_URL =
-  "https://identitysupport.dfinity.org/hc/en-us/articles/15738590400148-What-is-a-passkey";
+  "https://identitysupport.dfinity.org/hc/articles/15738590400148-What-is-a-passkey";
 
 // Internet Identity Development Docs URL
 export const II_DEVELOPER_DOCS_URL =
@@ -43,4 +46,4 @@ export const II_DEVELOPER_DOCS_URL =
 
 // Privacy Support URL
 export const II_SUPPORT_PRIVACY_SECURITY =
-  "https://identitysupport.dfinity.org/hc/en-us/sections/15395039891988-Privacy-Security";
+  "https://identitysupport.dfinity.org/hc/sections/15395039891988";
