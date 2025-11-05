@@ -239,7 +239,6 @@
                 oninput={(event) => {
                   const target = event.currentTarget as HTMLInputElement;
                   word.value = target.value.toLowerCase();
-                  target.value = word.value;
                 }}
                 onkeydown={(e) => handleKeyDownInput(e, i)}
                 onpaste={(e) => handlePaste(e, i)}
