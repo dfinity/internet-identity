@@ -51,17 +51,12 @@
   const removingAccessMethod = $derived(
     accessMethods.find((m) => removingAccessMethodKey === toKey(m)),
   );
-  const isUsingPasskeys = $derived(
-    accessMethods.some((accessMethod) => "passkey" in accessMethod),
-  );
+  const isUsingPasskeys = $derived(accessMethods.some((m) => "passkey" in m));
   const maxPasskeysReached = $derived(
-    accessMethods.filter((accessMethod) => "passkey" in accessMethod).length >=
-      MAX_PASSKEYS,
+    accessMethods.filter((m) => "passkey" in m).length >= MAX_PASSKEYS,
   );
   const openIdCredentials = $derived(
-    accessMethods
-      .filter((accessMethod) => "openid" in accessMethod)
-      .map(({ openid }) => openid),
+    accessMethods.filter((m) => "openid" in m).map(({ openid }) => openid),
   );
 
   // Handlers
