@@ -7,27 +7,27 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
-    onUnlink: () => Promise<void>;
+    onRemove: () => Promise<void>;
     onCancel: () => void;
     providerName: string;
     isCurrentAccessMethod?: boolean;
   }
 
   const {
-    onUnlink,
+    onRemove,
     onCancel,
     providerName: name,
     isCurrentAccessMethod,
   }: Props = $props();
 
-  let isUnlinking = $state(false);
+  let isRemoving = $state(false);
 
-  const handleUnlink = async () => {
+  const handleRemove = async () => {
     try {
-      isUnlinking = true;
-      await onUnlink();
+      isRemoving = true;
+      await onRemove();
     } finally {
-      isUnlinking = false;
+      isRemoving = false;
     }
   };
 </script>
@@ -69,8 +69,8 @@
     </div>
   </div>
   <div class="mt-auto flex flex-col items-stretch gap-3">
-    <Button onclick={handleUnlink} size="lg" danger disabled={isUnlinking}>
-      {#if isUnlinking}
+    <Button onclick={handleRemove} size="lg" danger disabled={isRemoving}>
+      {#if isRemoving}
         <ProgressRing />
         <span>{$t`Unlinking ${name} account...`}</span>
       {:else}
@@ -81,7 +81,7 @@
       onclick={onCancel}
       variant="tertiary"
       size="lg"
-      disabled={isUnlinking}
+      disabled={isRemoving}
     >
       {$t`Keep linked`}
     </Button>
