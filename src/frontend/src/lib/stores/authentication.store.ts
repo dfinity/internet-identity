@@ -21,7 +21,8 @@ export interface Authenticated {
   actor: ActorSubclass<_SERVICE>;
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
-    | { openid: { iss: string; sub: string } };
+    | { openid: { iss: string; sub: string } }
+    | { recoveryPhrase: { identityNumber: bigint } };
 }
 
 type AuthenticationStore = Readable<Authenticated | undefined> & {

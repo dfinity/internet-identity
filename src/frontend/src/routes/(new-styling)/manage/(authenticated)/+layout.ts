@@ -10,11 +10,7 @@ export const load: LayoutLoad = async ({ url }) => {
   // Go back to / if not authenticated with currently selected identity
   const authentication = get(authenticationStore);
   const selectedIdentity = get(lastUsedIdentitiesStore).selected;
-  if (
-    isNullish(authentication) ||
-    isNullish(selectedIdentity) ||
-    authentication.identityNumber !== selectedIdentity.identityNumber
-  ) {
+  if (isNullish(authentication)) {
     // Add original target URL as next search param,
     // if it's not the default target URL (/manage).
     const next = url.pathname + url.search;
