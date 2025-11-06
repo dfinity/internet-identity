@@ -10,9 +10,9 @@
     AuthnMethodData,
     OpenIdCredential,
   } from "$lib/generated/internet_identity_types";
-  import RemovePasskey from "../../../routes/(new-styling)/manage/(authenticated)/access-new/components/RemovePasskey.svelte";
-  import RenamePasskey from "../../../routes/(new-styling)/manage/(authenticated)/access-new/components/RenamePasskey.svelte";
-  import RemoveOpenIdCredential from "../../../routes/(new-styling)/manage/(authenticated)/access-new/components/RemoveOpenIdCredential.svelte";
+  import RemovePasskey from "../../../routes/(new-styling)/manage/(authenticated)/access/components/RemovePasskey.svelte";
+  import RenamePasskey from "../../../routes/(new-styling)/manage/(authenticated)/access/components/RenamePasskey.svelte";
+  import RemoveOpenIdCredential from "../../../routes/(new-styling)/manage/(authenticated)/access/components/RemoveOpenIdCredential.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { handleError } from "$lib/components/utils/error";
   import {
