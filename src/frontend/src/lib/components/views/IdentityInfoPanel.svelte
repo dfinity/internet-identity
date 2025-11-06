@@ -1,10 +1,13 @@
 <script lang="ts">
   import Panel from "$lib/components/ui/Panel.svelte";
-  import identityInfo from "$lib/stores/identity-info.state.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { InfoIcon } from "@lucide/svelte";
-  import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
-  import { fade } from "svelte/transition";
+
+  interface Props {
+    name: string;
+  }
+
+  const { name }: Props = $props();
 </script>
 
 <Panel>
@@ -25,16 +28,9 @@
         Identity Name
       </h5>
       <div class="flex items-center">
-        {#if identityInfo.name}
-          <h5
-            class="text-text-primary text-sm font-semibold nth-[2]:hidden"
-            transition:fade={{ delay: 30 }}
-          >
-            {identityInfo.name}
-          </h5>
-        {:else}
-          <PlaceHolder class="mr-8 h-4 w-full !rounded-sm" />
-        {/if}
+        <h5 class="text-text-primary text-sm font-semibold nth-[2]:hidden">
+          {name}
+        </h5>
       </div>
       <div class="flex items-center justify-center">
         <Tooltip
