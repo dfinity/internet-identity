@@ -571,7 +571,7 @@ impl<M: Memory + Clone> Storage<M> {
         let (storable_anchor, stable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
 
         // Get anchor address
-        let record_number = self.anchor_number_to_record(anchor_number)?;
+        let record_number = self.anchor_number_to_record_number(anchor_number)?;
         let address = self.record_address(record_number);
 
         // Read previous fixed 4KB stable memory anchor
@@ -627,7 +627,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         // Read fixed 4KB anchor
-        let record_number = self.anchor_number_to_record(anchor_number)?;
+        let record_number = self.anchor_number_to_record_number(anchor_number)?;
         let address = self.record_address(record_number);
 
         let mut reader = Reader::new(&self.anchor_memory, address);
@@ -636,12 +636,12 @@ impl<M: Memory + Clone> Storage<M> {
         reader.read_exact(&mut buf).expect("failed to read memory");
 
         // Read unbounded stable structures anchor
-        let storable_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
-        let stable_anchor = self.stable_anchor_memory.get(&anchor_number);
+        let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
+        let storable_anchor = self.stable_anchor_memory.get(&anchor_number);
         Ok(Anchor::from((
             anchor_number,
+            storable_fixed_anchor,
             storable_anchor,
-            stable_anchor,
         )))
     }
 
@@ -1579,7 +1579,7 @@ impl<M: Memory + Clone> Storage<M> {
         self.archive_entries_buffer.iter().count()
     }
 
-    fn anchor_number_to_record(&self, anchor_number: u64) -> Result<u32, StorageError> {
+    fn anchor_number_to_record_number(&self, anchor_number: u64) -> Result<u32, StorageError> {
         if anchor_number < self.header.id_range_lo || anchor_number >= self.header.id_range_hi {
             return Err(StorageError::AnchorNumberOutOfRange {
                 anchor_number,
