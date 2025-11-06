@@ -43,14 +43,7 @@
 <div>
   <div class="mh-9 mb-3">
     <h1 class="text-text-primary text-3xl font-medium">
-      Welcome,
-      {#if !identityInfo.name}
-        <PlaceHolder class="mt-0.5 inline-block h-6 w-40 md:w-64" />
-      {:else}
-        <span transition:fade={{ delay: 30 }}>
-          {identityInfo.name}!
-        </span>
-      {/if}
+      Welcome, {name}!
     </h1>
   </div>
   <h2 class="text-text-tertiary mb-12 text-base">
