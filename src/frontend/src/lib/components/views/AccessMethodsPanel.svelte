@@ -1,8 +1,13 @@
 <script lang="ts">
   import Panel from "$lib/components/ui/Panel.svelte";
-  import identityInfo from "$lib/stores/identity-info.state.svelte";
   import { ChevronRightIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
+
+  interface Props {
+    totalAccessMethods: number;
+  }
+
+  const { totalAccessMethods }: Props = $props();
 </script>
 
 <Panel>
@@ -24,7 +29,7 @@
       </h5>
       <div class="flex items-center">
         <h5 class="text-text-primary text-sm font-semibold nth-[2]:hidden">
-          {identityInfo.totalAccessMethods}
+          {totalAccessMethods}
         </h5>
       </div>
       <div class="flex items-center justify-center">

@@ -12,10 +12,18 @@
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
   import AccessMethodsPanel from "$lib/components/views/AccessMethodsPanel.svelte";
+  import { toAccessMethods } from "./access/utils";
 
   const { data }: PageProps = $props();
 
   let pendingRegistrationId = $state(data.pendingRegistrationId);
+
+  const name = $derived(
+    data.identityInfo.name[0] ?? String(data.identityNumber),
+  );
+  const totalAccessMethods = $derived(
+    toAccessMethods(data.identityInfo).length,
+  );
 
   const handleConfirm = () => {
     toaster.success({
@@ -35,14 +43,7 @@
 <div>
   <div class="mh-9 mb-3">
     <h1 class="text-text-primary text-3xl font-medium">
-      Welcome,
-      {#if !identityInfo.name}
-        <PlaceHolder class="mt-0.5 inline-block h-6 w-40 md:w-64" />
-      {:else}
-        <span transition:fade={{ delay: 30 }}>
-          {identityInfo.name}!
-        </span>
-      {/if}
+      Welcome, {name}!
     </h1>
   </div>
   <h2 class="text-text-tertiary mb-12 text-base">
@@ -51,10 +52,10 @@
 
   <div class="flex flex-col gap-6 lg:flex-row">
     <div class="flex-1">
-      <IdentityInfoPanel />
+      <IdentityInfoPanel {name} />
     </div>
     <div class="flex-1">
-      <AccessMethodsPanel />
+      <AccessMethodsPanel {totalAccessMethods} />
     </div>
   </div>
 </div>

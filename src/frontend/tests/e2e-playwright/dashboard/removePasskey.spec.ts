@@ -5,6 +5,8 @@ import {
   dummyAuth,
   II_URL,
   addPasskeyCurrentDevice,
+  renamePasskey,
+  removePasskey,
 } from "../utils";
 
 const TEST_USER_NAME = "Test User";
@@ -34,55 +36,30 @@ test("User can remove a passkey when they have multiple access methods", async (
   }
   await page.getByRole("link", { name: "Access methods" }).click();
 
+  // Rename current passkey to old passkey
+  await renamePasskey(page, "Chrome", "Current passkey");
+
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
 
   // Start the "add passkey" flow to create a second passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
+  await renamePasskey(page, "Chrome", "New passkey");
 
   // Verify that we now have two passkeys
-  await expect(page.getByText("Chrome")).toHaveCount(2);
-
-  // Wait for remove buttons to appear (they only show when there are multiple access methods)
-  await expect(page.getByLabel("Remove passkey")).toBeVisible();
-
-  // Click the remove button for the passkey (not the current one)
-  // Label for current one is "Remove current passkey"
-  const removeButtons = page.getByLabel("Remove passkey");
-  await expect(removeButtons).toHaveCount(1);
-  await removeButtons.click();
-
-  const removePasskeyDialog = page.getByRole("dialog");
-  // Verify the remove dialog opens
   await expect(
-    removePasskeyDialog.getByRole("heading", {
-      level: 1,
-      name: "Are you sure?",
-    }),
-  ).toBeVisible();
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
 
-  // Verify the dialog shows the standard warning (not the current access method warning)
+  // Remove new passkey
+  await removePasskey(page, "New passkey", false);
+
+  // Verify that we now have one passkey
   await expect(
-    removePasskeyDialog.getByText(
-      "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later.",
-    ),
-  ).toBeVisible();
-
-  // Verify the current access method warning is NOT shown
-  await expect(
-    removePasskeyDialog.getByText(
-      "As you are currently signed in with this passkey, you will be signed out.",
-    ),
-  ).not.toBeVisible();
-
-  // Confirm removal
-  await removePasskeyDialog
-    .getByRole("button", { name: "Remove passkey" })
-    .click();
-
-  // Verify the dialog closes and we now have only one passkey
-  await expect(removePasskeyDialog).not.toBeVisible();
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
 
   // Verify we're still logged in and at the dashboard
   await expect(page).toHaveURL(II_URL + "/manage/access");
@@ -114,13 +91,20 @@ test("User cannot remove passkey if they only have one access method", async ({
   await page.getByRole("link", { name: "Access methods" }).click();
 
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
 
   // Verify that the remove button is not visible when there's only one access method
-  await expect(page.getByLabel("Remove current passkey")).not.toBeVisible();
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "Chrome" })
+    .getByRole("button", { name: "More options" })
+    .click();
+  await expect(page.getByRole("menuitem", { name: "Remove" })).toBeHidden();
 
   // Verify that the rename button is still visible (to ensure we're looking at the right area)
-  await expect(page.getByLabel("Rename current passkey")).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Rename" })).toBeVisible();
 });
 
 test("User is logged out after removing the passkey they used to authenticate", async ({
@@ -148,49 +132,29 @@ test("User is logged out after removing the passkey they used to authenticate", 
   }
   await page.getByRole("link", { name: "Access methods" }).click();
 
-  // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  // Rename passkey to current passkey
+  await renamePasskey(page, "Chrome", "Current passkey");
 
+  // Verify we have one passkey
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
+
+  // Start the "add passkey" flow to create a second passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
+  await renamePasskey(page, "Chrome", "New passkey");
 
   // Verify that we now have two passkeys
-  await expect(page.getByText("Chrome")).toHaveCount(2);
-
-  // Click the remove button for the current passkey (the one used for authentication)
-  const removeButtons = page.getByLabel("Remove current passkey");
-  await expect(removeButtons).toHaveCount(1);
-  await removeButtons.click();
-
-  // Verify the remove dialog opens
-  const removePasskeyDialog = page.getByRole("dialog");
   await expect(
-    removePasskeyDialog.getByRole("heading", {
-      level: 1,
-      name: "Are you sure?",
-    }),
-  ).toBeVisible();
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
 
-  // Verify the dialog shows both the standard warning AND the current access method warning
-  await expect(
-    removePasskeyDialog.getByText(
-      "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later.",
-    ),
-  ).toBeVisible();
-
-  await expect(
-    removePasskeyDialog.getByText(
-      "As you are currently signed in with this passkey, you will be signed out.",
-    ),
-  ).toBeVisible();
-
-  // Confirm removal
-  await removePasskeyDialog
-    .getByRole("button", { name: "Remove passkey" })
-    .click();
+  // Remove current passkey
+  await removePasskey(page, "Current passkey", true);
 
   // Verify the user is logged out and redirected to the login page
   // The URL should change from /manage to the root or login page
-  await page.waitForURL((url) => url.pathname === "/login");
+  await page.waitForURL(II_URL + "/login");
 
   // Verify we're back at the login screen without selectable identity
   await expect(
@@ -202,7 +166,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
     page.getByRole("heading", {
       name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
     }),
-  ).not.toBeVisible();
+  ).toBeHidden();
 });
 
 test("User can cancel passkey removal", async ({ page }) => {
@@ -228,43 +192,51 @@ test("User can cancel passkey removal", async ({ page }) => {
   }
   await page.getByRole("link", { name: "Access methods" }).click();
 
+  // Rename passkey to current passkey
+  await renamePasskey(page, "Chrome", "Current passkey");
+
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
 
   await addPasskeyCurrentDevice(page, dummyAuth());
 
   // Verify that we now have two passkeys
-  await expect(page.getByText("Chrome")).toHaveCount(2);
-
-  // Wait for remove buttons to appear (they only show when there are multiple access methods)
-  await expect(page.getByLabel("Remove passkey")).toBeVisible();
-
-  // Click the remove button for the passkey
-  const removeButtons = page.getByLabel("Remove passkey");
-  await expect(removeButtons).toHaveCount(1);
-  await removeButtons.click();
-
-  // Verify the remove dialog opens
-  const removePasskeyDialog = page.getByRole("dialog");
   await expect(
-    removePasskeyDialog.getByRole("heading", {
-      level: 1,
-      name: "Are you sure?",
-    }),
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
+
+  // Open the remove passkey dialog for the current passkey
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "Current passkey" })
+    .getByRole("button", { name: "More options" })
+    .click();
+  await page.getByRole("menuitem", { name: "Remove" }).click();
+
+  // Wait for the remove dialog to open
+  await expect(
+    page.getByRole("heading", { name: "Are you sure?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later.",
+    ),
   ).toBeVisible();
 
   // Cancel the removal
-  await removePasskeyDialog.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: "Cancel" }).click();
 
-  // Verify the dialog closes and we still have both passkeys
+  // Wait for the remove dialog to close
   await expect(
-    removePasskeyDialog.getByRole("heading", {
-      level: 1,
-      name: "Are you sure?",
-    }),
-  ).not.toBeVisible();
+    page.getByRole("heading", { name: "Are you sure?" }),
+  ).toBeHidden();
 
-  await expect(page.getByText("Chrome")).toHaveCount(2);
+  // Verify that we still have two passkeys
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
 
   // Verify we're still logged in and at the dashboard
   await expect(page).toHaveURL(II_URL + "/manage/access");

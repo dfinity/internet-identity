@@ -160,7 +160,7 @@ export const addPasskeyCurrentDevice = async (
   page: Page,
   dummyAuth: DummyAuthFn,
 ): Promise<void> => {
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add new" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   dummyAuth(page);
   await page.getByRole("button", { name: "Create Passkey" }).click();
@@ -168,10 +168,17 @@ export const addPasskeyCurrentDevice = async (
 
 export const renamePasskey = async (
   page: Page,
-  name: string,
+  currentName: string,
+  nextName: string,
 ): Promise<void> => {
-  await expect(page.getByLabel("Rename passkey")).toHaveCount(1);
-  await page.getByLabel("Rename passkey").click();
+  // Open the rename passkey dialog
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "Passkey" })
+    .filter({ hasText: currentName })
+    .getByRole("button", { name: "More options" })
+    .click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
 
   // Wait for the rename dialog to open
   await expect(
@@ -179,9 +186,55 @@ export const renamePasskey = async (
   ).toBeVisible();
 
   const input = page.getByRole("textbox");
+  await expect(input).toHaveValue(currentName);
   await input.clear();
-  await input.fill(name);
-  await page.getByRole("button", { name: "Save" }).click();
+  await input.fill(nextName);
+  await page.getByRole("button", { name: "Save changes" }).click();
+
+  // Wait for the rename dialog to close
+  await expect(
+    page.getByRole("heading", { name: "Rename passkey" }),
+  ).toBeHidden();
+};
+
+export const removePasskey = async (
+  page: Page,
+  name: string,
+  isCurrent: boolean,
+): Promise<void> => {
+  // Open the remove passkey dialog
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: name })
+    .getByRole("button", { name: "More options" })
+    .click();
+  await page.getByRole("menuitem", { name: "Remove" }).click();
+
+  // Wait for the remove dialog to open with the correct message
+  await expect(
+    page.getByRole("heading", { name: "Are you sure?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later.",
+    ),
+  ).toBeVisible();
+  const signedInMessage = page.getByText(
+    "As you are currently signed in with this passkey, you will be signed out.",
+  );
+  if (isCurrent) {
+    await expect(signedInMessage).toBeVisible();
+  } else {
+    await expect(signedInMessage).toBeHidden();
+  }
+
+  // Remove the passkey
+  await page.getByRole("button", { name: "Remove passkey" }).click();
+
+  // Wait for the remove dialog to close
+  await expect(
+    page.getByRole("heading", { name: "Are you sure?" }),
+  ).toBeHidden();
 };
 
 export const signOut = async (page: Page): Promise<void> => {
