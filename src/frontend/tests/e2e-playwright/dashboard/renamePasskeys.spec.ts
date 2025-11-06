@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  addPasskeyCurrentDevice,
   clearStorage,
   createNewIdentityInII,
   dummyAuth,
@@ -35,34 +36,26 @@ test("User can rename the current passkey used for authentication", async ({
   await page.getByRole("link", { name: "Access methods" }).click();
 
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
-
-  // Click the rename button for the passkey
-  await page.getByLabel("Rename current Passkey").click();
-
-  // Verify the rename dialog opens
   await expect(
-    page.getByRole("heading", { name: "Rename passkey" }),
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
+
+  // Rename passkey
+  await renamePasskey(page, "Chrome", "My Main Passkey");
+
+  // Verify passkey has been renamed
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Passkey" })
+      .filter({ hasText: "Chrome" }),
+  ).toBeHidden();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Passkey" })
+      .filter({ hasText: "My Main Passkey" }),
   ).toBeVisible();
-
-  // Verify the input is pre-filled with current name
-  const input = page.getByRole("textbox");
-  await expect(input).toHaveValue("Chrome");
-
-  // Change the name
-  await input.clear();
-  const passkeyName = "My Main Passkey";
-  await input.fill(passkeyName);
-
-  // Save the changes
-  await page.getByRole("button", { name: "Save" }).click();
-
-  // Verify the dialog closes and the passkey now shows the new name
-  await expect(
-    page.getByRole("heading", { name: "Rename passkey" }),
-  ).not.toBeVisible();
-  await expect(page.getByText(passkeyName)).toBeVisible();
-  await expect(page.getByText("Chrome")).not.toBeVisible();
 });
 
 test("User can rename a newly added passkey from the same device", async ({
@@ -91,29 +84,35 @@ test("User can rename a newly added passkey from the same device", async ({
   await page.getByRole("link", { name: "Access methods" }).click();
 
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
 
-  // Start the "add passkey" flow
-  await page.getByRole("button", { name: "Add" }).click();
-  await page.getByRole("button", { name: "Continue with passkey" }).click();
+  // Rename passkey to current passkey
+  await renamePasskey(page, "Chrome", "Current passkey");
 
-  // Authenticate to add the new passkey
-  const auth2 = dummyAuth();
-  auth2(page);
-  await page.getByRole("button", { name: "Create Passkey" }).click();
+  // Add another passkey
+  await addPasskeyCurrentDevice(page, dummyAuth());
+  await renamePasskey(page, "Chrome", "New passkey");
 
   // Verify that we now have two passkeys
-  await expect(page.getByText("Chrome")).toHaveCount(2);
-
-  const passkeyName = "Secondary Passkey";
-  await renamePasskey(page, passkeyName);
-
-  // Verify the dialog closes and we now have both passkeys with different names
   await expect(
-    page.getByRole("heading", { name: "Rename passkey" }),
-  ).not.toBeVisible();
-  await expect(page.getByText("Chrome")).toHaveCount(1);
-  await expect(page.getByText(passkeyName)).toHaveCount(1);
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(2);
+
+  // Verify we now have both passkeys with different names
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Passkey" })
+      .filter({ hasText: "Current passkey" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Passkey" })
+      .filter({ hasText: "New passkey" }),
+  ).toBeVisible();
 });
 
 test("User cannot rename passkey to an empty name nor is it renamed on cancel", async ({
@@ -142,48 +141,70 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
   await page.getByRole("link", { name: "Access methods" }).click();
 
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(
+    page.getByRole("listitem").filter({ hasText: "Passkey" }),
+  ).toHaveCount(1);
 
-  // Click the rename button for the passkey
-  await page.getByLabel("Rename current Passkey").click();
+  // Open the rename passkey dialog
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: "Passkey" })
+    .filter({ hasText: "Chrome" })
+    .getByRole("button", { name: "More options" })
+    .click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
 
-  // Verify the rename dialog opens
+  // Wait for the rename dialog to open
   await expect(
     page.getByRole("heading", { name: "Rename passkey" }),
   ).toBeVisible();
 
+  // Expect input to be prefilled with current name
   const input = page.getByRole("textbox");
-  const saveButton = page.getByRole("button", { name: "Save" });
+  await expect(input).toHaveValue("Chrome");
 
-  // Initially, the Save button should be disabled with the pre-filled name
-  // since it's unchanged.
-  await expect(saveButton).toBeDisabled();
+  // Expect save button to be disabled since it's unchanged
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
 
-  // Clear the input field (make it empty)
+  // Clear input
   await input.clear();
 
-  // Verify the Save button is disabled for empty input
-  await expect(saveButton).toBeDisabled();
+  // Expect save button to be disabled since the input is empty
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
 
   // Try entering only whitespace
   await input.fill("   ");
 
-  // Verify the Save button remains disabled for whitespace-only input
-  await expect(saveButton).toBeDisabled();
+  // Expect save button to be disabled since the input is still empty
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
 
-  // Enter a valid name to verify Save becomes enabled again
-  await input.clear();
-  const passkeyName = "Valid Name";
-  await input.fill(passkeyName);
-  await expect(saveButton).toBeEnabled();
+  // Enter valid name
+  await input.fill("Valid name");
 
-  // Cancel the dialog and verify no changes were made
+  // Expect save button to be enabled now
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeEnabled();
+
+  // Cancel the dialog
   await page.getByRole("button", { name: "Cancel" }).click();
 
-  // Verify the dialog closes and the original name is still there
+  // Wait for the rename dialog to close
   await expect(
     page.getByRole("heading", { name: "Rename passkey" }),
-  ).not.toBeVisible();
-  await expect(page.getByText("Chrome")).toHaveCount(1);
-  await expect(page.getByText(passkeyName)).not.toBeVisible();
+  ).toBeHidden();
+
+  // Verify the original name is still there
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "Passkey" })
+      .filter({ hasText: "Chrome" }),
+  ).toBeVisible();
 });

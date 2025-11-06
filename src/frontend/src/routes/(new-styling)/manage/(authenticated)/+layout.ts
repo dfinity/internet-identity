@@ -4,9 +4,9 @@ import { get } from "svelte/store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { isNullish } from "@dfinity/utils";
-import identityInfoState from "$lib/stores/identity-info.state.svelte";
+import { throwCanisterError } from "$lib/utils/utils";
 
-export const load: LayoutLoad = ({ url }) => {
+export const load: LayoutLoad = async ({ url }) => {
   // Go back to / if not authenticated with currently selected identity
   const authentication = get(authenticationStore);
   const selectedIdentity = get(lastUsedIdentitiesStore).selected;
@@ -25,5 +25,9 @@ export const load: LayoutLoad = ({ url }) => {
     throw redirect(307, location);
   }
 
-  void identityInfoState.fetch();
+  const identityInfo = await authentication.actor
+    .identity_info(selectedIdentity.identityNumber)
+    .then(throwCanisterError);
+
+  return { identityInfo, identityNumber: selectedIdentity.identityNumber };
 };
