@@ -49,7 +49,7 @@ for po_file in "$LOCALES_DIR"/*.po; do
     
     # Use npx to invoke the Gemini CLI to translate missing translations
     echo -e "\nTranslating file: $po_filename"
-    translated_entries=$(npx https://github.com/google-gemini/gemini-cli -p "$INSTRUCTIONS/n/nThe $po_filename file content:/n$po_content")
+    translated_entries=$(npx https://github.com/google-gemini/gemini-cli -p "$INSTRUCTIONS\n\nThe $po_filename file content:\n$po_content")
      
     # Merge existing and new translations, while making sure that 
     # existing translations take priority (remain unchanged).
