@@ -20,8 +20,8 @@ export const load: LayoutLoad = async ({ url }) => {
   }
 
   const identityInfo = await authentication.actor
-    .identity_info(selectedIdentity.identityNumber)
+    .identity_info(authentication.identityNumber)
     .then(throwCanisterError);
 
-  return { identityInfo, identityNumber: selectedIdentity.identityNumber };
+  return { identityInfo, identityNumber: authentication.identityNumber };
 };
