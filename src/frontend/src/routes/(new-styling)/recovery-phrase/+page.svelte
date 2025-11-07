@@ -328,11 +328,13 @@
               <!-- Left slot -->
               <!-- Reverse order to use "peer" class to change the border color when peer is focused -->
               <span
-                class={`peer peer-disabled:border-border-disabled_subtle absolute top-0 left-0 flex h-8 w-8 items-center border-r-1 px-2 text-center text-sm font-semibold peer-focus:border-r-2 ${
+                class={[
+                  "absolute top-0 left-0 flex h-8 w-8 items-center border-r-1 px-2 text-center text-sm font-semibold",
+                  "peer peer-disabled:border-border-disabled_subtle peer-focus:border-r-2",
                   word.isValid
                     ? "border-border-secondary text-text-secondary peer-focus:border-border-brand"
-                    : "border-border-error text-text-error-primary peer-focus:border-border-error"
-                }`}
+                    : "border-border-error text-text-error-primary peer-focus:border-border-error",
+                ]}
               >
                 {String(i + 1).padStart(2, "0")}
               </span>
