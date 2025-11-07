@@ -158,28 +158,44 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
 impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Anchor {
     fn from(
-        (anchor_number, storable_anchor, stable_anchor): (
+        (anchor_number, storable_fixed_anchor, storable_anchor): (
             AnchorNumber,
             StorableFixedAnchor,
             Option<StorableAnchor>,
         ),
     ) -> Self {
+        let StorableFixedAnchor {
+            devices,
+            metadata,
+            created_at,
+        } = storable_fixed_anchor;
+
+        let Some(storable_anchor) = storable_anchor else {
+            return Anchor {
+                name: None,
+                openid_credentials: vec![],
+                anchor_number,
+                devices,
+                metadata,
+                created_at,
+            };
+        };
+
+        let name = storable_anchor.name.clone();
+
+        let openid_credentials = storable_anchor
+            .openid_credentials
+            .into_iter()
+            .map(OpenIdCredential::from)
+            .collect();
+
         Anchor {
             anchor_number,
-            devices: storable_anchor.devices,
-            openid_credentials: stable_anchor
-                .clone()
-                .map(|anchor| {
-                    anchor
-                        .openid_credentials
-                        .into_iter()
-                        .map(Into::into)
-                        .collect()
-                })
-                .unwrap_or_default(),
-            metadata: storable_anchor.metadata,
-            name: stable_anchor.and_then(|anchor| anchor.name),
-            created_at: storable_anchor.created_at,
+            devices,
+            openid_credentials,
+            metadata,
+            name,
+            created_at,
         }
     }
 }
