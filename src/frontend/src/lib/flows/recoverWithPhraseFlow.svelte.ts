@@ -50,7 +50,11 @@ export class InvalidMnemonicError extends Error {
 
 export const recoverWithPhrase = async (
   words: string[],
-): Promise<{ info: IdentityInfo; identity: DelegationIdentity }> => {
+): Promise<{
+  info: IdentityInfo;
+  identity: DelegationIdentity;
+  identityNumber: bigint;
+}> => {
   const recoveryPhrase = words.join(" ");
   if (!isValidMnemonic(recoveryPhrase)) {
     throw new InvalidMnemonicError();
@@ -80,5 +84,6 @@ export const recoverWithPhrase = async (
   return {
     info: identityInfo,
     identity: delegationIdentity,
+    identityNumber: userNumber,
   };
 };
