@@ -10,13 +10,12 @@
 
   type Props = {
     identityName: string;
-    createdAtNanos?: bigint;
+    createdAt?: Date;
     onContinue: () => Promise<void>;
     onCancel: () => void;
   };
 
-  const { identityName, createdAtNanos, onContinue, onCancel }: Props =
-    $props();
+  const { identityName, createdAt, onContinue, onCancel }: Props = $props();
 
   let continueInProgress = $state(false);
 
@@ -50,9 +49,9 @@
         {identityName}
       </div>
       <div class="text-text-tertiary font-normal" aria-hidden="true">
-        {#if nonNullish(createdAtNanos)}
+        {#if nonNullish(createdAt)}
           <span
-            >{$t`Created ${$formatDate(new Date(nanosToMillis(createdAtNanos)), { dateStyle: "short" })}`}</span
+            >{$t`Created ${$formatDate(createdAt, { dateStyle: "short" })}`}</span
           >
         {/if}
       </div>
