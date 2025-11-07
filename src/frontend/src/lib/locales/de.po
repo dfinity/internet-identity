@@ -20,7 +20,7 @@ msgid "{name} | Created {date}"
 msgstr "{name} | Erstellt {date}"
 
 msgid "{name} account"
-msgstr ""
+msgstr "{name}-Konto"
 
 msgid "{name} logo"
 msgstr "{name}-Logo"
@@ -47,40 +47,40 @@ msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as t
 msgstr "<0>Nahtlose Passkey-Integration:</0> Wir setzen weiterhin auf Passkeys als die Zukunft sicherer Authentifizierung. Internet Identity 2.0 nutzt die neuesten Passkey-Standards für erhöhte Sicherheit und Benutzerfreundlichkeit."
 
 msgid "Access methods"
-msgstr ""
+msgstr "Zugriffsmethoden"
 
 msgid "Account name"
 msgstr "Kontoname"
 
 msgid "Add a passkey"
-msgstr ""
+msgstr "Einen Passkey hinzufügen"
 
 msgid "Add access method"
-msgstr ""
+msgstr "Zugriffsmethode hinzufügen"
 
 msgid "Add another account"
 msgstr "Weiteres Konto hinzufügen"
 
 msgid "Add another passkey"
-msgstr ""
+msgstr "Weiteren Passkey hinzufügen"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
-msgstr ""
+msgstr "Fügen Sie eine weitere Möglichkeit hinzu, sich mit einem Passkey oder einem Drittanbieter-Konto für sicheren Zugriff anzumelden."
 
 msgid "Add new"
-msgstr ""
+msgstr "Neu hinzufügen"
 
 msgid "Advanced identity management"
 msgstr "Fortgeschrittenes Identitäts-Management"
 
 msgid "Are you sure?"
-msgstr ""
+msgstr "Sind Sie sicher?"
 
 msgid "As you are currently signed in with this Account, you will be signed out."
-msgstr ""
+msgstr "Da Sie derzeit mit diesem Konto angemeldet sind, werden Sie abgemeldet."
 
 msgid "As you are currently signed in with this passkey, you will be signed out."
-msgstr ""
+msgstr "Da Sie derzeit mit diesem Passkey angemeldet sind, werden Sie abgemeldet."
 
 msgid "Authenticating..."
 msgstr "Authentifizierung..."
@@ -98,7 +98,7 @@ msgid "Can't find your identity?"
 msgstr "Finden Sie Ihre Identität nicht?"
 
 msgid "Cancel"
-msgstr ""
+msgstr "Abbrechen"
 
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-Zeichen"
@@ -119,13 +119,13 @@ msgid "Choose method"
 msgstr "Methode auswählen"
 
 msgid "Clear all"
-msgstr ""
+msgstr "Alle löschen"
 
 msgid "Close"
 msgstr "Schließen"
 
 msgid "Close menu"
-msgstr ""
+msgstr "Menü schließen"
 
 msgid "Code copied to clipboard"
 msgstr "Code in die Zwischenablage kopiert"
@@ -179,7 +179,7 @@ msgid "Create passkey"
 msgstr "Passkey erstellen"
 
 msgid "Created {0}"
-msgstr ""
+msgstr "Erstellt {0}"
 
 msgid "Creating account..."
 msgstr "Konto wird erstellt..."
@@ -191,10 +191,10 @@ msgid "Creating passkey..."
 msgstr "Passkey wird erstellt..."
 
 msgid "Currently signed in with this account"
-msgstr ""
+msgstr "Derzeit mit diesem Konto angemeldet"
 
 msgid "Currently signed in with this passkey"
-msgstr ""
+msgstr "Derzeit mit diesem Passkey angemeldet"
 
 msgid "Default"
 msgstr "Standard"
@@ -218,7 +218,7 @@ msgid "Enter characters"
 msgstr "Zeichen eingeben"
 
 msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
-msgstr ""
+msgstr "Geben Sie die Wörter Ihrer Wiederherstellungsphrase in jedes Feld ein, korrekt geschrieben und in der richtigen Reihenfolge."
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, sichere und einfache Möglichkeit, sich bei Apps auf dem Internet Computer anzumelden."
@@ -252,7 +252,7 @@ msgid "Give your identity a clear, simple, and memorable name you'll easily reco
 msgstr "Geben Sie Ihrer Identität einen klaren, einfachen und einprägsamen Namen, den Sie leicht erkennen."
 
 msgid "Give your passkey a memorable name to help you identify it."
-msgstr ""
+msgstr "Geben Sie Ihrem Passkey einen einprägsamen Namen, um ihn leichter identifizieren zu können."
 
 msgid "Go to the app"
 msgstr "Zur App gehen"
@@ -261,22 +261,22 @@ msgid "Go to the app - (<0>{countdown}</0>)"
 msgstr "Zur App gehen - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
-msgstr ""
+msgstr "Noch nicht verwendet"
 
 msgid "Help & FAQ"
 msgstr "Hilfe & FAQ"
 
 msgid "Here is the identity that is linked to your recovery phrase. Continue to access it and add another access method if required."
-msgstr ""
+msgstr "Hier ist die Identität, die mit Ihrer Wiederherstellungsphrase verknüpft ist. Fahren Sie fort, um darauf zuzugreifen und bei Bedarf eine weitere Zugriffsmethode hinzuzufügen."
 
 msgid "Hidden email"
-msgstr ""
+msgstr "Versteckte E-Mail"
 
 msgid "Hide all"
-msgstr ""
+msgstr "Alle ausblenden"
 
 msgid "Home"
-msgstr ""
+msgstr "Startseite"
 
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
 msgstr "Wie funktionieren die Integrationen von Google, Microsoft und Apple mit Internet Identity?"
@@ -303,13 +303,13 @@ msgid "Identity upgraded!"
 msgstr "Identität aktualisiert!"
 
 msgid "If you proceed, you will no longer be able to sign-in to your identity or dapps using your {name} account."
-msgstr ""
+msgstr "Wenn Sie fortfahren, können Sie sich nicht mehr mit Ihrem {name}-Konto bei Ihrer Identität oder Ihren Dapps anmelden."
 
 msgid "In use on another account."
 msgstr "Wird auf einem anderen Konto verwendet."
 
 msgid "Incorrect spelling"
-msgstr ""
+msgstr "Falsche Schreibweise"
 
 msgid "Incorrect. Try again with the new code."
 msgstr "Falsch. Versuchen Sie es erneut mit dem neuen Code."
@@ -366,16 +366,16 @@ msgid "It seems like the connection with the service could not be established. T
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
 
 msgid "It won't be removed from your device or password manager."
-msgstr ""
+msgstr "Es wird nicht von Ihrem Gerät oder Passwort-Manager entfernt."
 
 msgid "Keep linked"
-msgstr ""
+msgstr "Verknüpft lassen"
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "Kennzeichnen Sie die Nutzung (z.B. 'Arbeit' oder 'Demo')."
 
 msgid "Last used"
-msgstr ""
+msgstr "Zuletzt verwendet"
 
 msgid "Learn how to open links in your browser"
 msgstr "Erfahren Sie, wie Sie Links in Ihrem Browser öffnen"
@@ -396,7 +396,7 @@ msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The log
 msgstr "Machen Sie die Anmeldung mit Google, Apple oder Microsoft einfach. Der Login, den Sie kennen, jetzt mit erhöhter Privatsphäre."
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
-msgstr ""
+msgstr "Stellen Sie sicher, dass Sie eine neue Zugriffsmethode hinzufügen, damit Sie sich beim nächsten Mal anmelden oder Ihre Wiederherstellungsphrase zurücksetzen können."
 
 msgid "Manage Identity"
 msgstr "Identität verwalten"
@@ -423,7 +423,7 @@ msgid "More information about multiple accounts"
 msgstr "Weitere Informationen zu mehreren Konten"
 
 msgid "More options"
-msgstr ""
+msgstr "Weitere Optionen"
 
 msgid "Multiple accounts"
 msgstr "Mehrere Konten"
@@ -435,7 +435,7 @@ msgid "My account"
 msgstr "Mein Konto"
 
 msgid "n/a"
-msgstr ""
+msgstr "k. A."
 
 msgid "Name account"
 msgstr "Konto benennen"
@@ -453,22 +453,22 @@ msgid "Only enter the code from that device if you initiated this process <0>you
 msgstr "Geben Sie den Code von diesem Gerät nur ein, wenn Sie diesen Vorgang <0>selbst</0> gestartet haben."
 
 msgid "Open menu"
-msgstr ""
+msgstr "Menü öffnen"
 
 msgid "or"
 msgstr "oder"
 
 msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
-msgstr ""
+msgstr "Übersicht der Zugriffsmethoden (Erstellungsdaten, letzte Nutzung). Fügen Sie eine neue Methode hinzu oder entfernen Sie sie."
 
 msgid "Pairing link"
 msgstr "Kopplungslink"
 
 msgid "Passkey"
-msgstr ""
+msgstr "Passkey"
 
 msgid "Passkey name"
-msgstr ""
+msgstr "Passkey-Name"
 
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 msgstr "Passkeys sind eine sichere und einfache Möglichkeit, sich ohne Passwörter anzumelden. Sie werden in Ihrem Passwort-Manager (Google Password Manager, iCloud Keychain, 1Password, etc.) gespeichert und können durch Fingerabdruck, Gesicht oder Gerätecode geschützt werden."
@@ -477,7 +477,7 @@ msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your 
 msgstr "Passkeys sind phishing-resistent, schwer zu stehlen und können über Anbieter wie Google, Apple oder Microsoft auf Ihren Geräten synchronisiert werden. <0>Mehr erfahren.</0>"
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
-msgstr ""
+msgstr "Passkeys sind auf diesem Gerät oder Browser nicht verfügbar. Bitte wählen Sie eine andere Zugriffsmethode, um fortzufahren."
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue."
 msgstr "Passkeys sind auf diesem Gerät oder Browser nicht verfügbar. Bitte wählen Sie eine andere Anmeldemethode, um fortzufahren."
@@ -504,25 +504,25 @@ msgid "Redirecting to the app"
 msgstr "Weiterleitung zur App..."
 
 msgid "Remove"
-msgstr ""
+msgstr "Entfernen"
 
 msgid "Remove passkey"
-msgstr ""
+msgstr "Passkey entfernen"
 
 msgid "Removing passkey..."
-msgstr ""
+msgstr "Passkey wird entfernt..."
 
 msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
-msgstr ""
+msgstr "Das Entfernen dieses Passkeys bedeutet, dass Sie ihn nicht mehr zum Anmelden verwenden können. Sie können später jederzeit einen neuen hinzufügen."
 
 msgid "Rename"
-msgstr ""
+msgstr "Umbenennen"
 
 msgid "Rename or make this your default sign-in"
 msgstr "Umbenennen oder als Standardanmeldung festlegen"
 
 msgid "Rename passkey"
-msgstr ""
+msgstr "Passkey umbenennen"
 
 msgid "Rename this account"
 msgstr "Dieses Konto umbenennen"
@@ -531,7 +531,7 @@ msgid "Return to app"
 msgstr "Zurück zur App"
 
 msgid "Right now"
-msgstr ""
+msgstr "Jetzt gerade"
 
 msgid "Save changes"
 msgstr "Änderungen speichern"
@@ -546,7 +546,7 @@ msgid "Seamless Access"
 msgstr "Nahtloser Zugriff"
 
 msgid "Secure recovery"
-msgstr ""
+msgstr "Sichere Wiederherstellung"
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Wählen Sie <0>In Safari öffnen</0> oder <1>In Chrome öffnen</1>."
@@ -555,7 +555,7 @@ msgid "Set as default sign-in"
 msgstr "Als Standardanmeldung festlegen"
 
 msgid "Show all"
-msgstr ""
+msgstr "Alle anzeigen"
 
 msgid "Sign in"
 msgstr "Anmelden"
@@ -570,7 +570,7 @@ msgid "Sign in using familiar methods"
 msgstr "Anmelden mit bekannten Methoden"
 
 msgid "Sign in with your {name} account from any device."
-msgstr ""
+msgstr "Melden Sie sich von jedem Gerät aus mit Ihrem {name}-Konto an."
 
 msgid "Sign Out"
 msgstr "Abmelden"
@@ -597,10 +597,10 @@ msgid "Still have an identity number?"
 msgstr "Haben Sie noch eine Identitätsnummer?"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
-msgstr ""
+msgstr "Sicher auf Ihrem Gerät, in Ihrem Passwort-Manager oder auf einem Sicherheitsschlüssel gespeichert."
 
 msgid "Successfully restored access to your identity"
-msgstr ""
+msgstr "Zugriff auf Ihre Identität erfolgreich wiederhergestellt"
 
 msgid "Support"
 msgstr "Support"
@@ -657,19 +657,19 @@ msgid "Understanding Internet Identity"
 msgstr "Internet Identity verstehen"
 
 msgid "Unknown"
-msgstr ""
+msgstr "Unbekannt"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
 msgstr "Im Gegensatz zu vielen Web3-Auth-Systemen, die für jede Aktion eine manuelle Signatur erfordern, erstellt Internet Identity für jede Anwendung authentifizierte Sitzungen. Dies bietet sowohl Sicherheit als auch Komfort – keine wiederholten Signaturen – und jede Sitzung erhält dennoch ihre eigene Identität."
 
 msgid "Unlink"
-msgstr ""
+msgstr "Verknüpfung aufheben"
 
 msgid "Unlink {name} account"
-msgstr ""
+msgstr "{name}-Konto-Verknüpfung aufheben"
 
 msgid "Unlinking {name} account..."
-msgstr ""
+msgstr "Verknüpfung mit {name}-Konto wird aufgehoben..."
 
 msgid "Unsupported Browser"
 msgstr "Nicht unterstützter Browser"
@@ -720,7 +720,7 @@ msgid "We didn't recognize that activation code."
 msgstr "Wir haben diesen Aktivierungscode nicht erkannt."
 
 msgid "We have found your identity"
-msgstr ""
+msgstr "Wir haben Ihre Identität gefunden"
 
 msgid "What are passkeys?"
 msgstr "Was sind Passkeys?"
@@ -744,7 +744,7 @@ msgid "When you create a passkey, your device makes two matching keys. One stays
 msgstr "Wenn Sie einen Passkey erstellen, erzeugt Ihr Gerät zwei passende Schlüssel. Einer bleibt sicher auf Ihrem Gerät, der andere wird an die App oder den Dienst gesendet. Sie arbeiten zusammen, um zu bestätigen, dass Sie es sind – ohne jemals persönliche Informationen oder ein Passwort zu teilen."
 
 msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
-msgstr ""
+msgstr "Mit Passkeys können Sie jetzt Ihren Fingerabdruck, Ihr Gesicht oder Ihre Bildschirmsperre verwenden, um schnell und sicher zu bestätigen, dass Sie es wirklich sind."
 
 msgid "with your Internet Identity"
 msgstr "mit Ihrer Internet Identity"
@@ -756,7 +756,7 @@ msgid "You <0>cannot</0> rename this once it is set."
 msgstr "Kann nach Festlegung <0>nicht</0> mehr umbenannt werden."
 
 msgid "You already have a {name} account linked"
-msgstr ""
+msgstr "Sie haben bereits ein {name}-Konto verknüpft"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Sie aktualisieren die ID <0>{identityNumber}</0>"
@@ -765,7 +765,7 @@ msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Sie können im Anmeldeprozess mit <0>Bestehenden Passkey verwenden</0> fortfahren."
 
 msgid "You have reached the maximum number of passkeys"
-msgstr ""
+msgstr "Sie sind dabei, die Verknüpfung Ihres {name}-Kontos aufzuheben."
 
 msgid "You may close this page."
 msgstr "Sie können diese Seite schließen."
@@ -780,7 +780,7 @@ msgid "You're about to sign in."
 msgstr "Sie sind dabei, sich anzumelden."
 
 msgid "You're about to unlink your {name} account."
-msgstr ""
+msgstr "Sie sind dabei, die Verknüpfung Ihres {name}-Kontos aufzuheben."
 
 msgid "You're all set. Your identity has been created."
 msgstr "Alles bereit. Ihre Identität wurde erstellt."
