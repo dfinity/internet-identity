@@ -31,7 +31,7 @@ msgstr "Logo {name}"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:412
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
-msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami telah memberikan Internet Identity tampilan dan nuansa yang segar dan modern. Desain baru ini intuitif dan lebih mudah dinavigasi, memastikan perjalanan pengguna yang lebih lancar."
+msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Internet Identity tampilan baru yang modern. Desain baru ini intuitif dan lebih mudah dinavigasi, sehingga pengalaman pengguna menjadi lebih lancar."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:442
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
@@ -309,7 +309,7 @@ msgstr "Masukkan kata-kata frasa pemulihan Anda di setiap kotak, dengan ejaan ya
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:212
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
-msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara pribadi, aman, dan mudah Anda untuk masuk ke aplikasi di Internet Computer."
+msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang pribadi, aman, dan mudah untuk masuk ke aplikasi di Internet Computer."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:114
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
@@ -318,7 +318,7 @@ msgstr "Rasakan"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:208
 msgid "FAQs"
-msgstr "Pertanyaan Umum"
+msgstr "Pertanyaan yang Sering Diajukan"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:101
 msgid "For developers"
@@ -326,7 +326,7 @@ msgstr "Untuk pengembang"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:388
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
-msgstr "Misalnya, pengguna A masuk ke Internet Identity dengan akun Google mereka “A@gmail.com” dan kemudian menggunakan Internet Identity untuk mengautentikasi di aplikasi Z. Google tidak akan pernah tahu bahwa pengguna tersebut diautentikasi di aplikasi Z, hanya Internet Identity yang tahu. Selain itu, aplikasi Z juga tidak akan pernah tahu bahwa pengguna A menggunakan Google untuk mengautentikasi pengguna Internet Identity mereka."
+msgstr "Misalnya, pengguna A masuk ke Internet Identity dengan akun Google mereka “A@gmail.com” dan kemudian menggunakan Internet Identity untuk autentikasi di aplikasi Z. Google tidak akan pernah tahu bahwa pengguna tersebut terautentikasi di aplikasi Z, hanya Internet Identity yang mengetahuinya. Selain itu, aplikasi Z juga tidak akan pernah tahu bahwa pengguna A menggunakan Google untuk mengautentikasi pengguna Internet Identity mereka."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:166
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
@@ -384,7 +384,7 @@ msgstr "Beranda"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:361
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
-msgstr "Bagaimana cara kerja integrasi Google, Microsoft, dan Apple dengan Internet Identity?"
+msgstr "Bagaimana integrasi Google, Microsoft, dan Apple bekerja dengan Internet Identity?"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:280
 msgid "How do passkeys work?"
@@ -453,15 +453,15 @@ msgstr "Internet Identity <0>tidak</0> menyimpan data biometrik Anda. Data terse
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:405
 msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
-msgstr "Internet Identity 2.0 membawa serangkaian peningkatan yang dirancang untuk menyempurnakan pengalaman Anda:"
+msgstr "Internet Identity 2.0 membawa berbagai peningkatan untuk meningkatkan pengalaman Anda:"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:247
 msgid "Internet Identity is an authentication system for applications running on the <0>Internet Computer</0>. Instead of traditional usernames and passwords, it uses keys created via <1>passkeys</1> or other authentication systems like Google, Microsoft or Apple."
-msgstr "Internet Identity adalah sistem autentikasi untuk aplikasi yang berjalan di <0>Internet Computer</0>. Alih-alih nama pengguna dan kata sandi tradisional, ia menggunakan kunci yang dibuat melalui <1>passkey</1> atau sistem autentikasi lain seperti Google, Microsoft, atau Apple."
+msgstr "Internet Identity adalah sistem autentikasi untuk aplikasi yang berjalan di <0>Internet Computer</0>. Alih-alih menggunakan nama pengguna dan kata sandi tradisional, sistem ini menggunakan kunci yang dibuat melalui <1>passkey</1> atau sistem autentikasi lain seperti Google, Microsoft, atau Apple."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:319
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
-msgstr "Internet Identity seaman metode autentikasi yang digunakannya — seperti Google, Apple, Microsoft, atau Passkey. Itu berarti ia dibangun di atas keamanan canggih. Saat Anda memilih Passkey, akses dilindungi oleh metode buka kunci perangkat Anda (Face ID atau sidik jari), membuatnya semudah membuka kunci ponsel Anda."
+msgstr "Internet Identity seaman metode autentikasi yang digunakan — seperti Google, Apple, Microsoft, atau Passkey. Artinya, sistem ini dibangun dengan keamanan mutakhir. Saat Anda memilih Passkey, akses dilindungi oleh metode buka kunci perangkat Anda (Face ID atau sidik jari), sehingga semudah membuka kunci ponsel Anda."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:137
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
@@ -469,7 +469,7 @@ msgstr "Internet Identity memungkinkan Anda mengakses aplikasi dan layanan denga
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:335
 msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background — you don't need to manage anything."
-msgstr "Internet Identity tidak pernah membagikan data pribadi Anda, seperti email Anda, dengan aplikasi atau situs web. Sebagai gantinya, ia membuat pseudonim unik untuk Anda di setiap aplikasi. Setiap aplikasi mendapatkan yang berbeda, sehingga mereka tidak dapat melacak Anda di seluruh layanan. Semua ini terjadi secara otomatis di latar belakang — Anda tidak perlu mengelola apa pun."
+msgstr "Internet Identity tidak pernah membagikan data pribadi Anda, seperti email, dengan aplikasi atau situs web. Sebagai gantinya, sistem ini membuat pseudonim unik untuk Anda di setiap aplikasi. Setiap aplikasi mendapat pseudonim berbeda, sehingga mereka tidak dapat melacak Anda di berbagai layanan. Semua ini terjadi secara otomatis di latar belakang — Anda tidak perlu mengelola apa pun."
 
 #: src/frontend/src/lib/components/wizards/migration/views/EnterIdentityNumber.svelte:76
 msgid "Internet Identity number"
@@ -481,7 +481,7 @@ msgstr "Internet Identity melindungi privasi Anda"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:373
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
-msgstr "Internet Identity kemudian menjembatani autentikasi dengan penyedia tersebut dengan Internet Computer. Dengan mengautentikasi dengan salah satu layanan tersebut, Internet Identity dapat memastikan bahwa Anda adalah diri Anda, dan kemudian membuat autentikasi lain untuk aplikasi yang berjalan di Internet Computer."
+msgstr "Internet Identity kemudian menghubungkan autentikasi dari penyedia tersebut dengan Internet Computer. Dengan autentikasi melalui salah satu layanan tersebut, Internet Identity dapat memastikan Anda adalah diri Anda, dan kemudian membuat autentikasi lain untuk aplikasi yang berjalan di Internet Computer."
 
 #: src/frontend/src/routes/(new-styling)/activate/+page.svelte:20
 msgid "Invalid code link"
@@ -497,7 +497,7 @@ msgstr "Permintaan tidak valid"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:266
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
-msgstr "Apakah Face ID atau Sidik Jari saya disimpan di Internet Identity?"
+msgstr "Apakah Face ID atau sidik jari saya disimpan di Internet Identity?"
 
 #: src/frontend/src/routes/(new-styling)/unsupported/+page.svelte:27
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
@@ -625,11 +625,11 @@ msgstr "Beri nama identitas Anda"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:382
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
-msgstr "Tidak ada data yang dibagikan dengan Google, Microsoft, atau Apple tentang aplikasi apa yang Anda masuki dengan Internet Identity."
+msgstr "Tidak ada data yang dibagikan kepada Google, Microsoft, atau Apple mengenai aplikasi mana yang Anda masuk dengan Internet Identity."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:271
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
-msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau membuka kunci passkey Anda. Data biometrik Anda tidak pernah dibagikan dengan Internet Identity atau dengan situs web atau aplikasi apa pun yang Anda gunakan."
+msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau membuka passkey Anda. Data biometrik Anda tidak pernah dibagikan dengan Internet Identity atau situs web dan aplikasi lain yang Anda gunakan."
 
 #: src/frontend/src/lib/components/wizards/confirmAccessMethod/views/EnterConfirmationCode.svelte:62
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
@@ -663,11 +663,11 @@ msgstr "Nama passkey"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:285
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
-msgstr "Passkey adalah cara yang aman dan mudah untuk masuk tanpa menggunakan kata sandi. Mereka disimpan di pengelola kata sandi Anda (Google Password Manager, iCloud Keychain, 1Password, dll.) dan dapat dilindungi oleh sidik jari, wajah, atau kode perangkat Anda."
+msgstr "Passkey adalah cara yang aman dan mudah untuk masuk tanpa menggunakan kata sandi. Passkey disimpan di pengelola kata sandi Anda (Google Password Manager, iCloud Keychain, 1Password, dll.) dan dapat dilindungi dengan sidik jari, wajah, atau kode perangkat."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:301
 msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
-msgstr "Passkey tahan terhadap phishing, sulit dicuri, dan dapat disinkronkan di seluruh perangkat Anda melalui penyedia seperti Google, Apple, atau Microsoft. <0>Pelajari lebih lanjut.</0>"
+msgstr "Passkey tahan phishing, sulit dicuri, dan dapat disinkronkan di perangkat Anda melalui penyedia seperti Google, Apple, atau Microsoft. <0>Pelajari lebih lanjut.</0>"
 
 #: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddAccessMethod.svelte:78
 msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
@@ -861,7 +861,7 @@ msgstr "<0>Perangkat baru</0> sedang bersiap untuk melanjutkan."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:366
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
-msgstr "Integrasi dengan Google, Microsoft, dan Apple menggunakan protokol autentikasi standar bernama OpenID. Ini adalah protokol yang sama yang digunakan aplikasi lain untuk masuk dengan Google."
+msgstr "Integrasi dengan Google, Microsoft, dan Apple menggunakan protokol autentikasi standar yang disebut OpenID. Ini adalah protokol yang sama yang digunakan aplikasi lain untuk masuk dengan Google."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:29
 msgid "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
@@ -921,7 +921,7 @@ msgstr "Tidak dikenal"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:351
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
-msgstr "Berbeda dengan banyak sistem autentikasi Web3 yang memerlukan penandatanganan manual untuk setiap tindakan, Internet Identity membuat sesi terautentikasi per aplikasi. Ini memberikan keamanan dan kenyamanan—tanpa penandatanganan berulang—sambil tetap memberikan identitas sendiri pada setiap sesi."
+msgstr "Berbeda dengan banyak sistem autentikasi Web3 yang memerlukan tanda tangan manual untuk setiap aksi, Internet Identity membuat sesi autentikasi per aplikasi. Ini memberikan keamanan dan kenyamanan — tanpa tanda tangan berulang — sekaligus memberi setiap sesi identitasnya sendiri."
 
 #: src/frontend/src/routes/(new-styling)/manage/(authenticated)/access/components/OpenIdItem.svelte:26
 msgid "Unlink"
@@ -1017,7 +1017,7 @@ msgstr "Apa yang membuat Internet Identity menjaga privasi?"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:314
 msgid "What makes Internet Identity secure & easy to use?"
-msgstr "Apa yang membuat Internet Identity aman & mudah digunakan?"
+msgstr "Apa yang membuat Internet Identity aman dan mudah digunakan?"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:400
 msgid "What's new in Internet Identity 2.0?"
@@ -1029,7 +1029,7 @@ msgstr "Siapa nama Anda?"
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:293
 msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
-msgstr "Saat Anda membuat passkey, perangkat Anda membuat dua kunci yang cocok. Satu tetap aman di perangkat Anda, dan yang lainnya masuk ke aplikasi atau layanan. Keduanya bekerja sama untuk mengonfirmasi bahwa itu adalah Anda — tanpa pernah membagikan info pribadi atau kata sandi Anda."
+msgstr "Saat Anda membuat passkey, perangkat Anda membuat dua kunci yang cocok. Satu tetap aman di perangkat Anda, dan yang lain dikirim ke aplikasi atau layanan. Keduanya bekerja sama untuk memastikan itu Anda — tanpa pernah membagikan info pribadi atau kata sandi."
 
 #: src/frontend/src/lib/components/wizards/addAccessMethod/views/AddPasskey.svelte:47
 msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."

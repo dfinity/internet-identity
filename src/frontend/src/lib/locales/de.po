@@ -461,7 +461,7 @@ msgstr "Internet Identity ist ein Authentifizierungssystem für Anwendungen auf 
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:319
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
-msgstr "Internet Identity ist so sicher wie die verwendeten Authentifizierungsmethoden – wie Google, Apple, Microsoft oder Passkeys. Das bedeutet, dass es auf modernster Sicherheitstechnologie basiert. Bei der Wahl von Passkeys wird der Zugriff durch die Entsperrmethode Ihres Geräts (Face ID oder Fingerabdruck) geschützt, wodurch es genauso einfach ist wie das Entsperren Ihres Telefons."
+msgstr "Internet Identity ist so sicher wie die verwendeten Authentifizierungsmethoden – z. B. Google, Apple, Microsoft oder Passkeys. Das bedeutet, dass es auf modernster Sicherheitstechnologie basiert. Bei der Wahl von Passkeys wird der Zugriff durch die Entsperrmethode Ihres Geräts (Face ID oder Fingerabdruck) geschützt, wodurch es genauso einfach ist wie das Entsperren Ihres Telefons."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:137
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
@@ -861,7 +861,7 @@ msgstr "Das <0>neue Gerät</0> bereitet die Fortsetzung vor."
 
 #: src/frontend/src/routes/(new-styling)/+page.svelte:366
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
-msgstr "Die Integration mit Google, Microsoft und Apple verwendet ein standardisiertes Authentifizierungsprotokoll namens OpenID. Dies ist dasselbe Protokoll, das andere Anwendungen für die Anmeldung über Google nutzen."
+msgstr "Die Integration von Google, Microsoft und Apple verwendet ein standardisiertes Authentifizierungsprotokoll namens OpenID. Dies ist dasselbe Protokoll, das andere Anwendungen für die Anmeldung über Google nutzen."
 
 #: src/frontend/src/lib/components/views/AuthorizeError.svelte:29
 msgid "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
