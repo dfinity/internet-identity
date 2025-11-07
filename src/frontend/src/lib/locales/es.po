@@ -53,16 +53,16 @@ msgid "Account name"
 msgstr "Nombre de la cuenta"
 
 msgid "Add a passkey"
-msgstr "Añadir una passkey"
+msgstr "Añade una passkey"
 
 msgid "Add access method"
-msgstr "Añadir método de acceso"
+msgstr "Añade un método de acceso"
 
 msgid "Add another account"
 msgstr "Añadir otra cuenta"
 
 msgid "Add another passkey"
-msgstr "Añadir otra passkey"
+msgstr "Añade otra passkey"
 
 msgid "Add another way to sign in with a passkey or third-party account for secure access."
 msgstr "Añade otra forma de iniciar sesión con una passkey o una cuenta de terceros para un acceso seguro."
@@ -179,7 +179,7 @@ msgid "Create passkey"
 msgstr "Crear passkey"
 
 msgid "Created {0}"
-msgstr "Creado {0}"
+msgstr "Creada {0}"
 
 msgid "Creating account..."
 msgstr "Creando cuenta..."
