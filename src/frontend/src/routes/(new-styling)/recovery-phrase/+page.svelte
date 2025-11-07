@@ -8,7 +8,7 @@
   import { formatDate, t } from "$lib/stores/locale.store";
   import { nanosToMillis } from "$lib/utils/time";
   import { nonNullish } from "@dfinity/utils";
-  import { goto, preloadData } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { InfoIcon } from "@lucide/svelte";
   import type { IdentityInfo } from "$lib/generated/internet_identity_types";
   import type { DelegationIdentity } from "@icp-sdk/core/identity";
@@ -166,7 +166,7 @@
             },
           },
         });
-        goto("/manage");
+        await goto("/manage");
       } finally {
         resetRecoveryState();
         continueInProgress = false;
