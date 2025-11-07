@@ -2,7 +2,6 @@ import type { LayoutLoad } from "./$types";
 import { redirect } from "@sveltejs/kit";
 import { get } from "svelte/store";
 import { authenticationStore } from "$lib/stores/authentication.store";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { isNullish } from "@dfinity/utils";
 import { throwCanisterError } from "$lib/utils/utils";
 
