@@ -363,7 +363,9 @@
           </Button>
         </div>
       </div>
-      <Button size="xl" variant="secondary">{$t`Cancel`}</Button>
+      <Button size="xl" variant="secondary" disabled={loading}
+        >{$t`Cancel`}</Button
+      >
     </div>
   </AuthPanel>
 </div>
