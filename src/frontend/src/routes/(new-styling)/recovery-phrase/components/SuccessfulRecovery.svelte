@@ -1,6 +1,6 @@
 <script lang="ts">
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { UserIcon } from "@lucide/svelte";
+  import { UserCheckIcon, UserIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
@@ -28,8 +28,8 @@
 
 <div class="flex flex-col gap-8">
   <div class="mt-6 flex flex-col gap-4">
-    <FeaturedIcon size="md" class="self-start">
-      <UserIcon class="size-6" />
+    <FeaturedIcon size="md" variant="success">
+      <UserCheckIcon class="size-6" />
     </FeaturedIcon>
     <div class="flex flex-col gap-3">
       <h2 class="text-text-primary text-xl">

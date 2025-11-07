@@ -14,6 +14,7 @@
   import type { DelegationIdentity } from "@icp-sdk/core/identity";
   import { wordlists } from "bip39";
   import SuccessfulRecovery from "./components/SuccessfulRecovery.svelte";
+  import { toaster } from "$lib/components/utils/toaster";
 
   type RecoveryWord = {
     value: string;
@@ -165,6 +166,11 @@
               identityNumber: recoveredIdentityData.identityNumber,
             },
           },
+        });
+        toaster.success({
+          title: $t`Successfully restored access to your identity`,
+          description: $t`Make sure to add a new access method so that you can sign in next time or reset your recovery phrase.`,
+          duration: 5000,
         });
         await goto("/manage");
       } finally {
