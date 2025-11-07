@@ -1,6 +1,7 @@
 import { defineConfig } from "@lingui/cli";
 import { svelteExtractor } from "./src/lingui-svelte";
 import { availableLocales } from "./src/frontend/src/lib/constants/locale.constants";
+import { formatter } from "@lingui/format-po";
 
 export default defineConfig({
   locales: availableLocales,
@@ -12,4 +13,5 @@ export default defineConfig({
     },
   ],
   extractors: [svelteExtractor],
+  format: formatter({ origins: false }),
 });
