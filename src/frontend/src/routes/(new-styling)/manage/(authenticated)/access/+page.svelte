@@ -32,6 +32,7 @@
     toKey,
     isCurrentAccessMethod,
   } from "./utils";
+  import { sessionStore } from "$lib/stores/session.store";
 
   const MAX_PASSKEYS = 8;
 
@@ -133,6 +134,7 @@
         lastUsedIdentitiesStore.removeIdentity(
           $authenticatedStore.identityNumber,
         );
+        await sessionStore.reset();
         location.replace("/login");
         return;
       }
