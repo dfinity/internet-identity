@@ -1,8 +1,5 @@
 <script lang="ts">
-  import identityInfo from "$lib/stores/identity-info.state.svelte";
-  import PlaceHolder from "$lib/components/ui/PlaceHolder.svelte";
   import IdentityInfoPanel from "$lib/components/views/IdentityInfoPanel.svelte";
-  import { fade } from "svelte/transition";
   import type { PageProps } from "./$types";
   import { afterNavigate, invalidateAll, replaceState } from "$app/navigation";
   import { page } from "$app/state";
