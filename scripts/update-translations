@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPTS_DIR/.."
+
+# Directory containing .po files
+LOCALES_DIR="$PWD/src/frontend/src/lib/locales"
+
+INSTRUCTIONS="SYSTEM: You are a silent \`.po\` file translation bot.
+1.  You will receive a \`.po\` file with missing translations.
+2.  Analyze the existing translations in the file to determine the established tone (e.g., formal/informal 'you'), style, and terminology.
+3.  Use these established decisions to translate *only* the entries where \`msgstr\` is empty.
+4.  Ensure all variables (like {variable}) and tags (like <0>...</0>) are preserved in the translation.
+5.  Apply the correct ICU plural categories required by the target language (e.g., one/other, one/few/many/other, or just other).
+6.  Your output must be *only* the plain text \`.po\` entries (from msgid ... to msgstr \"...\") that you have just translated.
+7.  DO NOT output any other text, greetings, explanations, or markdown. Your response must be *only* the plain text code snippet."
+
+# Make sure .po files are up to date
+echo "Updating .po files with latest changes"
+npm run extract > /dev/null # No need to output here
+
+# Loop through all .po files
+for po_file in "$LOCALES_DIR"/*.po; do
+  if [[ -f "$po_file" ]]; then
+    po_filename=$(basename "$po_file")
+    
+    # Skip source file
+    if [[ "$po_filename" == "en.po" ]]; then
+      echo -e "\nSkipping file: $po_filename"
+      continue
+    fi
+    
+    # Get entries without header
+    po_content=$(<"$po_file")
+    without_header=$(echo "$po_content" | awk '
+                     BEGIN { skip=0; entry="" }
+                     /^msgid ""$/ { skip=1; entry="" ; next }   # start skipping
+                     /^msgid / { if (!skip) { printf "%s", entry }; entry=$0 "\n"; skip=0; next } 
+                     { entry = entry $0 "\n" }                 # accumulate lines
+                     END { if (!skip) printf "%s", entry }     # print last entry if not skipped
+                   ')
+              
+    # Skip files without missing translations     
+    if ! grep -q '^msgstr ""$' <<< "$without_header"; then
+        echo -e "\nSkipping file: $po_filename"
+        continue;
+    fi
+    
+    # Use npx to invoke the Gemini CLI to translate missing translations
+    echo -e "\nTranslating file: $po_filename"
+    translated_entries=$(npx https://github.com/google-gemini/gemini-cli -p "$INSTRUCTIONS\n\nThe $po_filename file content:\n$po_content")
+     
+    # Merge existing and new translations, while making sure that 
+    # existing translations take priority (remain unchanged).
+    already_translated=$(echo "$without_header" | awk '
+                         BEGIN {entry=""}
+                         {
+                           entry = entry $0 "\n"
+                           if ($0 ~ /^msgstr /) {
+                             if ($0 == "msgstr \"\"") {
+                               # Empty translation, skip entry
+                               entry = ""
+                             } else {
+                               # Non-empty msgstr, print entry
+                               printf "%s", entry
+                               entry = ""
+                             }
+                           }
+                         }
+                       ')
+    merged_content="$po_content"$'\n'"$translated_entries"$'\n'"$already_translated"
+    
+    # Overwrite file with merged content
+    echo "$merged_content" > "$po_file"
+  fi
+done
+
+# Make sure .po files are cleaned up after adding the translations
+echo -e "\nCleaning up .po files with latest translations"
+npm run extract # We do not silence the output here so we can check if there are still missing translations
