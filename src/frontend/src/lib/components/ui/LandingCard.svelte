@@ -8,6 +8,8 @@
     description: string;
   };
 
+  clearTimeout(undefined);
+
   const { children, header, subheader, description }: Props = $props();
 </script>
 

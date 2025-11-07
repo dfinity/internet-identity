@@ -1,7 +1,7 @@
 <script lang="ts">
   import {
     ChevronDownIcon,
-    HomeIcon,
+    HouseIcon,
     KeyRoundIcon,
     MenuIcon,
     XIcon,
@@ -14,25 +14,20 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Button from "$lib/components/ui/Button.svelte";
-  import identityInfo from "$lib/stores/identity-info.state.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
-  import type { Snippet } from "svelte";
   import { sessionStore } from "$lib/stores/session.store";
   import { t } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
+  import type { LayoutProps } from "./$types";
 
-  interface Props {
-    children: Snippet;
-  }
-
-  const { children }: Props = $props();
+  const { children, data }: LayoutProps = $props();
 
   let identityButtonRef = $state<HTMLElement>();
   let isMobileSidebarOpen = $state(false);
@@ -47,32 +42,32 @@
   );
 
   const gotoManage = () => goto("/manage", { replaceState: true });
-  const onSignIn = async (identityNumber: bigint) => {
-    identityInfo.reset();
+  const handleSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
-  const onSignUp = async (identityNumber: bigint) => {
-    identityInfo.reset();
+  const handleSignUp = async (identityNumber: bigint) => {
     toaster.success({
-      title: "You're all set. Your identity has been created.",
+      title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void identityInfo.fetch();
     await gotoManage();
     isAuthDialogOpen = false;
   };
-  const onMigration = async (identityNumber: bigint) => {
+  const handleMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
-      title: "Migration completed successfully",
+      title: $t`Migration completed successfully`,
       duration: 4000,
     });
     isAuthDialogOpen = false;
     await gotoManage();
+  };
+  const handleLogout = async () => {
+    await sessionStore.reset();
+    location.replace("/login");
   };
 
   const authLastUsedFlow = new AuthLastUsedFlow();
@@ -87,9 +82,7 @@
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[Number(identityNumber)];
     await authLastUsedFlow.authenticate(chosenIdentity);
-    identityInfo.reset();
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    void identityInfo.fetch();
     await gotoManage();
     isIdentityPopoverOpen = false;
   };
@@ -143,7 +136,7 @@
       <ul class="contents">
         <li class="contents">
           <NavItem href="/manage" current={page.url.pathname === "/manage"}>
-            <HomeIcon class="size-5 sm:max-md:mx-auto" />
+            <HouseIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Home`}</span>
           </NavItem>
         </li>
@@ -192,7 +185,9 @@
         class="ml-auto gap-2.5 pr-3 sm:-mr-3"
         aria-label={$t`Switch identity`}
       >
-        <span>{identityInfo.name ?? $authenticatedStore.identityNumber}</span>
+        <span>
+          {data.identityInfo.name[0] ?? data.identityNumber.toString()}
+        </span>
         <ChevronDownIcon size="1rem" />
       </Button>
       <!-- Mobile menu button -->
@@ -231,7 +226,7 @@
         isAuthDialogOpen = true;
       }}
       onClose={() => (isIdentityPopoverOpen = false)}
-      onLogout={identityInfo.logout}
+      onLogout={handleLogout}
     />
   </Popover>
 {/if}
@@ -244,9 +239,9 @@
   >
     <AuthWizard
       bind:isAuthenticating
-      {onSignIn}
-      {onSignUp}
-      {onMigration}
+      onSignIn={handleSignIn}
+      onSignUp={handleSignUp}
+      onMigration={handleMigration}
       onError={(error) => {
         isAuthDialogOpen = false;
         handleError(error);
