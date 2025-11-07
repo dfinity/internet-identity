@@ -765,7 +765,7 @@ msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Sie können im Anmeldeprozess mit <0>Bestehenden Passkey verwenden</0> fortfahren."
 
 msgid "You have reached the maximum number of passkeys"
-msgstr "Sie sind dabei, die Verknüpfung Ihres {name}-Kontos aufzuheben."
+msgstr "Sie haben die maximale Anzahl von Passkeys erreicht."
 
 msgid "You may close this page."
 msgstr "Sie können diese Seite schließen."
