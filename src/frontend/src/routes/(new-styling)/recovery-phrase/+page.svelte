@@ -369,9 +369,9 @@
           </Button>
         </div>
       </div>
-      <Button size="xl" variant="secondary" disabled={loading}
-        >{$t`Cancel`}</Button
-      >
+      <Button size="xl" variant="secondary" disabled={loading}>
+        {$t`Cancel`}
+      </Button>
     </div>
   </AuthPanel>
 </div>
@@ -380,18 +380,10 @@
   {@const identityName =
     recoveredIdentityData.info.name[0] ??
     recoveredIdentityData.identityNumber.toString()}
-  {@const createdAt = nonNullish(recoveredIdentityData.info.created_at[0])
-    ? $formatDate(
-        new Date(nanosToMillis(recoveredIdentityData.info.created_at[0])),
-        {
-          dateStyle: "short",
-        },
-      )
-    : undefined}
   <Dialog onClose={resetRecoveryState}>
     <SuccessfulRecovery
       {identityName}
-      {createdAt}
+      createdAtNanos={recoveredIdentityData.info.created_at[0]}
       onContinue={handleContinue}
       onCancel={handleCancel}
     />

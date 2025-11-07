@@ -1,25 +1,26 @@
 <script lang="ts">
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { UserCheckIcon, UserIcon } from "@lucide/svelte";
-  import { t } from "$lib/stores/locale.store";
+  import { formatDate, t } from "$lib/stores/locale.store";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { nonNullish } from "@dfinity/utils";
+  import { nanosToMillis } from "$lib/utils/time";
 
   type Props = {
     identityName: string;
-    createdAt?: string;
+    createdAtNanos?: bigint;
     onContinue: () => Promise<void>;
     onCancel: () => void;
   };
 
-  const { identityName, createdAt, onContinue, onCancel }: Props = $props();
+  const { identityName, createdAtNanos, onContinue, onCancel }: Props =
+    $props();
 
   let continueInProgress = $state(false);
 
   const handleContinue = async () => {
-    if (continueInProgress) return;
     continueInProgress = true;
     await onContinue();
     continueInProgress = false;
@@ -49,8 +50,10 @@
         {identityName}
       </div>
       <div class="text-text-tertiary font-normal" aria-hidden="true">
-        {#if nonNullish(createdAt)}
-          <span>{$t`Created ${createdAt}`}</span>
+        {#if nonNullish(createdAtNanos)}
+          <span
+            >{$t`Created ${$formatDate(new Date(nanosToMillis(createdAtNanos)), { dateStyle: "short" })}`}</span
+          >
         {/if}
       </div>
     </div>
