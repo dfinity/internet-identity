@@ -722,6 +722,9 @@ msgstr "We didn't recognize that activation code."
 msgid "We have found your identity"
 msgstr "We have found your identity"
 
+msgid "Welcome, {name}!"
+msgstr "Welcome, {name}!"
+
 msgid "What are passkeys?"
 msgstr "What are passkeys?"
 

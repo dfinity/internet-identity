@@ -10,6 +10,8 @@
   import { toaster } from "$lib/components/utils/toaster";
   import AccessMethodsPanel from "$lib/components/views/AccessMethodsPanel.svelte";
   import { toAccessMethods } from "./access/utils";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
 
   const { data }: PageProps = $props();
 
@@ -37,24 +39,20 @@
   });
 </script>
 
-<div>
-  <div class="mh-9 mb-3">
-    <h1 class="text-text-primary text-3xl font-medium">
-      Welcome, {name}!
-    </h1>
-  </div>
-  <h2 class="text-text-tertiary mb-12 text-base">
-    Manage your identity and access methods.
-  </h2>
+<header class="flex flex-col gap-3">
+  <h1 class="text-text-primary text-3xl font-medium">
+    {$t`Welcome, ${name}!`}
+  </h1>
+  <p class="text-text-tertiary text-base">
+    <Trans>Manage your identity and access methods.</Trans>
+  </p>
+</header>
 
-  <div class="flex flex-col gap-6 lg:flex-row">
-    <div class="flex-1">
-      <IdentityInfoPanel {name} />
-    </div>
-    <div class="flex-1">
-      <AccessMethodsPanel {totalAccessMethods} />
-    </div>
-  </div>
+<div
+  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(24rem,1fr))] gap-5 max-sm:grid-cols-1"
+>
+  <IdentityInfoPanel {name} />
+  <AccessMethodsPanel {totalAccessMethods} />
 </div>
 
 {#if nonNullish(pendingRegistrationId)}

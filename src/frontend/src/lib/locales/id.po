@@ -722,6 +722,9 @@ msgstr "Kami tidak mengenali kode aktivasi tersebut."
 msgid "We have found your identity"
 msgstr "Kami telah menemukan identitas Anda"
 
+msgid "Welcome, {name}!"
+msgstr "Selamat datang, {name}!"
+
 msgid "What are passkeys?"
 msgstr "Apa itu passkey?"
 
