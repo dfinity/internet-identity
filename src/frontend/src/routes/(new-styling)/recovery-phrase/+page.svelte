@@ -54,7 +54,7 @@
   >(undefined);
 
   let continueInProgress = $state(false);
-  let recoveryError = $state(false);
+  let recoveryError = $state(false); // Recovery phrase fails checksum validation
   // When this is `true`, the auto-submit is disabled, and the user has to manually submit the recovery phrase.
   let manualSubmitRequired = $state(false);
 
