@@ -44,7 +44,7 @@
       .slice(0, 3),
   );
 
-  const switchedToIdentity = async (identityNumber: bigint) => {
+  const switchToIdentity = async (identityNumber: bigint) => {
     isAuthDialogOpen = false;
     isSwitchingIdentity = true;
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
@@ -52,21 +52,21 @@
     isSwitchingIdentity = false;
   };
   const handleSignIn = async (identityNumber: bigint) => {
-    await switchedToIdentity(identityNumber);
+    await switchToIdentity(identityNumber);
   };
   const handleSignUp = async (identityNumber: bigint) => {
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
-    await switchedToIdentity(identityNumber);
+    await switchToIdentity(identityNumber);
   };
   const handleMigration = async (identityNumber: bigint) => {
     toaster.success({
       title: $t`Migration completed successfully`,
       duration: 4000,
     });
-    await switchedToIdentity(identityNumber);
+    await switchToIdentity(identityNumber);
   };
   const handleLogout = async () => {
     await sessionStore.reset();
@@ -86,7 +86,7 @@
     const chosenIdentity =
       $lastUsedIdentitiesStore.identities[identityNumber.toString()];
     await authLastUsedFlow.authenticate(chosenIdentity);
-    await switchedToIdentity(identityNumber);
+    await switchToIdentity(identityNumber);
   };
 
   // Hide mobile sidebar on navigation
