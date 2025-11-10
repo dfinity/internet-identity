@@ -14,6 +14,7 @@
   import type { DelegationIdentity } from "@icp-sdk/core/identity";
   import { wordlists } from "bip39";
   import SuccessfulRecovery from "./components/SuccessfulRecovery.svelte";
+  import RecoveryError from "./components/RecoveryError.svelte";
   import { toaster } from "$lib/components/utils/toaster";
 
   type RecoveryWord = {
@@ -53,6 +54,9 @@
   >(undefined);
 
   let continueInProgress = $state(false);
+  let recoveryError = $state(false); // Recovery phrase fails checksum validation
+  // When this is `true`, the auto-submit is disabled, and the user has to manually submit the recovery phrase.
+  let manualSubmitRequired = $state(false);
 
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0 && word.isValid),
@@ -81,13 +85,15 @@
       validateWord(currentIndex);
     }
 
-    // Clear any pending timeout and submit immediately if last index and submit is enabled
-    const isLastIndex = currentIndex === words.length - 1;
-    if (event.key === "Enter" && isLastIndex && submitEnabled) {
-      clearTimeout(submitTimeoutId);
-      submitTimeoutId = undefined;
-      handleRecoverWithPhrase();
-      return;
+    if (!manualSubmitRequired) {
+      // Clear any pending timeout and submit immediately if last index and submit is enabled
+      const isLastIndex = currentIndex === words.length - 1;
+      if (event.key === "Enter" && isLastIndex && submitEnabled) {
+        clearTimeout(submitTimeoutId);
+        submitTimeoutId = undefined;
+        handleRecoverWithPhrase();
+        return;
+      }
     }
 
     // Focus next input if not last index
@@ -104,15 +110,16 @@
       }
     }
 
-    // Clear existing timeout and start new one for auto-submit
-    clearTimeout(submitTimeoutId);
-
-    // Set 1 second timeout to auto-submit if all words are filled
-    submitTimeoutId = window.setTimeout(() => {
-      if (submitEnabled && !recoveryInProgress) {
-        handleRecoverWithPhrase();
-      }
-    }, 1000);
+    if (!manualSubmitRequired) {
+      // Clear existing timeout and start new one for auto-submit
+      clearTimeout(submitTimeoutId);
+      // Set 1 second timeout to auto-submit if all words are filled
+      submitTimeoutId = window.setTimeout(() => {
+        if (submitEnabled && !recoveryInProgress) {
+          handleRecoverWithPhrase();
+        }
+      }, 1000);
+    }
   };
 
   const handleRecoverWithPhrase = async () => {
@@ -128,14 +135,16 @@
 
     // Set the flag to prevent multiple submissions
     recoveryInProgress = true;
+    recoveryError = false;
+    recoveredIdentityData = undefined;
 
     const phraseWords = words.map((word) => word.value.trim());
     try {
       const result = await recoverWithPhrase(phraseWords);
       recoveredIdentityData = result;
     } catch (error) {
-      // TODO: Manage error
-      console.error("error", error);
+      recoveredIdentityData = undefined;
+      recoveryError = true;
     } finally {
       clearTimeout(submitTimeoutId);
       submitTimeoutId = undefined;
@@ -146,6 +155,14 @@
 
   const resetRecoveryState = () => {
     recoveredIdentityData = undefined;
+  };
+
+  const handleRetry = () => {
+    recoveryError = false;
+    manualSubmitRequired = true;
+    showAll = true;
+    clearTimeout(submitTimeoutId);
+    submitTimeoutId = undefined;
   };
 
   const handleContinue = async () => {
@@ -229,6 +246,7 @@
     submitTimeoutId = undefined;
 
     showAll = false;
+    recoveryError = false;
 
     words.forEach((word) => {
       word.value = "";
@@ -364,6 +382,16 @@
           </Button>
         </div>
       </div>
+      {#if manualSubmitRequired}
+        <Button
+          size="xl"
+          variant="primary"
+          disabled={!submitEnabled || loading}
+          onclick={handleRecoverWithPhrase}
+        >
+          {$t`Submit`}
+        </Button>
+      {/if}
       <Button size="xl" variant="secondary" disabled={loading}>
         {$t`Cancel`}
       </Button>
@@ -385,5 +413,11 @@
       onContinue={handleContinue}
       onCancel={handleCancel}
     />
+  </Dialog>
+{/if}
+
+{#if recoveryError}
+  <Dialog>
+    <RecoveryError onRetry={handleRetry} onCancel={handleCancel} />
   </Dialog>
 {/if}
