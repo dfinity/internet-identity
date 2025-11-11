@@ -826,7 +826,10 @@ impl fmt::Display for AnchorError {
                 field,
                 length,
                 limit,
-            } => write!(f, "{field} limit exceeded: length {length}, limit {limit}"),
+            } => write!(
+                f,
+                "{field} limit exceeded: length {length}, limit {limit}"
+            ),
             AnchorError::CumulativeDataLimitExceeded { length, limit } => write!(
                 f,
                 "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}."
@@ -835,48 +838,20 @@ impl fmt::Display for AnchorError {
                 f,
                 "Only recovery phrases can be locked but key type is {key_type:?}"
             ),
-            AnchorError::MutationNotAllowed {
-                actual_principal,
-                authorized_principal,
-            } => write!(
+            AnchorError::MutationNotAllowed { actual_principal, authorized_principal } => write!(
                 f,
                 "Device is locked. Must be authenticated with this device to mutate: authorized principal {authorized_principal}, actual principal {actual_principal}"
             ),
-            AnchorError::MultipleRecoveryPhrases => write!(
-                f,
-                "There is already a recovery phrase and only one is allowed."
-            ),
+            AnchorError::MultipleRecoveryPhrases => write!(f, "There is already a recovery phrase and only one is allowed."),
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
-            AnchorError::NotFound { device_key } => {
-                write!(f, "Device with key {} not found.", hex::encode(device_key))
-            }
-            AnchorError::DuplicateDevice { device_key } => write!(
-                f,
-                "Device with key {} already exists on this anchor.",
-                hex::encode(device_key)
-            ),
-            AnchorError::ReservedMetadataKey { key } => {
-                write!(f, "Metadata key '{key}' is reserved and cannot be used.")
-            }
-            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(
-                f,
-                "Devices with key type seed_phrase must not have a credential id."
-            ),
-            AnchorError::OpenIdCredentialAlreadyRegistered => write!(
-                f,
-                "OpenID credential has already been registered on this or another anchor."
-            ),
+            AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
+            AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
+            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{key}' is reserved and cannot be used."),
+            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
+            AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
-            AnchorError::NameTooLong { limit } => {
-                write!(f, "Name is too long. Maximum length of name is {limit}.")
-            }
-            AnchorError::TooManyOpenIdCredentials {
-                limit,
-                num_credentials,
-            } => write!(
-                f,
-                "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."
-            ),
+            AnchorError::NameTooLong {limit} => write!(f, "Name is too long. Maximum length of name is {limit}."),
+            AnchorError::TooManyOpenIdCredentials { limit, num_credentials } => write!(f, "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."),
         }
     }
 }

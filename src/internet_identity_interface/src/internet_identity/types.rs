@@ -56,7 +56,7 @@ pub struct DeviceWithUsage {
     pub metadata: Option<HashMap<String, MetadataEntry>>,
 }
 
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum Purpose {
     #[serde(rename = "recovery")]
     Recovery,
@@ -74,7 +74,7 @@ pub enum RegisterResponse {
     BadChallenge,
 }
 
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum KeyType {
     #[serde(rename = "unknown")]
     Unknown,
@@ -88,7 +88,7 @@ pub enum KeyType {
     BrowserStorageKey,
 }
 
-#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Debug, CandidType, Deserialize)]
 pub enum DeviceProtection {
     #[serde(rename = "protected")]
     Protected,
