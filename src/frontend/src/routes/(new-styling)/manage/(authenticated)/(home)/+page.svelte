@@ -1,5 +1,5 @@
 <script lang="ts">
-  import IdentityInfoPanel from "$lib/components/views/IdentityInfoPanel.svelte";
+  import IdentityInfo from "./components/IdentityInfo.svelte";
   import type { PageProps } from "./$types";
   import { afterNavigate, invalidateAll, replaceState } from "$app/navigation";
   import { page } from "$app/state";
@@ -8,8 +8,11 @@
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import AccessMethodsPanel from "$lib/components/views/AccessMethodsPanel.svelte";
-  import { toAccessMethods } from "./access/utils";
+  import AccessMethods from "./components/AccessMethods.svelte";
+  import { toAccessMethods } from "../access/utils";
+  import { t } from "$lib/stores/locale.store";
+  import { Trans } from "$lib/components/locale";
+  import Panel from "./components/Panel.svelte";
 
   const { data }: PageProps = $props();
 
@@ -37,24 +40,24 @@
   });
 </script>
 
-<div>
-  <div class="mh-9 mb-3">
-    <h1 class="text-text-primary text-3xl font-medium">
-      Welcome, {name}!
-    </h1>
-  </div>
-  <h2 class="text-text-tertiary mb-12 text-base">
-    Manage your identity and access methods.
-  </h2>
+<header class="flex flex-col gap-3">
+  <h1 class="text-text-primary text-3xl font-medium">
+    {$t`Welcome, ${name}!`}
+  </h1>
+  <p class="text-text-tertiary text-base">
+    <Trans>View services linked to your identity and manage passkeys.</Trans>
+  </p>
+</header>
 
-  <div class="flex flex-col gap-6 lg:flex-row">
-    <div class="flex-1">
-      <IdentityInfoPanel {name} />
-    </div>
-    <div class="flex-1">
-      <AccessMethodsPanel {totalAccessMethods} />
-    </div>
-  </div>
+<div
+  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,24rem),1fr))] gap-6"
+>
+  <Panel>
+    <IdentityInfo {name} />
+  </Panel>
+  <Panel>
+    <AccessMethods {totalAccessMethods} />
+  </Panel>
 </div>
 
 {#if nonNullish(pendingRegistrationId)}

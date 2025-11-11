@@ -329,6 +329,9 @@ msgstr "Internet Identity ist ein Authentifizierungssystem für Anwendungen auf 
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 msgstr "Internet Identity ist so sicher wie die verwendeten Authentifizierungsmethoden – z. B. Google, Apple, Microsoft oder Passkeys. Das bedeutet, dass es auf modernster Sicherheitstechnologie basiert. Bei der Wahl von Passkeys wird der Zugriff durch die Entsperrmethode Ihres Geräts (Face ID oder Fingerabdruck) geschützt, wodurch es genauso einfach ist wie das Entsperren Ihres Telefons."
 
+msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
+msgstr "Internet Identity wird verwendet, um sich sicher anzumelden und sich mit Passkeys mit Apps zu verbinden."
+
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity ermöglicht den sicheren Zugriff auf Apps und Dienste, ohne Passwörter zu erstellen, persönliche Daten zu teilen oder Kontrolle abzugeben."
 
@@ -437,6 +440,9 @@ msgstr "Mein {application}-Konto"
 msgid "My account"
 msgstr "Mein Konto"
 
+msgid "My identity"
+msgstr "Meine Identität"
+
 msgid "n/a"
 msgstr "k. A."
 
@@ -454,6 +460,9 @@ msgstr ""
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten werden niemals mit Internet Identity oder anderen Websites oder Apps geteilt."
+
+msgid "Number of access methods"
+msgstr "Anzahl der Zugriffsmethoden"
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Geben Sie den Code von diesem Gerät nur ein, wenn Sie diesen Vorgang <0>selbst</0> gestartet haben."
@@ -556,6 +565,9 @@ msgstr "Nahtloser Zugriff"
 
 msgid "Secure recovery"
 msgstr "Sichere Wiederherstellung"
+
+msgid "See how many access methods are within your identity and manage your recovery phrase."
+msgstr "Sehen Sie, wie viele Zugriffsmethoden Ihre Identität hat, und verwalten Sie Ihre Wiederherstellungsphrase."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Wählen Sie <0>In Safari öffnen</0> oder <1>In Chrome öffnen</1>."
@@ -725,6 +737,9 @@ msgstr "Bestätigen Sie, dass Sie ein Mensch sind"
 msgid "Verifying..."
 msgstr "Überprüfung..."
 
+msgid "View services linked to your identity and manage passkeys."
+msgstr "Sehen Sie die mit Ihrer Identität verknüpften Dienste ein und verwalten Sie Passkeys."
+
 msgid "Waiting for your existing device"
 msgstr "Warten auf Ihr bestehendes Gerät"
 
@@ -736,6 +751,9 @@ msgstr "Wir haben diesen Aktivierungscode nicht erkannt."
 
 msgid "We have found your identity"
 msgstr "Wir haben Ihre Identität gefunden"
+
+msgid "Welcome, {name}!"
+msgstr "Willkommen, {name}!"
 
 msgid "What are passkeys?"
 msgstr "Was sind Passkeys?"
@@ -805,6 +823,9 @@ msgstr "Alles bereit. Ihr Passkey wurde registriert."
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Sie melden sich als <0>{name}</0> an."
+
+msgid "Your identity name is currently not editable. It is only ever visible to you."
+msgstr "Ihr Identitätsname ist derzeit nicht bearbeitbar. Er ist nur für Sie sichtbar."
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Ihre persönlichen Daten, wie Ihr Name oder Ihre E-Mail, werden niemals geteilt. Jede App erhält automatisch ein eindeutiges Pseudonym, um Tracking zu verhindern."

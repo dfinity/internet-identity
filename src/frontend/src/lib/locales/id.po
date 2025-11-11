@@ -329,6 +329,9 @@ msgstr "Internet Identity adalah sistem autentikasi untuk aplikasi yang berjalan
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 msgstr "Internet Identity seaman metode autentikasi yang digunakan — seperti Google, Apple, Microsoft, atau Passkey. Artinya, sistem ini dibangun dengan keamanan mutakhir. Saat Anda memilih Passkey, akses dilindungi oleh metode buka kunci perangkat Anda (Face ID atau sidik jari), sehingga semudah membuka kunci ponsel Anda."
 
+msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
+msgstr "Internet Identity digunakan untuk masuk dengan aman dan terhubung ke aplikasi dengan passkey."
+
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity memungkinkan Anda mengakses aplikasi dan layanan dengan aman, tanpa membuat kata sandi, membagikan data pribadi, atau menyerahkan kontrol."
 
@@ -437,6 +440,9 @@ msgstr "Akun {application} saya"
 msgid "My account"
 msgstr "Akun saya"
 
+msgid "My identity"
+msgstr "Identitas saya"
+
 msgid "n/a"
 msgstr "t/a"
 
@@ -454,6 +460,9 @@ msgstr ""
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau membuka passkey Anda. Data biometrik Anda tidak pernah dibagikan dengan Internet Identity atau situs web dan aplikasi lain yang Anda gunakan."
+
+msgid "Number of access methods"
+msgstr "Jumlah metode akses"
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
@@ -556,6 +565,9 @@ msgstr "Akses tanpa hambatan"
 
 msgid "Secure recovery"
 msgstr "Pemulihan aman"
+
+msgid "See how many access methods are within your identity and manage your recovery phrase."
+msgstr "Lihat berapa banyak metode akses yang ada dalam identitas Anda dan kelola frasa pemulihan Anda."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
@@ -725,6 +737,9 @@ msgstr "Verifikasi bahwa Anda manusia"
 msgid "Verifying..."
 msgstr "Memverifikasi..."
 
+msgid "View services linked to your identity and manage passkeys."
+msgstr "Lihat layanan yang tertaut ke identitas Anda dan kelola passkey."
+
 msgid "Waiting for your existing device"
 msgstr "Menunggu perangkat Anda yang ada"
 
@@ -736,6 +751,9 @@ msgstr "Kami tidak mengenali kode aktivasi tersebut."
 
 msgid "We have found your identity"
 msgstr "Kami telah menemukan identitas Anda"
+
+msgid "Welcome, {name}!"
+msgstr "Selamat datang, {name}!"
 
 msgid "What are passkeys?"
 msgstr "Apa itu passkey?"
@@ -805,6 +823,9 @@ msgstr "Semua siap. Passkey Anda telah terdaftar."
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Anda masuk sebagai <0>{name}</0>."
+
+msgid "Your identity name is currently not editable. It is only ever visible to you."
+msgstr "Nama identitas Anda saat ini tidak dapat diedit. Ini hanya terlihat oleh Anda."
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Data pribadi Anda, seperti nama atau email, tidak pernah dibagikan. Setiap aplikasi mendapatkan pseudonim unik untuk mencegah pelacakan secara otomatis."

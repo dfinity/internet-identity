@@ -160,7 +160,9 @@
     </Trans>
   </p>
 </header>
-<div class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-5">
+<div
+  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-5"
+>
   <button
     onclick={() => (isAddingAccessMethod = true)}
     class={[

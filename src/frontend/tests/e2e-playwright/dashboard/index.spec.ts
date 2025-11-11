@@ -23,9 +23,6 @@ test.describe("Dashboard Navigation", () => {
         name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: TEST_USER_NAME }),
-    ).toBeVisible();
 
     // Navigate to access methods
     const menuButton = page.getByRole("button", { name: "Open menu" });
