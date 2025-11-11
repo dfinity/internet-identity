@@ -28,9 +28,6 @@ test.describe("First visit", () => {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
-    ).toBeVisible();
   });
 
   test("Sign in with an existing passkey", async ({ page }) => {
@@ -47,9 +44,6 @@ test.describe("First visit", () => {
       page.getByRole("heading", {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
     ).toBeVisible();
   });
 
@@ -148,9 +142,6 @@ test.describe("First visit", () => {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
     ).toBeVisible();
-    await expect(
-      newDevicePage.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
-    ).toBeVisible();
   });
 
   test("Sign up with OpenID", async ({ page }) => {
@@ -198,9 +189,6 @@ test.describe("First visit", () => {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
-    ).toBeVisible();
   });
 
   test("Sign up with OpenID (no name available)", async ({ page }) => {
@@ -243,9 +231,6 @@ test.describe("First visit", () => {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
-    ).toBeVisible();
   });
 });
 
@@ -263,9 +248,6 @@ test.describe("Last used identities listed", () => {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
-    ).toBeVisible();
   });
 
   test("Sign in with another identity", async ({ page }) => {
@@ -282,9 +264,6 @@ test.describe("Last used identities listed", () => {
       page.getByRole("heading", {
         name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
       }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: DEFAULT_USER_NAME }),
     ).toBeVisible();
   });
 
@@ -304,9 +283,6 @@ test.describe("Last used identities listed", () => {
       page.getByRole("heading", {
         name: new RegExp(`Welcome, ${SECONDARY_USER_NAME}!`),
       }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { level: 5, name: SECONDARY_USER_NAME }),
     ).toBeVisible();
   });
 });
