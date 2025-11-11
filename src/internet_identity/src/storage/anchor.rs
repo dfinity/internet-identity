@@ -564,6 +564,10 @@ impl Device {
             .as_ref()
             .and_then(|origin| IIDomain::try_from(origin.as_str()).ok())
     }
+
+    pub fn is_recovery_phrase(&self) -> bool {
+        self.purpose == Purpose::Recovery && self.key_type == KeyType::SeedPhrase
+    }
 }
 
 fn check_mutation_allowed(device: &Device) -> Result<(), AnchorError> {

@@ -272,7 +272,8 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 
 #[query]
 fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
-    // TODO: Implement this function
+    // TODO: Implement this function after the `lookup_anchor_with_recovery_phrase_principal_memory`
+    // TODO: index is initialized with existing user data.
     None
 }
 

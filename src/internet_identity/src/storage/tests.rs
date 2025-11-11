@@ -805,3 +805,346 @@ mod storable_origin_sha256_tests {
         assert!(StorableOriginSha256::BOUND.is_fixed_size());
     }
 }
+
+#[cfg(test)]
+mod sync_anchor_with_recovery_phrase_principal_index_tests {
+    use super::*;
+    use crate::storage::anchor::Device;
+    use candid::Principal;
+    use internet_identity_interface::internet_identity::types::{KeyType, PublicKey};
+
+    fn pubkey(n: u8) -> PublicKey {
+        vec![n].into()
+    }
+
+    fn seed_phrase_device(pubkey: PublicKey) -> Device {
+        Device {
+            pubkey,
+            alias: "seed".to_string(),
+            credential_id: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            protection: DeviceProtection::Unprotected,
+            origin: None,
+            metadata: None,
+            last_usage_timestamp: None,
+        }
+    }
+
+    fn other_device(pubkey: PublicKey) -> Device {
+        Device {
+            pubkey,
+            alias: "other".to_string(),
+            credential_id: None,
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+            origin: None,
+            metadata: None,
+            last_usage_timestamp: None,
+        }
+    }
+
+    fn pre_populate_index<M: Memory + Clone>(
+        storage: &mut Storage<M>,
+        anchor_number: u64,
+        devices: &[Device],
+    ) {
+        for d in devices {
+            let principal = Principal::self_authenticating(&d.pubkey);
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .insert(principal, anchor_number);
+        }
+    }
+
+    #[test]
+    fn adds_new_seed_phrase_principals() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number = 1;
+        let prev = vec![];
+        let curr = vec![seed_phrase_device(pubkey(42)), other_device(pubkey(99))];
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
+
+        let principal = Principal::self_authenticating(pubkey(42));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal),
+            Some(anchor_number)
+        );
+        // Should not add non-seed phrase device
+        let principal_other = Principal::self_authenticating(pubkey(99));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_other),
+            None
+        );
+
+        // Bonus: What if the same recovery phrase is used again by another user?
+        let another_anchor_number = 2;
+        let prev = vec![];
+        let curr = vec![seed_phrase_device(pubkey(42))];
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(
+            another_anchor_number,
+            &prev,
+            &curr,
+        );
+
+        // Index should not change for this principal.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
+    fn removes_old_seed_phrase_principals() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number = 2;
+        let prev = vec![seed_phrase_device(pubkey(1)), seed_phrase_device(pubkey(2))];
+        let curr = vec![seed_phrase_device(pubkey(2))];
+
+        pre_populate_index(&mut storage, anchor_number, &prev);
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
+
+        let principal_removed = Principal::self_authenticating(pubkey(1));
+        let principal_kept = Principal::self_authenticating(pubkey(2));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_removed),
+            None
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_kept),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
+    fn no_change_if_same_devices() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number = 3;
+        let prev = vec![seed_phrase_device(pubkey(7))];
+        let curr = vec![seed_phrase_device(pubkey(7))];
+
+        pre_populate_index(&mut storage, anchor_number, &prev);
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
+
+        let principal = Principal::self_authenticating(pubkey(7));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
+    fn handles_empty_current_and_previous() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number = 4;
+        let prev = vec![];
+        let curr = vec![];
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
+
+        // Should remain empty
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .count(),
+            0
+        );
+    }
+
+    #[test]
+    fn adds_and_removes_seed_phrase_principals_in_single_call() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number = 5;
+        let prev = vec![
+            seed_phrase_device(pubkey(1)),
+            seed_phrase_device(pubkey(2)),
+            seed_phrase_device(pubkey(3)),
+        ];
+        let curr = vec![
+            seed_phrase_device(pubkey(2)),
+            seed_phrase_device(pubkey(4)),
+            seed_phrase_device(pubkey(5)),
+        ];
+
+        pre_populate_index(&mut storage, anchor_number, &prev);
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
+
+        // Devices 1 and 3 should be removed
+        let principal_1 = Principal::self_authenticating(pubkey(1));
+        let principal_3 = Principal::self_authenticating(pubkey(3));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_1),
+            None
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_3),
+            None
+        );
+
+        // Device 2 should remain
+        let principal_2 = Principal::self_authenticating(pubkey(2));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_2),
+            Some(anchor_number)
+        );
+
+        // Devices 4 and 5 should be added
+        let principal_4 = Principal::self_authenticating(pubkey(4));
+        let principal_5 = Principal::self_authenticating(pubkey(5));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_4),
+            Some(anchor_number)
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_5),
+            Some(anchor_number)
+        );
+    }
+
+    #[test]
+    fn removes_seed_phrase_principals_only_for_specified_anchor() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+        let anchor_number_1 = 10;
+        let anchor_number_2 = 20;
+
+        // Device present for both anchors
+        let device_shared = seed_phrase_device(pubkey(42));
+        let device_unique_1 = seed_phrase_device(pubkey(1));
+        let device_unique_2 = seed_phrase_device(pubkey(2));
+
+        // Pre-populate index for both anchors
+        pre_populate_index(
+            &mut storage,
+            anchor_number_1,
+            &[device_shared.clone(), device_unique_1.clone()],
+        );
+        pre_populate_index(
+            &mut storage,
+            anchor_number_2,
+            &[device_shared.clone(), device_unique_2.clone()],
+        );
+
+        // Remove device_shared and device_unique_1 from anchor_number_1
+        let prev = vec![device_shared.clone(), device_unique_1.clone()];
+        let curr = vec![]; // all removed for anchor_number_1
+
+        storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number_1, &prev, &curr);
+
+        let principal_shared = Principal::self_authenticating(&device_shared.pubkey);
+        let principal_unique_1 = Principal::self_authenticating(&device_unique_1.pubkey);
+        let principal_unique_2 = Principal::self_authenticating(&device_unique_2.pubkey);
+
+        // Should be removed for anchor_number_1
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_shared),
+            Some(anchor_number_2)
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_unique_1),
+            None
+        );
+        // Should remain for anchor_number_2
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_unique_2),
+            Some(anchor_number_2)
+        );
+    }
+
+    #[test]
+    fn write_moves_recovery_phrase_principal_between_anchors() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+
+        let d1 = other_device(pubkey(1));
+        let d2 = seed_phrase_device(pubkey(2)); // recovery device
+        let d3 = other_device(pubkey(3));
+
+        let mut anchor_a = storage.allocate_anchor(111).unwrap();
+        anchor_a.add_device(d1.clone()).unwrap();
+        anchor_a.add_device(d2.clone()).unwrap();
+
+        // Code under test (I)
+        storage.create(anchor_a.clone()).unwrap();
+
+        let mut anchor_b = storage.allocate_anchor(222).unwrap();
+        anchor_b.add_device(d3.clone()).unwrap();
+
+        // Code under test (II)
+        storage.create(anchor_b.clone()).unwrap();
+
+        let principal_d2 = Principal::self_authenticating(&d2.pubkey);
+
+        // d2 should be indexed for anchor_a
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![(principal_d2, anchor_a.anchor_number())]
+        );
+
+        // Remove d2 from anchor_a
+        anchor_a.remove_device(&d2.pubkey).unwrap();
+
+        // Code under test (III)
+        storage.update(anchor_a).unwrap();
+
+        // No recovery devices are left in the index.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![]
+        );
+
+        // Add d2 to anchor_b
+        anchor_b.add_device(d2).unwrap();
+
+        // Code under test (IV)
+        storage.update(anchor_b.clone()).unwrap();
+
+        // d2 should now be indexed for anchor_b only
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![(principal_d2, anchor_b.anchor_number())]
+        );
+    }
+}
