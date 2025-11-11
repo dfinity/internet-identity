@@ -717,12 +717,12 @@ impl<M: Memory + Clone> Storage<M> {
         };
 
         let previous_devices = previous_devices
-            .into_iter()
+            .iter()
             .filter_map(retain_recovery_phrase_device_principals)
             .collect::<BTreeSet<_>>();
 
         let current_devices = current_devices
-            .into_iter()
+            .iter()
             .filter_map(retain_recovery_phrase_device_principals)
             .collect::<BTreeSet<_>>();
 
@@ -730,11 +730,30 @@ impl<M: Memory + Clone> Storage<M> {
         let devices_to_be_added = current_devices.difference(&previous_devices);
 
         for key in devices_to_be_removed {
+            let Some(existing_anchor_number) = self
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(key)
+            else {
+                // This principal is not indexed, nothing to do.
+                continue;
+            };
+            if existing_anchor_number != anchor_number {
+                // Ensure that a user can remove only their own recovery phrase device from the index.
+                continue;
+            }
             self.lookup_anchor_with_recovery_phrase_principal_memory
-                .remove(&key);
+                .remove(key);
         }
 
         for key in devices_to_be_added {
+            if self
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .contains_key(key)
+            {
+                // This principal is already occupied; do not overwrite it.
+                continue;
+            };
+
             self.lookup_anchor_with_recovery_phrase_principal_memory
                 .insert(*key, anchor_number);
         }
