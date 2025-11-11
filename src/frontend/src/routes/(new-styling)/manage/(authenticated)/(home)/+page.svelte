@@ -1,5 +1,5 @@
 <script lang="ts">
-  import IdentityInfoPanel from "$lib/components/views/IdentityInfoPanel.svelte";
+  import IdentityInfo from "./components/IdentityInfo.svelte";
   import type { PageProps } from "./$types";
   import { afterNavigate, invalidateAll, replaceState } from "$app/navigation";
   import { page } from "$app/state";
@@ -8,10 +8,11 @@
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { handleError } from "$lib/components/utils/error";
   import { toaster } from "$lib/components/utils/toaster";
-  import AccessMethodsPanel from "$lib/components/views/AccessMethodsPanel.svelte";
-  import { toAccessMethods } from "./access/utils";
+  import AccessMethods from "./components/AccessMethods.svelte";
+  import { toAccessMethods } from "../access/utils";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import Panel from "./components/Panel.svelte";
 
   const { data }: PageProps = $props();
 
@@ -44,15 +45,23 @@
     {$t`Welcome, ${name}!`}
   </h1>
   <p class="text-text-tertiary text-base">
-    <Trans>Manage your identity and access methods.</Trans>
+    <Trans>View services linked to your identity and manage passkeys.</Trans>
   </p>
 </header>
 
 <div
-  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(24rem,1fr))] gap-5 max-sm:grid-cols-1"
+  class={[
+    "mt-10",
+    "grid grid-cols-[repeat(auto-fill,minmax(24rem,1fr))] gap-6",
+    "max-sm:grid-cols-1",
+  ]}
 >
-  <IdentityInfoPanel {name} />
-  <AccessMethodsPanel {totalAccessMethods} />
+  <Panel class="p-4">
+    <IdentityInfo {name} />
+  </Panel>
+  <Panel class="p-4">
+    <AccessMethods {totalAccessMethods} />
+  </Panel>
 </div>
 
 {#if nonNullish(pendingRegistrationId)}
