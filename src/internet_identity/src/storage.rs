@@ -705,8 +705,8 @@ impl<M: Memory + Clone> Storage<M> {
     fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
-        previous_devices: &Vec<Device>,
-        current_devices: &Vec<Device>,
+        previous_devices: &[Device],
+        current_devices: &[Device],
     ) {
         let retain_recovery_phrase_device_principals = |device: &Device| {
             let KeyType::SeedPhrase = device.key_type else {
