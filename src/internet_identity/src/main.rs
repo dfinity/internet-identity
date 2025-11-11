@@ -271,6 +271,12 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 }
 
 #[query]
+fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
+    // TODO: Implement this function
+    None
+}
+
+#[query]
 fn lookup_device_key(credential_id: CredentialId) -> Option<DeviceKeyWithAnchor> {
     anchor_management::lookup_device_key_with_credential_id(&credential_id)
 }

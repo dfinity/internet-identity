@@ -1014,4 +1014,7 @@ service : (opt InternetIdentityInit) -> {
         origin : FrontendHostname,
         account_number : opt AccountNumber
     ) -> (variant { Ok : AccountInfo; Err: SetDefaultAccountError });
+
+    // Looks up identity number when called with a recovery phrase
+    lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber) query;
 };
