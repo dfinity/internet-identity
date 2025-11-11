@@ -822,7 +822,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
             pubkey,
             alias: "seed".to_string(),
             credential_id: None,
-            purpose: Purpose::Authentication,
+            purpose: Purpose::Recovery,
             key_type: KeyType::SeedPhrase,
             protection: DeviceProtection::Unprotected,
             origin: None,
@@ -867,7 +867,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
 
         storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
 
-        let principal = Principal::self_authenticating(&pubkey(42));
+        let principal = Principal::self_authenticating(pubkey(42));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
@@ -875,7 +875,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
             Some(anchor_number)
         );
         // Should not add non-seed phrase device
-        let principal_other = Principal::self_authenticating(&pubkey(99));
+        let principal_other = Principal::self_authenticating(pubkey(99));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
@@ -914,8 +914,8 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
 
         storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
 
-        let principal_removed = Principal::self_authenticating(&pubkey(1));
-        let principal_kept = Principal::self_authenticating(&pubkey(2));
+        let principal_removed = Principal::self_authenticating(pubkey(1));
+        let principal_kept = Principal::self_authenticating(pubkey(2));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
@@ -941,7 +941,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
 
         storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
 
-        let principal = Principal::self_authenticating(&pubkey(7));
+        let principal = Principal::self_authenticating(pubkey(7));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
@@ -989,8 +989,8 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
 
         // Devices 1 and 3 should be removed
-        let principal_1 = Principal::self_authenticating(&pubkey(1));
-        let principal_3 = Principal::self_authenticating(&pubkey(3));
+        let principal_1 = Principal::self_authenticating(pubkey(1));
+        let principal_3 = Principal::self_authenticating(pubkey(3));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
@@ -1005,7 +1005,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         );
 
         // Device 2 should remain
-        let principal_2 = Principal::self_authenticating(&pubkey(2));
+        let principal_2 = Principal::self_authenticating(pubkey(2));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
@@ -1014,8 +1014,8 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         );
 
         // Devices 4 and 5 should be added
-        let principal_4 = Principal::self_authenticating(&pubkey(4));
-        let principal_5 = Principal::self_authenticating(&pubkey(5));
+        let principal_4 = Principal::self_authenticating(pubkey(4));
+        let principal_5 = Principal::self_authenticating(pubkey(5));
         assert_eq!(
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
