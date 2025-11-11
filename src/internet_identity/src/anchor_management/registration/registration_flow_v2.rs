@@ -215,16 +215,6 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
             );
 
-            // Sync recovery phrase principal index (this is currently a no-op, as recovery phrases
-            // are not used as the initial device during registration).
-            state::storage_borrow_mut(|storage| {
-                storage.sync_anchor_with_recovery_phrase_principal_index(
-                    &device,
-                    identity.anchor_number(),
-                    false,
-                );
-            });
-
             Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device),
             }

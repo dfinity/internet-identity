@@ -708,7 +708,7 @@ impl<M: Memory + Clone> Storage<M> {
         previous_devices: &Vec<Device>,
         current_devices: &Vec<Device>,
     ) {
-        let retain_recovery_phrase_device_principals = |device: Device| {
+        let retain_recovery_phrase_device_principals = |device: &Device| {
             let KeyType::SeedPhrase = device.key_type else {
                 // lookup_anchor_with_recovery_phrase_principal_memory is not affected by this device.
                 return None;
