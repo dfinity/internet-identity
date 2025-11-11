@@ -3,9 +3,12 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { recoverWithPhrase } from "$lib/flows/recoverWithPhraseFlow.svelte";
+  import {
+    IdentityNotFoundError,
+    recoverWithPhrase,
+  } from "$lib/flows/recoverWithPhraseFlow.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { formatDate, t } from "$lib/stores/locale.store";
+  import { t } from "$lib/stores/locale.store";
   import { nanosToMillis } from "$lib/utils/time";
   import { nonNullish } from "@dfinity/utils";
   import { goto } from "$app/navigation";
@@ -15,6 +18,7 @@
   import { wordlists } from "bip39";
   import SuccessfulRecovery from "./components/SuccessfulRecovery.svelte";
   import RecoveryError from "./components/RecoveryError.svelte";
+  import IdentityNotFound from "./components/IdentityNotFound.svelte";
   import { toaster } from "$lib/components/utils/toaster";
 
   type RecoveryWord = {
@@ -55,6 +59,7 @@
 
   let continueInProgress = $state(false);
   let recoveryError = $state(false); // Recovery phrase fails checksum validation
+  let identityNotFoundError = $state(false);
   // When this is `true`, the auto-submit is disabled, and the user has to manually submit the recovery phrase.
   let manualSubmitRequired = $state(false);
 
@@ -136,6 +141,7 @@
     // Set the flag to prevent multiple submissions
     recoveryInProgress = true;
     recoveryError = false;
+    identityNotFoundError = false;
     recoveredIdentityData = undefined;
 
     const phraseWords = words.map((word) => word.value.trim());
@@ -144,7 +150,11 @@
       recoveredIdentityData = result;
     } catch (error) {
       recoveredIdentityData = undefined;
-      recoveryError = true;
+      if (error instanceof IdentityNotFoundError) {
+        identityNotFoundError = true;
+      } else {
+        recoveryError = true;
+      }
     } finally {
       clearTimeout(submitTimeoutId);
       submitTimeoutId = undefined;
@@ -159,6 +169,7 @@
 
   const handleRetry = () => {
     recoveryError = false;
+    identityNotFoundError = false;
     manualSubmitRequired = true;
     showAll = true;
     clearTimeout(submitTimeoutId);
@@ -247,6 +258,7 @@
 
     showAll = false;
     recoveryError = false;
+    identityNotFoundError = false;
 
     words.forEach((word) => {
       word.value = "";
@@ -419,5 +431,11 @@
 {#if recoveryError}
   <Dialog>
     <RecoveryError onRetry={handleRetry} onCancel={handleCancel} />
+  </Dialog>
+{/if}
+
+{#if identityNotFoundError}
+  <Dialog>
+    <IdentityNotFound onRetry={handleRetry} onCancel={handleCancel} />
   </Dialog>
 {/if}

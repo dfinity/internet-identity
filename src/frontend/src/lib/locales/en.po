@@ -329,6 +329,9 @@ msgstr "Internet Identity is an authentication system for applications running o
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 msgstr "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
 
+msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
+msgstr "Internet Identity is used to sign in securely and connect to apps with passkeys."
+
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 
@@ -364,6 +367,9 @@ msgstr "It seems like an invalid authentication request was received."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
+
+msgid "It seems like you have not placed the correct words in order. You will have to try again to gain access to your identity."
+msgstr "It seems like you have not placed the correct words in order. You will have to try again to gain access to your identity."
 
 msgid "It won't be removed from your device or password manager."
 msgstr "It won't be removed from your device or password manager."
@@ -434,6 +440,9 @@ msgstr "My {application} account"
 msgid "My account"
 msgstr "My account"
 
+msgid "My identity"
+msgstr "My identity"
+
 msgid "n/a"
 msgstr "n/a"
 
@@ -446,8 +455,14 @@ msgstr "Name your identity"
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 
+msgid "No identity found"
+msgstr "No identity found"
+
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
+
+msgid "Number of access methods"
+msgstr "Number of access methods"
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Only enter the code from that device if you initiated this process <0>yourself</0>."
@@ -527,6 +542,9 @@ msgstr "Rename passkey"
 msgid "Rename this account"
 msgstr "Rename this account"
 
+msgid "Retry"
+msgstr "Retry"
+
 msgid "Return to app"
 msgstr "Return to app"
 
@@ -547,6 +565,9 @@ msgstr "Seamless Access"
 
 msgid "Secure recovery"
 msgstr "Secure recovery"
+
+msgid "See how many access methods are within your identity and manage your recovery phrase."
+msgstr "See how many access methods are within your identity and manage your recovery phrase."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
@@ -581,6 +602,9 @@ msgstr "Signing in securely"
 msgid "Simplify your sign-in"
 msgstr "Simplify your sign-in"
 
+msgid "Something is wrong!"
+msgstr "Something is wrong!"
+
 msgid "Something went wrong"
 msgstr "Something went wrong"
 
@@ -598,6 +622,9 @@ msgstr "Still have an identity number?"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Stored securely on your device, in your password manager, or on a security key."
+
+msgid "Submit"
+msgstr "Submit"
 
 msgid "Successfully restored access to your identity"
 msgstr "Successfully restored access to your identity"
@@ -710,6 +737,9 @@ msgstr "Verify you are human"
 msgid "Verifying..."
 msgstr "Verifying..."
 
+msgid "View services linked to your identity and manage passkeys."
+msgstr "View services linked to your identity and manage passkeys."
+
 msgid "Waiting for your existing device"
 msgstr "Waiting for your existing device"
 
@@ -721,6 +751,9 @@ msgstr "We didn't recognize that activation code."
 
 msgid "We have found your identity"
 msgstr "We have found your identity"
+
+msgid "Welcome, {name}!"
+msgstr "Welcome, {name}!"
 
 msgid "What are passkeys?"
 msgstr "What are passkeys?"
@@ -791,5 +824,11 @@ msgstr "You're all set. Your passkey has been registered."
 msgid "You're signing in as <0>{name}</0>."
 msgstr "You're signing in as <0>{name}</0>."
 
+msgid "Your identity name is currently not editable. It is only ever visible to you."
+msgstr "Your identity name is currently not editable. It is only ever visible to you."
+
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
+
+msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
+msgstr "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."

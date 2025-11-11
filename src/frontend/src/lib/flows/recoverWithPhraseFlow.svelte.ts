@@ -48,6 +48,12 @@ export class InvalidMnemonicError extends Error {
   }
 }
 
+export class IdentityNotFoundError extends Error {
+  constructor() {
+    super("Identity not found");
+  }
+}
+
 export const recoverWithPhrase = async (
   words: string[],
 ): Promise<{
@@ -64,13 +70,14 @@ export const recoverWithPhrase = async (
     IC_DERIVATION_PATH,
   );
   // TODO: Use lookup endpoint of recovery phrase to user number.
+  // TODO: Raise IdentityNotFoundError based on the lookup endpoint response.
   const userNumber = BigInt(window.prompt("Identity number")!);
   const devices = await anonymousActor.get_anchor_credentials(userNumber);
   const isCorrectPhrase = devices.recovery_phrases.some((pubkey) =>
     bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
   );
   if (!isCorrectPhrase) {
-    throw new Error("Invalid phrase");
+    throw new IdentityNotFoundError();
   }
   const delegationIdentity = await authenticateWithRecoveryPhrase(identity);
   const agent = HttpAgent.createSync({
