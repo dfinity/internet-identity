@@ -117,6 +117,11 @@ pub fn register(
         });
     }
 
+    // Sync recovery phrase principal index
+    state::storage_borrow_mut(|storage| {
+        storage.sync_anchor_with_recovery_phrase_principal_index(&device, anchor_number, false);
+    });
+
     let operation = Operation::RegisterAnchor {
         device: DeviceDataWithoutAlias::from(device),
     };
@@ -133,10 +138,14 @@ fn verify_caller_is_device_or_temp_key(temp_key: &Option<Principal>, device_prin
     if &caller != device_principal {
         if let Some(temp_key) = temp_key {
             if &caller != temp_key {
-                trap(&format!("caller {caller} could not be authenticated against device pubkey {device_principal} or temporary key {temp_key}"));
+                trap(&format!(
+                    "caller {caller} could not be authenticated against device pubkey {device_principal} or temporary key {temp_key}"
+                ));
             }
         } else {
-            trap(&format!("caller {caller} could not be authenticated against device pubkey {device_principal} and no temporary key was sent"));
+            trap(&format!(
+                "caller {caller} could not be authenticated against device pubkey {device_principal} and no temporary key was sent"
+            ));
         }
     }
 }

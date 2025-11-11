@@ -86,6 +86,14 @@ pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to add device: {err}")));
 
+    state::storage_borrow_mut(|storage| {
+        storage.sync_anchor_with_recovery_phrase_principal_index(
+            &new_device,
+            anchor.anchor_number(),
+            false,
+        );
+    });
+
     Operation::AddDevice {
         device: DeviceDataWithoutAlias::from(new_device),
     }
@@ -112,6 +120,10 @@ pub fn update_device(
         .modify_device(&device_key, new_device)
         .unwrap_or_else(|err| trap(&format!("failed to modify device: {err}")));
 
+    // No need to sync recovery phrase principal index (by calling
+    // `sync_anchor_with_recovery_phrase_principal_index`), as the device key (i.e. public key)
+    // cannot be changed.
+
     Operation::UpdateDevice {
         device: device_key,
         new_values: diff,
@@ -128,15 +140,32 @@ pub fn replace_device(
     old_device: DeviceKey,
     new_device: DeviceData,
 ) -> Operation {
-    anchor
+    let old_device = anchor
         .remove_device(&old_device)
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
+
     let new_device = Device::from(new_device);
     anchor
         .add_device(new_device.clone())
         .unwrap_or_else(|err| trap(&format!("failed to replace device: {err}")));
 
-    state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &old_device));
+    state::with_temp_keys_mut(|temp_keys| {
+        temp_keys.remove_temp_key(anchor_number, &old_device.pubkey)
+    });
+
+    state::storage_borrow_mut(|storage| {
+        storage.sync_anchor_with_recovery_phrase_principal_index(
+            &old_device,
+            anchor.anchor_number(),
+            true,
+        );
+        storage.sync_anchor_with_recovery_phrase_principal_index(
+            &new_device,
+            anchor.anchor_number(),
+            false,
+        );
+    });
+
     Operation::ReplaceDevice {
         old_device,
         new_device: DeviceDataWithoutAlias::from(new_device),
@@ -150,11 +179,20 @@ pub fn remove_device(
     anchor: &mut Anchor,
     device_key: DeviceKey,
 ) -> Operation {
-    anchor
+    let old_device = anchor
         .remove_device(&device_key)
         .unwrap_or_else(|err| trap(&format!("failed to remove device: {err}")));
 
     state::with_temp_keys_mut(|temp_keys| temp_keys.remove_temp_key(anchor_number, &device_key));
+
+    state::storage_borrow_mut(|storage| {
+        storage.sync_anchor_with_recovery_phrase_principal_index(
+            &old_device,
+            anchor.anchor_number(),
+            true,
+        );
+    });
+
     Operation::RemoveDevice { device: device_key }
 }
 

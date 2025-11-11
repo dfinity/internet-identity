@@ -83,7 +83,7 @@ use account::{
     Account, AccountsCounter, CreateAccountParams, ReadAccountParams, UpdateAccountParams,
     UpdateExistingAccountParams,
 };
-use candid::{CandidType, Deserialize};
+use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
 use std::borrow::Cow;
@@ -175,6 +175,7 @@ const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX: u8 = 17u8;
 const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
+const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -205,6 +206,9 @@ const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID: MemoryId =
 
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX);
+
+const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -310,6 +314,10 @@ pub struct Storage<M: Memory> {
 
     pub(crate) lookup_application_with_origin_memory:
         StableBTreeMap<StorableOriginSha256, StorableApplicationNumber, ManagedMemory<M>>,
+
+    lookup_anchor_with_recovery_phrase_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_anchor_with_recovery_phrase_principal_memory:
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -389,6 +397,9 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID);
         let lookup_application_with_origin_memory =
             memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID);
+        let lookup_anchor_with_recovery_phrase_principal_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
+
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
                 .expect("failed to initialize registration reference rate min heap"),
@@ -475,6 +486,35 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_application_with_origin_memory: StableBTreeMap::init(
                 lookup_application_with_origin_memory,
             ),
+
+            lookup_anchor_with_recovery_phrase_principal_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_recovery_phrase_principal_memory.clone(),
+            ),
+            lookup_anchor_with_recovery_phrase_principal_memory: StableBTreeMap::init(
+                lookup_anchor_with_recovery_phrase_principal_memory,
+            ),
+        }
+    }
+
+    pub fn sync_anchor_with_recovery_phrase_principal_index(
+        &mut self,
+        device: &Device,
+        anchor_number: AnchorNumber,
+        is_removal: bool,
+    ) {
+        let KeyType::SeedPhrase = device.key_type else {
+            // lookup_anchor_with_recovery_phrase_principal_memory is not affected by this device.
+            return;
+        };
+
+        let key = Principal::self_authenticating(&device.pubkey);
+
+        if is_removal {
+            self.lookup_anchor_with_recovery_phrase_principal_memory
+                .remove(&key);
+        } else {
+            self.lookup_anchor_with_recovery_phrase_principal_memory
+                .insert(key, anchor_number);
         }
     }
 
@@ -1529,16 +1569,18 @@ impl<M: Memory + Clone> Storage<M> {
             if self.header.id_range_lo != lo {
                 trap(&format!(
                     "set_anchor_number_range: specified range [{lo}, {hi}) does not start from the same number ({}) \
-                     as the existing range thus would make existing anchors invalid"
-                    , { self.header.id_range_lo }));
+                     as the existing range thus would make existing anchors invalid",
+                    { self.header.id_range_lo }
+                ));
             }
             // Check that all _existing_ anchors fit into the new range. I.e. making the range smaller
             // is ok as long as the range reduction only affects _unused_ anchor number.
             if (hi - lo) < self.header.num_anchors as u64 {
                 trap(&format!(
                     "set_anchor_number_range: specified range [{lo}, {hi}) does not accommodate all {} anchors \
-                     thus would make existing anchors invalid"
-                    , { self.header.num_anchors }));
+                     thus would make existing anchors invalid",
+                    { self.header.num_anchors }
+                ));
             }
         }
 

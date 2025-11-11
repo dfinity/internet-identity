@@ -1,8 +1,8 @@
+use crate::anchor_management::registration::Base64;
 use crate::anchor_management::registration::captcha::{
     check_captcha_solution, create_captcha, make_rng,
 };
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
-use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
     activity_bookkeeping, add_openid_credential, post_operation_bookkeeping, set_name,
 };
@@ -214,6 +214,16 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
                 &mut identity,
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
             );
+
+            // Sync recovery phrase principal index (this is currently a no-op, as recovery phrases
+            // are not used as the initial device during registration).
+            state::storage_borrow_mut(|storage| {
+                storage.sync_anchor_with_recovery_phrase_principal_index(
+                    &device,
+                    identity.anchor_number(),
+                    false,
+                );
+            });
 
             Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device),

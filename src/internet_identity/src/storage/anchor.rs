@@ -237,17 +237,19 @@ impl Anchor {
     /// **Note:** Does not check invariants, based on the assumption that no invariant can be
     /// violated by removing a device. See also the documentation on
     /// [check_invariants](Anchor::check_invariants).
-    pub fn remove_device(&mut self, device_key: &DeviceKey) -> Result<(), AnchorError> {
+    ///
+    /// Returns the removed device on success.
+    pub fn remove_device(&mut self, device_key: &DeviceKey) -> Result<Device, AnchorError> {
         let index = self.device_index(device_key)?;
         check_mutation_allowed(&self.devices[index])?;
 
-        self.devices.remove(index);
+        let device = self.devices.remove(index);
 
         // We do _not_ check invariants here, because there might be anchors that do not fulfill
         // the invariants still stored in stable memory (e.g. anchors with multiple recovery phrases).
         // By allowing the removal of devices on such anchors, they can be made conforming to the invariants
         // by removing devices.
-        Ok(())
+        Ok(device)
     }
 
     pub fn modify_device(
@@ -826,10 +828,7 @@ impl fmt::Display for AnchorError {
                 field,
                 length,
                 limit,
-            } => write!(
-                f,
-                "{field} limit exceeded: length {length}, limit {limit}"
-            ),
+            } => write!(f, "{field} limit exceeded: length {length}, limit {limit}"),
             AnchorError::CumulativeDataLimitExceeded { length, limit } => write!(
                 f,
                 "Cumulative size of variable sized fields exceeds limit: length {length}, limit {limit}."
@@ -838,20 +837,48 @@ impl fmt::Display for AnchorError {
                 f,
                 "Only recovery phrases can be locked but key type is {key_type:?}"
             ),
-            AnchorError::MutationNotAllowed { actual_principal, authorized_principal } => write!(
+            AnchorError::MutationNotAllowed {
+                actual_principal,
+                authorized_principal,
+            } => write!(
                 f,
                 "Device is locked. Must be authenticated with this device to mutate: authorized principal {authorized_principal}, actual principal {actual_principal}"
             ),
-            AnchorError::MultipleRecoveryPhrases => write!(f, "There is already a recovery phrase and only one is allowed."),
+            AnchorError::MultipleRecoveryPhrases => write!(
+                f,
+                "There is already a recovery phrase and only one is allowed."
+            ),
             AnchorError::CannotModifyDeviceKey => write!(f, "Device key cannot be updated."),
-            AnchorError::NotFound { device_key } => write!(f, "Device with key {} not found.", hex::encode(device_key)),
-            AnchorError::DuplicateDevice { device_key } => write!(f, "Device with key {} already exists on this anchor.", hex::encode(device_key)),
-            AnchorError::ReservedMetadataKey { key } => write!(f, "Metadata key '{key}' is reserved and cannot be used."),
-            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
-            AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
+            AnchorError::NotFound { device_key } => {
+                write!(f, "Device with key {} not found.", hex::encode(device_key))
+            }
+            AnchorError::DuplicateDevice { device_key } => write!(
+                f,
+                "Device with key {} already exists on this anchor.",
+                hex::encode(device_key)
+            ),
+            AnchorError::ReservedMetadataKey { key } => {
+                write!(f, "Metadata key '{key}' is reserved and cannot be used.")
+            }
+            AnchorError::RecoveryPhraseCredentialIdMismatch => write!(
+                f,
+                "Devices with key type seed_phrase must not have a credential id."
+            ),
+            AnchorError::OpenIdCredentialAlreadyRegistered => write!(
+                f,
+                "OpenID credential has already been registered on this or another anchor."
+            ),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
-            AnchorError::NameTooLong {limit} => write!(f, "Name is too long. Maximum length of name is {limit}."),
-            AnchorError::TooManyOpenIdCredentials { limit, num_credentials } => write!(f, "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."),
+            AnchorError::NameTooLong { limit } => {
+                write!(f, "Name is too long. Maximum length of name is {limit}.")
+            }
+            AnchorError::TooManyOpenIdCredentials {
+                limit,
+                num_credentials,
+            } => write!(
+                f,
+                "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."
+            ),
         }
     }
 }
