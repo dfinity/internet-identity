@@ -50,11 +50,7 @@
 </header>
 
 <div
-  class={[
-    "mt-10",
-    "grid grid-cols-[repeat(auto-fill,minmax(24rem,1fr))] gap-6",
-    "max-sm:grid-cols-1",
-  ]}
+  class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,24rem),1fr))] gap-6"
 >
   <Panel class="p-4">
     <IdentityInfo {name} />
