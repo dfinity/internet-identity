@@ -1084,4 +1084,67 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
             Some(anchor_number_2)
         );
     }
+
+    #[test]
+    fn write_moves_recovery_phrase_principal_between_anchors() {
+        let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
+
+        let d1 = other_device(pubkey(1));
+        let d2 = seed_phrase_device(pubkey(2)); // recovery device
+        let d3 = other_device(pubkey(3));
+
+        let mut anchor_a = storage.allocate_anchor(111).unwrap();
+        anchor_a.add_device(d1.clone()).unwrap();
+        anchor_a.add_device(d2.clone()).unwrap();
+
+        // Code under test (I)
+        storage.create(anchor_a.clone()).unwrap();
+
+        let mut anchor_b = storage.allocate_anchor(222).unwrap();
+        anchor_b.add_device(d3.clone()).unwrap();
+
+        // Code under test (II)
+        storage.create(anchor_b.clone()).unwrap();
+
+        let principal_d2 = Principal::self_authenticating(&d2.pubkey);
+
+        // d2 should be indexed for anchor_a
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![(principal_d2, anchor_a.anchor_number())]
+        );
+
+        // Remove d2 from anchor_a
+        anchor_a.remove_device(&d2.pubkey).unwrap();
+
+        // Code under test (III)
+        storage.update(anchor_a).unwrap();
+
+        // No recovery devices are left in the index.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![]
+        );
+
+        // Add d2 to anchor_b
+        anchor_b.add_device(d2).unwrap();
+
+        // Code under test (IV)
+        storage.update(anchor_b.clone()).unwrap();
+
+        // d2 should now be indexed for anchor_b only
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .iter()
+                .collect::<Vec<_>>(),
+            vec![(principal_d2, anchor_b.anchor_number())]
+        );
+    }
 }
