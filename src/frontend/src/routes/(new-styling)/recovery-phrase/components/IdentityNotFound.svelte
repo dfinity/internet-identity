@@ -3,6 +3,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { UserXIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import Trans from "$lib/components/locale/Trans.svelte";
 
   type Props = {
     onRetry: () => void;
@@ -22,7 +23,10 @@
         {$t`No identity found`}
       </h2>
       <p class="text-text-tertiary text-sm">
-        {$t`Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product.`}
+        <Trans>
+          Your recovery phrase is valid but not for internet identity. You may
+          have used the wrong seed phrase for the wrong product.
+        </Trans>
       </p>
     </div>
   </div>

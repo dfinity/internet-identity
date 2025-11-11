@@ -365,6 +365,9 @@ msgstr "Es scheint, als wäre eine ungültige Authentifizierungsanfrage eingegan
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
 
+msgid "It seems like you have not placed the correct words in order. You will have to try again to gain access to your identity."
+msgstr ""
+
 msgid "It won't be removed from your device or password manager."
 msgstr "Es wird nicht von Ihrem Gerät oder Passwort-Manager entfernt."
 
@@ -445,6 +448,9 @@ msgstr "Benennen Sie Ihre Identität"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Es werden keine Daten an Google, Microsoft oder Apple darüber weitergegeben, bei welchen Anwendungen Sie sich mit Internet Identity anmelden."
+
+msgid "No identity found"
+msgstr ""
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten werden niemals mit Internet Identity oder anderen Websites oder Apps geteilt."
@@ -527,6 +533,9 @@ msgstr "Passkey umbenennen"
 msgid "Rename this account"
 msgstr "Dieses Konto umbenennen"
 
+msgid "Retry"
+msgstr ""
+
 msgid "Return to app"
 msgstr "Zurück zur App"
 
@@ -581,6 +590,9 @@ msgstr "Sichere Anmeldung"
 msgid "Simplify your sign-in"
 msgstr "Vereinfachen Sie Ihre Anmeldung"
 
+msgid "Something is wrong!"
+msgstr ""
+
 msgid "Something went wrong"
 msgstr "Etwas ist schiefgelaufen"
 
@@ -598,6 +610,9 @@ msgstr "Haben Sie noch eine Identitätsnummer?"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Sicher auf Ihrem Gerät, in Ihrem Passwort-Manager oder auf einem Sicherheitsschlüssel gespeichert."
+
+msgid "Submit"
+msgstr ""
 
 msgid "Successfully restored access to your identity"
 msgstr "Zugriff auf Ihre Identität erfolgreich wiederhergestellt"
@@ -793,3 +808,6 @@ msgstr "Sie melden sich als <0>{name}</0> an."
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Ihre persönlichen Daten, wie Ihr Name oder Ihre E-Mail, werden niemals geteilt. Jede App erhält automatisch ein eindeutiges Pseudonym, um Tracking zu verhindern."
+
+msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
+msgstr ""
