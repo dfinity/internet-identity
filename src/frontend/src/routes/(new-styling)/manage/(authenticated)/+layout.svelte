@@ -10,6 +10,7 @@
   } from "@lucide/svelte";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
+  import { fade } from "svelte/transition";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -26,6 +27,7 @@
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -34,6 +36,7 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isSwitchingIdentity = $state(false);
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -41,29 +44,29 @@
       .slice(0, 3),
   );
 
-  const gotoManage = () => goto("/manage", { replaceState: true });
-  const handleSignIn = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
+  const switchToIdentity = async (identityNumber: bigint) => {
     isAuthDialogOpen = false;
+    isSwitchingIdentity = true;
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    await goto("/manage", { replaceState: true, invalidateAll: true });
+    isSwitchingIdentity = false;
+  };
+  const handleSignIn = async (identityNumber: bigint) => {
+    await switchToIdentity(identityNumber);
   };
   const handleSignUp = async (identityNumber: bigint) => {
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
-    isAuthDialogOpen = false;
+    await switchToIdentity(identityNumber);
   };
   const handleMigration = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
       title: $t`Migration completed successfully`,
       duration: 4000,
     });
-    isAuthDialogOpen = false;
-    await gotoManage();
+    await switchToIdentity(identityNumber);
   };
   const handleLogout = async () => {
     await sessionStore.reset();
@@ -78,13 +81,12 @@
   );
 
   const handleSwitchIdentity = async (identityNumber: bigint) => {
+    isIdentityPopoverOpen = false;
     await sessionStore.reset();
     const chosenIdentity =
-      $lastUsedIdentitiesStore.identities[Number(identityNumber)];
+      $lastUsedIdentitiesStore.identities[identityNumber.toString()];
     await authLastUsedFlow.authenticate(chosenIdentity);
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await gotoManage();
-    isIdentityPopoverOpen = false;
+    await switchToIdentity(identityNumber);
   };
 
   // Hide mobile sidebar on navigation
@@ -171,7 +173,7 @@
     <div class="h-[env(safe-area-inset-bottom)]"></div>
   </aside>
   <!-- Main content -->
-  <div class="flex flex-1 flex-col">
+  <div class="relative flex flex-1 flex-col">
     <div class="h-[env(safe-area-inset-top)]"></div>
     <!-- Header -->
     <header class="flex h-16 flex-row items-center px-4 sm:px-8 md:px-12">
@@ -202,9 +204,23 @@
       </Button>
     </header>
     <!-- Page content -->
-    <main class="flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12">
+    <main
+      class={[
+        "flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12",
+        "transition-opacity duration-200",
+        isSwitchingIdentity && "pointer-events-none opacity-0",
+      ]}
+    >
       {@render children()}
     </main>
+    {#if isSwitchingIdentity}
+      <div
+        class="absolute top-1/2 left-1/2 -translate-1/2"
+        transition:fade={{ duration: 200 }}
+      >
+        <ProgressRing class="text-fg-tertiary size-14" />
+      </div>
+    {/if}
     <div class="h-[env(safe-area-inset-bottom)]"></div>
   </div>
 </div>
