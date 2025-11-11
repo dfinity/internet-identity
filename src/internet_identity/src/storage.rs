@@ -496,28 +496,6 @@ impl<M: Memory + Clone> Storage<M> {
         }
     }
 
-    pub fn sync_anchor_with_recovery_phrase_principal_index(
-        &mut self,
-        device: &Device,
-        anchor_number: AnchorNumber,
-        is_removal: bool,
-    ) {
-        let KeyType::SeedPhrase = device.key_type else {
-            // lookup_anchor_with_recovery_phrase_principal_memory is not affected by this device.
-            return;
-        };
-
-        let key = Principal::self_authenticating(&device.pubkey);
-
-        if is_removal {
-            self.lookup_anchor_with_recovery_phrase_principal_memory
-                .remove(&key);
-        } else {
-            self.lookup_anchor_with_recovery_phrase_principal_memory
-                .insert(key, anchor_number);
-        }
-    }
-
     pub fn salt(&self) -> Option<&Salt> {
         if self.header.salt == EMPTY_SALT {
             None
@@ -655,6 +633,11 @@ impl<M: Memory + Clone> Storage<M> {
         // Update `CredentialId` to `AnchorNumber` lookup map
         let previous_devices = previous_storable_anchor.map_or(vec![], |anchor| anchor.devices);
         let current_devices = storable_anchor.devices;
+        self.sync_anchor_with_recovery_phrase_principal_index(
+            anchor_number,
+            &previous_devices,
+            &current_devices,
+        );
         self.update_lookup_anchors_with_device_credential(
             anchor_number,
             previous_devices,
@@ -717,6 +700,44 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key.clone().into())
             .map(Into::into)?;
         anchor_numbers.first().copied()
+    }
+
+    fn sync_anchor_with_recovery_phrase_principal_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_devices: &Vec<Device>,
+        current_devices: &Vec<Device>,
+    ) {
+        let retain_recovery_phrase_device_principals = |device: Device| {
+            let KeyType::SeedPhrase = device.key_type else {
+                // lookup_anchor_with_recovery_phrase_principal_memory is not affected by this device.
+                return None;
+            };
+            Some(Principal::self_authenticating(&device.pubkey))
+        };
+
+        let previous_devices = previous_devices
+            .into_iter()
+            .filter_map(retain_recovery_phrase_device_principals)
+            .collect::<BTreeSet<_>>();
+
+        let current_devices = current_devices
+            .into_iter()
+            .filter_map(retain_recovery_phrase_device_principals)
+            .collect::<BTreeSet<_>>();
+
+        let devices_to_be_removed = previous_devices.difference(&current_devices);
+        let devices_to_be_added = current_devices.difference(&previous_devices);
+
+        for key in devices_to_be_removed {
+            self.lookup_anchor_with_recovery_phrase_principal_memory
+                .remove(&key);
+        }
+
+        for key in devices_to_be_added {
+            self.lookup_anchor_with_recovery_phrase_principal_memory
+                .insert(*key, anchor_number);
+        }
     }
 
     /// Update `CredentialId` to `AnchorNumber` lookup map
@@ -1722,6 +1743,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "stable_anchor_application_config".to_string(),
                 self.stable_anchor_application_config_memory_wrapper.size(),
+            ),
+            (
+                "lookup_anchor_with_recovery_phrase_principal_memory".to_string(),
+                self.lookup_anchor_with_recovery_phrase_principal_memory_wrapper
+                    .size(),
             ),
         ])
     }

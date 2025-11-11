@@ -237,19 +237,17 @@ impl Anchor {
     /// **Note:** Does not check invariants, based on the assumption that no invariant can be
     /// violated by removing a device. See also the documentation on
     /// [check_invariants](Anchor::check_invariants).
-    ///
-    /// Returns the removed device on success.
-    pub fn remove_device(&mut self, device_key: &DeviceKey) -> Result<Device, AnchorError> {
+    pub fn remove_device(&mut self, device_key: &DeviceKey) -> Result<(), AnchorError> {
         let index = self.device_index(device_key)?;
         check_mutation_allowed(&self.devices[index])?;
 
-        let device = self.devices.remove(index);
+        self.devices.remove(index);
 
         // We do _not_ check invariants here, because there might be anchors that do not fulfill
         // the invariants still stored in stable memory (e.g. anchors with multiple recovery phrases).
         // By allowing the removal of devices on such anchors, they can be made conforming to the invariants
         // by removing devices.
-        Ok(device)
+        Ok(())
     }
 
     pub fn modify_device(

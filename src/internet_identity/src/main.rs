@@ -272,7 +272,8 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
 
 #[query]
 fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
-    // TODO: Implement this function
+    // TODO: Implement this function after the `lookup_anchor_with_recovery_phrase_principal_memory`
+    // TODO: index is initialized with existing user data.
     None
 }
 
@@ -1071,12 +1072,12 @@ mod openid_api {
         add_openid_credential, lookup_anchor_with_openid_credential, registration,
         remove_openid_credential, update_openid_credential,
     };
-    use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
+    use crate::authz_utils::{IdentityUpdateError, anchor_operation_with_authz_check};
     use crate::openid::{self, OpenIdCredentialKey};
     use crate::storage::anchor::AnchorError;
     use crate::{
-        state, IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
-        OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp,
+        IdentityNumber, OpenIdCredentialAddError, OpenIdCredentialRemoveError,
+        OpenIdDelegationError, OpenIdPrepareDelegationResponse, SessionKey, Timestamp, state,
     };
     use ic_cdk::caller;
     use ic_cdk_macros::{query, update};
@@ -1246,7 +1247,7 @@ candid::export_service!();
 #[cfg(test)]
 mod test {
     use crate::__export_service;
-    use candid_parser::utils::{service_equal, CandidSource};
+    use candid_parser::utils::{CandidSource, service_equal};
     use std::path::Path;
 
     /// Checks candid interface type equality by making sure that the service in the did file is
