@@ -1,8 +1,8 @@
-use crate::anchor_management::registration::Base64;
 use crate::anchor_management::registration::captcha::{
     check_captcha_solution, create_captcha, make_rng,
 };
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
+use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
     activity_bookkeeping, add_openid_credential, post_operation_bookkeeping, set_name,
 };
