@@ -11,7 +11,7 @@
 <div
   {...props}
   class={[
-    "flex flex-col",
+    "flex flex-col p-4",
     "bg-bg-primary border-border-secondary rounded-2xl border",
     "not-dark:shadow-sm",
     className,

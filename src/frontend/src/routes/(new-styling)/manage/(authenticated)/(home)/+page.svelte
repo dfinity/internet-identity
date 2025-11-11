@@ -52,10 +52,10 @@
 <div
   class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,24rem),1fr))] gap-6"
 >
-  <Panel class="p-4">
+  <Panel>
     <IdentityInfo {name} />
   </Panel>
-  <Panel class="p-4">
+  <Panel>
     <AccessMethods {totalAccessMethods} />
   </Panel>
 </div>
