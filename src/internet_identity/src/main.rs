@@ -76,15 +76,29 @@ thread_local! {
     // TODO: Remove this state after the data migration is complete.
     pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = RefCell::new(0);
     pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+    pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = RefCell::new(None);
 
     static TIMER_ID: RefCell<Option<TimerId>> = RefCell::new(Default::default());
 }
 
-#[query(hidden = true)]
+/// Temporary function to list migration errors.
+/// TODO: expand the comment.
+#[update(hidden = true)]
 fn list_recovery_phrase_migration_errors() -> Vec<String> {
+    RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow_mut(|xs| {
+        xs.extend(["world".to_string()]);
+    });
     RECOVERY_PHRASE_MIGRATION_ERRORS.with(|errors| errors.borrow().clone())
 }
 
+/// Temporary function to list migration errors.
+/// TODO: expand the comment.
+#[query(hidden = true)]
+fn list_recovery_phrase_migration_current_batch_id() -> u64 {
+    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| id.borrow().clone())
+}
+
+/// DO NOT MERGE!!!
 #[query(hidden = true)]
 fn list_recovery_phrases() -> Vec<(Principal, u64)> {
     state::storage_borrow(|storage| {

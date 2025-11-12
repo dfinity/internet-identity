@@ -371,7 +371,7 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
         let payload = candid::encode_one(()).unwrap();
 
         let data = env
-            .query_call(
+            .update_call(
                 canister_id,
                 Principal::anonymous(),
                 "list_recovery_phrase_migration_errors",
@@ -382,6 +382,27 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
         let errors: Vec<String> = candid::decode_one(&data).unwrap();
 
         println!("errors: {:#?}", errors);
+    }
+
+    {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .update_call(
+                canister_id,
+                Principal::anonymous(),
+                "list_recovery_phrase_migration_current_batch_id",
+                payload,
+            )
+            .unwrap();
+
+        let list_recovery_phrase_migration_current_batch_id: u64 =
+            candid::decode_one(&data).unwrap();
+
+        println!(
+            "list_recovery_phrase_migration_current_batch_id: {}",
+            list_recovery_phrase_migration_current_batch_id
+        );
     }
 
     {
