@@ -74,7 +74,7 @@
 
   const validateWord = (index: number) => {
     const entry = words[index];
-    if (entry === undefined) {
+    if (!entry) {
       return;
     }
 
@@ -86,7 +86,7 @@
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
     const currentWord = words[currentIndex];
     // Reset validity state when typing
-    if (currentWord !== undefined && event.key !== "Enter") {
+    if (currentWord && event.key !== "Enter") {
       currentWord.isValid = true;
     }
 
@@ -101,7 +101,7 @@
       if (event.key === "Enter" && isLastIndex && submitEnabled) {
         clearTimeout(submitTimeoutId);
         submitTimeoutId = undefined;
-        void handleRecoverWithPhrase();
+        handleRecoverWithPhrase();
         return;
       }
     }
@@ -126,7 +126,7 @@
       // Set 1 second timeout to auto-submit if all words are filled
       submitTimeoutId = window.setTimeout(() => {
         if (submitEnabled && !recoveryInProgress) {
-          void handleRecoverWithPhrase();
+          handleRecoverWithPhrase();
         }
       }, 1000);
     }
@@ -218,7 +218,7 @@
 
     // Get pasted text from clipboard
     const pastedText = event.clipboardData?.getData("text");
-    if (pastedText === undefined || pastedText.trim().length === 0) {
+    if (!pastedText) {
       return;
     }
 
