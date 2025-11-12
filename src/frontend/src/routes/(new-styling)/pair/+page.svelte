@@ -14,12 +14,12 @@
 
   let isUnableToComplete = $state(false);
 
-  const onRegistered = (identityNumber: bigint) => {
+  const handleRegistered = async (identityNumber: bigint) => {
     toaster.success({
       title: $t`You're all set. Your passkey has been registered.`,
     });
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    goto("/manage");
+    void goto("/manage");
   };
 </script>
 
@@ -31,7 +31,7 @@
       <div class="flex-1"></div>
       <RegisterAccessMethodWizard
         registrationId={window.location.hash.slice(1)}
-        {onRegistered}
+        onRegistered={handleRegistered}
         onError={() => (isUnableToComplete = true)}
       />
     </AuthPanel>

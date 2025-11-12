@@ -482,6 +482,9 @@ msgstr "Tautan penyambungan"
 msgid "Passkey"
 msgstr "Passkey"
 
+msgid "Passkey has been registered from another device."
+msgstr ""
+
 msgid "Passkey name"
 msgstr "Nama passkey"
 

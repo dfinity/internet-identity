@@ -18,7 +18,7 @@
     authnMethodToPublicKey,
     getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
-  import { invalidateAll, replaceState } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
@@ -37,7 +37,6 @@
   import { nonNullish } from "@dfinity/utils";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { toaster } from "$lib/components/utils/toaster";
-  import { untrack } from "svelte";
 
   const MAX_PASSKEYS = 8;
 
@@ -89,7 +88,8 @@
       title: $t`Passkey has been registered from another device.`,
     });
     pendingRegistrationId = null;
-    void invalidateAll();
+    // Remove searchParam and update state
+    void goto(page.url.pathname, { replaceState: true, invalidateAll: true });
   };
 
   const handleNameChanged = async (name: string) => {
@@ -163,16 +163,6 @@
       handleError(error);
     }
   };
-
-  // Remove searchParam when it's unset in state
-  $effect(() => {
-    if (
-      pendingRegistrationId === null &&
-      untrack(() => page.url.searchParams.has("activate"))
-    ) {
-      replaceState("/manage/access", {});
-    }
-  });
 </script>
 
 <header class="flex flex-col gap-3">
@@ -305,6 +295,7 @@
       onError={(error) => {
         pendingRegistrationId = null;
         handleError(error);
+        goto(page.url.pathname, { replaceState: true }); // Remove searchParam
       }}
     />
   </Dialog>
