@@ -3,6 +3,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import { AlertTriangleIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import Trans from "$lib/components/locale/Trans.svelte";
 
   type Props = {
     onConfirm: () => void;
@@ -22,7 +23,7 @@
         {$t`Cancel recovery?`}
       </h2>
       <p class="text-text-tertiary text-sm">
-        {$t`Are you sure you want to cancel the recovery process?`}
+        <Trans>Are you sure you want to cancel the recovery process?</Trans>
       </p>
     </div>
   </div>

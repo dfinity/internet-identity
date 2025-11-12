@@ -73,6 +73,9 @@ msgstr "Add new"
 msgid "Advanced identity management"
 msgstr "Advanced identity management"
 
+msgid "Are you sure you want to cancel the recovery process?"
+msgstr "Are you sure you want to cancel the recovery process?"
+
 msgid "Are you sure?"
 msgstr "Are you sure?"
 
@@ -99,6 +102,9 @@ msgstr "Can't find your identity?"
 
 msgid "Cancel"
 msgstr "Cancel"
+
+msgid "Cancel recovery?"
+msgstr "Cancel recovery?"
 
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA characters"
