@@ -316,7 +316,7 @@ pub struct Storage<M: Memory> {
         StableBTreeMap<StorableOriginSha256, StorableApplicationNumber, ManagedMemory<M>>,
 
     lookup_anchor_with_recovery_phrase_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    lookup_anchor_with_recovery_phrase_principal_memory:
+    pub(crate) lookup_anchor_with_recovery_phrase_principal_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
@@ -702,7 +702,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
-    fn sync_anchor_with_recovery_phrase_principal_index(
+    pub(crate) fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous_devices: &[Device],

@@ -1,0 +1,1 @@
+pub mod lookup_anchor_with_recovery_phrase_principal;
