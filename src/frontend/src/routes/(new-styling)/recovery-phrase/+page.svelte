@@ -456,10 +456,7 @@
 {#if showCancelDialog}
   <Dialog onClose={() => (showCancelDialog = false)}>
     <CancelRecoveryDialog
-      onConfirm={async () => {
-        showCancelDialog = false;
-        await handleCancel();
-      }}
+      onConfirm={handleCancel}
       onClose={() => (showCancelDialog = false)}
     />
   </Dialog>
