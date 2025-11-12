@@ -71,7 +71,7 @@ msgid "Add new"
 msgstr "Añadir nuevo"
 
 msgid "Add or remove the ways you can sign in with your identity."
-msgstr "Añade o elimina las formas en que puedes iniciar sesión con tu identidad."
+msgstr "Añade o elimina los métodos con los que puedes iniciar sesión con tu identidad."
 
 msgid "Advanced identity management"
 msgstr "Gestión avanzada de identidad"
@@ -612,7 +612,7 @@ msgid "Simplify your sign-in"
 msgstr "Simplifica tu inicio de sesión"
 
 msgid "Something is wrong!"
-msgstr "¡Algo va mal!"
+msgstr "¡Algo salió mal!"
 
 msgid "Something went wrong"
 msgstr "Algo salió mal"
@@ -840,4 +840,4 @@ msgid "Your personal data, such as your name or email, is never shared. Each app
 msgstr "Tus datos personales, como tu nombre o email, nunca se comparten. Cada app obtiene un seudónimo único para evitar el rastreo automáticamente."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
-msgstr "Tu frase de recuperación es válida pero no para Internet Identity. Es posible que hayas usado la frase semilla incorrecta para el producto equivocado."
+msgstr "Tu frase de recuperación es válida, pero no para Internet Identity. Es posible que hayas usado la frase incorrecta para el producto equivocado."
