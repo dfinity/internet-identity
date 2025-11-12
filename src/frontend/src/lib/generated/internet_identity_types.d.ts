@@ -1212,6 +1212,10 @@ export interface _SERVICE {
     [RegistrationId],
     [] | [IdentityNumber]
   >,
+  'lookup_caller_identity_by_recovery_phrase' : ActorMethod<
+    [],
+    [] | [IdentityNumber]
+  >,
   /**
    * Discoverable passkeys protocol
    */
