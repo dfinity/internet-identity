@@ -18,7 +18,7 @@
     authnMethodToPublicKey,
     getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
-  import { invalidateAll } from "$app/navigation";
+  import { invalidateAll, replaceState } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
@@ -33,6 +33,11 @@
     isCurrentAccessMethod,
   } from "./utils";
   import { sessionStore } from "$lib/stores/session.store";
+  import { page } from "$app/state";
+  import { nonNullish } from "@dfinity/utils";
+  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
+  import { toaster } from "$lib/components/utils/toaster";
+  import { untrack } from "svelte";
 
   const MAX_PASSKEYS = 8;
 
@@ -43,6 +48,7 @@
   let renamingAccessMethodKey = $state<string>();
   let removingAccessMethodKey = $state<string>();
   let accessMethods = $derived(toAccessMethods(data.identityInfo));
+  let pendingRegistrationId = $state(data.pendingRegistrationId);
 
   // Derived
   const renamingAccessMethod = $derived(
@@ -78,6 +84,14 @@
     isAddingAccessMethod = false;
     void invalidateAll();
   };
+  const handleOtherDeviceConfirmed = async () => {
+    toaster.success({
+      title: $t`Passkey has been registered from another device.`,
+    });
+    pendingRegistrationId = null;
+    void invalidateAll();
+  };
+
   const handleNameChanged = async (name: string) => {
     if (
       renamingAccessMethod === undefined ||
@@ -149,6 +163,16 @@
       handleError(error);
     }
   };
+
+  // Remove searchParam when it's unset in state
+  $effect(() => {
+    if (
+      pendingRegistrationId === null &&
+      untrack(() => page.url.searchParams.has("activate"))
+    ) {
+      replaceState("/manage/access", {});
+    }
+  });
 </script>
 
 <header class="flex flex-col gap-3">
@@ -270,5 +294,18 @@
         )}
       />
     {/if}
+  </Dialog>
+{/if}
+
+{#if nonNullish(pendingRegistrationId)}
+  <Dialog onClose={() => (pendingRegistrationId = null)}>
+    <ConfirmAccessMethodWizard
+      registrationId={pendingRegistrationId}
+      onConfirm={handleOtherDeviceConfirmed}
+      onError={(error) => {
+        pendingRegistrationId = null;
+        handleError(error);
+      }}
+    />
   </Dialog>
 {/if}

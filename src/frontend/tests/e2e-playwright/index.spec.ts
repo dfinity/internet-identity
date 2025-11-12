@@ -136,11 +136,9 @@ test.describe("First visit", () => {
     await expect(existingDevicePage.getByText("Chrome")).toHaveCount(2);
 
     // Switch to new device and verify we are signed in
-    await newDevicePage.waitForURL(II_URL + "/manage");
+    await newDevicePage.waitForURL(II_URL + "/manage/access");
     await expect(
-      newDevicePage.getByRole("heading", {
-        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      }),
+      newDevicePage.getByRole("heading", { name: "Access methods" }),
     ).toBeVisible();
   });
 

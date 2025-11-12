@@ -93,7 +93,7 @@
     "@icp-sdk/auth": "^4.0.1",
     "@icp-sdk/core": "^4.0.4",
     "@lingui/core": "^5.5.1",
-    "@lucide/svelte": "^0.508.0",
+    "@lucide/svelte": "^0.553.0",
     "@noble/hashes": "^1.8.0",
     "@slide-computer/signer": "^4.0.0",
     "@slide-computer/signer-web": "^4.0.0",
