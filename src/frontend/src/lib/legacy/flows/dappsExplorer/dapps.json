@@ -468,12 +468,6 @@
     "logo": "ReCheck_logo.svg"
   },
   {
-    "name": "B4B",
-    "oneLiner": "A Web3 influencer marketing protocol that brings transparency, ownership, escrow, and onchain history from all socials.",
-    "website": "https://b4b.world",
-    "logo": "b4b_logo.png"
-  },
-  {
     "name": "ICTO",
     "oneLiner": "ICTO is a one-stop platform automating token operations on the Internet Computer.",
     "website": "https://icto.app",
@@ -528,12 +522,6 @@
     "logo": "b3pay_logo.png"
   },
   {
-    "name": "Pass",
-    "oneLiner": "First blockchain password manager.",
-    "website": "https://www.ic-pass.app/",
-    "logo": "pass_logo.svg"
-  },
-  {
     "name": "Hamster",
     "oneLiner": "One-stop infrastructure, developer toolkit and middleware DevOps service platform",
     "website": "https://hamsternet.io/",
@@ -544,12 +532,6 @@
     "website": "https://riide.org/",
     "logo": "riide_logo.png",
     "oneLiner": "A community-owned Web3 application that primarily offers taxi, delivery, and courier services."
-  },
-  {
-    "name": "ChainkeyX",
-    "website": "https://www.chainkeyx.com",
-    "logo": "chainkeyx_logo.png",
-    "oneLiner": "A crypto neobank that offers fully onchain bitcoin borrowing and lending on ICP."
   },
   {
     "name": "Konectª",
@@ -578,12 +560,6 @@
     "oneLiner": "A liquidity protocol and native stablecoin that allows users to deposit assets, borrow stablecoins at zero interest.",
     "website": "https://www.clp.finance/",
     "logo": "clpfinance_logo.png"
-  },
-  {
-    "name": "Dotmeet",
-    "oneLiner": "A city-based events calendar app helping web3 communities and companies in effectively reaching their target audience within cities.",
-    "website": "https://dotmeet.app/",
-    "logo": "dotmeet_logo.svg"
   },
   {
     "name": "Syron",
@@ -631,12 +607,6 @@
     "oneLiner": "An open-source, 100% onchain social network.",
     "website": "https://mjlwf-iqaaa-aaaan-qmtna-cai.icp0.io/home",
     "logo": "icecube_logo.png"
-  },
-  {
-    "name": "Bridge 23",
-    "oneLiner": "Bridge23 is Your AI Employee Department",
-    "website": "https://bridge23.app",
-    "logo": "bridge23_logo.svg"
   },
   {
     "name": "Gate23",

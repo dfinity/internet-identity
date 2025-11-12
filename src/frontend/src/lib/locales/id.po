@@ -73,6 +73,9 @@ msgstr "Tambah baru"
 msgid "Advanced identity management"
 msgstr "Manajemen identitas tingkat lanjut"
 
+msgid "Are you sure you want to cancel the recovery process?"
+msgstr ""
+
 msgid "Are you sure?"
 msgstr "Apakah Anda yakin?"
 
@@ -99,6 +102,9 @@ msgstr "Tidak dapat menemukan identitas Anda?"
 
 msgid "Cancel"
 msgstr "Batal"
+
+msgid "Cancel recovery?"
+msgstr ""
 
 msgid "CAPTCHA characters"
 msgstr "Karakter CAPTCHA"
