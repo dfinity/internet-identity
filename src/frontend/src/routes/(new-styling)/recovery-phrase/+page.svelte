@@ -66,6 +66,9 @@
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0 && word.isValid),
   );
+  const hasAnyWord = $derived(
+    words.some((word) => word.value.trim().length > 0),
+  );
 
   const validateWord = (index: number) => {
     const entry = words[index];
@@ -373,7 +376,7 @@
         </div>
         <div class="flex flex-row gap-2">
           <Button
-            disabled={loading}
+            disabled={loading || !hasAnyWord}
             class="w-full"
             variant="tertiary"
             onclick={toggleAll}
@@ -385,7 +388,7 @@
             {/if}
           </Button>
           <Button
-            disabled={loading}
+            disabled={loading || !hasAnyWord}
             class="w-full"
             variant="tertiary"
             onclick={handleClearAll}
