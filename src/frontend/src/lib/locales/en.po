@@ -488,6 +488,9 @@ msgstr "Pairing link"
 msgid "Passkey"
 msgstr "Passkey"
 
+msgid "Passkey has been registered from another device."
+msgstr "Passkey has been registered from another device."
+
 msgid "Passkey name"
 msgstr "Passkey name"
 

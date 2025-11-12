@@ -488,6 +488,9 @@ msgstr "Enlace de emparejamiento"
 msgid "Passkey"
 msgstr "Passkey"
 
+msgid "Passkey has been registered from another device."
+msgstr ""
+
 msgid "Passkey name"
 msgstr "Nombre de la passkey"
 

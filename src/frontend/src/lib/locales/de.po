@@ -488,6 +488,9 @@ msgstr "Kopplungslink"
 msgid "Passkey"
 msgstr "Passkey"
 
+msgid "Passkey has been registered from another device."
+msgstr ""
+
 msgid "Passkey name"
 msgstr "Passkey-Name"
 
