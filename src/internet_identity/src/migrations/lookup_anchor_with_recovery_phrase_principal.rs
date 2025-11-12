@@ -21,8 +21,9 @@ impl<M: Memory + Clone> Storage<M> {
             return;
         };
 
-        let begin = RECOVERY_PHRASE_MIGRATION_BATCH_SIZE
-            * RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow());
+        let begin = id_range_lo
+            + RECOVERY_PHRASE_MIGRATION_BATCH_SIZE
+                * RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow());
 
         let end = begin + RECOVERY_PHRASE_MIGRATION_BATCH_SIZE;
 
