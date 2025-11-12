@@ -19,7 +19,7 @@
   import SuccessfulRecovery from "./components/SuccessfulRecovery.svelte";
   import RecoveryError from "./components/RecoveryError.svelte";
   import IdentityNotFound from "./components/IdentityNotFound.svelte";
-  import CancelRecoveryDialog from "./components/CancelRecoveryDialog.svelte";
+  import CancelRecovery from "./components/CancelRecovery.svelte";
   import { toaster } from "$lib/components/utils/toaster";
 
   type RecoveryWord = {
@@ -455,8 +455,8 @@
 
 {#if showCancelDialog}
   <Dialog onClose={() => (showCancelDialog = false)}>
-    <CancelRecoveryDialog
-      onConfirm={handleCancel}
+    <CancelRecovery
+      onCancel={handleCancel}
       onClose={() => (showCancelDialog = false)}
     />
   </Dialog>

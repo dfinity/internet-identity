@@ -6,11 +6,11 @@
   import Trans from "$lib/components/locale/Trans.svelte";
 
   type Props = {
-    onConfirm: () => void;
+    onCancel: () => void;
     onClose: () => void;
   };
 
-  const { onConfirm, onClose }: Props = $props();
+  const { onCancel, onClose }: Props = $props();
 </script>
 
 <div class="flex flex-col gap-8">
@@ -28,7 +28,7 @@
     </div>
   </div>
   <div class="align-stretch flex flex-col gap-2">
-    <Button size="lg" variant="primary" danger onclick={onConfirm}>
+    <Button size="lg" variant="primary" danger onclick={onCancel}>
       {$t`Cancel`}
     </Button>
     <Button size="lg" variant="tertiary" onclick={onClose}>
