@@ -13,6 +13,7 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk_timers::TimerId;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::openid::{
@@ -25,7 +26,9 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
@@ -34,6 +37,7 @@ mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
+mod migrations;
 
 /// Type conversions between internal and external types.
 mod conversions;
@@ -62,9 +66,33 @@ const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
 
-#[update]
-async fn init_salt() {
-    state::init_salt().await;
+/// Number of anchors to process in one batch during the recovery phrase migration.
+pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_SIZE: u64 = 2000;
+
+/// Batch dispatch frequency to minimize the chance of overlapping messages.
+pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_FREQUENCY: Duration = Duration::from_secs(3);
+
+thread_local! {
+    // TODO: Remove this state after the data migration is complete.
+    pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = RefCell::new(0);
+    pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = RefCell::new(Vec::new());
+
+    static TIMER_ID: RefCell<Option<TimerId>> = RefCell::new(Default::default());
+}
+
+#[query(hidden = true)]
+fn list_recovery_phrase_migration_errors() -> Vec<String> {
+    RECOVERY_PHRASE_MIGRATION_ERRORS.with(|errors| errors.borrow().clone())
+}
+
+#[query(hidden = true)]
+fn list_recovery_phrases() -> Vec<(Principal, u64)> {
+    state::storage_borrow(|storage| {
+        storage
+            .lookup_anchor_with_recovery_phrase_principal_memory
+            .iter()
+            .collect()
+    })
 }
 
 #[update]
@@ -576,6 +604,36 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     initialize(maybe_arg);
 }
 
+async fn run_periodic_tasks() {
+    state::storage_borrow_mut(|storage| {
+        storage.maybe_apply_lookup_anchor_with_recovery_phrase_principal_migration();
+    });
+
+    if RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
+        // Migration complete, clear timer.
+        TIMER_ID.with_borrow_mut(|saved_timer_id| {
+            if let Some(saved_timer_id) = *saved_timer_id {
+                ic_cdk_timers::clear_timer(saved_timer_id);
+            }
+            *saved_timer_id = None;
+        });
+    }
+}
+
+fn init_timers() {
+    let new_timer_id =
+        ic_cdk_timers::set_timer_interval(RECOVERY_PHRASE_MIGRATION_BATCH_FREQUENCY, || {
+            ic_cdk::spawn(run_periodic_tasks())
+        });
+
+    TIMER_ID.with_borrow_mut(|saved_timer_id| {
+        if let Some(saved_timer_id) = *saved_timer_id {
+            ic_cdk_timers::clear_timer(saved_timer_id);
+        }
+        saved_timer_id.replace(new_timer_id);
+    });
+}
+
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
@@ -583,6 +641,9 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::load_persistent_state();
 
     initialize(maybe_arg);
+
+    // TODO: Remove the data migration.
+    init_timers();
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
