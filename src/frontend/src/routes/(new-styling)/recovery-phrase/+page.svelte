@@ -19,6 +19,7 @@
   import SuccessfulRecovery from "./components/SuccessfulRecovery.svelte";
   import RecoveryError from "./components/RecoveryError.svelte";
   import IdentityNotFound from "./components/IdentityNotFound.svelte";
+  import CancelRecoveryDialog from "./components/CancelRecoveryDialog.svelte";
   import { toaster } from "$lib/components/utils/toaster";
 
   type RecoveryWord = {
@@ -62,6 +63,7 @@
   let identityNotFoundError = $state(false);
   // When this is `true`, the auto-submit is disabled, and the user has to manually submit the recovery phrase.
   let manualSubmitRequired = $state(false);
+  let showCancelDialog = $state(false);
 
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0 && word.isValid),
@@ -72,7 +74,7 @@
 
   const validateWord = (index: number) => {
     const entry = words[index];
-    if (!entry) {
+    if (entry === undefined) {
       return;
     }
 
@@ -84,7 +86,7 @@
   const handleKeyDownInput = (event: KeyboardEvent, currentIndex: number) => {
     const currentWord = words[currentIndex];
     // Reset validity state when typing
-    if (currentWord && event.key !== "Enter") {
+    if (currentWord !== undefined && event.key !== "Enter") {
       currentWord.isValid = true;
     }
 
@@ -99,7 +101,7 @@
       if (event.key === "Enter" && isLastIndex && submitEnabled) {
         clearTimeout(submitTimeoutId);
         submitTimeoutId = undefined;
-        handleRecoverWithPhrase();
+        void handleRecoverWithPhrase();
         return;
       }
     }
@@ -124,7 +126,7 @@
       // Set 1 second timeout to auto-submit if all words are filled
       submitTimeoutId = window.setTimeout(() => {
         if (submitEnabled && !recoveryInProgress) {
-          handleRecoverWithPhrase();
+          void handleRecoverWithPhrase();
         }
       }, 1000);
     }
@@ -206,6 +208,7 @@
   };
 
   const handleCancel = async () => {
+    showCancelDialog = false;
     resetRecoveryState();
     await goto("/login");
   };
@@ -215,7 +218,9 @@
 
     // Get pasted text from clipboard
     const pastedText = event.clipboardData?.getData("text");
-    if (!pastedText) return;
+    if (pastedText === undefined || pastedText.trim().length === 0) {
+      return;
+    }
 
     // Uses might paste text with multiple spaces, tabs, or newlines between words.
     const pastedWords = pastedText.trim().split(/\s+/);
@@ -407,7 +412,12 @@
           {$t`Submit`}
         </Button>
       {/if}
-      <Button size="xl" variant="secondary" disabled={loading}>
+      <Button
+        size="xl"
+        variant="secondary"
+        disabled={loading}
+        onclick={() => (showCancelDialog = true)}
+      >
         {$t`Cancel`}
       </Button>
     </div>
@@ -440,5 +450,17 @@
 {#if identityNotFoundError}
   <Dialog>
     <IdentityNotFound onRetry={handleRetry} onCancel={handleCancel} />
+  </Dialog>
+{/if}
+
+{#if showCancelDialog}
+  <Dialog onClose={() => (showCancelDialog = false)}>
+    <CancelRecoveryDialog
+      onConfirm={async () => {
+        showCancelDialog = false;
+        await handleCancel();
+      }}
+      onClose={() => (showCancelDialog = false)}
+    />
   </Dialog>
 {/if}
