@@ -19,6 +19,7 @@
   import SuccessfulRecovery from "./components/SuccessfulRecovery.svelte";
   import RecoveryError from "./components/RecoveryError.svelte";
   import IdentityNotFound from "./components/IdentityNotFound.svelte";
+  import CancelRecovery from "./components/CancelRecovery.svelte";
   import { toaster } from "$lib/components/utils/toaster";
 
   type RecoveryWord = {
@@ -62,9 +63,13 @@
   let identityNotFoundError = $state(false);
   // When this is `true`, the auto-submit is disabled, and the user has to manually submit the recovery phrase.
   let manualSubmitRequired = $state(false);
+  let showCancelDialog = $state(false);
 
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0 && word.isValid),
+  );
+  const hasAnyWord = $derived(
+    words.some((word) => word.value.trim().length > 0),
   );
 
   const validateWord = (index: number) => {
@@ -203,6 +208,7 @@
   };
 
   const handleCancel = async () => {
+    showCancelDialog = false;
     resetRecoveryState();
     await goto("/login");
   };
@@ -212,7 +218,9 @@
 
     // Get pasted text from clipboard
     const pastedText = event.clipboardData?.getData("text");
-    if (!pastedText) return;
+    if (!pastedText) {
+      return;
+    }
 
     // Uses might paste text with multiple spaces, tabs, or newlines between words.
     const pastedWords = pastedText.trim().split(/\s+/);
@@ -373,7 +381,7 @@
         </div>
         <div class="flex flex-row gap-2">
           <Button
-            disabled={loading}
+            disabled={loading || !hasAnyWord}
             class="w-full"
             variant="tertiary"
             onclick={toggleAll}
@@ -385,7 +393,7 @@
             {/if}
           </Button>
           <Button
-            disabled={loading}
+            disabled={loading || !hasAnyWord}
             class="w-full"
             variant="tertiary"
             onclick={handleClearAll}
@@ -404,7 +412,12 @@
           {$t`Submit`}
         </Button>
       {/if}
-      <Button size="xl" variant="secondary" disabled={loading}>
+      <Button
+        size="xl"
+        variant="secondary"
+        disabled={loading}
+        onclick={() => (showCancelDialog = true)}
+      >
         {$t`Cancel`}
       </Button>
     </div>
@@ -437,5 +450,14 @@
 {#if identityNotFoundError}
   <Dialog>
     <IdentityNotFound onRetry={handleRetry} onCancel={handleCancel} />
+  </Dialog>
+{/if}
+
+{#if showCancelDialog}
+  <Dialog onClose={() => (showCancelDialog = false)}>
+    <CancelRecovery
+      onCancel={handleCancel}
+      onClose={() => (showCancelDialog = false)}
+    />
   </Dialog>
 {/if}
