@@ -27,9 +27,8 @@
   <div
     {...props}
     class={[
-      "flex rounded-2xl border p-6",
+      "flex flex-col rounded-2xl border p-6",
       "bg-bg-primary border-border-secondary not-dark:shadow-sm",
-      "@max-xl:flex-col",
       "@xl:flex-row",
       className,
     ]}
