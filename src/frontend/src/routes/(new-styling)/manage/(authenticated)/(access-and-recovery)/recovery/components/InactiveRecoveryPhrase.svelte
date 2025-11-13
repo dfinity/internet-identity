@@ -7,13 +7,13 @@
 
   type Props = {
     onActivate: () => void;
-  } & SvelteHTMLElements["div"];
+  } & SvelteHTMLElements["section"];
 
   const { onActivate, class: className, ...props }: Props = $props();
 </script>
 
 <div class="@container">
-  <div
+  <section
     {...props}
     class={[
       "flex rounded-2xl border p-6",
@@ -26,18 +26,18 @@
     <ShieldOffIcon
       class={["text-fg-error-primary size-5 shrink-0", "@lg:mt-0.5"]}
     />
-    <div class={["flex flex-col", "@max-lg:mt-3 @max-lg:mb-5", "@lg:mx-3"]}>
-      <div class="text-text-primary text-base font-semibold">
+    <header class={["flex flex-col", "@max-lg:mt-3 @max-lg:mb-5", "@lg:mx-3"]}>
+      <h2 class="text-text-primary text-base font-semibold">
         {$t`Recovery phrase not activated`}
-      </div>
-      <div class="text-text-tertiary text-sm">
+      </h2>
+      <p class="text-text-tertiary text-sm">
         <Trans>
           Activate it so that you can recover your identity at any time.
         </Trans>
-      </div>
-    </div>
+      </p>
+    </header>
     <Button onclick={onActivate} size="sm" class="@lg:my-auto @lg:ms-auto">
       {$t`Activate`}
     </Button>
-  </div>
+  </section>
 </div>

@@ -12,7 +12,7 @@
     recoveryPhrase: AuthnMethodData;
     onReset: () => void;
     isCurrentAccessMethod: boolean;
-  } & SvelteHTMLElements["div"];
+  } & SvelteHTMLElements["section"];
 
   const {
     recoveryPhrase,
@@ -24,7 +24,7 @@
 </script>
 
 <div class="@container">
-  <div
+  <section
     {...props}
     class={[
       "flex flex-col rounded-2xl border p-6",
@@ -36,20 +36,20 @@
     <ShieldCheckIcon
       class={["text-fg-success-primary size-5 shrink-0", "@xl:mt-0.5"]}
     />
-    <div class={["flex flex-col", "@max-xl:mt-3", "@xl:mx-3"]}>
-      <div class="text-text-primary text-base font-semibold">
+    <header class={["flex flex-col", "@max-xl:mt-3", "@xl:mx-3"]}>
+      <h2 class="text-text-primary text-base font-semibold">
         {$t`Recovery phrase activated`}
-      </div>
-      <div class="text-text-tertiary text-sm">
+      </h2>
+      <p class="text-text-tertiary text-sm">
         <Trans>It can be used at any time to recover your identity.</Trans>
-      </div>
-    </div>
-    <div class={["border-border-tertiary my-5 border-t", "@xl:hidden"]}></div>
-    <div class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>
-      <div class="text-text-primary text-xs font-semibold">
+      </p>
+    </header>
+    <hr class={["border-border-tertiary my-5 border-t", "@xl:hidden"]} />
+    <dl class={["flex flex-col gap-1", "@xl:my-auto @xl:ms-auto @xl:me-20"]}>
+      <dt class="text-text-primary text-xs font-semibold">
         {$t`Last used`}
-      </div>
-      <div class="text-text-primary cursor-default text-xs">
+      </dt>
+      <dd class="text-text-primary cursor-default text-xs">
         {#if isCurrentAccessMethod}
           <Tooltip
             label={$t`Currently signed in with this passkey`}
@@ -81,8 +81,8 @@
             <span>{$t`n/a`}</span>
           </Tooltip>
         {/if}
-      </div>
-    </div>
+      </dd>
+    </dl>
     <Button
       onclick={onReset}
       danger
@@ -92,5 +92,5 @@
     >
       {$t`Reset`}
     </Button>
-  </div>
+  </section>
 </div>
