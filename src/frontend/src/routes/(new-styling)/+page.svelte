@@ -17,8 +17,8 @@
   import { Trans } from "$lib/components/locale";
   import {
     ChevronDownIcon,
-    MinusCircleIcon,
-    PlusCircleIcon,
+    CircleMinusIcon,
+    CirclePlusIcon,
   } from "@lucide/svelte";
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
@@ -240,8 +240,8 @@
       <details>
         <summary>
           {$t`What is Internet Identity?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -264,8 +264,8 @@
       <details>
         <summary>
           {$t`Is my Face ID or Fingerprint stored in Internet Identity?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -278,8 +278,8 @@
       <details>
         <summary>
           {$t`How do passkeys work?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -312,8 +312,8 @@
       <details>
         <summary>
           {$t`What makes Internet Identity secure & easy to use?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -328,8 +328,8 @@
       <details>
         <summary>
           {$t`What makes Internet Identity privacy-preserving?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -344,8 +344,8 @@
       <details>
         <summary>
           {$t`How does Internet Identity compare to other Web3 authentication tools?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -359,8 +359,8 @@
       <details>
         <summary>
           {$t`How do Google, Microsoft and Apple integrations work with Internet Identity?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>
@@ -398,8 +398,8 @@
       <details>
         <summary>
           {$t`What's new in Internet Identity 2.0?`}
-          <MinusCircleIcon />
-          <PlusCircleIcon />
+          <CircleMinusIcon />
+          <CirclePlusIcon />
         </summary>
         <p>
           <Trans>

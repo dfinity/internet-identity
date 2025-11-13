@@ -70,8 +70,14 @@ msgstr "Tambahkan cara lain untuk masuk dengan passkey atau akun pihak ketiga un
 msgid "Add new"
 msgstr "Tambah baru"
 
+msgid "Add or remove the ways you can sign in with your identity."
+msgstr "Tambahkan atau hapus cara Anda dapat masuk dengan identitas Anda."
+
 msgid "Advanced identity management"
 msgstr "Manajemen identitas tingkat lanjut"
+
+msgid "Are you sure you want to cancel the recovery process?"
+msgstr "Apakah Anda yakin ingin membatalkan proses pemulihan?"
 
 msgid "Are you sure?"
 msgstr "Apakah Anda yakin?"
@@ -99,6 +105,9 @@ msgstr "Tidak dapat menemukan identitas Anda?"
 
 msgid "Cancel"
 msgstr "Batal"
+
+msgid "Cancel recovery?"
+msgstr "Batalkan pemulihan?"
 
 msgid "CAPTCHA characters"
 msgstr "Karakter CAPTCHA"
@@ -369,7 +378,7 @@ msgid "It seems like the connection with the service could not be established. T
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
 
 msgid "It seems like you have not placed the correct words in order. You will have to try again to gain access to your identity."
-msgstr ""
+msgstr "Tampaknya Anda belum menempatkan kata-kata yang benar secara berurutan. Anda harus mencoba lagi untuk mendapatkan akses ke identitas Anda."
 
 msgid "It won't be removed from your device or password manager."
 msgstr "Ini tidak akan dihapus dari perangkat atau pengelola kata sandi Anda."
@@ -456,7 +465,7 @@ msgid "No data is shared with Google, Microsoft or Apple on which applications y
 msgstr "Tidak ada data yang dibagikan kepada Google, Microsoft, atau Apple mengenai aplikasi mana yang Anda masuk dengan Internet Identity."
 
 msgid "No identity found"
-msgstr ""
+msgstr "Tidak ada identitas yang ditemukan"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau membuka passkey Anda. Data biometrik Anda tidak pernah dibagikan dengan Internet Identity atau situs web dan aplikasi lain yang Anda gunakan."
@@ -473,14 +482,14 @@ msgstr "Buka menu"
 msgid "or"
 msgstr "atau"
 
-msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
-msgstr "Ikhtisar metode akses (tanggal dibuat, penggunaan terbaru). Tambahkan metode baru atau hapus."
-
 msgid "Pairing link"
 msgstr "Tautan penyambungan"
 
 msgid "Passkey"
 msgstr "Passkey"
+
+msgid "Passkey has been registered from another device."
+msgstr "Passkey telah didaftarkan dari perangkat lain."
 
 msgid "Passkey name"
 msgstr "Nama passkey"
@@ -543,7 +552,7 @@ msgid "Rename this account"
 msgstr "Ubah nama akun ini"
 
 msgid "Retry"
-msgstr ""
+msgstr "Coba lagi"
 
 msgid "Return to app"
 msgstr "Kembali ke aplikasi"
@@ -603,7 +612,7 @@ msgid "Simplify your sign-in"
 msgstr "Sederhanakan proses masuk Anda"
 
 msgid "Something is wrong!"
-msgstr ""
+msgstr "Ada yang salah!"
 
 msgid "Something went wrong"
 msgstr "Terjadi kesalahan"
@@ -624,7 +633,7 @@ msgid "Stored securely on your device, in your password manager, or on a securit
 msgstr "Disimpan dengan aman di perangkat Anda, di pengelola kata sandi Anda, atau di kunci keamanan."
 
 msgid "Submit"
-msgstr ""
+msgstr "Kirim"
 
 msgid "Successfully restored access to your identity"
 msgstr "Berhasil memulihkan akses ke identitas Anda"
@@ -737,9 +746,6 @@ msgstr "Verifikasi bahwa Anda manusia"
 msgid "Verifying..."
 msgstr "Memverifikasi..."
 
-msgid "View services linked to your identity and manage passkeys."
-msgstr "Lihat layanan yang tertaut ke identitas Anda dan kelola passkey."
-
 msgid "Waiting for your existing device"
 msgstr "Menunggu perangkat Anda yang ada"
 
@@ -824,6 +830,9 @@ msgstr "Semua siap. Passkey Anda telah terdaftar."
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Anda masuk sebagai <0>{name}</0>."
 
+msgid "Your identity and sign-in methods at a glance."
+msgstr "Identitas dan metode masuk Anda sekilas."
+
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "Nama identitas Anda saat ini tidak dapat diedit. Ini hanya terlihat oleh Anda."
 
@@ -831,4 +840,4 @@ msgid "Your personal data, such as your name or email, is never shared. Each app
 msgstr "Data pribadi Anda, seperti nama atau email, tidak pernah dibagikan. Setiap aplikasi mendapatkan pseudonim unik untuk mencegah pelacakan secara otomatis."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
-msgstr ""
+msgstr "Frasa pemulihan Anda valid tetapi bukan untuk identitas internet. Anda mungkin telah menggunakan frasa benih yang salah untuk produk yang salah."

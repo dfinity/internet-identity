@@ -18,7 +18,7 @@
     authnMethodToPublicKey,
     getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
-  import { invalidateAll } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
   import { scale } from "svelte/transition";
@@ -33,6 +33,10 @@
     isCurrentAccessMethod,
   } from "./utils";
   import { sessionStore } from "$lib/stores/session.store";
+  import { page } from "$app/state";
+  import { nonNullish } from "@dfinity/utils";
+  import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
+  import { toaster } from "$lib/components/utils/toaster";
 
   const MAX_PASSKEYS = 8;
 
@@ -43,6 +47,7 @@
   let renamingAccessMethodKey = $state<string>();
   let removingAccessMethodKey = $state<string>();
   let accessMethods = $derived(toAccessMethods(data.identityInfo));
+  let pendingRegistrationId = $state(data.pendingRegistrationId);
 
   // Derived
   const renamingAccessMethod = $derived(
@@ -78,6 +83,15 @@
     isAddingAccessMethod = false;
     void invalidateAll();
   };
+  const handleOtherDeviceConfirmed = async () => {
+    toaster.success({
+      title: $t`Passkey has been registered from another device.`,
+    });
+    pendingRegistrationId = null;
+    // Remove searchParam and update state
+    void goto(page.url.pathname, { replaceState: true, invalidateAll: true });
+  };
+
   const handleNameChanged = async (name: string) => {
     if (
       renamingAccessMethod === undefined ||
@@ -154,10 +168,7 @@
 <header class="flex flex-col gap-3">
   <h1 class="text-text-primary text-3xl font-medium">{$t`Access methods`}</h1>
   <p class="text-text-tertiary text-base">
-    <Trans>
-      Overview of access methods (dates created, recent usage). Add a new method
-      or remove them.
-    </Trans>
+    <Trans>Add or remove the ways you can sign in with your identity.</Trans>
   </p>
 </header>
 <div
@@ -270,5 +281,19 @@
         )}
       />
     {/if}
+  </Dialog>
+{/if}
+
+{#if nonNullish(pendingRegistrationId)}
+  <Dialog onClose={() => (pendingRegistrationId = null)}>
+    <ConfirmAccessMethodWizard
+      registrationId={pendingRegistrationId}
+      onConfirm={handleOtherDeviceConfirmed}
+      onError={(error) => {
+        pendingRegistrationId = null;
+        handleError(error);
+        goto(page.url.pathname, { replaceState: true }); // Remove searchParam
+      }}
+    />
   </Dialog>
 {/if}

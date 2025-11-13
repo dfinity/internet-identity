@@ -70,8 +70,14 @@ msgstr "Fügen Sie eine weitere Möglichkeit hinzu, sich mit einem Passkey oder 
 msgid "Add new"
 msgstr "Neu hinzufügen"
 
+msgid "Add or remove the ways you can sign in with your identity."
+msgstr "Fügen Sie die Möglichkeiten hinzu oder entfernen Sie sie, mit denen Sie sich mit Ihrer Identität anmelden können."
+
 msgid "Advanced identity management"
 msgstr "Fortgeschrittenes Identitäts-Management"
+
+msgid "Are you sure you want to cancel the recovery process?"
+msgstr "Sind Sie sicher, dass Sie den Wiederherstellungsprozess abbrechen möchten?"
 
 msgid "Are you sure?"
 msgstr "Sind Sie sicher?"
@@ -99,6 +105,9 @@ msgstr "Finden Sie Ihre Identität nicht?"
 
 msgid "Cancel"
 msgstr "Abbrechen"
+
+msgid "Cancel recovery?"
+msgstr "Wiederherstellung abbrechen?"
 
 msgid "CAPTCHA characters"
 msgstr "CAPTCHA-Zeichen"
@@ -369,7 +378,7 @@ msgid "It seems like the connection with the service could not be established. T
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
 
 msgid "It seems like you have not placed the correct words in order. You will have to try again to gain access to your identity."
-msgstr ""
+msgstr "Es scheint, als hätten Sie die Wörter nicht in der richtigen Reihenfolge eingegeben. Sie müssen es erneut versuchen, um Zugriff auf Ihre Identität zu erhalten."
 
 msgid "It won't be removed from your device or password manager."
 msgstr "Es wird nicht von Ihrem Gerät oder Passwort-Manager entfernt."
@@ -456,7 +465,7 @@ msgid "No data is shared with Google, Microsoft or Apple on which applications y
 msgstr "Es werden keine Daten an Google, Microsoft oder Apple darüber weitergegeben, bei welchen Anwendungen Sie sich mit Internet Identity anmelden."
 
 msgid "No identity found"
-msgstr ""
+msgstr "Keine Identität gefunden"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten werden niemals mit Internet Identity oder anderen Websites oder Apps geteilt."
@@ -473,14 +482,14 @@ msgstr "Menü öffnen"
 msgid "or"
 msgstr "oder"
 
-msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
-msgstr "Übersicht der Zugriffsmethoden (Erstellungsdaten, letzte Nutzung). Fügen Sie eine neue Methode hinzu oder entfernen Sie sie."
-
 msgid "Pairing link"
 msgstr "Kopplungslink"
 
 msgid "Passkey"
 msgstr "Passkey"
+
+msgid "Passkey has been registered from another device."
+msgstr "Passkey wurde von einem anderen Gerät registriert."
 
 msgid "Passkey name"
 msgstr "Passkey-Name"
@@ -543,7 +552,7 @@ msgid "Rename this account"
 msgstr "Dieses Konto umbenennen"
 
 msgid "Retry"
-msgstr ""
+msgstr "Wiederholen"
 
 msgid "Return to app"
 msgstr "Zurück zur App"
@@ -603,7 +612,7 @@ msgid "Simplify your sign-in"
 msgstr "Vereinfachen Sie Ihre Anmeldung"
 
 msgid "Something is wrong!"
-msgstr ""
+msgstr "Etwas stimmt nicht!"
 
 msgid "Something went wrong"
 msgstr "Etwas ist schiefgelaufen"
@@ -624,7 +633,7 @@ msgid "Stored securely on your device, in your password manager, or on a securit
 msgstr "Sicher auf Ihrem Gerät, in Ihrem Passwort-Manager oder auf einem Sicherheitsschlüssel gespeichert."
 
 msgid "Submit"
-msgstr ""
+msgstr "Senden"
 
 msgid "Successfully restored access to your identity"
 msgstr "Zugriff auf Ihre Identität erfolgreich wiederhergestellt"
@@ -737,9 +746,6 @@ msgstr "Bestätigen Sie, dass Sie ein Mensch sind"
 msgid "Verifying..."
 msgstr "Überprüfung..."
 
-msgid "View services linked to your identity and manage passkeys."
-msgstr "Sehen Sie die mit Ihrer Identität verknüpften Dienste ein und verwalten Sie Passkeys."
-
 msgid "Waiting for your existing device"
 msgstr "Warten auf Ihr bestehendes Gerät"
 
@@ -824,6 +830,9 @@ msgstr "Alles bereit. Ihr Passkey wurde registriert."
 msgid "You're signing in as <0>{name}</0>."
 msgstr "Sie melden sich als <0>{name}</0> an."
 
+msgid "Your identity and sign-in methods at a glance."
+msgstr "Ihre Identität und Anmeldemethoden auf einen Blick."
+
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "Ihr Identitätsname ist derzeit nicht bearbeitbar. Er ist nur für Sie sichtbar."
 
@@ -831,4 +840,4 @@ msgid "Your personal data, such as your name or email, is never shared. Each app
 msgstr "Ihre persönlichen Daten, wie Ihr Name oder Ihre E-Mail, werden niemals geteilt. Jede App erhält automatisch ein eindeutiges Pseudonym, um Tracking zu verhindern."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
-msgstr ""
+msgstr "Ihre Wiederherstellungsphrase ist gültig, aber nicht für Internet Identity. Möglicherweise haben Sie die falsche Seed-Phrase für das falsche Produkt verwendet."
