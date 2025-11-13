@@ -89,7 +89,7 @@ fn list_recovery_phrase_migration_errors() -> Vec<String> {
     RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
 }
 
-/// Temporary function to list migration errors.
+/// Temporary function to fetch the current migration batch id.
 ///
 /// Can be called to retrieve the current batch id of the ongoing data recovery phrase migration.
 ///
@@ -99,7 +99,7 @@ fn list_recovery_phrase_migration_current_batch_id() -> u64 {
     RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| *id)
 }
 
-/// Temporary function to list migration errors.
+/// Temporary function to count migrated recovery phrases.
 ///
 /// Can be called to retrieve the number of recovery phrases indexed so far.
 #[query(hidden = true)]
@@ -109,6 +109,11 @@ fn count_recovery_phrases() -> u64 {
             .lookup_anchor_with_recovery_phrase_principal_memory
             .len()
     })
+}
+
+#[update]
+async fn init_salt() {
+    state::init_salt().await;
 }
 
 #[update]
