@@ -320,7 +320,7 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
 
 // TODO: Remove this test after the migration takes place.
 #[test]
-fn upgrade_and_rollback_with_realistic_data_migration() {
+fn test_recovery_phrase_migration() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
@@ -427,9 +427,9 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
             None,
         ),
         (
-            "User with pub-key-0 should get anchor number 10001",
+            "User with pub-key-0 should get anchor number 10000",
             Principal::self_authenticating("pub-key-0".to_string()),
-            Some(10_001),
+            Some(10_000),
         ),
     ] {
         let payload = candid::encode_one(()).unwrap();
