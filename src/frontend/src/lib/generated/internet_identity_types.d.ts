@@ -1212,6 +1212,9 @@ export interface _SERVICE {
     [RegistrationId],
     [] | [IdentityNumber]
   >,
+  /**
+   * Looks up identity number when called with a recovery phrase
+   */
   'lookup_caller_identity_by_recovery_phrase' : ActorMethod<
     [],
     [] | [IdentityNumber]
