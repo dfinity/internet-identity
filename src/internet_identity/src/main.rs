@@ -74,11 +74,11 @@ pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Dur
 
 thread_local! {
     // TODO: Remove this state after the data migration is complete.
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = RefCell::new(0);
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = RefCell::new(Vec::new());
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = RefCell::new(None);
+    pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = const { RefCell::new(0) };
+    pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
 
-    static TIMER_ID: RefCell<Option<TimerId>> = RefCell::new(Default::default());
+    static TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
 }
 
 /// Temporary function to list migration errors.
@@ -96,7 +96,7 @@ fn list_recovery_phrase_migration_errors() -> Vec<String> {
 /// The special value `u64::MAX` indicates that the migration is complete.
 #[query(hidden = true)]
 fn list_recovery_phrase_migration_current_batch_id() -> u64 {
-    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| id.clone())
+    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| *id)
 }
 
 /// Temporary function to list migration errors.
@@ -107,7 +107,7 @@ fn count_recovery_phrases() -> u64 {
     state::storage_borrow(|storage| {
         storage
             .lookup_anchor_with_recovery_phrase_principal_memory
-            .len() as u64
+            .len()
     })
 }
 
