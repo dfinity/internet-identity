@@ -324,7 +324,9 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
-    for i in 0..20 {
+    const NUM_ANCHORS: usize = 20;
+
+    for i in 0..NUM_ANCHORS {
         let pubkey = format!("pub-key-{}", i);
         let sender = Principal::self_authenticating(pubkey.clone());
         let origin = format!("https://www.app{}.org", i);
@@ -355,7 +357,7 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    for _ in 0..2000 {
+    for _ in 0..NUM_ANCHORS {
         env.tick();
         env.tick();
         env.advance_time(Duration::from_secs(3));
@@ -363,23 +365,6 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
     }
 
     api::health_check(&env, canister_id);
-
-    {
-        let payload = candid::encode_one(()).unwrap();
-
-        let data = env
-            .query_call(
-                canister_id,
-                Principal::anonymous(),
-                "list_recovery_phrases",
-                payload,
-            )
-            .unwrap();
-
-        let recovery_phrases: Vec<(Principal, u64)> = candid::decode_one(&data).unwrap();
-
-        println!("recovery_phrases: {:#?}", recovery_phrases);
-    }
 
     {
         let payload = candid::encode_one(()).unwrap();
@@ -413,11 +398,24 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
         let list_recovery_phrase_migration_current_batch_id: u64 =
             candid::decode_one(&data).unwrap();
 
-        println!(
-            "list_recovery_phrase_migration_current_batch_id: {}",
-            list_recovery_phrase_migration_current_batch_id
-        );
+        // The special value u64::MAX indicates that the migration is complete.
+        assert_eq!(list_recovery_phrase_migration_current_batch_id, u64::MAX);
     }
 
-    panic!("the end")
+    {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .update_call(
+                canister_id,
+                Principal::anonymous(),
+                "count_recovery_phrases",
+                payload,
+            )
+            .unwrap();
+
+        let count_recovery_phrases: u64 = candid::decode_one(&data).unwrap();
+
+        assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64);
+    }
 }

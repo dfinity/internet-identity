@@ -70,7 +70,7 @@ const ID_AI_ORIGIN: &str = "https://id.ai";
 pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_SIZE: u64 = 2000;
 
 /// Batch dispatch frequency to minimize the chance of DoS.
-pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_FREQUENCY: Duration = Duration::from_secs(1);
+pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
 
 thread_local! {
     // TODO: Remove this state after the data migration is complete.
@@ -82,27 +82,32 @@ thread_local! {
 }
 
 /// Temporary function to list migration errors.
-/// TODO: expand the comment.
+///
+/// Can be called to retrieve any errors that occurred during the recovery phrase migration.
 #[update(hidden = true)]
 fn list_recovery_phrase_migration_errors() -> Vec<String> {
     RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
 }
 
 /// Temporary function to list migration errors.
-/// TODO: expand the comment.
+///
+/// Can be called to retrieve the current batch id of the ongoing data recovery phrase migration.
+///
+/// The special value `u64::MAX` indicates that the migration is complete.
 #[query(hidden = true)]
 fn list_recovery_phrase_migration_current_batch_id() -> u64 {
     RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| id.clone())
 }
 
-/// DO NOT MERGE!!!
+/// Temporary function to list migration errors.
+///
+/// Can be called to retrieve the number of recovery phrases indexed so far.
 #[query(hidden = true)]
-fn list_recovery_phrases() -> Vec<(Principal, u64)> {
+fn count_recovery_phrases() -> u64 {
     state::storage_borrow(|storage| {
         storage
             .lookup_anchor_with_recovery_phrase_principal_memory
-            .iter()
-            .collect()
+            .len() as u64
     })
 }
 
@@ -617,7 +622,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 
 async fn run_periodic_tasks() {
     state::storage_borrow_mut(|storage| {
-        storage.maybe_apply_lookup_anchor_with_recovery_phrase_principal_migration();
+        storage.sync_anchor_indices();
     });
 
     if RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
@@ -633,7 +638,7 @@ async fn run_periodic_tasks() {
 
 fn init_timers() {
     let new_timer_id =
-        ic_cdk_timers::set_timer_interval(RECOVERY_PHRASE_MIGRATION_BATCH_FREQUENCY, || {
+        ic_cdk_timers::set_timer_interval(RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS, || {
             ic_cdk::spawn(run_periodic_tasks())
         });
 
