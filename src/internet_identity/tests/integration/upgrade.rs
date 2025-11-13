@@ -364,8 +364,22 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
 
     api::health_check(&env, canister_id);
 
-    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
-    api::health_check(&env, canister_id);
+    {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .query_call(
+                canister_id,
+                Principal::anonymous(),
+                "list_recovery_phrases",
+                payload,
+            )
+            .unwrap();
+
+        let recovery_phrases: Vec<(Principal, u64)> = candid::decode_one(&data).unwrap();
+
+        println!("recovery_phrases: {:#?}", recovery_phrases);
+    }
 
     {
         let payload = candid::encode_one(()).unwrap();
@@ -403,23 +417,6 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
             "list_recovery_phrase_migration_current_batch_id: {}",
             list_recovery_phrase_migration_current_batch_id
         );
-    }
-
-    {
-        let payload = candid::encode_one(()).unwrap();
-
-        let data = env
-            .query_call(
-                canister_id,
-                Principal::anonymous(),
-                "list_recovery_phrases",
-                payload,
-            )
-            .unwrap();
-
-        let recovery_phrases: Vec<(Principal, u64)> = candid::decode_one(&data).unwrap();
-
-        println!("recovery_phrases: {:#?}", recovery_phrases);
     }
 
     panic!("the end")
