@@ -355,7 +355,7 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    for _ in 0..200 {
+    for _ in 0..2000 {
         env.tick();
         env.tick();
         env.advance_time(Duration::from_secs(3));

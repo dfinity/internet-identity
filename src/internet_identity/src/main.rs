@@ -69,8 +69,8 @@ const ID_AI_ORIGIN: &str = "https://id.ai";
 /// Number of anchors to process in one batch during the recovery phrase migration.
 pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_SIZE: u64 = 2000;
 
-/// Batch dispatch frequency to minimize the chance of overlapping messages.
-pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_FREQUENCY: Duration = Duration::from_secs(3);
+/// Batch dispatch frequency to minimize the chance of DoS.
+pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_FREQUENCY: Duration = Duration::from_secs(1);
 
 thread_local! {
     // TODO: Remove this state after the data migration is complete.
@@ -85,17 +85,14 @@ thread_local! {
 /// TODO: expand the comment.
 #[update(hidden = true)]
 fn list_recovery_phrase_migration_errors() -> Vec<String> {
-    RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow_mut(|xs| {
-        xs.extend(["world".to_string()]);
-    });
-    RECOVERY_PHRASE_MIGRATION_ERRORS.with(|errors| errors.borrow().clone())
+    RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
 }
 
 /// Temporary function to list migration errors.
 /// TODO: expand the comment.
 #[query(hidden = true)]
 fn list_recovery_phrase_migration_current_batch_id() -> u64 {
-    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| id.borrow().clone())
+    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| id.clone())
 }
 
 /// DO NOT MERGE!!!

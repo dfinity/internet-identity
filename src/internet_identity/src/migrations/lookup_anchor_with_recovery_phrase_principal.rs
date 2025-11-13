@@ -33,13 +33,9 @@ impl<M: Memory + Clone> Storage<M> {
             next_anchor_number
         };
 
-        // DO NOT MERGE!!!
-        let begin = RECOVERY_PHRASE_MIGRATION_BATCH_SIZE
-            * RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow());
-        // Use the following:
-        // let begin = id_range_lo
-        //     + RECOVERY_PHRASE_MIGRATION_BATCH_SIZE
-        //         * RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow());
+        let begin = id_range_lo
+            + RECOVERY_PHRASE_MIGRATION_BATCH_SIZE
+                * RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow());
 
         let end = begin + RECOVERY_PHRASE_MIGRATION_BATCH_SIZE;
 
