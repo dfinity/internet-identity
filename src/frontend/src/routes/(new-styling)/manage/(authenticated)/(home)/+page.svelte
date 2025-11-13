@@ -2,7 +2,7 @@
   import IdentityInfo from "./components/IdentityInfo.svelte";
   import type { PageProps } from "./$types";
   import AccessMethods from "./components/AccessMethods.svelte";
-  import { toAccessMethods } from "../(access & recovery)/access/utils";
+  import { toAccessMethods } from "../(access-and-recovery)/access/utils";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import Panel from "./components/Panel.svelte";
