@@ -428,7 +428,7 @@ fn test_recovery_phrase_migration() {
         ),
         (
             "User with pub-key-0 should get anchor number 10000",
-            Principal::self_authenticating("pub-key-0".to_string()),
+            Principal::self_authenticating("pub-key-0"),
             Some(10_000),
         ),
     ] {
@@ -445,6 +445,10 @@ fn test_recovery_phrase_migration() {
 
         let observed_anchor_number: Option<u64> = candid::decode_one(&data).unwrap();
 
-        assert_eq!(observed_anchor_number, expected_anchor_number);
+        assert_eq!(
+            observed_anchor_number, expected_anchor_number,
+            "failed for {}",
+            label
+        );
     }
 }
