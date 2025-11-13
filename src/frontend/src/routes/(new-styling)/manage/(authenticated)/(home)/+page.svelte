@@ -22,7 +22,7 @@
     {$t`Welcome, ${name}!`}
   </h1>
   <p class="text-text-tertiary text-base">
-    <Trans>View services linked to your identity and manage passkeys.</Trans>
+    <Trans>Your identity and sign-in methods at a glance.</Trans>
   </p>
 </header>
 

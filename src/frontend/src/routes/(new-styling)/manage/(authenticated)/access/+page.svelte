@@ -168,10 +168,7 @@
 <header class="flex flex-col gap-3">
   <h1 class="text-text-primary text-3xl font-medium">{$t`Access methods`}</h1>
   <p class="text-text-tertiary text-base">
-    <Trans>
-      Overview of access methods (dates created, recent usage). Add a new method
-      or remove them.
-    </Trans>
+    <Trans>Add or remove the ways you can sign in with your identity.</Trans>
   </p>
 </header>
 <div

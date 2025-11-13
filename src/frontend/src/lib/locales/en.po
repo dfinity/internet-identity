@@ -70,6 +70,9 @@ msgstr "Add another way to sign in with a passkey or third-party account for sec
 msgid "Add new"
 msgstr "Add new"
 
+msgid "Add or remove the ways you can sign in with your identity."
+msgstr "Add or remove the ways you can sign in with your identity."
+
 msgid "Advanced identity management"
 msgstr "Advanced identity management"
 
@@ -479,9 +482,6 @@ msgstr "Open menu"
 msgid "or"
 msgstr "or"
 
-msgid "Overview of access methods (dates created, recent usage). Add a new method or remove them."
-msgstr "Overview of access methods (dates created, recent usage). Add a new method or remove them."
-
 msgid "Pairing link"
 msgstr "Pairing link"
 
@@ -746,9 +746,6 @@ msgstr "Verify you are human"
 msgid "Verifying..."
 msgstr "Verifying..."
 
-msgid "View services linked to your identity and manage passkeys."
-msgstr "View services linked to your identity and manage passkeys."
-
 msgid "Waiting for your existing device"
 msgstr "Waiting for your existing device"
 
@@ -832,6 +829,9 @@ msgstr "You're all set. Your passkey has been registered."
 
 msgid "You're signing in as <0>{name}</0>."
 msgstr "You're signing in as <0>{name}</0>."
+
+msgid "Your identity and sign-in methods at a glance."
+msgstr "Your identity and sign-in methods at a glance."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "Your identity name is currently not editable. It is only ever visible to you."
