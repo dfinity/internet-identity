@@ -46,11 +46,20 @@ msgstr "<0>Sin números de identidad:</0> Como se explica más arriba, las passk
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integración de passkey sin interrupciones:</0> Seguimos adoptando las passkeys como el futuro de la autenticación segura. Internet Identity 2.0 aprovecha los últimos estándares de passkey para mayor seguridad y facilidad de uso."
 
+msgid "A way to regain access to your identity if you ever lose it."
+msgstr "Una forma de recuperar el acceso a tu identidad si alguna vez la pierdes."
+
 msgid "Access methods"
 msgstr "Métodos de acceso"
 
 msgid "Account name"
 msgstr "Nombre de la cuenta"
+
+msgid "Activate"
+msgstr "Activar"
+
+msgid "Activate it so that you can recover your identity at any time."
+msgstr "Actívala para que puedas recuperar tu identidad en cualquier momento."
 
 msgid "Add a passkey"
 msgstr "Añade una passkey"
@@ -299,6 +308,9 @@ msgstr "¿Cómo se compara Internet Identity con otras herramientas de autentica
 msgid "How it works"
 msgstr "Cómo funciona"
 
+msgid "How to stay secure"
+msgstr "Cómo mantenerse seguro"
+
 msgid "Identity already upgraded"
 msgstr "Identidad ya actualizada"
 
@@ -368,6 +380,9 @@ msgstr "Solicitud inválida"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "¿Se almacena mi Face ID o huella digital en Internet Identity?"
 
+msgid "It can be used at any time to recover your identity."
+msgstr "Se puede usar en cualquier momento para recuperar tu identidad."
+
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "Parece que estás intentando iniciar sesión desde dentro de una aplicación (como X, Telegram o Instagram). El navegador integrado de esta aplicación no es compatible."
 
@@ -382,6 +397,9 @@ msgstr "Parece que no has colocado las palabras correctas en orden. Tendrás que
 
 msgid "It won't be removed from your device or password manager."
 msgstr "No se eliminará de tu dispositivo ni de tu gestor de contraseñas."
+
+msgid "Keep it secret"
+msgstr "Mantenla en secreto"
 
 msgid "Keep linked"
 msgstr "Mantener vinculado"
@@ -524,6 +542,15 @@ msgstr "Con la tecnología de Internet Identity"
 msgid "Real Privacy"
 msgstr "Privacidad Verdadera"
 
+msgid "Recovery phrase"
+msgstr "Frase de recuperación"
+
+msgid "Recovery phrase activated"
+msgstr "Frase de recuperación activada"
+
+msgid "Recovery phrase not activated"
+msgstr "Frase de recuperación no activada"
+
 msgid "Redirecting to the app"
 msgstr "Redirigiendo a la app..."
 
@@ -550,6 +577,12 @@ msgstr "Renombrar passkey"
 
 msgid "Rename this account"
 msgstr "Renombra esta cuenta"
+
+msgid "Replace it anytime"
+msgstr "Reemplázala en cualquier momento"
+
+msgid "Reset"
+msgstr "Restablecer"
 
 msgid "Retry"
 msgstr "Reintentar"
@@ -628,6 +661,9 @@ msgstr "Empezar de nuevo"
 
 msgid "Still have an identity number?"
 msgstr "¿Aún tienes un número de identidad?"
+
+msgid "Store it safely"
+msgstr "Guárdala de forma segura"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Almacenado de forma segura en tu dispositivo, en tu gestor de contraseñas o en una llave de seguridad."
@@ -788,6 +824,9 @@ msgstr "Con las passkeys, ahora puedes usar tu huella digital, rostro o bloqueo 
 msgid "with your Internet Identity"
 msgstr "con tu Internet Identity"
 
+msgid "Write down all <0>24 words</0> correctly and keep them <1>offline</1>. Do <2>not</2> store them in the cloud or on devices."
+msgstr "Anota las <0>24 palabras</0> correctamente y guárdalas <1>sin conexión</1>. <2>No</2> las almacenes en la nube ni en dispositivos."
+
 msgid "Wrong domain was set. Please try again."
 msgstr "Se estableció un dominio incorrecto. Por favor, inténtalo de nuevo."
 
@@ -799,6 +838,9 @@ msgstr "Ya tienes una cuenta de {name} vinculada"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Estás actualizando el ID <0>{identityNumber}</0>"
+
+msgid "You can <0>reset</0> your recovery phrase at any time. This keeps your identity <1>secure</1> if it is ever exposed."
+msgstr "Puedes <0>restablecer</0> tu frase de recuperación en cualquier momento. Esto mantiene tu identidad <1>segura</1> si alguna vez queda expuesta."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Puedes continuar con <0>Usar Passkey existente</0> en el proceso de inicio de sesión."
@@ -838,6 +880,9 @@ msgstr "El nombre de tu identidad no se puede editar actualmente. Solo es visibl
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Tus datos personales, como tu nombre o email, nunca se comparten. Cada app obtiene un seudónimo único para evitar el rastreo automáticamente."
+
+msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1>share it and<2>only</2> use it on the official website."
+msgstr "Tu frase de recuperación te da <0>control total</0> sobre tu identidad. <1>Nunca</1> la compartas y <2>solo</2> úsala en el sitio web oficial."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
 msgstr "Tu frase de recuperación es válida, pero no para Internet Identity. Es posible que hayas usado la frase incorrecta para el producto equivocado."

@@ -46,11 +46,20 @@ msgstr "<0>No More Identity Numbers:</0> As explained above, discoverable passke
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 
+msgid "A way to regain access to your identity if you ever lose it."
+msgstr "A way to regain access to your identity if you ever lose it."
+
 msgid "Access methods"
 msgstr "Access methods"
 
 msgid "Account name"
 msgstr "Account name"
+
+msgid "Activate"
+msgstr "Activate"
+
+msgid "Activate it so that you can recover your identity at any time."
+msgstr "Activate it so that you can recover your identity at any time."
 
 msgid "Add a passkey"
 msgstr "Add a passkey"
@@ -299,6 +308,9 @@ msgstr "How does Internet Identity compare to other Web3 authentication tools?"
 msgid "How it works"
 msgstr "How it works"
 
+msgid "How to stay secure"
+msgstr "How to stay secure"
+
 msgid "Identity already upgraded"
 msgstr "Identity already upgraded"
 
@@ -368,6 +380,9 @@ msgstr "Invalid request"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Is my Face ID or Fingerprint stored in Internet Identity?"
 
+msgid "It can be used at any time to recover your identity."
+msgstr "It can be used at any time to recover your identity."
+
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 
@@ -382,6 +397,9 @@ msgstr "It seems like you have not placed the correct words in order. You will h
 
 msgid "It won't be removed from your device or password manager."
 msgstr "It won't be removed from your device or password manager."
+
+msgid "Keep it secret"
+msgstr "Keep it secret"
 
 msgid "Keep linked"
 msgstr "Keep linked"
@@ -524,6 +542,15 @@ msgstr "Powered by Internet Identity"
 msgid "Real Privacy"
 msgstr "Real Privacy"
 
+msgid "Recovery phrase"
+msgstr "Recovery phrase"
+
+msgid "Recovery phrase activated"
+msgstr "Recovery phrase activated"
+
+msgid "Recovery phrase not activated"
+msgstr "Recovery phrase not activated"
+
 msgid "Redirecting to the app"
 msgstr "Redirecting to the app"
 
@@ -550,6 +577,12 @@ msgstr "Rename passkey"
 
 msgid "Rename this account"
 msgstr "Rename this account"
+
+msgid "Replace it anytime"
+msgstr "Replace it anytime"
+
+msgid "Reset"
+msgstr "Reset"
 
 msgid "Retry"
 msgstr "Retry"
@@ -628,6 +661,9 @@ msgstr "Start over"
 
 msgid "Still have an identity number?"
 msgstr "Still have an identity number?"
+
+msgid "Store it safely"
+msgstr "Store it safely"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Stored securely on your device, in your password manager, or on a security key."
@@ -788,6 +824,9 @@ msgstr "With passkeys, you can now use your fingerprint, face, or screen lock to
 msgid "with your Internet Identity"
 msgstr "with your Internet Identity"
 
+msgid "Write down all <0>24 words</0> correctly and keep them <1>offline</1>. Do <2>not</2> store them in the cloud or on devices."
+msgstr "Write down all <0>24 words</0> correctly and keep them <1>offline</1>. Do <2>not</2> store them in the cloud or on devices."
+
 msgid "Wrong domain was set. Please try again."
 msgstr "Wrong domain was set. Please try again."
 
@@ -799,6 +838,9 @@ msgstr "You already have a {name} account linked"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "You are upgrading ID <0>{identityNumber}</0>"
+
+msgid "You can <0>reset</0> your recovery phrase at any time. This keeps your identity <1>secure</1> if it is ever exposed."
+msgstr "You can <0>reset</0> your recovery phrase at any time. This keeps your identity <1>secure</1> if it is ever exposed."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "You can continue with <0>Use existing Passkey</0> in the login process."
@@ -838,6 +880,9 @@ msgstr "Your identity name is currently not editable. It is only ever visible to
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
+
+msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1>share it and<2>only</2> use it on the official website."
+msgstr "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1>share it and<2>only</2> use it on the official website."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
 msgstr "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."

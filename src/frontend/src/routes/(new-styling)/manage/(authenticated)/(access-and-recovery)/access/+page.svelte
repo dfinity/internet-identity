@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PageProps } from "./$types";
+  import type { PageProps } from "../../../../../../../../../.svelte-kit/types/src/frontend";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { PlusIcon } from "@lucide/svelte";
