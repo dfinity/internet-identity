@@ -881,8 +881,8 @@ msgstr "Nama identitas Anda saat ini tidak dapat diedit. Ini hanya terlihat oleh
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Data pribadi Anda, seperti nama atau email, tidak pernah dibagikan. Setiap aplikasi mendapatkan pseudonim unik untuk mencegah pelacakan secara otomatis."
 
-msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1>share it and<2>only</2> use it on the official website."
-msgstr "Frasa pemulihan Anda memberikan <0>kontrol penuh</0> atas identitas Anda. <1>Jangan pernah</1> membagikannya dan <2>hanya</2> menggunakannya di situs web resmi."
+msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1> share it and <2>only</2> use it on the official website."
+msgstr "Frasa pemulihan Anda memberikan <0>kontrol penuh</0> atas identitas Anda. <1>Jangan pernah</1> membagikannya dan <2>hanya</2> gunakan di situs web resmi."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
 msgstr "Frasa pemulihan Anda valid tetapi bukan untuk identitas internet. Anda mungkin telah menggunakan frasa benih yang salah untuk produk yang salah."

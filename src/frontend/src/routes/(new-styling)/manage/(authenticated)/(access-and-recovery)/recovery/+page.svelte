@@ -59,7 +59,7 @@
       "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
       // Paragraphs with emphasis
       "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
-      "[&_p_em]:text-text-primary [&_p_em]:font-medium",
+      "[&_p_em]:text-text-primary [&_p_em]:normal [&_p_em]:not-italic",
     ]}
   >
     <article>
@@ -67,7 +67,7 @@
       <p>
         <Trans>
           Your recovery phrase gives <em>full control</em> over your identity.
-          <em>Never</em>share it and<em>only</em> use it on the official website.
+          <em>Never</em> share it and <em>only</em> use it on the official website.
         </Trans>
       </p>
     </article>

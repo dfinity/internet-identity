@@ -881,8 +881,8 @@ msgstr "Your identity name is currently not editable. It is only ever visible to
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 
-msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1>share it and<2>only</2> use it on the official website."
-msgstr "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1>share it and<2>only</2> use it on the official website."
+msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1> share it and <2>only</2> use it on the official website."
+msgstr "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1> share it and <2>only</2> use it on the official website."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
 msgstr "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
