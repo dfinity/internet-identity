@@ -5,6 +5,7 @@
   import InactiveRecoveryPhrase from "./components/InactiveRecoveryPhrase.svelte";
   import { getMetadataString } from "$lib/utils/openID";
   import ActiveRecoveryPhrase from "./components/ActiveRecoveryPhrase.svelte";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
 
   const { data }: PageProps = $props();
 
@@ -14,6 +15,9 @@
         "Recovery" in m.security_settings.purpose &&
         getMetadataString(m.metadata, "usage") === "recovery_phrase",
     ),
+  );
+  const isCurrentAccessMethod = $derived(
+    "recoveryPhrase" in $authenticatedStore.authMethod,
   );
 </script>
 
@@ -31,9 +35,9 @@
   <div class="col-span-3 max-sm:col-span-1">
     {#if recoveryPhrase !== undefined}
       <ActiveRecoveryPhrase
-        {recoveryPhrase}
         onReset={() => {}}
-        isCurrentAccessMethod={false}
+        {recoveryPhrase}
+        {isCurrentAccessMethod}
       />
     {:else}
       <InactiveRecoveryPhrase onActivate={() => {}} />
