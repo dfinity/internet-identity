@@ -30,9 +30,9 @@ impl<M: Memory + Clone> Storage<M> {
         let anchor_count = self.anchor_count() as u64;
 
         // Lazily compute the bound on the ID of anchors to be migrated.
-        let last_achor_id = RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID.with_borrow(|x| x.clone());
+        let last_anchor_id = RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID.with_borrow(|x| *x);
 
-        let next_anchor_number = if let Some(last_anchor_id) = last_achor_id {
+        let next_anchor_number = if let Some(last_anchor_id) = last_anchor_id {
             // The ID of the last anchor that needs to be migrated. Does not change during
             // the migration. Note that anchors created during the migration don't need to be
             // migrated since the migration should be released together with index
@@ -51,14 +51,14 @@ impl<M: Memory + Clone> Storage<M> {
             };
 
             // (ID of the last anchor to be migrated) = (next unallocated anchor number) - 1
-            RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID.with_borrow_mut(|x| {
-                *x = Some(next_anchor_number.saturating_sub(1));
+            RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID.with_borrow_mut(|last_anchor_id| {
+                *last_anchor_id = Some(next_anchor_number.saturating_sub(1));
             });
 
             next_anchor_number
         };
 
-        let batch_id = RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow());
+        let batch_id = RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| *id);
 
         let begin = id_range_lo
             .saturating_add(RECOVERY_PHRASE_MIGRATION_BATCH_SIZE.saturating_mul(batch_id));
@@ -109,7 +109,7 @@ impl<M: Memory + Clone> Storage<M> {
             );
 
             RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow_mut(|all_errors| {
-                all_errors.extend(errors.into_iter());
+                all_errors.extend(errors);
             });
         }
 
