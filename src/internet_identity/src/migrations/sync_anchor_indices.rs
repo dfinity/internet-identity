@@ -207,9 +207,9 @@ mod sync_anchor_indices_tests {
         storage.sync_anchor_indices(BATCH_SIZE);
 
         // Check that recovery phrase principals are indexed for anchors 1 and 3
-        let principal_1 = Principal::self_authenticating(&pubkey(1));
-        let principal_2 = Principal::self_authenticating(&pubkey(2));
-        let principal_3 = Principal::self_authenticating(&pubkey(3));
+        let principal_1 = Principal::self_authenticating(pubkey(1));
+        let principal_2 = Principal::self_authenticating(pubkey(2));
+        let principal_3 = Principal::self_authenticating(pubkey(3));
 
         assert_eq!(
             storage
@@ -265,9 +265,9 @@ mod sync_anchor_indices_tests {
         storage.sync_anchor_indices(BATCH_SIZE);
 
         // Check that recovery phrase principals are indexed for anchors 1 and 3
-        let principal_1 = Principal::self_authenticating(&pubkey(1));
-        let principal_2 = Principal::self_authenticating(&pubkey(2));
-        let principal_3 = Principal::self_authenticating(&pubkey(3));
+        let principal_1 = Principal::self_authenticating(pubkey(1));
+        let principal_2 = Principal::self_authenticating(pubkey(2));
+        let principal_3 = Principal::self_authenticating(pubkey(3));
 
         assert_eq!(
             storage
