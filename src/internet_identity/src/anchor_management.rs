@@ -2,13 +2,14 @@ use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::anchor::{Anchor, AnchorError, Device};
 use crate::{state, stats::activity_stats};
+use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, AuthorizationKey, CredentialId, DeviceData, DeviceKey, DeviceKeyWithAnchor,
-    DeviceWithUsage, IdentityAnchorInfo, IdentityPropertiesReplace, MetadataEntry,
+    DeviceWithUsage, IdentityAnchorInfo, IdentityNumber, IdentityPropertiesReplace, MetadataEntry,
 };
 use state::storage_borrow;
 use std::collections::HashMap;
@@ -235,6 +236,11 @@ pub fn lookup_device_key_with_credential_id(
         pubkey: device.pubkey.clone(),
         anchor_number,
     })
+}
+
+/// Lookup `IdentityNumber` for the given caller `Principal` used as recovery phrase.
+pub fn lookup_caller_identity_by_recovery_phrase(caller: Principal) -> Option<IdentityNumber> {
+    storage_borrow(|storage| storage.lookup_anchor_with_recovery_phrase_principal(caller))
 }
 
 /// Set `name` of the given anchor.
