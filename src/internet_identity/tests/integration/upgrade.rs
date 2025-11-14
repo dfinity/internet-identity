@@ -320,7 +320,7 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
 
 // TODO: Remove this test after the migration takes place.
 #[test]
-fn upgrade_and_rollback_with_realistic_data_migration() {
+fn test_sync_anchor_indices_migration() {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
 
@@ -357,7 +357,7 @@ fn upgrade_and_rollback_with_realistic_data_migration() {
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
 
-    for _ in 0..NUM_ANCHORS {
+    for _ in 0..(NUM_ANCHORS / 2_000 + 1) {
         env.tick();
         env.tick();
         env.advance_time(Duration::from_secs(3));

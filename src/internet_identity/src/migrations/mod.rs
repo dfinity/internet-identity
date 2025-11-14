@@ -1,1 +1,1 @@
-pub mod lookup_anchor_with_recovery_phrase_principal;
+pub mod sync_anchor_indices;

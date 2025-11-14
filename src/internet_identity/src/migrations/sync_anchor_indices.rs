@@ -7,8 +7,8 @@ use crate::{
 
 impl<M: Memory + Clone> Storage<M> {
     /// Migrates the next batch of anchors to synchronize the following indices:
-    /// `lookup_anchor_with_recovery_phrase_principal_memory_wrapper`
-    /// `lookup_anchor_with_device_credential_memory`
+    /// - `lookup_anchor_with_recovery_phrase_principal_memory`
+    /// - `lookup_anchor_with_device_credential_memory`
     ///
     /// The batch size is `batch_size` anchors.
     ///
@@ -59,33 +59,21 @@ impl<M: Memory + Clone> Storage<M> {
             last_anchor_id
         };
 
-        println!(" last_anchor_id={}", last_anchor_id);
-
         let batch_id = RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| *id);
 
-        println!(" batch_id={}", batch_id);
-
         let begin = id_range_lo.saturating_add(batch_size.saturating_mul(batch_id));
-
-        println!(" begin={}", begin);
 
         // The end index is inclusive.
         let end = begin.saturating_add(batch_size).saturating_sub(1);
 
-        println!(" end={}", end);
-
         // Stop *before* the next un-allocated anchor number.
         let end = std::cmp::min(end, last_anchor_id);
 
-        println!(" end={}", end);
-
         let mut errors = vec![];
 
-        // This is where the index migrastion happens. For each anchor in the batch, read it
+        // This is where the index migration happens. For each anchor in the batch, read it
         // from storage and write it back, which updates the indices.
         for anchor_number in begin..=end {
-            println!("Migrating anchor #{}", anchor_number);
-
             let anchor = match self.read(anchor_number) {
                 Ok(anchor) => anchor,
                 Err(err) => {
