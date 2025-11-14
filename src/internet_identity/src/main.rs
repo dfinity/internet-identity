@@ -627,7 +627,7 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 
 async fn run_periodic_tasks() {
     state::storage_borrow_mut(|storage| {
-        storage.sync_anchor_indices();
+        storage.sync_anchor_indices(RECOVERY_PHRASE_MIGRATION_BATCH_SIZE);
     });
 
     if RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
