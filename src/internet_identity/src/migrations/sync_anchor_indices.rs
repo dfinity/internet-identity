@@ -44,9 +44,7 @@ impl<M: Memory + Clone> Storage<M> {
                     "id_range_lo={} + anchor_count={} overflowed",
                     id_range_lo, anchor_count
                 );
-                RECOVERY_PHRASE_MIGRATION_ERRORS.with(|errors| {
-                    errors.borrow_mut().push(err);
-                });
+                ic_cdk::println!("ERROR: {}", err);
                 return;
             };
 
