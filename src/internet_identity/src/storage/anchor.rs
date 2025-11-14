@@ -203,7 +203,7 @@ impl From<(AnchorNumber, StorableFixedAnchor, Option<StorableAnchor>)> for Ancho
 impl Anchor {
     /// Creation of new anchors is restricted in order to make sure that the device checks are
     /// not accidentally bypassed.
-    pub(super) fn new(anchor_number: AnchorNumber, created_at: Timestamp) -> Anchor {
+    pub fn new(anchor_number: AnchorNumber, created_at: Timestamp) -> Anchor {
         Self {
             anchor_number,
             created_at: Some(created_at),

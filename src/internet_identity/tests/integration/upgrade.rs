@@ -1,6 +1,8 @@
 //! Tests for making sure that the current version can be upgraded to from the last release.
 //! This tests stable memory compatibility and pre / post install hooks.
 
+use std::time::Duration;
+
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::api::internet_identity::api_v2::create_account;
@@ -314,4 +316,106 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
 
     assert_eq!(accounts_before, accounts_between);
     assert_eq!(accounts_between, accounts_after);
+}
+
+// TODO: Remove this test after the migration takes place.
+#[test]
+fn test_sync_anchor_indices_migration() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+
+    const NUM_ANCHORS: usize = 20;
+
+    for i in 0..NUM_ANCHORS {
+        let pubkey = format!("pub-key-{}", i);
+        let sender = Principal::self_authenticating(pubkey.clone());
+        let origin = format!("https://www.app{}.org", i);
+        let device_data = DeviceData {
+            pubkey: ByteBuf::from(pubkey),
+            alias: "My Device".to_string(),
+            credential_id: None,
+            origin: Some(origin.clone()),
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            ..DeviceData::auth_test_device()
+        };
+        let identity_number = flows::register_anchor_with(&env, canister_id, sender, &device_data);
+
+        let account_name = format!("Account-{}", i);
+
+        create_account(
+            &env,
+            canister_id,
+            sender,
+            identity_number,
+            origin,
+            account_name,
+        )
+        .unwrap()
+        .unwrap();
+    }
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+
+    for _ in 0..(NUM_ANCHORS / 2_000 + 1) {
+        env.tick();
+        env.tick();
+        env.advance_time(Duration::from_secs(3));
+        env.tick();
+    }
+
+    api::health_check(&env, canister_id);
+
+    {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .update_call(
+                canister_id,
+                Principal::anonymous(),
+                "list_recovery_phrase_migration_errors",
+                payload,
+            )
+            .unwrap();
+
+        let errors: Vec<String> = candid::decode_one(&data).unwrap();
+
+        println!("errors: {:#?}", errors);
+    }
+
+    {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .update_call(
+                canister_id,
+                Principal::anonymous(),
+                "list_recovery_phrase_migration_current_batch_id",
+                payload,
+            )
+            .unwrap();
+
+        let list_recovery_phrase_migration_current_batch_id: u64 =
+            candid::decode_one(&data).unwrap();
+
+        // The special value u64::MAX indicates that the migration is complete.
+        assert_eq!(list_recovery_phrase_migration_current_batch_id, u64::MAX);
+    }
+
+    {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .update_call(
+                canister_id,
+                Principal::anonymous(),
+                "count_recovery_phrases",
+                payload,
+            )
+            .unwrap();
+
+        let count_recovery_phrases: u64 = candid::decode_one(&data).unwrap();
+
+        assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64);
+    }
 }

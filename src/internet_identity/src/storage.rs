@@ -316,7 +316,7 @@ pub struct Storage<M: Memory> {
         StableBTreeMap<StorableOriginSha256, StorableApplicationNumber, ManagedMemory<M>>,
 
     lookup_anchor_with_recovery_phrase_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    lookup_anchor_with_recovery_phrase_principal_memory:
+    pub(crate) lookup_anchor_with_recovery_phrase_principal_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
@@ -702,7 +702,7 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
-    fn sync_anchor_with_recovery_phrase_principal_index(
+    pub(crate) fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous_devices: &[Device],
@@ -716,20 +716,17 @@ impl<M: Memory + Clone> Storage<M> {
             Some(Principal::self_authenticating(&device.pubkey))
         };
 
-        let previous_devices = previous_devices
+        let previous_recovery_phrases = previous_devices
             .iter()
             .filter_map(retain_recovery_phrase_device_principals)
             .collect::<BTreeSet<_>>();
 
-        let current_devices = current_devices
+        let current_recovery_phrases = current_devices
             .iter()
             .filter_map(retain_recovery_phrase_device_principals)
             .collect::<BTreeSet<_>>();
 
-        let devices_to_be_removed = previous_devices.difference(&current_devices);
-        let devices_to_be_added = current_devices.difference(&previous_devices);
-
-        for key in devices_to_be_removed {
+        for key in previous_recovery_phrases.difference(&current_recovery_phrases) {
             let Some(existing_anchor_number) = self
                 .lookup_anchor_with_recovery_phrase_principal_memory
                 .get(key)
@@ -745,17 +742,17 @@ impl<M: Memory + Clone> Storage<M> {
                 .remove(key);
         }
 
-        for key in devices_to_be_added {
+        for key in current_recovery_phrases {
             if self
                 .lookup_anchor_with_recovery_phrase_principal_memory
-                .contains_key(key)
+                .contains_key(&key)
             {
                 // This principal is already occupied; do not overwrite it.
                 continue;
             };
 
             self.lookup_anchor_with_recovery_phrase_principal_memory
-                .insert(*key, anchor_number);
+                .insert(key, anchor_number);
         }
     }
 
@@ -766,43 +763,49 @@ impl<M: Memory + Clone> Storage<M> {
         previous: Vec<Device>,
         current: Vec<Device>,
     ) {
-        let previous_set: BTreeSet<CredentialId> = previous
+        let previous_credential_ids: BTreeSet<CredentialId> = previous
             .into_iter()
             .filter_map(|device| device.credential_id)
             .collect();
-        let current_set: BTreeSet<CredentialId> = current
+
+        let current_credential_ids: BTreeSet<CredentialId> = current
             .into_iter()
             .filter_map(|device| device.credential_id)
             .collect();
-        let credential_to_be_removed = previous_set.difference(&current_set);
-        let credential_to_be_added = current_set.difference(&previous_set);
-        credential_to_be_removed
-            .cloned()
-            .map(StorableCredentialId::from)
-            .for_each(|credential_id| {
-                // Only remove if the credential is assigned to this anchor
-                if self
-                    .lookup_anchor_with_device_credential_memory
-                    .get(&credential_id)
-                    .is_some_and(|other_anchor_number| other_anchor_number == anchor_number)
-                {
-                    self.lookup_anchor_with_device_credential_memory
-                        .remove(&credential_id);
-                }
-            });
-        credential_to_be_added
-            .cloned()
-            .map(StorableCredentialId::from)
-            .for_each(|credential_id| {
-                // Only insert if the credential id isn't assigned yet to an anchor
-                if !self
-                    .lookup_anchor_with_device_credential_memory
-                    .contains_key(&credential_id)
-                {
-                    self.lookup_anchor_with_device_credential_memory
-                        .insert(credential_id, anchor_number);
-                }
-            });
+
+        for credential_id in previous_credential_ids.difference(&current_credential_ids) {
+            let credential_id = StorableCredentialId::from(credential_id.clone());
+
+            let Some(indexed_anchor_number) = self
+                .lookup_anchor_with_device_credential_memory
+                .get(&credential_id)
+            else {
+                continue;
+            };
+
+            // Only remove if the credential is assigned to *this* anchor.
+            if indexed_anchor_number != anchor_number {
+                continue;
+            }
+
+            self.lookup_anchor_with_device_credential_memory
+                .remove(&credential_id);
+        }
+
+        for credential_id in current_credential_ids {
+            let credential_id = StorableCredentialId::from(credential_id);
+
+            // Only insert if the credential id isn't yet assigned to an anchor.
+            if self
+                .lookup_anchor_with_device_credential_memory
+                .contains_key(&credential_id)
+            {
+                continue;
+            }
+
+            self.lookup_anchor_with_device_credential_memory
+                .insert(credential_id, anchor_number);
+        }
     }
 
     #[allow(dead_code)]
