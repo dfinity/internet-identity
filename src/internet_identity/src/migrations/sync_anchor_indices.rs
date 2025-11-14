@@ -45,6 +45,13 @@ impl<M: Memory + Clone> Storage<M> {
                     id_range_lo, anchor_count
                 );
                 ic_cdk::println!("ERROR: {}", err);
+                RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow_mut(|all_errors| {
+                    all_errors.push(err);
+                });
+
+                // Ensure that migration is not retried endlessly.
+                ic_cdk::println!("Recovery phrase migration CANCELED.");
+                RECOVERY_PHRASE_MIGRATION_BATCH_ID.replace(u64::MAX);
                 return;
             };
 
@@ -69,6 +76,10 @@ impl<M: Memory + Clone> Storage<M> {
 
         let mut errors = vec![];
 
+        // This condition is used to terminate the migration in the unlikely event that *all*
+        // anchors within this entire batch failed to migrate.
+        let mut batch_did_not_fail_completely = false;
+
         // This is where the index migration happens. For each anchor in the batch, read it
         // from storage and write it back, which updates the indices.
         for anchor_number in begin..=end {
@@ -86,16 +97,15 @@ impl<M: Memory + Clone> Storage<M> {
                 Err(err) => {
                     let err = format!("w#{}:{:?}", anchor_number, err);
                     errors.push(err);
+                    continue;
                 }
             }
+
+            batch_did_not_fail_completely = true;
         }
 
         // Whether more batches are to be migrated.
         let has_more_work = end < last_anchor_id;
-
-        // This condition is used to terminate the migration in the unlikely event that *all*
-        // anchors within this entire batch failed to migrate.
-        let batch_did_not_fail_completely = errors.len() < batch_size as usize;
 
         if errors.is_empty() {
             ic_cdk::println!("Successfully migrated batch {}..{}", begin, end);
