@@ -97,6 +97,7 @@ impl<M: Memory + Clone> Storage<M> {
                 Err(err) => {
                     let err = format!("w#{}:{:?}", anchor_number, err);
                     errors.push(err);
+                    continue;
                 }
             }
 
