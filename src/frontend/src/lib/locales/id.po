@@ -46,11 +46,20 @@ msgstr "<0>Tidak Perlu Nomor Identitas Lagi:</0> Seperti dijelaskan sebelumnya, 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Integrasi Passkey Tanpa Hambatan:</0> Kami terus mendukung passkey sebagai masa depan autentikasi yang aman. Internet Identity 2.0 memanfaatkan standar passkey terbaru untuk keamanan dan kemudahan penggunaan yang lebih baik."
 
+msgid "A way to regain access to your identity if you ever lose it."
+msgstr "Cara untuk mendapatkan kembali akses ke identitas Anda jika Anda kehilangannya."
+
 msgid "Access methods"
 msgstr "Metode akses"
 
 msgid "Account name"
 msgstr "Nama akun"
+
+msgid "Activate"
+msgstr "Aktifkan"
+
+msgid "Activate it so that you can recover your identity at any time."
+msgstr "Aktifkan agar Anda dapat memulihkan identitas Anda kapan saja."
 
 msgid "Add a passkey"
 msgstr "Tambahkan passkey"
@@ -299,6 +308,9 @@ msgstr "Bagaimana Internet Identity dibandingkan dengan alat autentikasi Web3 la
 msgid "How it works"
 msgstr "Cara kerja"
 
+msgid "How to stay secure"
+msgstr "Cara tetap aman"
+
 msgid "Identity already upgraded"
 msgstr "Identitas sudah ditingkatkan"
 
@@ -368,6 +380,9 @@ msgstr "Permintaan tidak valid"
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Apakah Face ID atau sidik jari saya disimpan di Internet Identity?"
 
+msgid "It can be used at any time to recover your identity."
+msgstr "Ini dapat digunakan kapan saja untuk memulihkan identitas Anda."
+
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Peramban bawaan aplikasi ini tidak didukung."
 
@@ -382,6 +397,9 @@ msgstr "Tampaknya Anda belum menempatkan kata-kata yang benar secara berurutan. 
 
 msgid "It won't be removed from your device or password manager."
 msgstr "Ini tidak akan dihapus dari perangkat atau pengelola kata sandi Anda."
+
+msgid "Keep it secret"
+msgstr "Rahasiakan"
 
 msgid "Keep linked"
 msgstr "Tetap tertaut"
@@ -524,6 +542,15 @@ msgstr "Didukung oleh Internet Identity"
 msgid "Real Privacy"
 msgstr "Privasi nyata"
 
+msgid "Recovery phrase"
+msgstr "Frasa pemulihan"
+
+msgid "Recovery phrase activated"
+msgstr "Frasa pemulihan diaktifkan"
+
+msgid "Recovery phrase not activated"
+msgstr "Frasa pemulihan tidak diaktifkan"
+
 msgid "Redirecting to the app"
 msgstr "Mengalihkan ke aplikasi..."
 
@@ -550,6 +577,12 @@ msgstr "Ubah nama passkey"
 
 msgid "Rename this account"
 msgstr "Ubah nama akun ini"
+
+msgid "Replace it anytime"
+msgstr "Ganti kapan saja"
+
+msgid "Reset"
+msgstr "Setel ulang"
 
 msgid "Retry"
 msgstr "Coba lagi"
@@ -628,6 +661,9 @@ msgstr "Mulai ulang"
 
 msgid "Still have an identity number?"
 msgstr "Masih punya nomor identitas?"
+
+msgid "Store it safely"
+msgstr "Simpan dengan aman"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Disimpan dengan aman di perangkat Anda, di pengelola kata sandi Anda, atau di kunci keamanan."
@@ -788,6 +824,9 @@ msgstr "Dengan passkey, Anda sekarang dapat menggunakan sidik jari, wajah, atau 
 msgid "with your Internet Identity"
 msgstr "dengan Internet Identity Anda"
 
+msgid "Write down all <0>24 words</0> correctly and keep them <1>offline</1>. Do <2>not</2> store them in the cloud or on devices."
+msgstr "Tulis semua <0>24 kata</0> dengan benar dan simpan <1>offline</1>. <2>Jangan</2> menyimpannya di cloud atau di perangkat."
+
 msgid "Wrong domain was set. Please try again."
 msgstr "Domain yang salah diatur. Silakan coba lagi."
 
@@ -799,6 +838,9 @@ msgstr "Anda sudah memiliki akun {name} yang tertaut"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Anda sedang meningkatkan ID <0>{identityNumber}</0>"
+
+msgid "You can <0>reset</0> your recovery phrase at any time. This keeps your identity <1>secure</1> if it is ever exposed."
+msgstr "Anda dapat <0>mereset</0> frasa pemulihan Anda kapan saja. Ini menjaga identitas Anda <1>tetap aman</1> jika sewaktu-waktu terekspos."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
@@ -838,6 +880,9 @@ msgstr "Nama identitas Anda saat ini tidak dapat diedit. Ini hanya terlihat oleh
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Data pribadi Anda, seperti nama atau email, tidak pernah dibagikan. Setiap aplikasi mendapatkan pseudonim unik untuk mencegah pelacakan secara otomatis."
+
+msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1> share it and <2>only</2> use it on the official website."
+msgstr "Frasa pemulihan Anda memberikan <0>kontrol penuh</0> atas identitas Anda. <1>Jangan pernah</1> membagikannya dan <2>hanya</2> gunakan di situs web resmi."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
 msgstr "Frasa pemulihan Anda valid tetapi bukan untuk identitas internet. Anda mungkin telah menggunakan frasa benih yang salah untuk produk yang salah."
