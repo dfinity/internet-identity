@@ -702,7 +702,15 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
-    pub(crate) fn sync_anchor_with_recovery_phrase_principal_index(
+    pub fn lookup_anchor_with_recovery_phrase_principal(
+        &self,
+        key: Principal,
+    ) -> Option<AnchorNumber> {
+        self.lookup_anchor_with_recovery_phrase_principal_memory
+            .get(&key)
+    }
+
+    fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous_devices: &[Device],

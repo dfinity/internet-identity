@@ -418,4 +418,37 @@ fn test_sync_anchor_indices_migration() {
 
         assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64);
     }
+
+    // smoke test
+    for (label, sender, expected_anchor_number) in [
+        (
+            "Anonymous user should not get any anchor number",
+            Principal::anonymous(),
+            None,
+        ),
+        (
+            "User with pub-key-0 should get anchor number 10000",
+            Principal::self_authenticating("pub-key-0"),
+            Some(10_000),
+        ),
+    ] {
+        let payload = candid::encode_one(()).unwrap();
+
+        let data = env
+            .update_call(
+                canister_id,
+                sender,
+                "lookup_caller_identity_by_recovery_phrase",
+                payload,
+            )
+            .unwrap();
+
+        let observed_anchor_number: Option<u64> = candid::decode_one(&data).unwrap();
+
+        assert_eq!(
+            observed_anchor_number, expected_anchor_number,
+            "failed for {}",
+            label
+        );
+    }
 }
