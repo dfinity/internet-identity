@@ -37,7 +37,7 @@
   const handleVerifyPending = () => {
     showRecoveryPhraseSetup = true;
   };
-  const handleAcknowledged = async (recoveryPhrase: string[]) => {
+  const handleCreateOrReplace = async (recoveryPhrase: string[]) => {
     const data = await recoveryAuthnMethodData(recoveryPhrase);
     // Add new recovery phrase if there isn't one yet, else replace existing
     if (recoveryPhraseData === undefined) {
@@ -155,9 +155,11 @@
 {#if showRecoveryPhraseSetup}
   <Dialog onClose={pendingRecoveryPhrase ? handleUnverified : handleCancel}>
     <CreateRecoveryPhraseWizard
-      onAcknowledged={handleAcknowledged}
+      onCreate={handleCreateOrReplace}
       onVerified={handleVerified}
+      onCancel={handleCancel}
       unverifiedRecoveryPhrase={pendingRecoveryPhrase}
+      hasExistingRecoveryPhrase={recoveryPhraseData !== undefined}
     />
   </Dialog>
 {/if}

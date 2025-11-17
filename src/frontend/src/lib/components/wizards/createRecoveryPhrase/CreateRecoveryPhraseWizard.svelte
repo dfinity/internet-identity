@@ -3,28 +3,40 @@
   import Write from "$lib/components/wizards/createRecoveryPhrase/views/Write.svelte";
   import Verify from "$lib/components/wizards/createRecoveryPhrase/views/Verify.svelte";
   import { generateMnemonic } from "$lib/utils/recoveryPhrase";
+  import Reset from "$lib/components/wizards/createRecoveryPhrase/views/Reset.svelte";
 
   interface Props {
-    onAcknowledged: (recoveryPhrase: string[]) => Promise<void>;
+    onCreate: (recoveryPhrase: string[]) => Promise<void>;
     onVerified: () => Promise<void>;
+    onCancel: () => void;
     unverifiedRecoveryPhrase?: string[];
+    hasExistingRecoveryPhrase?: boolean;
   }
 
-  const { onAcknowledged, onVerified, unverifiedRecoveryPhrase }: Props =
-    $props();
+  const {
+    onCreate,
+    onVerified,
+    onCancel,
+    unverifiedRecoveryPhrase,
+    hasExistingRecoveryPhrase,
+  }: Props = $props();
 
   let recoveryPhrase = $state(unverifiedRecoveryPhrase);
   let isWritten = $state(unverifiedRecoveryPhrase !== undefined);
 
-  const handleAcknowledged = async () => {
+  const createRecoveryPhrase = async () => {
     const generated = generateMnemonic();
-    await onAcknowledged(generated);
+    await onCreate(generated);
     recoveryPhrase = generated;
   };
 </script>
 
 {#if recoveryPhrase === undefined}
-  <Acknowledge onAcknowledged={handleAcknowledged} />
+  {#if hasExistingRecoveryPhrase}
+    <Reset onReset={createRecoveryPhrase} {onCancel} />
+  {:else}
+    <Acknowledge onAcknowledged={createRecoveryPhrase} />
+  {/if}
 {:else if !isWritten}
   <Write {recoveryPhrase} onWritten={() => (isWritten = true)} />
 {:else}
