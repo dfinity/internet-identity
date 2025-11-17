@@ -152,6 +152,7 @@
     </article>
   </div>
 </section>
+
 {#if showRecoveryPhraseSetup}
   <Dialog onClose={pendingRecoveryPhrase ? handleUnverified : handleCancel}>
     <CreateRecoveryPhraseWizard
