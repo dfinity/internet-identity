@@ -12,8 +12,6 @@ const HARDENED = 0x80000000;
  */
 export const generateMnemonic = (): string[] => {
   const entropy = globalThis.crypto.getRandomValues(new Uint8Array(32));
-  console.log("entropy:", entropy);
-  console.log("entropy2:", bytesToHex(entropy));
   return entropyToMnemonic(bytesToHex(entropy)).split(" ");
 };
 
