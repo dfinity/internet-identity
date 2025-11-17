@@ -34,7 +34,7 @@
     pendingRecoveryPhrase = undefined;
     showRecoveryPhraseSetup = true;
   };
-  const handleVerify = () => {
+  const handleVerifyPending = () => {
     showRecoveryPhraseSetup = true;
   };
   const handleAcknowledged = async (recoveryPhrase: string[]) => {
@@ -58,7 +58,7 @@
   const handleCancel = () => {
     showRecoveryPhraseSetup = false;
   };
-  const handlePending = async () => {
+  const handleCompletePending = async () => {
     if (pendingRecoveryPhrase === undefined) {
       return;
     }
@@ -67,11 +67,11 @@
     void invalidateAll();
   };
   const handleUnverified = async () => {
-    await handlePending();
+    await handleCompletePending();
     isUnverified = true;
   };
   const handleVerified = async () => {
-    await handlePending();
+    await handleCompletePending();
     isUnverified = false;
     pendingRecoveryPhrase = undefined;
   };
@@ -90,7 +90,10 @@
 >
   <div class="col-span-3 max-sm:col-span-1">
     {#if isUnverified}
-      <UnverifiedRecoveryPhrase onReset={handleSetup} onVerify={handleVerify} />
+      <UnverifiedRecoveryPhrase
+        onReset={handleSetup}
+        onVerify={handleVerifyPending}
+      />
     {:else if recoveryPhraseData !== undefined}
       <ActiveRecoveryPhrase
         onReset={handleSetup}
