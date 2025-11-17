@@ -17,7 +17,8 @@
 
   let showRecoveryPhraseSetup = $state(false);
   let pendingRecoveryPhrase = $state<string[]>();
-  let isUnverified = $state(false);
+  let isPendingUnverified = $state(false);
+  let verifyPending = $state(false);
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -31,13 +32,13 @@
   );
 
   const handleSetup = () => {
-    pendingRecoveryPhrase = undefined;
     showRecoveryPhraseSetup = true;
   };
   const handleVerifyPending = () => {
+    verifyPending = true;
     showRecoveryPhraseSetup = true;
   };
-  const handleCreateOrReplace = async (recoveryPhrase: string[]) => {
+  const handleCreate = async (recoveryPhrase: string[]) => {
     const data = await recoveryAuthnMethodData(recoveryPhrase);
     // Add new recovery phrase if there isn't one yet, else replace existing
     if (recoveryPhraseData === undefined) {
@@ -57,23 +58,25 @@
   };
   const handleCancel = () => {
     showRecoveryPhraseSetup = false;
+    verifyPending = false;
   };
   const handleCompletePending = async () => {
     if (pendingRecoveryPhrase === undefined) {
       return;
     }
     showRecoveryPhraseSetup = false;
+    verifyPending = false;
     recoveryPhraseData = await recoveryAuthnMethodData(pendingRecoveryPhrase);
     void invalidateAll();
   };
   const handleUnverified = async () => {
     await handleCompletePending();
-    isUnverified = true;
+    isPendingUnverified = true;
   };
   const handleVerified = async () => {
     await handleCompletePending();
-    isUnverified = false;
     pendingRecoveryPhrase = undefined;
+    isPendingUnverified = false;
   };
 </script>
 
@@ -89,7 +92,7 @@
   class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5"
 >
   <div class="col-span-3 max-sm:col-span-1">
-    {#if isUnverified}
+    {#if isPendingUnverified}
       <UnverifiedRecoveryPhrase
         onReset={handleSetup}
         onVerify={handleVerifyPending}
@@ -156,10 +159,12 @@
 {#if showRecoveryPhraseSetup}
   <Dialog onClose={pendingRecoveryPhrase ? handleUnverified : handleCancel}>
     <CreateRecoveryPhraseWizard
-      onCreate={handleCreateOrReplace}
+      onCreate={handleCreate}
       onVerified={handleVerified}
       onCancel={handleCancel}
-      unverifiedRecoveryPhrase={pendingRecoveryPhrase}
+      unverifiedRecoveryPhrase={verifyPending
+        ? pendingRecoveryPhrase
+        : undefined}
       hasExistingRecoveryPhrase={recoveryPhraseData !== undefined}
     />
   </Dialog>
