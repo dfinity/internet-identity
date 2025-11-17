@@ -14,12 +14,6 @@
 </script>
 
 <h2>{$t`Secure your identity`}</h2>
-<p>
-  <Trans>
-    Protect your access: save your recovery phrase in a trusted place. It’s the
-    only way to recover your identity.
-  </Trans>
-</p>
 <Checkbox
   bind:checked={isAcknowledged}
   label={$t`I Acknowledge`}

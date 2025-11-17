@@ -13,8 +13,5 @@
 </script>
 
 <h2>{$t`Verify your recovery phrase`}</h2>
-<p>
-  <Trans>Select each word in the correct order</Trans>
-</p>
 <!-- TODO: implement word verification -->
 <button onclick={onVerified}>Mark as verified</button>

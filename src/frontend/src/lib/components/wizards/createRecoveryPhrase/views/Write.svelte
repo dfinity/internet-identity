@@ -12,12 +12,6 @@
 </script>
 
 <h2>{$t`Save your recovery phrase`}</h2>
-<p>
-  <Trans>
-    Write down (in order), store safely. Don't share. Lose it, lose access. Make
-    sure to verify your recovery phrase after you have written it down.
-  </Trans>
-</p>
 <div class="grid grid-cols-3 gap-1">
   {#each recoveryPhrase as word}
     <div>{word}</div>

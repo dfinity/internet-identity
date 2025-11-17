@@ -13,12 +13,6 @@
 </script>
 
 <h2>{$t`Reset your recovery phrase?`}</h2>
-<p>
-  <Trans>
-    All current phrases become invalid; only the new one can recover your
-    identity. Do you want to continue?
-  </Trans>
-</p>
 <Button onclick={onReset}>
   {$t`Reset`}
 </Button>
