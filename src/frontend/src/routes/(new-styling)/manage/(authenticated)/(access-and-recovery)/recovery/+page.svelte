@@ -6,10 +6,20 @@
   import { getMetadataString } from "$lib/utils/openID";
   import ActiveRecoveryPhrase from "./components/ActiveRecoveryPhrase.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import { CreateRecoveryPhraseWizard } from "$lib/components/wizards/createRecoveryPhrase";
+  import { throwCanisterError } from "$lib/utils/utils";
+  import { invalidateAll } from "$app/navigation";
+  import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
+  import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
 
   const { data }: PageProps = $props();
 
-  const recoveryPhrase = $derived(
+  let showRecoveryPhraseSetup = $state(false);
+  let pendingRecoveryPhrase = $state<string[]>();
+  let isUnverified = $state(false);
+
+  let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
       (m) =>
         "Recovery" in m.security_settings.purpose &&
@@ -19,6 +29,52 @@
   const isCurrentAccessMethod = $derived(
     "recoveryPhrase" in $authenticatedStore.authMethod,
   );
+
+  const handleSetup = () => {
+    pendingRecoveryPhrase = undefined;
+    showRecoveryPhraseSetup = true;
+  };
+  const handleVerify = () => {
+    showRecoveryPhraseSetup = true;
+  };
+  const handleAcknowledged = async (recoveryPhrase: string[]) => {
+    const data = await recoveryAuthnMethodData(recoveryPhrase);
+    // Add new recovery phrase if there isn't one yet, else replace existing
+    if (recoveryPhraseData === undefined) {
+      await $authenticatedStore.actor
+        .authn_method_add($authenticatedStore.identityNumber, data)
+        .then(throwCanisterError);
+    } else if ("PubKey" in recoveryPhraseData.authn_method) {
+      await $authenticatedStore.actor
+        .authn_method_replace(
+          $authenticatedStore.identityNumber,
+          recoveryPhraseData.authn_method.PubKey.pubkey,
+          data,
+        )
+        .then(throwCanisterError);
+    }
+    pendingRecoveryPhrase = recoveryPhrase;
+  };
+  const handleCancel = () => {
+    showRecoveryPhraseSetup = false;
+  };
+  const handlePending = async () => {
+    if (pendingRecoveryPhrase === undefined) {
+      return;
+    }
+    showRecoveryPhraseSetup = false;
+    recoveryPhraseData = await recoveryAuthnMethodData(pendingRecoveryPhrase);
+    void invalidateAll();
+  };
+  const handleUnverified = async () => {
+    await handlePending();
+    isUnverified = true;
+  };
+  const handleVerified = async () => {
+    await handlePending();
+    isUnverified = false;
+    pendingRecoveryPhrase = undefined;
+  };
 </script>
 
 <header class="flex flex-col gap-3">
@@ -33,14 +89,16 @@
   class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5"
 >
   <div class="col-span-3 max-sm:col-span-1">
-    {#if recoveryPhrase !== undefined}
+    {#if isUnverified}
+      <UnverifiedRecoveryPhrase onReset={handleSetup} onVerify={handleVerify} />
+    {:else if recoveryPhraseData !== undefined}
       <ActiveRecoveryPhrase
-        onReset={() => {}}
-        {recoveryPhrase}
+        onReset={handleSetup}
+        recoveryPhrase={recoveryPhraseData}
         {isCurrentAccessMethod}
       />
     {:else}
-      <InactiveRecoveryPhrase onActivate={() => {}} />
+      <InactiveRecoveryPhrase onActivate={handleSetup} />
     {/if}
   </div>
 </div>
@@ -59,7 +117,7 @@
       "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
       // Paragraphs with emphasis
       "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
-      "[&_p_em]:text-text-primary [&_p_em]:normal [&_p_em]:not-italic",
+      "[&_p_em]:text-text-primary [&_p_em]:normal [&_p_em]:font-medium [&_p_em]:not-italic",
     ]}
   >
     <article>
@@ -91,3 +149,12 @@
     </article>
   </div>
 </section>
+{#if showRecoveryPhraseSetup}
+  <Dialog onClose={pendingRecoveryPhrase ? handleUnverified : handleCancel}>
+    <CreateRecoveryPhraseWizard
+      onAcknowledged={handleAcknowledged}
+      onVerified={handleVerified}
+      unverifiedRecoveryPhrase={pendingRecoveryPhrase}
+    />
+  </Dialog>
+{/if}

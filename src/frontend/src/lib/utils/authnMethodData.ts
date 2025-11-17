@@ -6,6 +6,10 @@ import type {
 import { CredentialId } from "$lib/utils/credential-devices";
 import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 import { nonNullish } from "@dfinity/utils";
+import {
+  fromMnemonicWithoutValidation,
+  IC_DERIVATION_PATH,
+} from "$lib/utils/recoveryPhrase";
 
 /**
  * Helper to create a new PinIdentity authn method to be used in a registration flow.
@@ -68,6 +72,31 @@ export const passkeyAuthnMethodData = ({
       },
     },
     security_settings: defaultSecuritySettings(),
+    last_authentication: [],
+  };
+};
+
+export const recoveryAuthnMethodData = async (
+  recoveryPhrase: string[],
+): Promise<AuthnMethodData> => {
+  const identity = await fromMnemonicWithoutValidation(
+    recoveryPhrase.join(" "),
+    IC_DERIVATION_PATH,
+  );
+  return {
+    metadata: [
+      ["alias", { String: "Recovery phrase" }],
+      ["usage", { String: "recovery_phrase" }],
+    ],
+    authn_method: {
+      PubKey: {
+        pubkey: new Uint8Array(identity.getPublicKey().derKey),
+      },
+    },
+    security_settings: {
+      protection: { Unprotected: null },
+      purpose: { Recovery: null },
+    },
     last_authentication: [],
   };
 };
