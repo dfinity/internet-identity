@@ -212,7 +212,7 @@
           } catch (error) {
             toaster.error({
               title: $t`Failed to update identity name`,
-              description: $t`Your identity was restored, but the name could not be updated. Please try the recoery flow again to set a name.`,
+              description: $t`Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name.`,
               duration: 5000,
             });
           }
@@ -222,7 +222,6 @@
           description: $t`Make sure to add a new access method so that you can sign in next time or reset your recovery phrase.`,
           duration: 5000,
         });
-
         await goto("/manage");
       } finally {
         resetRecoveryState();

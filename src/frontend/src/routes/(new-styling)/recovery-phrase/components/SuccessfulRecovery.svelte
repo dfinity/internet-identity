@@ -32,11 +32,10 @@
   let inputRef = $state<HTMLInputElement>();
   let name = $state(identityName ?? "");
   const MAX_NAME_LENGTH = 64;
-  const trimmedName = $derived(name.trim());
   const nameTooLong = $derived(name.length > MAX_NAME_LENGTH);
 
   const canSubmit = $derived(
-    !continueInProgress && trimmedName.length > 0 && !nameTooLong,
+    !continueInProgress && name.length > 0 && !nameTooLong,
   );
 
   const displayIdentity = $derived(identityName ?? identityNumber.toString());
@@ -56,7 +55,7 @@
     }
     continueInProgress = true;
     try {
-      await onContinue(trimmedName);
+      await onContinue(name.trim());
     } finally {
       continueInProgress = false;
     }
