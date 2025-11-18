@@ -209,7 +209,7 @@
                 },
               )
               .then(throwCanisterError);
-          } catch (error) {
+          } catch {
             toaster.error({
               title: $t`Failed to update identity name`,
               description: $t`Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name.`,
