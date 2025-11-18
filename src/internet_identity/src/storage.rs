@@ -662,7 +662,8 @@ impl<M: Memory + Clone> Storage<M> {
 
         reader.read_exact(&mut buf).expect("failed to read memory");
 
-        // Check if this anchor exists
+        // Anchors that are allocated but have never been written to, due to a priorly missing
+        // allocation cleanup implementation, are handled as if they don't exist.
         if buf.iter().all(|&b| b == 0) {
             return Err(StorageError::AnchorNotFound { anchor_number });
         }

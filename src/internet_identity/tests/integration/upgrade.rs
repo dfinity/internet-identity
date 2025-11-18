@@ -342,8 +342,8 @@ fn test_sync_anchor_indices_migration() {
 
         let name = if i == 0 {
             // A very long name should cause an error during identity creation. If this happens,
-            // the Identity anchor should not be allocated, or else the migration crash while trying
-            // to read it.
+            // the Identity anchor should not be allocated, or else the migration would crash while
+            // trying to read it.
             Some("Test User".repeat(100))
         } else {
             Some(format!("Test User {}", i))
