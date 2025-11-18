@@ -201,7 +201,7 @@
         });
         if (nonNullish(newName) && newName.length > 0) {
           try {
-            await get(authenticatedStore)
+            await $authenticatedStore
               .actor.identity_properties_replace(
                 recoveredIdentityData.identityNumber,
                 {
