@@ -1,7 +1,8 @@
 use ic_stable_structures::Memory;
 
 use crate::{
-    storage::Storage, RECOVERY_PHRASE_MIGRATION_BATCH_ID, RECOVERY_PHRASE_MIGRATION_ERRORS,
+    storage::{anchor::Anchor, Storage, StorageError},
+    RECOVERY_PHRASE_MIGRATION_BATCH_ID, RECOVERY_PHRASE_MIGRATION_ERRORS,
     RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID,
 };
 
@@ -22,7 +23,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// (can be queried via a separate function `list_recovery_phrase_migration_errors`).
     ///
     /// Must not panic.
-    pub fn sync_anchor_indices(&mut self, batch_size: u64) {
+    pub fn sync_anchor_indices(&mut self, now_nanos: u64, batch_size: u64) {
         // This is 10000 in the production II canister.
         let (id_range_lo, _) = self.assigned_anchor_number_range();
 
@@ -83,8 +84,23 @@ impl<M: Memory + Clone> Storage<M> {
         // This is where the index migration happens. For each anchor in the batch, read it
         // from storage and write it back, which updates the indices.
         for anchor_number in begin..=end {
-            let anchor = match self.read(anchor_number) {
-                Ok(anchor) => anchor,
+            let (anchor, is_previously_written) = match self.read(anchor_number) {
+                Ok(anchor) => (anchor, true),
+                Err(StorageError::AnchorNotFound { .. }) => {
+                    ic_cdk::println!("Marking {} as <DUMMY ANCHOR>", anchor_number);
+
+                    // If an anchor is not found, write a dummy anchor to the memory
+                    // to ensure other read attempts succeed (currently, each anchor number within
+                    // the allocated range must have an entry in stable memory, but this invariant
+                    // has been violated for some anchors due to a past bug).
+                    let mut anchor = Anchor::new(anchor_number, now_nanos);
+
+                    // Mark this anchor in case it needs to be easily identifiable using on-chain
+                    // data in the future. Safe to unwrap while the name is shorter than
+                    // `MAX_NAME_LENGTH` bytes.
+                    anchor.set_name(Some("<DUMMY ANCHOR>".to_string())).unwrap();
+                    (anchor, false)
+                }
                 Err(err) => {
                     let err = format!("r#{}:{:?}", anchor_number, err);
                     errors.push(err);
@@ -92,7 +108,7 @@ impl<M: Memory + Clone> Storage<M> {
                 }
             };
 
-            match self.update(anchor) {
+            match self.write(anchor, is_previously_written) {
                 Ok(_) => (),
                 Err(err) => {
                     let err = format!("w#{}:{:?}", anchor_number, err);
@@ -214,7 +230,7 @@ mod sync_anchor_indices_tests {
         reset_migration_state();
 
         // Run migration
-        storage.sync_anchor_indices(BATCH_SIZE);
+        storage.sync_anchor_indices(0, BATCH_SIZE);
 
         // Check that recovery phrase principals are indexed for anchors 1 and 3
         let principal_1 = Principal::self_authenticating(pubkey(1));
@@ -272,7 +288,7 @@ mod sync_anchor_indices_tests {
         reset_migration_state();
 
         // Run migration (1)
-        storage.sync_anchor_indices(BATCH_SIZE);
+        storage.sync_anchor_indices(0, BATCH_SIZE);
 
         // Check that recovery phrase principals are indexed for anchors 1 and 3
         let principal_1 = Principal::self_authenticating(pubkey(1));
@@ -301,7 +317,7 @@ mod sync_anchor_indices_tests {
         );
 
         // Run migration (2)
-        storage.sync_anchor_indices(BATCH_SIZE);
+        storage.sync_anchor_indices(0, BATCH_SIZE);
 
         // Now anchor 3 should be migrated
         assert_eq!(
@@ -327,7 +343,7 @@ mod sync_anchor_indices_tests {
         reset_migration_state();
 
         // Run migration
-        storage.sync_anchor_indices(BATCH_SIZE);
+        storage.sync_anchor_indices(0, BATCH_SIZE);
 
         assert_migration_completed(vec![]);
     }

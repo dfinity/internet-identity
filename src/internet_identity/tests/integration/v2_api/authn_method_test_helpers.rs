@@ -57,7 +57,7 @@ pub fn create_identity_with_authn_method(
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
 ) -> IdentityNumber {
-    create_identity_with_authn_method_and_name(env, canister_id, authn_method, None)
+    create_identity_with_authn_method_and_name(env, canister_id, authn_method, None).unwrap()
 }
 
 pub fn create_identity_with_authn_method_and_name(
@@ -65,7 +65,7 @@ pub fn create_identity_with_authn_method_and_name(
     canister_id: CanisterId,
     authn_method: &AuthnMethodData,
     name: Option<String>,
-) -> IdentityNumber {
+) -> Result<IdentityNumber, String> {
     // unique flow principal as the time changes every round
     let flow_principal = test_principal(time(env));
     let result = api_v2::identity_registration_start(env, canister_id, flow_principal)
@@ -75,14 +75,14 @@ pub fn create_identity_with_authn_method_and_name(
     // supply captcha only if required
     if let RegistrationFlowNextStep::CheckCaptcha { .. } = result.next_step {
         api_v2::check_captcha(env, canister_id, flow_principal, "a".to_string())
-            .expect("API call failed")
-            .expect("check_captcha failed");
+            .map_err(|err| format!("{:?}", err))?
+            .map_err(|err| format!("{:?}", err))?;
     }
 
     api_v2::identity_registration_finish(env, canister_id, flow_principal, authn_method, name)
         .expect("API call failed")
-        .expect("registration finish failed")
-        .identity_number
+        .map_err(|err| format!("{:?}", err))
+        .map(|res| res.identity_number)
 }
 
 pub fn create_identity_with_authn_methods(

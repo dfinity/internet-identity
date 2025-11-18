@@ -567,6 +567,34 @@ impl<M: Memory + Clone> Storage<M> {
         Some(Anchor::new(anchor_number, now))
     }
 
+    /// Runs `f` over a new anchor, allocating that anchor in stable memory if `f` succeeds.
+    ///
+    /// The new anchor is an optional argument to `f`, which is `None` if no anchor could be allocated.
+    ///
+    /// Otherwise, no state change is made, and the error from `f` is returned.
+    pub fn allocate_anchor_safe<F, T, E>(&mut self, now: Timestamp, f: F) -> Result<T, E>
+    where
+        F: FnOnce(Option<Anchor>) -> Result<T, E>,
+    {
+        let num_anchors = u64::from(self.header.num_anchors);
+
+        let anchor_number = self.header.id_range_lo.saturating_add(num_anchors);
+
+        let anchor = if anchor_number >= self.header.id_range_hi {
+            None
+        } else {
+            Some(Anchor::new(anchor_number, now))
+        };
+
+        let result = f(anchor)?;
+
+        self.header.num_anchors = self.header.num_anchors.saturating_add(1);
+
+        self.flush();
+
+        Ok(result)
+    }
+
     /// This method can be replaced with `write` once `anchor_memory` is removed.
     pub fn create(&mut self, data: Anchor) -> Result<(), StorageError> {
         self.write(data, false)
@@ -584,7 +612,11 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Therefore, this information is passed as an additional argument,
     /// this argument can be removed once `anchor_memory` is removed.
-    fn write(&mut self, data: Anchor, is_previously_written: bool) -> Result<(), StorageError> {
+    pub(crate) fn write(
+        &mut self,
+        data: Anchor,
+        is_previously_written: bool,
+    ) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
         let (storable_anchor, stable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
 
@@ -657,6 +689,12 @@ impl<M: Memory + Clone> Storage<M> {
         let mut buf = vec![0; self.header.entry_size as usize];
 
         reader.read_exact(&mut buf).expect("failed to read memory");
+
+        // Anchors that are allocated but have never been written to, due to a priorly missing
+        // allocation cleanup implementation, are handled as if they don't exist.
+        if buf.iter().all(|&b| b == 0) {
+            return Err(StorageError::AnchorNotFound { anchor_number });
+        }
 
         // Read unbounded stable structures anchor
         let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
@@ -1890,6 +1928,155 @@ mod memory_wrapper {
 
         pub fn size(&self) -> u64 {
             self.memory.size()
+        }
+    }
+}
+
+#[cfg(test)]
+mod allocate_anchor_safe_tests {
+    use super::*;
+    use ic_stable_structures::DefaultMemoryImpl;
+
+    #[test]
+    fn allocate_anchor_safe_runs_multiple_scenarios() {
+        #[allow(clippy::type_complexity)]
+        let test_cases: Vec<(
+            &str,
+            (u64, u64),
+            Box<dyn Fn(Option<Anchor>) -> Result<String, String>>,
+            Result<String, String>,
+        )> = vec![
+            (
+                "success case",
+                (10000, 20000),
+                Box::new(|anchor| {
+                    anchor
+                        .map(|a| format!("Anchor {}", a.anchor_number()))
+                        .ok_or_else(|| "No anchor available".to_string())
+                }),
+                Ok("Anchor 10000".to_string()),
+            ),
+            (
+                "failure case with error",
+                (10000, 20000),
+                Box::new(|_anchor| Err("Intentional failure".to_string())),
+                Err("Intentional failure".to_string()),
+            ),
+            (
+                "success case that ignores anchor",
+                (10000, 20000),
+                Box::new(|_anchor| Ok("Success without using anchor".to_string())),
+                Ok("Success without using anchor".to_string()),
+            ),
+            (
+                "failure case with validation error",
+                (10000, 20000),
+                Box::new(|anchor| {
+                    if anchor.is_some() {
+                        Err("Validation failed".to_string())
+                    } else {
+                        Ok("Unexpected success".to_string())
+                    }
+                }),
+                Err("Validation failed".to_string()),
+            ),
+            (
+                "allocation is safe at range limit",
+                (10000, 10001),
+                Box::new(|anchor| {
+                    let Some(anchor_number) = anchor else {
+                        return Err("No anchor available".to_string());
+                    };
+
+                    let anchor_number = anchor_number.anchor_number();
+                    if anchor_number == 10000 {
+                        Ok("Allocated at range limit".to_string())
+                    } else {
+                        Err(format!("Allocated wrong anchor number {}", anchor_number))
+                    }
+                }),
+                Ok("Allocated at range limit".to_string()),
+            ),
+            (
+                "exhausted range case (f errors out)",
+                (10000, 10000),
+                Box::new(|anchor| {
+                    if anchor.is_none() {
+                        Err("No anchor available as expected".to_string())
+                    } else {
+                        Ok("Expected no anchor due to exhausted range".to_string())
+                    }
+                }),
+                Err("No anchor available as expected".to_string()),
+            ),
+            (
+                "exhausted range case (f does not error out)",
+                (10000, 10000),
+                Box::new(|anchor| {
+                    if anchor.is_none() {
+                        Ok("No anchor available as expected".to_string())
+                    } else {
+                        Err("Expected no anchor due to exhausted range".to_string())
+                    }
+                }),
+                Ok("No anchor available as expected".to_string()),
+            ),
+            (
+                "no overflow at u64::MAX - 1",
+                (u64::MAX - 1, u64::MAX),
+                Box::new(|anchor| {
+                    anchor
+                        .map(|a| format!("Anchor {}", a.anchor_number()))
+                        .ok_or_else(|| "No anchor available".to_string())
+                }),
+                Ok(format!("Anchor {}", u64::MAX - 1)),
+            ),
+            (
+                "overflow at u64::MAX",
+                (u64::MAX, u64::MAX),
+                Box::new(|anchor| {
+                    let Some(anchor) = anchor else {
+                        return Ok("No anchor available".to_string());
+                    };
+
+                    Err(format!(
+                        "Expected no anchor due to exhausted range, but got anchor {}",
+                        anchor.anchor_number()
+                    ))
+                }),
+                Ok("No anchor available".to_string()),
+            ),
+        ];
+
+        for (label, (id_range_lo, id_range_hi), f, expected) in test_cases {
+            let mut storage =
+                Storage::new((id_range_lo, id_range_hi), DefaultMemoryImpl::default());
+            let initial_count = storage.anchor_count();
+            let now = 123456789;
+
+            let result = storage.allocate_anchor_safe(now, f);
+
+            assert_eq!(
+                result, expected,
+                "Test case '{}' failed: result mismatch",
+                label
+            );
+
+            let final_count = storage.anchor_count();
+            if expected.is_ok() {
+                assert_eq!(
+                    final_count,
+                    initial_count.saturating_add(1),
+                    "Test case '{}' failed: anchor count should have incremented",
+                    label
+                );
+            } else {
+                assert_eq!(
+                    final_count, initial_count,
+                    "Test case '{}' failed: anchor count should not have changed",
+                    label
+                );
+            }
         }
     }
 }

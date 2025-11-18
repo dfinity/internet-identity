@@ -1,10 +1,12 @@
 use crate::archive::{archive_operation, device_diff};
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
 use crate::storage::anchor::{Anchor, AnchorError, Device};
+use crate::storage::Storage;
 use crate::{state, stats::activity_stats};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::{caller, trap};
+use ic_stable_structures::Memory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::{
@@ -179,19 +181,44 @@ pub fn identity_properties_replace(
     set_name(anchor, properties.name)
 }
 
+pub fn check_openid_credential_is_unique<M: Memory + Clone>(
+    storage: &Storage<M>,
+    openid_credential_key: &OpenIdCredentialKey,
+) -> Result<(), AnchorError> {
+    if storage
+        .lookup_anchor_with_openid_credential(openid_credential_key)
+        .is_some()
+    {
+        return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
+    }
+
+    Ok(())
+}
+
+/// Similar to `add_openid_credential` but is only safe to call after establishing the
+/// `check_openid_credential_is_unique` precondition.
+pub fn add_openid_credential_skip_checks(
+    anchor: &mut Anchor,
+    openid_credential: OpenIdCredential,
+) -> Result<Operation, AnchorError> {
+    anchor.add_openid_credential(openid_credential.clone())?;
+
+    Ok(Operation::AddOpenIdCredential {
+        iss: openid_credential.iss,
+    })
+}
+
 /// Adds an `OpenIdCredential` to the given anchor and returns the operation to be archived.
 /// Returns an error if the `OpenIdCredential` already exists in this or another anchor.
 pub fn add_openid_credential(
     anchor: &mut Anchor,
     openid_credential: OpenIdCredential,
 ) -> Result<Operation, AnchorError> {
-    if lookup_anchor_with_openid_credential(&openid_credential.key()).is_some() {
-        return Err(AnchorError::OpenIdCredentialAlreadyRegistered);
-    }
-    anchor.add_openid_credential(openid_credential.clone())?;
-    Ok(Operation::AddOpenIdCredential {
-        iss: openid_credential.iss,
-    })
+    storage_borrow(|storage| check_openid_credential_is_unique(storage, &openid_credential.key()))?;
+
+    let operation = add_openid_credential_skip_checks(anchor, openid_credential)?;
+
+    Ok(operation)
 }
 
 /// Removes an `OpenIdCredential` of the given anchor and returns the operation to be archived.
@@ -212,11 +239,6 @@ pub fn update_openid_credential(
     openid_credential: OpenIdCredential,
 ) -> Result<(), AnchorError> {
     anchor.update_openid_credential(openid_credential)
-}
-
-/// Lookup `AnchorNumber` for the given `OpenIdCredentialKey`.
-pub fn lookup_anchor_with_openid_credential(key: &OpenIdCredentialKey) -> Option<AnchorNumber> {
-    storage_borrow(|storage| storage.lookup_anchor_with_openid_credential(key))
 }
 
 /// Lookup `DeviceKeyWithAnchor` for the given `CredentialId`.
