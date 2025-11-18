@@ -637,6 +637,21 @@ impl<M: Memory + Clone> Storage<M> {
         // Get anchor address
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
 
+        let num_anchors = self.header.num_anchors;
+
+        // Strict inequality allows for calling this function before allocating an anchor,
+        // which is a safer way to create new anchors.
+        // TODO: switch this condition to `record_number != num_anchors`.
+        if record_number > num_anchors {
+            ic_cdk::println!(
+                "ERROR: Tried to write anchor number {} which maps to record number {}, but only {} anchors are allocated.",
+                anchor_number,
+                record_number,
+                num_anchors,
+            );
+            return Err(StorageError::BadAnchorNumber(anchor_number));
+        }
+
         let address = self.record_address(record_number);
 
         // Read previous fixed 4KB stable memory anchor
