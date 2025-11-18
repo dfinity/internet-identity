@@ -41,9 +41,7 @@
   const displayIdentity = $derived(identityName ?? identityNumber.toString());
 
   onMount(() => {
-    if (nonNullish(inputRef)) {
-      inputRef?.focus();
-    }
+    inputRef?.focus();
   });
 
   const handleContinue = async () => {
