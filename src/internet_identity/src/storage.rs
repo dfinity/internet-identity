@@ -1937,6 +1937,7 @@ mod allocate_anchor_safe_tests {
 
     #[test]
     fn allocate_anchor_safe_runs_multiple_scenarios() {
+        #[allow(clippy::type_complexity)]
         let test_cases: Vec<(
             &str,
             (u64, u64),
