@@ -567,29 +567,43 @@ impl<M: Memory + Clone> Storage<M> {
         Some(Anchor::new(anchor_number, now))
     }
 
-    /// Runs `f` over a new anchor, allocating that anchor in stable memory if `f` succeeds.
+    /// Runs `f` over a new identity, allocating that identity in stable memory if `f` succeeds.
     ///
-    /// The new anchor is an optional argument to `f`, which is `None` if no anchor could be allocated.
-    ///
-    /// Otherwise, no state change is made, and the error from `f` is returned.
+    /// Returns `Ok(None)` if the range of Identity Anchor assigned to this storage is exhausted,
+    /// in which case `f` is not called and no state is modified.
     pub fn allocate_anchor_safe<F, T, E>(&mut self, now: Timestamp, f: F) -> Result<T, E>
     where
-        F: FnOnce(Option<Anchor>) -> Result<T, E>,
+        F: FnOnce(&mut Anchor) -> Result<T, E>,
+        E: From<StorageError>,
     {
         let num_anchors = u64::from(self.header.num_anchors);
 
-        let anchor_number = self.header.id_range_lo.saturating_add(num_anchors);
+        let (id_range_lo, id_range_hi) = (self.header.id_range_lo, self.header.id_range_hi);
 
-        let anchor = if anchor_number >= self.header.id_range_hi {
+        let anchor_number = id_range_lo.saturating_add(num_anchors);
+
+        let identity = if anchor_number >= id_range_hi {
             None
         } else {
             Some(Anchor::new(anchor_number, now))
         };
 
-        let result = f(anchor)?;
+        let Some(mut identity) = identity else {
+            return Err(StorageError::AnchorNumberOutOfRange {
+                anchor_number,
+                range: (id_range_lo, id_range_hi),
+            }
+            .into());
+        };
 
+        let result = f(&mut identity)?;
+
+        self.registration_rates.new_registration();
+
+        self.create(identity).map_err(E::from)?;
+
+        // Important! Only increment num_anchors after the anchor creation succeeds.
         self.header.num_anchors = self.header.num_anchors.saturating_add(1);
-
         self.flush();
 
         Ok(result)
@@ -622,6 +636,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Get anchor address
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
+
         let address = self.record_address(record_number);
 
         // Read previous fixed 4KB stable memory anchor
@@ -683,6 +698,20 @@ impl<M: Memory + Clone> Storage<M> {
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         // Read fixed 4KB anchor
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
+
+        let num_anchors = self.header.num_anchors;
+
+        if record_number >= num_anchors {
+            ic_cdk::println!(
+                "ERROR: Requested anchor number {} maps to record number {}, but only {} anchors \
+                 are allocated.",
+                anchor_number,
+                record_number,
+                num_anchors,
+            );
+            return Err(StorageError::BadAnchorNumber(anchor_number));
+        }
+
         let address = self.record_address(record_number);
 
         let mut reader = Reader::new(&self.anchor_memory, address);
@@ -690,7 +719,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         reader.read_exact(&mut buf).expect("failed to read memory");
 
-        // Anchors that are allocated but have never been written to, due to a priorly missing
+        // Anchors that are allocated but have never been written to, due to a previously missing
         // allocation cleanup implementation, are handled as if they don't exist.
         if buf.iter().all(|&b| b == 0) {
             return Err(StorageError::AnchorNotFound { anchor_number });
@@ -1719,9 +1748,7 @@ impl<M: Memory + Clone> Storage<M> {
         }
 
         let record_number = (anchor_number - self.header.id_range_lo) as u32;
-        if record_number >= self.header.num_anchors {
-            return Err(StorageError::BadAnchorNumber(anchor_number));
-        }
+
         Ok(record_number)
     }
 
@@ -1911,6 +1938,12 @@ impl fmt::Display for StorageError {
     }
 }
 
+impl From<StorageError> for IdRegFinishError {
+    fn from(err: StorageError) -> Self {
+        IdRegFinishError::StorageError(err.to_string())
+    }
+}
+
 /// Helper module to hide internal memory of the memory wrapper.
 mod memory_wrapper {
     use ic_stable_structures::Memory;
@@ -1937,122 +1970,158 @@ mod allocate_anchor_safe_tests {
     use super::*;
     use ic_stable_structures::DefaultMemoryImpl;
 
+    #[derive(Debug)]
+    enum TestError {
+        Err(String),
+        StorageErr(StorageError),
+    }
+
+    impl PartialEq for TestError {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (TestError::Err(s1), TestError::Err(s2)) => s1 == s2,
+                (TestError::StorageErr(e1), TestError::StorageErr(e2)) => {
+                    format!("{}", e1) == format!("{}", e2)
+                }
+                _ => false,
+            }
+        }
+    }
+
+    impl From<&str> for TestError {
+        fn from(err: &str) -> Self {
+            TestError::Err(err.to_string())
+        }
+    }
+
+    impl From<String> for TestError {
+        fn from(err: String) -> Self {
+            TestError::Err(err)
+        }
+    }
+
+    impl From<StorageError> for TestError {
+        fn from(err: StorageError) -> Self {
+            TestError::StorageErr(err)
+        }
+    }
+
     #[test]
     fn allocate_anchor_safe_runs_multiple_scenarios() {
         #[allow(clippy::type_complexity)]
         let test_cases: Vec<(
             &str,
             (u64, u64),
-            Box<dyn Fn(Option<Anchor>) -> Result<String, String>>,
-            Result<String, String>,
+            usize,
+            Box<dyn Fn(&mut Anchor) -> Result<String, TestError>>,
+            Result<String, TestError>,
+            usize,
         )> = vec![
             (
                 "success case",
                 (10000, 20000),
-                Box::new(|anchor| {
-                    anchor
-                        .map(|a| format!("Anchor {}", a.anchor_number()))
-                        .ok_or_else(|| "No anchor available".to_string())
-                }),
+                0,
+                Box::new(|a| Ok(format!("Anchor {}", a.anchor_number()))),
                 Ok("Anchor 10000".to_string()),
+                1,
             ),
             (
                 "failure case with error",
                 (10000, 20000),
-                Box::new(|_anchor| Err("Intentional failure".to_string())),
-                Err("Intentional failure".to_string()),
+                0,
+                Box::new(|_| Err(TestError::Err("Intentional failure".to_string()))),
+                Err(TestError::Err("Intentional failure".to_string())),
+                0,
             ),
             (
                 "success case that ignores anchor",
                 (10000, 20000),
-                Box::new(|_anchor| Ok("Success without using anchor".to_string())),
+                0,
+                Box::new(|_| Ok("Success without using anchor".to_string())),
                 Ok("Success without using anchor".to_string()),
-            ),
-            (
-                "failure case with validation error",
-                (10000, 20000),
-                Box::new(|anchor| {
-                    if anchor.is_some() {
-                        Err("Validation failed".to_string())
-                    } else {
-                        Ok("Unexpected success".to_string())
-                    }
-                }),
-                Err("Validation failed".to_string()),
+                1,
             ),
             (
                 "allocation is safe at range limit",
                 (10000, 10001),
-                Box::new(|anchor| {
-                    let Some(anchor_number) = anchor else {
-                        return Err("No anchor available".to_string());
-                    };
-
-                    let anchor_number = anchor_number.anchor_number();
+                0,
+                Box::new(|a| {
+                    let anchor_number = a.anchor_number();
                     if anchor_number == 10000 {
                         Ok("Allocated at range limit".to_string())
                     } else {
-                        Err(format!("Allocated wrong anchor number {}", anchor_number))
+                        Err(TestError::Err(format!(
+                            "Allocated wrong anchor number {}",
+                            anchor_number
+                        )))
                     }
                 }),
                 Ok("Allocated at range limit".to_string()),
+                1,
             ),
             (
                 "exhausted range case (f errors out)",
                 (10000, 10000),
-                Box::new(|anchor| {
-                    if anchor.is_none() {
-                        Err("No anchor available as expected".to_string())
-                    } else {
-                        Ok("Expected no anchor due to exhausted range".to_string())
-                    }
-                }),
-                Err("No anchor available as expected".to_string()),
+                0,
+                Box::new(|_| Err("Expected no anchor due to exhausted range".into())),
+                Err(TestError::StorageErr(
+                    StorageError::AnchorNumberOutOfRange {
+                        anchor_number: 10000,
+                        range: (10000, 10000),
+                    },
+                )),
+                0,
             ),
             (
-                "exhausted range case (f does not error out)",
+                "exhausted range case (f returns ok)",
                 (10000, 10000),
-                Box::new(|anchor| {
-                    if anchor.is_none() {
-                        Ok("No anchor available as expected".to_string())
-                    } else {
-                        Err("Expected no anchor due to exhausted range".to_string())
-                    }
-                }),
-                Ok("No anchor available as expected".to_string()),
+                0,
+                Box::new(|_| Ok("Expected no anchor due to exhausted range".to_string())),
+                Err(TestError::StorageErr(
+                    StorageError::AnchorNumberOutOfRange {
+                        anchor_number: 10000,
+                        range: (10000, 10000),
+                    },
+                )),
+                0,
             ),
             (
                 "no overflow at u64::MAX - 1",
                 (u64::MAX - 1, u64::MAX),
-                Box::new(|anchor| {
-                    anchor
-                        .map(|a| format!("Anchor {}", a.anchor_number()))
-                        .ok_or_else(|| "No anchor available".to_string())
-                }),
-                Ok(format!("Anchor {}", u64::MAX - 1)),
+                0,
+                Box::new(|a| Ok(format!("Anchor {}", a.anchor_number()))),
+                Ok(format!("Anchor {}", u64::MAX - 1).into()),
+                1,
             ),
             (
                 "overflow at u64::MAX",
-                (u64::MAX, u64::MAX),
-                Box::new(|anchor| {
-                    let Some(anchor) = anchor else {
-                        return Ok("No anchor available".to_string());
-                    };
-
-                    Err(format!(
+                (u64::MAX - 1, u64::MAX),
+                1,
+                Box::new(|a| {
+                    Err(TestError::Err(format!(
                         "Expected no anchor due to exhausted range, but got anchor {}",
-                        anchor.anchor_number()
-                    ))
+                        a.anchor_number()
+                    )))
                 }),
-                Ok("No anchor available".to_string()),
+                Err(TestError::StorageErr(
+                    StorageError::AnchorNumberOutOfRange {
+                        anchor_number: u64::MAX,
+                        range: (u64::MAX - 1, u64::MAX),
+                    },
+                )),
+                1,
             ),
         ];
 
-        for (label, (id_range_lo, id_range_hi), f, expected) in test_cases {
+        let now = 123456789;
+
+        for (label, (id_range_lo, id_range_hi), initial_count, f, expected, expected_count) in
+            test_cases
+        {
             let mut storage =
                 Storage::new((id_range_lo, id_range_hi), DefaultMemoryImpl::default());
-            let initial_count = storage.anchor_count();
-            let now = 123456789;
+
+            storage.header.num_anchors = initial_count as u32;
 
             let result = storage.allocate_anchor_safe(now, f);
 
@@ -2063,20 +2132,12 @@ mod allocate_anchor_safe_tests {
             );
 
             let final_count = storage.anchor_count();
-            if expected.is_ok() {
-                assert_eq!(
-                    final_count,
-                    initial_count.saturating_add(1),
-                    "Test case '{}' failed: anchor count should have incremented",
-                    label
-                );
-            } else {
-                assert_eq!(
-                    final_count, initial_count,
-                    "Test case '{}' failed: anchor count should not have changed",
-                    label
-                );
-            }
+
+            assert_eq!(
+                final_count, expected_count,
+                "Test case '{}' failed: anchor count observed {} but expected {}",
+                label, final_count, expected_count
+            );
         }
     }
 }
