@@ -63,7 +63,7 @@
   };
 </script>
 
-<form class="flex flex-col gap-8">
+<form class="flex flex-col gap-8" onsubmit={handleContinue}>
   <div class="mt-6 flex flex-col gap-4">
     <FeaturedIcon size="md" variant="success">
       <UserCheckIcon class="size-6" />
