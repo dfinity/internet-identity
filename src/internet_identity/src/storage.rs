@@ -590,6 +590,8 @@ impl<M: Memory + Clone> Storage<M> {
 
         self.header.num_anchors = self.header.num_anchors.saturating_add(1);
 
+        self.flush();
+
         Ok(result)
     }
 
