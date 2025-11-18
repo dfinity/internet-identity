@@ -18,7 +18,7 @@
   const { data }: PageProps = $props();
 
   let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
-  // Had been already registered with the identity but hasn't been verified yet,
+  // Has been already registered with the identity but hasn't been verified yet,
   // this state is only local to the page so "unverified" state is only temporary.
   let unverifiedRecoveryPhrase = $state<{
     words: string[];
