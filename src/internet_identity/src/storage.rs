@@ -584,7 +584,11 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Therefore, this information is passed as an additional argument,
     /// this argument can be removed once `anchor_memory` is removed.
-    fn write(&mut self, data: Anchor, is_previously_written: bool) -> Result<(), StorageError> {
+    pub(crate) fn write(
+        &mut self,
+        data: Anchor,
+        is_previously_written: bool,
+    ) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
         let (storable_anchor, stable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
 
@@ -657,6 +661,11 @@ impl<M: Memory + Clone> Storage<M> {
         let mut buf = vec![0; self.header.entry_size as usize];
 
         reader.read_exact(&mut buf).expect("failed to read memory");
+
+        // Check if this anchor exists
+        if buf.iter().all(|&b| b == 0) {
+            return Err(StorageError::AnchorNotFound { anchor_number });
+        }
 
         // Read unbounded stable structures anchor
         let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));

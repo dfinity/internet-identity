@@ -323,7 +323,8 @@ fn should_register_new_identity_with_name_timestamp() {
     let authn_method = test_authn_method();
     let name = Some("John Doe".to_string());
     let identity_number =
-        create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name.clone());
+        create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name.clone())
+            .unwrap();
 
     let identity_should_be_created_at = env.get_time().as_nanos_since_unix_epoch();
 
