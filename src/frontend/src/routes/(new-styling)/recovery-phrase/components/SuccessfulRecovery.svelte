@@ -42,7 +42,7 @@
   const displayIdentity = $derived(identityName ?? identityNumber.toString());
 
   onMount(() => {
-    if (hasName) {
+    if (nonNullish(inputRef)) {
       inputRef?.focus();
     }
   });
@@ -84,7 +84,7 @@
     </div>
   </div>
   {#if hasName}
-    <ButtonCard onclick={hasName ? undefined : handleContinue}>
+    <ButtonCard onclick={handleContinue}>
       <Avatar size="sm">
         <UserIcon class="size-5" />
       </Avatar>
@@ -132,9 +132,9 @@
   <div class="align-stretch flex flex-col gap-2">
     <Button size="lg" type="submit" disabled={!canSubmit}>
       {#if hasName}
-        {$t`Update and Continue`}
-      {:else}
         {$t`Continue`}
+      {:else}
+        {$t`Update and Continue`}
       {/if}
     </Button>
     <Button size="lg" variant="tertiary" onclick={onCancel}>
