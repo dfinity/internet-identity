@@ -18,6 +18,8 @@
   const { data }: PageProps = $props();
 
   let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
+  // Had been already registered with the identity but hasn't been verified yet,
+  // this state is only local to the page so "unverified" state is only temporary.
   let unverifiedRecoveryPhrase = $state<{
     words: string[];
     data: AuthnMethodData;
@@ -99,17 +101,20 @@
 >
   <div class="col-span-3 max-sm:col-span-1">
     {#if isUnverified}
+      <!-- This identity has a recovery phrase that isn't verified yet -->
       <UnverifiedRecoveryPhrase
         onReset={() => (showRecoveryPhraseSetup = "reset")}
         onVerify={() => (showRecoveryPhraseSetup = "verify")}
       />
     {:else if recoveryPhraseData !== undefined}
+      <!-- This identity has a verified recovery phrase -->
       <ActiveRecoveryPhrase
         onReset={() => (showRecoveryPhraseSetup = "reset")}
         recoveryPhrase={recoveryPhraseData}
         {isCurrentAccessMethod}
       />
     {:else}
+      <!-- This identity doesn't have a recovery phrase yet -->
       <InactiveRecoveryPhrase
         onActivate={() => (showRecoveryPhraseSetup = "activate")}
       />
