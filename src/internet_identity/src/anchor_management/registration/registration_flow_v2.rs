@@ -166,7 +166,9 @@ pub fn identity_registration_finish(
         });
     };
 
-    let identity_number = create_identity(&arg)?;
+    let now = time();
+
+    let identity_number = create_identity(&arg, now)?;
 
     // flow completed --> remove flow state
     state::with_flow_states_mut(|flow_states| flow_states.remove_registration_flow(&caller));
@@ -241,9 +243,7 @@ fn apply_identity_data(
     }
 }
 
-fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFinishError> {
-    let now = time();
-
+fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber, IdRegFinishError> {
     let (operation, identity_number): (Operation, u64) = state::storage_borrow_mut(|storage| {
         let (operation, identity) = storage.allocate_anchor_safe(now, |identity| {
             let Some(mut identity) = identity else {
@@ -265,7 +265,70 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
         Ok::<_, IdRegFinishError>((operation, identity_number))
     })?;
 
+    // TODO: propagate the `now` timestamp from above to here to avoid `time()` call.
     post_operation_bookkeeping(identity_number, operation);
 
     Ok(identity_number)
+}
+
+#[cfg(test)]
+mod create_identity_tests {
+    use super::*;
+    use crate::state::{storage_borrow, storage_replace};
+    use crate::storage::Storage;
+    use ic_stable_structures::VectorMemory;
+    use internet_identity_interface::internet_identity::types::{
+        AuthnMethodData, DeviceData, DeviceProtection, KeyType, Purpose,
+    };
+
+    #[test]
+    fn create_identity_failure_does_not_leave_dangling_anchor_allocation() {
+        storage_replace(Storage::new((0, 10000), VectorMemory::default()));
+
+        // Record initial anchor count
+        let initial_anchor_count = storage_borrow(|storage| storage.anchor_count());
+
+        // Create identity data with an extremely long name that will cause failure
+        let very_long_name = "a".repeat(10_000); // Assuming this exceeds the name length limit
+        let create_identity_data = CreateIdentityData::PubkeyAuthn(
+            internet_identity_interface::internet_identity::types::IdRegFinishArg {
+                authn_method: AuthnMethodData::from(DeviceData {
+                    pubkey: vec![1, 2, 3].into(),
+                    alias: "test_device".to_string(),
+                    credential_id: Some(vec![4, 5, 6].into()),
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::Unknown,
+                    protection: DeviceProtection::Unprotected,
+                    origin: None,
+                    metadata: None,
+                }),
+                name: Some(very_long_name),
+            },
+        );
+
+        // Attempt to create identity - this should fail
+        let result = create_identity(&create_identity_data, 111);
+
+        // Verify that the creation failed
+        assert!(result.is_err());
+
+        // Verify that the anchor count hasn't changed - no dangling allocation
+        let final_anchor_count = storage_borrow(|storage| storage.anchor_count());
+        assert_eq!(
+            initial_anchor_count, final_anchor_count,
+            "Anchor count should remain unchanged after failed identity creation"
+        );
+
+        // Verify that no anchor was actually created by trying to read the next anchor number
+        let expected_next_anchor = storage_borrow(|storage| {
+            let (id_range_lo, _) = storage.assigned_anchor_number_range();
+            id_range_lo + final_anchor_count as u64
+        });
+
+        let read_result = storage_borrow(|storage| storage.read(expected_next_anchor));
+        assert!(
+            read_result.is_err(),
+            "No anchor should exist at the next anchor number after failed creation"
+        );
+    }
 }
