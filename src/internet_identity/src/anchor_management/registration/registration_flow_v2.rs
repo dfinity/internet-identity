@@ -4,21 +4,24 @@ use crate::anchor_management::registration::captcha::{
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
-    activity_bookkeeping, add_openid_credential, post_operation_bookkeeping, set_name,
+    activity_bookkeeping, add_openid_credential_skip_checks, check_openid_credential_is_unique,
+    post_operation_bookkeeping, set_name,
 };
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::{Anchor, Device};
+use crate::storage::Storage;
 use crate::{openid, state};
 use candid::Principal;
 use ic_cdk::api::time;
 use ic_cdk::caller;
+use ic_stable_structures::Memory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::IdRegFinishError::IdentityLimitReached;
 use internet_identity_interface::internet_identity::types::{
     AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData,
-    DeviceData, DeviceWithUsage, IdRegFinishError, IdRegFinishResult, IdRegNextStepResult,
-    IdRegStartError, IdentityNumber, OpenIDRegFinishArg, RegistrationFlowNextStep,
-    StaticCaptchaTrigger,
+    DeviceData, DeviceWithUsage, IdRegFinishArg, IdRegFinishError, IdRegFinishResult,
+    IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
+    RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 
 impl RegistrationFlowState {
@@ -194,12 +197,65 @@ pub fn identity_registration_finish(
     Ok(IdRegFinishResult { identity_number })
 }
 
+fn create_openid_credential_and_config(
+    openid_registration_data: &OpenIDRegFinishArg,
+) -> Result<(openid::OpenIdCredential, String), IdRegFinishError> {
+    let OpenIDRegFinishArg { jwt, salt, name: _ } = openid_registration_data;
+
+    let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
+        Ok((provider.verify(jwt, salt)?, provider.issuer()))
+    })?;
+
+    Ok((openid_credential, openid_config_iss))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ValidatedCreateIdentityData {
+    PubkeyAuthn(IdRegFinishArg),
+    OpenID(ValidatedOpenIDRegFinishArg),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValidatedOpenIDRegFinishArg {
+    pub name: String,
+    pub credential: openid::OpenIdCredential,
+    pub openid_config_iss: String,
+}
+
+fn validate_identity_data<M: Memory + Clone>(
+    storage: &Storage<M>,
+    arg: &CreateIdentityData,
+) -> Result<ValidatedCreateIdentityData, IdRegFinishError> {
+    match &arg {
+        CreateIdentityData::PubkeyAuthn(arg) => {
+            Ok(ValidatedCreateIdentityData::PubkeyAuthn(arg.clone()))
+        }
+        CreateIdentityData::OpenID(openid_registration_data) => {
+            let (credential, openid_config_iss) =
+                create_openid_credential_and_config(openid_registration_data)?;
+
+            check_openid_credential_is_unique(&storage, &credential.key())
+                .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
+
+            let name = openid_registration_data.name.clone();
+
+            Ok(ValidatedCreateIdentityData::OpenID(
+                ValidatedOpenIDRegFinishArg {
+                    name,
+                    credential,
+                    openid_config_iss,
+                },
+            ))
+        }
+    }
+}
+
 fn apply_identity_data(
     identity: &mut Anchor,
-    arg: &CreateIdentityData,
+    arg: ValidatedCreateIdentityData,
 ) -> Result<Operation, IdRegFinishError> {
-    match &arg {
-        CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
+    match arg {
+        ValidatedCreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
             let name = id_reg_finish_arg.name.clone();
             let device = DeviceWithUsage::try_from(id_reg_finish_arg.authn_method.clone())
                 .map(|device| Device::from(DeviceData::from(device)))
@@ -219,41 +275,44 @@ fn apply_identity_data(
                 device: DeviceDataWithoutAlias::from(device),
             })
         }
-        CreateIdentityData::OpenID(openid_registration_data) => {
-            let OpenIDRegFinishArg { jwt, salt, name } = openid_registration_data;
-            let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
-                Ok((provider.verify(jwt, salt)?, provider.issuer()))
-            })?;
-            add_openid_credential(identity, openid_credential.clone())
+        ValidatedCreateIdentityData::OpenID(ValidatedOpenIDRegFinishArg {
+            name,
+            credential,
+            openid_config_iss,
+        }) => {
+            let key = credential.key();
+            let iss = openid_config_iss.clone();
+
+            add_openid_credential_skip_checks(identity, credential)
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-            set_name(identity, Some(name.clone()))
+
+            set_name(identity, Some(name))
                 .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
+
             activity_bookkeeping(
                 identity,
-                &AuthorizationKey::OpenIdCredentialKey((
-                    openid_credential.key(),
-                    Some(openid_config_iss),
-                )),
+                &AuthorizationKey::OpenIdCredentialKey((key, Some(openid_config_iss))),
             );
 
-            Ok(Operation::RegisterAnchorWithOpenIdCredential {
-                iss: openid_credential.iss,
-            })
+            Ok(Operation::RegisterAnchorWithOpenIdCredential { iss })
         }
     }
 }
 
 fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber, IdRegFinishError> {
     let (operation, identity_number): (Operation, u64) = state::storage_borrow_mut(|storage| {
-        let (operation, identity) = storage.allocate_anchor_safe(now, |identity| {
-            let Some(mut identity) = identity else {
-                return Err(IdentityLimitReached);
-            };
+        let arg = validate_identity_data(storage, arg)?;
 
-            let operation = apply_identity_data(&mut identity, arg)?;
+        let (operation, identity) =
+            storage.allocate_anchor_safe(now, |identity: Option<Anchor>| {
+                let Some(mut identity) = identity else {
+                    return Err(IdentityLimitReached);
+                };
 
-            Ok((operation, identity))
-        })?;
+                let operation = apply_identity_data(&mut identity, arg)?;
+
+                Ok((operation, identity))
+            })?;
 
         let identity_number = identity.anchor_number();
 
