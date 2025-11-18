@@ -569,8 +569,9 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Runs `f` over a new identity, allocating that identity in stable memory if `f` succeeds.
     ///
-    /// Returns `Ok(None)` if the range of Identity Anchor assigned to this storage is exhausted,
-    /// in which case `f` is not called and no state is modified.
+    /// Returns a `StorageError::AnchorNumberOutOfRange` error (converted to `E`) if the range
+    /// of Identity Anchor assigned to this storage is exhausted, in which case `f` is not called
+    /// and no state is modified.
     pub fn allocate_anchor_safe<F, T, E>(&mut self, now: Timestamp, f: F) -> Result<T, E>
     where
         F: FnOnce(&mut Anchor) -> Result<T, E>,
@@ -2105,7 +2106,7 @@ mod allocate_anchor_safe_tests {
                 (u64::MAX - 1, u64::MAX),
                 0,
                 Box::new(|a| Ok(format!("Anchor {}", a.anchor_number()))),
-                Ok(format!("Anchor {}", u64::MAX - 1).into()),
+                Ok(format!("Anchor {}", u64::MAX - 1)),
                 1,
             ),
             (
