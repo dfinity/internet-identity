@@ -7,7 +7,7 @@ use crate::anchor_management::{
     activity_bookkeeping, add_openid_credential, post_operation_bookkeeping, set_name,
 };
 use crate::state::flow_states::RegistrationFlowState;
-use crate::storage::anchor::Device;
+use crate::storage::anchor::{Anchor, Device};
 use crate::{openid, state};
 use candid::Principal;
 use ic_cdk::api::time;
@@ -192,13 +192,11 @@ pub fn identity_registration_finish(
     Ok(IdRegFinishResult { identity_number })
 }
 
-fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFinishError> {
-    let now = time();
-    let Some(mut identity) = state::storage_borrow_mut(|s| s.allocate_anchor(now)) else {
-        return Err(IdentityLimitReached);
-    };
-
-    let operation = match &arg {
+fn apply_identity_data(
+    identity: &mut Anchor,
+    arg: &CreateIdentityData,
+) -> Result<Operation, IdRegFinishError> {
+    match &arg {
         CreateIdentityData::PubkeyAuthn(id_reg_finish_arg) => {
             let name = id_reg_finish_arg.name.clone();
             let device = DeviceWithUsage::try_from(id_reg_finish_arg.authn_method.clone())
@@ -208,47 +206,64 @@ fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFini
             identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-            set_name(&mut identity, name)
+            set_name(identity, name)
                 .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
             activity_bookkeeping(
-                &mut identity,
+                identity,
                 &AuthorizationKey::DeviceKey(device.pubkey.clone()),
             );
 
-            Operation::RegisterAnchor {
+            Ok(Operation::RegisterAnchor {
                 device: DeviceDataWithoutAlias::from(device),
-            }
+            })
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
             let OpenIDRegFinishArg { jwt, salt, name } = openid_registration_data;
             let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
                 Ok((provider.verify(jwt, salt)?, provider.issuer()))
             })?;
-            add_openid_credential(&mut identity, openid_credential.clone())
+            add_openid_credential(identity, openid_credential.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-            set_name(&mut identity, Some(name.clone()))
+            set_name(identity, Some(name.clone()))
                 .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
             activity_bookkeeping(
-                &mut identity,
+                identity,
                 &AuthorizationKey::OpenIdCredentialKey((
                     openid_credential.key(),
                     Some(openid_config_iss),
                 )),
             );
 
-            Operation::RegisterAnchorWithOpenIdCredential {
+            Ok(Operation::RegisterAnchorWithOpenIdCredential {
                 iss: openid_credential.iss,
-            }
+            })
         }
-    };
+    }
+}
 
-    let identity_number = identity.anchor_number();
+fn create_identity(arg: &CreateIdentityData) -> Result<IdentityNumber, IdRegFinishError> {
+    let now = time();
 
-    state::storage_borrow_mut(|s| {
-        s.registration_rates.new_registration();
-        s.create(identity)
-    })
-    .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
+    let (operation, identity_number): (Operation, u64) = state::storage_borrow_mut(|storage| {
+        let (operation, identity) = storage.allocate_anchor_safe(now, |identity| {
+            let Some(mut identity) = identity else {
+                return Err(IdentityLimitReached);
+            };
+
+            let operation = apply_identity_data(&mut identity, arg)?;
+
+            Ok((operation, identity))
+        })?;
+
+        let identity_number = identity.anchor_number();
+
+        storage.registration_rates.new_registration();
+        storage
+            .create(identity)
+            .map_err(|err| IdRegFinishError::StorageError(err.to_string()))?;
+
+        Ok::<_, IdRegFinishError>((operation, identity_number))
+    })?;
 
     post_operation_bookkeeping(identity_number, operation);
 

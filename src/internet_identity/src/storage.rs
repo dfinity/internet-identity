@@ -567,6 +567,32 @@ impl<M: Memory + Clone> Storage<M> {
         Some(Anchor::new(anchor_number, now))
     }
 
+    /// Runs `f` over a new anchor, allocating that anchor in stable memory if `f` succeeds.
+    ///
+    /// The new anchor is an optional argument to `f`, which is `None` if no anchor could be allocated.
+    ///
+    /// Otherwise, no state change is made, and the error from `f` is returned.
+    pub fn allocate_anchor_safe<F, T, E>(&mut self, now: Timestamp, f: F) -> Result<T, E>
+    where
+        F: FnOnce(Option<Anchor>) -> Result<T, E>,
+    {
+        let num_anchors = u64::from(self.header.num_anchors);
+
+        let anchor_number = self.header.id_range_lo.saturating_add(num_anchors);
+
+        let anchor = if anchor_number >= self.header.id_range_hi {
+            None
+        } else {
+            Some(Anchor::new(anchor_number, now))
+        };
+
+        let result = f(anchor)?;
+
+        self.header.num_anchors = self.header.num_anchors.saturating_sub(1);
+
+        Ok(result)
+    }
+
     /// This method can be replaced with `write` once `anchor_memory` is removed.
     pub fn create(&mut self, data: Anchor) -> Result<(), StorageError> {
         self.write(data, false)
