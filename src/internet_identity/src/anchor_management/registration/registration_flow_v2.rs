@@ -234,7 +234,7 @@ fn validate_identity_data<M: Memory + Clone>(
             let (credential, openid_config_iss) =
                 create_openid_credential_and_config(openid_registration_data)?;
 
-            check_openid_credential_is_unique(&storage, &credential.key())
+            check_openid_credential_is_unique(storage, &credential.key())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
 
             let name = openid_registration_data.name.clone();
