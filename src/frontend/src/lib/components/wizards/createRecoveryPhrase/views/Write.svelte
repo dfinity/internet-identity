@@ -1,6 +1,5 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import Button from "$lib/components/ui/Button.svelte";
 
   interface Props {

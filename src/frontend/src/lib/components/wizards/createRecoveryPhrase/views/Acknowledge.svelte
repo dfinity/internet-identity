@@ -1,6 +1,5 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
-  import { Trans } from "$lib/components/locale";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import Button from "$lib/components/ui/Button.svelte";
 

@@ -12,13 +12,16 @@
   import { invalidateAll } from "$app/navigation";
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
+  import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
+  import { authnMethodEqual } from "$lib/utils/webAuthn";
 
   const { data }: PageProps = $props();
 
-  let showRecoveryPhraseSetup = $state(false);
-  let pendingRecoveryPhrase = $state<string[]>();
-  let isPendingUnverified = $state(false);
-  let verifyPending = $state(false);
+  let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
+  let unverifiedRecoveryPhrase = $state<{
+    words: string[];
+    data: AuthnMethodData;
+  }>();
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -30,53 +33,56 @@
   const isCurrentAccessMethod = $derived(
     "recoveryPhrase" in $authenticatedStore.authMethod,
   );
+  const isUnverified = $derived(
+    recoveryPhraseData !== undefined &&
+      unverifiedRecoveryPhrase !== undefined &&
+      authnMethodEqual(recoveryPhraseData, unverifiedRecoveryPhrase.data),
+  );
 
-  const handleSetup = () => {
-    showRecoveryPhraseSetup = true;
+  const handleCreate = async (words: string[]) => {
+    const data = await recoveryAuthnMethodData(words);
+    await $authenticatedStore.actor
+      .authn_method_add($authenticatedStore.identityNumber, data)
+      .then(throwCanisterError);
+    unverifiedRecoveryPhrase = { words, data };
   };
-  const handleVerifyPending = () => {
-    verifyPending = true;
-    showRecoveryPhraseSetup = true;
-  };
-  const handleCreate = async (recoveryPhrase: string[]) => {
-    const data = await recoveryAuthnMethodData(recoveryPhrase);
-    // Add new recovery phrase if there isn't one yet, else replace existing
-    if (recoveryPhraseData === undefined) {
-      await $authenticatedStore.actor
-        .authn_method_add($authenticatedStore.identityNumber, data)
-        .then(throwCanisterError);
-    } else if ("PubKey" in recoveryPhraseData.authn_method) {
-      await $authenticatedStore.actor
-        .authn_method_replace(
-          $authenticatedStore.identityNumber,
-          recoveryPhraseData.authn_method.PubKey.pubkey,
-          data,
-        )
-        .then(throwCanisterError);
-    }
-    pendingRecoveryPhrase = recoveryPhrase;
-  };
-  const handleCancel = () => {
-    showRecoveryPhraseSetup = false;
-    verifyPending = false;
-  };
-  const handleCompletePending = async () => {
-    if (pendingRecoveryPhrase === undefined) {
+  const handleReplace = async (words: string[]) => {
+    const data = await recoveryAuthnMethodData(words);
+    if (
+      recoveryPhraseData === undefined ||
+      !("PubKey" in recoveryPhraseData.authn_method)
+    ) {
       return;
     }
-    showRecoveryPhraseSetup = false;
-    verifyPending = false;
-    recoveryPhraseData = await recoveryAuthnMethodData(pendingRecoveryPhrase);
-    void invalidateAll();
+    await $authenticatedStore.actor
+      .authn_method_replace(
+        $authenticatedStore.identityNumber,
+        recoveryPhraseData.authn_method.PubKey.pubkey,
+        data,
+      )
+      .then(throwCanisterError);
+    unverifiedRecoveryPhrase = { words, data };
+  };
+  const handleCancel = () => {
+    showRecoveryPhraseSetup = undefined;
   };
   const handleUnverified = async () => {
-    await handleCompletePending();
-    isPendingUnverified = true;
+    if (unverifiedRecoveryPhrase === undefined) {
+      return;
+    }
+    showRecoveryPhraseSetup = undefined;
+    recoveryPhraseData = unverifiedRecoveryPhrase.data;
+    void invalidateAll();
   };
   const handleVerified = async () => {
-    await handleCompletePending();
-    pendingRecoveryPhrase = undefined;
-    isPendingUnverified = false;
+    if (unverifiedRecoveryPhrase === undefined) {
+      return;
+    }
+    showRecoveryPhraseSetup = undefined;
+    const { data } = unverifiedRecoveryPhrase;
+    unverifiedRecoveryPhrase = undefined;
+    recoveryPhraseData = data;
+    void invalidateAll();
   };
 </script>
 
@@ -92,19 +98,21 @@
   class="mt-10 grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-5"
 >
   <div class="col-span-3 max-sm:col-span-1">
-    {#if isPendingUnverified}
+    {#if isUnverified}
       <UnverifiedRecoveryPhrase
-        onReset={handleSetup}
-        onVerify={handleVerifyPending}
+        onReset={() => (showRecoveryPhraseSetup = "reset")}
+        onVerify={() => (showRecoveryPhraseSetup = "verify")}
       />
     {:else if recoveryPhraseData !== undefined}
       <ActiveRecoveryPhrase
-        onReset={handleSetup}
+        onReset={() => (showRecoveryPhraseSetup = "reset")}
         recoveryPhrase={recoveryPhraseData}
         {isCurrentAccessMethod}
       />
     {:else}
-      <InactiveRecoveryPhrase onActivate={handleSetup} />
+      <InactiveRecoveryPhrase
+        onActivate={() => (showRecoveryPhraseSetup = "activate")}
+      />
     {/if}
   </div>
 </div>
@@ -156,14 +164,16 @@
   </div>
 </section>
 
-{#if showRecoveryPhraseSetup}
-  <Dialog onClose={pendingRecoveryPhrase ? handleUnverified : handleCancel}>
+{#if showRecoveryPhraseSetup !== undefined}
+  <Dialog onClose={unverifiedRecoveryPhrase ? handleUnverified : handleCancel}>
     <CreateRecoveryPhraseWizard
-      onCreate={handleCreate}
+      onCreate={showRecoveryPhraseSetup === "activate"
+        ? handleCreate
+        : handleReplace}
       onVerified={handleVerified}
       onCancel={handleCancel}
-      unverifiedRecoveryPhrase={verifyPending
-        ? pendingRecoveryPhrase
+      unverifiedRecoveryPhrase={showRecoveryPhraseSetup === "verify"
+        ? unverifiedRecoveryPhrase?.words
         : undefined}
       hasExistingRecoveryPhrase={recoveryPhraseData !== undefined}
     />
