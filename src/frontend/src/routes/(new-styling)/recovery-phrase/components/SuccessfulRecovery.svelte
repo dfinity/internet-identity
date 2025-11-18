@@ -70,11 +70,11 @@
         {$t`We have found your identity`}
       </h2>
       {#if hasName}
-        <p class="text-text-tertiary text-sm">
+        <p class="text-text-tertiary text-md">
           {$t`Here is the identity that is linked to your recovery phrase. Continue to access it and add another access method if required.`}
         </p>
       {:else}
-        <p class="text-text-primary text-sm font-bold">
+        <p class="text-text-primary text-md font-bold">
           {identityNumber.toString()}
         </p>
       {/if}
@@ -100,7 +100,7 @@
     </ButtonCard>
   {:else}
     <div class="flex flex-col gap-2">
-      <p class="text-text-tertiary text-sm">
+      <p class="text-text-tertiary text-md">
         <Trans>
           Name your identity to upgrade to II 2.0 and gain access. You can't
           rename it later once set.
