@@ -18,6 +18,7 @@
     authnMethodToPublicKey,
     getAuthnMethodAlias,
   } from "$lib/utils/webAuthn";
+  import { nanosToMillis } from "$lib/utils/time";
   import { goto, invalidateAll } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
   import { flip } from "svelte/animate";
@@ -70,6 +71,22 @@
     accessMethods = [{ openid } as const, ...accessMethods].sort(
       compareAccessMethods,
     );
+    lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({
+      identityNumber: data.identityNumber,
+      name: data.identityInfo.name[0],
+      createdAtMillis:
+        data.identityInfo.created_at.length > 0 &&
+        nonNullish(data.identityInfo.created_at[0])
+          ? nanosToMillis(data.identityInfo.created_at[0])
+          : undefined,
+      authMethod: {
+        openid: {
+          iss: openid.iss,
+          sub: openid.sub,
+          metadata: openid.metadata,
+        },
+      },
+    });
     void invalidateAll();
   };
   const handlePasskeyRegistered = async (passkey: AuthnMethodData) => {
@@ -77,6 +94,26 @@
     accessMethods = [{ passkey } as const, ...accessMethods].sort(
       compareAccessMethods,
     );
+
+    if ("WebAuthn" in passkey.authn_method) {
+      lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({
+        identityNumber: data.identityNumber,
+        name: data.identityInfo.name[0],
+        createdAtMillis:
+          data.identityInfo.created_at.length > 0 &&
+          nonNullish(data.identityInfo.created_at[0])
+            ? nanosToMillis(data.identityInfo.created_at[0])
+            : undefined,
+        authMethod: {
+          passkey: {
+            credentialId: new Uint8Array(
+              passkey.authn_method.WebAuthn.credential_id,
+            ),
+          },
+        },
+      });
+    }
+
     void invalidateAll();
   };
   const handleOtherDeviceRegistered = async () => {

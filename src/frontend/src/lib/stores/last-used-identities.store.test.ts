@@ -192,6 +192,53 @@ describe("lastUsedIdentitiesStore", () => {
       },
     });
   });
+
+  describe("addLastUsedIdentityIfMissing", () => {
+    it("should add the identity if it does not exist", () => {
+      lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({
+        identityNumber: identity1,
+        name: name1,
+        authMethod: { passkey: { credentialId: credId1 } },
+      });
+
+      expect(
+        get(lastUsedIdentitiesStore).identities[identity1.toString()],
+      ).toEqual({
+        identityNumber: identity1,
+        name: name1,
+        authMethod: { passkey: { credentialId: credId1 } },
+        lastUsedTimestampMillis: mockTimestamp1,
+        accounts: undefined,
+      });
+    });
+
+    it("should not update the identity if it already exists", () => {
+      // Add initially
+      lastUsedIdentitiesStore.addLastUsedIdentity({
+        identityNumber: identity1,
+        name: name1,
+        authMethod: { passkey: { credentialId: credId1 } },
+      });
+
+      // Advance time
+      vi.setSystemTime(mockTimestamp2);
+
+      // Try to add again with different name
+      lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({
+        identityNumber: identity1,
+        name: "New Name",
+        authMethod: { passkey: { credentialId: credId1 } },
+      });
+
+      const identity = get(lastUsedIdentitiesStore).identities[
+        identity1.toString()
+      ];
+
+      // Should match original state (timestamp1 and original name)
+      expect(identity.name).toBe(name1);
+      expect(identity.lastUsedTimestampMillis).toBe(mockTimestamp1);
+    });
+  });
 });
 
 describe("lastUsedIdentityStore (derived store)", () => {
