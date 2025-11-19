@@ -74,11 +74,9 @@
     lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({
       identityNumber: data.identityNumber,
       name: data.identityInfo.name[0],
-      createdAtMillis:
-        data.identityInfo.created_at.length > 0 &&
-        nonNullish(data.identityInfo.created_at[0])
-          ? nanosToMillis(data.identityInfo.created_at[0])
-          : undefined,
+      createdAtMillis: nonNullish(data.identityInfo.created_at[0])
+        ? nanosToMillis(data.identityInfo.created_at[0])
+        : undefined,
       authMethod: {
         openid: {
           iss: openid.iss,
