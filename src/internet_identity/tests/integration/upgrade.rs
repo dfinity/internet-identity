@@ -15,6 +15,8 @@ use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 
+use crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name;
+
 /// Basic upgrade test.
 #[test]
 fn ii_upgrade_works() -> Result<(), RejectResponse> {
@@ -318,7 +320,6 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
     assert_eq!(accounts_between, accounts_after);
 }
 
-// TODO: Remove this test after the migration takes place.
 #[test]
 fn test_sync_anchor_indices_migration() {
     let env = env();
@@ -328,7 +329,6 @@ fn test_sync_anchor_indices_migration() {
 
     for i in 0..NUM_ANCHORS {
         let pubkey = format!("pub-key-{}", i);
-        let sender = Principal::self_authenticating(pubkey.clone());
         let origin = format!("https://www.app{}.org", i);
         let device_data = DeviceData {
             pubkey: ByteBuf::from(pubkey),
@@ -339,20 +339,22 @@ fn test_sync_anchor_indices_migration() {
             key_type: KeyType::SeedPhrase,
             ..DeviceData::auth_test_device()
         };
-        let identity_number = flows::register_anchor_with(&env, canister_id, sender, &device_data);
 
-        let account_name = format!("Account-{}", i);
+        let name = if i == 0 {
+            // A very long name should cause an error during identity creation. If this happens,
+            // the Identity anchor should not be allocated, or else the migration would crash while
+            // trying to read it.
+            Some("Test User".repeat(100))
+        } else {
+            Some(format!("Test User {}", i))
+        };
 
-        create_account(
+        let _identity_number = create_identity_with_authn_method_and_name(
             &env,
             canister_id,
-            sender,
-            identity_number,
-            origin,
-            account_name,
-        )
-        .unwrap()
-        .unwrap();
+            &AuthnMethodData::from(device_data),
+            name,
+        );
     }
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -380,7 +382,7 @@ fn test_sync_anchor_indices_migration() {
 
         let errors: Vec<String> = candid::decode_one(&data).unwrap();
 
-        println!("errors: {:#?}", errors);
+        assert_eq!(errors, Vec::<String>::new());
     }
 
     {
@@ -416,7 +418,8 @@ fn test_sync_anchor_indices_migration() {
 
         let count_recovery_phrases: u64 = candid::decode_one(&data).unwrap();
 
-        assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64);
+        // One of the anchors did not actually exist, so only NUM_ANCHORS - 1 recovery phrases.
+        assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64 - 1);
     }
 
     // smoke test
@@ -427,9 +430,14 @@ fn test_sync_anchor_indices_migration() {
             None,
         ),
         (
-            "User with pub-key-0 should get anchor number 10000",
+            "User with pub-key-0 did not have an anchor in stable memory",
             Principal::self_authenticating("pub-key-0"),
-            Some(10_000),
+            None,
+        ),
+        (
+            "User with pub-key-1 should get anchor number 10001",
+            Principal::self_authenticating("pub-key-1"),
+            Some(10001),
         ),
     ] {
         let payload = candid::encode_one(()).unwrap();

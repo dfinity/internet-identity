@@ -626,7 +626,8 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 
 async fn run_periodic_tasks() {
     state::storage_borrow_mut(|storage| {
-        storage.sync_anchor_indices(RECOVERY_PHRASE_MIGRATION_BATCH_SIZE);
+        let now_nanos = ic_cdk::api::time();
+        storage.sync_anchor_indices(now_nanos, RECOVERY_PHRASE_MIGRATION_BATCH_SIZE);
     });
 
     if RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
@@ -1150,8 +1151,7 @@ mod v2_api {
 /// API for OpenID credentials
 mod openid_api {
     use crate::anchor_management::{
-        add_openid_credential, lookup_anchor_with_openid_credential, registration,
-        remove_openid_credential, update_openid_credential,
+        add_openid_credential, registration, remove_openid_credential, update_openid_credential,
     };
     use crate::authz_utils::{anchor_operation_with_authz_check, IdentityUpdateError};
     use crate::openid::{self, OpenIdCredentialKey};
@@ -1235,8 +1235,10 @@ mod openid_api {
             openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
                 .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
-        let anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+        let anchor_number = state::storage_borrow(|storage| {
+            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+        })
+        .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
         // Update anchor with latest OpenID credential from JWT so latest metadata is stored,
         // this means all data except the `last_used_timestamp` e.g. `name`, `email` and `picture`.
@@ -1251,8 +1253,10 @@ mod openid_api {
             .await;
 
         // Checking again because the association could've changed during the .await
-        let still_anchor_number = lookup_anchor_with_openid_credential(&openid_credential.key())
-            .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
+        let still_anchor_number = state::storage_borrow(|storage| {
+            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+        })
+        .ok_or(OpenIdDelegationError::NoSuchAnchor)?;
 
         if anchor_number != still_anchor_number {
             return Err(OpenIdDelegationError::NoSuchAnchor);
@@ -1276,7 +1280,9 @@ mod openid_api {
             openid::with_provider(&jwt, |provider| provider.verify(&jwt, &salt))
                 .map_err(|_| OpenIdDelegationError::JwtVerificationFailed)?;
 
-        match lookup_anchor_with_openid_credential(&openid_credential.key()) {
+        match state::storage_borrow(|storage| {
+            storage.lookup_anchor_with_openid_credential(&openid_credential.key())
+        }) {
             Some(anchor_number) => {
                 openid_credential.get_jwt_delegation(session_key, expiration, anchor_number)
             }

@@ -371,9 +371,6 @@ export class Connection {
       if ("NoRegistrationFlow" in err) {
         return { kind: "noRegistrationFlow" };
       }
-      if ("IdentityLimitReached" in err) {
-        return { kind: "registerNoSpace" };
-      }
       if ("StorageError" in err) {
         // this is unrecoverable, so we can just map it to a generic API error
         return {

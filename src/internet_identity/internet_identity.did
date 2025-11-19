@@ -772,8 +772,6 @@ type IdRegFinishResult = record {
 };
 
 type IdRegFinishError = variant {
-    // The configured maximum number of identities has been reached.
-    IdentityLimitReached;
     // This call is unexpected, see next_step.
     UnexpectedCall : record {
         next_step : RegistrationFlowNextStep;
