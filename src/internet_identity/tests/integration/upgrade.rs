@@ -9,7 +9,6 @@ use canister_tests::api::internet_identity::api_v2::create_account;
 use canister_tests::api::internet_identity::api_v2::get_accounts;
 use canister_tests::flows;
 use canister_tests::framework::*;
-use internet_identity_interface::internet_identity::authn_method;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
