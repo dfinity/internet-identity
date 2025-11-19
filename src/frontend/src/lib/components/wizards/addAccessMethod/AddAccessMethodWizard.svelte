@@ -20,6 +20,7 @@
     isUsingPasskeys?: boolean;
     openIdCredentials?: OpenIdCredential[];
     maxPasskeysReached?: boolean;
+    identityName?: string;
   }
 
   const {
@@ -30,6 +31,7 @@
     isUsingPasskeys,
     openIdCredentials,
     maxPasskeysReached,
+    identityName,
   }: Props = $props();
 
   const addAccessMethodFlow = new AddAccessMethodFlow();
@@ -48,7 +50,9 @@
   };
   const handleCreatePasskey = async () => {
     try {
-      onPasskeyRegistered(await addAccessMethodFlow.createPasskey());
+      onPasskeyRegistered(
+        await addAccessMethodFlow.createPasskey(identityName),
+      );
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";

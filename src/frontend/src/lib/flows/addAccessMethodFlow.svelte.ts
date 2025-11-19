@@ -73,10 +73,9 @@ export class AddAccessMethodFlow {
     }
   };
 
-  createPasskey = async (): Promise<AuthnMethodData> => {
-    const { selected } = get(lastUsedIdentitiesStore);
+  createPasskey = async (name?: string): Promise<AuthnMethodData> => {
     const { actor, identityNumber } = get(authenticatedStore);
-    const name = selected?.name;
+    // TODO: Do not fail if name is not provided, maybe use the identity number as a fallback?
     if (isNullish(name)) {
       throw new Error("Identity is missing a name");
     }

@@ -278,6 +278,7 @@
       {maxPasskeysReached}
       {isUsingPasskeys}
       {openIdCredentials}
+      identityName={data.identityInfo.name[0]}
     />
   </Dialog>
 {/if}
