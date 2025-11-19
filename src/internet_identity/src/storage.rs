@@ -599,8 +599,6 @@ impl<M: Memory + Clone> Storage<M> {
 
         let result = f(&mut identity)?;
 
-        self.registration_rates.new_registration();
-
         self.create(identity).map_err(E::from)?;
 
         // Important! Only increment num_anchors after the anchor creation succeeds.
@@ -627,6 +625,9 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Therefore, this information is passed as an additional argument,
     /// this argument can be removed once `anchor_memory` is removed.
+    ///
+    /// *TODO*: remove `pub(crate)` after the `sync_anchor_indices` migration. Do **NOT**,
+    /// under _any_ circumstances, use this method directly. Use `create` or `update` instead.
     pub(crate) fn write(
         &mut self,
         data: Anchor,
@@ -642,10 +643,11 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Strict inequality allows for calling this function before allocating an anchor,
         // which is a safer way to create new anchors.
-        // TODO: switch this condition to `record_number != num_anchors`.
+        // TODO: switch this condition to `!is_previously_written ==> record_number != num_anchors`.
         if record_number > num_anchors {
             ic_cdk::println!(
-                "ERROR: Tried to write anchor number {} which maps to record number {}, but only {} anchors are allocated.",
+                "ERROR: Tried to write anchor number {} which maps to record number {}, \
+                 but only {} anchors are allocated.",
                 anchor_number,
                 record_number,
                 num_anchors,

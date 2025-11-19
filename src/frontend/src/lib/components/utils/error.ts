@@ -43,11 +43,6 @@ export const handleError = (error: unknown) => {
   ) {
     switch (error.type) {
       case "RateLimitExceeded":
-      case "IdentityLimitReached":
-        toaster.error({
-          title: "It seems like registration is unavailable at this moment",
-        });
-        break;
       case "InvalidCaller":
       case "UnexpectedCall":
       case "NoRegistrationFlow":

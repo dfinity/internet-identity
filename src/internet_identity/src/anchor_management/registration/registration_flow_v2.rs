@@ -312,14 +312,18 @@ fn apply_identity_data(
 }
 
 fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber, IdRegFinishError> {
-    let (operation, identity_number): (Operation, u64) = state::storage_borrow_mut(|storage| {
+    let (identity_number, operation) = state::storage_borrow_mut(|storage| {
         let arg = validate_identity_data(storage, arg)?;
 
-        storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
+        let allocation = storage.allocate_anchor_safe(now, |identity: &mut Anchor| {
             let operation = apply_identity_data(identity, arg)?;
             let identity_number = identity.anchor_number();
-            Ok::<_, IdRegFinishError>((operation, identity_number))
-        })
+            Ok::<_, IdRegFinishError>((identity_number, operation))
+        })?;
+
+        storage.registration_rates.new_registration();
+
+        Ok::<_, IdRegFinishError>(allocation)
     })?;
 
     // TODO: propagate the `now` timestamp from above to here to avoid `time()` call.
