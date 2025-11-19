@@ -83,6 +83,19 @@
   });
 </script>
 
+<!--<div-->
+<!--  class="animated-gradient1 absolute inset-0 -z-100 bg-gradient-to-r from-transparent via-red-500 to-transparent dark:via-purple-500"-->
+<!--&gt;</div>-->
+<!--<div-->
+<!--  class="animated-gradient2 absolute inset-0 -z-100 bg-gradient-to-r from-transparent via-yellow-500 to-transparent dark:via-blue-500"-->
+<!--&gt;</div>-->
+<!--<div-->
+<!--  class="from-bg-primary via-bg-primary absolute inset-0 -z-100 bg-gradient-to-t to-transparent"-->
+<!--&gt;</div>-->
+<div
+  class="from-bg-primary via-bg-primary to-bg-primary/90 absolute inset-0 -z-100 bg-orange-200 bg-gradient-to-t dark:bg-blue-900"
+></div>
+
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header>
@@ -167,3 +180,40 @@
 
 <!-- Renders any error status or late success status dialog when needed -->
 <AuthorizeError {status} />
+
+<style>
+  .animated-gradient1 {
+    animation:
+      move-bg1 40s infinite linear,
+      fade-bg 10s infinite linear alternate;
+  }
+  .animated-gradient2 {
+    animation:
+      move-bg2 60s infinite linear,
+      fade-bg 10s infinite linear alternate-reverse;
+  }
+  @keyframes move-bg1 {
+    from {
+      background-position: 50vw 0;
+    }
+    to {
+      background-position: 150vw 0;
+    }
+  }
+  @keyframes move-bg2 {
+    from {
+      background-position: 100vw 0;
+    }
+    to {
+      background-position: 0 0;
+    }
+  }
+  @keyframes fade-bg {
+    from {
+      opacity: 0.07;
+    }
+    to {
+      opacity: 0.05;
+    }
+  }
+</style>

@@ -13,9 +13,9 @@
 <div
   {...props}
   class={[
-    "grid w-full flex-col overflow-hidden rounded-xl px-4 pt-5 pb-8",
+    "grid w-full flex-col rounded-xl px-4 pt-5 pb-8",
     "max-sm:flex-1",
-    "sm:bg-bg-secondary sm:border-border-secondary sm:border sm:px-6",
+    "sm:from-bg-secondary sm:via-bg-secondary sm:to-bg-secondary/97 sm:bg-orange-400 sm:bg-gradient-to-t sm:px-6 sm:ring sm:ring-black/10 sm:ring-inset dark:sm:bg-blue-400 dark:sm:ring-white/14",
     className,
   ]}
 >

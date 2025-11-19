@@ -10,7 +10,7 @@
 <header
   {...props}
   class={[
-    "from-bg-primary flex items-center bg-gradient-to-b to-transparent px-3 md:px-6 lg:px-8",
+    "flex items-center bg-gradient-to-b from-transparent to-transparent px-3 md:px-6 lg:px-8",
     className,
   ]}
 >
