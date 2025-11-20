@@ -73,6 +73,7 @@ type DeviceData = record {
     pubkey : DeviceKey;
     alias : text;
     credential_id : opt CredentialId;
+    aaguid : opt blob;
     purpose : Purpose;
     key_type : KeyType;
     protection : DeviceProtection;
@@ -92,6 +93,7 @@ type DeviceWithUsage = record {
     pubkey : DeviceKey;
     alias : text;
     credential_id : opt CredentialId;
+    aaguid : opt blob;
     purpose : Purpose;
     key_type : KeyType;
     protection : DeviceProtection;

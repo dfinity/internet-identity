@@ -10,6 +10,7 @@ impl From<DeviceWithUsage> for DeviceData {
             pubkey: device.pubkey,
             alias: device.alias,
             credential_id: device.credential_id,
+            aaguid: device.aaguid,
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
@@ -25,6 +26,7 @@ impl From<DeviceData> for DeviceWithUsage {
             pubkey: device.pubkey,
             alias: device.alias,
             credential_id: device.credential_id,
+            aaguid: device.aaguid,
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
@@ -122,6 +124,7 @@ impl From<DeviceWithUsage> for AuthnMethodData {
         let authn_method = if let Some(credential_id) = device_data.credential_id.clone() {
             AuthnMethod::WebAuthn(WebAuthn {
                 credential_id,
+                aaguid: device_data.aaguid.map(|aaguid| aaguid.to_vec()),
                 pubkey: device_data.pubkey.clone(),
             })
         } else {
