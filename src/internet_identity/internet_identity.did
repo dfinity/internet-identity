@@ -436,6 +436,9 @@ type MetadataMapV2 = vec record {
 type WebAuthn = record {
     credential_id : CredentialId;
     pubkey : PublicKey;
+
+    // Authenticator Attestation Global Unique Identifier (AAGUID)
+    aaguid : opt blob;
 };
 
 // Authentication method using generic signatures

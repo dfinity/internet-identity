@@ -35,6 +35,7 @@ pub struct PublicKeyAuthn {
 pub struct WebAuthn {
     pub pubkey: PublicKey,
     pub credential_id: CredentialId,
+    pub aaguid: Option<Vec<u8>>,
 }
 
 /// Supported authentication methods

@@ -835,6 +835,7 @@ mod v2_api {
                     AuthnMethod::WebAuthn(WebAuthn {
                         credential_id,
                         pubkey: device.pubkey,
+                        aaguid: None,
                     })
                 } else {
                     AuthnMethod::PubKey(PublicKeyAuthn {

@@ -48,6 +48,7 @@ pub struct DeviceWithUsage {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
+    pub aaguid: Option<[u8; 16]>,
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
