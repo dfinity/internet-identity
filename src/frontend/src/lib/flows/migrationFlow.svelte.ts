@@ -152,6 +152,7 @@ export class MigrationFlow {
                 new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
               ),
               credential_id: Array.from(new Uint8Array(credentialId)),
+              aaguid: [],
             },
           },
         })

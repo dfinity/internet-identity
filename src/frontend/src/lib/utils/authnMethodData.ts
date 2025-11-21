@@ -65,6 +65,7 @@ export const passkeyAuthnMethodData = ({
       WebAuthn: {
         pubkey: new Uint8Array(pubKey),
         credential_id: new Uint8Array(credentialId),
+        aaguid: [],
       },
     },
     security_settings: defaultSecuritySettings(),

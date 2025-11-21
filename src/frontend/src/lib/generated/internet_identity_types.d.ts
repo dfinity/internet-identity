@@ -347,6 +347,7 @@ export interface DeviceData {
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
+  'aaguid' : [] | [Uint8Array | number[]],
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
@@ -394,6 +395,7 @@ export interface DeviceWithUsage {
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
+  'aaguid' : [] | [Uint8Array | number[]],
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
@@ -952,6 +954,10 @@ export type VerifyTentativeDeviceResponse = {
  */
 export interface WebAuthn {
   'pubkey' : PublicKey,
+  /**
+   * Authenticator Attestation Global Unique Identifier (AAGUID)
+   */
+  'aaguid' : [] | [Uint8Array | number[]],
   'credential_id' : CredentialId,
 }
 export interface WebAuthnCredential {

@@ -18,6 +18,7 @@ const makePasskey = (id: number, lastAuth?: bigint): AuthnMethodData => ({
     WebAuthn: {
       credential_id: new Uint8Array([id]),
       pubkey: new Uint8Array(),
+      aaguid: [],
     },
   },
   last_authentication: lastAuth !== undefined ? [lastAuth] : [],

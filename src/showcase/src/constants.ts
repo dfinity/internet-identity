@@ -23,6 +23,7 @@ export const chromeDevice: DeviceData = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
+  aaguid: [],
   origin: [],
   metadata: [],
 };

@@ -823,6 +823,7 @@ export class AuthenticatedConnection extends Connection {
       credential_id: credentialId
         ? [Array.from(new Uint8Array(credentialId))]
         : [],
+      aaguid: [],
       key_type: keyType,
       purpose,
       protection,

@@ -34,6 +34,7 @@ const createMockDevice = (origin?: string): DeviceData => ({
   key_type: { platform: null },
   purpose: { authentication: null },
   credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+  aaguid: [],
 });
 const mockDevice = createMockDevice();
 
@@ -641,6 +642,7 @@ describe("Connection.login", () => {
         key_type: { browser_storage_key: null },
         purpose: { authentication: null },
         credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+        aaguid: [],
       };
       const mockActor = {
         lookup: vi.fn().mockResolvedValue([pinDevice]),

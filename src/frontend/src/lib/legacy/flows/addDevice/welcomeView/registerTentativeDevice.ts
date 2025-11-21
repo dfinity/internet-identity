@@ -92,6 +92,7 @@ export const registerTentativeDevice = async (
       ),
       purpose: { authentication: null },
       credential_id: [Array.from(new Uint8Array(result.rawId))],
+      aaguid: [],
       metadata: [],
     };
   const addResponse = await addTentativeDevice({

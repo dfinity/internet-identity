@@ -67,7 +67,7 @@ const makeAuthnMethodWithOrigin = (origin?: string): AuthnMethodData => {
     },
     metadata,
     authn_method: {
-      WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+      WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array(), aaguid: [] },
     },
   } as AuthnMethodData;
 };
@@ -260,7 +260,7 @@ describe("getOrigin", () => {
       },
       metadata: [],
       authn_method: {
-        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array(), aaguid: [] },
       },
     } as AuthnMethodData;
     expect(getOrigin(method)).toBeUndefined();
@@ -276,7 +276,7 @@ describe("getOrigin", () => {
       },
       metadata: [["origin", { Bytes: [1, 2, 3] }]],
       authn_method: {
-        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array(), aaguid: [] },
       },
     } as AuthnMethodData;
     expect(getOrigin(method)).toBeUndefined();
@@ -362,7 +362,7 @@ describe("isLegacyAuthnMethod", () => {
       },
       metadata,
       authn_method: {
-        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array() },
+        WebAuthn: { pubkey: new Uint8Array(), credential_id: new Uint8Array(), aaguid: [] },
       },
     } as AuthnMethodData;
   };
@@ -477,6 +477,7 @@ describe("isSameAccessMethod", () => {
         WebAuthn: {
           pubkey: new Uint8Array(pubkeyBytes),
           credential_id: new Uint8Array([1, 2, 3]),
+          aaguid: [],
         },
       },
     } as AuthnMethodData;

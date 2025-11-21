@@ -13,6 +13,7 @@ describe("credetial-devices test", () => {
       key_type: { unknown: null },
       purpose: { authentication: null },
       credential_id: [],
+      aaguid: [],
       metadata: [],
     });
 
