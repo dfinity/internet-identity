@@ -5,6 +5,7 @@
   import { generateMnemonic } from "$lib/utils/recoveryPhrase";
   import Reset from "$lib/components/wizards/createRecoveryPhrase/views/Reset.svelte";
   import { waitFor } from "$lib/utils/utils";
+  import Retry from "$lib/components/wizards/createRecoveryPhrase/views/Retry.svelte";
 
   interface Props {
     onCreate: (recoveryPhrase: string[]) => Promise<void>;
@@ -24,6 +25,7 @@
 
   let recoveryPhrase = $state(unverifiedRecoveryPhrase);
   let isWritten = $state(unverifiedRecoveryPhrase !== undefined);
+  let isIncorrect = $state(false);
 
   const createRecoveryPhrase = async () => {
     const generated = generateMnemonic();
@@ -35,10 +37,14 @@
     // after the user spent some time on selecting words one after another.
     await waitFor(2000);
     if (recoveryPhrase?.join(" ") !== entered.join(" ")) {
-      // TODO: add error view for this with retry action
-      throw new Error("Invalid recovery phrase");
+      isIncorrect = true;
+      return;
     }
     onVerified();
+  };
+  const retryVerification = () => {
+    isWritten = false;
+    isIncorrect = false;
   };
 </script>
 
@@ -50,6 +56,8 @@
   {/if}
 {:else if !isWritten}
   <Write {recoveryPhrase} onWritten={() => (isWritten = true)} />
+{:else if isIncorrect}
+  <Retry onRetry={retryVerification} {onCancel} />
 {:else}
   <Verify {recoveryPhrase} onCompleted={verifyRecoveryPhrase} />
 {/if}
