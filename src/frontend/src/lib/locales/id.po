@@ -245,6 +245,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "Rasakan"
 
+msgid "Failed to update identity name"
+msgstr ""
+
 msgid "FAQs"
 msgstr "Pertanyaan yang Sering Diajukan"
 
@@ -479,6 +482,9 @@ msgstr "Beri nama akun"
 msgid "Name your identity"
 msgstr "Beri nama identitas Anda"
 
+msgid "Name your identity to upgrade to II 2.0 and gain access. You can't rename it later once set."
+msgstr ""
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Tidak ada data yang dibagikan kepada Google, Microsoft, atau Apple mengenai aplikasi mana yang Anda masuk dengan Internet Identity."
 
@@ -532,6 +538,9 @@ msgstr "Passkey menggunakan kunci kriptografis yang disimpan di perangkat Anda u
 
 msgid "Password-free"
 msgstr "Tanpa kata sandi"
+
+msgid "Pick something recognizable, like your name"
+msgstr ""
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Silakan kembali ke <0>perangkat Anda yang ada</0> dan pilih <1>Mulai ulang</1> untuk mencoba lagi."
@@ -749,6 +758,9 @@ msgstr "Peramban Tidak Didukung"
 msgid "Unverified origin"
 msgstr "Asal tidak terverifikasi"
 
+msgid "Update and Continue"
+msgstr ""
+
 msgid "Upgrade"
 msgstr "Tingkatkan"
 
@@ -877,6 +889,9 @@ msgstr "Identitas dan metode masuk Anda sekilas."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "Nama identitas Anda saat ini tidak dapat diedit. Ini hanya terlihat oleh Anda."
+
+msgid "Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name."
+msgstr ""
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Data pribadi Anda, seperti nama atau email, tidak pernah dibagikan. Setiap aplikasi mendapatkan pseudonim unik untuk mencegah pelacakan secara otomatis."

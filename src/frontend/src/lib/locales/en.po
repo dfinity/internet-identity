@@ -245,6 +245,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "Experience"
 
+msgid "Failed to update identity name"
+msgstr "Failed to update identity name"
+
 msgid "FAQs"
 msgstr "FAQs"
 
@@ -479,6 +482,9 @@ msgstr "Name account"
 msgid "Name your identity"
 msgstr "Name your identity"
 
+msgid "Name your identity to upgrade to II 2.0 and gain access. You can't rename it later once set."
+msgstr "Name your identity to upgrade to II 2.0 and gain access. You can't rename it later once set."
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 
@@ -532,6 +538,9 @@ msgstr "Passkeys use cryptographic keys stored on your device for secure, passwo
 
 msgid "Password-free"
 msgstr "Password-free"
+
+msgid "Pick something recognizable, like your name"
+msgstr "Pick something recognizable, like your name"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
@@ -749,6 +758,9 @@ msgstr "Unsupported Browser"
 msgid "Unverified origin"
 msgstr "Unverified origin"
 
+msgid "Update and Continue"
+msgstr "Update and Continue"
+
 msgid "Upgrade"
 msgstr "Upgrade"
 
@@ -877,6 +889,9 @@ msgstr "Your identity and sign-in methods at a glance."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "Your identity name is currently not editable. It is only ever visible to you."
+
+msgid "Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name."
+msgstr "Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name."
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."

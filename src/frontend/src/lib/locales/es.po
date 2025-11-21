@@ -245,6 +245,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "Disfruta"
 
+msgid "Failed to update identity name"
+msgstr "No se ha podido editar el nombre"
+
 msgid "FAQs"
 msgstr "Preguntas frecuentes"
 
@@ -479,6 +482,9 @@ msgstr "Añade una cuenta"
 msgid "Name your identity"
 msgstr "Nombra tu identidad"
 
+msgid "Name your identity to upgrade to II 2.0 and gain access. You can't rename it later once set."
+msgstr "Crea un nombre para tu identidad para acceder a II 2.0. No podrás renombrarla después."
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "No se comparten datos con Google, Microsoft o Apple sobre en qué aplicaciones inicias sesión con Internet Identity."
 
@@ -532,6 +538,9 @@ msgstr "Las passkeys usan claves criptográficas almacenadas en tu dispositivo p
 
 msgid "Password-free"
 msgstr "Sin contraseña"
+
+msgid "Pick something recognizable, like your name"
+msgstr "Elija algo que puedas reconocer fácilmente, como tu nombre"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Vuelve a tu <0>dispositivo existente</0> y elige <1>Empezar de nuevo</1> para volver a intentarlo."
@@ -749,6 +758,9 @@ msgstr "Navegador no compatible"
 msgid "Unverified origin"
 msgstr "Origen no verificado"
 
+msgid "Update and Continue"
+msgstr "Editar y continuar"
+
 msgid "Upgrade"
 msgstr "Actualizar"
 
@@ -877,6 +889,9 @@ msgstr "Tu identidad y métodos de inicio de sesión de un vistazo."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "El nombre de tu identidad no se puede editar actualmente. Solo es visible para ti."
+
+msgid "Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name."
+msgstr "Tu identidad ha sido restaurada, pero el nombre no se pudo actualizar. Por favor, vuelve a restaurar la identidad y crea un nombre."
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Tus datos personales, como tu nombre o email, nunca se comparten. Cada app obtiene un seudónimo único para evitar el rastreo automáticamente."

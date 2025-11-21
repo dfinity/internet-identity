@@ -13,7 +13,6 @@ import type {
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
-import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 
@@ -73,10 +72,9 @@ export class AddAccessMethodFlow {
     }
   };
 
-  createPasskey = async (): Promise<AuthnMethodData> => {
-    const { selected } = get(lastUsedIdentitiesStore);
+  createPasskey = async (name?: string): Promise<AuthnMethodData> => {
     const { actor, identityNumber } = get(authenticatedStore);
-    const name = selected?.name;
+    // TODO: Do not fail if name is not provided, maybe use the identity number as a fallback?
     if (isNullish(name)) {
       throw new Error("Identity is missing a name");
     }
