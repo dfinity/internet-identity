@@ -810,6 +810,7 @@ describe("Connection.login", () => {
         alias,
         pubkey: Array.from(new Uint8Array(newPublicKey)),
         credential_id: [Array.from(credentialId)],
+        aaguid: [],
         key_type: keyType,
         purpose,
         protection,
