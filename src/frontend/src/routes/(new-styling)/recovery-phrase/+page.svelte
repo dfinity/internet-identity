@@ -7,7 +7,10 @@
     IdentityNotFoundError,
     recoverWithPhrase,
   } from "$lib/flows/recoverWithPhraseFlow.svelte";
-  import { authenticationStore } from "$lib/stores/authentication.store";
+  import {
+    authenticatedStore,
+    authenticationStore,
+  } from "$lib/stores/authentication.store";
   import { t } from "$lib/stores/locale.store";
   import { nanosToMillis } from "$lib/utils/time";
   import { nonNullish } from "@dfinity/utils";
@@ -21,6 +24,8 @@
   import IdentityNotFound from "./components/IdentityNotFound.svelte";
   import CancelRecovery from "./components/CancelRecovery.svelte";
   import { toaster } from "$lib/components/utils/toaster";
+  import { throwCanisterError } from "$lib/utils/utils";
+  import { get } from "svelte/store";
 
   type RecoveryWord = {
     value: string;
@@ -181,7 +186,7 @@
     submitTimeoutId = undefined;
   };
 
-  const handleContinue = async () => {
+  const handleContinue = async (newName?: string) => {
     if (nonNullish(recoveredIdentityData) && !continueInProgress) {
       continueInProgress = true;
       try {
@@ -194,6 +199,24 @@
             },
           },
         });
+        if (nonNullish(newName) && newName.length > 0) {
+          try {
+            await $authenticatedStore.actor
+              .identity_properties_replace(
+                recoveredIdentityData.identityNumber,
+                {
+                  name: [newName],
+                },
+              )
+              .then(throwCanisterError);
+          } catch {
+            toaster.error({
+              title: $t`Failed to update identity name`,
+              description: $t`Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name.`,
+              duration: 5000,
+            });
+          }
+        }
         toaster.success({
           title: $t`Successfully restored access to your identity`,
           description: $t`Make sure to add a new access method so that you can sign in next time or reset your recovery phrase.`,
@@ -425,14 +448,13 @@
 </div>
 
 {#if recoveredIdentityData}
-  {@const identityName =
-    recoveredIdentityData.info.name[0] ??
-    recoveredIdentityData.identityNumber.toString()}
+  {@const identityName = recoveredIdentityData.info.name[0]}
   {@const createdAt = nonNullish(recoveredIdentityData.info.created_at[0])
     ? new Date(nanosToMillis(recoveredIdentityData.info.created_at[0]))
     : undefined}
   <Dialog onClose={resetRecoveryState}>
     <SuccessfulRecovery
+      identityNumber={recoveredIdentityData.identityNumber}
       {identityName}
       {createdAt}
       onContinue={handleContinue}

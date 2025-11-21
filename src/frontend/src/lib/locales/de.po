@@ -245,6 +245,9 @@ msgctxt "Used as an action word inviting the reader to try or feel something, e.
 msgid "Experience"
 msgstr "Erleben"
 
+msgid "Failed to update identity name"
+msgstr ""
+
 msgid "FAQs"
 msgstr "Häufig gestellte Fragen"
 
@@ -479,6 +482,9 @@ msgstr "Konto benennen"
 msgid "Name your identity"
 msgstr "Benennen Sie Ihre Identität"
 
+msgid "Name your identity to upgrade to II 2.0 and gain access. You can't rename it later once set."
+msgstr ""
+
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Es werden keine Daten an Google, Microsoft oder Apple darüber weitergegeben, bei welchen Anwendungen Sie sich mit Internet Identity anmelden."
 
@@ -532,6 +538,9 @@ msgstr "Passkeys verwenden kryptografische Schlüssel, die auf Ihrem Gerät gesp
 
 msgid "Password-free"
 msgstr "Passwortfrei"
+
+msgid "Pick something recognizable, like your name"
+msgstr ""
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Gehen Sie zu Ihrem <0>bestehenden Gerät</0> zurück und wählen Sie <1>Neu starten</1>, um es erneut zu versuchen."
@@ -749,6 +758,9 @@ msgstr "Nicht unterstützter Browser"
 msgid "Unverified origin"
 msgstr "Unverifizierter Ursprung"
 
+msgid "Update and Continue"
+msgstr ""
+
 msgid "Upgrade"
 msgstr "Aktualisieren"
 
@@ -877,6 +889,9 @@ msgstr "Ihre Identität und Anmeldemethoden auf einen Blick."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
 msgstr "Ihr Identitätsname ist derzeit nicht bearbeitbar. Er ist nur für Sie sichtbar."
+
+msgid "Your identity was restored, but the name could not be updated. Please try the recovery flow again to set a name."
+msgstr ""
 
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Ihre persönlichen Daten, wie Ihr Name oder Ihre E-Mail, werden niemals geteilt. Jede App erhält automatisch ein eindeutiges Pseudonym, um Tracking zu verhindern."
