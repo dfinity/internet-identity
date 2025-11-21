@@ -50,6 +50,12 @@ type LastUsedIdentitiesStore = Readable<{
       "identityNumber" | "name" | "authMethod" | "createdAtMillis"
     >,
   ) => void;
+  addLastUsedIdentityIfMissing: (
+    params: Pick<
+      LastUsedIdentity,
+      "identityNumber" | "name" | "authMethod" | "createdAtMillis"
+    >,
+  ) => void;
   addLastUsedAccount: (
     params: Omit<LastUsedAccount, "lastUsedTimestampMillis">,
   ) => void;
@@ -95,6 +101,20 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
         const identity = lastUsedIdentities[params.identityNumber.toString()];
         lastUsedIdentities[params.identityNumber.toString()] = {
           accounts: identity?.accounts,
+          ...params,
+          lastUsedTimestampMillis: Date.now(),
+        };
+        return lastUsedIdentities;
+      });
+    },
+    addLastUsedIdentityIfMissing: (params) => {
+      lastUsedStore.update((lastUsedIdentities) => {
+        const identity = lastUsedIdentities[params.identityNumber.toString()];
+        if (nonNullish(identity)) {
+          return lastUsedIdentities;
+        }
+        lastUsedIdentities[params.identityNumber.toString()] = {
+          accounts: undefined,
           ...params,
           lastUsedTimestampMillis: Date.now(),
         };
