@@ -80,7 +80,11 @@ fn should_not_write_using_anchor_number_outside_allocated_range() {
     let anchor = Anchor::new(222, 333);
 
     let result = storage.create(anchor);
-    assert!(matches!(result, Err(StorageError::BadAnchorNumber(_))))
+    assert!(
+        matches!(result, Err(StorageError::BadAnchorNumber(_))),
+        "result = {:?}",
+        result
+    )
 }
 
 #[test]

@@ -101,7 +101,7 @@ fn should_not_exceed_configured_identity_range() {
         .expect("API call failed")
         .expect("check_captcha failed");
 
-    let result = api_v2::identity_registration_finish(
+    let observed = api_v2::identity_registration_finish(
         &env,
         canister_id,
         flow_principal,
@@ -109,10 +109,13 @@ fn should_not_exceed_configured_identity_range() {
         None,
     )
     .expect("API call failed");
-    assert!(matches!(
-        result,
-        Err(IdRegFinishError::IdentityLimitReached)
-    ));
+
+    assert_eq!(
+        observed,
+        Err(IdRegFinishError::StorageError(
+            "Identity Anchor 44 is out of range [42, 44)".to_string()
+        ))
+    );
 }
 
 #[test]
@@ -323,7 +326,8 @@ fn should_register_new_identity_with_name_timestamp() {
     let authn_method = test_authn_method();
     let name = Some("John Doe".to_string());
     let identity_number =
-        create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name.clone());
+        create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name.clone())
+            .unwrap();
 
     let identity_should_be_created_at = env.get_time().as_nanos_since_unix_epoch();
 

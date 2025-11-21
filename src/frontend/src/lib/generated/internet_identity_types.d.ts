@@ -501,12 +501,6 @@ export type IdRegFinishError = {
   } |
   {
     /**
-     * The configured maximum number of identities has been reached.
-     */
-    'IdentityLimitReached' : null
-  } |
-  {
-    /**
      * Error while persisting the new identity.
      */
     'StorageError' : string

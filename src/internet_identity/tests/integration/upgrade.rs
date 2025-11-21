@@ -15,6 +15,8 @@ use pocket_ic::RejectResponse;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 
+use crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name;
+
 /// Basic upgrade test.
 #[test]
 fn ii_upgrade_works() -> Result<(), RejectResponse> {
@@ -318,7 +320,6 @@ fn upgrade_and_rollback_keeps_accounts_intact() {
     assert_eq!(accounts_between, accounts_after);
 }
 
-// TODO: Remove this test after the migration takes place.
 #[test]
 fn test_sync_anchor_indices_migration() {
     let env = env();
@@ -327,8 +328,8 @@ fn test_sync_anchor_indices_migration() {
     const NUM_ANCHORS: usize = 20;
 
     for i in 0..NUM_ANCHORS {
+        let name = Some(format!("Test User {}", i));
         let pubkey = format!("pub-key-{}", i);
-        let sender = Principal::self_authenticating(pubkey.clone());
         let origin = format!("https://www.app{}.org", i);
         let device_data = DeviceData {
             pubkey: ByteBuf::from(pubkey),
@@ -339,20 +340,10 @@ fn test_sync_anchor_indices_migration() {
             key_type: KeyType::SeedPhrase,
             ..DeviceData::auth_test_device()
         };
-        let identity_number = flows::register_anchor_with(&env, canister_id, sender, &device_data);
+        let authn_method = AuthnMethodData::from(device_data);
 
-        let account_name = format!("Account-{}", i);
-
-        create_account(
-            &env,
-            canister_id,
-            sender,
-            identity_number,
-            origin,
-            account_name,
-        )
-        .unwrap()
-        .unwrap();
+        let _identity_number =
+            create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name);
     }
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -380,7 +371,7 @@ fn test_sync_anchor_indices_migration() {
 
         let errors: Vec<String> = candid::decode_one(&data).unwrap();
 
-        println!("errors: {:#?}", errors);
+        assert_eq!(errors, Vec::<String>::new());
     }
 
     {
@@ -429,7 +420,12 @@ fn test_sync_anchor_indices_migration() {
         (
             "User with pub-key-0 should get anchor number 10000",
             Principal::self_authenticating("pub-key-0"),
-            Some(10_000),
+            Some(10000),
+        ),
+        (
+            "User with pub-key-1 should get anchor number 10001",
+            Principal::self_authenticating("pub-key-1"),
+            Some(10001),
         ),
     ] {
         let payload = candid::encode_one(()).unwrap();

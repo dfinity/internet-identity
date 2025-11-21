@@ -1,10 +1,19 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
-import { mnemonicToSeedSync, validateMnemonic } from "bip39";
+import { mnemonicToSeedSync, validateMnemonic, entropyToMnemonic } from "bip39";
+import { bytesToHex } from "@noble/hashes/utils";
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
 // A constant used for xor-ing derived paths to make them hardened.
 const HARDENED = 0x80000000;
+
+/**
+ * @returns A random BIP39 mnemonic with 256 bits of entropy (generates a list of 24 words)
+ */
+export const generateMnemonic = (): string[] => {
+  const entropy = globalThis.crypto.getRandomValues(new Uint8Array(32));
+  return entropyToMnemonic(bytesToHex(entropy)).split(" ");
+};
 
 /**
  * Validates a mnemonic phrase using BIP-39.

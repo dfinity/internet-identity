@@ -522,12 +522,6 @@
     "logo": "b3pay_logo.png"
   },
   {
-    "name": "Hamster",
-    "oneLiner": "One-stop infrastructure, developer toolkit and middleware DevOps service platform",
-    "website": "https://hamsternet.io/",
-    "logo": "hamster_logo.svg"
-  },
-  {
     "name": "RIIDE",
     "website": "https://riide.org/",
     "logo": "riide_logo.png",
