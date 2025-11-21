@@ -24,6 +24,7 @@ import {
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
+import { aa } from "vitest/dist/chunks/reporters.d.CqBhtcTq.js";
 
 const createMockDevice = (origin?: string): DeviceData => ({
   alias: "mockDevice",
@@ -693,6 +694,7 @@ describe("Connection.login", () => {
         alias,
         pubkey: Array.from(new Uint8Array(newPublicKey)),
         credential_id: [],
+        aaguid: [],
         key_type: keyType,
         purpose,
         protection,
@@ -731,6 +733,7 @@ describe("Connection.login", () => {
         alias,
         pubkey: Array.from(new Uint8Array(newPublicKey)),
         credential_id: [],
+        aaguid: [],
         key_type: keyType,
         purpose,
         protection,
@@ -768,6 +771,7 @@ describe("Connection.login", () => {
         alias,
         pubkey: Array.from(new Uint8Array(newPublicKey)),
         credential_id: [],
+        aaguid: [],
         key_type: keyType,
         purpose,
         protection,
