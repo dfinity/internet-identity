@@ -24,6 +24,10 @@
     "typescript": "5.2.2",
     "vite": "^6.4.1",
     "vite-plugin-wasm": "^3.3.0",
-    "vitest": "^0.34.0"
+    "vitest": "^0.34.6"
+  },
+  "dependencies": {
+    "@sveltejs/adapter-static": "0.0.17",
+    "@sveltejs/kit": "0.0.30"
   }
 }
