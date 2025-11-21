@@ -9,11 +9,17 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { CreateRecoveryPhraseWizard } from "$lib/components/wizards/createRecoveryPhrase";
   import { throwCanisterError } from "$lib/utils/utils";
-  import { invalidateAll } from "$app/navigation";
+  import { beforeNavigate, invalidateAll } from "$app/navigation";
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
   import { authnMethodEqual } from "$lib/utils/webAuthn";
+  import {
+    fromMnemonicWithoutValidation,
+    IC_DERIVATION_PATH,
+  } from "$lib/utils/recoveryPhrase";
+  import { authenticateWithSession } from "$lib/utils/authentication";
+  import { toaster } from "$lib/components/utils/toaster";
 
   const { data }: PageProps = $props();
 
@@ -64,6 +70,19 @@
       )
       .then(throwCanisterError);
     unverifiedRecoveryPhrase = { words, data };
+
+    // Update auth store if we just replaced the auth method currently in use
+    if (isCurrentAccessMethod) {
+      const identity = await fromMnemonicWithoutValidation(
+        words.join(" "),
+        IC_DERIVATION_PATH,
+      );
+      await authenticateWithSession({
+        session: { identity },
+        // 10 minutes to match session duration of recovery flow
+        expiration: 10 * 60 * 1000,
+      });
+    }
   };
   const handleCancel = () => {
     showRecoveryPhraseSetup = undefined;
@@ -80,12 +99,24 @@
     if (unverifiedRecoveryPhrase === undefined) {
       return;
     }
+    toaster.success({
+      title: $t`Recovery phrase activated`,
+      description: $t`Your recovery phrase is now active and can be reset anytime.`,
+    });
     showRecoveryPhraseSetup = undefined;
     const { data } = unverifiedRecoveryPhrase;
     unverifiedRecoveryPhrase = undefined;
     recoveryPhraseData = data;
     void invalidateAll();
   };
+
+  // Warn user if they're leaving in the middle of a recovery phrase set-up
+  beforeNavigate((navigation) => {
+    if (showRecoveryPhraseSetup === undefined || navigation.type !== "leave") {
+      return;
+    }
+    navigation.cancel();
+  });
 </script>
 
 <header class="flex flex-col gap-3">
@@ -170,13 +201,16 @@
 </section>
 
 {#if showRecoveryPhraseSetup !== undefined}
-  <Dialog onClose={unverifiedRecoveryPhrase ? handleUnverified : handleCancel}>
+  <Dialog
+    onClose={unverifiedRecoveryPhrase ? handleUnverified : handleCancel}
+    closeOnOutsideClick={false}
+  >
     <CreateRecoveryPhraseWizard
       onCreate={showRecoveryPhraseSetup === "activate"
         ? handleCreate
         : handleReplace}
       onVerified={handleVerified}
-      onCancel={handleCancel}
+      onCancel={unverifiedRecoveryPhrase ? handleUnverified : handleCancel}
       unverifiedRecoveryPhrase={showRecoveryPhraseSetup === "verify"
         ? unverifiedRecoveryPhrase?.words
         : undefined}

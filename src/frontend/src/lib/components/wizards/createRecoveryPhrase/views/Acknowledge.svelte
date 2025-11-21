@@ -12,6 +12,9 @@
 
   const { onAcknowledged }: Props = $props();
 
+  let isAcknowledged = $state(false);
+  let isGeneratingPhrase = $state(false);
+
   const handleAcknowledge = async () => {
     try {
       isGeneratingPhrase = true;
@@ -20,9 +23,6 @@
       isGeneratingPhrase = false;
     }
   };
-
-  let isAcknowledged = $state(false);
-  let isGeneratingPhrase = $state(false);
 </script>
 
 <Steps total={3} current={1} class="my-10" />

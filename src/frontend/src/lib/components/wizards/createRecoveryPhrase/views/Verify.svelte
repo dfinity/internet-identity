@@ -3,7 +3,7 @@
   import { Trans } from "$lib/components/locale";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import ProgressSteps from "$lib/components/wizards/createRecoveryPhrase/components/ProgressSteps.svelte";
+  import StepsProgressBar from "$lib/components/wizards/createRecoveryPhrase/components/StepsProgressBar.svelte";
 
   interface Props {
     recoveryPhrase: string[];
@@ -33,11 +33,13 @@
   });
 </script>
 
-{#if isCheckingOrder}
-  <ProgressSteps total={3} class="my-10" />
-{:else}
-  <Steps total={3} current={3} class="my-10" />
-{/if}
+<div class="limited-height my-10">
+  {#if isCheckingOrder}
+    <StepsProgressBar total={3} />
+  {:else}
+    <Steps total={3} current={3} />
+  {/if}
+</div>
 <h2 class="text-text-primary mb-3 text-2xl font-medium">
   {#if isCheckingOrder}
     {$t`Checking your order`}
@@ -73,13 +75,13 @@
       <span
         class={[
           "text-text-secondary w-4 text-center text-xs font-semibold tabular-nums select-none",
-          isSelected && "!text-text-primary",
+          isSelected ? "!text-text-primary" : "-translate-y-0.25",
           isCheckingOrder && "!text-text-disabled",
         ]}
       >
         {isSelected || isCheckingOrder
           ? `${selectedPosition + 1}`.padStart(2, "0")
-          : "__"}
+          : "＿"}
       </span>
       <span
         class={[
@@ -90,8 +92,8 @@
       ></span>
       <span
         class={[
-          "text-text-secondary -translate-y-0.25 select-none",
-          word.length > 8 ? "text-sm" : "text-base",
+          "text-text-secondary -translate-y-0.25 text-base select-none",
+          word.length > 7 && "tracking-tight",
           isSelected && "!text-text-primary font-semibold",
           isCheckingOrder && "!text-text-disabled",
         ]}
@@ -109,3 +111,11 @@
 >
   {$t`Clear all`}
 </Button>
+
+<style>
+  @media (max-height: 700px) {
+    .limited-height {
+      display: none !important;
+    }
+  }
+</style>
