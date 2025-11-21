@@ -306,7 +306,7 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
 
         let aaguid = if let Some(aaguid) = aaguid {
             let actual_bytes = aaguid.len();
-            let aaguid = <[u8; 16]>::try_from(aaguid).map_err(|_| Self::Error::InvalidAaguid {
+            let aaguid = <Aaguid>::try_from(aaguid).map_err(|_| Self::Error::InvalidAaguid {
                 expected_bytes: 16,
                 actual_bytes,
             })?;
