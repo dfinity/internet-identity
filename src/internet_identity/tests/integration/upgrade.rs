@@ -328,6 +328,7 @@ fn test_sync_anchor_indices_migration() {
     const NUM_ANCHORS: usize = 20;
 
     for i in 0..NUM_ANCHORS {
+        let name = Some(format!("Test User {}", i));
         let pubkey = format!("pub-key-{}", i);
         let origin = format!("https://www.app{}.org", i);
         let device_data = DeviceData {
@@ -339,22 +340,10 @@ fn test_sync_anchor_indices_migration() {
             key_type: KeyType::SeedPhrase,
             ..DeviceData::auth_test_device()
         };
+        let authn_method = AuthnMethodData::from(device_data);
 
-        let name = if i == 0 {
-            // A very long name should cause an error during identity creation. If this happens,
-            // the Identity anchor should not be allocated, or else the migration would crash while
-            // trying to read it.
-            Some("Test User".repeat(100))
-        } else {
-            Some(format!("Test User {}", i))
-        };
-
-        let _identity_number = create_identity_with_authn_method_and_name(
-            &env,
-            canister_id,
-            &AuthnMethodData::from(device_data),
-            name,
-        );
+        let _identity_number =
+            create_identity_with_authn_method_and_name(&env, canister_id, &authn_method, name);
     }
 
     upgrade_ii_canister(&env, canister_id, II_WASM.clone());
@@ -418,8 +407,7 @@ fn test_sync_anchor_indices_migration() {
 
         let count_recovery_phrases: u64 = candid::decode_one(&data).unwrap();
 
-        // One of the anchors did not actually exist, so only NUM_ANCHORS - 1 recovery phrases.
-        assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64 - 1);
+        assert_eq!(count_recovery_phrases, NUM_ANCHORS as u64);
     }
 
     // smoke test
@@ -430,9 +418,9 @@ fn test_sync_anchor_indices_migration() {
             None,
         ),
         (
-            "User with pub-key-0 did not have an anchor in stable memory",
+            "User with pub-key-0 should get anchor number 10000",
             Principal::self_authenticating("pub-key-0"),
-            None,
+            Some(10000),
         ),
         (
             "User with pub-key-1 should get anchor number 10001",

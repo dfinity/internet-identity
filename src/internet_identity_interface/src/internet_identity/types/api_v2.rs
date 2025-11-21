@@ -244,7 +244,6 @@ pub struct IdRegFinishResult {
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum IdRegFinishError {
-    IdentityLimitReached,
     UnexpectedCall { next_step: RegistrationFlowNextStep },
     NoRegistrationFlow,
     InvalidAuthnMethod(String),
