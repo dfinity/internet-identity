@@ -24,7 +24,6 @@ import {
 import { AuthenticatedConnection, Connection } from "./iiConnection";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
-import { aa } from "vitest/dist/chunks/reporters.d.CqBhtcTq.js";
 
 const createMockDevice = (origin?: string): DeviceData => ({
   alias: "mockDevice",
