@@ -49,7 +49,6 @@
         md: "size-5",
       }[size],
       (nonNullish(label) || nonNullish(hint)) && "mt-0.5",
-      className,
     ]}
   >
     {#if checked}
