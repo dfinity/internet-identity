@@ -154,6 +154,7 @@ pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
             pubkey: ByteBuf::from(vec![i; 32]),
             credential_id: ByteBuf::from(vec![i * 2; 32]),
+            aaguid: None,
         }),
         ..test_authn_method()
     }

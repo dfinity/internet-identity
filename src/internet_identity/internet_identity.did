@@ -2,6 +2,7 @@ type UserNumber = nat64;
 type AccountNumber = nat64;
 type PublicKey = blob;
 type CredentialId = blob;
+type Aaguid = blob;
 type DeviceKey = PublicKey;
 type UserKey = PublicKey;
 type SessionKey = PublicKey;
@@ -73,6 +74,7 @@ type DeviceData = record {
     pubkey : DeviceKey;
     alias : text;
     credential_id : opt CredentialId;
+    aaguid : opt Aaguid;
     purpose : Purpose;
     key_type : KeyType;
     protection : DeviceProtection;
@@ -92,6 +94,7 @@ type DeviceWithUsage = record {
     pubkey : DeviceKey;
     alias : text;
     credential_id : opt CredentialId;
+    aaguid : opt Aaguid;
     purpose : Purpose;
     key_type : KeyType;
     protection : DeviceProtection;
@@ -436,6 +439,9 @@ type MetadataMapV2 = vec record {
 type WebAuthn = record {
     credential_id : CredentialId;
     pubkey : PublicKey;
+
+    // Authenticator Attestation Global Unique Identifier (AAGUID)
+    aaguid : opt Aaguid;
 };
 
 // Authentication method using generic signatures

@@ -11,6 +11,7 @@ const recoveryPhrase: DeviceData = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
+  aaguid: [],
   metadata: [],
 };
 
@@ -23,6 +24,7 @@ const authenticator: DeviceData = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
+  aaguid: [],
   metadata: [],
 };
 

@@ -13,6 +13,7 @@ impl DeviceData {
             pubkey: ByteBuf::from([0; 32]),
             alias: "test device".to_string(),
             credential_id: None,
+            aaguid: None,
             purpose: Purpose::Authentication,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,

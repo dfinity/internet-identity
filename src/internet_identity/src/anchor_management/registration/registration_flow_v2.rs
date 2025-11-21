@@ -357,6 +357,7 @@ mod create_identity_tests {
                     pubkey: vec![1, 2, 3].into(),
                     alias: "test_device".to_string(),
                     credential_id: Some(vec![4, 5, 6].into()),
+                    aaguid: None,
                     purpose: Purpose::Authentication,
                     key_type: KeyType::Unknown,
                     protection: DeviceProtection::Unprotected,

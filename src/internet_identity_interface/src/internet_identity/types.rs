@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 pub type AnchorNumber = u64;
 pub type CredentialId = ByteBuf;
+pub type Aaguid = [u8; 16];
 pub type PublicKey = ByteBuf;
 pub type DeviceKey = PublicKey;
 pub type UserKey = PublicKey;
@@ -31,6 +32,7 @@ pub struct DeviceData {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
+    pub aaguid: Option<Aaguid>,
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,
@@ -48,6 +50,7 @@ pub struct DeviceWithUsage {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
+    pub aaguid: Option<[u8; 16]>,
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,

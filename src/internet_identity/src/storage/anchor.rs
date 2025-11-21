@@ -30,14 +30,27 @@ pub struct Anchor {
 impl Device {
     /// Applies the values of `device_data` to self while leaving the other fields intact.
     pub fn apply_device_data(&mut self, device_data: DeviceData) {
-        self.pubkey = device_data.pubkey;
-        self.alias = device_data.alias;
-        self.credential_id = device_data.credential_id;
-        self.purpose = device_data.purpose;
-        self.key_type = device_data.key_type;
-        self.protection = device_data.protection;
-        self.origin = device_data.origin;
-        self.metadata = device_data.metadata;
+        let DeviceData {
+            pubkey,
+            alias,
+            credential_id,
+            aaguid,
+            purpose,
+            key_type,
+            protection,
+            origin,
+            metadata,
+        } = device_data;
+
+        self.pubkey = pubkey;
+        self.alias = alias;
+        self.credential_id = credential_id;
+        self.aaguid = aaguid;
+        self.purpose = purpose;
+        self.key_type = key_type;
+        self.protection = protection;
+        self.origin = origin;
+        self.metadata = metadata;
     }
 }
 
@@ -47,6 +60,7 @@ impl From<DeviceData> for Device {
             pubkey: device_data.pubkey,
             alias: device_data.alias,
             credential_id: device_data.credential_id,
+            aaguid: device_data.aaguid,
             purpose: device_data.purpose,
             key_type: device_data.key_type,
             protection: device_data.protection,
@@ -63,6 +77,7 @@ impl From<Device> for DeviceData {
             pubkey: device.pubkey,
             alias: device.alias,
             credential_id: device.credential_id,
+            aaguid: device.aaguid,
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
@@ -78,6 +93,7 @@ impl From<Device> for DeviceWithUsage {
             pubkey: device.pubkey,
             alias: device.alias,
             credential_id: device.credential_id,
+            aaguid: device.aaguid,
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
@@ -542,6 +558,7 @@ pub struct Device {
     pub pubkey: DeviceKey,
     pub alias: String,
     pub credential_id: Option<CredentialId>,
+    pub aaguid: Option<[u8; 16]>,
     pub purpose: Purpose,
     pub key_type: KeyType,
     pub protection: DeviceProtection,

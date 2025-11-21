@@ -97,6 +97,7 @@ export const idlFactory = ({ IDL }) => {
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
+    'aaguid' : IDL.Opt(IDL.Vec(IDL.Nat8)),
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
@@ -137,6 +138,7 @@ export const idlFactory = ({ IDL }) => {
   const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
   const WebAuthn = IDL.Record({
     'pubkey' : PublicKey,
+    'aaguid' : IDL.Opt(IDL.Vec(IDL.Nat8)),
     'credential_id' : CredentialId,
   });
   const AuthnMethod = IDL.Variant({
@@ -273,6 +275,7 @@ export const idlFactory = ({ IDL }) => {
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
+    'aaguid' : IDL.Opt(IDL.Vec(IDL.Nat8)),
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });

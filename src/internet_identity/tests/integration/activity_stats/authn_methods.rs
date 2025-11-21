@@ -305,6 +305,7 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
     let webauthn_authn_method = AuthnMethod::WebAuthn(WebAuthn {
         pubkey: ByteBuf::from("example pubkey"),
         credential_id: ByteBuf::from("example credential id"),
+        aaguid: None,
     });
     let ii_domain_entry = (
         "origin".to_string(),

@@ -20,6 +20,7 @@ const recoveryPhrase: Omit<DeviceData, "alias"> = {
   key_type: { seed_phrase: null },
   purpose: { recovery: null },
   credential_id: [],
+  aaguid: [],
   metadata: [],
 };
 
@@ -31,6 +32,7 @@ const device: Omit<DeviceData, "alias"> = {
   key_type: { unknown: null },
   purpose: { authentication: null },
   credential_id: [],
+  aaguid: [],
   metadata: [],
 };
 
@@ -42,6 +44,7 @@ const recoveryDevice: Omit<DeviceData, "alias"> = {
   key_type: { cross_platform: null },
   purpose: { recovery: null },
   credential_id: [Uint8Array.from([0, 0, 0, 0, 0])],
+  aaguid: [],
 };
 
 const oneDeviceOnly: Omit<DeviceData, "alias">[] = [device];

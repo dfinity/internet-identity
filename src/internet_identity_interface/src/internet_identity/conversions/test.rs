@@ -119,6 +119,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         pubkey: pubkey.clone(),
         alias: alias.clone(),
         credential_id: None,
+        aaguid: None,
         purpose: Purpose::Recovery,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Protected,
@@ -151,6 +152,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         pubkey: pubkey.clone(),
         alias: alias.clone(),
         credential_id: Some(credential_id.clone()),
+        aaguid: None,
         purpose: Purpose::Authentication,
         key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Unprotected,
@@ -165,6 +167,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
             pubkey: pubkey.clone(),
             credential_id: credential_id.clone(),
+            aaguid: None,
         }),
         metadata: HashMap::from([
             (ALIAS.to_string(), MetadataEntryV2::String(alias.clone())),
@@ -196,6 +199,7 @@ fn test_conversion_pairs() -> Vec<(DeviceWithUsage, AuthnMethodData)> {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
             pubkey,
             credential_id,
+            aaguid: None,
         }),
         metadata: HashMap::from([
             (

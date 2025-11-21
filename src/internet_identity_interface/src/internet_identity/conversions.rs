@@ -10,6 +10,7 @@ impl From<DeviceWithUsage> for DeviceData {
             pubkey: device.pubkey,
             alias: device.alias,
             credential_id: device.credential_id,
+            aaguid: device.aaguid,
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
@@ -25,6 +26,7 @@ impl From<DeviceData> for DeviceWithUsage {
             pubkey: device.pubkey,
             alias: device.alias,
             credential_id: device.credential_id,
+            aaguid: device.aaguid,
             purpose: device.purpose,
             key_type: device.key_type,
             protection: device.protection,
@@ -122,6 +124,7 @@ impl From<DeviceWithUsage> for AuthnMethodData {
         let authn_method = if let Some(credential_id) = device_data.credential_id.clone() {
             AuthnMethod::WebAuthn(WebAuthn {
                 credential_id,
+                aaguid: device_data.aaguid.map(|aaguid| aaguid.to_vec()),
                 pubkey: device_data.pubkey.clone(),
             })
         } else {
@@ -209,6 +212,10 @@ pub enum AuthnMethodConversionError {
         expected_type: String,
         actual_value: String,
     },
+    InvalidAaguid {
+        expected_bytes: usize,
+        actual_bytes: usize,
+    },
 }
 
 impl Display for AuthnMethodConversionError {
@@ -221,6 +228,13 @@ impl Display for AuthnMethodConversionError {
             } => write!(
                 f,
                 "Invalid metadata type for key '{key}': expected {expected_type}, got value {actual_value}",
+            ),
+            AuthnMethodConversionError::InvalidAaguid {
+                expected_bytes,
+                actual_bytes,
+            } => write!(
+                f,
+                "Invalid AAGUID length: expected {expected_bytes} bytes, got {actual_bytes} bytes",
             ),
         }
     }
@@ -281,18 +295,31 @@ impl TryFrom<AuthnMethodData> for DeviceWithUsage {
                 .unwrap_or(KeyType::Unknown);
         }
 
-        let (pubkey, credential_id) = match data.authn_method {
+        let (pubkey, credential_id, aaguid) = match data.authn_method {
             AuthnMethod::WebAuthn(WebAuthn {
                 pubkey,
                 credential_id,
-            }) => (pubkey, Some(credential_id)),
-            AuthnMethod::PubKey(PublicKeyAuthn { pubkey }) => (pubkey, None),
+                aaguid,
+            }) => (pubkey, Some(credential_id), aaguid),
+            AuthnMethod::PubKey(PublicKeyAuthn { pubkey }) => (pubkey, None, None),
+        };
+
+        let aaguid = if let Some(aaguid) = aaguid {
+            let actual_bytes = aaguid.len();
+            let aaguid = <Aaguid>::try_from(aaguid).map_err(|_| Self::Error::InvalidAaguid {
+                expected_bytes: 16,
+                actual_bytes,
+            })?;
+            Some(aaguid)
+        } else {
+            None
         };
 
         Ok(DeviceWithUsage {
             pubkey,
             alias,
             credential_id,
+            aaguid,
             purpose: Purpose::from(data.security_settings.purpose),
             key_type,
             protection: DeviceProtection::from(data.security_settings.protection),

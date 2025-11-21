@@ -39,6 +39,7 @@ describe("devicesFromDevicesWithUsage", () => {
     key_type: { platform: null },
     purpose: { authentication: null },
     credential_id: [],
+    aaguid: [],
   });
 
   describe("domains compatibility flag disabled", () => {
