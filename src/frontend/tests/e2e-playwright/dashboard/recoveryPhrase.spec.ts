@@ -140,6 +140,12 @@ class RecoveryPhrasePage {
   }
 
   async verify(words: string[]): Promise<void> {
+    await expect(
+      this.#page.getByRole("heading", {
+        name: "Recovery phrase not verified",
+      }),
+    ).toBeVisible();
+    
     await this.#page.getByRole("button", { name: "Verify" }).click();
     const dialog = this.#page.getByRole("dialog");
     const wizard = new RecoveryPhraseWizard(dialog);
