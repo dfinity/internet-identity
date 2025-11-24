@@ -360,6 +360,7 @@ export const addCredentialToVirtualAuthenticator = async (
  * `navigator.clipboard.readText()` since that is blocked by CSP.
  */
 export const readClipboard = async (page: Page): Promise<string> => {
+  // Create temporary text area and focus it
   const textarea = await page.evaluateHandle(() => {
     const el = document.createElement("textarea");
     // Append element to dialog if present so it can always be focused
@@ -368,6 +369,7 @@ export const readClipboard = async (page: Page): Promise<string> => {
     el.focus();
     return el;
   });
+  // Paste clipboard content into it, read the textarea value and clean it up
   await page.keyboard.press("Meta+v");
   const value = await page.evaluate((el) => el.value, textarea);
   await page.evaluate((el) => el.remove(), textarea);
