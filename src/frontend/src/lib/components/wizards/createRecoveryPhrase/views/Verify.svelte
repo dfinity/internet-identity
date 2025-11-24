@@ -24,6 +24,13 @@
     selectedIndexes.length === recoveryPhrase.length,
   );
 
+  const handleSelect = (index: number) => {
+    selectedIndexes = [...selectedIndexes, index];
+  };
+  const handleUndo = () => {
+    selectedIndexes = selectedIndexes.slice(0, -1);
+  };
+
   // Auto-submit after the last word has been selected
   $effect(() => {
     if (selectedIndexes.length !== recoveryPhrase.length) {
@@ -62,10 +69,7 @@
     {@const isLastSelected = selectedIndexes.slice(-1)[0] === index}
     <li class="contents">
       <button
-        onclick={() =>
-          (selectedIndexes = isLastSelected
-            ? selectedIndexes.slice(0, -1)
-            : [...selectedIndexes, index])}
+        onclick={isLastSelected ? handleUndo : () => handleSelect(index)}
         class={[
           "border-border-primary hover:not-disabled:bg-bg-primary_hover focus-visible:not-disabled:bg-bg-primary_hover flex h-7 flex-row items-center rounded-full border px-1.5 outline-none",
           isSelected && "!border-fg-primary",
