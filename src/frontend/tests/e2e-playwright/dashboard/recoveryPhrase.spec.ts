@@ -26,6 +26,8 @@ class RecoveryPhraseWizard {
       this.#dialog.getByRole("heading", { name: "Save your recovery phrase" }),
     ).toBeVisible();
     await this.#dialog.getByRole("button", { name: "Click to reveal" }).click();
+    // We use selection and copying to the clipboard here to make sure that it
+    // works correctly for power-users that don't physically write things down.
     await this.#dialog.getByRole("list").selectText();
     await this.#dialog.press("Meta+c");
     const clipboard = await readClipboard(this.#dialog.page());
