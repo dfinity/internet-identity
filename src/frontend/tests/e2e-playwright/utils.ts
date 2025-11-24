@@ -1,4 +1,4 @@
-import { CDPSession, Page, expect } from "@playwright/test";
+import { CDPSession, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
@@ -371,7 +371,9 @@ export const readClipboard = async (page: Page): Promise<string> => {
   });
   // Paste clipboard content into it, read the textarea value and clean it up
   await page.keyboard.press("Meta+v");
-  const value = await page.evaluate((el) => el.value, textarea);
-  await page.evaluate((el) => el.remove(), textarea);
-  return value;
+  return page.evaluate((el) => {
+    const text = el.value;
+    el.remove();
+    return text;
+  }, textarea);
 };
