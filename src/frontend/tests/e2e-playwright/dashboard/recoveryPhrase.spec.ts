@@ -61,6 +61,9 @@ class RecoveryPhraseWizard {
       }),
     ).toBeVisible();
     await this.#dialog.getByRole("button", { name: "Reset" }).click();
+    await expect(
+      this.#dialog.getByRole("heading", { name: "Save your recovery phrase" }),
+    ).toBeVisible();
   }
 }
 
