@@ -171,13 +171,13 @@ test.describe("Recovery phrase", () => {
     await page.waitForURL(II_URL + "/manage/recovery");
   });
 
-  test("Activate", async ({ page }) => {
+  test("can be activated", async ({ page }) => {
     const recoveryPhrasePage = new RecoveryPhrasePage(page);
     await recoveryPhrasePage.activate();
   });
 
-  test.describe("Verify", () => {
-    test("Unverified (skipped during activation)", async ({ page }) => {
+  test.describe("can be verified", () => {
+    test("when it was skipped during activation", async ({ page }) => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       const words = await recoveryPhrasePage.activate({
         skipVerification: true,
@@ -185,7 +185,7 @@ test.describe("Recovery phrase", () => {
       await recoveryPhrasePage.verify(words);
     });
 
-    test("Unverified (skipped during reset)", async ({ page }) => {
+    test("when it was skipped during reset", async ({ page }) => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       await recoveryPhrasePage.activate();
       const words = await recoveryPhrasePage.reset({
@@ -194,7 +194,7 @@ test.describe("Recovery phrase", () => {
       await recoveryPhrasePage.verify(words);
     });
 
-    test("Retry (incorrect word order)", async ({ page }) => {
+    test("when first attempt is in incorrect order", async ({ page }) => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       const words = await recoveryPhrasePage.activate({
         skipVerification: true,
@@ -233,14 +233,16 @@ test.describe("Recovery phrase", () => {
     });
   });
 
-  test.describe("Reset", () => {
-    test("Activated", async ({ page }) => {
+  test.describe("can be reset", () => {
+    test("when it is activated", async ({ page }) => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       await recoveryPhrasePage.activate();
       await recoveryPhrasePage.reset();
     });
 
-    test("Unverified (skipped during activation)", async ({ page }) => {
+    test("when it is unverified (skipped during activation)", async ({
+      page,
+    }) => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       await recoveryPhrasePage.activate({
         skipVerification: true,
@@ -248,7 +250,7 @@ test.describe("Recovery phrase", () => {
       await recoveryPhrasePage.reset({ isUnverified: true });
     });
 
-    test("Unverified (skipped during reset)", async ({ page }) => {
+    test("when it is unverified (skipped during reset)", async ({ page }) => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       await recoveryPhrasePage.activate();
       await recoveryPhrasePage.reset({
