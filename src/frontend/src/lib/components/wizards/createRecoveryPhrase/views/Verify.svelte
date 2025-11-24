@@ -24,13 +24,14 @@
     selectedIndexes.length === recoveryPhrase.length,
   );
 
-  // Add index to selection
   const handleSelect = (index: number) => {
     selectedIndexes = [...selectedIndexes, index];
   };
-  // Remove last selected index
   const handleUndo = () => {
     selectedIndexes = selectedIndexes.slice(0, -1);
+  };
+  const handleClear = () => {
+    selectedIndexes = [];
   };
 
   // Auto-submit after the last word has been selected
@@ -113,7 +114,7 @@
   {/each}
 </ul>
 <Button
-  onclick={() => (selectedIndexes = [])}
+  onclick={handleClear}
   variant="secondary"
   size="lg"
   disabled={selectedIndexes.length === 0 || isCheckingOrder}
