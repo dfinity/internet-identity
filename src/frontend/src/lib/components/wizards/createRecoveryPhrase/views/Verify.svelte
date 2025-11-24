@@ -20,8 +20,11 @@
       .sort((a, b) => a.sort - b.sort)
       .map(({ index }) => index),
   );
+  const selectedWords = $derived(
+    selectedIndexes.map((index) => recoveryPhrase[index]),
+  );
   const isCheckingOrder = $derived(
-    selectedIndexes.length === recoveryPhrase.length,
+    selectedWords.length === recoveryPhrase.length,
   );
 
   const handleSelect = (index: number) => {
@@ -36,10 +39,10 @@
 
   // Auto-submit after the last word has been selected
   $effect(() => {
-    if (selectedIndexes.length !== recoveryPhrase.length) {
+    if (!isCheckingOrder) {
       return;
     }
-    onCompleted(selectedIndexes.map((index) => recoveryPhrase[index]));
+    onCompleted(selectedWords);
   });
 </script>
 
