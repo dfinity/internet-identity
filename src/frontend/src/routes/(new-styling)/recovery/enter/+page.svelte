@@ -9,10 +9,6 @@
 
   let showCancelDialog = $state(false);
 
-  const handleGetStarted = async () => {
-    await goto("/recovery");
-  };
-
   const handleCancel = async () => {
     showCancelDialog = false;
     await goto("/login");
@@ -37,7 +33,7 @@
         </p>
       </div>
       <div class="flex flex-col gap-3">
-        <Button size="xl" variant="primary" onclick={handleGetStarted}>
+        <Button size="xl" variant="primary" href="/recovery">
           {$t`Get started`}
         </Button>
         <Button
