@@ -354,3 +354,22 @@ export const addCredentialToVirtualAuthenticator = async (
     credential,
   });
 };
+
+/**
+ * Read current text value from clipboard, this is an alternative to
+ * `navigator.clipboard.readText()` since that is blocked by CSP.
+ */
+export const readClipboard = async (page: Page): Promise<string> => {
+  const textarea = await page.evaluateHandle(() => {
+    const el = document.createElement("textarea");
+    // Append element to dialog if present so it can always be focused
+    const dialog = document.body.querySelector("dialog");
+    (dialog ?? document.body).appendChild(el);
+    el.focus();
+    return el;
+  });
+  await page.keyboard.press("Meta+v");
+  const value = await page.evaluate((el) => el.value, textarea);
+  await page.evaluate((el) => el.remove(), textarea);
+  return value;
+};

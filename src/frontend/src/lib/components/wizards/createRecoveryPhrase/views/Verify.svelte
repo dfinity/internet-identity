@@ -54,55 +54,58 @@
     <Trans>Select each word in the correct order</Trans>
   {/if}
 </p>
-<div class={["mb-8 grid grid-cols-3 gap-3"]}>
+<ul class={["mb-8 grid grid-cols-3 gap-3"]}>
   {#each shuffledIndexes as index}
     {@const word = recoveryPhrase[index]}
     {@const selectedPosition = selectedIndexes.indexOf(index)}
     {@const isSelected = selectedPosition !== -1 && !isCheckingOrder}
     {@const isLastSelected = selectedIndexes.slice(-1)[0] === index}
-    <button
-      onclick={() =>
-        (selectedIndexes = isLastSelected
-          ? selectedIndexes.slice(0, -1)
-          : [...selectedIndexes, index])}
-      class={[
-        "border-border-primary hover:not-disabled:bg-bg-primary_hover focus-visible:not-disabled:bg-bg-primary_hover flex h-7 flex-row items-center rounded-full border px-1.5 outline-none",
-        isSelected && "!border-fg-primary",
-        isCheckingOrder && "!bg-bg-disabled !border-border-disabled_subtle",
-      ]}
-      disabled={(isSelected && !isLastSelected) || isCheckingOrder}
-    >
-      <span
+    <li class="contents">
+      <button
+        onclick={() =>
+          (selectedIndexes = isLastSelected
+            ? selectedIndexes.slice(0, -1)
+            : [...selectedIndexes, index])}
         class={[
-          "text-text-secondary w-4 text-center text-xs font-semibold tabular-nums select-none",
-          isSelected ? "!text-text-primary" : "-translate-y-0.25",
-          isCheckingOrder && "!text-text-disabled",
-        ]}
-      >
-        {isSelected || isCheckingOrder
-          ? `${selectedPosition + 1}`.padStart(2, "0")
-          : "＿"}
-      </span>
-      <span
-        class={[
-          "border-border-secondary mx-1 h-full border-r",
+          "border-border-primary hover:not-disabled:bg-bg-primary_hover focus-visible:not-disabled:bg-bg-primary_hover flex h-7 flex-row items-center rounded-full border px-1.5 outline-none",
           isSelected && "!border-fg-primary",
-          isCheckingOrder && "!border-border-disabled_subtle",
+          isCheckingOrder && "!bg-bg-disabled !border-border-disabled_subtle",
         ]}
-      ></span>
-      <span
-        class={[
-          "text-text-secondary -translate-y-0.25 text-base select-none",
-          word.length > 7 && "tracking-tight",
-          isSelected && "!text-text-primary font-semibold",
-          isCheckingOrder && "!text-text-disabled",
-        ]}
+        disabled={(isSelected && !isLastSelected) || isCheckingOrder}
+        aria-pressed={isSelected ? "true" : "false"}
       >
-        {word}
-      </span>
-    </button>
+        <span
+          class={[
+            "text-text-secondary w-4 text-center text-xs font-semibold tabular-nums select-none",
+            isSelected ? "!text-text-primary" : "-translate-y-0.25",
+            isCheckingOrder && "!text-text-disabled",
+          ]}
+        >
+          {isSelected || isCheckingOrder
+            ? `${selectedPosition + 1}`.padStart(2, "0")
+            : "＿"}
+        </span>
+        <span
+          class={[
+            "border-border-secondary mx-1 h-full border-r",
+            isSelected && "!border-fg-primary",
+            isCheckingOrder && "!border-border-disabled_subtle",
+          ]}
+        ></span>
+        <span
+          class={[
+            "text-text-secondary -translate-y-0.25 text-base select-none",
+            word.length > 7 && "tracking-tight",
+            isSelected && "!text-text-primary font-semibold",
+            isCheckingOrder && "!text-text-disabled",
+          ]}
+        >
+          {word}
+        </span>
+      </button>
+    </li>
   {/each}
-</div>
+</ul>
 <Button
   onclick={() => (selectedIndexes = [])}
   variant="secondary"

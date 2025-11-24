@@ -5,6 +5,7 @@
   import { nonNullish } from "@dfinity/utils";
   import Button from "$lib/components/ui/Button.svelte";
   import { XIcon } from "@lucide/svelte";
+  import { t } from "$lib/stores/locale.store";
 
   type Props = HTMLAttributes<HTMLDialogElement> & {
     onClose?: () => void;
@@ -133,8 +134,9 @@
         type="button"
         class="absolute top-2 right-2 z-2 !rounded-full"
         onclick={onClose}
+        aria-label={$t`Close`}
       >
-        <XIcon class="size-5" />
+        <XIcon class="size-5" aria-hidden="true" />
       </Button>
     {/if}
   </div>
