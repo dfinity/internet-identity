@@ -25,9 +25,10 @@ class RecoveryPhraseWizard {
   }
 
   async writeDown(): Promise<string[]> {
-    await expect(
-      this.#dialog.getByRole("heading", { name: "Save your recovery phrase" }),
-    ).toBeVisible();
+    const heading = this.#dialog.getByRole("heading", {
+      name: "Save your recovery phrase",
+    });
+    await expect(heading).toBeVisible();
     await this.#dialog.getByRole("button", { name: "Click to reveal" }).click();
     // We use selection and copying to the clipboard here to make sure that it
     // works correctly for power-users that don't physically write things down.
@@ -37,18 +38,15 @@ class RecoveryPhraseWizard {
     await this.#dialog
       .getByRole("button", { name: "I have written it down" })
       .click();
-    await expect(
-      this.#dialog.getByRole("heading", { name: "Save your recovery phrase" }),
-    ).toBeHidden();
+    await expect(heading).toBeHidden();
     return clipboard.trim().split("\n");
   }
 
   async verify(words: string[]): Promise<void> {
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: "Verify your recovery phrase",
-      }),
-    ).toBeVisible();
+    const heading = this.#dialog.getByRole("heading", {
+      name: "Verify your recovery phrase",
+    });
+    await expect(heading).toBeVisible();
     for (const word of words) {
       // Recovery phrase could have duplicate words, so always
       // select the first enabled button that isn't pressed.
@@ -58,25 +56,16 @@ class RecoveryPhraseWizard {
         .first()
         .click();
     }
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: "Verify your recovery phrase",
-      }),
-    ).toBeHidden();
+    await expect(heading).toBeHidden();
   }
 
   async reset(): Promise<void> {
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: "Reset your recovery phrase?",
-      }),
-    ).toBeVisible();
+    const heading = this.#dialog.getByRole("heading", {
+      name: "Reset your recovery phrase?",
+    });
+    await expect(heading).toBeVisible();
     await this.#dialog.getByRole("button", { name: "Reset" }).click();
-    await expect(
-      this.#dialog.getByRole("heading", {
-        name: "Reset your recovery phrase?",
-      }),
-    ).toBeHidden();
+    await expect(heading).toBeHidden();
   }
 }
 
