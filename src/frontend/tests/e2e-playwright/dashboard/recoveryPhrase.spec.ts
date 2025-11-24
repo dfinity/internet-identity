@@ -145,7 +145,7 @@ class RecoveryPhrasePage {
         name: "Recovery phrase not verified",
       }),
     ).toBeVisible();
-    
+
     await this.#page.getByRole("button", { name: "Verify" }).click();
     const dialog = this.#page.getByRole("dialog");
     const wizard = new RecoveryPhraseWizard(dialog);
@@ -187,6 +187,44 @@ test.describe("Recovery phrase", () => {
         skipVerification: true,
       });
       await recoveryPhrasePage.verify(words);
+    });
+
+    test("Retry (incorrect word order)", async ({ page }) => {
+      const recoveryPhrasePage = new RecoveryPhrasePage(page);
+      const words = await recoveryPhrasePage.activate({
+        skipVerification: true,
+      });
+
+      // Swap the first word around with the next different word found,
+      // compared to random shuffle, this guarantees a different phrase.
+      const incorrectOrder = [...words];
+      const firstWord = incorrectOrder[0];
+      const differentWordIndex = incorrectOrder.findIndex(
+        (word) => word !== firstWord,
+      );
+      incorrectOrder[0] = incorrectOrder[differentWordIndex];
+      incorrectOrder[differentWordIndex] = firstWord;
+
+      // Verify with incorrect word order
+      await page.getByRole("button", { name: "Verify" }).click();
+      const dialog = page.getByRole("dialog");
+      const wizard = new RecoveryPhraseWizard(dialog);
+      await wizard.verify(incorrectOrder);
+      await expect(
+        dialog.getByRole("heading", { name: "Something is wrong!" }),
+      ).toBeVisible();
+
+      // Retry, words shown should be equal to earlier words
+      await dialog.getByRole("button", { name: "Retry" }).click();
+      const correctWords = await wizard.writeDown();
+      expect(correctWords).toEqual(words);
+
+      // Enter correct word order
+      await wizard.verify(words);
+      await expect(dialog).toBeHidden();
+      await expect(
+        page.getByRole("heading", { name: "Recovery phrase activated" }),
+      ).toBeVisible();
     });
   });
 
