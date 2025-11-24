@@ -19,6 +19,9 @@ class RecoveryPhraseWizard {
     ).toBeVisible();
     await this.#dialog.getByRole("checkbox", { name: "I acknowledge" }).check();
     await this.#dialog.getByRole("button", { name: "Continue" }).click();
+    await expect(
+      this.#dialog.getByRole("heading", { name: "Before you continue" }),
+    ).toBeHidden();
   }
 
   async writeDown(): Promise<string[]> {
@@ -34,6 +37,9 @@ class RecoveryPhraseWizard {
     await this.#dialog
       .getByRole("button", { name: "I have written it down" })
       .click();
+    await expect(
+      this.#dialog.getByRole("heading", { name: "Save your recovery phrase" }),
+    ).toBeHidden();
     return clipboard.trim().split("\n");
   }
 
@@ -52,6 +58,11 @@ class RecoveryPhraseWizard {
         .first()
         .click();
     }
+    await expect(
+      this.#dialog.getByRole("heading", {
+        name: "Verify your recovery phrase",
+      }),
+    ).toBeHidden();
   }
 
   async reset(): Promise<void> {
@@ -62,8 +73,10 @@ class RecoveryPhraseWizard {
     ).toBeVisible();
     await this.#dialog.getByRole("button", { name: "Reset" }).click();
     await expect(
-      this.#dialog.getByRole("heading", { name: "Save your recovery phrase" }),
-    ).toBeVisible();
+      this.#dialog.getByRole("heading", {
+        name: "Reset your recovery phrase?",
+      }),
+    ).toBeHidden();
   }
 }
 
