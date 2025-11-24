@@ -43,7 +43,7 @@ class RecoveryPhraseWizard {
     ).toBeVisible();
     for (const word of words) {
       // Recovery phrase could have duplicate words, so always
-      // select the first button that hasn't been pressed.
+      // select the first enabled button that isn't pressed.
       await this.#dialog
         .getByRole("list")
         .getByRole("button", { name: word, disabled: false, pressed: false })
