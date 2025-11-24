@@ -24,9 +24,11 @@
     selectedIndexes.length === recoveryPhrase.length,
   );
 
+  // Add index to selection
   const handleSelect = (index: number) => {
     selectedIndexes = [...selectedIndexes, index];
   };
+  // Remove last selected index
   const handleUndo = () => {
     selectedIndexes = selectedIndexes.slice(0, -1);
   };
