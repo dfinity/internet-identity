@@ -52,7 +52,12 @@ class RecoveryPhraseWizard {
       // select the first enabled button that isn't pressed.
       await this.#dialog
         .getByRole("list")
-        .getByRole("button", { name: word, disabled: false, pressed: false })
+        .getByRole("button", {
+          name: word,
+          exact: true,
+          disabled: false,
+          pressed: false,
+        })
         .first()
         .click();
     }

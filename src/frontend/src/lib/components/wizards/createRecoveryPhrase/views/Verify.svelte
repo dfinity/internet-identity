@@ -90,6 +90,7 @@
             isSelected ? "!text-text-primary" : "-translate-y-0.25",
             isCheckingOrder && "!text-text-disabled",
           ]}
+          aria-hidden="true"
         >
           {isSelected || isCheckingOrder
             ? `${selectedPosition + 1}`.padStart(2, "0")
