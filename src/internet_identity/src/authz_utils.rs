@@ -79,19 +79,15 @@ where
 
     anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
 
-    let result = op(&mut anchor);
+    let (ret, operation) = op(&mut anchor)?;
 
     // write back anchor
     state::storage_borrow_mut(|storage| storage.update(anchor))
         .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
 
-    match result {
-        Ok((ret, operation)) => {
-            post_operation_bookkeeping(anchor_number, operation);
-            Ok(ret)
-        }
-        Err(err) => Err(err),
-    }
+    post_operation_bookkeeping(anchor_number, operation);
+
+    Ok(ret)
 }
 
 /// Checks if the caller is authorized to operate on the anchor provided and returns a reference to the public key of the authentication method used (device or openid).
