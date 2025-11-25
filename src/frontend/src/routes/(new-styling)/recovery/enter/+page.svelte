@@ -15,37 +15,31 @@
   };
 </script>
 
-<div
-  class="flex flex-1 flex-row items-end justify-center sm:max-w-120 sm:items-center"
->
-  <AuthPanel>
-    <div class="flex flex-col gap-6">
-      <div class="flex flex-col gap-3">
-        <h1 class="text-text-primary text-2xl font-medium">
-          {$t`Recover your identity`}
-        </h1>
-        <p class="text-text-tertiary text-sm">
-          <Trans>
-            Have your recovery phrase ready before continuing. Keep it private.
-            Don’t let anyone watch you enter it. You can reset it later in your
-            dashboard if you want a new one.
-          </Trans>
-        </p>
-      </div>
-      <div class="flex flex-col gap-3">
-        <Button size="xl" variant="primary" href="/recovery">
-          {$t`Get started`}
-        </Button>
-        <Button
-          size="xl"
-          variant="secondary"
-          onclick={() => (showCancelDialog = true)}
-        >
-          {$t`Cancel`}
-        </Button>
-      </div>
-    </div>
-  </AuthPanel>
+<div class="flex flex-col gap-6">
+  <div class="flex flex-col gap-3">
+    <h1 class="text-text-primary text-2xl font-medium">
+      {$t`Recover your identity`}
+    </h1>
+    <p class="text-text-tertiary text-sm">
+      <Trans>
+        Have your recovery phrase ready before continuing. Keep it private.
+        Don’t let anyone watch you enter it. You can reset it later in your
+        dashboard if you want a new one.
+      </Trans>
+    </p>
+  </div>
+  <div class="flex flex-col gap-3">
+    <Button size="xl" variant="primary" href="/recovery">
+      {$t`Get started`}
+    </Button>
+    <Button
+      size="xl"
+      variant="secondary"
+      onclick={() => (showCancelDialog = true)}
+    >
+      {$t`Cancel`}
+    </Button>
+  </div>
 </div>
 
 {#if showCancelDialog}

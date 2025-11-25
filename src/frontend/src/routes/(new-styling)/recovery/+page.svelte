@@ -314,140 +314,134 @@
   const loading = $derived(recoveryInProgress || continueInProgress);
 </script>
 
-<div
-  class="flex flex-1 flex-row items-end justify-center sm:max-w-120 sm:items-center"
->
-  <AuthPanel>
-    <div class="w-full">
-      <div class="flex flex-col gap-6">
-        <div class="flex flex-col gap-3">
-          <h1 class="text-text-primary text-2xl font-medium">
-            {$t`Secure recovery`}
-          </h1>
-          <p class="text-text-tertiary text-sm">
-            {$t`Enter your recovery phrase words in each box, spelled correctly and in order.`}
-          </p>
-        </div>
-        <div class="flex flex-col gap-3">
-          <div class="grid grid-cols-3 gap-3">
-            {#each words as word, i}
-              <label class="relative h-8">
-                <!-- Text input -->
-                <!-- "data-lpignore" Last pass ignore -->
-                <!-- "data-1p-ignore" 1Password ignore -->
-                <!-- "data-bwignore" Bitwarden ignore -->
-                <!-- "data-form-type=other" Non-standard hint to password managers -->
-                <input
-                  type={showAll || word.showContent || !word.isValid
-                    ? "text"
-                    : "password"}
-                  inputmode="text"
-                  autocorrect="off"
-                  autocomplete="off"
-                  autocapitalize="off"
-                  spellcheck="false"
-                  id={`recovery-phrase-${i}`}
-                  value={word.value}
-                  oninput={(event) => {
-                    const target = event.currentTarget as HTMLInputElement;
-                    word.value = target.value.toLowerCase();
-                  }}
-                  onkeydown={(e) => handleKeyDownInput(e, i)}
-                  onpaste={(e) => handlePaste(e, i)}
-                  data-lpignore="true"
-                  data-1p-ignore="true"
-                  data-bwignore="true"
-                  data-form-type="other"
-                  onfocus={() => (word.showContent = true)}
-                  onblur={() => {
-                    validateWord(i);
-                    word.showContent = false;
-                  }}
-                  disabled={loading}
-                  aria-invalid={!word.isValid}
-                  class={[
-                    "peer text-text-primary h-8 w-full pr-10 pl-10 text-base",
-                    "rounded-full border-none ring outline-none ring-inset focus:ring-2",
-                    "disabled:bg-bg-disabled disabled:ring-border-disabled_subtle disabled:text-text-disabled",
-                    word.isValid
-                      ? "ring-border-secondary focus:ring-border-brand bg-transparent"
-                      : "bg-bg-error-primary/30 ring-border-error focus:ring-border-error",
-                  ]}
-                />
-                {#if !word.isValid}
-                  <Tooltip
-                    label={$t`Incorrect spelling`}
-                    direction="up"
-                    distance="0.5rem"
-                  >
-                    <span
-                      class="text-text-error-primary focus:ring-border-error absolute top-1/2 right-3 flex size-5 -translate-y-1/2 items-center justify-center rounded-full focus:ring-2 focus:outline-none"
-                      aria-label={$t`Incorrect spelling`}
-                    >
-                      <InfoIcon class="size-4" />
-                    </span>
-                  </Tooltip>
-                {/if}
-                <!-- Left slot -->
-                <!-- Reverse order to use "peer" class to change the border color when peer is focused -->
+<div class="w-full">
+  <div class="flex flex-col gap-6">
+    <div class="flex flex-col gap-3">
+      <h1 class="text-text-primary text-2xl font-medium">
+        {$t`Secure recovery`}
+      </h1>
+      <p class="text-text-tertiary text-sm">
+        {$t`Enter your recovery phrase words in each box, spelled correctly and in order.`}
+      </p>
+    </div>
+    <div class="flex flex-col gap-3">
+      <div class="grid grid-cols-3 gap-3">
+        {#each words as word, i}
+          <label class="relative h-8">
+            <!-- Text input -->
+            <!-- "data-lpignore" Last pass ignore -->
+            <!-- "data-1p-ignore" 1Password ignore -->
+            <!-- "data-bwignore" Bitwarden ignore -->
+            <!-- "data-form-type=other" Non-standard hint to password managers -->
+            <input
+              type={showAll || word.showContent || !word.isValid
+                ? "text"
+                : "password"}
+              inputmode="text"
+              autocorrect="off"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              id={`recovery-phrase-${i}`}
+              value={word.value}
+              oninput={(event) => {
+                const target = event.currentTarget as HTMLInputElement;
+                word.value = target.value.toLowerCase();
+              }}
+              onkeydown={(e) => handleKeyDownInput(e, i)}
+              onpaste={(e) => handlePaste(e, i)}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-bwignore="true"
+              data-form-type="other"
+              onfocus={() => (word.showContent = true)}
+              onblur={() => {
+                validateWord(i);
+                word.showContent = false;
+              }}
+              disabled={loading}
+              aria-invalid={!word.isValid}
+              class={[
+                "peer text-text-primary h-8 w-full pr-10 pl-10 text-base",
+                "rounded-full border-none ring outline-none ring-inset focus:ring-2",
+                "disabled:bg-bg-disabled disabled:ring-border-disabled_subtle disabled:text-text-disabled",
+                word.isValid
+                  ? "ring-border-secondary focus:ring-border-brand bg-transparent"
+                  : "bg-bg-error-primary/30 ring-border-error focus:ring-border-error",
+              ]}
+            />
+            {#if !word.isValid}
+              <Tooltip
+                label={$t`Incorrect spelling`}
+                direction="up"
+                distance="0.5rem"
+              >
                 <span
-                  class={[
-                    "absolute top-0 left-0 flex h-8 w-8 items-center border-r-1 px-2 text-center text-sm font-semibold",
-                    "peer peer-disabled:border-border-disabled_subtle peer-focus:border-r-2",
-                    word.isValid
-                      ? "border-border-secondary text-text-secondary peer-focus:border-border-brand"
-                      : "border-border-error text-text-error-primary peer-focus:border-border-error",
-                  ]}
+                  class="text-text-error-primary focus:ring-border-error absolute top-1/2 right-3 flex size-5 -translate-y-1/2 items-center justify-center rounded-full focus:ring-2 focus:outline-none"
+                  aria-label={$t`Incorrect spelling`}
                 >
-                  {String(i + 1).padStart(2, "0")}
+                  <InfoIcon class="size-4" />
                 </span>
-              </label>
-            {/each}
-          </div>
-          <div class="flex flex-row gap-2">
-            <Button
-              disabled={loading || !hasAnyWord}
-              class="w-full"
-              variant="tertiary"
-              onclick={toggleAll}
+              </Tooltip>
+            {/if}
+            <!-- Left slot -->
+            <!-- Reverse order to use "peer" class to change the border color when peer is focused -->
+            <span
+              class={[
+                "absolute top-0 left-0 flex h-8 w-8 items-center border-r-1 px-2 text-center text-sm font-semibold",
+                "peer peer-disabled:border-border-disabled_subtle peer-focus:border-r-2",
+                word.isValid
+                  ? "border-border-secondary text-text-secondary peer-focus:border-border-brand"
+                  : "border-border-error text-text-error-primary peer-focus:border-border-error",
+              ]}
             >
-              {#if showAll}
-                {$t`Hide all`}
-              {:else}
-                {$t`Show all`}
-              {/if}
-            </Button>
-            <Button
-              disabled={loading || !hasAnyWord}
-              class="w-full"
-              variant="tertiary"
-              onclick={handleClearAll}
-            >
-              {$t`Clear all`}
-            </Button>
-          </div>
-        </div>
-        {#if manualSubmitRequired}
-          <Button
-            size="xl"
-            variant="primary"
-            disabled={!submitEnabled || loading}
-            onclick={handleRecoverWithPhrase}
-          >
-            {$t`Submit`}
-          </Button>
-        {/if}
+              {String(i + 1).padStart(2, "0")}
+            </span>
+          </label>
+        {/each}
+      </div>
+      <div class="flex flex-row gap-2">
         <Button
-          size="xl"
-          variant="secondary"
-          disabled={loading}
-          onclick={() => (showCancelDialog = true)}
+          disabled={loading || !hasAnyWord}
+          class="w-full"
+          variant="tertiary"
+          onclick={toggleAll}
         >
-          {$t`Cancel`}
+          {#if showAll}
+            {$t`Hide all`}
+          {:else}
+            {$t`Show all`}
+          {/if}
+        </Button>
+        <Button
+          disabled={loading || !hasAnyWord}
+          class="w-full"
+          variant="tertiary"
+          onclick={handleClearAll}
+        >
+          {$t`Clear all`}
         </Button>
       </div>
     </div>
-  </AuthPanel>
+    {#if manualSubmitRequired}
+      <Button
+        size="xl"
+        variant="primary"
+        disabled={!submitEnabled || loading}
+        onclick={handleRecoverWithPhrase}
+      >
+        {$t`Submit`}
+      </Button>
+    {/if}
+    <Button
+      size="xl"
+      variant="secondary"
+      disabled={loading}
+      onclick={() => (showCancelDialog = true)}
+    >
+      {$t`Cancel`}
+    </Button>
+  </div>
 </div>
 
 {#if recoveredIdentityData}
