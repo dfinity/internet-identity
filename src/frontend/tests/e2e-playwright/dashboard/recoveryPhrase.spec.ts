@@ -183,6 +183,7 @@ test.describe("Recovery phrase", () => {
   test("can be activated", async ({ page }) => {
     const recoveryPhrasePage = new RecoveryPhrasePage(page);
     await recoveryPhrasePage.activate();
+    // TODO: Verify we can recover using the recovery phrase
   });
 
   test.describe("can be verified", () => {
@@ -192,6 +193,7 @@ test.describe("Recovery phrase", () => {
         skipVerification: true,
       });
       await recoveryPhrasePage.verify(words);
+      // TODO: Verify we can recover using the recovery phrase
     });
 
     test("when it was skipped during reset", async ({ page }) => {
@@ -201,6 +203,7 @@ test.describe("Recovery phrase", () => {
         skipVerification: true,
       });
       await recoveryPhrasePage.verify(words);
+      // TODO: Verify we can recover using the recovery phrase
     });
 
     test("when first attempt is in incorrect order", async ({ page }) => {
@@ -239,6 +242,7 @@ test.describe("Recovery phrase", () => {
       await expect(
         page.getByRole("heading", { name: "Recovery phrase activated" }),
       ).toBeVisible();
+      // TODO: Verify we can recover using the recovery phrase
     });
   });
 
@@ -247,6 +251,7 @@ test.describe("Recovery phrase", () => {
       const recoveryPhrasePage = new RecoveryPhrasePage(page);
       await recoveryPhrasePage.activate();
       await recoveryPhrasePage.reset();
+      // TODO: Verify we can recover using the recovery phrase
     });
 
     test("when it is unverified (skipped during activation)", async ({
@@ -257,6 +262,7 @@ test.describe("Recovery phrase", () => {
         skipVerification: true,
       });
       await recoveryPhrasePage.reset({ isUnverified: true });
+      // TODO: Verify we can recover using the recovery phrase
     });
 
     test("when it is unverified (skipped during reset)", async ({ page }) => {
@@ -266,6 +272,7 @@ test.describe("Recovery phrase", () => {
         skipVerification: true,
       });
       await recoveryPhrasePage.reset({ isUnverified: true });
+      // TODO: Verify we can recover using the recovery phrase
     });
   });
 });
