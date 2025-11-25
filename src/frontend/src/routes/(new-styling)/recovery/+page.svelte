@@ -27,7 +27,6 @@
   import CancelRecovery from "./components/CancelRecovery.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { throwCanisterError } from "$lib/utils/utils";
-  import Trans from "$lib/components/locale/Trans.svelte";
 
   type RecoveryWord = {
     value: string;
@@ -71,7 +70,6 @@
   // When this is `true`, the auto-submit is disabled, and the user has to manually submit the recovery phrase.
   let manualSubmitRequired = $state(false);
   let showCancelDialog = $state(false);
-  let showIntroScreen = $state(true);
 
   const submitEnabled = $derived(
     words.every((word) => word.value.trim().length > 0 && word.isValid),
@@ -316,57 +314,7 @@
   const loading = $derived(recoveryInProgress || continueInProgress);
 </script>
 
-<div
-  class="flex flex-1 flex-row items-end justify-center sm:max-w-120 sm:items-center"
->
-  <AuthPanel>
-    {#if showIntroScreen}
-      {@render introScreen()}
-    {:else}
-      <div
-        in:fly={{ x: 48, duration: 300, opacity: 0.2, easing: cubicOut }}
-        class="w-full"
-      >
-        {@render recoveryInputs()}
-      </div>
-    {/if}
-  </AuthPanel>
-</div>
-
-{#snippet introScreen()}
-  <div class="flex flex-col gap-6">
-    <div class="flex flex-col gap-3">
-      <h1 class="text-text-primary text-2xl font-medium">
-        {$t`Recover your identity`}
-      </h1>
-      <p class="text-text-tertiary text-sm">
-        <Trans>
-          Have your recovery phrase ready before continuing. Keep it private.
-          Don’t let anyone watch you enter it. You can reset it later in your
-          dashboard if you want a new one.
-        </Trans>
-      </p>
-    </div>
-    <div class="flex flex-col gap-3">
-      <Button
-        size="xl"
-        variant="primary"
-        onclick={() => (showIntroScreen = false)}
-      >
-        {$t`Get started`}
-      </Button>
-      <Button
-        size="xl"
-        variant="secondary"
-        onclick={() => (showCancelDialog = true)}
-      >
-        {$t`Cancel`}
-      </Button>
-    </div>
-  </div>
-{/snippet}
-
-{#snippet recoveryInputs()}
+<div class="w-full">
   <div class="flex flex-col gap-6">
     <div class="flex flex-col gap-3">
       <h1 class="text-text-primary text-2xl font-medium">
@@ -494,7 +442,7 @@
       {$t`Cancel`}
     </Button>
   </div>
-{/snippet}
+</div>
 
 {#if recoveredIdentityData}
   {@const identityName = recoveredIdentityData.info.name[0]}
