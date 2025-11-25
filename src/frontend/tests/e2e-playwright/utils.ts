@@ -370,7 +370,9 @@ export const readClipboard = async (page: Page): Promise<string> => {
     return el;
   });
   // Paste clipboard content into it, read the textarea value and clean it up
-  await page.keyboard.press("Meta+v");
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+V" : "Control+V",
+  );
   return page.evaluate((el) => {
     const text = el.value;
     el.remove();

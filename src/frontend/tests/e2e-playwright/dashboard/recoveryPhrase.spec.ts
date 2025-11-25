@@ -33,7 +33,9 @@ class RecoveryPhraseWizard {
     // We use selection and copying to the clipboard here to make sure that it
     // works correctly for power-users that don't physically write things down.
     await this.#dialog.getByRole("list").selectText();
-    await this.#dialog.press("Meta+c");
+    await this.#dialog
+      .page()
+      .keyboard.press(process.platform === "darwin" ? "Meta+C" : "Control+C");
     const clipboard = await readClipboard(this.#dialog.page());
     await this.#dialog
       .getByRole("button", { name: "I have written it down" })
