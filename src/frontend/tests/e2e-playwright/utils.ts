@@ -1,4 +1,4 @@
-import { CDPSession, Page, expect } from "@playwright/test";
+import { CDPSession, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
@@ -353,4 +353,29 @@ export const addCredentialToVirtualAuthenticator = async (
     authenticatorId,
     credential,
   });
+};
+
+/**
+ * Read current text value from clipboard, this is an alternative to
+ * `navigator.clipboard.readText()` since that is blocked by CSP.
+ */
+export const readClipboard = async (page: Page): Promise<string> => {
+  // Create temporary text area and focus it
+  const textarea = await page.evaluateHandle(() => {
+    const el = document.createElement("textarea");
+    // Append element to dialog if present so it can always be focused
+    const dialog = document.body.querySelector("dialog");
+    (dialog ?? document.body).appendChild(el);
+    el.focus();
+    return el;
+  });
+  // Paste clipboard content into it, read the textarea value and clean it up
+  await page.keyboard.press(
+    process.platform === "darwin" ? "Meta+V" : "Control+V",
+  );
+  return page.evaluate((el) => {
+    const text = el.value;
+    el.remove();
+    return text;
+  }, textarea);
 };
