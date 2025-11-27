@@ -17,16 +17,16 @@
   }: Props = $props();
 
   let words = $derived(Array.from(value));
-  let inputRefs = $state<HTMLInputElement[]>([]);
+  let wrapperRef = $state<HTMLDivElement>();
   let dictionary = $state<string[]>();
 
   const handleKeyDown = (event: KeyboardEvent, index: number) => {
     if (event.code === "Backspace" && words[index].length === 0) {
-      inputRefs[index - 1]?.focus();
+      wrapperRef?.querySelectorAll("input")[index - 1]?.focus();
       event.preventDefault();
     }
     if (event.code === "Space" || event.code === "Enter") {
-      inputRefs[index + 1]?.focus();
+      wrapperRef?.querySelectorAll("input")[index + 1]?.focus();
       event.preventDefault();
     }
   };
@@ -39,7 +39,9 @@
       clipboard.forEach((word, i) => (words[index + i] = word));
       words = [...words];
       event.preventDefault();
-      inputRefs[index + clipboard.length - 1]?.focus();
+      wrapperRef
+        ?.querySelectorAll("input")
+        [index + clipboard.length - 1]?.focus();
     }
   };
 
@@ -47,7 +49,9 @@
     // Lazy load dictionary so this component doesn't include it in the bundle eagerly
     import("bip39").then((bip39) => (dictionary = bip39.wordlists.english));
     // Focus on first empty input
-    inputRefs[words.findIndex((word) => word.length === 0)]?.focus();
+    wrapperRef
+      ?.querySelectorAll("input")
+      [words.findIndex((word) => word.length === 0)]?.focus();
   });
 
   $effect(() => {
@@ -68,13 +72,10 @@
   });
 </script>
 
-<div class="grid grid-cols-3 gap-3">
+<div bind:this={wrapperRef} class="grid grid-cols-3 gap-3">
   {#each words as word, index}
     <label class="relative">
       <input
-        bind:this={
-          () => inputRefs[index], (element) => (inputRefs[index] = element)
-        }
         inputmode="text"
         autocorrect="off"
         autocomplete="off"
