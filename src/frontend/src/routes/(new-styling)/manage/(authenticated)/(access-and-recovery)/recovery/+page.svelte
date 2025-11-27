@@ -43,7 +43,8 @@
     "recoveryPhrase" in $authenticatedStore.authMethod,
   );
   const isUnverified = $derived(
-    recoveryPhraseData?.last_authentication[0] === undefined,
+    recoveryPhraseData !== undefined &&
+      recoveryPhraseData.last_authentication[0] === undefined,
   );
 
   const handleCreate = async (words: string[]) => {
