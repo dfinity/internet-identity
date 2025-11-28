@@ -20,18 +20,41 @@
   let wrapperRef = $state<HTMLDivElement>();
   let dictionary = $state<string[]>();
 
+  const isCompleteAndCorrect = $derived(
+    words.every(
+      (word) =>
+        word.length > 0 &&
+        dictionary !== undefined &&
+        dictionary.includes(word),
+    ),
+  );
+  const hasChanges = $derived(words.join(" ") === value.join(" "));
   const inputPattern = $derived(dictionary?.join("|"));
+  const firstEmptyInputIndex = $derived(
+    words.findIndex((word) => word.length === 0),
+  );
 
+  /** Focus on input (if it can be found for given index) */
+  const focusInput = (index: number) =>
+    wrapperRef?.querySelectorAll("input")[index]?.focus();
+  /** Change value into lower case and filter out disallowed characters */
+  const maskInput = (value: string) =>
+    value.toLowerCase().replace(/[^a-z]/g, "");
+  /** Switch focus between inputs when user presses certain keys */
   const handleKeyDown = (event: KeyboardEvent, index: number) => {
     if (event.code === "Backspace" && words[index].length === 0) {
-      wrapperRef?.querySelectorAll("input")[index - 1]?.focus();
+      focusInput(index - 1);
       event.preventDefault();
     }
     if (event.code === "Space" || event.code === "Enter") {
-      wrapperRef?.querySelectorAll("input")[index + 1]?.focus();
+      focusInput(index + 1);
       event.preventDefault();
     }
   };
+  /**
+   * Handle pasting clipboard content, split it into multiple words based on
+   * whitespace and fills input with these words starting from current input.
+   */
   const handlePaste = (event: ClipboardEvent, index: number) => {
     const clipboard = (event.clipboardData?.getData("text/plain") ?? "")
       .trim()
@@ -46,36 +69,37 @@
       });
       words = [...words];
       event.preventDefault();
-      wrapperRef
-        ?.querySelectorAll("input")
-        [Math.min(index + clipboard.length - 1, words.length - 1)]?.focus();
+      focusInput(Math.min(index + clipboard.length - 1, words.length - 1));
     }
   };
-
-  onMount(() => {
-    // Lazy load dictionary so this component doesn't include it in the bundle eagerly
-    import("bip39").then((bip39) => (dictionary = bip39.wordlists.english));
-    // Focus on first empty input
-    wrapperRef
-      ?.querySelectorAll("input")
-      [words.findIndex((word) => word.length === 0)]?.focus();
-  });
-
-  $effect(() => {
-    if (
-      words.some((word) => word.length === 0 || !dictionary?.includes(word)) ||
-      words.join(" ") === value.join(" ")
-    ) {
-      return;
-    }
-    // Update value binding when recovery phrase is filled in correctly,
-    // this is with a timeout so that the user can type "act" -> "actor"
+  /**
+   * Update value binding when recovery phrase is filled in correctly,
+   * this is with a timeout so that the user can type "act" -> "actor"
+   *
+   * @return function to cancel the update within the timeout
+   */
+  const handleUpdate = () => {
     const timeout = setTimeout(() => {
       value = words;
     }, 1000);
     return () => {
       clearTimeout(timeout);
     };
+  };
+
+  onMount(() => {
+    // Lazy load dictionary so this component doesn't include it in the bundle eagerly
+    import("bip39").then((bip39) => (dictionary = bip39.wordlists.english));
+    focusInput(firstEmptyInputIndex);
+  });
+
+  $effect(() => {
+    if (!isCompleteAndCorrect || hasChanges) {
+      return;
+    }
+    // Update value binding when recovery phrase is filled in correctly,
+    // this is with a timeout so that the user can type "act" -> "actor"
+    return handleUpdate();
   });
 </script>
 
@@ -91,7 +115,7 @@
         bind:value={
           () => word,
           (v) => {
-            words[index] = v.toLowerCase().replace(/[^a-z]/g, "");
+            words[index] = maskInput(v);
             words = [...words];
           }
         }
