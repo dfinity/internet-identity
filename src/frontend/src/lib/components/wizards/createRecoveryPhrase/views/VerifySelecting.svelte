@@ -64,7 +64,7 @@
   {#if isCheckingOrder}
     <Trans>This may take a few seconds</Trans>
   {:else}
-    <Trans>Select each word in the correct order</Trans>
+    <Trans>Select each word in the correct order:</Trans>
   {/if}
 </p>
 <ul class={["mb-8 grid grid-cols-3 gap-3"]}>
