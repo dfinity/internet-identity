@@ -97,8 +97,6 @@
     if (!isCompleteAndCorrect || hasChanges) {
       return;
     }
-    // Update value binding when recovery phrase is filled in correctly,
-    // this is with a timeout so that the user can type "act" -> "actor"
     return handleUpdate();
   });
 </script>
