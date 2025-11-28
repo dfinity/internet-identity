@@ -73,12 +73,16 @@
     }
   };
   /**
-   * Update value binding when recovery phrase is filled in correctly,
-   * this is with a timeout so that the user can type "act" -> "actor"
+   * Update binding when recovery phrase is filled in completely and correctly,
+   * this is with a timeout so that the user can still type "act" -> "actor".
    *
    * @return function to cancel the update within the timeout
    */
   const updateBinding = () => {
+    if (!isCompleteAndCorrect || hasChanges) {
+      return;
+    }
+
     const timeout = setTimeout(() => {
       value = words;
     }, 1000);
@@ -93,12 +97,7 @@
     focusInput(firstEmptyInputIndex);
   });
 
-  $effect(() => {
-    if (!isCompleteAndCorrect || hasChanges) {
-      return;
-    }
-    return updateBinding();
-  });
+  $effect(updateBinding);
 </script>
 
 <div bind:this={wrapperRef} class="grid grid-cols-3 gap-3">
