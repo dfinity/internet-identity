@@ -78,7 +78,7 @@
    *
    * @return function to cancel the update within the timeout
    */
-  const handleUpdate = () => {
+  const updateBinding = () => {
     const timeout = setTimeout(() => {
       value = words;
     }, 1000);
@@ -97,7 +97,7 @@
     if (!isCompleteAndCorrect || hasChanges) {
       return;
     }
-    return handleUpdate();
+    return updateBinding();
   });
 </script>
 
