@@ -69,7 +69,7 @@
       });
       words = [...words];
       event.preventDefault();
-      focusInput(Math.min(index + clipboard.length - 1, words.length - 1));
+      focusInput(index + clipboard.length - 1);
     }
   };
   /**
