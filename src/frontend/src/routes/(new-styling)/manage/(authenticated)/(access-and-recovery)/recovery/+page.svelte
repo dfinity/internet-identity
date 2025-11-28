@@ -130,10 +130,10 @@
     }
 
     const data = await recoveryAuthnMethodData(recoveryPhrase);
-    const nowMillis = BigInt(Date.now()) * BigInt(1_000_000);
+    const nowNanos = BigInt(Date.now()) * BigInt(1_000_000);
     recoveryPhraseData = {
       ...data,
-      last_authentication: [nowMillis],
+      last_authentication: [nowNanos],
     };
     void invalidateAll();
 
