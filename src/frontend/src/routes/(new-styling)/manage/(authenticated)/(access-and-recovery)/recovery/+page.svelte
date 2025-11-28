@@ -8,28 +8,29 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { CreateRecoveryPhraseWizard } from "$lib/components/wizards/createRecoveryPhrase";
-  import { throwCanisterError } from "$lib/utils/utils";
+  import {
+    isCanisterError,
+    throwCanisterError,
+    waitFor,
+  } from "$lib/utils/utils";
   import { beforeNavigate, invalidateAll } from "$app/navigation";
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
-  import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
-  import { authnMethodEqual } from "$lib/utils/webAuthn";
   import {
     fromMnemonicWithoutValidation,
     IC_DERIVATION_PATH,
   } from "$lib/utils/recoveryPhrase";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { toaster } from "$lib/components/utils/toaster";
+  import { HttpAgent } from "@icp-sdk/core/agent";
+  import { anonymousActor, anonymousAgent } from "$lib/globals";
+  import { handleError } from "$lib/components/utils/error";
+  import type { IdentityInfoError } from "$lib/generated/internet_identity_types";
 
   const { data }: PageProps = $props();
 
   let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
-  // Has been already registered with the identity but hasn't been verified yet,
-  // this state is only local to the page so "unverified" state is only temporary.
-  let unverifiedRecoveryPhrase = $state<{
-    words: string[];
-    data: AuthnMethodData;
-  }>();
+  let unverifiedRecoveryPhrase = $state<string[]>();
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -43,8 +44,7 @@
   );
   const isUnverified = $derived(
     recoveryPhraseData !== undefined &&
-      unverifiedRecoveryPhrase !== undefined &&
-      authnMethodEqual(recoveryPhraseData, unverifiedRecoveryPhrase.data),
+      recoveryPhraseData.last_authentication[0] === undefined,
   );
 
   const handleCreate = async (words: string[]) => {
@@ -52,7 +52,7 @@
     await $authenticatedStore.actor
       .authn_method_add($authenticatedStore.identityNumber, data)
       .then(throwCanisterError);
-    unverifiedRecoveryPhrase = { words, data };
+    unverifiedRecoveryPhrase = words;
   };
   const handleReplace = async (words: string[]) => {
     const data = await recoveryAuthnMethodData(words);
@@ -62,14 +62,18 @@
     ) {
       return;
     }
-    await $authenticatedStore.actor
-      .authn_method_replace(
-        $authenticatedStore.identityNumber,
-        recoveryPhraseData.authn_method.PubKey.pubkey,
-        data,
-      )
-      .then(throwCanisterError);
-    unverifiedRecoveryPhrase = { words, data };
+    await Promise.all([
+      $authenticatedStore.actor
+        .authn_method_replace(
+          $authenticatedStore.identityNumber,
+          recoveryPhraseData.authn_method.PubKey.pubkey,
+          data,
+        )
+        .then(throwCanisterError),
+      // Artificial delay to improve UX, wait at least 2 seconds even if network is faster.
+      waitFor(2000),
+    ]);
+    unverifiedRecoveryPhrase = words;
 
     // Update auth store if we just replaced the auth method currently in use
     if (isCurrentAccessMethod) {
@@ -92,22 +96,54 @@
       return;
     }
     showRecoveryPhraseSetup = undefined;
-    recoveryPhraseData = unverifiedRecoveryPhrase.data;
+    recoveryPhraseData = await recoveryAuthnMethodData(
+      unverifiedRecoveryPhrase,
+    );
     void invalidateAll();
   };
-  const handleVerified = async () => {
-    if (unverifiedRecoveryPhrase === undefined) {
-      return;
+  const handleVerify = async (recoveryPhrase: string[]): Promise<boolean> => {
+    const identity = await fromMnemonicWithoutValidation(
+      recoveryPhrase.join(" "),
+      IC_DERIVATION_PATH,
+    );
+    const agent = await HttpAgent.from(anonymousAgent);
+    agent.replaceIdentity(identity);
+    try {
+      await Promise.all([
+        // Make authenticated call with recovery phrase to mark it as used (verified)
+        anonymousActor.identity_info
+          .withOptions({ agent })($authenticatedStore.identityNumber)
+          .then(throwCanisterError),
+        // Artificial delay to improve UX, wait at least 2 seconds even if network is faster.
+        waitFor(2000),
+      ]);
+    } catch (error) {
+      if (
+        isCanisterError<IdentityInfoError>(error) &&
+        error.type === "Unauthorized"
+      ) {
+        // Authenticated call failed due to incorrect recovery phrase
+        return false;
+      } else {
+        throw error;
+      }
     }
+
+    const data = await recoveryAuthnMethodData(recoveryPhrase);
+    const nowNanos = BigInt(Date.now()) * BigInt(1_000_000);
+    recoveryPhraseData = {
+      ...data,
+      last_authentication: [nowNanos],
+    };
+    void invalidateAll();
+
+    unverifiedRecoveryPhrase = undefined;
+    showRecoveryPhraseSetup = undefined;
     toaster.success({
       title: $t`Recovery phrase activated`,
       description: $t`Your recovery phrase is now active and can be reset anytime.`,
     });
-    showRecoveryPhraseSetup = undefined;
-    const { data } = unverifiedRecoveryPhrase;
-    unverifiedRecoveryPhrase = undefined;
-    recoveryPhraseData = data;
-    void invalidateAll();
+    return true;
   };
 
   // Warn user if they're leaving in the middle of a recovery phrase set-up
@@ -206,15 +242,18 @@
     closeOnOutsideClick={false}
   >
     <CreateRecoveryPhraseWizard
+      action={showRecoveryPhraseSetup === "verify" ? "verify" : "create"}
       onCreate={showRecoveryPhraseSetup === "activate"
         ? handleCreate
         : handleReplace}
-      onVerified={handleVerified}
+      onVerify={handleVerify}
       onCancel={unverifiedRecoveryPhrase ? handleUnverified : handleCancel}
-      unverifiedRecoveryPhrase={showRecoveryPhraseSetup === "verify"
-        ? unverifiedRecoveryPhrase?.words
-        : undefined}
+      onError={(error) => {
+        showRecoveryPhraseSetup = undefined;
+        handleError(error);
+      }}
       hasExistingRecoveryPhrase={recoveryPhraseData !== undefined}
+      {unverifiedRecoveryPhrase}
     />
   </Dialog>
 {/if}
