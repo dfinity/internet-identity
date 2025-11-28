@@ -16,8 +16,8 @@
    * so effectively it's only ever set on reload.
    */
   const trackPageReload = (navigation: BeforeNavigate) => {
-    const isReload = navigation.type === "leave";
-    if (!isReload) {
+    const isReloadOrClose = navigation.type === "leave";
+    if (!isReloadOrClose) {
       return;
     }
     sessionStorage.setItem(SESSION_KEY, "true");
