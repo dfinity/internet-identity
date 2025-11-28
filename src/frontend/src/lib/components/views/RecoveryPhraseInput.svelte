@@ -1,7 +1,7 @@
 <script lang="ts">
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { InfoIcon } from "@lucide/svelte";
-  import { t } from "$lib//stores/locale.store";
+  import { t } from "$lib/stores/locale.store";
   import { onMount } from "svelte";
 
   interface Props {
