@@ -120,7 +120,7 @@
     } catch (error) {
       if (
         isCanisterError<IdentityInfoError>(error) &&
-        error.type == "Unauthorized"
+        error.type === "Unauthorized"
       ) {
         // Authenticated call failed due to incorrect recovery phrase
         return false;
