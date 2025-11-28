@@ -20,6 +20,8 @@
   let wrapperRef = $state<HTMLDivElement>();
   let dictionary = $state<string[]>();
 
+  const inputPattern = $derived(dictionary?.join("|"));
+
   const handleKeyDown = (event: KeyboardEvent, index: number) => {
     if (event.code === "Backspace" && words[index].length === 0) {
       wrapperRef?.querySelectorAll("input")[index - 1]?.focus();
@@ -95,7 +97,7 @@
         }
         onkeydown={(event) => handleKeyDown(event, index)}
         onpaste={(event) => handlePaste(event, index)}
-        pattern={dictionary?.join("|")}
+        pattern={inputPattern}
         {disabled}
         class={[
           "peer h-7 w-full ps-8 pe-2",
