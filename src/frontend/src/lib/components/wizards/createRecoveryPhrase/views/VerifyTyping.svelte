@@ -22,9 +22,13 @@
   const phraseValid = $derived(value.every((word) => word.length > 0));
   const autoSubmit = $derived(recoveryPhrase === undefined);
 
-  const handleSubmit = () => {
-    isCheckingPhrase = true;
-    onCompleted(value);
+  const handleSubmit = async () => {
+    try {
+      isCheckingPhrase = true;
+      await onCompleted(value);
+    } finally {
+      isCheckingPhrase = false;
+    }
   };
 
   // Auto-submit after the last word has been entered
