@@ -53,7 +53,7 @@
   };
   /**
    * Handle pasting clipboard content, split it into multiple words based on
-   * whitespace and fills input with these words starting from current input.
+   * whitespace and fills inputs with these words starting from current input.
    */
   const handlePaste = (event: ClipboardEvent, index: number) => {
     const clipboard = (event.clipboardData?.getData("text/plain") ?? "")
