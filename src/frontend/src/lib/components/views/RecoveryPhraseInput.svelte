@@ -6,13 +6,13 @@
 
   interface Props {
     value: string[];
-    showAll?: boolean;
+    showValues?: boolean;
     disabled?: boolean;
   }
 
   let {
     value = $bindable(),
-    showAll = false,
+    showValues = false,
     disabled = false,
   }: Props = $props();
 
@@ -126,7 +126,7 @@
           "border-border-primary rounded-full",
           "focus:not-disabled:border-fg-primary",
           "not-focus:user-invalid:!border-border-error not-focus:user-invalid:!bg-bg-error-primary/30 not-focus:user-invalid:!pe-7",
-          !showAll &&
+          !showValues &&
             "not-focus:valid:!text-transparent disabled:!text-transparent",
           "disabled:!text-text-disabled disabled:!bg-bg-disabled disabled:!border-border-disabled_subtle",
           word.length > 7 && "tracking-tight",
@@ -156,7 +156,7 @@
           "text-text-primary bg-transparent text-base tracking-tight",
           "peer-disabled:!text-text-disabled",
           word.length > 0 &&
-            !showAll &&
+            !showValues &&
             "peer-not-focus:peer-valid:!block peer-disabled:!block",
         ]}
         aria-hidden="true"

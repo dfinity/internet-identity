@@ -16,7 +16,7 @@
   const { onCompleted, recoveryPhrase }: Props = $props();
 
   let value = $state<string[]>(recoveryPhrase ?? EMPTY_PHRASE);
-  let showAll = $state(recoveryPhrase !== undefined);
+  let showValues = $state(recoveryPhrase !== undefined);
   let isCheckingPhrase = $state(false);
 
   const phraseValid = $derived(value.every((word) => word.length > 0));
@@ -61,15 +61,15 @@
     <Trans>Enter each word in the correct order:</Trans>
   {/if}
 </p>
-<RecoveryPhraseInput bind:value {showAll} disabled={isCheckingPhrase} />
+<RecoveryPhraseInput bind:value {showValues} disabled={isCheckingPhrase} />
 <div class="more-limited-height mt-5 flex flex-row">
   <Button
-    onclick={() => (showAll = !showAll)}
+    onclick={() => (showValues = !showValues)}
     variant="tertiary"
     disabled={isCheckingPhrase}
     class="flex-1"
   >
-    {showAll ? $t`Hide all` : $t`Show all`}
+    {showValues ? $t`Hide all` : $t`Show all`}
   </Button>
   <Button
     onclick={() => (value = EMPTY_PHRASE)}
