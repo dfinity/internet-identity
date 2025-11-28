@@ -36,12 +36,17 @@
       .split(/\s/)
       .map((word) => word.toLowerCase().replace(/[^a-z]/g, ""));
     if (clipboard.length > 0) {
-      clipboard.forEach((word, i) => (words[index + i] = word));
+      clipboard.forEach((word, i) => {
+        if (index + i >= word.length) {
+          return;
+        }
+        words[index + i] = word;
+      });
       words = [...words];
       event.preventDefault();
       wrapperRef
         ?.querySelectorAll("input")
-        [index + clipboard.length - 1]?.focus();
+        [Math.min(index + clipboard.length - 1, words.length - 1)]?.focus();
     }
   };
 
