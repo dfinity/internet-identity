@@ -1,278 +1,323 @@
-import { expect, Locator, Page, test } from "@playwright/test";
-import {
-  createNewIdentityInII,
-  dummyAuth,
-  II_URL,
-  readClipboard,
-} from "../utils";
+import { test as base } from "../fixtures";
+import { expect } from "@playwright/test";
 
-class RecoveryPhraseWizard {
-  #dialog: Locator;
+/**
+ * Swap the first word around with the next different word found,
+ * compared to random shuffle, this guarantees a different phrase.
+ */
+const swapWordsAround = (words: string[]) => {
+  const incorrectOrder = [...words];
+  const firstWord = incorrectOrder[0];
+  const differentWordIndex = incorrectOrder.findIndex(
+    (word) => word !== firstWord,
+  );
+  incorrectOrder[0] = incorrectOrder[differentWordIndex];
+  incorrectOrder[differentWordIndex] = firstWord;
+  expect(incorrectOrder).not.toEqual(words);
+  return incorrectOrder;
+};
 
-  constructor(dialog: Locator) {
-    this.#dialog = dialog;
-  }
-
-  async acknowledge(): Promise<void> {
-    await expect(
-      this.#dialog.getByRole("heading", { name: "Before you continue" }),
-    ).toBeVisible();
-    await this.#dialog.getByRole("checkbox", { name: "I acknowledge" }).check();
-    await this.#dialog.getByRole("button", { name: "Continue" }).click();
-    await expect(
-      this.#dialog.getByRole("heading", { name: "Before you continue" }),
-    ).toBeHidden();
-  }
-
-  async writeDown(): Promise<string[]> {
-    const heading = this.#dialog.getByRole("heading", {
-      name: "Save your recovery phrase",
-    });
-    await expect(heading).toBeVisible();
-    await this.#dialog.getByRole("button", { name: "Click to reveal" }).click();
-    // We use selection and copying to the clipboard here to make sure that it
-    // works correctly for power-users that don't physically write things down.
-    await this.#dialog.getByRole("list").selectText();
-    await this.#dialog
-      .page()
-      .keyboard.press(process.platform === "darwin" ? "Meta+C" : "Control+C");
-    const clipboard = await readClipboard(this.#dialog.page());
-    await this.#dialog
-      .getByRole("button", { name: "I have written it down" })
-      .click();
-    await expect(heading).toBeHidden();
-    return clipboard.trim().split("\n");
-  }
-
-  async verify(words: string[]): Promise<void> {
-    const heading = this.#dialog.getByRole("heading", {
-      name: "Verify your recovery phrase",
-    });
-    await expect(heading).toBeVisible();
-    for (const word of words) {
-      // Recovery phrase could have duplicate words, so always
-      // select the first enabled button that isn't pressed.
-      await this.#dialog
-        .getByRole("list")
-        .getByRole("button", {
-          name: word,
-          exact: true,
-          disabled: false,
-          pressed: false,
-        })
-        .first()
-        .click();
-    }
-    await expect(heading).toBeHidden();
-  }
-
-  async reset(): Promise<void> {
-    const heading = this.#dialog.getByRole("heading", {
-      name: "Reset your recovery phrase?",
-    });
-    await expect(heading).toBeVisible();
-    await this.#dialog.getByRole("button", { name: "Reset" }).click();
-    await expect(heading).toBeHidden();
-  }
-}
-
-class RecoveryPhrasePage {
-  #page: Page;
-
-  constructor(page: Page) {
-    this.#page = page;
-  }
-
-  async activate(options?: { skipVerification?: boolean }): Promise<string[]> {
-    await expect(
-      this.#page.getByRole("heading", {
-        name: "Recovery phrase not activated",
-      }),
-    ).toBeVisible();
-
-    await this.#page.getByRole("button", { name: "Activate" }).click();
-    const dialog = this.#page.getByRole("dialog");
-    const wizard = new RecoveryPhraseWizard(dialog);
-
-    await wizard.acknowledge();
-    const words = await wizard.writeDown();
-    if (options?.skipVerification === true) {
-      await dialog.getByRole("button", { name: "Close" }).click();
-    } else {
-      await wizard.verify(words);
-    }
-
-    await expect(dialog).toBeHidden();
-    await expect(
-      this.#page.getByRole("heading", {
-        name:
-          options?.skipVerification === true
-            ? "Recovery phrase not verified"
-            : "Recovery phrase activated",
-      }),
-    ).toBeVisible();
-
-    return words;
-  }
-
-  async reset(options?: {
-    isUnverified?: boolean;
-    skipVerification?: boolean;
-  }): Promise<string[]> {
-    await expect(
-      this.#page.getByRole("heading", {
-        name:
-          options?.isUnverified === true
-            ? "Recovery phrase not verified"
-            : "Recovery phrase activated",
-      }),
-    ).toBeVisible();
-
-    await this.#page.getByRole("button", { name: "Reset" }).click();
-    const dialog = this.#page.getByRole("dialog");
-    const wizard = new RecoveryPhraseWizard(dialog);
-
-    await wizard.reset();
-    const words = await wizard.writeDown();
-    if (options?.skipVerification === true) {
-      await dialog.getByRole("button", { name: "Close" }).click();
-    } else {
-      await wizard.verify(words);
-    }
-
-    await expect(dialog).toBeHidden();
-    await expect(
-      this.#page.getByRole("heading", {
-        name:
-          options?.skipVerification === true
-            ? "Recovery phrase not verified"
-            : "Recovery phrase activated",
-      }),
-    ).toBeVisible();
-
-    return words;
-  }
-
-  async verify(words: string[]): Promise<void> {
-    await expect(
-      this.#page.getByRole("heading", {
-        name: "Recovery phrase not verified",
-      }),
-    ).toBeVisible();
-
-    await this.#page.getByRole("button", { name: "Verify" }).click();
-    const dialog = this.#page.getByRole("dialog");
-    const wizard = new RecoveryPhraseWizard(dialog);
-
-    await wizard.verify(words);
-
-    await expect(dialog).toBeHidden();
-    await expect(
-      this.#page.getByRole("heading", { name: "Recovery phrase activated" }),
-    ).toBeVisible();
-  }
-}
+// Add words fixture to test so they can be passed around between blocks
+const test = base.extend<{
+  words: {
+    current?: string[];
+  };
+}>({
+  // Destructuring first argument is required in Playwright
+  // eslint-disable-next-line no-empty-pattern
+  words: ({}, use) => use({}),
+});
 
 test.describe("Recovery phrase", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(II_URL + "/manage/recovery");
-    await createNewIdentityInII(page, "Test User", dummyAuth());
-    await page.waitForURL(II_URL + "/manage/recovery");
+  test.beforeEach(async ({ recoveryPhrasePage, identity }) => {
+    await recoveryPhrasePage.goto();
+    await identity.signIn();
+    await recoveryPhrasePage.assertNotActivated();
   });
 
-  test("can be activated", async ({ page }) => {
-    const recoveryPhrasePage = new RecoveryPhrasePage(page);
-    await recoveryPhrasePage.activate();
-    // TODO: Verify we can recover using the recovery phrase
+  test.describe("can be activated", () => {
+    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
+      await recoveryPhrasePage.assertActivated();
+      // Assert it's still activated after signing back in
+      await identity.signOut();
+      await recoveryPhrasePage.goto();
+      await identity.signIn();
+      await recoveryPhrasePage.assertActivated();
+      // TODO: Verify we can recover using `words.current`
+    });
+
+    test("on first attempt", async ({ recoveryPhrasePage, words }) => {
+      await recoveryPhrasePage.activate(async (wizard) => {
+        await wizard.acknowledge();
+        words.current = await wizard.writeDown();
+        await wizard.verifySelecting(words.current);
+      });
+    });
+
+    test("on retry", async ({ recoveryPhrasePage, words }) => {
+      await recoveryPhrasePage.activate(async (wizard) => {
+        await wizard.acknowledge();
+        words.current = await wizard.writeDown();
+        await wizard.verifySelecting(swapWordsAround(words.current));
+        await wizard.retry();
+        const reminderWords = await wizard.writeDown();
+        expect(reminderWords).toEqual(words.current);
+        await wizard.verifySelecting(reminderWords);
+      });
+    });
   });
 
   test.describe("can be verified", () => {
-    test("when it was skipped during activation", async ({ page }) => {
-      const recoveryPhrasePage = new RecoveryPhrasePage(page);
-      const words = await recoveryPhrasePage.activate({
-        skipVerification: true,
+    test.beforeEach(async ({ recoveryPhrasePage, words }) => {
+      words.current = await recoveryPhrasePage.activate(async (wizard) => {
+        await wizard.acknowledge();
+        const words = await wizard.writeDown();
+        await wizard.close();
+        return words;
       });
-      await recoveryPhrasePage.verify(words);
-      // TODO: Verify we can recover using the recovery phrase
+      await recoveryPhrasePage.assertNotVerified();
     });
 
-    test("when it was skipped during reset", async ({ page }) => {
-      const recoveryPhrasePage = new RecoveryPhrasePage(page);
-      await recoveryPhrasePage.activate();
-      const words = await recoveryPhrasePage.reset({
-        skipVerification: true,
-      });
-      await recoveryPhrasePage.verify(words);
-      // TODO: Verify we can recover using the recovery phrase
+    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
+      await recoveryPhrasePage.assertActivated();
+      // Assert it's still activated after signing back in
+      await identity.signOut();
+      await recoveryPhrasePage.goto();
+      await identity.signIn();
+      await recoveryPhrasePage.assertActivated();
+      // TODO: Verify we can recover using `words.current`
     });
 
-    test("when first attempt is in incorrect order", async ({ page }) => {
-      const recoveryPhrasePage = new RecoveryPhrasePage(page);
-      const words = await recoveryPhrasePage.activate({
-        skipVerification: true,
+    test.describe("when still signed in", () => {
+      test("on first attempt", async ({ recoveryPhrasePage, words }) => {
+        await recoveryPhrasePage.verify(async (wizard) => {
+          await wizard.verifySelecting(words.current!);
+        });
       });
 
-      // Swap the first word around with the next different word found,
-      // compared to random shuffle, this guarantees a different phrase.
-      const incorrectOrder = [...words];
-      const firstWord = incorrectOrder[0];
-      const differentWordIndex = incorrectOrder.findIndex(
-        (word) => word !== firstWord,
-      );
-      incorrectOrder[0] = incorrectOrder[differentWordIndex];
-      incorrectOrder[differentWordIndex] = firstWord;
+      test("on retry", async ({ recoveryPhrasePage, words }) => {
+        await recoveryPhrasePage.verify(async (wizard) => {
+          await wizard.verifySelecting(swapWordsAround(words.current!));
+          await wizard.retry();
+          const reminderWords = await wizard.writeDown();
+          expect(reminderWords).toEqual(words.current);
+          await wizard.verifySelecting(reminderWords);
+        });
+      });
+    });
 
-      // Verify with incorrect word order
-      await page.getByRole("button", { name: "Verify" }).click();
-      const dialog = page.getByRole("dialog");
-      const wizard = new RecoveryPhraseWizard(dialog);
-      await wizard.verify(incorrectOrder);
-      await expect(
-        dialog.getByRole("heading", { name: "Something is wrong!" }),
-      ).toBeVisible();
+    test.describe("when coming back after sign out", () => {
+      test.beforeEach(async ({ recoveryPhrasePage, identity }) => {
+        await identity.signOut();
+        await recoveryPhrasePage.goto();
+        await identity.signIn();
+      });
 
-      // Retry, words shown should be equal to earlier words
-      await dialog.getByRole("button", { name: "Retry" }).click();
-      const correctWords = await wizard.writeDown();
-      expect(correctWords).toEqual(words);
+      test("on first attempt", async ({ recoveryPhrasePage, words }) => {
+        await recoveryPhrasePage.verify(async (wizard) => {
+          await wizard.verifyTyping(words.current!);
+        });
+      });
 
-      // Enter correct word order
-      await wizard.verify(words);
-      await expect(dialog).toBeHidden();
-      await expect(
-        page.getByRole("heading", { name: "Recovery phrase activated" }),
-      ).toBeVisible();
-      // TODO: Verify we can recover using the recovery phrase
+      test("on retry", async ({ recoveryPhrasePage, words }) => {
+        await recoveryPhrasePage.verify(async (wizard) => {
+          await wizard.verifyTyping(swapWordsAround(words.current!));
+          await wizard.retry();
+          await wizard.verifyTyping(words.current!);
+        });
+      });
     });
   });
 
   test.describe("can be reset", () => {
-    test("when it is activated", async ({ page }) => {
-      const recoveryPhrasePage = new RecoveryPhrasePage(page);
-      await recoveryPhrasePage.activate();
-      await recoveryPhrasePage.reset();
-      // TODO: Verify we can recover using the recovery phrase
+    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
+      await recoveryPhrasePage.assertActivated();
+      // Assert it's still activated after signing back in
+      await identity.signOut();
+      await recoveryPhrasePage.goto();
+      await identity.signIn();
+      await recoveryPhrasePage.assertActivated();
+      // TODO: Verify we can recover using `words.current`
     });
 
-    test("when it is unverified (skipped during activation)", async ({
-      page,
-    }) => {
-      const recoveryPhrasePage = new RecoveryPhrasePage(page);
-      await recoveryPhrasePage.activate({
-        skipVerification: true,
+    const scenarios: Array<{ label: string; setup: () => void }> = [
+      {
+        label: "when it is activated",
+        setup: () =>
+          test.beforeEach(async ({ recoveryPhrasePage, words }) => {
+            words.current = await recoveryPhrasePage.activate(
+              async (wizard) => {
+                await wizard.acknowledge();
+                const oldWords = await wizard.writeDown();
+                await wizard.verifySelecting(oldWords);
+                return oldWords;
+              },
+            );
+            await recoveryPhrasePage.assertActivated();
+          }),
+      },
+      {
+        label: "when it is not verified",
+        setup: () =>
+          test.beforeEach(async ({ recoveryPhrasePage, words }) => {
+            words.current = await recoveryPhrasePage.activate(
+              async (wizard) => {
+                await wizard.acknowledge();
+                const oldWords = await wizard.writeDown();
+                await wizard.close();
+                return oldWords;
+              },
+            );
+            await recoveryPhrasePage.assertNotVerified();
+          }),
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      test.describe(scenario.label, () => {
+        scenario.setup();
+
+        test("on first attempt", async ({ recoveryPhrasePage, words }) => {
+          words.current = await recoveryPhrasePage.reset(async (wizard) => {
+            await wizard.confirmReset();
+            const newWords = await wizard.writeDown();
+            expect(newWords).not.toEqual(words.current);
+            await wizard.verifySelecting(newWords);
+            return newWords;
+          });
+        });
+
+        test("on retry", async ({ recoveryPhrasePage, words }) => {
+          words.current = await recoveryPhrasePage.reset(async (wizard) => {
+            await wizard.confirmReset();
+            const newWords = await wizard.writeDown();
+            expect(newWords).not.toEqual(words.current);
+            await wizard.verifySelecting(swapWordsAround(newWords));
+            await wizard.retry();
+            const reminderWords = await wizard.writeDown();
+            expect(reminderWords).toEqual(newWords);
+            await wizard.verifySelecting(reminderWords);
+            return reminderWords;
+          });
+        });
       });
-      await recoveryPhrasePage.reset({ isUnverified: true });
-      // TODO: Verify we can recover using the recovery phrase
+    }
+  });
+
+  test.describe("can be cancelled", () => {
+    test("when activating", async ({ recoveryPhrasePage }) => {
+      await recoveryPhrasePage.activate(async (wizard) => {
+        await wizard.close();
+      });
+      await recoveryPhrasePage.assertNotActivated();
     });
 
-    test("when it is unverified (skipped during reset)", async ({ page }) => {
-      const recoveryPhrasePage = new RecoveryPhrasePage(page);
-      await recoveryPhrasePage.activate();
-      await recoveryPhrasePage.reset({
-        skipVerification: true,
+    test("when resetting", async ({ recoveryPhrasePage }) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const oldWords = await recoveryPhrasePage.activate(async (wizard) => {
+        await wizard.acknowledge();
+        const words = await wizard.writeDown();
+        await wizard.verifySelecting(words);
+        return words;
       });
-      await recoveryPhrasePage.reset({ isUnverified: true });
-      // TODO: Verify we can recover using the recovery phrase
+      await recoveryPhrasePage.assertActivated();
+      await recoveryPhrasePage.reset(async (wizard) => {
+        await wizard.cancelReset();
+      });
+      await recoveryPhrasePage.assertActivated();
+      // TODO: Verify we can still recover using `oldWords`
+    });
+  });
+
+  test.describe("is not verified", () => {
+    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
+      await recoveryPhrasePage.assertNotVerified();
+      // Assert it's still not verified after signing back in
+      await identity.signOut();
+      await recoveryPhrasePage.goto();
+      await identity.signIn();
+      await recoveryPhrasePage.assertNotVerified();
+    });
+
+    test.describe("when closed during activation", () => {
+      test("before written down", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.activate(async (wizard) => {
+          await wizard.acknowledge();
+          await wizard.close();
+        });
+      });
+
+      test("after written down", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.activate(async (wizard) => {
+          await wizard.acknowledge();
+          await wizard.writeDown();
+          await wizard.close();
+        });
+      });
+
+      test("before retry", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.activate(async (wizard) => {
+          await wizard.acknowledge();
+          const words = await wizard.writeDown();
+          await wizard.verifySelecting(swapWordsAround(words));
+          await wizard.close();
+        });
+      });
+
+      test("after retry", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.activate(async (wizard) => {
+          await wizard.acknowledge();
+          const words = await wizard.writeDown();
+          await wizard.verifySelecting(swapWordsAround(words));
+          await wizard.retry();
+          await wizard.close();
+        });
+      });
+    });
+
+    test.describe("when closed during reset", () => {
+      test.beforeEach(async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.activate(async (wizard) => {
+          await wizard.acknowledge();
+          const words = await wizard.writeDown();
+          await wizard.verifySelecting(words);
+        });
+        await recoveryPhrasePage.assertActivated();
+      });
+
+      test("before written down", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.reset(async (wizard) => {
+          await wizard.confirmReset();
+          await wizard.close();
+        });
+      });
+
+      test("after written down", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.reset(async (wizard) => {
+          await wizard.confirmReset();
+          await wizard.writeDown();
+          await wizard.close();
+        });
+      });
+
+      test("before retry", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.reset(async (wizard) => {
+          await wizard.confirmReset();
+          const words = await wizard.writeDown();
+          await wizard.verifySelecting(swapWordsAround(words));
+          await wizard.close();
+        });
+      });
+
+      test("after retry", async ({ recoveryPhrasePage }) => {
+        await recoveryPhrasePage.reset(async (wizard) => {
+          await wizard.confirmReset();
+          const words = await wizard.writeDown();
+          await wizard.verifySelecting(swapWordsAround(words));
+          await wizard.retry();
+          await wizard.close();
+        });
+      });
     });
   });
 });

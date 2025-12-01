@@ -102,6 +102,7 @@
 
 <div bind:this={wrapperRef} class="grid grid-cols-3 gap-3">
   {#each words as word, index}
+    {@const position = index + 1}
     <label class="relative">
       <input
         inputmode="text"
@@ -131,6 +132,7 @@
           "disabled:!text-text-disabled disabled:!bg-bg-disabled disabled:!border-border-disabled_subtle",
           word.length > 7 && "tracking-tight",
         ]}
+        aria-label={$t`Word ${position}`}
         data-lpignore="true"
         data-1p-ignore="true"
         data-bwignore="true"
