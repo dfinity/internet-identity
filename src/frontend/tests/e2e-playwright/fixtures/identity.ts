@@ -51,7 +51,9 @@ class IdentityWizard {
       this.#page.getByRole("button", { name: "Use another identity" }),
     ];
     // Wait for any of these buttons to appear
-    await Promise.race(buttons.map((button) => button.waitFor()));
+    await Promise.race(
+      buttons.map((button) => button.waitFor().catch(() => null)),
+    );
     // Click the buttons in order (if visible).
     for (const button of buttons) {
       if (await button.isVisible()) {
@@ -66,8 +68,8 @@ export const test = base.extend<{
 }>({
   identity: async ({ page, browser }, use) => {
     const auth = dummyAuth();
-    const temptContext = await browser.newContext();
-    const tempPage = await temptContext.newPage();
+    const tempContext = await browser.newContext();
+    const tempPage = await tempContext.newPage();
     await tempPage.goto(II_URL + "/login");
     const tempWizard = new IdentityWizard(tempPage);
     await tempWizard.signUpWithPasskey(auth, DEFAULT_NAME);
