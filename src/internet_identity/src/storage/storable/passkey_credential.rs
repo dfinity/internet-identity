@@ -3,9 +3,9 @@ use minicbor::{Decode, Encode};
 #[derive(Encode, Decode, Clone)]
 #[cbor(map)]
 pub struct StorablePasskeyCredential {
-    #[n(0)]
+    #[cbor(n(0), with = "minicbor::bytes")]
     pub pubkey: Vec<u8>,
-    #[n(1)]
+    #[cbor(n(1), with = "minicbor::bytes")]
     pub credential_id: Vec<u8>,
     #[n(2)]
     pub origin: String,
@@ -15,6 +15,6 @@ pub struct StorablePasskeyCredential {
     pub last_usage_timestamp_ns: Option<u64>,
     #[n(5)]
     pub alias: Option<String>,
-    #[n(6)]
+    #[cbor(n(6), with = "minicbor::bytes")]
     pub aaguid: Option<Vec<u8>>,
 }

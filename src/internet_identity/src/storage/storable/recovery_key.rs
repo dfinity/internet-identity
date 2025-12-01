@@ -3,7 +3,7 @@ use minicbor::{Decode, Encode};
 #[derive(Encode, Decode, Clone)]
 #[cbor(map)]
 pub struct StorableRecoveryKey {
-    #[n(0)]
+    #[cbor(n(0), with = "minicbor::bytes")]
     pub pubkey: Vec<u8>,
     #[n(1)]
     pub created_at_ns: Option<u64>,
