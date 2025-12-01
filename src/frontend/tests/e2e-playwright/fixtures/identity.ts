@@ -50,11 +50,6 @@ class IdentityWizard {
       this.#page.getByRole("button", { name: "Switch identity" }),
       this.#page.getByRole("button", { name: "Use another identity" }),
     ];
-    // Wait for any of these buttons to appear
-    await Promise.race(
-      buttons.map((button) => button.waitFor().catch(() => null)),
-    );
-    // Click the buttons in order (if visible).
     for (const button of buttons) {
       if (await button.isVisible()) {
         await button.click();
