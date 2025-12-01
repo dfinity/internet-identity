@@ -1,7 +1,7 @@
 import { expect, Locator, Page, test as base } from "@playwright/test";
 import { II_URL, readClipboard } from "../utils";
 
-class RecoveryPhraseWizard {
+class CreateRecoveryPhraseWizard {
   #view: Locator;
 
   constructor(view: Locator) {
@@ -115,7 +115,7 @@ class RecoveryPhraseWizard {
   }
 }
 
-class RecoveryPhrasePage {
+class ManageRecoveryPage {
   #page: Page;
 
   constructor(page: Page) {
@@ -127,19 +127,21 @@ class RecoveryPhrasePage {
   }
 
   async activate<T>(
-    fn: (wizard: RecoveryPhraseWizard) => Promise<T>,
+    fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
     await this.#page.getByRole("button", { name: "Activate" }).click();
     return this.#withWizard(fn);
   }
 
-  async reset<T>(fn: (wizard: RecoveryPhraseWizard) => Promise<T>): Promise<T> {
+  async reset<T>(
+    fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
+  ): Promise<T> {
     await this.#page.getByRole("button", { name: "Reset" }).click();
     return this.#withWizard(fn);
   }
 
   async verify<T>(
-    fn: (wizard: RecoveryPhraseWizard) => Promise<T>,
+    fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
     await this.#page.getByRole("button", { name: "Verify" }).click();
     return this.#withWizard(fn);
@@ -166,10 +168,10 @@ class RecoveryPhrasePage {
   }
 
   async #withWizard<T>(
-    fn: (wizard: RecoveryPhraseWizard) => Promise<T>,
+    fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
     const dialog = this.#page.getByRole("dialog");
-    const wizard = new RecoveryPhraseWizard(dialog);
+    const wizard = new CreateRecoveryPhraseWizard(dialog);
     await expect(dialog).toBeVisible();
     const value = await fn(wizard);
     await expect(dialog).toBeHidden();
@@ -177,8 +179,10 @@ class RecoveryPhrasePage {
   }
 }
 
-export const test = base.extend<{ recoveryPhrasePage: RecoveryPhrasePage }>({
-  recoveryPhrasePage: async ({ page }, use) => {
-    await use(new RecoveryPhrasePage(page));
+export const test = base.extend<{
+  manageRecoveryPage: ManageRecoveryPage;
+}>({
+  manageRecoveryPage: async ({ page }, use) => {
+    await use(new ManageRecoveryPage(page));
   },
 });

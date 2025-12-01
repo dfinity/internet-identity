@@ -29,33 +29,33 @@ const test = base.extend<{
 });
 
 test.describe("Recovery phrase", () => {
-  test.beforeEach(async ({ recoveryPhrasePage, identity }) => {
-    await recoveryPhrasePage.goto();
+  test.beforeEach(async ({ manageRecoveryPage, identity }) => {
+    await manageRecoveryPage.goto();
     await identity.signIn();
-    await recoveryPhrasePage.assertNotActivated();
+    await manageRecoveryPage.assertNotActivated();
   });
 
   test.describe("can be activated", () => {
-    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
-      await recoveryPhrasePage.assertActivated();
+    test.afterEach(async ({ manageRecoveryPage, identity }) => {
+      await manageRecoveryPage.assertActivated();
       // Assert it's still activated after signing back in
       await identity.signOut();
-      await recoveryPhrasePage.goto();
+      await manageRecoveryPage.goto();
       await identity.signIn();
-      await recoveryPhrasePage.assertActivated();
+      await manageRecoveryPage.assertActivated();
       // TODO: Verify we can recover using `words.current`
     });
 
-    test("on first attempt", async ({ recoveryPhrasePage, words }) => {
-      await recoveryPhrasePage.activate(async (wizard) => {
+    test("on first attempt", async ({ manageRecoveryPage, words }) => {
+      await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
         words.current = await wizard.writeDown();
         await wizard.verifySelecting(words.current);
       });
     });
 
-    test("on retry", async ({ recoveryPhrasePage, words }) => {
-      await recoveryPhrasePage.activate(async (wizard) => {
+    test("on retry", async ({ manageRecoveryPage, words }) => {
+      await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
         words.current = await wizard.writeDown();
         await wizard.verifySelecting(swapWordsAround(words.current));
@@ -68,35 +68,35 @@ test.describe("Recovery phrase", () => {
   });
 
   test.describe("can be verified", () => {
-    test.beforeEach(async ({ recoveryPhrasePage, words }) => {
-      words.current = await recoveryPhrasePage.activate(async (wizard) => {
+    test.beforeEach(async ({ manageRecoveryPage, words }) => {
+      words.current = await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
         const words = await wizard.writeDown();
         await wizard.close();
         return words;
       });
-      await recoveryPhrasePage.assertNotVerified();
+      await manageRecoveryPage.assertNotVerified();
     });
 
-    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
-      await recoveryPhrasePage.assertActivated();
+    test.afterEach(async ({ manageRecoveryPage, identity }) => {
+      await manageRecoveryPage.assertActivated();
       // Assert it's still activated after signing back in
       await identity.signOut();
-      await recoveryPhrasePage.goto();
+      await manageRecoveryPage.goto();
       await identity.signIn();
-      await recoveryPhrasePage.assertActivated();
+      await manageRecoveryPage.assertActivated();
       // TODO: Verify we can recover using `words.current`
     });
 
     test.describe("when still signed in", () => {
-      test("on first attempt", async ({ recoveryPhrasePage, words }) => {
-        await recoveryPhrasePage.verify(async (wizard) => {
+      test("on first attempt", async ({ manageRecoveryPage, words }) => {
+        await manageRecoveryPage.verify(async (wizard) => {
           await wizard.verifySelecting(words.current!);
         });
       });
 
-      test("on retry", async ({ recoveryPhrasePage, words }) => {
-        await recoveryPhrasePage.verify(async (wizard) => {
+      test("on retry", async ({ manageRecoveryPage, words }) => {
+        await manageRecoveryPage.verify(async (wizard) => {
           await wizard.verifySelecting(swapWordsAround(words.current!));
           await wizard.retry();
           const reminderWords = await wizard.writeDown();
@@ -107,20 +107,20 @@ test.describe("Recovery phrase", () => {
     });
 
     test.describe("when coming back after sign out", () => {
-      test.beforeEach(async ({ recoveryPhrasePage, identity }) => {
+      test.beforeEach(async ({ manageRecoveryPage, identity }) => {
         await identity.signOut();
-        await recoveryPhrasePage.goto();
+        await manageRecoveryPage.goto();
         await identity.signIn();
       });
 
-      test("on first attempt", async ({ recoveryPhrasePage, words }) => {
-        await recoveryPhrasePage.verify(async (wizard) => {
+      test("on first attempt", async ({ manageRecoveryPage, words }) => {
+        await manageRecoveryPage.verify(async (wizard) => {
           await wizard.verifyTyping(words.current!);
         });
       });
 
-      test("on retry", async ({ recoveryPhrasePage, words }) => {
-        await recoveryPhrasePage.verify(async (wizard) => {
+      test("on retry", async ({ manageRecoveryPage, words }) => {
+        await manageRecoveryPage.verify(async (wizard) => {
           await wizard.verifyTyping(swapWordsAround(words.current!));
           await wizard.retry();
           await wizard.verifyTyping(words.current!);
@@ -130,13 +130,13 @@ test.describe("Recovery phrase", () => {
   });
 
   test.describe("can be reset", () => {
-    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
-      await recoveryPhrasePage.assertActivated();
+    test.afterEach(async ({ manageRecoveryPage, identity }) => {
+      await manageRecoveryPage.assertActivated();
       // Assert it's still activated after signing back in
       await identity.signOut();
-      await recoveryPhrasePage.goto();
+      await manageRecoveryPage.goto();
       await identity.signIn();
-      await recoveryPhrasePage.assertActivated();
+      await manageRecoveryPage.assertActivated();
       // TODO: Verify we can recover using `words.current`
     });
 
@@ -144,8 +144,8 @@ test.describe("Recovery phrase", () => {
       {
         label: "when it is activated",
         setup: () =>
-          test.beforeEach(async ({ recoveryPhrasePage, words }) => {
-            words.current = await recoveryPhrasePage.activate(
+          test.beforeEach(async ({ manageRecoveryPage, words }) => {
+            words.current = await manageRecoveryPage.activate(
               async (wizard) => {
                 await wizard.acknowledge();
                 const oldWords = await wizard.writeDown();
@@ -153,14 +153,14 @@ test.describe("Recovery phrase", () => {
                 return oldWords;
               },
             );
-            await recoveryPhrasePage.assertActivated();
+            await manageRecoveryPage.assertActivated();
           }),
       },
       {
         label: "when it is not verified",
         setup: () =>
-          test.beforeEach(async ({ recoveryPhrasePage, words }) => {
-            words.current = await recoveryPhrasePage.activate(
+          test.beforeEach(async ({ manageRecoveryPage, words }) => {
+            words.current = await manageRecoveryPage.activate(
               async (wizard) => {
                 await wizard.acknowledge();
                 const oldWords = await wizard.writeDown();
@@ -168,7 +168,7 @@ test.describe("Recovery phrase", () => {
                 return oldWords;
               },
             );
-            await recoveryPhrasePage.assertNotVerified();
+            await manageRecoveryPage.assertNotVerified();
           }),
       },
     ];
@@ -177,8 +177,8 @@ test.describe("Recovery phrase", () => {
       test.describe(scenario.label, () => {
         scenario.setup();
 
-        test("on first attempt", async ({ recoveryPhrasePage, words }) => {
-          words.current = await recoveryPhrasePage.reset(async (wizard) => {
+        test("on first attempt", async ({ manageRecoveryPage, words }) => {
+          words.current = await manageRecoveryPage.reset(async (wizard) => {
             await wizard.confirmReset();
             const newWords = await wizard.writeDown();
             expect(newWords).not.toEqual(words.current);
@@ -187,8 +187,8 @@ test.describe("Recovery phrase", () => {
           });
         });
 
-        test("on retry", async ({ recoveryPhrasePage, words }) => {
-          words.current = await recoveryPhrasePage.reset(async (wizard) => {
+        test("on retry", async ({ manageRecoveryPage, words }) => {
+          words.current = await manageRecoveryPage.reset(async (wizard) => {
             await wizard.confirmReset();
             const newWords = await wizard.writeDown();
             expect(newWords).not.toEqual(words.current);
@@ -205,58 +205,58 @@ test.describe("Recovery phrase", () => {
   });
 
   test.describe("can be cancelled", () => {
-    test("when activating", async ({ recoveryPhrasePage }) => {
-      await recoveryPhrasePage.activate(async (wizard) => {
+    test("when activating", async ({ manageRecoveryPage }) => {
+      await manageRecoveryPage.activate(async (wizard) => {
         await wizard.close();
       });
-      await recoveryPhrasePage.assertNotActivated();
+      await manageRecoveryPage.assertNotActivated();
     });
 
-    test("when resetting", async ({ recoveryPhrasePage }) => {
+    test("when resetting", async ({ manageRecoveryPage }) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const oldWords = await recoveryPhrasePage.activate(async (wizard) => {
+      const oldWords = await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
         const words = await wizard.writeDown();
         await wizard.verifySelecting(words);
         return words;
       });
-      await recoveryPhrasePage.assertActivated();
-      await recoveryPhrasePage.reset(async (wizard) => {
+      await manageRecoveryPage.assertActivated();
+      await manageRecoveryPage.reset(async (wizard) => {
         await wizard.cancelReset();
       });
-      await recoveryPhrasePage.assertActivated();
+      await manageRecoveryPage.assertActivated();
       // TODO: Verify we can still recover using `oldWords`
     });
   });
 
   test.describe("is not verified", () => {
-    test.afterEach(async ({ recoveryPhrasePage, identity }) => {
-      await recoveryPhrasePage.assertNotVerified();
+    test.afterEach(async ({ manageRecoveryPage, identity }) => {
+      await manageRecoveryPage.assertNotVerified();
       // Assert it's still not verified after signing back in
       await identity.signOut();
-      await recoveryPhrasePage.goto();
+      await manageRecoveryPage.goto();
       await identity.signIn();
-      await recoveryPhrasePage.assertNotVerified();
+      await manageRecoveryPage.assertNotVerified();
     });
 
     test.describe("when closed during activation", () => {
-      test("before written down", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.activate(async (wizard) => {
+      test("before written down", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.activate(async (wizard) => {
           await wizard.acknowledge();
           await wizard.close();
         });
       });
 
-      test("after written down", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.activate(async (wizard) => {
+      test("after written down", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.activate(async (wizard) => {
           await wizard.acknowledge();
           await wizard.writeDown();
           await wizard.close();
         });
       });
 
-      test("before retry", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.activate(async (wizard) => {
+      test("before retry", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.activate(async (wizard) => {
           await wizard.acknowledge();
           const words = await wizard.writeDown();
           await wizard.verifySelecting(swapWordsAround(words));
@@ -264,8 +264,8 @@ test.describe("Recovery phrase", () => {
         });
       });
 
-      test("after retry", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.activate(async (wizard) => {
+      test("after retry", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.activate(async (wizard) => {
           await wizard.acknowledge();
           const words = await wizard.writeDown();
           await wizard.verifySelecting(swapWordsAround(words));
@@ -276,32 +276,32 @@ test.describe("Recovery phrase", () => {
     });
 
     test.describe("when closed during reset", () => {
-      test.beforeEach(async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.activate(async (wizard) => {
+      test.beforeEach(async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.activate(async (wizard) => {
           await wizard.acknowledge();
           const words = await wizard.writeDown();
           await wizard.verifySelecting(words);
         });
-        await recoveryPhrasePage.assertActivated();
+        await manageRecoveryPage.assertActivated();
       });
 
-      test("before written down", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.reset(async (wizard) => {
+      test("before written down", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.reset(async (wizard) => {
           await wizard.confirmReset();
           await wizard.close();
         });
       });
 
-      test("after written down", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.reset(async (wizard) => {
+      test("after written down", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.reset(async (wizard) => {
           await wizard.confirmReset();
           await wizard.writeDown();
           await wizard.close();
         });
       });
 
-      test("before retry", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.reset(async (wizard) => {
+      test("before retry", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.reset(async (wizard) => {
           await wizard.confirmReset();
           const words = await wizard.writeDown();
           await wizard.verifySelecting(swapWordsAround(words));
@@ -309,8 +309,8 @@ test.describe("Recovery phrase", () => {
         });
       });
 
-      test("after retry", async ({ recoveryPhrasePage }) => {
-        await recoveryPhrasePage.reset(async (wizard) => {
+      test("after retry", async ({ manageRecoveryPage }) => {
+        await manageRecoveryPage.reset(async (wizard) => {
           await wizard.confirmReset();
           const words = await wizard.writeDown();
           await wizard.verifySelecting(swapWordsAround(words));
