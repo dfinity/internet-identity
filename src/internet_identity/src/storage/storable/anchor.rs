@@ -43,9 +43,9 @@ pub struct StorableAnchor {
     #[n(2)]
     pub created_at_ns: Option<Timestamp>,
     #[n(3)]
-    pub passkey_credentials: Vec<StorablePasskeyCredential>,
+    pub passkey_credentials: Option<Vec<StorablePasskeyCredential>>,
     #[n(4)]
-    pub recovery_phrases: Vec<StorableRecoveryKey>,
+    pub recovery_phrases: Option<Vec<StorableRecoveryKey>>,
 }
 
 impl Storable for StorableAnchor {
