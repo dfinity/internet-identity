@@ -675,3 +675,350 @@ fn openid_credential(n: u8) -> OpenIdCredential {
 pub fn test_caller() -> Principal {
     Principal::self_authenticating(TEST_CALLER_PUBKEY)
 }
+
+#[cfg(test)]
+mod from_conversion_tests {
+    use super::*;
+    use crate::storage::storable::anchor::StorableAnchor;
+    use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+    use serde_bytes::ByteBuf;
+
+    /// Verifies that devices with authentication purpose and credential ID are correctly
+    /// converted to StorablePasskeyCredential with all fields mapped properly.
+    #[test]
+    fn should_convert_passkey_credentials_with_authentication_purpose() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let passkey_device = Device {
+            pubkey: ByteBuf::from(vec![1, 2, 3]),
+            alias: "My Passkey".to_string(),
+            credential_id: Some(ByteBuf::from(vec![4, 5, 6])),
+            aaguid: Some([7u8; 16]),
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Platform,
+            protection: DeviceProtection::Unprotected,
+            origin: Some("https://id.ai".to_string()),
+            last_usage_timestamp: Some(987654321),
+            metadata: None,
+        };
+        anchor.add_device(passkey_device.clone()).unwrap();
+
+        let (fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 1);
+        assert_eq!(passkeys[0].pubkey, vec![1, 2, 3]);
+        assert_eq!(passkeys[0].credential_id, vec![4, 5, 6]);
+        assert_eq!(passkeys[0].alias, Some("My Passkey".to_string()));
+        assert_eq!(passkeys[0].origin, "https://id.ai");
+        assert_eq!(passkeys[0].last_usage_timestamp_ns, Some(987654321));
+        assert_eq!(passkeys[0].aaguid, Some(vec![7u8; 16]));
+        assert_eq!(passkeys[0].created_at_ns, None);
+
+        assert_eq!(fixed.devices.len(), 1);
+    }
+
+    /// Verifies that passkey devices with recovery purpose are added to the passkey_credentials
+    /// list and placed at the end (after authentication passkeys).
+    #[test]
+    fn should_convert_passkey_credentials_with_recovery_purpose() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let recovery_passkey = Device {
+            pubkey: ByteBuf::from(vec![10, 11, 12]),
+            alias: "Recovery Passkey".to_string(),
+            credential_id: Some(ByteBuf::from(vec![13, 14, 15])),
+            aaguid: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::CrossPlatform,
+            protection: DeviceProtection::Unprotected,
+            origin: Some("https://identity.ic0.app".to_string()),
+            last_usage_timestamp: Some(111111111),
+            metadata: None,
+        };
+        anchor.add_device(recovery_passkey.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let passkeys = storable.passkey_credentials.unwrap();
+        // Recovery passkeys should still be in passkey_credentials list (at the end)
+        assert_eq!(passkeys.len(), 1);
+        assert_eq!(passkeys[0].pubkey, vec![10, 11, 12]);
+        assert_eq!(passkeys[0].credential_id, vec![13, 14, 15]);
+        assert_eq!(passkeys[0].alias, Some("Recovery Passkey".to_string()));
+    }
+
+    /// Verifies that seed phrase devices are converted to StorableRecoveryKey and excluded
+    /// from the passkey_credentials list.
+    #[test]
+    fn should_convert_recovery_keys_from_seed_phrase() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let seed_phrase = Device {
+            pubkey: ByteBuf::from(vec![20, 21, 22]),
+            alias: "Recovery Phrase".to_string(),
+            credential_id: None,
+            aaguid: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            protection: DeviceProtection::Unprotected,
+            origin: None,
+            last_usage_timestamp: Some(222222222),
+            metadata: None,
+        };
+        anchor.add_device(seed_phrase.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let recovery_keys = storable.recovery_keys.unwrap();
+        assert_eq!(recovery_keys.len(), 1);
+        assert_eq!(recovery_keys[0].pubkey, vec![20, 21, 22]);
+        assert_eq!(recovery_keys[0].last_usage_timestamp_ns, Some(222222222));
+        assert_eq!(recovery_keys[0].is_protected, None);
+        assert_eq!(recovery_keys[0].created_at_ns, None);
+
+        // Passkey credentials should not include seed phrases
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 0);
+    }
+
+    /// Verifies that DeviceProtection::Protected is correctly converted to is_protected: Some(true)
+    /// in the StorableRecoveryKey.
+    #[test]
+    fn should_convert_protected_recovery_key() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let protected_seed = Device {
+            pubkey: ByteBuf::from(vec![30, 31, 32]),
+            alias: "Protected Recovery".to_string(),
+            credential_id: None,
+            aaguid: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            protection: DeviceProtection::Protected,
+            origin: None,
+            last_usage_timestamp: Some(333333333),
+            metadata: None,
+        };
+        anchor.add_device(protected_seed.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let recovery_keys = storable.recovery_keys.unwrap();
+        assert_eq!(recovery_keys.len(), 1);
+        assert_eq!(recovery_keys[0].is_protected, Some(true));
+    }
+
+    /// Verifies that empty device aliases are converted to None in StorablePasskeyCredential
+    /// rather than Some("").
+    #[test]
+    fn should_handle_empty_alias() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let device_empty_alias = Device {
+            pubkey: ByteBuf::from(vec![40, 41, 42]),
+            alias: "".to_string(),
+            credential_id: Some(ByteBuf::from(vec![43, 44, 45])),
+            aaguid: None,
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Platform,
+            protection: DeviceProtection::Unprotected,
+            origin: Some("https://identity.ic0.app".to_string()),
+            last_usage_timestamp: None,
+            metadata: None,
+        };
+        anchor.add_device(device_empty_alias.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 1);
+        assert_eq!(passkeys[0].alias, None);
+    }
+
+    /// Verifies that passkeys without an origin default to "https://identity.ic0.app" for
+    /// backward compatibility with legacy devices.
+    #[test]
+    fn should_use_default_origin_for_passkeys_without_origin() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let device_no_origin = Device {
+            pubkey: ByteBuf::from(vec![50, 51, 52]),
+            alias: "Old Device".to_string(),
+            credential_id: Some(ByteBuf::from(vec![53, 54, 55])),
+            aaguid: None,
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Platform,
+            protection: DeviceProtection::Unprotected,
+            origin: None, // No origin specified
+            last_usage_timestamp: Some(444444444),
+            metadata: None,
+        };
+        anchor.add_device(device_no_origin.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 1);
+        // Should default to II_LEGACY_ORIGIN
+        assert_eq!(passkeys[0].origin, "https://identity.ic0.app");
+    }
+
+    /// Verifies correct conversion when an anchor contains multiple device types:
+    /// authentication passkeys, recovery passkeys, and seed phrases. Tests proper ordering
+    /// and separation into passkey_credentials and recovery_keys.
+    #[test]
+    fn should_convert_mixed_device_types() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+
+        // Add an authentication passkey
+        let auth_passkey = Device {
+            pubkey: ByteBuf::from(vec![60, 61, 62]),
+            alias: "Auth Passkey".to_string(),
+            credential_id: Some(ByteBuf::from(vec![63, 64, 65])),
+            aaguid: Some([1u8; 16]),
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Platform,
+            protection: DeviceProtection::Unprotected,
+            origin: Some("https://identity.ic0.app".to_string()),
+            last_usage_timestamp: Some(100),
+            metadata: None,
+        };
+        anchor.add_device(auth_passkey).unwrap();
+
+        // Add a recovery passkey
+        let recovery_passkey = Device {
+            pubkey: ByteBuf::from(vec![70, 71, 72]),
+            alias: "Recovery Device".to_string(),
+            credential_id: Some(ByteBuf::from(vec![73, 74, 75])),
+            aaguid: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::CrossPlatform,
+            protection: DeviceProtection::Unprotected,
+            origin: Some("https://identity.ic0.app".to_string()),
+            last_usage_timestamp: Some(200),
+            metadata: None,
+        };
+        anchor.add_device(recovery_passkey).unwrap();
+
+        // Add a seed phrase
+        let seed_phrase = Device {
+            pubkey: ByteBuf::from(vec![80, 81, 82]),
+            alias: "Seed Phrase".to_string(),
+            credential_id: None,
+            aaguid: None,
+            purpose: Purpose::Recovery,
+            key_type: KeyType::SeedPhrase,
+            protection: DeviceProtection::Protected,
+            origin: None,
+            last_usage_timestamp: Some(300),
+            metadata: None,
+        };
+        anchor.add_device(seed_phrase).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        // Check passkey credentials: auth passkey first, then recovery passkey
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 2);
+        assert_eq!(passkeys[0].pubkey, vec![60, 61, 62]); // Auth passkey
+        assert_eq!(passkeys[1].pubkey, vec![70, 71, 72]); // Recovery passkey (at the end)
+
+        // Check recovery keys
+        let recovery_keys = storable.recovery_keys.unwrap();
+        assert_eq!(recovery_keys.len(), 1);
+        assert_eq!(recovery_keys[0].pubkey, vec![80, 81, 82]);
+        assert_eq!(recovery_keys[0].is_protected, Some(true));
+    }
+
+    /// Verifies that OpenID credentials are properly converted and preserved during the
+    /// Anchor to StorableAnchor transformation.
+    #[test]
+    fn should_convert_openid_credentials() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let openid = openid_credential(5);
+        anchor.add_openid_credential(openid.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        assert_eq!(storable.openid_credentials.len(), 1);
+        assert_eq!(storable.openid_credentials[0].iss, "https://example.com");
+        assert_eq!(storable.openid_credentials[0].sub, "5");
+    }
+
+    /// Verifies that StorableFixedAnchor correctly preserves the original devices vector,
+    /// identity metadata, and created_at timestamp.
+    #[test]
+    fn should_preserve_fixed_anchor_fields() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        let device = sample_device();
+        anchor.add_device(device.clone()).unwrap();
+
+        let metadata = HashMap::from([(
+            "key1".to_string(),
+            MetadataEntry::String("value1".to_string()),
+        )]);
+        anchor.replace_identity_metadata(metadata.clone()).unwrap();
+
+        let (fixed, _storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        assert_eq!(fixed.devices.len(), 1);
+        assert_eq!(fixed.devices[0], device);
+        assert_eq!(fixed.metadata, Some(metadata));
+        assert_eq!(fixed.created_at, Some(123456789));
+    }
+
+    /// Verifies that the anchor name and created_at_ns fields are correctly set in
+    /// StorableAnchor during conversion.
+    #[test]
+    fn should_set_name_and_created_at_in_storable_anchor() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+        anchor.set_name(Some("My Identity".to_string())).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        assert_eq!(storable.name, Some("My Identity".to_string()));
+        assert_eq!(storable.created_at_ns, Some(123456789));
+    }
+
+    /// Verifies that devices without a credential_id and not a seed phrase are excluded
+    /// from both passkey_credentials and recovery_keys lists.
+    #[test]
+    fn should_handle_devices_without_credential_id() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+
+        // Device without credential_id (not a passkey, not a seed phrase)
+        // This should not be added to passkey_credentials or recovery_keys
+        let device = Device {
+            pubkey: ByteBuf::from(vec![90, 91, 92]),
+            alias: "Unknown Device".to_string(),
+            credential_id: None,
+            aaguid: None,
+            purpose: Purpose::Authentication,
+            key_type: KeyType::Unknown,
+            protection: DeviceProtection::Unprotected,
+            origin: None,
+            last_usage_timestamp: None,
+            metadata: None,
+        };
+        anchor.add_device(device.clone()).unwrap();
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        // Should be empty since device has no credential_id and is not a seed phrase
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 0);
+
+        let recovery_keys = storable.recovery_keys.unwrap();
+        assert_eq!(recovery_keys.len(), 0);
+    }
+
+    /// Verifies that an empty anchor (with no devices) converts to empty passkey_credentials
+    /// and recovery_keys vectors.
+    #[test]
+    fn should_handle_anchor_with_no_devices() {
+        let anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 0);
+
+        let recovery_keys = storable.recovery_keys.unwrap();
+        assert_eq!(recovery_keys.len(), 0);
+    }
+}
