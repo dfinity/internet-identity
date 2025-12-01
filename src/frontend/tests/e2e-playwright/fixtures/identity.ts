@@ -25,6 +25,7 @@ class IdentityWizard {
     await this.#page
       .getByRole("button", { name: "Use existing identity" })
       .click();
+    await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
   }
 
   async signUpWithPasskey(auth: DummyAuthFn, name: string): Promise<void> {
@@ -38,6 +39,7 @@ class IdentityWizard {
     await this.#page.getByLabel("Identity name").fill(name);
     auth(this.#page);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
+    await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
   }
 
   /**
