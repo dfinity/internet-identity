@@ -15,4 +15,6 @@ pub mod fixed_anchor;
 pub mod metadata_v2;
 pub mod openid_credential;
 pub mod openid_credential_key;
+pub mod passkey_credential;
+pub mod recovery_key;
 pub mod storable_persistent_state;

@@ -1,9 +1,9 @@
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::storage::storable::anchor::{
-    StorableAnchor, StorablePasskeyCredential, StorableRecoveryKey,
-};
+use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
+use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
