@@ -1,6 +1,8 @@
 use crate::ii_domain::IIDomain;
 use crate::openid::{OpenIdCredential, OpenIdCredentialKey};
-use crate::storage::storable::anchor::StorableAnchor;
+use crate::storage::storable::anchor::{
+    StorableAnchor, StorablePasskeyCredential, StorableRecoveryKey,
+};
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
@@ -158,6 +160,63 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
         let openid_credentials = openid_credentials.into_iter().map(Into::into).collect();
 
+        let created_at_ns = created_at;
+
+        let (mut passkey_credentials, mut recovery_phrases, mut recovery_devices) =
+            (vec![], vec![], vec![]);
+
+        for Device {
+            key_type,
+            pubkey,
+            alias,
+            credential_id,
+            aaguid,
+            purpose,
+            protection,
+            origin,
+            last_usage_timestamp,
+            metadata: _,
+        } in &devices
+        {
+            if key_type == &KeyType::SeedPhrase {
+                let pubkey = pubkey.clone().into_vec();
+                let last_usage_timestamp_ns = *last_usage_timestamp;
+                let is_protected = if matches!(protection, DeviceProtection::Protected) {
+                    Some(true)
+                } else {
+                    None
+                };
+
+                recovery_phrases.push(StorableRecoveryKey {
+                    pubkey,
+                    last_usage_timestamp_ns,
+                    is_protected,
+                });
+            } else if let Some(credential_id) = credential_id {
+                let pubkey = pubkey.clone().into_vec();
+                let credential_id = credential_id.clone().into_vec();
+                let last_usage_timestamp_ns = *last_usage_timestamp;
+                let alias = alias.clone();
+                let origin = origin.clone();
+                let aaguid = aaguid.map(Vec::from);
+
+                let passkey = StorablePasskeyCredential {
+                    pubkey,
+                    credential_id,
+                    last_usage_timestamp_ns,
+                    alias,
+                    origin,
+                    aaguid,
+                };
+
+                if purpose == &Purpose::Recovery {
+                    recovery_devices.push(passkey);
+                } else {
+                    passkey_credentials.push(passkey);
+                }
+            }
+        }
+
         (
             StorableFixedAnchor {
                 devices,
@@ -167,6 +226,9 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             StorableAnchor {
                 openid_credentials,
                 name,
+                created_at_ns,
+                passkey_credentials,
+                recovery_phrases,
             },
         )
     }

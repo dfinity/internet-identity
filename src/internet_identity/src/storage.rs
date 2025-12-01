@@ -1928,7 +1928,7 @@ impl fmt::Display for StorageError {
             Self::AnchorNotFound { anchor_number } => {
                 write!(
                     f,
-                    "StableAnchor not found for anchor number {anchor_number}",
+                    "StorableAnchor not found for anchor number {anchor_number}",
                 )
             }
             Self::ApplicationNotFound { origin } => {
