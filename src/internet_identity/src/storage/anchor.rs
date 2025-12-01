@@ -160,9 +160,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
         let openid_credentials = openid_credentials.into_iter().map(Into::into).collect();
 
-        let created_at_ns = created_at;
-
-        let (mut passkey_credentials, mut recovery_phrases, mut recovery_devices) =
+        let (mut passkey_credentials, mut recovery_keys, mut recovery_devices) =
             (vec![], vec![], vec![]);
 
         for Device {
@@ -187,26 +185,45 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     None
                 };
 
-                recovery_phrases.push(StorableRecoveryKey {
+                recovery_keys.push(StorableRecoveryKey {
                     pubkey,
                     last_usage_timestamp_ns,
                     is_protected,
+
+                    // Not available yet
+                    created_at_ns: None,
                 });
             } else if let Some(credential_id) = credential_id {
                 let pubkey = pubkey.clone().into_vec();
                 let credential_id = credential_id.clone().into_vec();
                 let last_usage_timestamp_ns = *last_usage_timestamp;
-                let alias = alias.clone();
-                let origin = origin.clone();
+                let alias = if alias.is_empty() {
+                    None
+                } else {
+                    Some(alias.clone())
+                };
+
+                // Without an origin, a passkey cannot be used, which means it's conceptually
+                // non-optional. Since some passkeys might not have an origin (for historical
+                // reasons; we used to have just one supported domain, which was hard coded),
+                // this code needs to set the default value. To that end, we default
+                // to `II_LEGACY_ORIGIN` from src/frontend/src/lib/legacy/constants.ts.
+                let origin = origin
+                    .clone()
+                    .unwrap_or_else(|| "https://identity.ic0.app".to_string());
+
                 let aaguid = aaguid.map(Vec::from);
 
                 let passkey = StorablePasskeyCredential {
                     pubkey,
                     credential_id,
+                    origin,
                     last_usage_timestamp_ns,
                     alias,
-                    origin,
                     aaguid,
+
+                    // Not available yet
+                    created_at_ns: None,
                 };
 
                 if purpose == &Purpose::Recovery {
@@ -220,10 +237,10 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
         // Recovery devices are also passkeys, but we add them to the end of the list for user
         // convenience (in some flows, the frontend may give preference to the passkeys that
         // appear easrlier in the list).
-        passkey_credentials.extend(recovery_devices.into_iter());
+        passkey_credentials.extend(recovery_devices);
 
         let passkey_credentials = Some(passkey_credentials);
-        let recovery_phrases = Some(recovery_phrases);
+        let recovery_keys = Some(recovery_keys);
 
         (
             StorableFixedAnchor {
@@ -232,11 +249,11 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 created_at,
             },
             StorableAnchor {
-                openid_credentials,
                 name,
-                created_at_ns,
+                created_at_ns: created_at,
+                openid_credentials,
                 passkey_credentials,
-                recovery_phrases,
+                recovery_keys,
             },
         )
     }
