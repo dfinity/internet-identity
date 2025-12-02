@@ -273,9 +273,7 @@
     ]}
   >
     <article>
-      <h3 class="text-text-primary mb-2 text-sm font-semibold">
-        {$t`Keep it secret`}
-      </h3>
+      <h3>{$t`Keep it secret`}</h3>
       <p>
         <Trans>
           Your recovery phrase gives full control over your identity. Never
@@ -284,9 +282,7 @@
       </p>
     </article>
     <article>
-      <h3 class="text-text-primary mb-2 text-sm font-semibold">
-        {$t`Store it safely`}
-      </h3>
+      <h3>{$t`Store it safely`}</h3>
       <p>
         <Trans>
           Write down all 24 words correctly and keep them offline. Do not store
@@ -295,9 +291,7 @@
       </p>
     </article>
     <article>
-      <h3 class="text-text-primary mb-2 text-sm font-semibold">
-        {$t`Replace it anytime`}
-      </h3>
+      <h3>{$t`Replace it anytime`}</h3>
       <p>
         <Trans>
           You can reset your recovery phrase at any time. This keeps your
