@@ -1,6 +1,6 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
-  import { ShieldCheckIcon } from "@lucide/svelte";
+  import { ShieldCheckIcon, LockKeyholeIcon } from "@lucide/svelte";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import type { SvelteHTMLElements } from "svelte/elements";
@@ -21,6 +21,10 @@
     class: className,
     ...props
   }: Props = $props();
+
+  const isProtected = $derived(
+    "Protected" in recoveryPhrase.security_settings.protection,
+  );
 </script>
 
 <div class="@container">
@@ -83,14 +87,28 @@
         {/if}
       </dd>
     </dl>
-    <Button
-      onclick={onReset}
-      danger
-      variant="secondary"
-      size="sm"
-      class={["@max-xl:mt-5", "@xl:my-auto"]}
+    <Tooltip
+      label={$t`Locked legacy recovery phrase`}
+      description={$t`Requires unlocking before it can be reset.`}
+      hidden={!isProtected}
+      direction="up"
+      align="end"
+      offset="0rem"
     >
-      {$t`Reset`}
-    </Button>
+      <Button
+        onclick={onReset}
+        danger
+        variant="secondary"
+        size="sm"
+        class={["@max-xl:mt-5", "@xl:my-auto"]}
+      >
+        {#if isProtected}
+          <LockKeyholeIcon class="size-4" />
+          <span>{$t`Unlock and reset`}</span>
+        {:else}
+          <span>{$t`Reset`}</span>
+        {/if}
+      </Button>
+    </Tooltip>
   </section>
 </div>

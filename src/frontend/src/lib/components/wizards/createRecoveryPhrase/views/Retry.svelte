@@ -8,10 +8,10 @@
   interface Props {
     onRetry: () => void;
     onCancel: () => void;
-    verificationMethod: "selecting" | "typing";
+    inputMethod: "selecting" | "typing";
   }
 
-  const { onRetry, onCancel, verificationMethod }: Props = $props();
+  const { onRetry, onCancel, inputMethod }: Props = $props();
 </script>
 
 <FeaturedIcon variant="error" size="lg" class="mb-4">
@@ -21,7 +21,7 @@
   {$t`Something is wrong!`}
 </h2>
 <p class="text-text-tertiary mb-8 text-base font-medium">
-  {#if verificationMethod === "selecting"}
+  {#if inputMethod === "selecting"}
     <Trans>Incorrect word order. Review and try again.</Trans>
   {:else}
     <Trans>Incorrect recovery phrase. Please try again.</Trans>

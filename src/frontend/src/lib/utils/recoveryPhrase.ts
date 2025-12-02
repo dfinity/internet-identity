@@ -71,7 +71,7 @@ async function generateMasterKey(
   seed: Uint8Array,
 ): Promise<[Uint8Array, Uint8Array]> {
   const data = new TextEncoder().encode("ed25519 seed");
-  const key = await window.crypto.subtle.importKey(
+  const key = await globalThis.crypto.subtle.importKey(
     "raw",
     data,
     {
@@ -81,7 +81,7 @@ async function generateMasterKey(
     false,
     ["sign"],
   );
-  const h = await window.crypto.subtle.sign("HMAC", key, seed);
+  const h = await globalThis.crypto.subtle.sign("HMAC", key, seed);
   const slipSeed = new Uint8Array(h.slice(0, 32));
   const chainCode = new Uint8Array(h.slice(32));
   return [slipSeed, chainCode];
@@ -94,7 +94,7 @@ async function derive(
 ): Promise<[Uint8Array, Uint8Array]> {
   // From the spec: Data = 0x00 || ser256(kpar) || ser32(i)
   const data = new Uint8Array([0, ...parentKey, ...toBigEndianArray(i)]);
-  const key = await window.crypto.subtle.importKey(
+  const key = await globalThis.crypto.subtle.importKey(
     "raw",
     parentChaincode,
     {
@@ -105,7 +105,7 @@ async function derive(
     ["sign"],
   );
 
-  const h = await window.crypto.subtle.sign("HMAC", key, data);
+  const h = await globalThis.crypto.subtle.sign("HMAC", key, data);
   const slipSeed = new Uint8Array(h.slice(0, 32));
   const chainCode = new Uint8Array(h.slice(32));
   return [slipSeed, chainCode];

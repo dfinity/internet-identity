@@ -62,7 +62,7 @@
       .map((word) => word.toLowerCase().replace(/[^a-z]/g, ""));
     if (clipboard.length > 0) {
       clipboard.forEach((word, i) => {
-        if (index + i >= word.length) {
+        if (index + i >= words.length) {
           return;
         }
         words[index + i] = word;
