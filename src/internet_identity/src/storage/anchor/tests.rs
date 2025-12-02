@@ -681,6 +681,7 @@ mod from_conversion_tests {
     use super::*;
     use crate::storage::storable::anchor::StorableAnchor;
     use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
+    use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
     use serde_bytes::ByteBuf;
 
     /// Verifies that devices with authentication purpose and credential ID are correctly
@@ -975,8 +976,8 @@ mod from_conversion_tests {
         assert_eq!(storable.created_at_ns, Some(123456789));
     }
 
-    /// Verifies that devices without a credential_id and not a seed phrase are excluded
-    /// from both passkey_credentials and recovery_keys lists.
+    /// Verifies that devices without a credential_id and not a seed phrase are included
+    /// in the passkey_credentials list.
     #[test]
     fn should_handle_devices_without_credential_id() {
         let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
@@ -991,8 +992,8 @@ mod from_conversion_tests {
             purpose: Purpose::Authentication,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
-            origin: None,
-            last_usage_timestamp: None,
+            origin: Some("https://id.ai".to_string()),
+            last_usage_timestamp: Some(123456789),
             metadata: None,
         };
         anchor.add_device(device.clone()).unwrap();
@@ -1001,10 +1002,21 @@ mod from_conversion_tests {
 
         // Should be empty since device has no credential_id and is not a seed phrase
         let passkeys = storable.passkey_credentials.unwrap();
-        assert_eq!(passkeys.len(), 0);
+        assert_eq!(
+            passkeys,
+            vec![StorablePasskeyCredential {
+                pubkey: vec![90, 91, 92],
+                credential_id: vec![0xde, 0xad, 0xbe, 0xef],
+                origin: "https://id.ai".to_string(),
+                created_at_ns: None,
+                last_usage_timestamp_ns: Some(123456789),
+                alias: Some("Unknown Device".to_string()),
+                aaguid: None,
+            }]
+        );
 
         let recovery_keys = storable.recovery_keys.unwrap();
-        assert_eq!(recovery_keys.len(), 0);
+        assert_eq!(recovery_keys, vec![]);
     }
 
     /// Verifies that an empty anchor (with no devices) converts to empty passkey_credentials

@@ -1,6 +1,6 @@
 use minicbor::{Decode, Encode};
 
-#[derive(Encode, Decode, Clone)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq)]
 #[cbor(map)]
 pub struct StorableRecoveryKey {
     #[cbor(n(0), with = "minicbor::bytes")]
