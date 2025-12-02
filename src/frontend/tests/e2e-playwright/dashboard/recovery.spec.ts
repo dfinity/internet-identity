@@ -260,7 +260,7 @@ test.describe("Recovery phrase", () => {
         await manageRecoveryPage.assertLocked();
       });
 
-      test("on first attempt ", async ({ manageRecoveryPage, words }) => {
+      test("on first attempt", async ({ manageRecoveryPage, words }) => {
         words.current = await manageRecoveryPage.unlockAndReset(
           async (wizard) => {
             await wizard.unlock(words.current!);

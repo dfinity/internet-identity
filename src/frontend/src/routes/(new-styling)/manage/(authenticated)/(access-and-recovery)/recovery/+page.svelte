@@ -45,9 +45,6 @@
         getMetadataString(m.metadata, "usage") === "recovery_phrase",
     ),
   );
-  const isCurrentAccessMethod = $derived(
-    "recoveryPhrase" in $authenticatedStore.authMethod,
-  );
   const recoveryPhraseType = $derived(
     recoveryPhraseData !== undefined
       ? "Protected" in recoveryPhraseData.security_settings.protection
@@ -55,9 +52,14 @@
         : "unprotected"
       : undefined,
   );
+  const isCurrentAccessMethod = $derived(
+    "recoveryPhrase" in $authenticatedStore.authMethod,
+  );
   const isUnverified = $derived(
     recoveryPhraseData !== undefined &&
       recoveryPhraseData.last_authentication[0] === undefined &&
+      // A locked recovery phrase is always considered verified
+      // since locking required re-typing the recovery phrase.
       recoveryPhraseType === "unprotected",
   );
 
