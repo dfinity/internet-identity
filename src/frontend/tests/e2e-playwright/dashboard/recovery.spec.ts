@@ -4,6 +4,8 @@ import { expect } from "@playwright/test";
 /**
  * Swap the first word around with the next different word found,
  * compared to random shuffle, this guarantees a different phrase.
+ *
+ * @example swapWordsAround(["abc", "abc", "xyz", "xyz"]) // ["xyz", "abc", "abc", "xyz"]
  */
 const swapWordsAround = (words: string[]) => {
   const incorrectOrder = [...words];
@@ -13,7 +15,7 @@ const swapWordsAround = (words: string[]) => {
   );
   incorrectOrder[0] = incorrectOrder[differentWordIndex];
   incorrectOrder[differentWordIndex] = firstWord;
-  expect(incorrectOrder).not.toEqual(words);
+  expect(incorrectOrder).not.toEqual(words); // Smoke test
   return incorrectOrder;
 };
 
@@ -125,6 +127,23 @@ test.describe("Recovery phrase", () => {
           await wizard.retry();
           await wizard.verifyTyping(words.current!);
         });
+      });
+    });
+
+    test("when signed in (incorrectly) and then when coming back (correctly)", async ({
+      manageRecoveryPage,
+      identity,
+      words,
+    }) => {
+      await manageRecoveryPage.verify(async (wizard) => {
+        await wizard.verifySelecting(swapWordsAround(words.current!));
+        await wizard.close();
+      });
+      await identity.signOut();
+      await manageRecoveryPage.goto();
+      await identity.signIn();
+      await manageRecoveryPage.verify(async (wizard) => {
+        await wizard.verifyTyping(words.current!);
       });
     });
   });
