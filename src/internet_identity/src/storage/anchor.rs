@@ -155,7 +155,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             metadata,
             name,
             created_at,
-            anchor_number: _,
+            anchor_number,
         } = anchor;
 
         let openid_credentials = openid_credentials.into_iter().map(Into::into).collect();
@@ -193,9 +193,22 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     // Not available yet
                     created_at_ns: None,
                 });
-            } else if let Some(credential_id) = credential_id {
+            } else {
                 let pubkey = pubkey.clone().into_vec();
-                let credential_id = credential_id.clone().into_vec();
+
+                let credential_id = if let Some(credential_id) = credential_id.clone() {
+                    credential_id.into_vec()
+                } else {
+                    // Not expecting this to happen in production, but if it somehow does, we
+                    // should at least log it.
+                    ic_cdk::println!(
+                        "credential_id is None for anchor {}, key type {:?}",
+                        anchor_number,
+                        key_type
+                    );
+                    vec![0xde, 0xad, 0xbe, 0xef]
+                };
+
                 let last_usage_timestamp_ns = *last_usage_timestamp;
                 let alias = if alias.is_empty() {
                     None
@@ -236,7 +249,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
         // Recovery devices are also passkeys, but we add them to the end of the list for user
         // convenience (in some flows, the frontend may give preference to the passkeys that
-        // appear easrlier in the list).
+        // appear earlier in the list).
         passkey_credentials.extend(recovery_devices);
 
         let passkey_credentials = Some(passkey_credentials);

@@ -201,7 +201,7 @@ const STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_ID: MemoryId =
     MemoryId::new(STABLE_ANCHOR_ACCOUNT_COUNTER_MEMORY_INDEX);
 const LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_INDEX);
-const LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID: MemoryId =
+const LOOKUP_ANCHOR_WITH_PASSKEY_CREDENTIAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_INDEX);
 
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
@@ -306,8 +306,8 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_openid_credential_memory:
         StableBTreeMap<StorableOpenIdCredentialKey, StorableAnchorNumberList, ManagedMemory<M>>,
     /// Memory wrapper used to report the size of the lookup anchor with device credential memory.
-    lookup_anchor_with_device_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
-    lookup_anchor_with_device_credential_memory:
+    lookup_anchor_with_passkey_credential_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    lookup_anchor_with_passkey_credential_memory:
         StableBTreeMap<StorableCredentialId, StorableAnchorNumber, ManagedMemory<M>>,
 
     lookup_application_with_origin_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
@@ -393,8 +393,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_ID);
         let lookup_anchor_with_openid_credential_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_OPENID_CREDENTIAL_MEMORY_ID);
-        let lookup_anchor_with_device_credential_memory =
-            memory_manager.get(LOOKUP_ANCHOR_WITH_DEVICE_CREDENTIAL_MEMORY_ID);
+        let lookup_anchor_with_passkey_credential_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_CREDENTIAL_MEMORY_ID);
         let lookup_application_with_origin_memory =
             memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID);
         let lookup_anchor_with_recovery_phrase_principal_memory =
@@ -473,11 +473,11 @@ impl<M: Memory + Clone> Storage<M> {
             lookup_anchor_with_openid_credential_memory: StableBTreeMap::init(
                 lookup_anchor_with_openid_credential_memory,
             ),
-            lookup_anchor_with_device_credential_memory_wrapper: MemoryWrapper::new(
-                lookup_anchor_with_device_credential_memory.clone(),
+            lookup_anchor_with_passkey_credential_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_passkey_credential_memory.clone(),
             ),
-            lookup_anchor_with_device_credential_memory: StableBTreeMap::init(
-                lookup_anchor_with_device_credential_memory,
+            lookup_anchor_with_passkey_credential_memory: StableBTreeMap::init(
+                lookup_anchor_with_passkey_credential_memory,
             ),
 
             lookup_application_with_origin_memory_wrapper: MemoryWrapper::new(
@@ -634,7 +634,8 @@ impl<M: Memory + Clone> Storage<M> {
         is_previously_written: bool,
     ) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
-        let (storable_anchor, stable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
+        let (storable_fixed_anchor, storable_anchor): (StorableFixedAnchor, StorableAnchor) =
+            data.into();
 
         // Get anchor address
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
@@ -657,53 +658,85 @@ impl<M: Memory + Clone> Storage<M> {
 
         let address = self.record_address(record_number);
 
-        // Read previous fixed 4KB stable memory anchor
-        let previous_storable_anchor = is_previously_written.then(|| {
+        // Read previous fixed 4KB stable memory anchor (this is used only for synching device indices)
+        let previous_devices = if is_previously_written {
             let mut reader = Reader::new(&self.anchor_memory, address);
             let mut read_buf = vec![0; self.header.entry_size as usize];
             reader
                 .read_exact(&mut read_buf)
                 .expect("failed to read memory");
-            StorableFixedAnchor::from_bytes(Cow::Owned(read_buf))
-        });
+            let anchor = StorableFixedAnchor::from_bytes(Cow::Owned(read_buf));
+            anchor.devices
+        } else {
+            vec![]
+        };
 
         // Write current fixed 4KB stable memory anchor
-        let write_buf = storable_anchor.to_bytes();
-        if write_buf.len() > self.header.entry_size as usize {
-            return Err(StorageError::EntrySizeLimitExceeded {
-                space_required: write_buf.len() as u64,
-                space_available: self.header.entry_size as u64,
-            });
+        {
+            let write_buf = storable_fixed_anchor.to_bytes();
+            if write_buf.len() > self.header.entry_size as usize {
+                return Err(StorageError::EntrySizeLimitExceeded {
+                    space_required: write_buf.len() as u64,
+                    space_available: self.header.entry_size as u64,
+                });
+            }
+            let mut writer = Writer::new(&mut self.anchor_memory, address);
+            writer.write_all(&write_buf).expect("memory write failed");
+            writer.flush().expect("memory write failed");
         }
-        let mut writer = Writer::new(&mut self.anchor_memory, address);
-        writer.write_all(&write_buf).expect("memory write failed");
-        writer.flush().expect("memory write failed");
 
-        // Write current and read previous unbounded stable structures anchor
-        let previous_stable_anchor = self
+        // If there was an anchor stored previously, we need to take its credentials and recovery keys into account
+        // while synchronizing the respective indices.
+        //
+        // First, read the previous anchor and store the new anchor as-is in its place.
+        let previous_anchor_maybe = self
             .stable_anchor_memory
-            .insert(anchor_number, stable_anchor.clone());
+            .insert(anchor_number, storable_anchor.clone());
 
-        // Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
-        let previous_openid_credentials = previous_stable_anchor
-            .map(|anchor| anchor.openid_credentials)
-            .unwrap_or_default();
-        let current_openid_credentials = stable_anchor.openid_credentials;
-        self.update_lookup_anchors_with_openid_credential(
+        // Second, deconstruct the previous anchor, obtaining the previous credentials and recovery keys.
+        let (previous_openid_credentials, _previous_passkey_credentials, _previous_recovery_keys) =
+            if let Some(StorableAnchor {
+                // The following fileds need to be merged with the previous anchor.
+                openid_credentials,
+                passkey_credentials,
+                recovery_keys,
+
+                // The following fields do not require merging.
+                created_at_ns: _,
+                name: _,
+            }) = previous_anchor_maybe
+            {
+                (
+                    openid_credentials,
+                    passkey_credentials.unwrap_or_default(),
+                    recovery_keys.unwrap_or_default(),
+                )
+            } else {
+                // Should never happen in practice, since each anchor number should correspond to a `StorableAnchor`.
+                (vec![], vec![], vec![])
+            };
+
+        // Right now, this is the only index that needs to be updated based on `StorableAnchor`.
+        self.sync_anchor_with_openid_credential_index(
             anchor_number,
             previous_openid_credentials,
-            current_openid_credentials,
+            storable_anchor.openid_credentials,
         );
 
+        // Sync device-based indices with the legacy source of truth (`StorableFixedAnchor`).
+        //
+        // TODO: After all anchors are migrated to `StableAnchor`, switch the source of truth to it.
+        //
         // Update `CredentialId` to `AnchorNumber` lookup map
-        let previous_devices = previous_storable_anchor.map_or(vec![], |anchor| anchor.devices);
-        let current_devices = storable_anchor.devices;
+
+        let current_devices = storable_fixed_anchor.devices;
+
         self.sync_anchor_with_recovery_phrase_principal_index(
             anchor_number,
             &previous_devices,
             &current_devices,
         );
-        self.update_lookup_anchors_with_device_credential(
+        self.sync_anchors_with_passkey_credential_index(
             anchor_number,
             previous_devices,
             current_devices,
@@ -754,7 +787,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
-    fn update_lookup_anchors_with_openid_credential(
+    fn sync_anchor_with_openid_credential_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous: Vec<StorableOpenIdCredential>,
@@ -850,7 +883,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Update `CredentialId` to `AnchorNumber` lookup map
-    fn update_lookup_anchors_with_device_credential(
+    fn sync_anchors_with_passkey_credential_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous: Vec<Device>,
@@ -870,7 +903,7 @@ impl<M: Memory + Clone> Storage<M> {
             let credential_id = StorableCredentialId::from(credential_id.clone());
 
             let Some(indexed_anchor_number) = self
-                .lookup_anchor_with_device_credential_memory
+                .lookup_anchor_with_passkey_credential_memory
                 .get(&credential_id)
             else {
                 continue;
@@ -881,7 +914,7 @@ impl<M: Memory + Clone> Storage<M> {
                 continue;
             }
 
-            self.lookup_anchor_with_device_credential_memory
+            self.lookup_anchor_with_passkey_credential_memory
                 .remove(&credential_id);
         }
 
@@ -890,20 +923,20 @@ impl<M: Memory + Clone> Storage<M> {
 
             // Only insert if the credential id isn't yet assigned to an anchor.
             if self
-                .lookup_anchor_with_device_credential_memory
+                .lookup_anchor_with_passkey_credential_memory
                 .contains_key(&credential_id)
             {
                 continue;
             }
 
-            self.lookup_anchor_with_device_credential_memory
+            self.lookup_anchor_with_passkey_credential_memory
                 .insert(credential_id, anchor_number);
         }
     }
 
     #[allow(dead_code)]
     pub fn lookup_anchor_with_device_credential(&self, key: &CredentialId) -> Option<AnchorNumber> {
-        self.lookup_anchor_with_device_credential_memory
+        self.lookup_anchor_with_passkey_credential_memory
             .get(&key.clone().into())
     }
 
@@ -1842,7 +1875,7 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             (
                 "lookup_anchor_with_device_credential".to_string(),
-                self.lookup_anchor_with_device_credential_memory_wrapper
+                self.lookup_anchor_with_passkey_credential_memory_wrapper
                     .size(),
             ),
             (
