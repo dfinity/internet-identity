@@ -696,7 +696,7 @@ impl<M: Memory + Clone> Storage<M> {
         // Second, deconstruct the previous anchor, obtaining the previous credentials and recovery keys.
         let (previous_openid_credentials, _previous_passkey_credentials, _previous_recovery_keys) =
             if let Some(StorableAnchor {
-                // The following fileds need to be merged with the previous anchor.
+                // The following fields need to be compared with the previous anchor
                 openid_credentials,
                 passkey_credentials,
                 recovery_keys,
