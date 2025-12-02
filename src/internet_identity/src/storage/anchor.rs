@@ -236,7 +236,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
         // Recovery devices are also passkeys, but we add them to the end of the list for user
         // convenience (in some flows, the frontend may give preference to the passkeys that
-        // appear easrlier in the list).
+        // appear earlier in the list).
         passkey_credentials.extend(recovery_devices);
 
         let passkey_credentials = Some(passkey_credentials);
