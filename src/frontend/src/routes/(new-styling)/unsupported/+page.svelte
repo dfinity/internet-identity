@@ -4,7 +4,7 @@
   import { afterNavigate, beforeNavigate, goto } from "$app/navigation";
   import type { AfterNavigate, BeforeNavigate } from "@sveltejs/kit";
 
-  const SESSION_KEY = "ii-unsupported-page-reloaded";
+  const PAGE_RELOADED_KEY = "ii-unsupported-page-reloaded";
 
   const isX = /\bTwitter/i.test(navigator.userAgent);
 
@@ -20,7 +20,7 @@
     if (!isReloadOrClose) {
       return;
     }
-    sessionStorage.setItem(SESSION_KEY, "true");
+    sessionStorage.setItem(PAGE_RELOADED_KEY, "true");
   };
   /**
    * Redirect to landing page when this page is visited directly,
@@ -28,9 +28,9 @@
    */
   const redirectOnEntryExceptReload = (navigation: AfterNavigate) => {
     const isEntry = navigation.type === "enter";
-    const isReload = sessionStorage.getItem(SESSION_KEY) === "true";
+    const isReload = sessionStorage.getItem(PAGE_RELOADED_KEY) === "true";
 
-    sessionStorage.removeItem(SESSION_KEY); // Always cleanup after it's read
+    sessionStorage.removeItem(PAGE_RELOADED_KEY); // Always cleanup after it's read
 
     if (!isEntry || isReload) {
       return;
