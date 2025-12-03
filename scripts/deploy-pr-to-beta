@@ -1,0 +1,98 @@
+#!/bin/bash
+set -e
+
+# Usage: ./download_wasm.sh <PR_NUMBER>
+PR_NUMBER=$1
+
+if [ -z "$PR_NUMBER" ]; then
+    echo "Usage: $0 <PR_NUMBER>"
+    exit 1
+fi
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT_DIR="$SCRIPTS_DIR/.."
+cd "$ROOT_DIR"
+
+REPO="dfinity/internet-identity"
+WORKFLOW_FILE="canister-tests.yml"
+ARTIFACT_NAME="internet_identity_dev.wasm.gz"
+ZIP_FILE="$ARTIFACT_NAME.zip"
+EXTRACTED_FILE="$ARTIFACT_NAME"
+
+# -------------------------
+# Cleanup handler
+# -------------------------
+cleanup() {
+    echo "Cleaning up temporary files..."
+    rm -f "$ROOT_DIR/$ZIP_FILE"
+    rm -f "$ROOT_DIR/$EXTRACTED_FILE"
+}
+trap cleanup EXIT
+# -------------------------
+
+# Get GitHub token from gh CLI
+if command -v gh >/dev/null 2>&1; then
+    GITHUB_TOKEN=$(gh auth token)
+    if [ -z "$GITHUB_TOKEN" ]; then
+        echo "Error: gh CLI is not authenticated or token unavailable."
+        exit 1
+    fi
+else
+    echo "Error: gh CLI not found. Install and authenticate to access private workflows."
+    exit 1
+fi
+
+AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
+
+# Fetch workflow runs for this PR and the specific workflow file
+RUN_ID=$(curl -s -H "$AUTH_HEADER" \
+    "https://api.github.com/repos/$REPO/actions/runs?per_page=50" \
+    | jq -r --arg PR "$PR_NUMBER" --arg WF "$WORKFLOW_FILE" '
+        [.workflow_runs[]
+            | select(.pull_requests[]?.number == ($PR|tonumber))
+            | select(.path == (".github/workflows/" + $WF))
+        ]
+        | sort_by(.run_number)
+        | reverse
+        | .[0].id
+    ')
+
+if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+    echo "Error: No workflow run found for PR #$PR_NUMBER using workflow $WORKFLOW_FILE"
+    exit 1
+fi
+
+echo "Found workflow run ID: $RUN_ID"
+
+# Get artifact download URL
+ARTIFACT_URL=$(curl -s -H "$AUTH_HEADER" \
+    "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+    | jq -r --arg ART "$ARTIFACT_NAME" '
+        .artifacts[] | select(.name == $ART) | .archive_download_url
+    ')
+
+if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
+    echo "Error: Artifact not found: $ARTIFACT_NAME"
+    exit 1
+fi
+
+# Download artifact ZIP
+echo "Downloading artifact $ARTIFACT_NAME..."
+curl -L -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
+
+# Unzip (contains only internet_identity_dev.wasm.gz)
+echo "Extracting ZIP..."
+unzip -o "$ZIP_FILE" -d "$ROOT_DIR"
+
+echo "Extracted: $EXTRACTED_FILE"
+
+# Upgrade the beta II canister
+echo "Upgrading canister fgte5-ciaaa-aaaad-aaatq-cai..."
+dfx canister \
+    --network ic \
+    --wallet cvthj-wyaaa-aaaad-aaaaq-cai \
+    install fgte5-ciaaa-aaaad-aaatq-cai \
+    --mode upgrade \
+    --wasm "$ROOT_DIR/$EXTRACTED_FILE"
+
+echo "Upgrade complete."
