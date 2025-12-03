@@ -22,7 +22,7 @@ export interface Authenticated {
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
     | { openid: { iss: string; sub: string } }
-    | { recoveryPhrase: { identityNumber: bigint } };
+    | { recoveryPhrase: true };
 }
 
 type AuthenticationStore = Readable<Authenticated | undefined> & {

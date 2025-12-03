@@ -58,7 +58,7 @@
   {#if isCheckingPhrase}
     <Trans>This may take a few seconds</Trans>
   {:else}
-    <Trans>Enter each word in the correct order:</Trans>
+    <Trans>Type each word in the correct order:</Trans>
   {/if}
 </p>
 <RecoveryPhraseInput bind:value {showValues} disabled={isCheckingPhrase} />

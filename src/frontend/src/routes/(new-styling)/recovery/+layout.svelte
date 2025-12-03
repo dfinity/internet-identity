@@ -7,12 +7,12 @@
   const { children }: LayoutProps = $props();
 </script>
 
-<div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
+<div class="flex min-h-[100dvh] flex-col">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header />
   <div class="flex flex-1 flex-col items-center justify-center">
     <div
-      class="flex flex-1 flex-row items-end justify-center sm:max-w-120 sm:items-center"
+      class="flex flex-1 flex-row items-end justify-center sm:max-w-100 sm:items-center"
     >
       <AuthPanel>
         {@render children()}

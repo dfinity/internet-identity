@@ -3,17 +3,20 @@
   import { InfoIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { onMount } from "svelte";
+  import type { SvelteHTMLElements } from "svelte/elements";
 
-  interface Props {
+  type Props = {
     value: string[];
     showValues?: boolean;
     disabled?: boolean;
-  }
+  } & SvelteHTMLElements["div"];
 
   let {
     value = $bindable(),
     showValues = false,
     disabled = false,
+    class: className,
+    ...props
   }: Props = $props();
 
   let words = $derived(Array.from(value));
@@ -100,7 +103,11 @@
   $effect(updateBinding);
 </script>
 
-<div bind:this={wrapperRef} class="grid grid-cols-3 gap-3">
+<div
+  {...props}
+  bind:this={wrapperRef}
+  class={["grid grid-cols-3 gap-3", className]}
+>
   {#each words as word, index}
     {@const position = index + 1}
     <label class="relative">
