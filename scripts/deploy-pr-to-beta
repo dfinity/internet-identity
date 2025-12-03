@@ -15,7 +15,7 @@ cd "$ROOT_DIR"
 
 REPO="dfinity/internet-identity"
 WORKFLOW_FILE="canister-tests.yml"
-ARTIFACT_NAME="internet_identity_dev.wasm.gz"
+ARTIFACT_NAME="internet_identity_production.wasm.gz"
 ZIP_FILE="$ARTIFACT_NAME.zip"
 EXTRACTED_FILE="$ARTIFACT_NAME"
 WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
