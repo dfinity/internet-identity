@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Usage: ./download_wasm.sh <PR_NUMBER>
+# Usage: ./scripts/deploy-pr-to-beta <PR_NUMBER>
 PR_NUMBER=$1
 
 if [ -z "$PR_NUMBER" ]; then
