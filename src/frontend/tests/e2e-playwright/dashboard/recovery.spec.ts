@@ -1,5 +1,10 @@
 import { test as base } from "../fixtures";
 import { expect } from "@playwright/test";
+import {
+  fromMnemonicWithoutValidation,
+  generateMnemonic,
+  IC_DERIVATION_PATH,
+} from "$lib/utils/recoveryPhrase";
 
 /**
  * Swap the first word around with the next different word found,
@@ -221,6 +226,68 @@ test.describe("Recovery phrase", () => {
         });
       });
     }
+
+    test.describe("when it is locked (legacy)", () => {
+      test.beforeEach(async ({ identity, manageRecoveryPage, words }) => {
+        // Use an actor to create a locked recovery phrase
+        // since this functionality is no longer available.
+        const { actor, identityNumber } = await identity.createActor();
+        words.current = generateMnemonic();
+        const recoveryIdentity = await fromMnemonicWithoutValidation(
+          words.current.join(" "),
+          IC_DERIVATION_PATH,
+        );
+        await actor.authn_method_add(identityNumber, {
+          metadata: [
+            ["alias", { String: "Recovery phrase" }],
+            ["usage", { String: "recovery_phrase" }],
+          ],
+          authn_method: {
+            PubKey: {
+              pubkey: new Uint8Array(recoveryIdentity.getPublicKey().derKey),
+            },
+          },
+          security_settings: {
+            protection: { Protected: null },
+            purpose: { Recovery: null },
+          },
+          last_authentication: [],
+        });
+        // Revisit the page to see the changes
+        await identity.signOut();
+        await manageRecoveryPage.goto();
+        await identity.signIn();
+        await manageRecoveryPage.assertLocked();
+      });
+
+      test("on first attempt", async ({ manageRecoveryPage, words }) => {
+        words.current = await manageRecoveryPage.unlockAndReset(
+          async (wizard) => {
+            await wizard.unlock(words.current!);
+            await wizard.confirmReset();
+            const newWords = await wizard.writeDown();
+            expect(newWords).not.toEqual(words.current);
+            await wizard.verifySelecting(newWords);
+            return newWords;
+          },
+        );
+      });
+
+      test("on retry", async ({ manageRecoveryPage, words }) => {
+        words.current = await manageRecoveryPage.unlockAndReset(
+          async (wizard) => {
+            await wizard.unlock(swapWordsAround(words.current!));
+            await wizard.retry();
+            await wizard.unlock(words.current!);
+            await wizard.confirmReset();
+            const newWords = await wizard.writeDown();
+            expect(newWords).not.toEqual(words.current);
+            await wizard.verifySelecting(newWords);
+            return newWords;
+          },
+        );
+      });
+    });
   });
 
   test.describe("can be cancelled", () => {

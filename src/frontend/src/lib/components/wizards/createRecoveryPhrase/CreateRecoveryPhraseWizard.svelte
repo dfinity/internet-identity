@@ -6,25 +6,28 @@
   import { generateMnemonic } from "$lib/utils/recoveryPhrase";
   import Reset from "$lib/components/wizards/createRecoveryPhrase/views/Reset.svelte";
   import Retry from "$lib/components/wizards/createRecoveryPhrase/views/Retry.svelte";
+  import Unlock from "$lib/components/wizards/createRecoveryPhrase/views/Unlock.svelte";
 
   interface Props {
     action?: "create" | "verify";
     onCreate: (recoveryPhrase: string[]) => Promise<void>;
     onVerify: (recoveryPhrase: string[]) => Promise<boolean>;
+    onUnlock: (recoveryPhrase: string[]) => Promise<boolean>;
     onCancel: () => void;
     onError: (error: unknown) => void;
     unverifiedRecoveryPhrase?: string[];
-    hasExistingRecoveryPhrase?: boolean;
+    existingRecoveryPhraseType?: "unprotected" | "protected";
   }
 
   const {
     action = "create",
     onCreate,
     onVerify,
+    onUnlock,
     onCancel,
     onError,
     unverifiedRecoveryPhrase,
-    hasExistingRecoveryPhrase,
+    existingRecoveryPhraseType,
   }: Props = $props();
 
   let recoveryPhrase = $state<string[] | undefined>(
@@ -32,9 +35,10 @@
   );
   let isWritten = $state(action === "verify");
   let isIncorrect = $state(false);
+  let isLocked = $state(existingRecoveryPhraseType === "protected");
   let incorrectRecoveryPhrase = $state<string[]>();
 
-  const createRecoveryPhrase = async () => {
+  const handleCreate = async () => {
     try {
       const generated = generateMnemonic();
       await onCreate(generated);
@@ -43,7 +47,7 @@
       onError(error);
     }
   };
-  const verifyRecoveryPhrase = async (entered: string[]) => {
+  const handleVerify = async (entered: string[]) => {
     try {
       isIncorrect = !(await onVerify(entered));
       incorrectRecoveryPhrase = isIncorrect ? entered : undefined;
@@ -51,31 +55,49 @@
       onError(error);
     }
   };
-  const retryVerification = () => {
+  const handleRetry = () => {
     isWritten = false;
     isIncorrect = false;
+  };
+  const handleUnlock = async (entered: string[]) => {
+    try {
+      isIncorrect = !(await onUnlock(entered));
+      incorrectRecoveryPhrase = isIncorrect ? entered : undefined;
+      isLocked = isIncorrect;
+    } catch (error) {
+      onError(error);
+    }
   };
 </script>
 
 {#if action === "create" && recoveryPhrase === undefined}
-  {#if hasExistingRecoveryPhrase}
-    <Reset onReset={createRecoveryPhrase} {onCancel} />
+  {#if existingRecoveryPhraseType !== undefined}
+    {#if isIncorrect}
+      <Retry onRetry={handleRetry} {onCancel} inputMethod="typing" />
+    {:else if isLocked}
+      <Unlock
+        recoveryPhrase={incorrectRecoveryPhrase}
+        onCompleted={handleUnlock}
+      />
+    {:else}
+      <Reset onReset={handleCreate} {onCancel} />
+    {/if}
   {:else}
-    <Acknowledge onAcknowledged={createRecoveryPhrase} />
+    <Acknowledge onAcknowledged={handleCreate} />
   {/if}
 {:else if !isWritten && recoveryPhrase !== undefined}
   <Write {recoveryPhrase} onWritten={() => (isWritten = true)} />
 {:else if isIncorrect}
   <Retry
-    onRetry={retryVerification}
+    onRetry={handleRetry}
     {onCancel}
-    verificationMethod={recoveryPhrase !== undefined ? "selecting" : "typing"}
+    inputMethod={recoveryPhrase !== undefined ? "selecting" : "typing"}
   />
 {:else if recoveryPhrase !== undefined}
-  <VerifySelecting {recoveryPhrase} onCompleted={verifyRecoveryPhrase} />
+  <VerifySelecting {recoveryPhrase} onCompleted={handleVerify} />
 {:else}
   <VerifyTyping
-    onCompleted={verifyRecoveryPhrase}
+    onCompleted={handleVerify}
     recoveryPhrase={incorrectRecoveryPhrase}
   />
 {/if}

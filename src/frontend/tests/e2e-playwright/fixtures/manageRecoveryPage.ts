@@ -113,6 +113,27 @@ class CreateRecoveryPhraseWizard {
       this.#view.getByRole("heading", { name: "Something is wrong!" }),
     ).toBeHidden();
   }
+
+  async unlock(words: string[]): Promise<void> {
+    const heading = this.#view.getByRole("heading", {
+      name: "Unlock to continue",
+    });
+    await expect(heading).toBeVisible();
+    await this.#view.getByRole("button", { name: "Clear all" }).click();
+    for (let index = 0; index < words.length; index++) {
+      await this.#view
+        .getByRole("textbox", {
+          name: `Word ${index + 1}`,
+          exact: true,
+        })
+        .fill(words[index]);
+    }
+    const submitButton = this.#view.getByRole("button", { name: "Submit" });
+    if (await submitButton.isVisible()) {
+      await submitButton.click();
+    }
+    await expect(heading).toBeHidden();
+  }
 }
 
 class ManageRecoveryPage {
@@ -140,6 +161,13 @@ class ManageRecoveryPage {
     return this.#withWizard(fn);
   }
 
+  async unlockAndReset<T>(
+    fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
+  ): Promise<T> {
+    await this.#page.getByRole("button", { name: "Unlock and reset" }).click();
+    return this.#withWizard(fn);
+  }
+
   async verify<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
@@ -164,6 +192,12 @@ class ManageRecoveryPage {
   async assertActivated() {
     await expect(
       this.#page.getByRole("heading", { name: "Recovery phrase activated" }),
+    ).toBeVisible();
+  }
+
+  async assertLocked() {
+    await expect(
+      this.#page.getByRole("button", { name: "Unlock and reset" }),
     ).toBeVisible();
   }
 

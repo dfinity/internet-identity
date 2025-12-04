@@ -22,15 +22,21 @@
   } from "$lib/utils/recoveryPhrase";
   import { authenticateWithSession } from "$lib/utils/authentication";
   import { toaster } from "$lib/components/utils/toaster";
-  import { HttpAgent } from "@icp-sdk/core/agent";
+  import { HttpAgent, type Identity } from "@icp-sdk/core/agent";
   import { anonymousActor, anonymousAgent } from "$lib/globals";
   import { handleError } from "$lib/components/utils/error";
   import type { IdentityInfoError } from "$lib/generated/internet_identity_types";
+  import {
+    ECDSAKeyIdentity,
+    DelegationChain,
+    DelegationIdentity,
+  } from "@icp-sdk/core/identity";
 
   const { data }: PageProps = $props();
 
   let showRecoveryPhraseSetup = $state<"activate" | "reset" | "verify">();
   let unverifiedRecoveryPhrase = $state<string[]>();
+  let lockedRecoveryPhraseIdentity = $state<Identity>();
 
   let recoveryPhraseData = $derived(
     data.identityInfo.authn_methods.find(
@@ -39,12 +45,22 @@
         getMetadataString(m.metadata, "usage") === "recovery_phrase",
     ),
   );
+  const recoveryPhraseType = $derived(
+    recoveryPhraseData !== undefined
+      ? "Protected" in recoveryPhraseData.security_settings.protection
+        ? "protected"
+        : "unprotected"
+      : undefined,
+  );
   const isCurrentAccessMethod = $derived(
     "recoveryPhrase" in $authenticatedStore.authMethod,
   );
   const isUnverified = $derived(
     recoveryPhraseData !== undefined &&
-      recoveryPhraseData.last_authentication[0] === undefined,
+      recoveryPhraseData.last_authentication[0] === undefined &&
+      // A locked recovery phrase is always considered verified
+      // since locking required re-typing the recovery phrase.
+      recoveryPhraseType === "unprotected",
   );
 
   const handleCreate = async (words: string[]) => {
@@ -62,9 +78,19 @@
     ) {
       return;
     }
+    // Make call with `lockedRecoveryPhraseIdentity` in case it's protected
+    const agent = await HttpAgent.from(anonymousAgent);
+    agent.replaceIdentity(
+      recoveryPhraseType === "protected" &&
+        lockedRecoveryPhraseIdentity !== undefined
+        ? lockedRecoveryPhraseIdentity
+        : $authenticatedStore.identity,
+    );
     await Promise.all([
-      $authenticatedStore.actor
-        .authn_method_replace(
+      anonymousActor.authn_method_replace
+        .withOptions({
+          agent,
+        })(
           $authenticatedStore.identityNumber,
           recoveryPhraseData.authn_method.PubKey.pubkey,
           data,
@@ -145,6 +171,49 @@
     });
     return true;
   };
+  const handleUnlock = async (recoveryPhrase: string[]): Promise<boolean> => {
+    const identity = await fromMnemonicWithoutValidation(
+      recoveryPhrase.join(" "),
+      IC_DERIVATION_PATH,
+    );
+    const sessionIdentity = await ECDSAKeyIdentity.generate();
+    const delegation = await DelegationChain.create(
+      identity,
+      sessionIdentity.getPublicKey(),
+      // This gives 10 minutes to click the reset button in the dialog,
+      // an error will be thrown if the button is clicked after that.
+      new Date(Date.now() + 10 * 60 * 1000),
+    );
+    const delegationIdentity = DelegationIdentity.fromDelegation(
+      sessionIdentity,
+      delegation,
+    );
+    const agent = await HttpAgent.from(anonymousAgent);
+    agent.replaceIdentity(delegationIdentity);
+    try {
+      await Promise.all([
+        // Make authenticated call with recovery phrase to check if it's correct
+        anonymousActor.identity_info
+          .withOptions({ agent })($authenticatedStore.identityNumber)
+          .then(throwCanisterError),
+        // Artificial delay to improve UX, wait at least 2 seconds even if network is faster.
+        waitFor(2000),
+      ]);
+    } catch (error) {
+      if (
+        isCanisterError<IdentityInfoError>(error) &&
+        error.type === "Unauthorized"
+      ) {
+        // Authenticated call failed due to incorrect recovery phrase
+        return false;
+      } else {
+        throw error;
+      }
+    }
+
+    lockedRecoveryPhraseIdentity = delegationIdentity;
+    return true;
+  };
 
   // Warn user if they're leaving in the middle of a recovery phrase set-up
   beforeNavigate((navigation) => {
@@ -201,17 +270,16 @@
       "[&_article]:border-border-secondary [&_article]:bg-bg-primary [&_article]:rounded-2xl [&_article]:border [&_article]:p-5 [&_article]:not-dark:shadow-sm",
       // Headings
       "[&_h3]:text-text-primary [&_h3]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold",
-      // Paragraphs with emphasis
+      // Paragraphs
       "[&_p]:text-text-tertiary [&_p]:text-sm [&_p]:text-pretty",
-      "[&_p_em]:text-text-primary [&_p_em]:normal [&_p_em]:font-medium [&_p_em]:not-italic",
     ]}
   >
     <article>
       <h3>{$t`Keep it secret`}</h3>
       <p>
         <Trans>
-          Your recovery phrase gives <em>full control</em> over your identity.
-          <em>Never</em> share it and <em>only</em> use it on the official website.
+          Your recovery phrase gives full control over your identity. Never
+          share it and only use it on the official website.
         </Trans>
       </p>
     </article>
@@ -219,8 +287,8 @@
       <h3>{$t`Store it safely`}</h3>
       <p>
         <Trans>
-          Write down all <em>24 words</em> correctly and keep them
-          <em>offline</em>. Do <em>not</em> store them in the cloud or on devices.
+          Write down all 24 words correctly and keep them offline. Do not store
+          them in the cloud or on devices.
         </Trans>
       </p>
     </article>
@@ -228,8 +296,8 @@
       <h3>{$t`Replace it anytime`}</h3>
       <p>
         <Trans>
-          You can <em>reset</em> your recovery phrase at any time. This keeps
-          your identity <em>secure</em> if it is ever exposed.
+          You can reset your recovery phrase at any time. This keeps your
+          identity secure if it is ever exposed.
         </Trans>
       </p>
     </article>
@@ -248,11 +316,12 @@
         : handleReplace}
       onVerify={handleVerify}
       onCancel={unverifiedRecoveryPhrase ? handleUnverified : handleCancel}
+      onUnlock={handleUnlock}
       onError={(error) => {
         showRecoveryPhraseSetup = undefined;
         handleError(error);
       }}
-      hasExistingRecoveryPhrase={recoveryPhraseData !== undefined}
+      existingRecoveryPhraseType={recoveryPhraseType}
       {unverifiedRecoveryPhrase}
     />
   </Dialog>

@@ -13,18 +13,21 @@ export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
 
 export type DummyAuthFn = (page: Page) => void;
 
-/**
- * Create dummy auth index value instance
- * @returns Function that can be called to respond to the next index prompt
- */
-export const dummyAuth = (): DummyAuthFn => {
+export const getRandomIndex = (): bigint => {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const hex =
     "0x" +
     Array.from(bytes)
       .map((byte) => byte.toString(16).padStart(2, "0"))
       .join("");
-  const index = BigInt(hex);
+  return BigInt(hex);
+};
+
+/**
+ * Create dummy auth index value instance
+ * @returns Function that can be called to respond to the next index prompt
+ */
+export const dummyAuth = (index = getRandomIndex()): DummyAuthFn => {
   return (page: Page) => {
     page.once("dialog", (dialog) => dialog.accept(`${index}`));
   };
