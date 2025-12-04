@@ -9,22 +9,16 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { nonNullish } from "@dfinity/utils";
+  import type { IdentityInfo } from "$lib/generated/internet_identity_types";
 
   type Props = {
     identityNumber: bigint;
-    identityName?: string;
-    createdAt?: Date;
-    onContinue: (name?: string) => Promise<void>;
+    identityInfo: IdentityInfo;
+    onContinue: (newName?: string) => Promise<void>;
     onCancel: () => void;
   };
 
-  const {
-    identityNumber,
-    identityName,
-    createdAt,
-    onContinue,
-    onCancel,
-  }: Props = $props();
+  const { identityNumber, info, onContinue, onCancel }: Props = $props();
 
   let continueInProgress = $state(false);
 
