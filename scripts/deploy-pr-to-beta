@@ -98,7 +98,7 @@ echo "Upgrading canister $BETA_CANISTER_ID..."
 dfx canister \
     --network ic \
     --wallet $WALLET_CANISTER_ID \
-    install $BETA_CANISTER_ID \
+    install "$BETA_CANISTER_ID" \
     --mode upgrade \
     --wasm "$ROOT_DIR/$EXTRACTED_FILE"
 
