@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: ./deploy-pr-to-beta <PR_NUMBER>
+PR_NUMBER="$1"
+
+if [ -z "$PR_NUMBER" ]; then
+    echo "Usage: $0 <PR_NUMBER>"
+    exit 1
+fi
+
+SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT_DIR="$SCRIPTS_DIR/.."
+cd "$ROOT_DIR"
+
+REPO="dfinity/internet-identity"
+WORKFLOW_FILE="canister-tests.yml"
+ARTIFACT_NAME="internet_identity_production.wasm.gz"
+ZIP_FILE="$ARTIFACT_NAME.zip"
+EXTRACTED_FILE="$ARTIFACT_NAME"
+WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
+BETA_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
+
+# -------------------------
+# Cleanup handler
+# -------------------------
+cleanup() {
+    echo "Cleaning up temporary files..."
+    rm -f "$ROOT_DIR/$ZIP_FILE"
+    rm -f "$ROOT_DIR/$EXTRACTED_FILE"
+}
+trap cleanup EXIT
+# -------------------------
+
+# Get GitHub token from gh CLI
+if command -v gh >/dev/null 2>&1; then
+    GITHUB_TOKEN="$(gh auth token)"
+    if [ -z "$GITHUB_TOKEN" ]; then
+        echo "Error: gh CLI is not authenticated or token unavailable."
+        exit 1
+    fi
+else
+    echo "Error: gh CLI not found. Install and authenticate to access private workflows."
+    exit 1
+fi
+
+AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
+
+echo "Fetching workflow runs for PR #$PR_NUMBER..."
+
+# Fetch workflow runs for this PR + workflow file, push events, 100 per page
+RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
+    "https://api.github.com/repos/$REPO/actions/runs?event=push&per_page=100" \
+    | jq -r --arg PR "$PR_NUMBER" --arg WF "$WORKFLOW_FILE" '
+        [.workflow_runs[]
+            | select(.pull_requests[]?.number == ($PR|tonumber))
+            | select(.path == (".github/workflows/" + $WF))
+        ]
+        | sort_by(.run_number)
+        | reverse
+        | .[0].id
+    ')
+
+if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+    echo "Error: No canister-tests.yml workflow run found for PR #$PR_NUMBER"
+    exit 1
+fi
+
+echo "Found workflow run ID: $RUN_ID"
+
+echo "Fetching artifact list..."
+ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
+    "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+    | jq -r --arg ART "$ARTIFACT_NAME" '
+        .artifacts[] | select(.name == $ART) | .archive_download_url
+    ')
+
+if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
+    echo "Error: Artifact not found: $ARTIFACT_NAME"
+    exit 1
+fi
+
+echo "Downloading artifact $ARTIFACT_NAME..."
+curl -sfL -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
+
+echo "Extracting ZIP..."
+unzip -o "$ZIP_FILE" -d "$ROOT_DIR" >/dev/null
+
+if [ ! -f "$ROOT_DIR/$EXTRACTED_FILE" ]; then
+    echo "Error: Extracted file not found: $EXTRACTED_FILE"
+    exit 1
+fi
+
+echo "Artifact extracted: $EXTRACTED_FILE"
+
+# Upgrade the beta II canister with the .wasm.gz file
+echo "Upgrading canister $BETA_CANISTER_ID..."
+dfx canister \
+    --network ic \
+    --wallet "$WALLET_CANISTER_ID" \
+    install "$BETA_CANISTER_ID" \
+    --mode upgrade \
+    --wasm "$ROOT_DIR/$EXTRACTED_FILE"
+
+echo "Upgrade complete."
