@@ -1,0 +1,111 @@
+/* ------------------------------------------- */
+/* Base Button                                 */
+/* ------------------------------------------- */
+@utility btn {
+  /* Base */
+  @apply box-border flex items-center justify-center justify-self-start;
+  @apply rounded-md font-semibold whitespace-nowrap opacity-100;
+  @apply not-disabled:cursor-pointer;
+
+  /* Focus */
+  @apply outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  @apply focus-visible:ring-offset-bg-primary focus-visible:ring-focus-ring;
+
+  /* Defaults */
+  @apply btn-primary btn-md;
+}
+
+/* ------------------------------------------- */
+/* Primary Variant                              */
+/* ------------------------------------------- */
+@utility btn-primary {
+  /* Base */
+  @apply bg-bg-brand-solid text-text-primary-inversed;
+
+  /* Hover */
+  @apply hover:not-disabled:bg-bg-brand-solid_hover;
+
+  /* Disabled */
+  @apply disabled:bg-bg-disabled disabled:text-fg-disabled;
+}
+
+/* ------------------------------------------- */
+/* Secondary Variant                            */
+/* ------------------------------------------- */
+@utility btn-secondary {
+  /* Base */
+  @apply bg-bg-primary border-border-secondary text-fg-primary border;
+
+  /* Hover */
+  @apply hover:not-disabled:bg-bg-primary_hover;
+
+  /* Disabled */
+  @apply disabled:border-border-disabled disabled:text-fg-disabled;
+}
+
+/* ------------------------------------------- */
+/* Tertiary Variant                              */
+/* ------------------------------------------- */
+@utility btn-tertiary {
+  /* Base */
+  @apply text-fg-primary bg-transparent;
+
+  /* Hover */
+  @apply hover:not-disabled:bg-bg-primary_hover;
+
+  /* Disabled */
+  @apply disabled:text-fg-disabled;
+}
+
+/* ------------------------------------------- */
+/* Sizes                                        */
+/* ------------------------------------------- */
+@utility btn-sm {
+  @apply h-9 gap-1.5 px-3 text-sm;
+}
+
+@utility btn-md {
+  @apply h-10 gap-1.5 px-3.5 text-sm;
+}
+
+@utility btn-lg {
+  @apply h-11 gap-2.5 px-4 text-base;
+}
+
+@utility btn-xl {
+  @apply h-12 gap-2.5 px-4.5 text-base;
+}
+
+@utility btn-icon {
+  @apply aspect-square !gap-0 !p-0;
+}
+
+/* ------------------------------------------- */
+/* Danger Variants                             */
+/* ------------------------------------------- */
+@utility btn-danger {
+  @apply focus-visible:ring-focus-ring-error;
+
+  /* Defaults */
+  @apply bg-bg-error-solid text-white;
+  @apply hover:not-disabled:bg-bg-error-solid_hover;
+  @apply disabled:bg-bg-disabled disabled:text-fg-disabled;
+}
+
+.btn-primary.btn-danger {
+  @apply bg-bg-error-solid text-white;
+  @apply hover:not-disabled:bg-bg-error-solid_hover;
+  @apply disabled:bg-bg-disabled disabled:text-fg-disabled;
+}
+
+.btn-secondary.btn-danger {
+  @apply border-border-error_subtle bg-bg-primary text-text-error-primary border;
+  @apply hover:not-disabled:bg-bg-error-primary hover:not-disabled:text-text-error-primary_hover;
+  @apply disabled:border-border-disabled disabled:text-fg-disabled;
+}
+
+.btn-tertiary.btn-danger {
+  @apply text-text-error-primary;
+  @apply hover:not-disabled:bg-bg-error-primary hover:not-disabled:text-text-error-primary_hover;
+  @apply disabled:text-fg-disabled;
+}

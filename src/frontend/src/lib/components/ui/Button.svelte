@@ -1,4 +1,5 @@
 <script lang="ts">
+  // TODO: Deprecate this component, use classes directly on <button> and <a>
   import ButtonOrAnchor from "$lib/components/utils/ButtonOrAnchor.svelte";
   import type {
     HTMLAnchorAttributes,
@@ -33,45 +34,20 @@
   bind:element
   {...props}
   class={[
-    "box-border flex items-center justify-center justify-self-start rounded-md font-semibold whitespace-nowrap opacity-100 not-disabled:cursor-pointer",
+    "btn",
     {
-      primary: [
-        danger
-          ? "bg-bg-error-solid text-white"
-          : "bg-bg-brand-solid text-text-primary-inversed",
-        danger
-          ? "not-disabled:hover:bg-bg-error-solid_hover"
-          : "not-disabled:hover:bg-bg-brand-solid_hover",
-        "disabled:bg-bg-disabled disabled:text-fg-disabled",
-      ],
-      secondary: [
-        "bg-bg-primary border",
-        danger
-          ? "border-border-error_subtle text-text-error-primary"
-          : "border-border-secondary text-fg-primary",
-        danger
-          ? "not-disabled:hover:bg-bg-error-primary text-text-error-primary_hover"
-          : "not-disabled:hover:bg-bg-primary_hover",
-        "disabled:border-border-disabled disabled:text-fg-disabled",
-      ],
-      tertiary: [
-        danger ? "text-text-error-primary" : "text-fg-primary",
-        danger
-          ? "not-disabled:hover:bg-bg-error-primary text-text-error-primary_hover"
-          : "not-disabled:hover:bg-bg-primary_hover",
-        "disabled:text-fg-disabled",
-      ],
+      primary: "btn-primary",
+      secondary: "btn-secondary",
+      tertiary: "btn-tertiary",
     }[variant],
-    "focus-visible:ring-offset-bg-primary outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-    danger
-      ? "focus-visible:ring-focus-ring-error"
-      : "focus-visible:ring-focus-ring",
     {
-      sm: iconOnly ? "size-9" : "h-9 gap-1.5 px-3 text-sm",
-      md: iconOnly ? "size-10" : "h-10 gap-1.5 px-3.5 text-sm",
-      lg: iconOnly ? "size-11" : "h-11 gap-2.5 px-4 text-base",
-      xl: iconOnly ? "size-12" : "h-12 gap-2.5 px-4.5 text-base",
+      sm: "btn-sm",
+      md: "btn-md",
+      lg: "btn-lg",
+      xl: "btn-xl",
     }[size],
+    danger && "btn-danger",
+    iconOnly && "btn-icon",
     className,
   ]}
 >
