@@ -34,7 +34,7 @@ trap cleanup EXIT
 
 # Get GitHub token from gh CLI
 if command -v gh >/dev/null 2>&1; then
-    GITHUB_TOKEN=$(gh auth token)
+    GITHUB_TOKEN="$(gh auth token)"
     if [ -z "$GITHUB_TOKEN" ]; then
         echo "Error: gh CLI is not authenticated or token unavailable."
         exit 1
