@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage: ./deploy-pr-to-beta <PR_NUMBER>
-PR_NUMBER=$1
+PR_NUMBER="$1"
 
 if [ -z "$PR_NUMBER" ]; then
     echo "Usage: $0 <PR_NUMBER>"
