@@ -94,7 +94,7 @@ fi
 echo "Artifact extracted: $EXTRACTED_FILE"
 
 # Upgrade the beta II canister with the .wasm.gz file
-echo "Upgrading canister fgte5-ciaaa-aaaad-aaatq-cai..."
+echo "Upgrading canister $BETA_CANISTER_ID..."
 dfx canister \
     --network ic \
     --wallet $WALLET_CANISTER_ID \
