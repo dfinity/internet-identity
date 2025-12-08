@@ -4,11 +4,13 @@ use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
+use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -176,7 +178,37 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             metadata: _,
         } in &devices
         {
-            if key_type == &KeyType::SeedPhrase {
+            let (is_recovery_phrase, special_device_migration) =
+                match (credential_id, purpose, key_type) {
+                    // Happy case: clearly a valid recovery phrase
+                    (None, Purpose::Recovery, KeyType::SeedPhrase) => (true, None),
+
+                    // Happy case: clearly a valid passkey
+                    (
+                        Some(_),
+                        Purpose::Authentication,
+                        KeyType::Platform | KeyType::CrossPlatform,
+                    ) => (false, None),
+
+                    // Happy case: recovery passkey
+                    (Some(_), Purpose::Recovery, KeyType::Platform | KeyType::CrossPlatform) => {
+                        (false, None)
+                    }
+
+                    (credential_id, purpose, key_type) => {
+                        let is_recovery_phrase = credential_id.is_none();
+                        (
+                            is_recovery_phrase,
+                            Some(SpecialDeviceMigration {
+                                credential_id: credential_id.clone().map(ByteBuf::into_vec),
+                                purpose: purpose.clone().into(),
+                                key_type: key_type.clone().into(),
+                            }),
+                        )
+                    }
+                };
+
+            if is_recovery_phrase {
                 let pubkey = pubkey.clone().into_vec();
                 let last_usage_timestamp_ns = *last_usage_timestamp;
                 let is_protected = if matches!(protection, DeviceProtection::Protected) {
@@ -192,6 +224,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
                     // Not available yet
                     created_at_ns: None,
+
+                    special_device_migration,
                 });
             } else {
                 let pubkey = pubkey.clone().into_vec();
@@ -237,6 +271,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
                     // Not available yet
                     created_at_ns: None,
+
+                    special_device_migration,
                 };
 
                 if purpose == &Purpose::Recovery {
