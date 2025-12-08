@@ -681,7 +681,9 @@ mod from_conversion_tests {
     use super::*;
     use crate::storage::storable::anchor::StorableAnchor;
     use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
-    use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
+    use crate::storage::storable::recovery_key::StorableRecoveryKey;
+    use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
+    use pretty_assertions::assert_eq;
     use serde_bytes::ByteBuf;
 
     /// Verifies that devices with authentication purpose and credential ID are correctly
@@ -1002,21 +1004,23 @@ mod from_conversion_tests {
 
         // Should be empty since device has no credential_id and is not a seed phrase
         let passkeys = storable.passkey_credentials.unwrap();
-        assert_eq!(
-            passkeys,
-            vec![StorablePasskeyCredential {
-                pubkey: vec![90, 91, 92],
-                credential_id: vec![0xde, 0xad, 0xbe, 0xef],
-                origin: "https://id.ai".to_string(),
-                created_at_ns: None,
-                last_usage_timestamp_ns: Some(123456789),
-                alias: Some("Unknown Device".to_string()),
-                aaguid: None,
-            }]
-        );
+        assert_eq!(passkeys, vec![]);
 
         let recovery_keys = storable.recovery_keys.unwrap();
-        assert_eq!(recovery_keys, vec![]);
+        assert_eq!(
+            recovery_keys,
+            vec![StorableRecoveryKey {
+                pubkey: vec![90, 91, 92],
+                created_at_ns: None,
+                last_usage_timestamp_ns: Some(123456789),
+                is_protected: None,
+                special_device_migration: Some(SpecialDeviceMigration {
+                    credential_id: None,
+                    purpose: Purpose::Authentication.into(),
+                    key_type: KeyType::Unknown.into(),
+                })
+            }]
+        );
     }
 
     /// Verifies that an empty anchor (with no devices) converts to empty passkey_credentials
