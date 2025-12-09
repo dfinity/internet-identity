@@ -16,7 +16,7 @@
 }
 
 /* ------------------------------------------- */
-/* Primary Variant                              */
+/* Primary Variant                             */
 /* ------------------------------------------- */
 @utility btn-primary {
   /* Base */
@@ -30,7 +30,7 @@
 }
 
 /* ------------------------------------------- */
-/* Secondary Variant                            */
+/* Secondary Variant                           */
 /* ------------------------------------------- */
 @utility btn-secondary {
   /* Base */
@@ -44,7 +44,7 @@
 }
 
 /* ------------------------------------------- */
-/* Tertiary Variant                              */
+/* Tertiary Variant                            */
 /* ------------------------------------------- */
 @utility btn-tertiary {
   /* Base */
@@ -54,11 +54,11 @@
   @apply hover:not-disabled:bg-bg-primary_hover;
 
   /* Disabled */
-  @apply disabled:text-fg-disabled;
+  @apply disabled:text-fg-disabled disabled:bg-transparent;
 }
 
 /* ------------------------------------------- */
-/* Sizes                                        */
+/* Sizes                                       */
 /* ------------------------------------------- */
 @utility btn-sm {
   @apply h-9 gap-1.5 px-3 text-sm;
@@ -78,6 +78,7 @@
 
 @utility btn-icon {
   @apply aspect-square !gap-0 !p-0;
+  @apply [&_>_span]:sr-only;
 }
 
 /* ------------------------------------------- */
