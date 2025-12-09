@@ -10,7 +10,6 @@ use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
-use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -178,7 +177,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             metadata: _,
         } in &devices
         {
-            let (is_recovery_phrase, special_device_migration) =
+            let (no_credential_id, special_device_migration) =
                 match (credential_id, purpose, key_type) {
                     // Happy case: clearly a valid recovery phrase
                     (None, Purpose::Recovery, KeyType::SeedPhrase) => (true, None),
@@ -195,20 +194,13 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                         (false, None)
                     }
 
-                    (credential_id, purpose, key_type) => {
-                        let is_recovery_phrase = credential_id.is_none();
-                        (
-                            is_recovery_phrase,
-                            Some(SpecialDeviceMigration {
-                                credential_id: credential_id.clone().map(ByteBuf::into_vec),
-                                purpose: purpose.clone().into(),
-                                key_type: key_type.clone().into(),
-                            }),
-                        )
-                    }
+                    other => (
+                        credential_id.is_none(),
+                        Some(SpecialDeviceMigration::from(other)),
+                    ),
                 };
 
-            if is_recovery_phrase {
+            if no_credential_id {
                 let pubkey = pubkey.clone().into_vec();
                 let last_usage_timestamp_ns = *last_usage_timestamp;
                 let is_protected = if matches!(protection, DeviceProtection::Protected) {

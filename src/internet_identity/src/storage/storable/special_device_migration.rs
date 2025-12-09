@@ -1,5 +1,6 @@
 use internet_identity_interface::internet_identity::types::{KeyType, Purpose};
 use minicbor::{Decode, Encode};
+use serde_bytes::ByteBuf;
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub enum StorablePurpose {
@@ -53,4 +54,20 @@ pub struct SpecialDeviceMigration {
     pub purpose: StorablePurpose,
     #[n(2)]
     pub key_type: StorableKeyType,
+}
+
+impl From<(&Option<ByteBuf>, &Purpose, &KeyType)> for SpecialDeviceMigration {
+    fn from(value: (&Option<ByteBuf>, &Purpose, &KeyType)) -> Self {
+        let (credential_id, purpose, key_type) = value;
+
+        let credential_id = credential_id.clone().map(ByteBuf::into_vec);
+        let purpose = purpose.clone().into();
+        let key_type = key_type.clone().into();
+
+        Self {
+            credential_id,
+            purpose,
+            key_type,
+        }
+    }
 }
