@@ -66,7 +66,10 @@ class CreateRecoveryPhraseWizard {
       name: "Verify your recovery phrase",
     });
     await expect(heading).toBeVisible();
-    await this.#view.getByRole("button", { name: "Clear all" }).click();
+    const clearButton = this.#view.getByRole("button", { name: "Clear all" });
+    if (await clearButton.isEnabled()) {
+      await clearButton.click();
+    }
     for (let index = 0; index < words.length; index++) {
       await this.#view
         .getByRole("textbox", {
@@ -119,7 +122,10 @@ class CreateRecoveryPhraseWizard {
       name: "Unlock to continue",
     });
     await expect(heading).toBeVisible();
-    await this.#view.getByRole("button", { name: "Clear all" }).click();
+    const clearButton = this.#view.getByRole("button", { name: "Clear all" });
+    if (await clearButton.isEnabled()) {
+      await clearButton.click();
+    }
     for (let index = 0; index < words.length; index++) {
       await this.#view
         .getByRole("textbox", {
