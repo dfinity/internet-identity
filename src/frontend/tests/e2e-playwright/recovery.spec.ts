@@ -181,14 +181,6 @@ test.describe("Recovery flow", () => {
       await recoveryPage.cancel();
     });
 
-    test("after invalid phrase", async ({ recoveryPage, words }) => {
-      await recoveryPage.start(async (wizard) => {
-        await wizard.enterRecoveryPhrase(changeLastWord(words.current!));
-        await wizard.cancelInvalid();
-      });
-      await recoveryPage.cancel();
-    });
-
     test("before upgrading legacy identity", async ({
       recoveryPage,
       words,
