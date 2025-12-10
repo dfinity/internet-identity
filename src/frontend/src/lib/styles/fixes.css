@@ -1,0 +1,18 @@
+/* Below is a workaround for iOS that avoids the browser from scrolling
+   the input to the center of the screen which breaks e.g. bottom sheets. */
+@keyframes input-scroll-animation {
+  0% {
+    transform: translateY(-9999px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@utility input-noscroll {
+  will-change: transform;
+
+  &:focus {
+    animation: input-scroll-animation 1ms forwards;
+  }
+}
