@@ -2,6 +2,7 @@
 members = [
     "src/asset_util",
     "src/internet_identity",
+    "src/internet_identity_frontend",
     "src/canister_tests",
     "src/internet_identity_interface",
     "src/archive",

@@ -106,6 +106,9 @@ msgstr "Authentication successful"
 msgid "Authorize new device"
 msgstr "Authorize new device"
 
+msgid "Before you continue"
+msgstr "Before you continue"
+
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 
@@ -124,6 +127,12 @@ msgstr "CAPTCHA characters"
 msgid "Characters are case-sensitive"
 msgstr "Characters are case-sensitive"
 
+msgid "Checking recovery phrase"
+msgstr "Checking recovery phrase"
+
+msgid "Checking your order"
+msgstr "Checking your order"
+
 msgid "Choose an account"
 msgstr "Choose an account"
 
@@ -138,6 +147,9 @@ msgstr "Choose method"
 
 msgid "Clear all"
 msgstr "Clear all"
+
+msgid "Click to reveal"
+msgstr "Click to reveal"
 
 msgid "Close"
 msgstr "Close"
@@ -220,6 +232,9 @@ msgstr "Default"
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
+msgid "Do you want to continue?"
+msgstr "Do you want to continue?"
+
 msgid "Easy access"
 msgstr "Easy access"
 
@@ -234,6 +249,9 @@ msgstr "Enable multiple accounts"
 
 msgid "Enter characters"
 msgstr "Enter characters"
+
+msgid "Enter each word in the correct order:"
+msgstr "Enter each word in the correct order:"
 
 msgid "Enter your recovery phrase words in each box, spelled correctly and in order."
 msgstr "Enter your recovery phrase words in each box, spelled correctly and in order."
@@ -269,6 +287,12 @@ msgstr "Full Ownership"
 msgid "Generating code..."
 msgstr "Generating code..."
 
+msgid "Generating phrase..."
+msgstr "Generating phrase..."
+
+msgid "Get started"
+msgstr "Get started"
+
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
 msgstr "Give your identity a clear, simple, and memorable name you'll easily recognize."
 
@@ -283,6 +307,9 @@ msgstr "Go to the app - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
 msgstr "Has not been used yet"
+
+msgid "Have your recovery phrase ready before continuing. Keep it private. Don’t let anyone watch you enter it. You can reset it later in your dashboard if you want a new one."
+msgstr "Have your recovery phrase ready before continuing. Keep it private. Don’t let anyone watch you enter it. You can reset it later in your dashboard if you want a new one."
 
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
@@ -314,6 +341,15 @@ msgstr "How it works"
 msgid "How to stay secure"
 msgstr "How to stay secure"
 
+msgid "I Acknowledge"
+msgstr "I Acknowledge"
+
+msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
+msgstr "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
+
+msgid "I have written it down"
+msgstr "I have written it down"
+
 msgid "Identity already upgraded"
 msgstr "Identity already upgraded"
 
@@ -332,8 +368,14 @@ msgstr "If you proceed, you will no longer be able to sign-in to your identity o
 msgid "In use on another account."
 msgstr "In use on another account."
 
+msgid "Incorrect recovery phrase. Please try again."
+msgstr "Incorrect recovery phrase. Please try again."
+
 msgid "Incorrect spelling"
 msgstr "Incorrect spelling"
+
+msgid "Incorrect word order. Review and try again."
+msgstr "Incorrect word order. Review and try again."
 
 msgid "Incorrect. Try again with the new code."
 msgstr "Incorrect. Try again with the new code."
@@ -386,6 +428,9 @@ msgstr "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgid "It can be used at any time to recover your identity."
 msgstr "It can be used at any time to recover your identity."
 
+msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
+msgstr "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
+
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 
@@ -425,11 +470,17 @@ msgstr "Limit reached"
 msgid "Link copied to clipboard"
 msgstr "Link copied to clipboard"
 
+msgid "Locked legacy recovery phrase"
+msgstr "Locked legacy recovery phrase"
+
 msgid "Long-press the link that opened this page."
 msgstr "Long-press the link that opened this page."
 
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
+
+msgid "Make sure no one can see what's on your screen or what you are writing."
+msgstr "Make sure no one can see what's on your screen or what you are writing."
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
@@ -500,6 +551,12 @@ msgstr "Number of access methods"
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Only enter the code from that device if you initiated this process <0>yourself</0>."
 
+msgid "Open in browser"
+msgstr "Open in browser"
+
+msgid "Open in browser to continue"
+msgstr "Open in browser to continue"
+
 msgid "Open menu"
 msgstr "Open menu"
 
@@ -551,6 +608,9 @@ msgstr "Powered by Internet Identity"
 msgid "Real Privacy"
 msgstr "Real Privacy"
 
+msgid "Recover your identity"
+msgstr "Recover your identity"
+
 msgid "Recovery phrase"
 msgstr "Recovery phrase"
 
@@ -559,6 +619,9 @@ msgstr "Recovery phrase activated"
 
 msgid "Recovery phrase not activated"
 msgstr "Recovery phrase not activated"
+
+msgid "Recovery phrase not verified"
+msgstr "Recovery phrase not verified"
 
 msgid "Redirecting to the app"
 msgstr "Redirecting to the app"
@@ -590,8 +653,20 @@ msgstr "Rename this account"
 msgid "Replace it anytime"
 msgstr "Replace it anytime"
 
+msgid "Requires unlocking before it can be reset."
+msgstr "Requires unlocking before it can be reset."
+
 msgid "Reset"
 msgstr "Reset"
+
+msgid "Reset your recovery phrase?"
+msgstr "Reset your recovery phrase?"
+
+msgid "Resetting recovery phrase..."
+msgstr "Resetting recovery phrase..."
+
+msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
+msgstr "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
 
 msgid "Retry"
 msgstr "Retry"
@@ -599,11 +674,17 @@ msgstr "Retry"
 msgid "Return to app"
 msgstr "Return to app"
 
+msgid "Return to application"
+msgstr "Return to application"
+
 msgid "Right now"
 msgstr "Right now"
 
 msgid "Save changes"
 msgstr "Save changes"
+
+msgid "Save your recovery phrase"
+msgstr "Save your recovery phrase"
 
 msgid "Saving changes..."
 msgstr "Saving changes..."
@@ -622,6 +703,9 @@ msgstr "See how many access methods are within your identity and manage your rec
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
+
+msgid "Select each word in the correct order:"
+msgstr "Select each word in the correct order:"
 
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
@@ -689,6 +773,12 @@ msgstr "Support"
 msgid "Switch identity"
 msgstr "Switch identity"
 
+msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
+msgstr "Tap on the <0>address bar</0> and <1>open in browser</1>."
+
+msgid "Tap on the highlighted <0>back</0> button."
+msgstr "Tap on the highlighted <0>back</0> button."
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "The <0>existing device</0> is preparing to continue."
 
@@ -706,6 +796,9 @@ msgstr "There was an issue connecting with the application. Try a different brow
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "This identity has already been upgraded to the new experience."
+
+msgid "This may take a few seconds"
+msgstr "This may take a few seconds"
 
 msgid "This takes a few seconds."
 msgstr "This takes a few seconds."
@@ -752,6 +845,12 @@ msgstr "Unlink {name} account"
 msgid "Unlinking {name} account..."
 msgstr "Unlinking {name} account..."
 
+msgid "Unlock and reset"
+msgstr "Unlock and reset"
+
+msgid "Unlock to continue"
+msgstr "Unlock to continue"
+
 msgid "Unsupported Browser"
 msgstr "Unsupported Browser"
 
@@ -790,6 +889,9 @@ msgstr "Verify"
 
 msgid "Verify you are human"
 msgstr "Verify you are human"
+
+msgid "Verify your recovery phrase"
+msgstr "Verify your recovery phrase"
 
 msgid "Verifying..."
 msgstr "Verifying..."
@@ -836,8 +938,14 @@ msgstr "With passkeys, you can now use your fingerprint, face, or screen lock to
 msgid "with your Internet Identity"
 msgstr "with your Internet Identity"
 
-msgid "Write down all <0>24 words</0> correctly and keep them <1>offline</1>. Do <2>not</2> store them in the cloud or on devices."
-msgstr "Write down all <0>24 words</0> correctly and keep them <1>offline</1>. Do <2>not</2> store them in the cloud or on devices."
+msgid "Word {position}"
+msgstr "Word {position}"
+
+msgid "Write down all 24 words correctly and keep them offline. Do not store them in the cloud or on devices."
+msgstr "Write down all 24 words correctly and keep them offline. Do not store them in the cloud or on devices."
+
+msgid "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
+msgstr "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
 
 msgid "Wrong domain was set. Please try again."
 msgstr "Wrong domain was set. Please try again."
@@ -851,11 +959,14 @@ msgstr "You already have a {name} account linked"
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "You are upgrading ID <0>{identityNumber}</0>"
 
-msgid "You can <0>reset</0> your recovery phrase at any time. This keeps your identity <1>secure</1> if it is ever exposed."
-msgstr "You can <0>reset</0> your recovery phrase at any time. This keeps your identity <1>secure</1> if it is ever exposed."
-
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "You can continue with <0>Use existing Passkey</0> in the login process."
+
+msgid "You can recover your identity now, verify you saved it correctly."
+msgstr "You can recover your identity now, verify you saved it correctly."
+
+msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
+msgstr "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "You have reached the maximum number of passkeys"
@@ -865,6 +976,9 @@ msgstr "You may close this page."
 
 msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
 msgstr "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
+
+msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
+msgstr "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
 
 msgid "You're about to sign in on a <0>new device</0>."
 msgstr "You're about to sign in on a <0>new device</0>."
@@ -896,8 +1010,11 @@ msgstr "Your identity was restored, but the name could not be updated. Please tr
 msgid "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 msgstr "Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically."
 
-msgid "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1> share it and <2>only</2> use it on the official website."
-msgstr "Your recovery phrase gives <0>full control</0> over your identity. <1>Never</1> share it and <2>only</2> use it on the official website."
+msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
+msgstr "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
+
+msgid "Your recovery phrase is now active and can be reset anytime."
+msgstr "Your recovery phrase is now active and can be reset anytime."
 
 msgid "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."
 msgstr "Your recovery phrase is valid but not for internet identity. You may have used the wrong seed phrase for the wrong product."

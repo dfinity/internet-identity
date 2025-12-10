@@ -1,0 +1,22 @@
+[package]
+name = "internet_identity_frontend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Core dependencies for HTTP gateway functionality
+internet_identity_interface.workspace = true
+serde_bytes.workspace = true
+
+# IC canister dependencies
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-macros.workspace = true
+
+
+[features]
+# The dev_csp feature weakens the CSP in oder to facilitate development with a locally deployed II instance.
+# In particular, this allows
+# * accessing II using http instead of https
+# * II to connect to localhost both on http and https, which is useful when developint a vc issuer
+dev_csp = []

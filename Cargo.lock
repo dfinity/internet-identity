@@ -2078,6 +2078,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "internet_identity_frontend"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "ic-cdk 0.16.0",
+ "ic-cdk-macros 0.16.0",
+ "internet_identity_interface",
+ "serde_bytes",
+]
+
+[[package]]
 name = "internet_identity_interface"
 version = "0.1.0"
 dependencies = [

@@ -18,12 +18,13 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 [--only-dependencies] [--internet-identity] [--archive]
+  $0 [--only-dependencies] [--internet-identity] [--archive] [--frontend]
 
 Options:
   --only-dependencies          only build rust dependencies (no js build, no wasm optimization)
   --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
   --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --frontend                   build the frontend (alongside other specifically mentioned canisters), defaults to --internet-identity
 EOF
 }
 
@@ -59,6 +60,10 @@ do
             ;;
         --archive)
             CANISTERS+=("archive")
+            shift
+            ;;
+        --frontend)
+            CANISTERS+=("frontend")
             shift
             ;;
         *)
@@ -252,11 +257,77 @@ function build_internet_identity() {
   build_canister "internet_identity" ${extra_build_args[@]+"${extra_build_args[@]}"}
 }
 
+function build_internet_identity_frontend() {
+  if [ "$ONLY_DEPS" != "1" ]
+  then
+      DIST_DIR="$SCRIPTS_DIR/../dist"
+      
+      # Compile frontend assets to dist
+      echo Compiling internet_identity frontend assets
+      npm run build
+      
+      # Add preload links for all css files in every html file
+      CSS_LINKS=""
+      TMP_HTML_FILE=$(mktemp)
+      while IFS= read -r css_file; do
+          css_file_relative="/${css_file#$DIST_DIR/}"
+          CSS_LINKS+="<link rel=\"preload\" href=\"$css_file_relative\" as=\"style\">"
+      done < <(find "$DIST_DIR" -type f -name "*.css" | sort)
+      find "$DIST_DIR" -type f -name "*.html" | while read -r html_file; do
+        sed "s#</head>#${CSS_LINKS}</head>#" "$html_file" > "$TMP_HTML_FILE" && mv "$TMP_HTML_FILE" "$html_file"
+      done
+      
+      # II canister only supports one content type per resource. 
+      # That is why we only keep either compressed or uncompressed.
+      find "$DIST_DIR" -type f -name "*.gz" | while read -r gz_file; do
+          # Remove the .gz suffix to get the base filename
+          base_file="${gz_file%.gz}"
+          
+          # Generate the .br filename
+          br_file="${base_file}.br"
+      
+          # Delete the .br file if it exists
+          if [[ -f "$br_file" ]]; then
+              rm -f "$br_file"
+          fi
+          
+          # Keep files not ending in .js or .woff2 as uncompressed files
+          if [[ ! "$base_file" =~ \.(js|woff2)$ ]]; then
+              rm -f "$gz_file"
+              continue
+          fi
+      
+          # Delete the base file if it exists
+          if [[ -f "$base_file" ]]; then
+              rm -f "$base_file"
+          fi
+      done
+  fi
+
+  # This enables the "dummy_captcha" feature which makes sure the captcha string
+  # is always "a".
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production.
+  extra_build_args=()
+
+  # This enables the "dev_csp" feature which weakens the content security policy to facilitate development.
+  # WARNING: this MUST be opt-in, because we DO NOT want this in production.
+  if [ "${II_DEV_CSP:-}" == "1" ]
+  then
+      echo "USING DEV CONTENT SECURITY POLICY"
+      extra_build_args+=( --features dev_csp )
+  fi
+  # XXX: for bash > 4.4, empty arrays are considered unset, so do some substitution
+  build_canister "internet_identity_frontend" ${extra_build_args[@]+"${extra_build_args[@]}"}
+}
+
 for canister in "${CANISTERS[@]}"
 do
   if [ "$canister" == "internet_identity" ]
   then
     build_internet_identity
+  elif [ "$canister" == "frontend" ]
+  then
+    build_internet_identity_frontend
   else
     build_canister "$canister"
   fi
