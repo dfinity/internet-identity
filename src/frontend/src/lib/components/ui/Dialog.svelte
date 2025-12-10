@@ -3,7 +3,6 @@
   import { scale, fly } from "svelte/transition";
   import type { HTMLAttributes } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
-  import Button from "$lib/components/ui/Button.svelte";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
 
@@ -63,7 +62,8 @@
         );
       }, 100);
     };
-    // If the API is not supported (e.g. iOS) prevent manual scrolling of the page
+    // If the API is not supported (e.g. iOS), prevent page scrolling
+    // and implement custom touch scroll handlers for dialog content.
     const preventScroll = (event: TouchEvent) => {
       event.preventDefault();
     };
@@ -128,7 +128,7 @@
   closedby={closeOnOutsideClick ? "any" : "none"}
   class={[
     // Layout base/dialog/bottomsheet
-    "fixed flex min-h-max max-w-full flex-col overflow-auto bg-transparent outline-none",
+    "fixed flex min-h-max max-w-full flex-col bg-transparent outline-none",
     "sm:m-auto sm:w-100",
     "max-sm:top-auto max-sm:bottom-0 max-sm:w-full",
     // Backdrop base/visible
