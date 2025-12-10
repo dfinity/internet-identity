@@ -1,9 +1,8 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import Button from "$lib/components/ui/Button.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import { MessageSquareXIcon, TriangleAlertIcon } from "@lucide/svelte";
+  import { MessageSquareXIcon } from "@lucide/svelte";
 
   interface Props {
     onRetry: () => void;
@@ -27,9 +26,9 @@
     <Trans>Incorrect recovery phrase. Please try again.</Trans>
   {/if}
 </p>
-<Button onclick={onRetry} size="lg" class="mb-1.5">
+<button onclick={onRetry} class="btn btn-lg mb-3">
   {$t`Retry`}
-</Button>
-<Button onclick={onCancel} variant="tertiary" size="lg">
+</button>
+<button onclick={onCancel} class="btn btn-tertiary btn-lg">
   {$t`Cancel`}
-</Button>
+</button>
