@@ -198,32 +198,58 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     Some(credential_id),
                     Purpose::Authentication,
                     KeyType::Platform | KeyType::CrossPlatform,
-                ) => (Some(credential_id), None),
+                ) => {
+                    if protection == &DeviceProtection::Protected {
+                        ic_cdk::println!(
+                            "Warning: Passkey with protected device protection found. \
+                             PubKey: {:?}, Anchor: {}",
+                            hex::encode(&pubkey),
+                            anchor_number,
+                        );
+                    }
+                    (Some(credential_id), None)
+                }
 
-                // Happy case: recovery passkey
+                // Special case: recovery passkey
                 (
                     Some(credential_id),
                     Purpose::Recovery,
                     KeyType::Platform | KeyType::CrossPlatform,
-                ) => (Some(credential_id), None),
+                ) => {
+                    let credential_id = Some(credential_id);
+                    let special_device_migration = Some(SpecialDeviceMigration::from((
+                        &credential_id,
+                        purpose,
+                        key_type,
+                    )));
 
-                // Special cases
+                    // No logging for a legitimate legacy recovery device.
+
+                    (credential_id, special_device_migration)
+                }
+
+                // Special case: legacy pin-flow
                 (None, purpose, KeyType::BrowserStorageKey) => {
                     let special_device_migration =
                         Some(SpecialDeviceMigration::from((&None, purpose, key_type)));
 
-                    ic_cdk::println!(
-                        "Missing credential_id for BrowserStorageKey (looks like a key from \
-                            the legacy pin-based flow); adding dummy credential_id for migration.\
-                            PubKey: {:?}, Purpose: {:?}, Anchor: {}",
-                        hex::encode(&pubkey),
-                        purpose,
-                        anchor_number,
-                    );
+                    if matches!(purpose, Purpose::Recovery) {
+                        ic_cdk::println!(
+                            "Missing credential_id for BrowserStorageKey (looks like a key from \
+                             the legacy pin-based flow); adding dummy credential_id for migration.\
+                             PubKey: {:?}, Purpose: {:?}, Anchor: {}",
+                            hex::encode(&pubkey),
+                            purpose,
+                            anchor_number,
+                        );
+                    }
+
+                    // purpose == Purpose::Authentication: No logging for a legitimate legacy flow.
 
                     (Some(vec![0xde, 0xad, 0xbe, 0xef]), special_device_migration)
                 }
 
+                // All other special cases
                 (credential_id, purpose, key_type) => {
                     let special_device_migration = Some(SpecialDeviceMigration::from((
                         &credential_id,

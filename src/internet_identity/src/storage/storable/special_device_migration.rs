@@ -45,6 +45,9 @@ impl From<KeyType> for StorableKeyType {
     }
 }
 
+/// Auxiliary data originating from the fields of `Device` during the anchor migration from bounded
+/// to unbounded storage. Useful for analyzing special cases, since clients were allowed to create
+/// inconsistent device data, e.g., `(Some(credential_id), Authentication, SeedPhrase)`.
 #[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
 #[cbor(map)]
 pub struct SpecialDeviceMigration {

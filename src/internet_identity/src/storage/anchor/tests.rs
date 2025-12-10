@@ -779,7 +779,14 @@ mod from_conversion_tests {
         assert_eq!(last_usage_timestamp_ns, Some(111111111));
         assert_eq!(alias, Some("Recovery Passkey".to_string()));
         assert_eq!(aaguid, None);
-        assert_eq!(special_device_migration, None);
+        assert_eq!(
+            special_device_migration,
+            Some(SpecialDeviceMigration {
+                credential_id: Some(vec![13, 14, 15]),
+                purpose: Purpose::Recovery.into(),
+                key_type: KeyType::CrossPlatform.into(),
+            })
+        );
     }
 
     /// Verifies that seed phrase devices are converted to StorableRecoveryKey and excluded
@@ -1011,6 +1018,8 @@ mod from_conversion_tests {
         assert_eq!(storable.created_at_ns, Some(123456789));
     }
 
+    /// Verifies that BrowserStorageKey devices without credential_id are migrated to
+    /// passkey_credentials with special migration metadata.
     #[test]
     fn should_handle_browser_storage_key_without_credential_id() {
         let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
@@ -1044,6 +1053,7 @@ mod from_conversion_tests {
                 key_type: KeyType::BrowserStorageKey.into(),
             })
         );
+        assert_eq!(passkeys[0].credential_id, vec![0xde, 0xad, 0xbe, 0xef]);
     }
 
     /// Verifies that devices without a credential_id and not marked as seed phrase are included
