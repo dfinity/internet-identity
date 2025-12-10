@@ -1030,14 +1030,24 @@ mod from_conversion_tests {
 
         let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
 
-        // Should be migrated as recovery phrase with special migration metadata
+        // Should be migrated as passkey with special migration metadata
         let recovery_keys = storable.recovery_keys.unwrap();
-        assert_eq!(recovery_keys.len(), 1);
-        assert!(recovery_keys[0].special_device_migration.is_some());
+        assert_eq!(recovery_keys.len(), 0);
+
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(passkeys.len(), 1);
+        assert_eq!(
+            passkeys[0].special_device_migration,
+            Some(SpecialDeviceMigration {
+                credential_id: None,
+                purpose: Purpose::Authentication.into(),
+                key_type: KeyType::BrowserStorageKey.into(),
+            })
+        );
     }
 
-    /// Verifies that devices without a credential_id and not a seed phrase are included
-    /// in the passkey_credentials list.
+    /// Verifies that devices without a credential_id and not marked as seed phrase are included
+    /// in the recovery_keys list.
     #[test]
     fn should_handle_devices_without_credential_id() {
         let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);

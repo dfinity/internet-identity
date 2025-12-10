@@ -1,8 +1,8 @@
+use candid::CandidType;
 use internet_identity_interface::internet_identity::types::{KeyType, Purpose};
 use minicbor::{Decode, Encode};
-use serde_bytes::ByteBuf;
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
 pub enum StorablePurpose {
     #[n(0)]
     Recovery,
@@ -19,7 +19,7 @@ impl From<Purpose> for StorablePurpose {
     }
 }
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
 pub enum StorableKeyType {
     #[n(0)]
     Unknown,
@@ -45,7 +45,7 @@ impl From<KeyType> for StorableKeyType {
     }
 }
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
 #[cbor(map)]
 pub struct SpecialDeviceMigration {
     #[n(0)]
@@ -56,11 +56,11 @@ pub struct SpecialDeviceMigration {
     pub key_type: StorableKeyType,
 }
 
-impl From<(&Option<ByteBuf>, &Purpose, &KeyType)> for SpecialDeviceMigration {
-    fn from(value: (&Option<ByteBuf>, &Purpose, &KeyType)) -> Self {
+impl From<(&Option<Vec<u8>>, &Purpose, &KeyType)> for SpecialDeviceMigration {
+    fn from(value: (&Option<Vec<u8>>, &Purpose, &KeyType)) -> Self {
         let (credential_id, purpose, key_type) = value;
 
-        let credential_id = credential_id.clone().map(ByteBuf::into_vec);
+        let credential_id = credential_id.clone();
         let purpose = purpose.clone().into();
         let key_type = key_type.clone().into();
 
