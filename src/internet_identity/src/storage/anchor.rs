@@ -4,11 +4,15 @@ use crate::storage::storable::anchor::StorableAnchor;
 use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
-use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
+use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
+use crate::{
+    ANCHOR_MIGRATION_SPECIAL_CASES, IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN,
+};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
+use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -176,40 +180,105 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             metadata: _,
         } in &devices
         {
-            if key_type == &KeyType::SeedPhrase {
-                let pubkey = pubkey.clone().into_vec();
-                let last_usage_timestamp_ns = *last_usage_timestamp;
-                let is_protected = if matches!(protection, DeviceProtection::Protected) {
-                    Some(true)
-                } else {
-                    None
-                };
+            // Marshall common fields into the new storage format.
+            let pubkey = pubkey.clone().into_vec();
+            let last_usage_timestamp_ns = *last_usage_timestamp;
+            let credential_id = credential_id.clone().map(ByteBuf::into_vec);
 
-                recovery_keys.push(StorableRecoveryKey {
-                    pubkey,
-                    last_usage_timestamp_ns,
-                    is_protected,
+            // Usually, we take `credential_id` as is. But in some special cases, we need to
+            // plug in a dummy `credential_id` in order to be able to later migrate the device
+            // without a credential ID as a passkey.
+            let (credential_id, special_device_migration) = match (credential_id, purpose, key_type)
+            {
+                // Happy case: clearly a valid recovery phrase
+                (None, Purpose::Recovery, KeyType::SeedPhrase) => (None, None),
 
-                    // Not available yet
-                    created_at_ns: None,
-                });
-            } else {
-                let pubkey = pubkey.clone().into_vec();
+                // Happy case: clearly a valid passkey
+                (
+                    Some(credential_id),
+                    Purpose::Authentication,
+                    KeyType::Platform | KeyType::CrossPlatform,
+                ) => {
+                    if protection == &DeviceProtection::Protected {
+                        ic_cdk::println!(
+                            "Warning: Passkey with protected device protection found. \
+                             PubKey: {:?}, Anchor: {}",
+                            hex::encode(&pubkey),
+                            anchor_number,
+                        );
+                    }
+                    (Some(credential_id), None)
+                }
 
-                let credential_id = if let Some(credential_id) = credential_id.clone() {
-                    credential_id.into_vec()
-                } else {
-                    // Not expecting this to happen in production, but if it somehow does, we
-                    // should at least log it.
+                // Special case: recovery passkey
+                (
+                    Some(credential_id),
+                    Purpose::Recovery,
+                    KeyType::Platform | KeyType::CrossPlatform,
+                ) => {
+                    let credential_id = Some(credential_id);
+                    let special_device_migration = Some(SpecialDeviceMigration::from((
+                        &credential_id,
+                        purpose,
+                        key_type,
+                    )));
+
+                    // No logging for a legitimate legacy recovery device.
+
+                    (credential_id, special_device_migration)
+                }
+
+                // Special case: legacy pin-flow
+                (None, purpose, KeyType::BrowserStorageKey) => {
+                    let special_device_migration =
+                        Some(SpecialDeviceMigration::from((&None, purpose, key_type)));
+
+                    if matches!(purpose, Purpose::Recovery) {
+                        ic_cdk::println!(
+                            "Missing credential_id for BrowserStorageKey (looks like a key from \
+                             the legacy pin-based flow); adding dummy credential_id for migration.\
+                             PubKey: {:?}, Purpose: {:?}, Anchor: {}",
+                            hex::encode(&pubkey),
+                            purpose,
+                            anchor_number,
+                        );
+                    }
+
+                    // purpose == Purpose::Authentication: No logging for a legitimate legacy flow.
+
+                    (Some(vec![0xde, 0xad, 0xbe, 0xef]), special_device_migration)
+                }
+
+                // All other special cases
+                (credential_id, purpose, key_type) => {
+                    let special_device_migration = Some(SpecialDeviceMigration::from((
+                        &credential_id,
+                        purpose,
+                        key_type,
+                    )));
+
                     ic_cdk::println!(
-                        "credential_id is None for anchor {}, key type {:?}",
+                        "Fallthrough case: PubKey: {:?}, Anchor: {}, special_device_migration: {:?}",
+                        hex::encode(&pubkey),
                         anchor_number,
-                        key_type
+                        special_device_migration,
                     );
-                    vec![0xde, 0xad, 0xbe, 0xef]
-                };
 
-                let last_usage_timestamp_ns = *last_usage_timestamp;
+                    (credential_id, special_device_migration)
+                }
+            };
+
+            // Store special cases to aid observability (they will also be persisted in stable memory).
+            if let Some(special_device_migration) = &special_device_migration {
+                ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow_mut(|cases| {
+                    cases
+                        .entry(anchor_number)
+                        .or_default()
+                        .push(special_device_migration.clone())
+                })
+            }
+
+            if let Some(credential_id) = credential_id {
                 let alias = if alias.is_empty() {
                     None
                 } else {
@@ -237,6 +306,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
                     // Not available yet
                     created_at_ns: None,
+
+                    special_device_migration,
                 };
 
                 if purpose == &Purpose::Recovery {
@@ -244,6 +315,25 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 } else {
                     passkey_credentials.push(passkey);
                 }
+            } else {
+                // No credential id ==> add this key as recovery key
+
+                let is_protected = if matches!(protection, DeviceProtection::Protected) {
+                    Some(true)
+                } else {
+                    None
+                };
+
+                recovery_keys.push(StorableRecoveryKey {
+                    pubkey,
+                    last_usage_timestamp_ns,
+                    is_protected,
+
+                    // Not available yet
+                    created_at_ns: None,
+
+                    special_device_migration,
+                });
             }
         }
 

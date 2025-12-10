@@ -1,3 +1,4 @@
+use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use minicbor::{Decode, Encode};
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
@@ -17,4 +18,7 @@ pub struct StorablePasskeyCredential {
     pub alias: Option<String>,
     #[cbor(n(6), with = "minicbor::bytes")]
     pub aaguid: Option<Vec<u8>>,
+
+    #[n(7)]
+    pub special_device_migration: Option<SpecialDeviceMigration>,
 }
