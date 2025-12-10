@@ -4,6 +4,7 @@ use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
+use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -27,7 +28,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
@@ -77,8 +78,20 @@ thread_local! {
     pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = const { RefCell::new(0) };
     pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
+    pub(crate) static ANCHOR_MIGRATION_SPECIAL_CASES: RefCell<BTreeMap<AnchorNumber, Vec<SpecialDeviceMigration>>> = const { RefCell::new(BTreeMap::new()) };
 
     static TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
+}
+
+#[query(hidden = true)]
+fn get_anchor_migration_special_cases(anchor_number: AnchorNumber) -> Vec<SpecialDeviceMigration> {
+    ANCHOR_MIGRATION_SPECIAL_CASES
+        .with_borrow(|cases| cases.get(&anchor_number).cloned().unwrap_or_default())
+}
+
+#[query(hidden = true)]
+fn get_anchor_migration_special_cases_keys() -> Vec<AnchorNumber> {
+    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect())
 }
 
 /// Temporary function to list migration errors.
