@@ -2,7 +2,6 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import StepsProgressBar from "$lib/components/wizards/createRecoveryPhrase/components/StepsProgressBar.svelte";
 
   interface Props {
@@ -46,7 +45,7 @@
   });
 </script>
 
-<div class="limited-height my-10">
+<div class="my-10 max-sm:hidden">
   {#if isCheckingOrder}
     <StepsProgressBar total={3} />
   {:else}
@@ -117,19 +116,10 @@
     </li>
   {/each}
 </ul>
-<Button
+<button
   onclick={handleClear}
-  variant="secondary"
-  size="lg"
   disabled={selectedIndexes.length === 0 || isCheckingOrder}
+  class="btn btn-secondary btn-lg"
 >
   {$t`Clear all`}
-</Button>
-
-<style>
-  @media (max-height: 700px) {
-    .limited-height {
-      display: none !important;
-    }
-  }
-</style>
+</button>
