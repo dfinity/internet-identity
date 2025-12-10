@@ -13,6 +13,9 @@ candid.workspace = true
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 
+ic-http-certification.workspace = true
+ic-asset-certification.workspace = true
+include_dir.workspace = true
 
 [features]
 # The dev_csp feature weakens the CSP in oder to facilitate development with a locally deployed II instance.
