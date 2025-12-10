@@ -1,6 +1,5 @@
 <script lang="ts">
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { MessageSquareXIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
