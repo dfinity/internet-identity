@@ -1,4 +1,5 @@
 @import "tailwindcss" source("../");
+@import "./styles/fixes.css";
 @import "./styles/button.css";
 
 @plugin "@tailwindcss/forms";
