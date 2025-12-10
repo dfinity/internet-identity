@@ -267,7 +267,7 @@
           disabled={isEmpty}
           class={[
             "btn btn-tertiary relative",
-            "max-sm:btn-icon  max-sm:after:absolute max-sm:after:-inset-2.5",
+            "max-sm:btn-icon max-sm:after:absolute max-sm:after:-inset-2.5",
             "sm:flex-1",
           ]}
         >
