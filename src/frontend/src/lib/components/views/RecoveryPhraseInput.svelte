@@ -229,7 +229,7 @@
     {/each}
   </div>
   <!-- Controls and submit -->
-  <div class={["flex gap-3", "max-sm:flex-row", "sm:flex-col"]}>
+  <div class={["flex gap-5", "max-sm:flex-row", "sm:flex-col"]}>
     <div class={["flex flex-row items-center gap-3"]}>
       <div class="relative flex flex-1 flex-row justify-center">
         <button
