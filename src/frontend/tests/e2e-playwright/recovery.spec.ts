@@ -15,6 +15,7 @@ export const changeLastWord = (words: string[]) => {
   const differentWordIndex = invalidOrder.findIndex(
     (word) => word !== checksumWord,
   );
+  expect(differentWordIndex).not.toEqual(-1); // Smoke test
   invalidOrder[invalidOrder.length - 1] = invalidOrder[differentWordIndex];
   expect(invalidOrder).not.toEqual(words); // Smoke test
   return invalidOrder;
