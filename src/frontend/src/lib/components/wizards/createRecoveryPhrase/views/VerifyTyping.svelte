@@ -24,7 +24,7 @@
   };
 </script>
 
-<div class={["my-10", "[@media(max-height:640px)]:hidden"]}>
+<div class="my-10 max-sm:hidden">
   {#if isCheckingPhrase}
     <StepsProgressBar total={3} />
   {:else}

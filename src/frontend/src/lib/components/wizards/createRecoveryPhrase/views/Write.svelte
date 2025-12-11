@@ -14,7 +14,7 @@
   let isRevealed = $state(false);
 </script>
 
-<div class={["my-10", "[@media(max-height:700px)]:hidden"]}>
+<div class="my-10 max-sm:hidden">
   <Steps total={3} current={2} />
 </div>
 <h2 class="text-text-primary text-2xl font-medium">
