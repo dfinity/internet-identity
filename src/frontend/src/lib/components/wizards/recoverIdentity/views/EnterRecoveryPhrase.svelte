@@ -9,27 +9,12 @@
   }
 
   const { recoveryPhrase, onSubmit }: Props = $props();
-
-  let isSubmitting = $state(false);
-
-  const handleSubmit = async (recoveryPhrase: string[]) => {
-    try {
-      isSubmitting = true;
-      await onSubmit(recoveryPhrase);
-    } finally {
-      isSubmitting = false;
-    }
-  };
 </script>
 
 <h2 class="text-text-primary mb-3 text-2xl font-medium">
   {$t`Enter recovery phrase`}
 </h2>
 <p class="text-text-tertiary mb-6 text-base font-medium">
-  {#if isSubmitting}
-    <Trans>This may take a few seconds</Trans>
-  {:else}
-    <Trans>Type each word in the correct order:</Trans>
-  {/if}
+  <Trans>Type each word in the correct order:</Trans>
 </p>
-<RecoveryPhraseInput value={recoveryPhrase} onSubmit={handleSubmit} />
+<RecoveryPhraseInput value={recoveryPhrase} {onSubmit} />
