@@ -14,11 +14,9 @@
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
-    migrate: () => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithOpenId, migrate }: Props =
-    $props();
+  const { setupOrUseExistingPasskey, continueWithOpenId }: Props = $props();
 
   let authenticatingProviderId = $state<string | null>(null);
   let cancelledProviderId = $state<string | null>(null);
