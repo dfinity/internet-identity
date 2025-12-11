@@ -45,12 +45,14 @@ export const passkeyAuthnMethodData = ({
   credentialId,
   authenticatorAttachment,
   origin,
+  aaguid,
 }: {
   alias: string;
   pubKey: DerEncodedPublicKey;
   credentialId: CredentialId;
   authenticatorAttachment?: AuthenticatorAttachment;
   origin: string;
+  aaguid?: Uint8Array;
 }): AuthnMethodData => {
   const metadata: MetadataMapV2 = [
     ["alias", { String: alias }],
@@ -69,7 +71,7 @@ export const passkeyAuthnMethodData = ({
       WebAuthn: {
         pubkey: new Uint8Array(pubKey),
         credential_id: new Uint8Array(credentialId),
-        aaguid: [],
+        aaguid: aaguid !== undefined ? [aaguid] : [],
       },
     },
     security_settings: defaultSecuritySettings(),

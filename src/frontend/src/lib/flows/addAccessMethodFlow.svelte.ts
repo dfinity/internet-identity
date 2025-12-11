@@ -15,6 +15,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
+import { aaguidToString } from "$lib/utils/webAuthn";
 
 export class AddAccessMethodFlow {
   #view = $state<"chooseMethod" | "addPasskey">("chooseMethod");
@@ -88,11 +89,12 @@ export class AddAccessMethodFlow {
       throw new Error("Credential ID is missing");
     }
     const uaParser = loadUAParser();
+    const aaguid = passkeyIdentity.getAaguid();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
+      aaguid,
     });
     const authnMethodData = passkeyAuthnMethodData({
       alias,
