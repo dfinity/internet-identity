@@ -162,13 +162,14 @@
   {/if}
   <div class="flex flex-row items-center justify-between gap-4">
     <p class="text-text-secondary text-sm">
-      {$t`Still have an identity number?`}
+      {$t`Lost access to your identity?`}
     </p>
-    <button
-      onclick={migrate}
+    <a
+      href="/recovery"
+      target="_blank"
       class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      {$t`Upgrade`}
-    </button>
+      {$t`Recover`}
+    </a>
   </div>
 </div>
