@@ -32,7 +32,7 @@
   <UserCheckIcon class="size-6" />
 </FeaturedIcon>
 <h2 class="text-text-primary mb-3 text-2xl font-medium">
-  {$t`We have found your identity`}
+  {$t`Identity found`}
 </h2>
 <p class="text-text-tertiary mb-5 text-base font-medium text-pretty">
   <Trans>

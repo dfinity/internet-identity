@@ -206,7 +206,7 @@
         </span>
         <!-- Error icon with tooltip -->
         <span
-          class="peer-valid:hidden peer-focus:hidden max-sm:hidden"
+          class="peer-valid:hidden peer-focus:hidden peer-disabled:hidden max-sm:hidden"
           aria-hidden="true"
         >
           <Tooltip
