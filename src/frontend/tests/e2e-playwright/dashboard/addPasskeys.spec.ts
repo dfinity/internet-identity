@@ -35,7 +35,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey and rename it
   await expect(
@@ -84,7 +84,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   if (await newMenuButton.isVisible()) {
     await newMenuButton.click();
   }
-  await newPage.getByRole("link", { name: "Access methods" }).click();
+  await newPage.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify that new passkey is the one currently in use
   await expect(
@@ -126,7 +126,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
   await expect(page.getByText("Chrome")).toHaveCount(1);
@@ -211,7 +211,7 @@ test("User can add a new passkey and use it with cached identity without clearin
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey and rename it
   await expect(
@@ -290,7 +290,7 @@ test("User can log into the dashboard and add up to 7 additional passkeys", asyn
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
   await expect(

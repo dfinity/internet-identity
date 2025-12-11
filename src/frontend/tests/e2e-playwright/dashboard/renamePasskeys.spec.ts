@@ -33,7 +33,7 @@ test("User can rename the current passkey used for authentication", async ({
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
   await expect(
@@ -81,7 +81,7 @@ test("User can rename a newly added passkey from the same device", async ({
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
   await expect(
@@ -138,7 +138,7 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
   await expect(
