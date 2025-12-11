@@ -1,23 +1,25 @@
+use asset_util::{collect_assets, Asset as AssetUtilAsset, ContentEncoding, ContentType};
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
+use candid::Encode;
+use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
-use ic_cdk::{init, post_upgrade};
+use ic_cdk::{api, init, post_upgrade};
 use ic_cdk_macros::query;
 use ic_http_certification::{
-    HeaderField, HttpCertification, HttpCertificationPath, HttpCertificationTree,
-    HttpCertificationTreeEntry, HttpRequest, HttpResponse, StatusCode,
+    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, StatusCode,
 };
 use include_dir::{include_dir, Dir};
+use internet_identity_interface::internet_identity::types::InternetIdentityInit;
+use lazy_static::lazy_static;
+use serde_json::json;
+use sha2::Digest;
+use std::io::Read;
+
 use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
     static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
-
-    // initializing the asset router with an HTTP certification tree is optional.
-    // if direct access to the HTTP certification tree is not needed for certifying
-    // requests and responses outside of the asset router, then this step can be skipped
-    // and the asset router can be initialized like so:
-    // ```
-    // static ASSET_ROUTER: RefCell<AssetRouter<'static>> = Default::default();
-    // ```
     static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone())));
 }
 
@@ -25,19 +27,89 @@ static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
 
-// Public methods
+// Default configuration for the frontend canister
+lazy_static! {
+    static ref DEFAULT_CONFIG: InternetIdentityInit = InternetIdentityInit {
+        assigned_user_number_range: None,
+        archive_config: None,
+        canister_creation_cycles_cost: None,
+        register_rate_limit: None,
+        captcha_config: Some(internet_identity_interface::internet_identity::types::CaptchaConfig {
+            max_unsolved_captchas: 50,
+            captcha_trigger: internet_identity_interface::internet_identity::types::CaptchaTrigger::Static(
+                internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::CaptchaDisabled
+            ),
+        }),
+        related_origins: Some(vec![
+            "https://identity.internetcomputer.org".to_string(),
+            "https://identity.ic0.app".to_string(),
+        ]),
+        new_flow_origins: None,
+        openid_configs: Some(vec![
+            internet_identity_interface::internet_identity::types::OpenIdConfig {
+                name: "Google".to_string(),
+                logo: "https://www.google.com/favicon.ico".to_string(),
+                issuer: "https://accounts.google.com".to_string(),
+                client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com".to_string(),
+                jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
+                auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+                fedcm_uri: None,
+            },
+        ]),
+        analytics_config: None,
+        fetch_root_key: None,
+        enable_dapps_explorer: None,
+        is_production: None,
+        dummy_auth: None,
+    };
+}
+
 #[init]
-fn init() {
-    certify_all_assets();
+fn init(init_arg: Option<InternetIdentityInit>) {
+    let config = init_arg.unwrap_or_else(|| DEFAULT_CONFIG.clone());
+    ic_cdk_timers::set_timer(std::time::Duration::from_secs(0), move || {
+        certify_all_assets(config)
+    });
 }
 
 #[post_upgrade]
 fn post_upgrade() {
-    certify_all_assets();
+    init(None);
 }
 
-fn certify_all_assets() {
-    // 1. Define the asset certification configurations.
+fn certify_all_assets(init: InternetIdentityInit) {
+    let static_assets = get_static_assets(&init);
+
+    // 2. Extract integrity hashes for inline scripts from HTML files
+    let integrity_hashes = static_assets
+        .iter()
+        .filter(|asset| asset.content_type == ContentType::HTML)
+        .fold(vec![], |mut acc, e| {
+            let content = std::str::from_utf8(&e.content).unwrap().to_string();
+            // We need to import extract_inline_scripts? It is defined in file (Line 396).
+            for inlined in extract_inline_scripts(content).iter() {
+                let hash = sha2::Sha384::digest(inlined.as_bytes());
+                let hash = BASE64.encode(hash);
+                let hash = format!("sha384-{hash}");
+                acc.push(hash);
+            }
+            acc
+        });
+
+    let mut router_assets = Vec::new();
+    for asset in static_assets {
+        let content = if asset.encoding == ContentEncoding::GZip {
+            let mut decoder = GzDecoder::new(&asset.content[..]);
+            let mut s = Vec::new();
+            decoder.read_to_end(&mut s).unwrap();
+            s
+        } else {
+            asset.content
+        };
+        router_assets.push(Asset::new(asset.url_path, content));
+    }
+
     let encodings = vec![
         AssetEncoding::Brotli.default_config(),
         AssetEncoding::Gzip.default_config(),
@@ -47,10 +119,13 @@ fn certify_all_assets() {
         AssetConfig::File {
             path: "index.html".to_string(),
             content_type: Some("text/html".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
+            headers: get_asset_headers(
+                integrity_hashes.clone(),
+                vec![(
+                    "cache-control".to_string(),
+                    NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
             fallback_for: vec![AssetFallbackConfig {
                 scope: "/".to_string(),
                 status_code: Some(StatusCode::OK),
@@ -58,132 +133,95 @@ fn certify_all_assets() {
             aliased_by: vec!["/".to_string()],
             encodings: encodings.clone(),
         },
-        // Compressed JavaScript files
-        AssetConfig::Pattern {
-            pattern: "**/*.js.gz".to_string(),
-            content_type: Some("text/javascript".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: encodings.clone(),
-        },
-        // CSS files
         AssetConfig::Pattern {
             pattern: "**/*.css".to_string(),
             content_type: Some("text/css".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: encodings.clone(),
-        },
-        // Font files
-        AssetConfig::Pattern {
-            pattern: "**/*.woff2".to_string(),
-            content_type: Some("font/woff2".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: vec![],
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.woff".to_string(),
-            content_type: Some("font/woff".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: vec![],
-        },
-        // Image files
-        AssetConfig::Pattern {
-            pattern: "**/*.png".to_string(),
-            content_type: Some("image/png".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: vec![],
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.svg".to_string(),
-            content_type: Some("image/svg+xml".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
+            headers: get_asset_headers(
+                vec![],
+                vec![(
+                    "cache-control".to_string(),
+                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
-            pattern: "**/*.webp".to_string(),
-            content_type: Some("image/webp".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: vec![],
+            pattern: "**/*.js".to_string(),
+            content_type: Some("text/javascript".to_string()),
+            headers: get_asset_headers(
+                vec![],
+                vec![(
+                    "cache-control".to_string(),
+                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
+            encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.ico".to_string(),
             content_type: Some("image/x-icon".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
+            headers: get_asset_headers(
+                vec![],
+                vec![(
+                    "cache-control".to_string(),
+                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
             encodings: vec![],
         },
-        // WebAssembly files
         AssetConfig::Pattern {
-            pattern: "**/*.wasm".to_string(),
-            content_type: Some("application/wasm".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
+            pattern: "**/*.png".to_string(),
+            content_type: Some("image/png".to_string()),
+            headers: get_asset_headers(
+                vec![],
+                vec![(
+                    "cache-control".to_string(),
+                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
             encodings: vec![],
         },
-        // JSON files
+        AssetConfig::Pattern {
+            pattern: "**/*.woff2".to_string(),
+            content_type: Some("font/woff2".to_string()),
+            headers: get_asset_headers(
+                vec![],
+                vec![(
+                    "cache-control".to_string(),
+                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
+            encodings: encodings.clone(),
+        },
         AssetConfig::Pattern {
             pattern: "**/*.json".to_string(),
             content_type: Some("application/json".to_string()),
-            headers: get_asset_headers(vec![(
-                "cache-control".to_string(),
-                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-            )]),
-            encodings: encodings.clone(),
+            headers: get_asset_headers(
+                vec![],
+                vec![(
+                    "cache-control".to_string(),
+                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
+            encodings: vec![],
         },
     ];
 
-    // 2. Collect all assets from the frontend build directory.
-    let mut assets = Vec::new();
-    collect_assets(&ASSETS_DIR, &mut assets);
-
-    // 3. Skip certification for the metrics endpoint.
-    HTTP_TREE.with(|tree| {
-        let mut tree = tree.borrow_mut();
-
-        let metrics_tree_path = HttpCertificationPath::exact("/metrics");
-        let metrics_certification = HttpCertification::skip();
-        let metrics_tree_entry =
-            HttpCertificationTreeEntry::new(metrics_tree_path, metrics_certification);
-
-        tree.insert(&metrics_tree_entry);
-    });
-
-    ASSET_ROUTER.with_borrow_mut(|asset_router| {
-        // 4. Certify the assets using the `certify_assets` function from the `ic-asset-certification` crate.
-        if let Err(err) = asset_router.certify_assets(assets, asset_configs) {
+    ASSET_ROUTER.with(|asset_router| {
+        if let Err(err) = asset_router
+            .borrow_mut()
+            .certify_assets(router_assets, asset_configs)
+        {
             ic_cdk::trap(&format!("Failed to certify assets: {}", err));
         }
-
-        // 5. Set the canister's certified data.
-        ic_cdk::api::set_certified_data(&asset_router.root_hash());
+        ic_cdk::api::set_certified_data(&asset_router.borrow().root_hash());
     });
 }
 
-fn get_asset_headers(additional_headers: Vec<HeaderField>) -> Vec<HeaderField> {
+fn get_asset_headers(
+    integrity_hashes: Vec<String>,
+    additional_headers: Vec<HeaderField>,
+) -> Vec<HeaderField> {
     // List of recommended security headers as per https://owasp.org/www-project-secure-headers/
     // These headers enable browser security features (like limit access to platform apis and set
     // iFrame policies, etc.)
@@ -200,7 +238,7 @@ fn get_asset_headers(additional_headers: Vec<HeaderField>) -> Vec<HeaderField> {
         // Comprehensive policy to prevent XSS attacks and data injection
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(),
+            get_content_security_policy(integrity_hashes),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -296,18 +334,32 @@ fn get_asset_headers(additional_headers: Vec<HeaderField>) -> Vec<HeaderField> {
 ///
 /// upgrade-insecure-requests (production only):
 ///   Automatically upgrade HTTP requests to HTTPS (omitted in dev for localhost)
-fn get_content_security_policy() -> String {
+fn get_content_security_policy(integrity_hashes: Vec<String>) -> String {
     let connect_src = "'self' https:";
 
     // Allow connecting via http for development purposes
     #[cfg(feature = "dev_csp")]
     let connect_src = format!("{connect_src} http:");
 
+    // Build script-src with integrity hashes if provided
+    let script_src = if integrity_hashes.is_empty() {
+        "'self' 'unsafe-inline' 'unsafe-eval'".to_string()
+    } else {
+        format!(
+            "'self' 'unsafe-inline' 'unsafe-eval' {}",
+            integrity_hashes
+                .into_iter()
+                .map(|x| format!("'{x}'"))
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
+    };
+
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
          img-src 'self' data: https://*.googleusercontent.com;\
-         script-src 'self' 'unsafe-inline' 'unsafe-eval';\
+         script-src {script_src};\
          base-uri 'none';\
          form-action 'none';\
          style-src 'self' 'unsafe-inline';\
@@ -325,22 +377,72 @@ fn get_content_security_policy() -> String {
     csp
 }
 
-/// Recursively collect all assets from the provided directory.
-/// For .gz files, strip the extension and treat them as the base file
-/// (since the build script deletes uncompressed .js and .woff2 files).
-fn collect_assets<'content, 'path>(
-    dir: &'content Dir<'path>,
-    assets: &mut Vec<Asset<'content, 'path>>,
-) {
-    for file in dir.files() {
-        let path_str = file.path().to_string_lossy().to_string();
+/// Gets the static assets with HTML fixup and well-known endpoints
+fn get_static_assets(config: &InternetIdentityInit) -> Vec<AssetUtilAsset> {
+    // Collect assets and fix up HTML files
+    let mut assets: Vec<AssetUtilAsset> = collect_assets(&ASSETS_DIR, None)
+        .into_iter()
+        .map(|mut asset| {
+            if asset.content_type == ContentType::HTML {
+                asset.content = fixup_html(std::str::from_utf8(&asset.content).unwrap(), config)
+                    .as_bytes()
+                    .to_vec();
+            }
+            asset
+        })
+        .collect();
 
-        assets.push(Asset::new(path_str, file.contents()));
+    // Add .well-known/ic-domains for custom domain support
+    let ic_domains_content = b"identity.internetcomputer.org\nbeta.identity.ic0.app\nbeta.identity.internetcomputer.org\nid.ai\nbeta.id.ai\nwww.id.ai".to_vec();
+    assets.push(AssetUtilAsset {
+        url_path: "/.well-known/ic-domains".to_string(),
+        content: ic_domains_content,
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
+
+    // Add .well-known/webauthn for passkey sharing if related_origins is configured
+    if let Some(related_origins) = &config.related_origins {
+        let content = json!({
+            "origins": related_origins,
+        })
+        .to_string()
+        .into_bytes();
+        assets.push(AssetUtilAsset {
+            url_path: "/.well-known/webauthn".to_string(),
+            content,
+            encoding: ContentEncoding::Identity,
+            content_type: ContentType::JSON,
+        });
     }
 
-    for dir in dir.dirs() {
-        collect_assets(dir, assets);
-    }
+    assets
+}
+
+/// Fix up HTML pages by injecting canister ID and canister config
+fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
+    let canister_id = api::id();
+    // Encode config to base64-encoded Candid to avoid JSON escaping issues
+    let encoded_config = BASE64.encode(Encode!(config).unwrap());
+    html.replace(
+        r#"<body "#,
+        &format!(
+            r#"<body data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#
+        ),
+    )
+}
+
+/// Extract all inline scripts from HTML for CSP hash generation
+fn extract_inline_scripts(content: String) -> Vec<String> {
+    content
+        .match_indices("<script")
+        .map(|(tag_open_start, _)| {
+            let tag_open_len = content[tag_open_start..].find('>').unwrap();
+            let inline_start = tag_open_start + tag_open_len + 1;
+            let tag_close_start = content[inline_start..].find("</script>").unwrap();
+            content[(inline_start)..(inline_start + tag_close_start)].to_string()
+        })
+        .collect()
 }
 
 #[query]
@@ -348,9 +450,9 @@ fn http_request(req: HttpRequest) -> HttpResponse {
     serve_asset(&req)
 }
 
-fn serve_asset(req: &HttpRequest) -> HttpResponse<'static> {
-    ASSET_ROUTER.with_borrow(|asset_router| {
-        if let Ok(response) = asset_router.serve_asset(
+fn serve_asset<'a>(req: &'a HttpRequest<'a>) -> HttpResponse<'static> {
+    ASSET_ROUTER.with(|asset_router| {
+        if let Ok(response) = asset_router.borrow().serve_asset(
             &ic_cdk::api::data_certificate().expect("No data certificate available"),
             req,
         ) {

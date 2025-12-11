@@ -199,7 +199,7 @@ dependencies = [
  "addr2line",
  "cfg-if",
  "libc",
- "miniz_oxide 0.8.0",
+ "miniz_oxide 0.8.9",
  "object",
  "rustc-demangle",
  "windows-targets",
@@ -1053,12 +1053,12 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.0.33"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "324a1be68054ef05ad64b861cc9eaf1d623d2d8cb25b4bf2cb9cdd902b4bf253"
+checksum = "bfe33edd8e85a12a67454e37f8c75e730830d83e313556ab9ebf9ee7fbeb3bfb"
 dependencies = [
  "crc32fast",
- "miniz_oxide 0.8.0",
+ "miniz_oxide 0.8.9",
 ]
 
 [[package]]
@@ -2144,14 +2144,21 @@ dependencies = [
 name = "internet_identity_frontend"
 version = "0.1.0"
 dependencies = [
+ "asset_util",
+ "base64 0.22.1",
  "candid",
+ "flate2",
  "ic-asset-certification",
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.16.0",
+ "ic-cdk-timers",
  "ic-http-certification 3.0.3",
  "include_dir",
  "internet_identity_interface",
+ "lazy_static",
  "serde_bytes",
+ "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -2482,11 +2489,12 @@ dependencies = [
 
 [[package]]
 name = "miniz_oxide"
-version = "0.8.0"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
+checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
+ "simd-adler32",
 ]
 
 [[package]]
