@@ -1,6 +1,5 @@
 <script lang="ts">
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import { MessageSquareXIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -17,10 +16,10 @@
   <MessageSquareXIcon class="size-6" />
 </FeaturedIcon>
 <h2 class="text-text-primary mb-3 text-2xl font-medium">
-  {$t`Something is wrong!`}
+  {$t`Invalid recovery phrase`}
 </h2>
 <p class="text-text-tertiary mb-8 text-base font-medium">
-  <Trans>Incorrect word order. Review and try again.</Trans>
+  <Trans>One or more words are wrong or out of order.</Trans>
 </p>
 <button onclick={onRetry} class="btn btn-lg mb-3">
   {$t`Retry`}

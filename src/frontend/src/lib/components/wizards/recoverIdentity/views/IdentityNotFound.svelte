@@ -20,8 +20,8 @@
 </h2>
 <p class="text-text-tertiary mb-8 text-base font-medium text-pretty">
   <Trans>
-    Your recovery phrase is valid but not for Internet Identity. You may have
-    used the wrong seed phrase for the wrong product.
+    The phrase was entered correctly but belongs to a product other than
+    Internet Identity.
   </Trans>
 </p>
 <button onclick={onRetry} class="btn btn-lg mb-3">
