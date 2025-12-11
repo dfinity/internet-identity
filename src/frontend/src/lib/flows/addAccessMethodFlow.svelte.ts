@@ -15,7 +15,6 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
-import { aaguidToString } from "$lib/utils/webAuthn";
 
 export class AddAccessMethodFlow {
   #view = $state<"chooseMethod" | "addPasskey">("chooseMethod");
