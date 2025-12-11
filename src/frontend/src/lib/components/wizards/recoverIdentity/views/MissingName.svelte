@@ -49,8 +49,8 @@
   </p>
   <p class="text-text-tertiary mb-4 text-base font-medium">
     <Trans>
-      Name your identity to upgrade to II 2.0 and gain access. You can't rename
-      it later once set.
+      Enter a name for your identity to complete the upgrade. Once set, it
+      cannot be changed later.
     </Trans>
   </p>
   <Input
