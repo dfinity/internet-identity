@@ -31,7 +31,7 @@ class RecoverIdentityWizard {
 
   async confirmFoundIdentity(name: string): Promise<void> {
     const heading = this.#view.getByRole("heading", {
-      name: "We have found your identity",
+      name: "Identity found",
     });
     await expect(heading).toBeVisible();
     await expect(this.#view.getByText(name)).toBeVisible();
@@ -41,7 +41,7 @@ class RecoverIdentityWizard {
 
   async cancelFoundIdentity() {
     const heading = this.#view.getByRole("heading", {
-      name: "We have found your identity",
+      name: "Identity found",
     });
     await expect(heading).toBeVisible();
     await this.#view.getByRole("button", { name: "Cancel" }).click();
@@ -72,7 +72,7 @@ class RecoverIdentityWizard {
 
   async retryInvalid() {
     const heading = this.#view.getByRole("heading", {
-      name: "Something is wrong!",
+      name: "Invalid recovery phrase",
     });
     await expect(heading).toBeVisible();
     await this.#view.getByRole("button", { name: "Retry" }).click();
@@ -81,7 +81,7 @@ class RecoverIdentityWizard {
 
   async cancelInvalid() {
     const heading = this.#view.getByRole("heading", {
-      name: "Something is wrong!",
+      name: "Invalid recovery phrase",
     });
     await expect(heading).toBeVisible();
     await this.#view.getByRole("button", { name: "Cancel" }).click();
@@ -90,7 +90,7 @@ class RecoverIdentityWizard {
 
   async enterMissingName(newName: string): Promise<void> {
     const heading = this.#view.getByRole("heading", {
-      name: "We have found your identity",
+      name: "Identity found",
     });
     await expect(heading).toBeVisible();
     await this.#view
@@ -102,7 +102,7 @@ class RecoverIdentityWizard {
 
   async cancelMissingName() {
     const heading = this.#view.getByRole("heading", {
-      name: "We have found your identity",
+      name: "Identity found",
     });
     await expect(heading).toBeVisible();
     await this.#view.getByRole("button", { name: "Cancel" }).click();
