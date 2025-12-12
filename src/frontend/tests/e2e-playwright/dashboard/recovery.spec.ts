@@ -5,6 +5,7 @@ import {
   generateMnemonic,
   IC_DERIVATION_PATH,
 } from "$lib/utils/recoveryPhrase";
+import { II_URL } from "../utils";
 
 /**
  * Swap the first word around with the next different word found,
@@ -43,15 +44,26 @@ test.describe("Recovery phrase", () => {
   });
 
   test.describe("can be activated", () => {
-    test.afterEach(async ({ manageRecoveryPage, identity }) => {
-      await manageRecoveryPage.assertActivated();
-      // Assert it's still activated after signing back in
-      await identity.signOut();
-      await manageRecoveryPage.goto();
-      await identity.signIn();
-      await manageRecoveryPage.assertActivated();
-      // TODO: Verify we can recover using `words.current`
-    });
+    test.afterEach(
+      async ({ page, manageRecoveryPage, identity, words, recoveryPage }) => {
+        await manageRecoveryPage.assertActivated();
+        // Assert it's still activated after signing back in
+        await identity.signOut();
+        await manageRecoveryPage.goto();
+        await identity.signIn();
+        await manageRecoveryPage.assertActivated();
+        // Verify we can recover using `words.current`
+        await recoveryPage.goto();
+        await recoveryPage.start(async (wizard) => {
+          await wizard.enterRecoveryPhrase(words.current!);
+          await wizard.confirmFoundIdentity(identity.name);
+        });
+        await page.waitForURL(II_URL + "/manage/access");
+        await expect(
+          page.getByRole("heading", { name: "Access methods" }),
+        ).toBeVisible();
+      },
+    );
 
     test("on first attempt", async ({ manageRecoveryPage, words }) => {
       await manageRecoveryPage.activate(async (wizard) => {
@@ -85,15 +97,26 @@ test.describe("Recovery phrase", () => {
       await manageRecoveryPage.assertNotVerified();
     });
 
-    test.afterEach(async ({ manageRecoveryPage, identity }) => {
-      await manageRecoveryPage.assertActivated();
-      // Assert it's still activated after signing back in
-      await identity.signOut();
-      await manageRecoveryPage.goto();
-      await identity.signIn();
-      await manageRecoveryPage.assertActivated();
-      // TODO: Verify we can recover using `words.current`
-    });
+    test.afterEach(
+      async ({ page, manageRecoveryPage, identity, recoveryPage, words }) => {
+        await manageRecoveryPage.assertActivated();
+        // Assert it's still activated after signing back in
+        await identity.signOut();
+        await manageRecoveryPage.goto();
+        await identity.signIn();
+        await manageRecoveryPage.assertActivated();
+        // Verify we can still recover using `words.current`
+        await recoveryPage.goto();
+        await recoveryPage.start(async (wizard) => {
+          await wizard.enterRecoveryPhrase(words.current!);
+          await wizard.confirmFoundIdentity(identity.name);
+        });
+        await page.waitForURL(II_URL + "/manage/access");
+        await expect(
+          page.getByRole("heading", { name: "Access methods" }),
+        ).toBeVisible();
+      },
+    );
 
     test.describe("when still signed in", () => {
       test("on first attempt", async ({ manageRecoveryPage, words }) => {
@@ -154,15 +177,26 @@ test.describe("Recovery phrase", () => {
   });
 
   test.describe("can be reset", () => {
-    test.afterEach(async ({ manageRecoveryPage, identity }) => {
-      await manageRecoveryPage.assertActivated();
-      // Assert it's still activated after signing back in
-      await identity.signOut();
-      await manageRecoveryPage.goto();
-      await identity.signIn();
-      await manageRecoveryPage.assertActivated();
-      // TODO: Verify we can recover using `words.current`
-    });
+    test.afterEach(
+      async ({ page, manageRecoveryPage, identity, recoveryPage, words }) => {
+        await manageRecoveryPage.assertActivated();
+        // Assert it's still activated after signing back in
+        await identity.signOut();
+        await manageRecoveryPage.goto();
+        await identity.signIn();
+        await manageRecoveryPage.assertActivated();
+        // Verify we can recover using the new recovery phrase (`words.current`)
+        await recoveryPage.goto();
+        await recoveryPage.start(async (wizard) => {
+          await wizard.enterRecoveryPhrase(words.current!);
+          await wizard.confirmFoundIdentity(identity.name);
+        });
+        await page.waitForURL(II_URL + "/manage/access");
+        await expect(
+          page.getByRole("heading", { name: "Access methods" }),
+        ).toBeVisible();
+      },
+    );
 
     const scenarios: Array<{ label: string; setup: () => void }> = [
       {
@@ -298,8 +332,12 @@ test.describe("Recovery phrase", () => {
       await manageRecoveryPage.assertNotActivated();
     });
 
-    test("when resetting", async ({ manageRecoveryPage }) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    test("when resetting", async ({
+      page,
+      manageRecoveryPage,
+      recoveryPage,
+      identity,
+    }) => {
       const oldWords = await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
         const words = await wizard.writeDown();
@@ -311,7 +349,16 @@ test.describe("Recovery phrase", () => {
         await wizard.cancelReset();
       });
       await manageRecoveryPage.assertActivated();
-      // TODO: Verify we can still recover using `oldWords`
+      //  Verify we can still recover using `oldWords`
+      await recoveryPage.goto();
+      await recoveryPage.start(async (wizard) => {
+        await wizard.enterRecoveryPhrase(oldWords);
+        await wizard.confirmFoundIdentity(identity.name);
+      });
+      await page.waitForURL(II_URL + "/manage/access");
+      await expect(
+        page.getByRole("heading", { name: "Access methods" }),
+      ).toBeVisible();
     });
   });
 
