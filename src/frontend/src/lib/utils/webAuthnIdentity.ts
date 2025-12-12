@@ -210,7 +210,7 @@ export class WebAuthnIdentity extends SignIdentity {
     cose: ArrayBuffer,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
     protected rpId: string | undefined,
-    public readonly aaguid: string | undefined,
+    public readonly aaguid: Uint8Array | undefined,
   ) {
     super();
     this._publicKey = new CosePublicKey(new Uint8Array(cose));

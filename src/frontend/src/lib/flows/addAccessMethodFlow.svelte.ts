@@ -88,11 +88,12 @@ export class AddAccessMethodFlow {
       throw new Error("Credential ID is missing");
     }
     const uaParser = loadUAParser();
+    const aaguid = passkeyIdentity.getAaguid();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
+      aaguid,
     });
     const authnMethodData = passkeyAuthnMethodData({
       alias,

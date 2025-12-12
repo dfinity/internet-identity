@@ -282,11 +282,12 @@ export class AuthFlow {
   ): Promise<bigint> => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     const uaParser = loadUAParser();
+    const aaguid = passkeyIdentity.getAaguid();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
+      aaguid,
     });
     const authnMethod = passkeyAuthnMethodData({
       alias,
@@ -294,6 +295,7 @@ export class AuthFlow {
       credentialId: passkeyIdentity.getCredentialId()!,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
+      aaguid,
     });
     const name = passkeyIdentity.getName();
     try {

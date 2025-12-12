@@ -46,18 +46,28 @@ export const constructIdentity = async ({
  * @param authData from which to extract AAGUID
  * @returns AAGUID or undefined
  */
-export const extractAAGUID = (authData: Uint8Array): string | undefined => {
+export const extractAAGUID = (authData: Uint8Array): Uint8Array | undefined => {
   if (authData.byteLength < 53) {
     return;
   }
-  const aaguid = [...authData.slice(37, 53)]
+  const aaguid = authData.slice(37, 53);
+  if (aaguid.every((byte) => byte === 0)) {
+    return undefined;
+  }
+  return aaguid;
+};
+
+/**
+ * Convert raw AAGUID bytes into its standardized human-readable UUID string
+ *
+ * @param aaguid in raw bytes
+ * @returns human-readable UUID string
+ */
+export const aaguidToString = (aaguid: Uint8Array): string =>
+  [...aaguid]
     .map((byte: number) => byte.toString(16).padStart(2, "0"))
     .join("")
     .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
-  if (aaguid !== "00000000-0000-0000-0000-000000000000") {
-    return aaguid;
-  }
-};
 
 /**
  * Lookup details from a list of known AAGUID

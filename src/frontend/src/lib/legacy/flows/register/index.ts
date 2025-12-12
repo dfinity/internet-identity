@@ -29,7 +29,7 @@ import {
   WrongCaptchaSolution,
 } from "$lib/utils/iiConnection";
 import { isRegistrationAllowed } from "$lib/utils/isRegistrationAllowed";
-import { lookupAAGUID } from "$lib/utils/webAuthn";
+import { aaguidToString, lookupAAGUID } from "$lib/utils/webAuthn";
 import { SignIdentity } from "@icp-sdk/core/agent";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { nonNullish } from "@dfinity/utils";
@@ -299,12 +299,12 @@ export const inferPasskeyAlias = async ({
   authenticatorType: AuthenticatorType;
   userAgent: typeof navigator.userAgent;
   uaParser: PreloadedUAParser;
-  aaguid?: string;
+  aaguid?: Uint8Array;
 }): Promise<string> => {
   // First lookup if alias can be found in known list
   // before falling back to user agent implementation.
   if (nonNullish(aaguid)) {
-    const knownName = await lookupAAGUID(aaguid);
+    const knownName = await lookupAAGUID(aaguidToString(aaguid));
     if (nonNullish(knownName)) {
       return knownName;
     }

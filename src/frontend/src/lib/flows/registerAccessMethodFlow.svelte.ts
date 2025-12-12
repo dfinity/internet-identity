@@ -106,11 +106,12 @@ export class RegisterAccessMethodFlow {
       throw new Error("Credential ID is missing");
     }
     const uaParser = loadUAParser();
+    const aaguid = passkeyIdentity.getAaguid();
     const alias = await inferPasskeyAlias({
       authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
+      aaguid,
     });
     const authnMethodData = passkeyAuthnMethodData({
       alias,
@@ -118,6 +119,7 @@ export class RegisterAccessMethodFlow {
       credentialId,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
+      aaguid,
     });
     await session.actor
       .authn_method_registration_mode_exit(this.#identityNumber, [

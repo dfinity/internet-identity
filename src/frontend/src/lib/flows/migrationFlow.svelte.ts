@@ -102,11 +102,12 @@ export class MigrationFlow {
     const uaParser = loadUAParser();
     const authenticatorAttachement =
       passkeyIdentity.getAuthenticatorAttachment();
+    const aaguid = passkeyIdentity.getAaguid();
     const deviceName = await inferPasskeyAlias({
       authenticatorType: authenticatorAttachement,
       userAgent: navigator.userAgent,
       uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
+      aaguid,
     });
     const credentialId = passkeyIdentity.getCredentialId();
     if (isNullish(credentialId)) {
@@ -152,7 +153,7 @@ export class MigrationFlow {
                 new Uint8Array(passkeyIdentity.getPublicKey().toDer()),
               ),
               credential_id: Array.from(new Uint8Array(credentialId)),
-              aaguid: [],
+              aaguid: aaguid !== undefined ? [aaguid] : [],
             },
           },
         })
