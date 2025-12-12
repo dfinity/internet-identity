@@ -37,7 +37,6 @@ import {
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
 import { nanosToMillis } from "$lib/utils/time";
-import { aaguidToString } from "$lib/utils/webAuthn";
 
 interface AuthFlowOptions {
   trackLastUsed?: boolean;
