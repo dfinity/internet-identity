@@ -57,7 +57,7 @@ test.describe("Migration from an app", () => {
         await authPage
           .getByRole("button", { name: "Continue with passkey" })
           .click();
-        const dialog = page.getByRole("dialog");
+        const dialog = authPage.getByRole("dialog");
         await expect(dialog).toBeVisible();
         await dialog.getByRole("button", { name: "Upgrade" }).click();
         const authAuthenticatorId = await addVirtualAuthenticator(authPage);
