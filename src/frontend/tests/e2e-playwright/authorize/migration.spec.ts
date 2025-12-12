@@ -57,23 +57,23 @@ test.describe("Migration from an app", () => {
         await authPage
           .getByRole("button", { name: "Continue with passkey" })
           .click();
-        await authPage.getByRole("button", { name: "Upgrade" }).click();
+        const dialog = page.getByRole("dialog");
+        await expect(dialog).toBeVisible();
+        await dialog.getByRole("button", { name: "Upgrade" }).click();
         const authAuthenticatorId = await addVirtualAuthenticator(authPage);
         await addCredentialToVirtualAuthenticator(
           authPage,
           authAuthenticatorId,
           credential,
         );
-        await authPage
+        await dialog
           .getByPlaceholder("Internet Identity number")
           .fill(identityNumber);
-        await authPage.getByRole("button", { name: "Continue" }).click();
+        await dialog.getByRole("button", { name: "Continue" }).click();
 
-        await authPage.getByLabel("Identity name").fill(TEST_USER_NAME);
+        await dialog.getByLabel("Identity name").fill(TEST_USER_NAME);
         auth(authPage);
-        await authPage
-          .getByRole("button", { name: "Upgrade identity" })
-          .click();
+        await dialog.getByRole("button", { name: "Upgrade identity" }).click();
       },
     );
     expect(legacyPrincipal).toEqual(migratedPrincipal);

@@ -28,13 +28,17 @@ const upgradeLegacyIdentity = async (
   auth: DummyAuthFn,
 ) => {
   await page.getByRole("button", { name: "Continue with passkey" }).click();
-  await page.getByRole("button", { name: "Upgrade" }).click();
-  await page.getByPlaceholder("Internet Identity number").fill(identityNumber);
-  await page.getByRole("button", { name: "Continue" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Upgrade" }).click();
+  await dialog
+    .getByPlaceholder("Internet Identity number")
+    .fill(identityNumber);
+  await dialog.getByRole("button", { name: "Continue" }).click();
 
-  await page.getByLabel("Identity name").fill(TEST_USER_NAME);
+  await dialog.getByLabel("Identity name").fill(TEST_USER_NAME);
   auth(page);
-  await page.getByRole("button", { name: "Upgrade identity" }).click();
+  await dialog.getByRole("button", { name: "Upgrade identity" }).click();
 };
 
 test.describe("Migration", () => {
