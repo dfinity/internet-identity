@@ -343,6 +343,17 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
         passkey_credentials.extend(recovery_devices);
 
         let passkey_credentials = Some(passkey_credentials);
+
+        // Currently, the frontend does not support more than one recovery key. Thus, we log
+        // a warning if there are multiple recovery keys for observability.
+        if recovery_keys.len() > 1 {
+            ic_cdk::println!(
+                "Warning: Anchor {} has multiple ({}) recovery keys.",
+                anchor_number,
+                recovery_keys.len()
+            );
+        }
+
         let recovery_keys = Some(recovery_keys);
 
         (
