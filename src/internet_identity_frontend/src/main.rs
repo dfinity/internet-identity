@@ -1,7 +1,7 @@
 use asset_util::{collect_assets, Asset as AssetUtilAsset, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use candid::Encode;
+use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
 use ic_cdk::{api, init, post_upgrade};
@@ -68,9 +68,7 @@ lazy_static! {
 #[init]
 fn init(init_arg: Option<InternetIdentityInit>) {
     let config = init_arg.unwrap_or_else(|| DEFAULT_CONFIG.clone());
-    ic_cdk_timers::set_timer(std::time::Duration::from_secs(0), move || {
-        certify_all_assets(config)
-    });
+    certify_all_assets(config);
 }
 
 #[post_upgrade]
@@ -132,6 +130,18 @@ fn certify_all_assets(init: InternetIdentityInit) {
             }],
             aliased_by: vec!["/".to_string()],
             encodings: encodings.clone(),
+        },
+        AssetConfig::Pattern {
+            pattern: "**/*.html".to_string(),
+            content_type: Some("text/html".to_string()),
+            headers: get_asset_headers(
+                integrity_hashes.clone(),
+                vec![(
+                    "cache-control".to_string(),
+                    NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+                )],
+            ),
+            encodings: vec![AssetEncoding::Identity.default_config()],
         },
         AssetConfig::Pattern {
             pattern: "**/*.css".to_string(),
@@ -421,7 +431,7 @@ fn get_static_assets(config: &InternetIdentityInit) -> Vec<AssetUtilAsset> {
 
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
-    let canister_id = api::id();
+    let canister_id = Principal::from_text("u6s2n-gx777-77774-qaaba-cai").unwrap();
     // Encode config to base64-encoded Candid to avoid JSON escaping issues
     let encoded_config = BASE64.encode(Encode!(config).unwrap());
     html.replace(
@@ -446,15 +456,11 @@ fn extract_inline_scripts(content: String) -> Vec<String> {
 }
 
 #[query]
-fn http_request(req: HttpRequest) -> HttpResponse {
-    serve_asset(&req)
-}
-
-fn serve_asset<'a>(req: &'a HttpRequest<'a>) -> HttpResponse<'static> {
+fn http_request(request: HttpRequest) -> HttpResponse {
     ASSET_ROUTER.with(|asset_router| {
         if let Ok(response) = asset_router.borrow().serve_asset(
             &ic_cdk::api::data_certificate().expect("No data certificate available"),
-            req,
+            &request,
         ) {
             response
         } else {
