@@ -58,7 +58,7 @@ export const extractAAGUID = (authData: Uint8Array): Uint8Array | undefined => {
 };
 
 /**
- * Convert raw AAGUID bytes into it's standardized human-readable UUID string
+ * Convert raw AAGUID bytes into its standardized human-readable UUID string
  *
  * @param aaguid in raw bytes
  * @returns human-readable UUID string
