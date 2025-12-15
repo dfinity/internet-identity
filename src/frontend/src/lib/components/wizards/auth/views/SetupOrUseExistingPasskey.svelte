@@ -13,9 +13,10 @@
   interface Props {
     setupNew: () => void;
     useExisting: () => Promise<void | "cancelled">;
+    upgrade: () => void;
   }
 
-  const { setupNew, useExisting }: Props = $props();
+  const { setupNew, useExisting, upgrade }: Props = $props();
 
   let isAuthenticating = $state(false);
   let isCancelled = $state(false);
@@ -71,34 +72,16 @@
       {/if}
     </Button>
   </Tooltip>
-  <div class="mt-3 flex flex-row items-center">
+  <div class="border-border-tertiary my-5 border-t"></div>
+  <div class="flex flex-row items-center justify-between gap-4">
     <p class="text-text-secondary text-sm">
-      <Trans>
-        <a
-          href={II_SUPPORT_PRIVACY_SECURITY}
-          target="_blank"
-          class="text-text-primary font-semibold hover:underline"
-        >
-          Learn more
-        </a>
-        about privacy preservation
-      </Trans>
+      {$t`Still have an identity number?`}
     </p>
-    <Tooltip
-      label={$t`Internet Identity protects your privacy`}
-      description={$t`Your personal data, such as your name or email, is never shared. Each app gets a unique pseudonym to prevent tracking automatically.`}
-      direction="up"
-      align="end"
-      offset="0rem"
-      class="max-w-80"
+    <button
+      onclick={upgrade}
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      <Button
-        variant="tertiary"
-        iconOnly
-        class="ms-auto !cursor-default !rounded-full"
-      >
-        <HelpCircleIcon class="size-5" />
-      </Button>
-    </Tooltip>
+      {$t`Upgrade`}
+    </button>
   </div>
 </div>

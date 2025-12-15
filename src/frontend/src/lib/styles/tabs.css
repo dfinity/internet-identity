@@ -1,0 +1,14 @@
+@utility tabs {
+  @apply relative flex flex-row gap-4;
+  @apply before:border-border-secondary before:absolute before:inset-x-0 before:bottom-0 before:border-b-1;
+}
+
+@utility tab {
+  @apply flex flex-row items-center gap-2 pb-3;
+  @apply text-text-tertiary text-sm font-semibold;
+  @apply border-b-2 border-transparent;
+}
+
+@utility tab-selected {
+  @apply border-fg-primary;
+}
