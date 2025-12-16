@@ -1056,6 +1056,69 @@ mod from_conversion_tests {
         assert_eq!(passkeys[0].credential_id, vec![0xde, 0xad, 0xbe, 0xef]);
     }
 
+    /// Tests that passkey devices with unknown key type but having a credential_id are
+    /// treated as normal passkeys during migration (regardless of the purpose).
+    #[test]
+    fn should_handle_unknown_key_type_with_credential_id() {
+        let mut anchor = Anchor::new(ANCHOR_NUMBER, 123456789);
+
+        for purpose in [Purpose::Authentication, Purpose::Recovery] {
+            // Device with unknown key type but has credential_id
+            let device = Device {
+                pubkey: ByteBuf::from(vec![80, 81, 82, purpose.clone() as u8]),
+                alias: "Unknown Key Type Device".to_string(),
+                credential_id: Some(ByteBuf::from(vec![83, 84, 85])),
+                aaguid: None,
+                purpose,
+                key_type: KeyType::Unknown,
+                protection: DeviceProtection::Unprotected,
+                origin: Some("https://id.ai".to_string()),
+                last_usage_timestamp: Some(123456789),
+                metadata: None,
+            };
+            anchor.add_device(device.clone()).unwrap();
+        }
+
+        let (_fixed, storable): (StorableFixedAnchor, StorableAnchor) = anchor.into();
+
+        // Device with unknown key type but has credential_id is migrated as passkey.
+        let passkeys = storable.passkey_credentials.unwrap();
+        assert_eq!(
+            passkeys,
+            vec![
+                StorablePasskeyCredential {
+                    pubkey: vec![80, 81, 82, Purpose::Authentication as u8],
+                    credential_id: vec![83, 84, 85],
+                    origin: "https://id.ai".to_string(),
+                    created_at_ns: None,
+                    last_usage_timestamp_ns: Some(123456789),
+                    alias: Some("Unknown Key Type Device".to_string()),
+                    aaguid: None,
+                    // Happy case, therefore no special migration data.
+                    special_device_migration: None,
+                },
+                StorablePasskeyCredential {
+                    pubkey: vec![80, 81, 82, Purpose::Recovery as u8],
+                    credential_id: vec![83, 84, 85],
+                    origin: "https://id.ai".to_string(),
+                    created_at_ns: None,
+                    last_usage_timestamp_ns: Some(123456789),
+                    alias: Some("Unknown Key Type Device".to_string()),
+                    aaguid: None,
+                    // Special case (recovery passkey); device migration data should be persisted.
+                    special_device_migration: Some(SpecialDeviceMigration {
+                        credential_id: Some(vec![83, 84, 85]),
+                        purpose: Purpose::Recovery.into(),
+                        key_type: KeyType::Unknown.into(),
+                    }),
+                }
+            ]
+        );
+
+        let recovery_keys = storable.recovery_keys.unwrap();
+        assert_eq!(recovery_keys, vec![]);
+    }
+
     /// Verifies that devices without a credential_id and not marked as seed phrase are included
     /// in the recovery_keys list.
     #[test]
