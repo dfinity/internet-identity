@@ -140,7 +140,7 @@ test("Authorize by signing in from another device", async ({
       .click();
 
     // Verify we have two passkeys
-    await expect(otherDevicePage.getByText("Chrome")).toHaveCount(2);
+    await expect(otherDevicePage.getByText("Unknown")).toHaveCount(2);
 
     // Switch to current device and verify we can authorize
     await authPage

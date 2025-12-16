@@ -41,7 +41,7 @@ test("User can rename the current passkey used for authentication", async ({
   ).toHaveCount(1);
 
   // Rename passkey
-  await renamePasskey(page, "Chrome", "My Main Passkey");
+  await renamePasskey(page, "Unknown", "My Main Passkey");
 
   // Verify passkey has been renamed
   await expect(

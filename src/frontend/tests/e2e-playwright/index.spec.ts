@@ -133,7 +133,7 @@ test.describe("First visit", () => {
     await existingDevicePage
       .getByRole("link", { name: "Access and recovery" })
       .click();
-    await expect(existingDevicePage.getByText("Chrome")).toHaveCount(2);
+    await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
 
     // Switch to new device and verify we are signed in
     await newDevicePage.waitForURL(II_URL + "/manage");
