@@ -1,25 +1,37 @@
 import knownPasswordManagers from "./password_managers.json";
 import knownSecurityKeys from "./security_keys.json";
 
+/**
+ * e.g. Stored in your Google account and synced across your Android devices.
+ */
 interface StoredInAccount {
   type: "account";
-  account: string; // e.g. Google account
-  platform?: string; // e.g. Android devices
+  account: string;
+  platform?: string;
 }
 
+/**
+ * e.g. Stored and usable only on the Windows device it was created on.
+ */
 interface StoredOnPlatform {
   type: "platform";
-  platform: string; // e.g. Windows
+  platform: string;
 }
 
+/**
+ * e.g. Kept on a physical key. Authenticate on supported devices via tap/insert.
+ */
 interface StoredOnDevice {
   type: "device";
 }
 
+/**
+ * e.g. Stored and usable only in Chrome on the macOS device it was created on.`
+ */
 interface StoredInBrowser {
   type: "browser";
-  browser: string; // e.g. Chrome
-  platform?: string; // e.g. Mac OS
+  browser: string;
+  platform?: string;
 }
 
 export type Provider = { name: string } & (
@@ -29,8 +41,8 @@ export type Provider = { name: string } & (
   | StoredInBrowser
 );
 
-// All passkey providers listed in order (top down) from least to most common,
-// this due to the fact that keys defined later override earlier keys in JS.
+// Passkey providers are listed from least to most common (top to bottom),
+// because in JavaScript, properties defined later override earlier ones.
 const knownProviders: Record<string, Provider> = {
   // Password managers (e.g. Bitwarden browser extension)
   ...Object.fromEntries(
@@ -58,13 +70,13 @@ const knownProviders: Record<string, Provider> = {
     name: "Chrome",
     type: "browser",
     browser: "Chrome",
-    platform: "Mac OS",
+    platform: "macOS",
   },
   "771b48fd-d3d4-4f74-9232-fc157ab0507a": {
     name: "Edge",
     type: "browser",
     browser: "Edge",
-    platform: "Mac OS",
+    platform: "macOS",
   },
   // Operating systems (provider available by default)
   ...Object.fromEntries(
