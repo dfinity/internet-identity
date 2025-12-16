@@ -1,5 +1,4 @@
 import { extractAAGUID, lookupAAGUID } from "$lib/utils/webAuthn";
-import { beforeAll } from "vitest";
 
 describe("webauthn", () => {
   describe("extractAAGUID", () => {
