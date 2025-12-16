@@ -282,7 +282,6 @@ export class AuthFlow {
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
     const aaguid = passkeyIdentity.getAaguid();
     const authnMethod = passkeyAuthnMethodData({
-      alias: "",
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId: passkeyIdentity.getCredentialId()!,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),

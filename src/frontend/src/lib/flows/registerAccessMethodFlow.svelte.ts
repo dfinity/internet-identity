@@ -106,7 +106,6 @@ export class RegisterAccessMethodFlow {
     }
     const aaguid = passkeyIdentity.getAaguid();
     const authnMethodData = passkeyAuthnMethodData({
-      alias: "",
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
