@@ -12,27 +12,25 @@ if [ $padding_needed -ne 4 ]; then
 fi
 decoded_content=$(echo "$base64_content" | base64 --decode)
 
-# External FIDO security key entries are written directly to a separate file for II 2.0
-declare -A extEntries
-extEntries_json=$(echo "$decoded_content" | jq -r '.entries[] | select(.aaguid and ((.metadataStatement.attachmentHint // []) | type=="array" and index("external"))) | "\(.aaguid)=\(.metadataStatement.description)"')
+# FIDO entries (used as source for security keys)
+declare -A fidoEntries
+fidoEntries_json=$(echo "$decoded_content" | jq -r '.entries[] | select(.aaguid and ((.metadataStatement.attachmentHint // []) | type=="array" and index("external"))) | "\(.aaguid)=\(.metadataStatement.description)"')
 while IFS="= " read -r key value; do
-    extEntries["$key"]="$value"
-done <<< "$extEntries_json"
+    fidoEntries["$key"]="$value"
+done <<< "$fidoEntries_json"
 {
     echo "{"
-    for key in "${!extEntries[@]}"; do
-        echo "  \"$key\": \"${extEntries[$key]}\","
+    for key in "${!fidoEntries[@]}"; do
+        echo "  \"$key\": \"${fidoEntries[$key]}\","
     done | sed '$ s/,$//'
     echo "}"
 } > "$PWD/src/frontend/src/lib/assets/aaguid/security_keys.json"
 
-# Community entries
+# Community entries (used as source for password managers)
 declare -A communityEntries
 while IFS="= " read -r key value; do
     communityEntries["$key"]="$value"
 done < <(curl -sL "https://raw.githubusercontent.com/passkeydeveloper/passkey-authenticator-aaguids/main/aaguid.json" | jq -r 'to_entries | map("\(.key)=\(.value.name)") | .[]')
-
-# Community entries are written directly to a separate file for II 2.0
 {
     echo "{"
     for key in "${!communityEntries[@]}"; do
