@@ -101,8 +101,12 @@
     {/if}
   </div>
   <div class="text-text-primary mb-1 text-base font-semibold">
-    {#if alias === undefined && provider !== undefined}
-      {provider.name}
+    {#if alias === undefined}
+      {#if provider === undefined}
+        {$t`Unknown`}
+      {:else}
+        {provider.name}
+      {/if}
     {:else}
       {alias}
     {/if}

@@ -48,7 +48,7 @@ test("User can rename the current passkey used for authentication", async ({
     page
       .getByRole("listitem")
       .filter({ hasText: "Passkey" })
-      .filter({ hasText: "Chrome" }),
+      .filter({ hasText: "Unknown" }),
   ).toBeHidden();
   await expect(
     page
@@ -89,11 +89,11 @@ test("User can rename a newly added passkey from the same device", async ({
   ).toHaveCount(1);
 
   // Rename passkey to current passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Add another passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify that we now have two passkeys
   await expect(
@@ -145,11 +145,14 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
 
+  // Assign it an initial name before moving forward
+  await renamePasskey(page, "Unknown", "My passkey");
+
   // Open the rename passkey dialog
   await page
     .getByRole("listitem")
     .filter({ hasText: "Passkey" })
-    .filter({ hasText: "Chrome" })
+    .filter({ hasText: "My passkey" })
     .getByRole("button", { name: "More options" })
     .click();
   await page.getByRole("menuitem", { name: "Rename" }).click();
@@ -161,7 +164,7 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
 
   // Expect input to be prefilled with current name
   const input = page.getByRole("textbox");
-  await expect(input).toHaveValue("Chrome");
+  await expect(input).toHaveValue("My passkey");
 
   // Expect save button to be disabled since it's unchanged
   await expect(
@@ -205,6 +208,6 @@ test("User cannot rename passkey to an empty name nor is it renamed on cancel", 
     page
       .getByRole("listitem")
       .filter({ hasText: "Passkey" })
-      .filter({ hasText: "Chrome" }),
+      .filter({ hasText: "My passkey" }),
   ).toBeVisible();
 });
