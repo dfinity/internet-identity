@@ -86,13 +86,12 @@ export class AddAccessMethodFlow {
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is missing");
     }
-    const aaguid = passkeyIdentity.getAaguid();
     const authnMethodData = passkeyAuthnMethodData({
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
-      aaguid,
+      aaguid: passkeyIdentity.getAaguid(),
     });
     await actor
       .authn_method_add(identityNumber, authnMethodData)

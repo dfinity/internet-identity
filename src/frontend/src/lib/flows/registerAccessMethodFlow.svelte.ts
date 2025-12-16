@@ -104,13 +104,12 @@ export class RegisterAccessMethodFlow {
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is missing");
     }
-    const aaguid = passkeyIdentity.getAaguid();
     const authnMethodData = passkeyAuthnMethodData({
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
-      aaguid,
+      aaguid: passkeyIdentity.getAaguid(),
     });
     await session.actor
       .authn_method_registration_mode_exit(this.#identityNumber, [

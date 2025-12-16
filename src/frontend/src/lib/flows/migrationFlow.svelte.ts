@@ -15,7 +15,6 @@ import { MultiWebAuthnIdentity } from "$lib/utils/multiWebAuthnIdentity";
 import { convertToValidCredentialData } from "$lib/utils/credential-devices";
 import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
-import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
@@ -98,17 +97,9 @@ export class MigrationFlow {
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
     const sanitizedOrigin =
       nonNullish(origin) && origin.length <= 50 ? origin : undefined;
-    // Kick-off fetching "ua-parser-js";
-    const uaParser = loadUAParser();
     const authenticatorAttachement =
       passkeyIdentity.getAuthenticatorAttachment();
     const aaguid = passkeyIdentity.getAaguid();
-    const deviceName = await inferPasskeyAlias({
-      authenticatorType: authenticatorAttachement,
-      userAgent: navigator.userAgent,
-      uaParser,
-      aaguid,
-    });
     const credentialId = passkeyIdentity.getCredentialId();
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is null");
@@ -117,14 +108,7 @@ export class MigrationFlow {
       protection: { Unprotected: null },
       purpose: { Authentication: null },
     };
-    const metadata: MetadataMapV2 = [
-      [
-        "alias",
-        {
-          String: deviceName,
-        },
-      ],
-    ];
+    const metadata: MetadataMapV2 = [];
     if (nonNullish(authenticatorAttachement)) {
       metadata.push([
         "authenticator_attachment",
