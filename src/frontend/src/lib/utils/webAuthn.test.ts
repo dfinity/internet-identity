@@ -40,9 +40,14 @@ describe("webauthn", () => {
 
   describe("lookupAAGUID", () => {
     beforeAll(() => {
-      vi.mock("../assets/passkey_aaguid_data.json", () => ({
+      vi.mock("$lib/assets/aaguid", () => ({
         default: {
-          "fbfc3007-154e-4ecc-8c0b-6e020557d7bd": "iCloud Keychain",
+          "fbfc3007-154e-4ecc-8c0b-6e020557d7bd": {
+            name: "iCloud Keychain",
+            type: "Account",
+            account: "Apple",
+            platform: "Apple",
+          },
         },
       }));
     });
