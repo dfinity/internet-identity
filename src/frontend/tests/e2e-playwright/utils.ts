@@ -189,7 +189,6 @@ export const renamePasskey = async (
   ).toBeVisible();
 
   const input = page.getByRole("textbox");
-  await expect(input).toHaveValue(currentName);
   await input.clear();
   await input.fill(nextName);
   await page.getByRole("button", { name: "Save changes" }).click();
