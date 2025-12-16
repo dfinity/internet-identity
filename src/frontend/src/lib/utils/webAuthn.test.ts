@@ -1,4 +1,5 @@
 import { extractAAGUID, lookupAAGUID } from "$lib/utils/webAuthn";
+import { beforeAll } from "vitest";
 
 describe("webauthn", () => {
   describe("extractAAGUID", () => {
@@ -40,9 +41,22 @@ describe("webauthn", () => {
   });
 
   describe("lookupAAGUID", () => {
+    beforeAll(() => {
+      vi.mock("$lib/assets/aaguid", () => ({
+        default: {
+          "fbfc3007-154e-4ecc-8c0b-6e020557d7bd": {
+            name: "iCloud Keychain",
+            type: "Account",
+            account: "Apple",
+            platform: "Apple",
+          },
+        },
+      }));
+    });
+
     it("should return expected value", async () => {
       expect(await lookupAAGUID("fbfc3007-154e-4ecc-8c0b-6e020557d7bd")).toBe(
-        "Apple Passwords",
+        "iCloud Keychain",
       );
     });
   });

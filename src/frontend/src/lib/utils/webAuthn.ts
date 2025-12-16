@@ -76,13 +76,11 @@ export const aaguidToString = (aaguid: Uint8Array): string =>
 export const lookupAAGUID = async (
   aaguid: string,
 ): Promise<string | undefined> => {
-  // Grab known provider list and map it to a record of only names
-  const knownList = Object.fromEntries(
-    Object.entries((await import("$lib/assets/aaguid")).default).map(
-      ([aaguid, { name }]) => [aaguid, name],
-    ),
+  const knownProviders = (await import("$lib/assets/aaguid")).default;
+  const knownNames = Object.fromEntries(
+    Object.entries(knownProviders).map(([aaguid, { name }]) => [aaguid, name]),
   );
-  return knownList[aaguid as keyof typeof knownList];
+  return knownNames[aaguid];
 };
 
 /**

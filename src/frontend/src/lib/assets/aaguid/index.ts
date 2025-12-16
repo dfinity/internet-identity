@@ -3,13 +3,13 @@ import knownSecurityKeys from "./security_keys.json";
 
 interface StoredInAccount {
   type: "account";
-  account: string;
-  platform?: string;
+  account: string; // e.g. Google account
+  platform?: string; // e.g. Android devices
 }
 
 interface StoredOnPlatform {
   type: "platform";
-  platform: string;
+  platform: string; // e.g. Windows
 }
 
 interface StoredOnDevice {
@@ -18,8 +18,8 @@ interface StoredOnDevice {
 
 interface StoredInBrowser {
   type: "browser";
-  browser: string;
-  platform?: string;
+  browser: string; // e.g. Chrome
+  platform?: string; // e.g. Mac OS
 }
 
 export type Provider = { name: string } & (
