@@ -47,7 +47,7 @@ export const passkeyAuthnMethodData = ({
   origin,
   aaguid,
 }: {
-  alias: string;
+  alias?: string;
   pubKey: DerEncodedPublicKey;
   credentialId: CredentialId;
   authenticatorAttachment?: AuthenticatorAttachment;
@@ -55,10 +55,12 @@ export const passkeyAuthnMethodData = ({
   aaguid?: Uint8Array;
 }): AuthnMethodData => {
   const metadata: MetadataMapV2 = [
-    ["alias", { String: alias }],
     // The origin in the metadata might not match the origin in the auth method if the origin is longer than 50 characters.
     ["origin", { String: origin }],
   ];
+  if (nonNullish(alias)) {
+    metadata.push(["alias", { String: alias }]);
+  }
   if (nonNullish(authenticatorAttachment)) {
     metadata.push([
       "authenticator_attachment",
