@@ -46,7 +46,7 @@ describe("webauthn", () => {
         default: {
           "fbfc3007-154e-4ecc-8c0b-6e020557d7bd": {
             name: "iCloud Keychain",
-            type: "Account",
+            type: "account",
             account: "Apple",
             platform: "Apple",
           },
