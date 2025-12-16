@@ -7,8 +7,10 @@
   import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
-  import { getAuthnMethodAlias } from "$lib/utils/webAuthn";
+  import { aaguidToString, getAuthnMethodAlias } from "$lib/utils/webAuthn";
   import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
+  import { onMount } from "svelte";
+  import type { Provider } from "$lib/assets/aaguid";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -20,7 +22,30 @@
   const { passkey, onRename, onRemove, isCurrentAccessMethod }: Props =
     $props();
 
-  const alias = $derived(getAuthnMethodAlias(passkey));
+  let knownProviders = $state<Record<string, Provider>>({});
+
+  const alias = $derived.by(() => {
+    const value = getAuthnMethodAlias(passkey);
+    if (value.length === 0) {
+      return;
+    }
+    return value;
+  });
+  const aaguid = $derived.by(() => {
+    if (!("WebAuthn" in passkey.authn_method)) {
+      return;
+    }
+    const [value] = passkey.authn_method.WebAuthn.aaguid;
+    if (value === undefined) {
+      return;
+    }
+    return aaguidToString(new Uint8Array(value));
+  });
+  const provider = $derived(
+    knownProviders !== undefined && aaguid !== undefined
+      ? knownProviders[aaguid]
+      : undefined,
+  );
   const options = $derived([
     ...(onRename !== undefined
       ? [
@@ -42,6 +67,13 @@
       : []),
   ]);
   const isLegacy = $derived(isLegacyAuthnMethod(passkey));
+
+  onMount(() => {
+    // Lazy load known providers data
+    import("$lib/assets/aaguid").then(
+      (data) => (knownProviders = data.default),
+    );
+  });
 </script>
 
 <div class={[isLegacy && "opacity-50"]}>
@@ -69,10 +101,18 @@
     {/if}
   </div>
   <div class="text-text-primary mb-1 text-base font-semibold">
-    {alias}
+    {#if alias === undefined && provider !== undefined}
+      {provider.name}
+    {:else}
+      {alias}
+    {/if}
   </div>
   <div class="text-text-tertiary text-sm">
-    {$t`Passkey`}
+    {#if alias === undefined || provider === undefined}
+      {$t`Passkey`}
+    {:else}
+      {$t`Passkey (${provider.name})`}
+    {/if}
   </div>
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="mb-4 flex flex-row">
@@ -116,6 +156,20 @@
     </div>
   </div>
   <div class="text-text-primary text-xs">
-    {$t`Stored securely on your device, in your password manager, or on a security key.`}
+    {#if provider?.type === "account"}
+      {provider.platform === undefined
+        ? $t`Stored in your ${provider.account} account and synced across your devices.`
+        : $t`Stored in your ${provider.account} account and synced across your ${provider.platform} devices.`}
+    {:else if provider?.type === "platform"}
+      {$t`Stored and usable only on the ${provider.platform} device it was created on.`}
+    {:else if provider?.type === "device"}
+      {$t`Kept on a physical key. Authenticate on supported devices via tap/insert.`}
+    {:else if provider?.type === "browser"}
+      {provider.platform === undefined
+        ? $t`Stored and usable only in ${provider.browser} on the device it was created on.`
+        : $t`Stored and usable only in ${provider.browser} on the ${provider.platform} device it was created on.`}
+    {:else}
+      {$t`Stored securely on your device, in your password manager, or on a security key.`}
+    {/if}
   </div>
 </div>

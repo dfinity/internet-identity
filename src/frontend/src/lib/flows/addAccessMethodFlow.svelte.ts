@@ -13,7 +13,6 @@ import type {
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
-import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 
 export class AddAccessMethodFlow {
@@ -87,20 +86,14 @@ export class AddAccessMethodFlow {
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is missing");
     }
-    const uaParser = loadUAParser();
     const aaguid = passkeyIdentity.getAaguid();
-    const alias = await inferPasskeyAlias({
-      authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
-      userAgent: navigator.userAgent,
-      uaParser,
-      aaguid,
-    });
     const authnMethodData = passkeyAuthnMethodData({
-      alias,
+      alias: "",
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
+      aaguid,
     });
     await actor
       .authn_method_add(identityNumber, authnMethodData)

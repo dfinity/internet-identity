@@ -43,7 +43,9 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           base: main
-          add-paths: src/frontend/src/assets/passkey_aaguid_data.json
+          add-paths: |
+            src/frontend/src/assets/aaguid/password_managers.json
+            src/frontend/src/assets/aaguid/security_keys.json
           commit-message: Update Passkey AAGUID
           committer: GitHub <noreply@github.com>
           branch: bot-passkey-aaguid-update

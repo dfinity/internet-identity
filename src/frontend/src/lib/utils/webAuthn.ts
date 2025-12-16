@@ -76,9 +76,12 @@ export const aaguidToString = (aaguid: Uint8Array): string =>
 export const lookupAAGUID = async (
   aaguid: string,
 ): Promise<string | undefined> => {
-  const knownList = (
-    await import("$lib/legacy/assets/passkey_aaguid_data.json")
-  ).default;
+  // Grab known provider list and map it to a record of only names
+  const knownList = Object.fromEntries(
+    Object.entries((await import("$lib/assets/aaguid")).default).map(
+      ([aaguid, { name }]) => [aaguid, name],
+    ),
+  );
   return knownList[aaguid as keyof typeof knownList];
 };
 
