@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SvelteHTMLElements, SVGAttributes } from "svelte/elements";
+  import type { SvelteHTMLElements } from "svelte/elements";
   import LogoLegacy from "./LogoLegacy.svelte";
   import { ArrowRightIcon } from "@lucide/svelte";
   import Logo from "../ui/Logo.svelte";
