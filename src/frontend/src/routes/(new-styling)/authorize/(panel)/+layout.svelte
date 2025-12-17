@@ -79,7 +79,7 @@
         ]}
       />
       <h2
-        class="mb-3 text-center text-lg font-medium text-balance text-black dark:text-white"
+        class="mx-6 mb-3 text-center text-lg font-medium text-balance text-black dark:text-white"
       >
         {#if dapp?.name !== undefined}
           {@const application = dapp.name}
