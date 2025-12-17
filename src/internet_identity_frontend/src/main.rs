@@ -4,13 +4,15 @@ use base64::Engine;
 use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
-use ic_cdk::{api, init, post_upgrade};
+use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
 use ic_http_certification::{
     HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, StatusCode,
 };
 use include_dir::{include_dir, Dir};
-use internet_identity_interface::internet_identity::types::InternetIdentityInit;
+use internet_identity_interface::internet_identity::types::{
+    DummyAuthConfig, InternetIdentityInit,
+};
 use lazy_static::lazy_static;
 use serde_json::json;
 use sha2::Digest;
@@ -61,7 +63,9 @@ lazy_static! {
         fetch_root_key: None,
         enable_dapps_explorer: None,
         is_production: None,
-        dummy_auth: None,
+        dummy_auth: Some(Some(
+            DummyAuthConfig { prompt_for_index: true }
+        )),
     };
 }
 
@@ -431,7 +435,7 @@ fn get_static_assets(config: &InternetIdentityInit) -> Vec<AssetUtilAsset> {
 
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
-    let canister_id = Principal::from_text("u6s2n-gx777-77774-qaaba-cai").unwrap();
+    let canister_id = Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
     // Encode config to base64-encoded Candid to avoid JSON escaping issues
     let encoded_config = BASE64.encode(Encode!(config).unwrap());
     html.replace(
