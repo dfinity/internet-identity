@@ -49,68 +49,66 @@
 </script>
 
 <form class="flex flex-1 flex-col" bind:this={attachElement}>
-  <div class="mb-8 flex flex-col">
-    <div class="text-text-primary flex h-32 items-center justify-center py-5">
-      <MigrationIllustration />
-    </div>
-    <div>
-      <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
-        {$t`Let's get started`}
-      </h1>
-      <p
-        class="text-text-tertiary text-base font-medium text-balance sm:text-center"
-      >
-        <Trans>
-          Upgrade your existing identity to the new experience in a few steps.
-        </Trans>
-      </p>
-    </div>
+  <div class="text-text-primary flex h-32 items-center justify-center py-5">
+    <MigrationIllustration />
   </div>
-  <div class="flex flex-col items-stretch gap-4">
-    <Input
-      bind:value={
-        () => identityNumber ?? "",
-        (value) => (identityNumber = value.replace(/\D/g, ""))
-      }
-      inputmode="numeric"
-      placeholder={$t`Internet Identity number`}
-      size="md"
-      bind:element={inputElement}
-      autocomplete="off"
-      autocorrect="off"
-      spellcheck="false"
-      aria-label={$t`Identity number`}
-    />
-    <Tooltip
-      label={isWrongDomain
-        ? $t`Wrong domain was set. Please try again.`
-        : $t`Interaction canceled. Please try again.`}
-      hidden={!isCancelled && !isWrongDomain}
-      manual
+  <h1 class="text-text-primary mb-3 text-2xl font-medium sm:text-center">
+    {$t`Let's get started`}
+  </h1>
+  <p
+    class="text-text-tertiary mb-8 text-base font-medium text-balance sm:text-center"
+  >
+    <Trans>
+      Upgrade your existing identity to the new experience in a few steps.
+    </Trans>
+  </p>
+  <Input
+    bind:value={
+      () => identityNumber ?? "",
+      (value) => (identityNumber = value.replace(/\D/g, ""))
+    }
+    inputmode="numeric"
+    placeholder={$t`Internet Identity number`}
+    size="md"
+    bind:element={inputElement}
+    autocomplete="off"
+    autocorrect="off"
+    spellcheck="false"
+    aria-label={$t`Identity number`}
+    class="mb-4"
+  />
+  <Tooltip
+    label={isWrongDomain
+      ? $t`Wrong domain was set. Please try again.`
+      : $t`Interaction canceled. Please try again.`}
+    hidden={!isCancelled && !isWrongDomain}
+    manual
+  >
+    <button
+      onclick={handleSubmit}
+      type="submit"
+      disabled={isSubmitting || identityNumber.length === 0}
+      class="btn btn-lg"
     >
-      <Button
-        onclick={handleSubmit}
-        variant="primary"
-        size="lg"
-        type="submit"
-        disabled={isSubmitting || identityNumber.length === 0}
-      >
-        {#if isSubmitting}
-          <ProgressRing />
-          <span>{$t`Authenticating...`}</span>
-        {:else}
-          <span>{$t`Continue`}</span>
-        {/if}
-      </Button>
-    </Tooltip>
-    <Button
+      {#if isSubmitting}
+        <ProgressRing />
+        <span>{$t`Authenticating...`}</span>
+      {:else}
+        <span>{$t`Continue`}</span>
+      {/if}
+    </button>
+  </Tooltip>
+  <div class="border-border-tertiary my-5 border-t"></div>
+  <div class="flex flex-row items-center justify-between gap-4">
+    <p class="text-text-secondary text-sm">
+      {$t`Don't remember your identity number?`}
+    </p>
+    <a
       href={UPGRADE_SUPPORT_URL}
       target="_blank"
-      rel="noopener noreferrer"
-      variant="tertiary"
-      size="lg"
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      {$t`Help & FAQ`}
-    </Button>
+      {$t`Help`}
+    </a>
   </div>
 </form>
