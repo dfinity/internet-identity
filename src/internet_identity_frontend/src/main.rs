@@ -46,7 +46,7 @@ lazy_static! {
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        new_flow_origins: None,
+        new_flow_origins: Some(vec!["https://id.ai".to_string()]),
         openid_configs: Some(vec![
             internet_identity_interface::internet_identity::types::OpenIdConfig {
                 name: "Google".to_string(),
