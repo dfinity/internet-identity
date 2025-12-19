@@ -83,6 +83,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
+name = "bytes"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
+
+[[package]]
 name = "candid"
 version = "0.10.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,6 +211,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
+name = "http"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3ba2a386d7f85a81f119ad7498ebe444d2e22c2af0b86b069416ace48b3311a"
+dependencies = [
+ "bytes",
+ "itoa",
+]
+
+[[package]]
 name = "ic-cdk"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -244,10 +260,27 @@ dependencies = [
 ]
 
 [[package]]
-name = "ic-representation-independent-hash"
-version = "2.6.0"
+name = "ic-http-certification"
+version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08ae59483e377cd9aad94ec339ed1d2583b0d5929cab989328dac2d853b2f570"
+checksum = "3d1a65b0ffb568e954750067f660e254f4564394f5c064a88e0e93b2eea4a532"
+dependencies = [
+ "base64",
+ "candid",
+ "http",
+ "ic-certification",
+ "ic-representation-independent-hash",
+ "serde",
+ "serde_cbor",
+ "thiserror",
+ "urlencoding",
+]
+
+[[package]]
+name = "ic-representation-independent-hash"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2800ba4910f21d9e1cb7b6ecbbbb0f76074bd2e127b4688c57d0936206caa6e"
 dependencies = [
  "leb128",
  "sha2",
@@ -297,9 +330,16 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "ic-cdk",
+ "ic-http-certification",
  "serde",
  "serde_bytes",
 ]
+
+[[package]]
+name = "itoa"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "lazy_static"
@@ -557,6 +597,12 @@ name = "unicode-width"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0336d538f7abc86d282a4189614dfaa90810dfc2c6f6427eaf88e16311dd225d"
+
+[[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "version_check"
