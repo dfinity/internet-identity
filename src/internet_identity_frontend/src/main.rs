@@ -50,7 +50,7 @@ lazy_static! {
         openid_configs: Some(vec![
             internet_identity_interface::internet_identity::types::OpenIdConfig {
                 name: "Google".to_string(),
-                logo: "https://www.google.com/favicon.ico".to_string(),
+                logo: "".to_string(),
                 issuer: "https://accounts.google.com".to_string(),
                 client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com".to_string(),
                 jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
@@ -100,126 +100,76 @@ fn certify_all_assets(init: InternetIdentityInit) {
         });
 
     let mut router_assets = Vec::new();
-    for asset in static_assets {
+    for asset in &static_assets {
         let content = if asset.encoding == ContentEncoding::GZip {
             let mut decoder = GzDecoder::new(&asset.content[..]);
             let mut s = Vec::new();
             decoder.read_to_end(&mut s).unwrap();
             s
         } else {
-            asset.content
+            asset.content.clone()
         };
-        router_assets.push(Asset::new(asset.url_path, content));
+        router_assets.push(Asset::new(asset.url_path.clone(), content));
     }
 
-    let encodings = vec![
-        AssetEncoding::Brotli.default_config(),
-        AssetEncoding::Gzip.default_config(),
-    ];
+    let asset_configs: Vec<_> = static_assets
+        .into_iter()
+        .map(
+            |asset_util::Asset {
+                 url_path: path,
+                 encoding,
+                 content_type,
+                 content: _,
+             }| {
+                if content_type == ContentType::HTML {
+                    AssetConfig::File {
+                        path,
+                        content_type: Some("text/html".to_string()),
+                        headers: get_asset_headers(
+                            integrity_hashes.clone(),
+                            vec![(
+                                "cache-control".to_string(),
+                                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+                            )],
+                        ),
+                        fallback_for: vec![AssetFallbackConfig {
+                            scope: "/".to_string(),
+                            status_code: Some(StatusCode::OK),
+                        }],
+                        aliased_by: vec!["/".to_string()],
+                        encodings: vec![AssetEncoding::Identity.default_config()],
+                    }
+                } else {
+                    let encodings = if encoding == ContentEncoding::GZip {
+                        vec![AssetEncoding::Gzip.default_config()]
+                    } else {
+                        vec![AssetEncoding::Identity.default_config()]
+                    };
 
-    let asset_configs = vec![
-        AssetConfig::File {
-            path: "index.html".to_string(),
-            content_type: Some("text/html".to_string()),
-            headers: get_asset_headers(
-                integrity_hashes.clone(),
-                vec![(
-                    "cache-control".to_string(),
-                    NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            fallback_for: vec![AssetFallbackConfig {
-                scope: "/".to_string(),
-                status_code: Some(StatusCode::OK),
-            }],
-            aliased_by: vec!["/".to_string()],
-            encodings: encodings.clone(),
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.html".to_string(),
-            content_type: Some("text/html".to_string()),
-            headers: get_asset_headers(
-                integrity_hashes.clone(),
-                vec![(
-                    "cache-control".to_string(),
-                    NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: vec![AssetEncoding::Identity.default_config()],
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.css".to_string(),
-            content_type: Some("text/css".to_string()),
-            headers: get_asset_headers(
-                vec![],
-                vec![(
-                    "cache-control".to_string(),
-                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: encodings.clone(),
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.js".to_string(),
-            content_type: Some("text/javascript".to_string()),
-            headers: get_asset_headers(
-                vec![],
-                vec![(
-                    "cache-control".to_string(),
-                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: encodings.clone(),
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.ico".to_string(),
-            content_type: Some("image/x-icon".to_string()),
-            headers: get_asset_headers(
-                vec![],
-                vec![(
-                    "cache-control".to_string(),
-                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: vec![],
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.png".to_string(),
-            content_type: Some("image/png".to_string()),
-            headers: get_asset_headers(
-                vec![],
-                vec![(
-                    "cache-control".to_string(),
-                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: vec![],
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.woff2".to_string(),
-            content_type: Some("font/woff2".to_string()),
-            headers: get_asset_headers(
-                vec![],
-                vec![(
-                    "cache-control".to_string(),
-                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: encodings.clone(),
-        },
-        AssetConfig::Pattern {
-            pattern: "**/*.json".to_string(),
-            content_type: Some("application/json".to_string()),
-            headers: get_asset_headers(
-                vec![],
-                vec![(
-                    "cache-control".to_string(),
-                    IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
-                )],
-            ),
-            encodings: vec![],
-        },
-    ];
+                    let headers = if path.starts_with("_app/immutable") {
+                        (
+                            "cache-control".to_string(),
+                            IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+                        )
+                    } else {
+                        (
+                            "cache-control".to_string(),
+                            NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+                        )
+                    };
+
+                    AssetConfig::File {
+                        path,
+                        content_type: Some(content_type.to_mime_type_string()),
+                        encodings,
+                        headers: get_asset_headers(integrity_hashes.clone(), vec![headers]),
+                        fallback_for: vec![],
+                        aliased_by: vec![],
+                    }
+                }
+            },
+        )
+        .collect();
 
     ASSET_ROUTER.with(|asset_router| {
         if let Err(err) = asset_router
@@ -461,8 +411,8 @@ fn extract_inline_scripts(content: String) -> Vec<String> {
 
 #[query]
 fn http_request(request: HttpRequest) -> HttpResponse {
-    ASSET_ROUTER.with(|asset_router| {
-        if let Ok(response) = asset_router.borrow().serve_asset(
+    ASSET_ROUTER.with_borrow(|asset_router| {
+        if let Ok(response) = asset_router.serve_asset(
             &ic_cdk::api::data_certificate().expect("No data certificate available"),
             &request,
         ) {

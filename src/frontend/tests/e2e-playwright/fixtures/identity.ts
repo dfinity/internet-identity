@@ -42,6 +42,18 @@ class IdentityWizard {
 
   async signInWithPasskey(auth: DummyAuthFn): Promise<void> {
     await this.#goto();
+
+    await this.#page
+      .getByRole("heading", { name: "Manage your Internet Identity" })
+      .waitFor();
+
+    const useAnotherIdentity = this.#page.getByRole("button", {
+      name: "Use another identity",
+    });
+    if (await useAnotherIdentity.isVisible()) {
+      await useAnotherIdentity.click();
+    }
+
     await this.#page
       .getByRole("button", { name: "Continue with passkey" })
       .click();
