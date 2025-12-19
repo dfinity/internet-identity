@@ -16,7 +16,6 @@
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import Button from "$lib/components/ui/Button.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
