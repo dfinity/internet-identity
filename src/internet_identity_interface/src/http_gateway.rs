@@ -68,7 +68,7 @@ impl TryFrom<HttpRequest> for ic_http_certification::HttpRequest<'static> {
     }
 }
 
-impl TryFrom<HttpResponse> for ic_http_certification::HttpResponse<'_> {
+impl TryFrom<HttpResponse> for ic_http_certification::HttpResponse<'static> {
     type Error = String;
 
     fn try_from(
