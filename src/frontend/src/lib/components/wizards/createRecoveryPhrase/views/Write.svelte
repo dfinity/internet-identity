@@ -1,6 +1,5 @@
 <script lang="ts">
   import { t } from "$lib/stores/locale.store";
-  import Button from "$lib/components/ui/Button.svelte";
   import Steps from "$lib/components/wizards/createRecoveryPhrase/components/Steps.svelte";
   import { Trans } from "$lib/components/locale";
   import { EyeOffIcon } from "@lucide/svelte";
@@ -15,13 +14,13 @@
   let isRevealed = $state(false);
 </script>
 
-<div class="limited-height my-10">
+<div class="my-10 max-sm:hidden">
   <Steps total={3} current={2} />
 </div>
 <h2 class="text-text-primary text-2xl font-medium">
   {$t`Save your recovery phrase`}
 </h2>
-<p class="text-text-tertiary limited-height mt-3 text-base font-medium">
+<p class="text-text-tertiary mt-3 text-base font-medium">
   <Trans>
     Write down your recovery phrase in order and verify it afterwards. Store it
     safely and do not share it. Losing it means you will lose access.
@@ -74,19 +73,11 @@
     </span>
   </button>
 </div>
-<Button
+<button
   onclick={onWritten}
   disabled={!isRevealed}
-  size="lg"
+  class="btn btn-lg"
   aria-hidden={isRevealed ? "false" : "true"}
 >
   {$t`I have written it down`}
-</Button>
-
-<style>
-  @media (max-height: 700px) {
-    .limited-height {
-      display: none !important;
-    }
-  }
-</style>
+</button>

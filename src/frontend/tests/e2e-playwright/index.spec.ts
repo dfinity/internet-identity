@@ -131,7 +131,7 @@ test.describe("First visit", () => {
       await existingMenuButton.click();
     }
     await existingDevicePage
-      .getByRole("link", { name: "Access methods" })
+      .getByRole("link", { name: "Access and recovery" })
       .click();
     await expect(existingDevicePage.getByText("Chrome")).toHaveCount(2);
 

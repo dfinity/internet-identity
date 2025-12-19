@@ -145,10 +145,11 @@
         <li class="contents">
           <NavItem
             href="/manage/access"
-            current={page.url.pathname === "/manage/access"}
+            current={page.url.pathname === "/manage/access" ||
+              page.url.pathname === "/manage/recovery"}
           >
             <KeyRoundIcon class="size-5 sm:max-md:mx-auto" />
-            <span class="sm:max-md:hidden">{$t`Access methods`}</span>
+            <span class="sm:max-md:hidden">{$t`Access and recovery`}</span>
           </NavItem>
         </li>
       </ul>

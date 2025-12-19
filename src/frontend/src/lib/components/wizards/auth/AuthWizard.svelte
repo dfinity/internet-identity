@@ -38,7 +38,7 @@
   const authFlow = new AuthFlow();
 
   let isContinueFromAnotherDeviceVisible = $state(false);
-  let isMigrating = $state(false);
+  let isUpgrading = $state(false);
 
   const handleContinueWithExistingPasskey = async (): Promise<
     void | "cancelled"
@@ -115,6 +115,7 @@
     <SetupOrUseExistingPasskey
       setupNew={authFlow.setupNewPasskey}
       useExisting={handleContinueWithExistingPasskey}
+      upgrade={() => (isUpgrading = true)}
     />
   {:else if authFlow.view === "setupNewPasskey"}
     <CreatePasskey create={handleCreatePasskey} />
@@ -131,9 +132,9 @@
   {:else}
     <RegisterAccessMethodWizard onRegistered={handleRegistered} {onError} />
   {/if}
-{:else if isMigrating}
+{:else if isUpgrading}
   {#if !withinDialog}
-    <Dialog onClose={() => (isMigrating = false)}>
+    <Dialog onClose={() => (isUpgrading = false)}>
       <MigrationWizard onSuccess={onMigration} {onError} />
     </Dialog>
   {:else}
@@ -147,7 +148,6 @@
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
       continueWithOpenId={handleContinueWithOpenId}
-      migrate={() => (isMigrating = true)}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}

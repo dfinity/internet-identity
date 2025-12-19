@@ -29,7 +29,7 @@ test.describe("Dashboard Navigation", () => {
     if (await menuButton.isVisible()) {
       await menuButton.click();
     }
-    await page.getByRole("link", { name: "Access methods" }).click();
+    await page.getByRole("link", { name: "Access and recovery" }).click();
 
     // Check that we have one passkey listed
     const passkey = await page.getByText("Chrome");
@@ -63,7 +63,7 @@ test.describe("Dashboard Navigation", () => {
     if (await menuButton.isVisible()) {
       await menuButton.click();
     }
-    await page.getByRole("link", { name: "Access methods" }).click();
+    await page.getByRole("link", { name: "Access and recovery" }).click();
 
     // Switch to second identity
     await page.getByRole("button", { name: "Switch identity" }).click();

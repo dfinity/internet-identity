@@ -34,7 +34,7 @@ test("User can remove a passkey when they have multiple access methods", async (
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Rename current passkey to old passkey
   await renamePasskey(page, "Chrome", "Current passkey");
@@ -88,7 +88,7 @@ test("User cannot remove passkey if they only have one access method", async ({
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
   await expect(
@@ -130,7 +130,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Rename passkey to current passkey
   await renamePasskey(page, "Chrome", "Current passkey");
@@ -190,7 +190,7 @@ test("User can cancel passkey removal", async ({ page }) => {
   if (await menuButton.isVisible()) {
     await menuButton.click();
   }
-  await page.getByRole("link", { name: "Access methods" }).click();
+  await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Rename passkey to current passkey
   await renamePasskey(page, "Chrome", "Current passkey");
