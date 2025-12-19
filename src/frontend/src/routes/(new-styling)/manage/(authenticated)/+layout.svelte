@@ -31,8 +31,6 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { Trans } from "$lib/components/locale";
   import { getMetadataString } from "$lib/utils/openID";
-  import { nonNullish } from "@dfinity/utils";
-  import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { nanosToMillis } from "$lib/utils/time";
@@ -343,6 +341,8 @@
         >
           <MenuIcon class="size-5" />
         </button>
+        <!-- Indicator that there's a message in the mobile menu
+             e.g. recovery phrase has not been set-up yet. -->
         <div
           class={[
             "border-bg-primary_alt absolute end-2 top-2 size-2 rounded-full border-2 bg-blue-700 dark:bg-blue-300",
