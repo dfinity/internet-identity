@@ -37,7 +37,7 @@ pub struct HttpRequest {
     pub certificate_version: Option<u16>,
 }
 
-impl TryFrom<HttpRequest> for ic_http_certification::HttpRequest<'_> {
+impl TryFrom<HttpRequest> for ic_http_certification::HttpRequest<'static> {
     type Error = String;
 
     fn try_from(request: HttpRequest) -> Result<Self, Self::Error> {
@@ -84,7 +84,7 @@ impl TryFrom<HttpResponse> for ic_http_certification::HttpResponse<'_> {
         let body = Cow::Owned(body.into_vec());
 
         let status_code = ic_http_certification::StatusCode::from_u16(status_code)
-            .map_err(|_| "Invalid HTTP status code".to_string())?;
+            .map_err(|_| format!("Invalid HTTP status code: {}", status_code))?;
 
         let mut builder = ic_http_certification::HttpResponse::builder()
             .with_status_code(status_code)
