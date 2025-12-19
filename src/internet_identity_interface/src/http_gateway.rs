@@ -49,9 +49,8 @@ impl TryFrom<HttpRequest> for ic_http_certification::HttpRequest<'_> {
             certificate_version,
         } = request;
 
-        let method = ic_http_certification::Method::from_bytes(&method.as_bytes())
-            .map_err(|_| format!("Invalid HTTP method: {}", method))?
-            .into();
+        let method = ic_http_certification::Method::from_bytes(method.as_bytes())
+            .map_err(|_| format!("Invalid HTTP method: {}", method))?;
 
         let body = Cow::Owned(body.into_vec());
 
