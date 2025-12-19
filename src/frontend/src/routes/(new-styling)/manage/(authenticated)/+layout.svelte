@@ -138,7 +138,7 @@
     </h3>
     <p class="text-text-secondary mb-4 text-sm">
       <Trans>
-        Activate your recovery phrase so that you can recovery your identity at
+        Activate your recovery phrase so that you can recover your identity at
         any point.
       </Trans>
     </p>
