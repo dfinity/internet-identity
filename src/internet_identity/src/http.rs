@@ -17,7 +17,6 @@ fn http_options_request() -> HttpResponse {
         headers,
         body: ByteBuf::from(vec![]),
         upgrade: None,
-        streaming_strategy: None,
     }
 }
 
@@ -40,7 +39,6 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
                     headers,
                     body: ByteBuf::from(body),
                     upgrade: None,
-                    streaming_strategy: None,
                 }
             }
             Err(err) => HttpResponse {
@@ -48,7 +46,6 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
                 headers: security_headers(vec![], None),
                 body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                 upgrade: None,
-                streaming_strategy: None,
             },
         },
         probably_an_asset => match get_asset(probably_an_asset, certificate_version) {
@@ -57,14 +54,12 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
                 headers,
                 body: ByteBuf::from(content),
                 upgrade: None,
-                streaming_strategy: None,
             },
             None => HttpResponse {
                 status_code: 404,
                 headers: security_headers(vec![], None),
                 body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                 upgrade: None,
-                streaming_strategy: None,
             },
         },
     }
@@ -76,7 +71,6 @@ fn method_not_allowed(unsupported_method: &str) -> HttpResponse {
         headers: vec![("Allow".into(), "GET, OPTIONS".into())],
         body: ByteBuf::from(format!("Method {unsupported_method} not allowed.")),
         upgrade: None,
-        streaming_strategy: None,
     }
 }
 

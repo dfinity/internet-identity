@@ -1393,18 +1393,10 @@ fn verify_response_certification(
     min_certification_version: u16,
 ) -> VerificationInfo {
     verify_request_response_pair(
-        ic_http_certification::HttpRequest {
-            method: request.method,
-            url: request.url,
-            headers: request.headers,
-            body: request.body.into_vec(),
-        },
-        ic_http_certification::HttpResponse {
-            status_code: http_response.status_code,
-            headers: http_response.headers,
-            body: http_response.body.into_vec(),
-            upgrade: None,
-        },
+        request.try_into().expect("Cannot represent HttpRequest"),
+        http_response
+            .try_into()
+            .expect("Cannot represent HttpResponse"),
         canister_id.as_slice(),
         time(env) as u128,
         Duration::from_secs(300).as_nanos(),

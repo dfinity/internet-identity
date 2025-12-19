@@ -100,7 +100,7 @@ dependencies = [
  "candid",
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.16.0",
- "ic-certification 2.6.0",
+ "ic-certification 3.0.3",
  "ic-representation-independent-hash",
  "include_dir",
  "internet_identity_interface",
