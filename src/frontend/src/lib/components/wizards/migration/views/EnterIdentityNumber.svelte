@@ -106,6 +106,7 @@
     <a
       href={UPGRADE_SUPPORT_URL}
       target="_blank"
+      rel="noopener noreferrer"
       class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
       {$t`Help`}
