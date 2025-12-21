@@ -590,10 +590,10 @@ fn should_remove_protected_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that the even last device can be removed.
-/// This behaviour should be changed because it makes anchors unusable, see L2-745.
+/// Verifies that the last device can be removed when there is no recovery method.
+/// This allows users without recovery to fully delete their anchor.
 #[test]
-fn should_remove_last_device() -> Result<(), RejectResponse> {
+fn should_remove_last_device_without_recovery() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
@@ -877,5 +877,79 @@ fn should_lookup_device_key_with_credential_id() -> Result<(), RejectResponse> {
     let not_found = api::lookup_device_key(&env, canister_id, principal_1(), &credential_id)?;
     assert_eq!(not_found, None);
 
+    Ok(())
+}
+
+/// Verifies that removing the last authentication device requires recovery authentication
+/// when a recovery method is configured. See issue #897.
+#[test]
+fn should_not_remove_last_device_without_recovery_auth() {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+
+    // Add a recovery device
+    api::add(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &recovery_device_data_1(),
+    )
+    .unwrap();
+
+    // Try to remove the last authentication device without recovery auth
+    let result = api::remove(
+        &env,
+        canister_id,
+        principal_1(), // Using auth device principal, not recovery
+        user_number,
+        &device_data_1().pubkey,
+    );
+
+    expect_user_error_with_message(
+        result,
+        CanisterCalledTrap,
+        Regex::new("Removing the last authentication device requires authentication with the recovery phrase").unwrap(),
+    );
+}
+
+/// Verifies that the last authentication device CAN be removed when authenticating
+/// with the recovery device. See issue #897.
+#[test]
+fn should_remove_last_device_with_recovery_auth() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+    let user_number = flows::register_anchor(&env, canister_id);
+
+    // Add a recovery device
+    api::add(
+        &env,
+        canister_id,
+        principal_1(),
+        user_number,
+        &recovery_device_data_1(),
+    )?;
+
+    // Remove the last authentication device using recovery principal
+    api::remove(
+        &env,
+        canister_id,
+        principal_recovery_1(), // Using recovery device principal
+        user_number,
+        &device_data_1().pubkey,
+    )?;
+
+    // Verify only recovery phrase remains (auth device was removed)
+    let anchor_credentials = api::get_anchor_credentials(&env, canister_id, user_number)?;
+    assert!(
+        anchor_credentials.credentials.is_empty(),
+        "Auth device should be removed"
+    );
+    assert_eq!(
+        anchor_credentials.recovery_phrases.len(),
+        1,
+        "Recovery phrase should still exist"
+    );
     Ok(())
 }

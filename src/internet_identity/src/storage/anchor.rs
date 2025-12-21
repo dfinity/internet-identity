@@ -458,6 +458,35 @@ impl Anchor {
         let index = self.device_index(device_key)?;
         check_mutation_allowed(&self.devices[index])?;
 
+        // Check if this is the last authentication device
+        let device_to_remove = &self.devices[index];
+        if device_to_remove.purpose == Purpose::Authentication {
+            let auth_device_count = self
+                .devices
+                .iter()
+                .filter(|d| d.purpose == Purpose::Authentication)
+                .count();
+
+            // If this is the last authentication device, check for recovery devices
+            if auth_device_count == 1 {
+                // Find the first recovery device (recovery phrase)
+                if let Some(recovery_device) = self
+                    .devices
+                    .iter()
+                    .find(|d| d.purpose == Purpose::Recovery)
+                {
+                    // Require authentication with the recovery device to remove the last auth device
+                    let recovery_principal =
+                        Principal::self_authenticating(&recovery_device.pubkey);
+                    if caller() != recovery_principal {
+                        return Err(AnchorError::LastDeviceRemovalRequiresRecoveryAuthentication {
+                            recovery_key: recovery_device.pubkey.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
         self.devices.remove(index);
 
         // We do _not_ check invariants here, because there might be anchors that do not fulfill
@@ -1025,6 +1054,9 @@ pub enum AnchorError {
     },
     OpenIdCredentialAlreadyRegistered,
     OpenIdCredentialNotFound,
+    LastDeviceRemovalRequiresRecoveryAuthentication {
+        recovery_key: DeviceKey,
+    },
     ReservedMetadataKey {
         key: String,
     },
@@ -1072,6 +1104,11 @@ impl fmt::Display for AnchorError {
             AnchorError::RecoveryPhraseCredentialIdMismatch => write!(f, "Devices with key type seed_phrase must not have a credential id."),
             AnchorError::OpenIdCredentialAlreadyRegistered => write!(f, "OpenID credential has already been registered on this or another anchor."),
             AnchorError::OpenIdCredentialNotFound => write!(f, "OpenID credential not found."),
+            AnchorError::LastDeviceRemovalRequiresRecoveryAuthentication { recovery_key } => write!(
+                f,
+                "Removing the last authentication device requires authentication with the recovery phrase. Recovery key: {}",
+                hex::encode(recovery_key)
+            ),
             AnchorError::NameTooLong {limit} => write!(f, "Name is too long. Maximum length of name is {limit}."),
             AnchorError::TooManyOpenIdCredentials { limit, num_credentials } => write!(f, "Too many OpenID credentials. Maximum number of OpenID credentials is {limit}. Current number of OpenID credentials is {num_credentials}."),
         }
