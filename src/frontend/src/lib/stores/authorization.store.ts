@@ -199,6 +199,7 @@ export const authorizationContextStore: Readable<AuthorizationContext> =
     if (isNullish(context)) {
       throw new Error("Authorization context is not available yet");
     }
+    context.requestOrigin = "https://caffeine.ai";
     return context;
   });
 
