@@ -230,6 +230,7 @@
       <ButtonCard
         onclick={() => (isIdentityPopoverOpen = true)}
         class="mx-4 mb-6 sm:hidden"
+        aria-label={$t`Switch identity`}
       >
         <Avatar size="sm">
           <UserIcon class="size-5" />
