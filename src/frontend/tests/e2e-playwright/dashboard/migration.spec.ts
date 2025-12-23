@@ -110,8 +110,7 @@ test.describe("Migration", () => {
 
     // Step 5: Login again with discoverable passkey
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Switch identity" }).click();
-    await page.getByRole("button", { name: "Use another identity" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -153,7 +152,7 @@ test.describe("Migration", () => {
     await page.goto(II_URL);
     const auth2 = dummyAuth();
 
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("button", { name: "Switch identity" }).click();
     await page.getByRole("button", { name: "Use another identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     await page.getByRole("button", { name: "Upgrade" }).click();
