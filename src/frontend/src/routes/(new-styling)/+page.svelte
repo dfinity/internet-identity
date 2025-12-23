@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { building } from "$app/environment";
   import Footer from "$lib/components/layout/Footer.svelte";
   import TextFade from "$lib/components/ui/TextFade.svelte";
   import FullControlIllustration from "$lib/components/illustrations/landing/FullControlIllustration.svelte";
@@ -186,20 +187,24 @@
     <h1 class="text-text-primary hidden text-base font-semibold sm:block">
       Internet Identity
     </h1>
-    {#if selectedIdentity === undefined}
-      <button onclick={() => (isAuthDialogOpen = true)} class="btn ms-auto">
-        {$t`Sign in`}
-      </button>
-    {:else}
-      <button
-        bind:this={identityButtonRef}
-        onclick={() => (isIdentityPopoverOpen = true)}
-        class="btn btn-tertiary ms-auto gap-2.5 pr-3"
-        aria-label={$t`Switch identity`}
-      >
-        <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
-        <ChevronDownIcon class="size-4" />
-      </button>
+    {#if !building}
+      {#if selectedIdentity === undefined}
+        <button onclick={() => (isAuthDialogOpen = true)} class="btn ms-auto">
+          {$t`Sign in`}
+        </button>
+      {:else}
+        <button
+          bind:this={identityButtonRef}
+          onclick={() => (isIdentityPopoverOpen = true)}
+          class="btn btn-tertiary ms-auto gap-2.5 pr-3"
+          aria-label={$t`Switch identity`}
+        >
+          <span>
+            {selectedIdentity.name ?? selectedIdentity.identityNumber}
+          </span>
+          <ChevronDownIcon class="size-4" />
+        </button>
+      {/if}
     {/if}
   </header>
   <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
