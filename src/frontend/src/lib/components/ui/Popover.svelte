@@ -10,7 +10,6 @@
   type Props = HTMLAttributes<HTMLElement> & {
     anchor?: HTMLElement;
     onClose?: () => void;
-    closeOnOutsideClick?: boolean;
     direction?: Direction;
     align?: Align;
     distance?: string;
@@ -21,7 +20,6 @@
   let {
     anchor: anchorRef,
     onClose,
-    closeOnOutsideClick = true,
     direction = "down",
     align = "center",
     distance = "0px",
@@ -134,7 +132,20 @@
   });
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} />
+<svelte:window
+  bind:innerWidth={windowWidth}
+  onclick={(event) => {
+    // Hide popover on outside click
+    if (
+      popoverRef?.matches(":popover-open") ||
+      (event.target instanceof HTMLElement &&
+        popoverRef?.contains(event.target))
+    ) {
+      return;
+    }
+    onClose?.();
+  }}
+/>
 
 {#if windowWidth >= MOBILE_BREAKPOINT || !responsive}
   <div
@@ -152,22 +163,26 @@
   <div
     {...props}
     bind:this={popoverRef}
-    popover={closeOnOutsideClick ? "auto" : "manual"}
+    popover={"manual"}
     in:fade|global={{ duration: 1 }}
     out:fade|global={{ delay: 160, duration: 1 }}
     ontoggle={() => {
-      if (!popoverRef?.matches(":popover-open")) onClose?.();
+      if (popoverRef?.matches(":popover-open")) {
+        return;
+      }
+      onClose?.();
     }}
     onintrostart={() => popoverRef?.showPopover()}
     onoutrostart={() => popoverRef?.hidePopover()}
     onfocusout={(e) => {
       if (
-        !(e.relatedTarget instanceof Node) ||
-        !popoverRef?.contains(e.relatedTarget)
+        e.relatedTarget instanceof Node &&
+        popoverRef?.contains(e.relatedTarget)
       ) {
-        anchorRef?.querySelector("button")?.focus();
-        onClose?.();
+        return;
       }
+      anchorRef?.querySelector("button")?.focus();
+      onClose?.();
     }}
     class="popover fixed overflow-visible bg-transparent"
   >

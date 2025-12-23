@@ -72,7 +72,7 @@ class IdentityWizard {
    */
   async #goto(): Promise<void> {
     const buttons = [
-      this.#page.getByRole("button", { name: "Manage identity" }),
+      this.#page.getByRole("button", { name: "Sign in" }),
       this.#page.getByRole("button", { name: "Switch identity" }),
       this.#page.getByRole("button", { name: "Use another identity" }),
     ];
@@ -92,7 +92,7 @@ export const test = base.extend<{
     const auth = dummyAuth(authIndex);
     const tempContext = await browser.newContext();
     const tempPage = await tempContext.newPage();
-    await tempPage.goto(II_URL + "/login");
+    await tempPage.goto(II_URL);
     const script = (await tempPage.$("[data-canister-id]"))!;
     const canisterId = (await script.getAttribute("data-canister-id"))!;
     const tempWizard = new IdentityWizard(tempPage);
