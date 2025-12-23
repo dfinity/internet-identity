@@ -162,7 +162,7 @@
     </ButtonCard>
   </div>
   {#if onSignOut !== undefined}
-    <button onclick={handleSignOut} class="btn btn-tertiary">
+    <button onclick={handleSignOut} class="btn btn-tertiary gap-2">
       {#if isSigningOut}
         <ProgressRing />
       {:else}
@@ -171,7 +171,7 @@
       <span>{$t`Sign Out`}</span>
     </button>
   {:else}
-    <button onclick={handleManageIdentity} class="btn btn-tertiary">
+    <button onclick={handleManageIdentity} class="btn btn-tertiary gap-2">
       {#if isNavigatingToManage}
         <ProgressRing />
       {:else}
