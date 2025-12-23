@@ -135,7 +135,7 @@ class RecoveryPage {
 
   async cancel(): Promise<void> {
     await this.#page.getByRole("link", { name: "Cancel" }).click();
-    await this.#page.waitForURL(II_URL + "/login");
+    await this.#page.waitForURL(II_URL);
   }
 }
 

@@ -120,7 +120,7 @@
         >
           {$t`Get started`}
         </button>
-        <a href="/login" class="btn btn-secondary btn-xl">
+        <a href="/" class="btn btn-secondary btn-xl">
           {$t`Cancel`}
         </a>
       </div>

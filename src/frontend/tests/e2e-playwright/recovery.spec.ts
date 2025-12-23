@@ -133,9 +133,9 @@ test.describe("Recovery flow", () => {
   });
 
   test.describe("can be cancelled", () => {
-    // Assert we're back on the login page and the recovery phrase is still valid
+    // Assert we're back on the landing page and the recovery phrase is still valid
     test.afterEach(async ({ page, recoveryPage, words, identity }) => {
-      await page.waitForURL(II_URL + "/login");
+      await page.waitForURL(II_URL);
       await recoveryPage.goto();
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(words.current!);

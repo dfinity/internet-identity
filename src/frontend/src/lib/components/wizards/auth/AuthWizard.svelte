@@ -16,20 +16,18 @@
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
 
   interface Props {
-    isAuthenticating?: boolean;
-    onSignIn: (identityNumber: bigint) => void;
-    onSignUp: (identityNumber: bigint) => void;
-    onMigration?: (identityNumber: bigint) => void;
+    onSignIn: (identityNumber: bigint) => Promise<void>;
+    onSignUp: (identityNumber: bigint) => Promise<void>;
+    onUpgrade: (identityNumber: bigint) => Promise<void>;
     onError: (error: unknown) => void;
     withinDialog?: boolean;
     children?: Snippet;
   }
 
   let {
-    isAuthenticating = $bindable(),
     onSignIn,
     onSignUp,
-    onMigration = () => {},
+    onUpgrade,
     onError,
     withinDialog = false,
     children,
@@ -38,14 +36,15 @@
   const authFlow = new AuthFlow();
 
   let isContinueFromAnotherDeviceVisible = $state(false);
+  let isAuthenticating = $state(false);
   let isUpgrading = $state(false);
 
   const handleContinueWithExistingPasskey = async (): Promise<
     void | "cancelled"
   > => {
-    isAuthenticating = true;
     try {
-      onSignIn(await authFlow.continueWithExistingPasskey());
+      isAuthenticating = true;
+      await onSignIn(await authFlow.continueWithExistingPasskey());
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         isContinueFromAnotherDeviceVisible = true;
@@ -60,10 +59,10 @@
   const handleCreatePasskey = async (
     name: string,
   ): Promise<void | "cancelled"> => {
-    isAuthenticating = true;
     try {
+      isAuthenticating = true;
       const result = await authFlow.submitNameAndContinue(name);
-      onSignUp(result.identityNumber);
+      await onSignUp(result.identityNumber);
     } catch (error) {
       if (isWebAuthnCancelError(error)) {
         return "cancelled";
@@ -77,13 +76,13 @@
   const handleContinueWithOpenId = async (
     config: OpenIdConfig,
   ): Promise<void | "cancelled"> => {
-    isAuthenticating = true;
     try {
+      isAuthenticating = true;
       const result = await authFlow.continueWithOpenId(config);
       if (result.type === "signIn") {
-        onSignIn(result.identityNumber);
+        await onSignIn(result.identityNumber);
       } else if (nonNullish(result.name)) {
-        onSignUp(await authFlow.completeOpenIdRegistration(result.name));
+        await onSignUp(await authFlow.completeOpenIdRegistration(result.name));
       }
     } catch (error) {
       if (isOpenIdCancelError(error)) {
@@ -99,14 +98,17 @@
     name: string,
   ): Promise<void> => {
     try {
-      onSignUp(await authFlow.completeOpenIdRegistration(name));
+      isAuthenticating = true;
+      await onSignUp(await authFlow.completeOpenIdRegistration(name));
     } catch (error) {
       onError(error); // Propagate unhandled errors to parent component
+    } finally {
+      isAuthenticating = false;
     }
   };
 
   const handleRegistered = async (identityNumber: bigint) => {
-    onSignIn(identityNumber);
+    await onSignIn(identityNumber);
   };
 </script>
 
@@ -135,10 +137,10 @@
 {:else if isUpgrading}
   {#if !withinDialog}
     <Dialog onClose={() => (isUpgrading = false)}>
-      <MigrationWizard onSuccess={onMigration} {onError} />
+      <MigrationWizard onSuccess={onUpgrade} {onError} />
     </Dialog>
   {:else}
-    <MigrationWizard onSuccess={onMigration} {onError} />
+    <MigrationWizard onSuccess={onUpgrade} {onError} />
   {/if}
 {:else if nonNullish(authFlow.captcha)}
   <SolveCaptcha {...authFlow.captcha} />
@@ -153,9 +155,12 @@
   {#if authFlow.view !== "chooseMethod"}
     {#if !withinDialog}
       <Dialog
-        onClose={authFlow.chooseMethod}
-        showCloseButton={!isAuthenticating}
-        closeOnOutsideClick={!isAuthenticating}
+        onClose={() => {
+          if (isAuthenticating) {
+            return;
+          }
+          authFlow.chooseMethod();
+        }}
       >
         {@render dialogContent()}
       </Dialog>
