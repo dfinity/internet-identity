@@ -63,7 +63,7 @@
   };
   const handleMigration = async (identityNumber: bigint) => {
     toaster.success({
-      title: $t`Migration completed successfully`,
+      title: $t`Upgrade completed successfully`,
       duration: 4000,
     });
     await switchToIdentity(identityNumber);

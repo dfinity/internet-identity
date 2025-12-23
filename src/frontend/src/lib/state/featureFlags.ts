@@ -97,10 +97,13 @@ export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
   false,
 );
 
+export const GUIDED_UPGRADE = createFeatureFlagStore("GUIDED_UPGRADE", false);
+
 export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   LARGE_GOOGLE_BUTTON,
   ENABLE_ALL_LOCALES,
+  GUIDED_UPGRADE,
 } as Record<string, FeatureFlagStore>;
