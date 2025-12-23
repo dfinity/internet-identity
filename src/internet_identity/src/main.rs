@@ -332,7 +332,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     )
 }
 
-#[query]
+#[update]
 fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
     let caller = caller();
     anchor_management::lookup_caller_identity_by_recovery_phrase(caller)

@@ -1020,5 +1020,5 @@ service : (opt InternetIdentityInit) -> {
     ) -> (variant { Ok : AccountInfo; Err: SetDefaultAccountError });
 
     // Looks up identity number when called with a recovery phrase
-    lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber) query;
+    lookup_caller_identity_by_recovery_phrase : () -> (opt IdentityNumber);
 };

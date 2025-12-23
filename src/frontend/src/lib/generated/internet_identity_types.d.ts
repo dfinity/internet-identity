@@ -2,6 +2,7 @@ import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
 import type { IDL } from '@dfinity/candid';
 
+export type Aaguid = Uint8Array | number[];
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
   { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
@@ -347,7 +348,7 @@ export interface DeviceData {
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
-  'aaguid' : [] | [Uint8Array | number[]],
+  'aaguid' : [] | [Aaguid],
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
@@ -395,7 +396,7 @@ export interface DeviceWithUsage {
   'protection' : DeviceProtection,
   'pubkey' : DeviceKey,
   'key_type' : KeyType,
-  'aaguid' : [] | [Uint8Array | number[]],
+  'aaguid' : [] | [Aaguid],
   'purpose' : Purpose,
   'credential_id' : [] | [CredentialId],
 }
@@ -957,7 +958,7 @@ export interface WebAuthn {
   /**
    * Authenticator Attestation Global Unique Identifier (AAGUID)
    */
-  'aaguid' : [] | [Uint8Array | number[]],
+  'aaguid' : [] | [Aaguid],
   'credential_id' : CredentialId,
 }
 export interface WebAuthnCredential {
