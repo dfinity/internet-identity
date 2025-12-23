@@ -66,10 +66,11 @@ export const extractAAGUID = (authData: Uint8Array): string | undefined => {
 export const lookupAAGUID = async (
   aaguid: string,
 ): Promise<string | undefined> => {
-  const knownList = (
-    await import("$lib/legacy/assets/passkey_aaguid_data.json")
-  ).default;
-  return knownList[aaguid as keyof typeof knownList];
+  const knownProviders = (await import("$lib/assets/aaguid")).default;
+  const knownNames = Object.fromEntries(
+    Object.entries(knownProviders).map(([aaguid, { name }]) => [aaguid, name]),
+  );
+  return knownNames[aaguid];
 };
 
 /**
