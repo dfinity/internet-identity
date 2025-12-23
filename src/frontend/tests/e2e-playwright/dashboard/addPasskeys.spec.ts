@@ -249,12 +249,12 @@ test("User can add a new passkey and use it with cached identity without clearin
   // This should use the cached identity
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
-  await newPage.getByRole("button", { name: "Sign in" }).click();
+  await newPage.getByRole("button", { name: "Switch identity" }).click();
 
   // Click on the cached identity button directly
   // But use the new passkey to authenticate
   auth2(newPage);
-  await newPage.getByRole("button", { name: TEST_USER_NAME }).click();
+  await newPage.getByRole("button", { name: "Manage identity" }).click();
 
   // Verify we're logged in with the new passkey
   await newPage.waitForURL(II_URL + "/manage");

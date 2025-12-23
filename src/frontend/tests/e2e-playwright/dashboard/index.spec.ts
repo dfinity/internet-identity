@@ -46,7 +46,7 @@ test.describe("Dashboard Navigation", () => {
 
     // Sign in to dashboard with first identity
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByRole("button", { name: "Switch identity" }).click();
     auth1(page);
     await page.getByRole("button", { name: "Test 1" }).click();
 
