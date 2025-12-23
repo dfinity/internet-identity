@@ -13,7 +13,12 @@
     throwCanisterError,
     waitFor,
   } from "$lib/utils/utils";
-  import { beforeNavigate, invalidateAll } from "$app/navigation";
+  import {
+    afterNavigate,
+    beforeNavigate,
+    invalidateAll,
+    replaceState,
+  } from "$app/navigation";
   import UnverifiedRecoveryPhrase from "./components/UnverifiedRecoveryPhrase.svelte";
   import { recoveryAuthnMethodData } from "$lib/utils/authnMethodData";
   import {
@@ -31,6 +36,7 @@
     DelegationChain,
     DelegationIdentity,
   } from "@icp-sdk/core/identity";
+  import { page } from "$app/state";
 
   const { data }: PageProps = $props();
 
@@ -221,6 +227,24 @@
       return;
     }
     navigation.cancel();
+  });
+
+  // Trigger recovery phrase verification
+  afterNavigate(() => {
+    if (!("verify" in page.state)) {
+      return;
+    }
+    replaceState("", {});
+    showRecoveryPhraseSetup = "verify";
+  });
+
+  // Trigger recovery phrase activation
+  afterNavigate(() => {
+    if (!("activate" in page.state)) {
+      return;
+    }
+    replaceState("", {});
+    showRecoveryPhraseSetup = "activate";
   });
 </script>
 

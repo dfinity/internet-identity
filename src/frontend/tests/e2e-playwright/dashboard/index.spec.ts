@@ -66,6 +66,9 @@ test.describe("Dashboard Navigation", () => {
     await page.getByRole("link", { name: "Access and recovery" }).click();
 
     // Switch to second identity
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+    }
     await page.getByRole("button", { name: "Switch identity" }).click();
     auth2(page);
     await page.getByRole("button", { name: "Test 2" }).click();

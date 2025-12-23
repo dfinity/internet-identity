@@ -156,28 +156,40 @@ class ManageRecoveryPage {
   async activate<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page.getByRole("button", { name: "Activate" }).click();
+    await this.#page
+      .getByRole("main")
+      .getByRole("button", { name: "Activate" })
+      .click();
     return this.#withWizard(fn);
   }
 
   async reset<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page.getByRole("button", { name: "Reset" }).click();
+    await this.#page
+      .getByRole("main")
+      .getByRole("button", { name: "Reset" })
+      .click();
     return this.#withWizard(fn);
   }
 
   async unlockAndReset<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page.getByRole("button", { name: "Unlock and reset" }).click();
+    await this.#page
+      .getByRole("main")
+      .getByRole("button", { name: "Unlock and reset" })
+      .click();
     return this.#withWizard(fn);
   }
 
   async verify<T>(
     fn: (wizard: CreateRecoveryPhraseWizard) => Promise<T>,
   ): Promise<T> {
-    await this.#page.getByRole("button", { name: "Verify" }).click();
+    await this.#page
+      .getByRole("main")
+      .getByRole("button", { name: "Verify" })
+      .click();
     return this.#withWizard(fn);
   }
 
@@ -203,7 +215,9 @@ class ManageRecoveryPage {
 
   async assertLocked() {
     await expect(
-      this.#page.getByRole("button", { name: "Unlock and reset" }),
+      this.#page
+        .getByRole("main")
+        .getByRole("button", { name: "Unlock and reset" }),
     ).toBeVisible();
   }
 
