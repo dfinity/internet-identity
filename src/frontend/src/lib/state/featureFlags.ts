@@ -83,15 +83,6 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   false,
 );
 
-export const LARGE_GOOGLE_BUTTON = createFeatureFlagStore(
-  "LARGE_GOOGLE_BUTTON",
-  true,
-  (featureFlag) => {
-    // A/B Test with 50/50 user groups
-    featureFlag.set(Math.random() > 0.5);
-  },
-);
-
 export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
   "ENABLE_ALL_LOCALES",
   false,
@@ -101,6 +92,5 @@ export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
-  LARGE_GOOGLE_BUTTON,
   ENABLE_ALL_LOCALES,
 } as Record<string, FeatureFlagStore>;
