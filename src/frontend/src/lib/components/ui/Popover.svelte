@@ -132,20 +132,7 @@
   });
 </script>
 
-<svelte:window
-  bind:innerWidth={windowWidth}
-  onclick={(event) => {
-    // Hide popover on outside click
-    if (
-      popoverRef?.matches(":popover-open") ||
-      (event.target instanceof HTMLElement &&
-        popoverRef?.contains(event.target))
-    ) {
-      return;
-    }
-    onClose?.();
-  }}
-/>
+<svelte:window bind:innerWidth={windowWidth} />
 
 {#if windowWidth >= MOBILE_BREAKPOINT || !responsive}
   <div
