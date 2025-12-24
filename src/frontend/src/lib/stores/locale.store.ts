@@ -33,6 +33,7 @@ type LocaleStore = Readable<string> & {
   init: () => Promise<void>;
   set: (locale: string) => Promise<void>;
   reset: () => Promise<void>;
+  setOrReset: (local: string) => Promise<void>;
 };
 
 const internalStore = writableStored<string | null>({
@@ -69,6 +70,14 @@ export const localeStore: LocaleStore = {
     );
     i18n.loadAndActivate({ locale: availableBrowserLocale, messages });
     internalStore.set(null);
+  },
+  setOrReset: async (locale: string) => {
+    // Switch back to locale auto-detection if locale matches browser
+    if (locale === availableBrowserLocale) {
+      await localeStore.reset();
+    } else {
+      await localeStore.set(locale);
+    }
   },
 };
 
@@ -166,24 +175,4 @@ export const formatRelative = derived(
       // Fallback
       return i18n.date(value);
     },
-);
-
-/**
- * Usage:
- * <Select option={$localeOptions}>
- *   <button>{$localeStore}<button>
- * </Select>
- */
-export const localeOptions = derived(locales, (locales) =>
-  locales.map((locale) => ({
-    label: locale.toUpperCase(),
-    onClick: () => {
-      // Switch back to locale auto-detection if locale matches browser
-      if (locale === availableBrowserLocale) {
-        void localeStore.reset();
-      } else {
-        void localeStore.set(locale);
-      }
-    },
-  })),
 );
