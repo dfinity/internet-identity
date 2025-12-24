@@ -33,7 +33,7 @@ type LocaleStore = Readable<string> & {
   init: () => Promise<void>;
   set: (locale: string) => Promise<void>;
   reset: () => Promise<void>;
-  setOrReset: (local: string) => Promise<void>;
+  setOrReset: (locale: string) => Promise<void>;
 };
 
 const internalStore = writableStored<string | null>({
