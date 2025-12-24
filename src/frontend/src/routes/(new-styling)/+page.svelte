@@ -44,14 +44,6 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import { waitForWindowReadyRequest } from "$lib/utils/internalPostMessage";
-  import { toBase64 } from "$lib/utils/utils";
-  import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
-  import {
-    type AuthRequest,
-    isAuthResponse,
-  } from "$lib/utils/internalAuthPostMessage";
-  import { Principal } from "@icp-sdk/core/principal";
 
   const authLastUsedFlow = new AuthLastUsedFlow();
 
