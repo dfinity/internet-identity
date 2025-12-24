@@ -75,15 +75,28 @@ export default defineConfig(({ command, mode }): UserConfig => {
             },
             ...(process.env.NO_HOT_RELOAD === "1"
               ? [
-                  {
-                    hosts: [
-                      "id.ai",
-                      "identity.ic0.app",
-                      "identity.internetcomputer.org",
-                    ],
-                    canisterName: "internet_identity",
-                  },
-                ]
+                {
+                  hosts: process.env.SEPARATE_FRONTEND_CANISTER === "1" ? [
+                    "identity.ic0.app",
+                    "identity.internetcomputer.org",
+                  ] : [
+                    "id.ai",
+                    "identity.ic0.app",
+                    "identity.internetcomputer.org",
+                  ],
+                  canisterName: "internet_identity",
+                },
+              ]
+              : []),
+            ...(process.env.NO_HOT_RELOAD === "1" && process.env.SEPARATE_FRONTEND_CANISTER === "1"
+              ? [
+                {
+                  hosts: [
+                    "id.ai",
+                  ],
+                  canisterName: "internet_identity_frontend",
+                },
+              ]
               : []),
           ],
         }),
@@ -101,29 +114,29 @@ export default defineConfig(({ command, mode }): UserConfig => {
       command !== "serve"
         ? {}
         : {
-            https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
-            proxy: {
-              "/api": `http://127.0.0.1:${readReplicaPort()}`,
-            },
-            allowedHosts: ["icp-api.io"],
-            cors: {
-              origin: [
-                "https://id.ai",
-                "https://identity.internetcomputer.org",
-                "https://identity.ic0.app",
-                "https://nice-name.com",
-                "https://nice-issuer-custom-orig.com",
-                "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
-                // Test app
-                "https://bd3sg-teaaa-aaaaa-qaaba-cai.icp0.io",
-                // Test app
-                "https://bd3sg-teaaa-aaaaa-qaaba-cai.ic0.app",
-                // Issuer
-                "https://bkyz2-fmaaa-aaaaa-qaaaq-cai.icp0.io",
-                // Issuer
-                "https://bkyz2-fmaaa-aaaaa-qaaaq-cai.ic0.app",
-              ],
-            },
+          https: process.env.TLS_DEV_SERVER === "1" ? {} : undefined,
+          proxy: {
+            "/api": `http://127.0.0.1:${readReplicaPort()}`,
           },
+          allowedHosts: ["icp-api.io"],
+          cors: {
+            origin: [
+              "https://id.ai",
+              "https://identity.internetcomputer.org",
+              "https://identity.ic0.app",
+              "https://nice-name.com",
+              "https://nice-issuer-custom-orig.com",
+              "https://be2us-64aaa-aaaaa-qaabq-cai.icp0.io",
+              // Test app
+              "https://bd3sg-teaaa-aaaaa-qaaba-cai.icp0.io",
+              // Test app
+              "https://bd3sg-teaaa-aaaaa-qaaba-cai.ic0.app",
+              // Issuer
+              "https://bkyz2-fmaaa-aaaaa-qaaaq-cai.icp0.io",
+              // Issuer
+              "https://bkyz2-fmaaa-aaaaa-qaaaq-cai.ic0.app",
+            ],
+          },
+        },
   };
 });
