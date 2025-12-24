@@ -38,7 +38,7 @@
   />
   <div
     class={[
-      "relative flex items-center justify-center rounded-full border",
+      "relative flex shrink-0 items-center justify-center rounded-full border",
       "border-border-primary text-fg-primary-inversed bg-bg-primary",
       "hover:bg-bg-primary_hover",
       "peer-checked:bg-bg-brand-solid peer-checked:hover:bg-bg-brand-solid_hover peer-checked:border-none",
