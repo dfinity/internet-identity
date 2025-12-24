@@ -10,7 +10,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import { ChevronDownIcon } from "@lucide/svelte";
+  import { ChevronDownIcon, ExternalLinkIcon } from "@lucide/svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -25,6 +25,14 @@
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { waitForWindowReadyResponse } from "$lib/utils/internalPostMessage";
+  import {
+    type InternalAuthResponse,
+    isInternalAuthRequest,
+    authenticatedToJson,
+    openWindowWithAuth,
+  } from "../internal-auth/utils";
+  import { Trans } from "$lib/components/locale";
 
   const { children, data }: LayoutProps = $props();
 
@@ -42,6 +50,7 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isContinueToManageDialogOpen = $state(false);
 
   const handleSignIn = async (identityNumber: bigint) => {
     isAuthenticating = true;
@@ -67,6 +76,14 @@
   const handleUpgrade = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
     await goto("/authorize/upgrade-success");
+  };
+  const handleManageIdentity = async () => {
+    if ($authenticationStore !== undefined) {
+      await openWindowWithAuth("/manage", $authenticationStore);
+    } else {
+      await handleSignIn(selectedIdentity!.identityNumber);
+      isContinueToManageDialogOpen = true;
+    }
   };
 
   onMount(() => {
@@ -137,6 +154,7 @@
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
             }}
+            onManageIdentity={handleManageIdentity}
             onError={(error) => {
               isIdentityPopoverOpen = false;
               handleError(error);
@@ -192,3 +210,27 @@
 
 <!-- Renders any error status or late success status dialog when needed -->
 <AuthorizeError {status} />
+
+{#if isContinueToManageDialogOpen && $authenticationStore !== undefined}
+  <Dialog onClose={() => (isContinueToManageDialogOpen = false)}>
+    <h2 class="text-text-primary mb-3 text-2xl">
+      {$t`Almost there`}
+    </h2>
+    <p class="text-text-tertiary mb-6 text-base">
+      <Trans>
+        You have been successfully authenticated and can now manage your
+        identity in a new window.
+      </Trans>
+    </p>
+    <button
+      onclick={async () => {
+        void openWindowWithAuth("/manage", $authenticationStore);
+        isContinueToManageDialogOpen = false;
+      }}
+      class="btn btn-xl"
+    >
+      <span>{$t`Manage identity`}</span>
+      <ExternalLinkIcon class="size-5" />
+    </button>
+  </Dialog>
+{/if}
