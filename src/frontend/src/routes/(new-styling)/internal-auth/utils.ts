@@ -3,10 +3,7 @@ import {
   DelegationIdentity,
   JsonnableDelegationChain,
 } from "@icp-sdk/core/identity";
-import {
-  Authenticated,
-  authenticationStore,
-} from "$lib/stores/authentication.store";
+import type { Authenticated } from "$lib/stores/authentication.store";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
@@ -15,7 +12,6 @@ import {
   waitForWindowReadyRequest,
   waitForWindowReadyResponse,
 } from "$lib/utils/internalPostMessage";
-import { goto } from "$app/navigation";
 
 interface JsonnableAuthenticated {
   identityNumber: string;
@@ -83,8 +79,6 @@ export const authenticatedFromJson = (
   }
   return { identityNumber, identity, authMethod };
 };
-
-export const INTERNAL_AUTH_REQUEST = "ii-internal-auth-request";
 
 export interface InternalAuthRequest {
   ii_auth_request: {
