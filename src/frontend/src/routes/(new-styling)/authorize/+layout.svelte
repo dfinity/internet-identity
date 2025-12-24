@@ -10,7 +10,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import { ChevronDownIcon } from "@lucide/svelte";
+  import { ChevronDownIcon, ExternalLinkIcon } from "@lucide/svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -24,8 +24,19 @@
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { waitForWindowReadyResponse } from "$lib/utils/internalPostMessage";
+  import {
+    type InternalAuthResponse,
+    isInternalAuthRequest,
+    authenticatedToJson,
+    openWindowWithAuth,
+  } from "../internal-auth/utils";
+  import { Trans } from "$lib/components/locale";
 
   const { children, data }: LayoutProps = $props();
+
+  const authLastUsedFlow = new AuthLastUsedFlow();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -39,22 +50,40 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isContinueToManageDialogOpen = $state(false);
 
-  const onSignIn = async (identityNumber: bigint) => {
+  const handleSignIn = async (identityNumber: bigint) => {
+    isAuthenticating = true;
+    if ($authenticationStore?.identityNumber !== identityNumber) {
+      // Sign in if not authenticated with this identity yet
+      await sessionStore.reset();
+      await authLastUsedFlow.authenticate(
+        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+      );
+    }
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    isIdentityPopoverOpen = false;
     isAuthDialogOpen = false;
+    isAuthenticating = false;
   };
-  const onSignUp = async (identityNumber: bigint) => {
+  const handleSignUp = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isAuthDialogOpen = false;
   };
-  const onMigration = async () => {
+  const handleUpgrade = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
     await goto("/authorize/upgrade-success");
-    isAuthDialogOpen = false;
+  };
+  const handleManageIdentity = async () => {
+    if ($authenticationStore !== undefined) {
+      await openWindowWithAuth("/manage", $authenticationStore);
+    } else {
+      await handleSignIn(selectedIdentity!.identityNumber);
+      isContinueToManageDialogOpen = true;
+    }
   };
 
   onMount(() => {
@@ -63,6 +92,13 @@
       legacyProtocol: data.legacyProtocol,
     });
   });
+
+  // Pre-fetch passkey credential ids
+  $effect(() =>
+    authLastUsedFlow.init(
+      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
+    ),
+  );
 
   // Remove legacyProtocol param from URL bar after initializing
   afterNavigate(() => {
@@ -100,7 +136,12 @@
       {#if isIdentityPopoverOpen}
         <Popover
           anchor={identityButtonRef}
-          onClose={() => (isIdentityPopoverOpen = false)}
+          onClose={() => {
+            if (isAuthenticating) {
+              return;
+            }
+            isIdentityPopoverOpen = false;
+          }}
           direction="down"
           align="end"
           distance="0.75rem"
@@ -108,15 +149,15 @@
           <IdentitySwitcher
             selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
-            switchIdentity={async (identityNumber) => {
-              authenticationStore.reset();
-              await sessionStore.reset();
-              lastUsedIdentitiesStore.selectIdentity(identityNumber);
-              isIdentityPopoverOpen = false;
-            }}
-            useAnotherIdentity={() => {
+            onSwitchIdentity={handleSignIn}
+            onUseAnotherIdentity={() => {
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
+            }}
+            onManageIdentity={handleManageIdentity}
+            onError={(error) => {
+              isIdentityPopoverOpen = false;
+              handleError(error);
             }}
             onClose={() => (isIdentityPopoverOpen = false)}
           />
@@ -124,15 +165,17 @@
       {/if}
       {#if isAuthDialogOpen}
         <Dialog
-          onClose={() => (isAuthDialogOpen = false)}
-          showCloseButton={!isAuthenticating}
-          closeOnOutsideClick={!isAuthenticating}
+          onClose={() => {
+            if (isAuthenticating) {
+              return;
+            }
+            isAuthDialogOpen = false;
+          }}
         >
           <AuthWizard
-            bind:isAuthenticating
-            {onSignIn}
-            {onSignUp}
-            {onMigration}
+            onSignIn={handleSignIn}
+            onSignUp={handleSignUp}
+            onUpgrade={handleUpgrade}
             onError={(error) => {
               isAuthDialogOpen = false;
               handleError(error);
@@ -140,10 +183,10 @@
             withinDialog
           >
             <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              {$t`Use another identity`}
+              {$t`Sign in`}
             </h1>
             <p class="text-text-secondary mb-6 self-start text-sm">
-              {$t`choose method`}
+              {$t`choose method to continue`}
             </p>
           </AuthWizard>
         </Dialog>
@@ -167,3 +210,27 @@
 
 <!-- Renders any error status or late success status dialog when needed -->
 <AuthorizeError {status} />
+
+{#if isContinueToManageDialogOpen && $authenticationStore !== undefined}
+  <Dialog onClose={() => (isContinueToManageDialogOpen = false)}>
+    <h2 class="text-text-primary mb-3 text-2xl">
+      {$t`Almost there`}
+    </h2>
+    <p class="text-text-tertiary mb-6 text-base">
+      <Trans>
+        You have been successfully authenticated and can now manage your
+        identity in a new window.
+      </Trans>
+    </p>
+    <button
+      onclick={async () => {
+        void openWindowWithAuth("/manage", $authenticationStore);
+        isContinueToManageDialogOpen = false;
+      }}
+      class="btn btn-xl"
+    >
+      <span>{$t`Manage identity`}</span>
+      <ExternalLinkIcon class="size-5" />
+    </button>
+  </Dialog>
+{/if}
