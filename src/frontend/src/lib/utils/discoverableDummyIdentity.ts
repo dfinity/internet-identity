@@ -54,7 +54,7 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
     return this.#credentialId;
   }
 
-  getAaguid(): string | undefined {
+  getAaguid(): Uint8Array | undefined {
     return;
   }
 

@@ -284,7 +284,7 @@
 {#if renamingAccessMethod !== undefined && "passkey" in renamingAccessMethod}
   <Dialog onClose={() => (renamingAccessMethodKey = undefined)}>
     <RenamePasskey
-      name={getAuthnMethodAlias(renamingAccessMethod.passkey)}
+      passkey={renamingAccessMethod.passkey}
       onRename={handleNameChanged}
       onCancel={() => (renamingAccessMethodKey = undefined)}
     />

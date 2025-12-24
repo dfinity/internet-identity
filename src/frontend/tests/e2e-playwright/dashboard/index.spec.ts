@@ -32,7 +32,7 @@ test.describe("Dashboard Navigation", () => {
     await page.getByRole("link", { name: "Access and recovery" }).click();
 
     // Check that we have one passkey listed
-    const passkey = await page.getByText("Chrome");
+    const passkey = await page.getByText("Unknown");
     await expect(passkey).toBeVisible();
     await expect(passkey).toHaveCount(1);
   });

@@ -19,7 +19,6 @@ import { features } from "$lib/legacy/features";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
-import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { isCanisterError, throwCanisterError } from "$lib/utils/utils";
 import {
@@ -281,19 +280,12 @@ export class AuthFlow {
     attempts = 0,
   ): Promise<bigint> => {
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithPasskey);
-    const uaParser = loadUAParser();
-    const alias = await inferPasskeyAlias({
-      authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
-      userAgent: navigator.userAgent,
-      uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
-    });
     const authnMethod = passkeyAuthnMethodData({
-      alias,
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId: passkeyIdentity.getCredentialId()!,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
+      aaguid: passkeyIdentity.getAaguid(),
     });
     const name = passkeyIdentity.getName();
     try {
