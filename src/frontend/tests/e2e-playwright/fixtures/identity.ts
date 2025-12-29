@@ -1,10 +1,11 @@
-import { Page, test as base } from "@playwright/test";
+import { Browser, Page, test as base } from "@playwright/test";
 import { dummyAuth, DummyAuthFn, getRandomIndex, II_URL } from "../utils";
 import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { Agent } from "undici";
+import { Principal } from "@icp-sdk/core/principal";
 
 // Fetch that's compatible with Vite server's self-signed certs
 const insecureAgent = new Agent({
@@ -18,20 +19,8 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
     ...options,
   } as RequestInit);
 
-interface Identity {
-  name: string;
-
-  signIn(): Promise<void>;
-
-  signOut(): Promise<void>;
-
-  createActor(): Promise<{
-    actor: ActorSubclass<_SERVICE>;
-    identityNumber: bigint;
-  }>;
-}
-
 const DEFAULT_NAME = "Test User";
+const ALT_NAME = "Alt User";
 
 class IdentityWizard {
   #page: Page;
@@ -95,52 +84,99 @@ class IdentityWizard {
   }
 }
 
-export const test = base.extend<{
-  identity: Identity;
-}>({
-  identity: async ({ page, browser }, use) => {
+interface IdentityOptions {
+  canisterId: Principal;
+  page: Page;
+  authIndex: bigint;
+  name: string;
+}
+
+export class Identity {
+  #options: IdentityOptions;
+
+  constructor(options: IdentityOptions) {
+    this.#options = options;
+  }
+
+  get auth(): DummyAuthFn {
+    return dummyAuth(this.#options.authIndex);
+  }
+
+  get name(): string {
+    return this.#options.name;
+  }
+
+  async signIn(): Promise<void> {
+    const wizard = new IdentityWizard(this.#options.page);
+    await wizard.signIn(this.auth);
+  }
+
+  async signOut(): Promise<void> {
+    // Navigating to landing page (reloading) is sufficient for now to sign out
+    await this.#options.page.goto(II_URL);
+  }
+
+  async createActor(): Promise<{
+    actor: ActorSubclass<_SERVICE>;
+    identityNumber: bigint;
+  }> {
+    // Same implementation as found in `DiscoverableDummyIdentity`
+    const buffer = new ArrayBuffer(32);
+    const view = new DataView(buffer);
+    view.setBigUint64(0, this.#options.authIndex);
+    const seed = new Uint8Array(buffer);
+    const agent = await HttpAgent.create({
+      host: "https://localhost:5173", // Vite dev server
+      shouldFetchRootKey: true,
+      verifyQuerySignatures: false,
+      fetch: insecureFetch,
+    });
+    const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+      agent,
+      canisterId: this.#options.canisterId,
+    });
+    const [deviceKeyWithAnchor] = await actor.lookup_device_key(seed);
+    const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
+    agent.replaceIdentity(Ed25519KeyIdentity.generate(seed));
+    return { actor, identityNumber };
+  }
+
+  replaceAuth(authIndex: bigint): void {
+    this.#options.authIndex = authIndex;
+  }
+
+  static async create(
+    browser: Browser,
+    page: Page,
+    name: string,
+  ): Promise<Identity> {
     const authIndex = getRandomIndex();
     const auth = dummyAuth(authIndex);
     const tempContext = await browser.newContext();
     const tempPage = await tempContext.newPage();
     await tempPage.goto(II_URL);
     const script = (await tempPage.$("[data-canister-id]"))!;
-    const canisterId = (await script.getAttribute("data-canister-id"))!;
+    const canisterId = Principal.fromText(
+      (await script.getAttribute("data-canister-id"))!,
+    );
     const tempWizard = new IdentityWizard(tempPage);
-    await tempWizard.signUp(auth, DEFAULT_NAME);
+    await tempWizard.signUp(auth, name);
     await tempPage.waitForURL(II_URL + "/manage");
     await tempPage.close();
-    await use({
-      name: DEFAULT_NAME,
-      signIn: async () => {
-        const wizard = new IdentityWizard(page);
-        await wizard.signIn(auth);
-      },
-      signOut: async () => {
-        // Navigating to landing page (reloading) is sufficient for now to sign out
-        await page.goto(II_URL);
-      },
-      createActor: async () => {
-        // Same implementation as found in `DiscoverableDummyIdentity`
-        const buffer = new ArrayBuffer(32);
-        const view = new DataView(buffer);
-        view.setBigUint64(0, authIndex);
-        const seed = new Uint8Array(buffer);
-        const agent = await HttpAgent.create({
-          host: "https://localhost:5173", // Vite dev server
-          shouldFetchRootKey: true,
-          verifyQuerySignatures: false,
-          fetch: insecureFetch,
-        });
-        const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-          agent,
-          canisterId,
-        });
-        const [deviceKeyWithAnchor] = await actor.lookup_device_key(seed);
-        const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
-        agent.replaceIdentity(Ed25519KeyIdentity.generate(seed));
-        return { actor, identityNumber };
-      },
-    });
+    return new Identity({ canisterId, page, authIndex, name });
+  }
+}
+
+export const test = base.extend<{
+  identity: Identity;
+  altIdentity: Identity;
+}>({
+  identity: async ({ page, browser }, use) => {
+    const identity = await Identity.create(browser, page, DEFAULT_NAME);
+    await use(identity);
+  },
+  altIdentity: async ({ page, browser }, use) => {
+    const identity = await Identity.create(browser, page, ALT_NAME);
+    await use(identity);
   },
 });
