@@ -584,6 +584,7 @@
       onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
+        isAuthenticating = false;
         handleError(error);
       }}
       withinDialog={true}
