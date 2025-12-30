@@ -98,7 +98,7 @@ class ManagePage {
     if (await menuButton.isVisible()) {
       await menuButton.click();
     }
-    await this.#page.getByRole("button", { name: "Identity switcher" }).click();
+    await this.#page.getByRole("button", { name: "Switch identity" }).click();
     identity.auth(this.#page);
     await this.#page.getByRole("button", { name: identity.name }).click();
   }
@@ -110,7 +110,7 @@ class ManagePage {
     if (await menuButton.isVisible()) {
       await menuButton.click();
     }
-    await this.#page.getByRole("button", { name: "Identity switcher" }).click();
+    await this.#page.getByRole("button", { name: "Switch identity" }).click();
     await this.#page.getByRole("button", { name: "Sign out" }).click();
   }
 

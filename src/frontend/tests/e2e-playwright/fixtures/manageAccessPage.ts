@@ -47,7 +47,7 @@ class RemovePasskeyDialog {
   }
 
   async assertSignOutWarningShown(): Promise<void> {
-    await expect(this.#dialog).toHaveText("currently signed in");
+    await expect(this.#dialog).toHaveText(/you will be signed out/);
   }
 }
 
@@ -82,7 +82,11 @@ class PasskeyItem {
     await expect(dialog).toBeVisible();
     const removePasskeyDialog = new RemovePasskeyDialog(dialog);
     const value = await fn(removePasskeyDialog);
-    await expect(dialog).toBeHidden();
+    const text = await dialog.textContent();
+    if (text?.includes("you will be signed out") !== true) {
+      // Skip this check when page reloads due to sign out
+      await expect(dialog).toBeHidden();
+    }
     return value;
   }
 
