@@ -23,6 +23,7 @@ class Navigation {
         .getByRole("main")
         .getByRole("heading", { name: `Welcome, ${name}!` }),
     ).toBeVisible();
+    await expect(this.#page).toHaveURL(II_URL + "/manage");
   }
 
   async accessMethods() {
@@ -40,6 +41,7 @@ class Navigation {
         .getByRole("main")
         .getByRole("heading", { name: "Access methods" }),
     ).toBeVisible();
+    await expect(this.#page).toHaveURL(II_URL + "/manage");
   }
 
   async recoveryPhrase() {
@@ -57,6 +59,7 @@ class Navigation {
         .getByRole("main")
         .getByRole("heading", { name: "Recovery phrase" }),
     ).toBeVisible();
+    await expect(this.#page).toHaveURL(II_URL + "/manage/recovery");
   }
 
   async #accessAndRecovery() {

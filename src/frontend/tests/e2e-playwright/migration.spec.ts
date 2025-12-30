@@ -7,7 +7,7 @@ import {
   II_URL,
   LEGACY_II_URL,
   signOut,
-} from "../utils";
+} from "./utils";
 
 const TEST_USER_NAME = "Test User";
 const TEST_USER_NAME_2 = "Test User 2";

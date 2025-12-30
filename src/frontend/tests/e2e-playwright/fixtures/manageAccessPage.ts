@@ -3,38 +3,87 @@ import { DummyAuthFn, II_URL } from "../utils";
 
 export const DEFAULT_PASSKEY_NAME = "Chrome";
 
-class Passkey {
+class RenamePasskeyDialog {
+  #dialog: Locator;
+
+  constructor(dialog: Locator) {
+    this.#dialog = dialog;
+  }
+
+  async fill(value: string): Promise<void> {
+    await this.#dialog
+      .getByRole("textbox", { name: "Passkey name" })
+      .fill(value);
+  }
+
+  async submit(): Promise<void> {
+    await this.#dialog.getByRole("button", { name: "Save changes" }).click();
+  }
+
+  async assertSubmitDisabled(): Promise<void> {
+    await expect(
+      this.#dialog.getByRole("button", { name: "Save changes" }),
+    ).toBeDisabled();
+  }
+
+  async close(): Promise<void> {
+    await this.#dialog.getByRole("button", { name: "Close" }).click();
+  }
+}
+
+class RemovePasskeyDialog {
+  #dialog: Locator;
+
+  constructor(dialog: Locator) {
+    this.#dialog = dialog;
+  }
+
+  async confirm(): Promise<void> {
+    await this.#dialog.getByRole("button", { name: "Remove passkey" }).click();
+  }
+
+  async cancel(): Promise<void> {
+    await this.#dialog.getByRole("button", { name: "Cancel" }).click();
+  }
+
+  async assertSignOutWarningShown(): Promise<void> {
+    await expect(this.#dialog).toHaveText("currently signed in");
+  }
+}
+
+class PasskeyItem {
   #item: Locator;
 
   constructor(item: Locator) {
     this.#item = item;
   }
 
-  async rename(name: string): Promise<void> {
+  async rename<T>(fn: (dialog: RenamePasskeyDialog) => Promise<T>): Promise<T> {
     await this.#item.getByRole("button", { name: "More options" }).click();
     await this.#item
       .getByRole("menu")
       .getByRole("menuitem", { name: "Rename" })
       .click();
     const dialog = this.#item.page().getByRole("dialog");
-    await dialog.getByRole("textbox", { name: "Passkey name" }).fill(name);
-    await dialog.getByRole("button", { name: "Save changes" }).click();
+    await expect(dialog).toBeVisible();
+    const renamePasskeyDialog = new RenamePasskeyDialog(dialog);
+    const value = await fn(renamePasskeyDialog);
+    await expect(dialog).toBeHidden();
+    return value;
   }
 
-  async remove(isInUse: boolean): Promise<void> {
+  async remove<T>(fn: (dialog: RemovePasskeyDialog) => Promise<T>): Promise<T> {
     await this.#item.getByRole("button", { name: "More options" }).click();
     await this.#item
       .getByRole("menu")
       .getByRole("menuitem", { name: "Remove" })
       .click();
     const dialog = this.#item.page().getByRole("dialog");
-    const warningText = "currently signed in";
-    if (isInUse) {
-      await expect(dialog).toHaveText(warningText);
-    } else {
-      await expect(dialog).not.toHaveText(warningText);
-    }
-    await dialog.getByRole("button", { name: "Remove passkey" }).click();
+    await expect(dialog).toBeVisible();
+    const removePasskeyDialog = new RemovePasskeyDialog(dialog);
+    const value = await fn(removePasskeyDialog);
+    await expect(dialog).toBeHidden();
+    return value;
   }
 
   async assertUnremovable(): Promise<void> {
@@ -45,7 +94,7 @@ class Passkey {
   }
 }
 
-class AddWizard {
+class AddDialog {
   #dialog: Locator;
 
   constructor(dialog: Locator) {
@@ -87,27 +136,27 @@ class ManageAccessPage {
     await this.#page.goto(II_URL + "/manage/access");
   }
 
-  async add<T>(fn: (wizard: AddWizard) => Promise<T>): Promise<T> {
+  async add<T>(fn: (dialog: AddDialog) => Promise<T>): Promise<T> {
     await this.#page
       .getByRole("main")
       .getByRole("button", { name: "Add new" })
       .click();
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    const wizard = new AddWizard(dialog);
-    const value = await fn(wizard);
+    const addDialog = new AddDialog(dialog);
+    const value = await fn(addDialog);
     await expect(dialog).toBeHidden();
     return value;
   }
 
-  findPasskey(name: string): Passkey {
+  findPasskey(name: string): PasskeyItem {
     const item = this.#page
       .getByRole("main")
       .getByRole("listitem")
       .filter({ hasText: "Passkey" })
       .filter({ hasText: name })
       .first();
-    return new Passkey(item);
+    return new PasskeyItem(item);
   }
 
   async assertPasskeyExists(name: string): Promise<void> {

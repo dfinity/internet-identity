@@ -102,6 +102,10 @@ export class Identity {
     return dummyAuth(this.#options.authIndex);
   }
 
+  get authIndex(): bigint {
+    return this.#options.authIndex;
+  }
+
   get name(): string {
     return this.#options.name;
   }
@@ -141,8 +145,9 @@ export class Identity {
     return { actor, identityNumber };
   }
 
-  replaceAuth(authIndex: bigint): void {
+  replaceAuth(authIndex: bigint): Identity {
     this.#options.authIndex = authIndex;
+    return this;
   }
 
   static async create(
