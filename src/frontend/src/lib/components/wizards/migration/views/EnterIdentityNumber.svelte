@@ -59,7 +59,7 @@
     class="text-text-tertiary mb-8 text-base font-medium text-balance sm:text-center"
   >
     <Trans>
-      Upgrade your existing identity to the new experience in a few steps.
+      Upgrade your existing identity to the new experience in a two steps.
     </Trans>
   </p>
   <Input
@@ -101,7 +101,7 @@
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="flex flex-row items-center justify-between gap-4">
     <p class="text-text-secondary text-sm">
-      {$t`Don't remember your identity number?`}
+      {$t`Forgot your identity number?`}
     </p>
     <a
       href={UPGRADE_SUPPORT_URL}
