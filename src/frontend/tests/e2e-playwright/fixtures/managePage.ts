@@ -21,7 +21,7 @@ class Navigation {
     await expect(
       this.#page
         .getByRole("main")
-        .getByRole("heading", { name: `Welcome, ${name}!` }),
+        .getByRole("heading", { name: `Welcome, ${name}!`, exact: true }),
     ).toBeVisible();
     await expect(this.#page).toHaveURL(II_URL + "/manage");
   }
@@ -39,7 +39,7 @@ class Navigation {
     await expect(
       this.#page
         .getByRole("main")
-        .getByRole("heading", { name: "Access methods" }),
+        .getByRole("heading", { name: "Access methods", exact: true }),
     ).toBeVisible();
     await expect(this.#page).toHaveURL(II_URL + "/manage/access");
   }
@@ -57,7 +57,7 @@ class Navigation {
     await expect(
       this.#page
         .getByRole("main")
-        .getByRole("heading", { name: "Recovery phrase" }),
+        .getByRole("heading", { name: "Recovery phrase", exact: true }),
     ).toBeVisible();
     await expect(this.#page).toHaveURL(II_URL + "/manage/recovery");
   }

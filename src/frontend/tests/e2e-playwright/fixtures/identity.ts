@@ -1,4 +1,4 @@
-import { Browser, Page, test as base } from "@playwright/test";
+import { Browser, expect, Page, test as base } from "@playwright/test";
 import { dummyAuth, DummyAuthFn, getRandomIndex, II_URL } from "../utils";
 import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -61,10 +61,16 @@ class IdentityWizard {
       "Use another identity",
       "Continue with passkey",
     ];
-    await this.#page
-      .getByRole("button", { name: new RegExp(buttons.join("|")) })
-      .first()
-      .waitFor();
+    await expect(
+      buttons
+        .slice(1)
+        .reduce(
+          (acc, button) =>
+            acc.or(this.#page.getByRole("button", { name: button })),
+          this.#page.getByRole("button", { name: buttons[0] }),
+        )
+        .first(),
+    ).toBeVisible();
     // If continue with passkey button is already visible,
     // e.g. after /login redirect we only need to click that.
     const continueWithPasskeyButton = this.#page.getByRole("button", {
