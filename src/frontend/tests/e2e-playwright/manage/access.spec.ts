@@ -107,7 +107,8 @@ test.describe("Access methods", () => {
           await dialog.confirm();
         });
 
-      await page.waitForURL(II_URL); // Expect to be signed out
+      await page.waitForURL(II_URL, { waitUntil: "domcontentloaded" }); // Expect to be signed out
+      // await page.waitForTimeout(1000);
       await manageAccessPage.goto(); // Go back to the manage page
 
       // Sign in with the new passkey and assert it's the only passkey
@@ -159,9 +160,32 @@ test.describe("Access methods", () => {
     });
 
     test("when removing a passkey", async ({ manageAccessPage }) => {
+      // Rename current
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
+        .rename(async (dialog) => {
+          await dialog.fill("in-use-passkey");
+          await dialog.submit();
+        });
+
+      // Add another, since we cannot remove a single passkey
+      await manageAccessPage.add((dialog) => dialog.passkey(dummyAuth()));
+
+      // Then remove the current passkey, but cancel instead of confirm
+      await manageAccessPage
+        .findPasskey("in-use-passkey")
         .remove((dialog) => dialog.cancel());
+
+      // Cleanup additional passkey and undo renaming of current
+      await manageAccessPage
+        .findPasskey(DEFAULT_PASSKEY_NAME)
+        .remove((dialog) => dialog.confirm());
+      await manageAccessPage
+        .findPasskey("in-use-passkey")
+        .rename(async (dialog) => {
+          await dialog.fill(DEFAULT_PASSKEY_NAME);
+          await dialog.submit();
+        });
     });
   });
 });

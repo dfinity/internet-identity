@@ -64,7 +64,9 @@ class PasskeyItem {
       .getByRole("menu")
       .getByRole("menuitem", { name: "Rename" })
       .click();
-    const dialog = this.#item.page().getByRole("dialog");
+    const dialog = this.#item.page().getByRole("dialog").filter({
+      hasText: "Rename passkey",
+    });
     await expect(dialog).toBeVisible();
     const renamePasskeyDialog = new RenamePasskeyDialog(dialog);
     const value = await fn(renamePasskeyDialog);
@@ -78,15 +80,13 @@ class PasskeyItem {
       .getByRole("menu")
       .getByRole("menuitem", { name: "Remove" })
       .click();
-    const dialog = this.#item.page().getByRole("dialog");
+    const dialog = this.#item.page().getByRole("dialog").filter({
+      hasText: "Are you sure?",
+    });
     await expect(dialog).toBeVisible();
     const removePasskeyDialog = new RemovePasskeyDialog(dialog);
     const value = await fn(removePasskeyDialog);
-    const text = await dialog.textContent();
-    if (text?.includes("you will be signed out") !== true) {
-      // Skip this check when page reloads due to sign out
-      await expect(dialog).toBeHidden();
-    }
+    await expect(dialog).toBeHidden();
     return value;
   }
 
