@@ -41,7 +41,7 @@ class Navigation {
         .getByRole("main")
         .getByRole("heading", { name: "Access methods" }),
     ).toBeVisible();
-    await expect(this.#page).toHaveURL(II_URL + "/manage");
+    await expect(this.#page).toHaveURL(II_URL + "/manage/access");
   }
 
   async recoveryPhrase() {
