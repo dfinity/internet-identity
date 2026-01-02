@@ -92,24 +92,12 @@ class ManagePage {
   }
 
   async switchToIdentity(identity: Identity) {
-    const menuButton = this.#page
-      .getByRole("banner")
-      .getByRole("button", { name: "Open menu" });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
-    }
     await this.#page.getByRole("button", { name: "Switch identity" }).click();
     identity.auth(this.#page);
     await this.#page.getByRole("button", { name: identity.name }).click();
   }
 
   async signOut() {
-    const menuButton = this.#page
-      .getByRole("banner")
-      .getByRole("button", { name: "Open menu" });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
-    }
     await this.#page.getByRole("button", { name: "Switch identity" }).click();
     await this.#page.getByRole("button", { name: "Sign out" }).click();
   }
