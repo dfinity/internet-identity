@@ -2,7 +2,6 @@ import { test } from "../fixtures";
 import { dummyAuth, getRandomIndex, II_URL } from "../utils";
 import { DEFAULT_PASSKEY_NAME } from "../fixtures/manageAccessPage";
 import { Identity } from "../fixtures/identity";
-import { expect } from "@playwright/test";
 
 test.describe("Access methods", () => {
   test.beforeEach(async ({ identity, manageAccessPage }) => {
