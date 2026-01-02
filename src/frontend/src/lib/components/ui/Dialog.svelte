@@ -5,6 +5,7 @@
   import { nonNullish } from "@dfinity/utils";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
+  import { navigating } from "$app/state";
 
   type Props = HTMLAttributes<HTMLDialogElement> & {
     onClose?: () => void;
@@ -32,8 +33,13 @@
 
   const transitionFn = $derived(
     window.innerWidth < 480
-      ? (node: Element) => fly(node, { duration: 200, y: "100%" })
-      : (node: Element) => scale(node, { duration: 200, start: 0.9 }),
+      ? (node: Element) =>
+          fly(node, { duration: navigating.to === null ? 200 : 0, y: "100%" })
+      : (node: Element) =>
+          scale(node, {
+            duration: navigating.to === null ? 200 : 0,
+            start: 0.9,
+          }),
   );
 
   const fadeOutBackDrop = () => {
