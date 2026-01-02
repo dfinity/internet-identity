@@ -2,6 +2,7 @@ import { test } from "../fixtures";
 import { dummyAuth, getRandomIndex, II_URL } from "../utils";
 import { DEFAULT_PASSKEY_NAME } from "../fixtures/manageAccessPage";
 import { Identity } from "../fixtures/identity";
+import { expect } from "@playwright/test";
 
 test.describe("Access methods", () => {
   test.beforeEach(async ({ identity, manageAccessPage }) => {
@@ -107,8 +108,7 @@ test.describe("Access methods", () => {
           await dialog.confirm();
         });
 
-      await page.waitForURL(II_URL, { waitUntil: "domcontentloaded" }); // Expect to be signed out
-      // await page.waitForTimeout(1000);
+      await page.waitForURL(II_URL); // Expect to be signed out
       await manageAccessPage.goto(); // Go back to the manage page
 
       // Sign in with the new passkey and assert it's the only passkey

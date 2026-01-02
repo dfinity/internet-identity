@@ -4,102 +4,125 @@ import { DummyAuthFn, II_URL } from "../utils";
 export const DEFAULT_PASSKEY_NAME = "Chrome";
 
 class RenamePasskeyDialog {
-  #dialog: Locator;
+  readonly #dialog: Locator;
+  readonly #onChange: (value: string) => void;
 
-  constructor(dialog: Locator) {
+  constructor(dialog: Locator, onChange: (value: string) => void) {
     this.#dialog = dialog;
+    this.#onChange = onChange;
+  }
+
+  get locator(): Locator {
+    return this.#dialog.filter({
+      has: this.#dialog.getByRole("heading", { name: "Rename passkey" }),
+    });
   }
 
   async fill(value: string): Promise<void> {
-    await this.#dialog
+    await this.locator
       .getByRole("textbox", { name: "Passkey name" })
       .fill(value);
   }
 
   async submit(): Promise<void> {
-    await this.#dialog.getByRole("button", { name: "Save changes" }).click();
+    await this.locator.getByRole("button", { name: "Save changes" }).click();
+    const value = await this.locator
+      .getByRole("textbox", { name: "Passkey name" })
+      .inputValue();
+    this.#onChange(value);
   }
 
   async assertSubmitDisabled(): Promise<void> {
     await expect(
-      this.#dialog.getByRole("button", { name: "Save changes" }),
+      this.locator.getByRole("button", { name: "Save changes" }),
     ).toBeDisabled();
   }
 
   async close(): Promise<void> {
-    await this.#dialog.getByRole("button", { name: "Close" }).click();
+    await this.locator.getByRole("button", { name: "Close" }).click();
   }
 }
 
 class RemovePasskeyDialog {
-  #dialog: Locator;
+  readonly #dialog: Locator;
 
   constructor(dialog: Locator) {
     this.#dialog = dialog;
   }
 
+  get locator(): Locator {
+    return this.#dialog.filter({
+      has: this.#dialog.getByRole("heading", { name: "Are you sure?" }),
+    });
+  }
+
   async confirm(): Promise<void> {
-    await this.#dialog.getByRole("button", { name: "Remove passkey" }).click();
+    await this.locator.getByRole("button", { name: "Remove passkey" }).click();
   }
 
   async cancel(): Promise<void> {
-    await this.#dialog.getByRole("button", { name: "Cancel" }).click();
+    await this.locator.getByRole("button", { name: "Cancel" }).click();
   }
 
   async assertSignOutWarningShown(): Promise<void> {
-    await expect(this.#dialog).toHaveText(/you will be signed out/);
+    await expect(this.locator).toHaveText(/you will be signed out/);
   }
 }
 
 class PasskeyItem {
-  #item: Locator;
+  readonly #item: Locator;
+  #name: string;
 
-  constructor(item: Locator) {
+  constructor(item: Locator, name: string) {
     this.#item = item;
+    this.#name = name;
+  }
+
+  get locator(): Locator {
+    return this.#item.filter({ hasText: this.#name }).first();
   }
 
   async rename<T>(fn: (dialog: RenamePasskeyDialog) => Promise<T>): Promise<T> {
-    await this.#item.getByRole("button", { name: "More options" }).click();
-    await this.#item
+    await this.locator.getByRole("button", { name: "More options" }).click();
+    await this.locator
       .getByRole("menu")
       .getByRole("menuitem", { name: "Rename" })
       .click();
-    const dialog = this.#item.page().getByRole("dialog").filter({
-      hasText: "Rename passkey",
-    });
-    await expect(dialog).toBeVisible();
-    const renamePasskeyDialog = new RenamePasskeyDialog(dialog);
-    const value = await fn(renamePasskeyDialog);
-    await expect(dialog).toBeHidden();
+    const dialog = new RenamePasskeyDialog(
+      this.locator.page().getByRole("dialog"),
+      (value) => (this.#name = value),
+    );
+    await expect(dialog.locator).toBeVisible();
+    const value = await fn(dialog);
+    await expect(dialog.locator).toBeHidden();
     return value;
   }
 
   async remove<T>(fn: (dialog: RemovePasskeyDialog) => Promise<T>): Promise<T> {
-    await this.#item.getByRole("button", { name: "More options" }).click();
-    await this.#item
+    await this.locator.getByRole("button", { name: "More options" }).click();
+    await this.locator
       .getByRole("menu")
       .getByRole("menuitem", { name: "Remove" })
       .click();
-    const dialog = this.#item.page().getByRole("dialog").filter({
-      hasText: "Are you sure?",
-    });
-    await expect(dialog).toBeVisible();
-    const removePasskeyDialog = new RemovePasskeyDialog(dialog);
-    const value = await fn(removePasskeyDialog);
-    await expect(dialog).toBeHidden();
+    const dialog = new RemovePasskeyDialog(
+      this.locator.page().getByRole("dialog"),
+    );
+    await expect(dialog.locator).toBeVisible();
+    const value = await fn(dialog);
+    await expect(dialog.locator).toBeHidden();
     return value;
   }
 
   async assertUnremovable(): Promise<void> {
-    await this.#item.getByRole("button", { name: "More options" }).click();
+    await this.locator.getByRole("button", { name: "More options" }).click();
     await expect(
-      this.#item.getByRole("menu").getByRole("menuitem", { name: "Remove" }),
+      this.locator.getByRole("menu").getByRole("menuitem", { name: "Remove" }),
     ).toBeHidden();
   }
 }
 
 class AddDialog {
-  #dialog: Locator;
+  readonly #dialog: Locator;
 
   constructor(dialog: Locator) {
     this.#dialog = dialog;
@@ -130,7 +153,7 @@ class AddDialog {
 }
 
 class ManageAccessPage {
-  #page: Page;
+  readonly #page: Page;
 
   constructor(page: Page) {
     this.#page = page;
@@ -158,9 +181,8 @@ class ManageAccessPage {
       .getByRole("main")
       .getByRole("listitem")
       .filter({ hasText: "Passkey" })
-      .filter({ hasText: name })
       .first();
-    return new PasskeyItem(item);
+    return new PasskeyItem(item, name);
   }
 
   async assertPasskeyExists(name: string): Promise<void> {
