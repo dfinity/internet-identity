@@ -14,7 +14,7 @@ class RenamePasskeyDialog {
 
   get locator(): Locator {
     return this.#dialog.filter({
-      has: this.#dialog.getByRole("heading", { name: "Rename passkey" }),
+      has: this.#dialog.page().getByRole("heading", { name: "Rename passkey" }),
     });
   }
 
@@ -52,7 +52,7 @@ class RemovePasskeyDialog {
 
   get locator(): Locator {
     return this.#dialog.filter({
-      has: this.#dialog.getByRole("heading", { name: "Are you sure?" }),
+      has: this.#dialog.page().getByRole("heading", { name: "Are you sure?" }),
     });
   }
 
