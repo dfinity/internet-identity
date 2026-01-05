@@ -2,6 +2,16 @@ import knownPasswordManagers from "./password_managers.json";
 import knownSecurityKeys from "./security_keys.json";
 
 /**
+ * This file lists known passkey providers with their AAGUID and storage
+ * characteristics. The providers are maintained in `password_managers.json` and
+ * `security_keys.json`, which are kept up to date through an CI job called
+ * `update-passkey-aaguid`. This job creates a PR to update the entries in these
+ * files coming from two sources:
+ * - FIDO Alliance: https://mds3.fidoalliance.org
+ * - GitHub Community: https://github.com/passkeydeveloper/passkey-authenticator-aaguids
+ */
+
+/**
  * e.g. Stored in your Google account and synced across your Android devices.
  */
 interface StoredInAccount {
