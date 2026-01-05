@@ -36,8 +36,8 @@ test("User can remove a passkey when they have multiple access methods", async (
   }
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
-  // Rename current passkey to old passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  // Assign name to current passkey
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Verify we have one passkey
   await expect(
@@ -46,7 +46,7 @@ test("User can remove a passkey when they have multiple access methods", async (
 
   // Start the "add passkey" flow to create a second passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify that we now have two passkeys
   await expect(
@@ -98,7 +98,7 @@ test("User cannot remove passkey if they only have one access method", async ({
   // Verify that the remove button is not visible when there's only one access method
   await page
     .getByRole("listitem")
-    .filter({ hasText: "Chrome" })
+    .filter({ hasText: "Unknown" })
     .getByRole("button", { name: "More options" })
     .click();
   await expect(page.getByRole("menuitem", { name: "Remove" })).toBeHidden();
@@ -132,8 +132,8 @@ test("User is logged out after removing the passkey they used to authenticate", 
   }
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
-  // Rename passkey to current passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  // Assign name to current passkey
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Verify we have one passkey
   await expect(
@@ -142,7 +142,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
 
   // Start the "add passkey" flow to create a second passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify that we now have two passkeys
   await expect(
@@ -180,8 +180,8 @@ test("User can cancel passkey removal", async ({ page }) => {
   }
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
-  // Rename passkey to current passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  // Assign name to current passkey
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Verify we have one passkey
   await expect(

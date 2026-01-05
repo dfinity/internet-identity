@@ -9,7 +9,6 @@ import { features } from "$lib/legacy/features";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
-import { inferPasskeyAlias, loadUAParser } from "$lib/legacy/flows/register";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { nanosToMillis } from "$lib/utils/time";
 
@@ -105,19 +104,12 @@ export class RegisterAccessMethodFlow {
     if (isNullish(credentialId)) {
       throw new Error("Credential ID is missing");
     }
-    const uaParser = loadUAParser();
-    const alias = await inferPasskeyAlias({
-      authenticatorType: passkeyIdentity.getAuthenticatorAttachment(),
-      userAgent: navigator.userAgent,
-      uaParser,
-      aaguid: passkeyIdentity.getAaguid(),
-    });
     const authnMethodData = passkeyAuthnMethodData({
-      alias,
       pubKey: passkeyIdentity.getPublicKey().toDer(),
       credentialId,
       authenticatorAttachment: passkeyIdentity.getAuthenticatorAttachment(),
       origin: window.location.origin,
+      aaguid: passkeyIdentity.getAaguid(),
     });
     await session.actor
       .authn_method_registration_mode_exit(this.#identityNumber, [

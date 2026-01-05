@@ -14,8 +14,8 @@ import knownSecurityKeys from "./security_keys.json";
 /**
  * e.g. Stored in your Google account and synced across your Android devices.
  */
-interface StoredInAccount {
-  type: "account";
+interface StoredInCloud {
+  type: "cloud";
   account: string;
   platform?: string;
 }
@@ -23,8 +23,8 @@ interface StoredInAccount {
 /**
  * e.g. Stored and usable only on the Windows device it was created on.
  */
-interface StoredOnPlatform {
-  type: "platform";
+interface StoredInOperatingSystem {
+  type: "os";
   platform: string;
 }
 
@@ -45,8 +45,8 @@ interface StoredInBrowser {
 }
 
 export type Provider = { name: string } & (
-  | StoredInAccount
-  | StoredOnPlatform
+  | StoredInCloud
+  | StoredInOperatingSystem
   | StoredOnDevice
   | StoredInBrowser
 );
@@ -60,7 +60,7 @@ const knownProviders: Record<string, Provider> = {
       aaguid,
       {
         name,
-        type: "account",
+        type: "cloud",
         account: name,
       },
     ]),
@@ -98,7 +98,7 @@ const knownProviders: Record<string, Provider> = {
       aaguid,
       {
         name: "Windows Hello",
-        type: "platform",
+        type: "os",
         platform: "Windows",
       },
     ]),
@@ -111,7 +111,7 @@ const knownProviders: Record<string, Provider> = {
       aaguid,
       {
         name: "Apple Passwords",
-        type: "account",
+        type: "cloud",
         account: "Apple",
         platform: "Apple",
       },
@@ -119,13 +119,13 @@ const knownProviders: Record<string, Provider> = {
   ),
   "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4": {
     name: "Google Password Manager",
-    type: "account",
+    type: "cloud",
     account: "Google",
     platform: "Android",
   },
   "53414d53-554e-4700-0000-000000000000": {
     name: "Samsung Pass",
-    type: "account",
+    type: "cloud",
     account: "Samsung",
     platform: "Samsung",
   },
