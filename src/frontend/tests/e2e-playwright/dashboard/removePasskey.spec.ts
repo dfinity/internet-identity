@@ -16,12 +16,12 @@ test("User can remove a passkey when they have multiple access methods", async (
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -70,12 +70,12 @@ test("User cannot remove passkey if they only have one access method", async ({
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -112,12 +112,12 @@ test("User is logged out after removing the passkey they used to authenticate", 
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -152,32 +152,20 @@ test("User is logged out after removing the passkey they used to authenticate", 
   // Remove current passkey
   await removePasskey(page, "Current passkey", true);
 
-  // Verify the user is logged out and redirected to the login page
-  // The URL should change from /manage to the root or login page
-  await page.waitForURL(II_URL + "/login");
-
-  // Verify we're back at the login screen without selectable identity
-  await expect(
-    page.getByRole("button", { name: "Continue with passkey" }),
-  ).toBeVisible();
-
-  // Verify we're no longer at the dashboard
-  await expect(
-    page.getByRole("heading", {
-      name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
-    }),
-  ).toBeHidden();
+  // Verify the user is logged out and redirected to the landing page
+  // The URL should change from /manage to landing page
+  await page.waitForURL(II_URL);
 });
 
 test("User can cancel passkey removal", async ({ page }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();

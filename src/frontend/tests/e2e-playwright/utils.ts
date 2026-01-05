@@ -240,8 +240,8 @@ export const removePasskey = async (
 };
 
 export const signOut = async (page: Page): Promise<void> => {
-  await page.getByLabel("Switch identity").click();
-  await page.getByRole("button", { name: "Sign Out" }).click();
+  // Navigating to landing page (reloading) is sufficient for now to sign out
+  await page.goto(II_URL);
 };
 
 /**

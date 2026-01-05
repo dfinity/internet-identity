@@ -12,7 +12,8 @@ if [ $padding_needed -ne 4 ]; then
 fi
 decoded_content=$(echo "$base64_content" | base64 --decode)
 
-# FIDO entries (used as source for security keys)
+# Fetch entries from the FIDO Alliance: https://mds3.fidoalliance.org,
+# these are used as source for security keys in `security_keys.json`.
 declare -A fidoEntries
 fidoEntries_json=$(echo "$decoded_content" | jq -r '.entries[] | select(.aaguid and ((.metadataStatement.attachmentHint // []) | type=="array" and index("external"))) | "\(.aaguid)=\(.metadataStatement.description)"')
 while IFS="= " read -r key value; do
@@ -26,7 +27,8 @@ done <<< "$fidoEntries_json"
     echo "}"
 } > "$PWD/src/frontend/src/lib/assets/aaguid/security_keys.json"
 
-# Community entries (used as source for password managers)
+# Fetch entries from the GitHub community: https://github.com/passkeydeveloper/passkey-authenticator-aaguids,
+# these are used as source for password managers in `password_managers.json`.
 declare -A communityEntries
 while IFS="= " read -r key value; do
     communityEntries["$key"]="$value"

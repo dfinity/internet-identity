@@ -18,11 +18,11 @@
     ),
   );
 
-  const onSignIn = async (identityNumber: bigint) => {
+  const handleSignIn = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     await goto("/authorize/continue");
   };
-  const onSignUp = async (identityNumber: bigint) => {
+  const handleSignUp = async (identityNumber: bigint) => {
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
@@ -30,12 +30,17 @@
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     await goto("/authorize/continue");
   };
-  const onMigration = async () => {
+  const handleUpgrade = async () => {
     await goto("/authorize/upgrade-success");
   };
 </script>
 
-<AuthWizard {onSignIn} {onSignUp} {onMigration} onError={handleError}>
+<AuthWizard
+  onSignIn={handleSignIn}
+  onSignUp={handleSignUp}
+  onUpgrade={handleUpgrade}
+  onError={handleError}
+>
   <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {$t`Choose method`}
