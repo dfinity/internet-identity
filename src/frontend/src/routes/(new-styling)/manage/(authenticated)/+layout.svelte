@@ -24,13 +24,24 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import { sessionStore } from "$lib/stores/session.store";
-  import { formatDate, t } from "$lib/stores/locale.store";
+  import {
+    formatDate,
+    locales,
+    localeStore,
+    t,
+  } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
+  import { nanosToMillis } from "$lib/utils/time";
+  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
+  import { Trans } from "$lib/components/locale";
+  import { getMetadataString } from "$lib/utils/openID";
 
   const { children, data }: LayoutProps = $props();
 
