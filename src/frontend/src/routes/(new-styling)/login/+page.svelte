@@ -42,7 +42,7 @@
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
-      title: $t`Migration completed successfully`,
+      title: $t`Upgrade completed successfully`,
       duration: 4000,
     });
     isAuthDialogOpen = false;
