@@ -56,7 +56,7 @@
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
       .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3),
+      .slice(0, 3), // Only show 3 last used since entries can't be removed yet
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
