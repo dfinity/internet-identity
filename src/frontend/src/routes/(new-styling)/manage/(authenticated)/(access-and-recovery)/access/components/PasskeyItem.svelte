@@ -160,11 +160,11 @@
     </div>
   </div>
   <div class="text-text-primary text-xs">
-    {#if provider?.type === "account"}
+    {#if provider?.type === "cloud"}
       {provider.platform === undefined
         ? $t`Stored in your ${provider.account} account and synced across your devices.`
         : $t`Stored in your ${provider.account} account and synced across your ${provider.platform} devices.`}
-    {:else if provider?.type === "platform"}
+    {:else if provider?.type === "os"}
       {$t`Stored and usable only on the ${provider.platform} device it was created on.`}
     {:else if provider?.type === "device"}
       {$t`Kept on a physical key. Authenticate on supported devices via tap/insert.`}
