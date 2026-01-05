@@ -82,9 +82,12 @@ test("Authorize by signing in from another device", async ({
 
     // Switch to other device and authenticate after visiting link
     await otherDevicePage.goto(linkToPair);
+    await otherDevicePage
+      .getByRole("button", { name: "Continue with Passkey" })
+      .click();
     authOtherDevice(otherDevicePage);
     await otherDevicePage
-      .getByRole("button", { name: DEFAULT_USER_NAME })
+      .getByRole("button", { name: "Use existing identity" })
       .click();
 
     // Switch to current device and get confirmation code

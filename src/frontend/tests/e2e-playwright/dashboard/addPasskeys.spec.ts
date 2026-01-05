@@ -17,12 +17,12 @@ test("User can log into the dashboard and add a new passkey from the same device
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -73,7 +73,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await clearStorage(page);
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
-  await newPage.getByRole("link", { name: "Manage Identity" }).click();
+  await newPage.getByRole("button", { name: "Sign in" }).click();
   await newPage.getByRole("button", { name: "Continue with passkey" }).click();
   auth2(newPage);
   await newPage.getByRole("button", { name: "Use existing identity" }).click();
@@ -108,12 +108,12 @@ test("User can log in the dashboard and add a new passkey from another device", 
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -199,7 +199,7 @@ test("User can add a new passkey and use it with cached identity without clearin
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
 
@@ -249,12 +249,12 @@ test("User can add a new passkey and use it with cached identity without clearin
   // This should use the cached identity
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
-  await newPage.getByRole("link", { name: "Manage Identity" }).click();
+  await newPage.getByRole("button", { name: "Switch identity" }).click();
 
   // Click on the cached identity button directly
   // But use the new passkey to authenticate
   auth2(newPage);
-  await newPage.getByRole("button", { name: TEST_USER_NAME }).click();
+  await newPage.getByRole("button", { name: "Manage identity" }).click();
 
   // Verify we're logged in with the new passkey
   await newPage.waitForURL(II_URL + "/manage");
@@ -272,12 +272,12 @@ test("User can log into the dashboard and add up to 7 additional passkeys", asyn
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();

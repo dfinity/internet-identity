@@ -13,9 +13,11 @@
   } from "@lucide/svelte";
   import { page } from "$app/state";
   import { afterNavigate, goto } from "$app/navigation";
-  import { fade } from "svelte/transition";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
-  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import {
+    authenticatedStore,
+    authenticationStore,
+  } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { toaster } from "$lib/components/utils/toaster";
@@ -34,7 +36,6 @@
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
-  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
@@ -42,15 +43,17 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { Trans } from "$lib/components/locale";
   import { getMetadataString } from "$lib/utils/openID";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const { children, data }: LayoutProps = $props();
+
+  const authLastUsedFlow = new AuthLastUsedFlow();
 
   let identityButtonRef = $state<HTMLElement>();
   let isMobileSidebarOpen = $state(false);
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
-  let isSwitchingIdentity = $state(false);
   let isLanguageDialogOpen = $state(false);
   let isRecoveryPhraseSetUpDismissed = $state(false);
 
@@ -74,50 +77,45 @@
     },
   );
 
-  const switchToIdentity = async (identityNumber: bigint) => {
-    isAuthDialogOpen = false;
-    isSwitchingIdentity = true;
+  const handleSignIn = async (identityNumber: bigint) => {
+    isAuthenticating = true;
+    if ($authenticationStore?.identityNumber !== identityNumber) {
+      // Sign in if not authenticated with this identity yet
+      await sessionStore.reset();
+      await authLastUsedFlow.authenticate(
+        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+      );
+    }
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     await goto("/manage", { replaceState: true, invalidateAll: true });
-    isSwitchingIdentity = false;
-  };
-  const handleSignIn = async (identityNumber: bigint) => {
-    await switchToIdentity(identityNumber);
+    isIdentityPopoverOpen = false;
+    isAuthDialogOpen = false;
+    isAuthenticating = false;
   };
   const handleSignUp = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
-    await switchToIdentity(identityNumber);
   };
-  const handleMigration = async (identityNumber: bigint) => {
+  const handleUpgrade = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
     toaster.success({
       title: $t`Upgrade completed successfully`,
       duration: 4000,
     });
-    await switchToIdentity(identityNumber);
   };
-  const handleLogout = async () => {
-    await sessionStore.reset();
-    location.replace("/login");
+  const handleSignOut = async () => {
+    window.location.replace("/");
   };
 
-  const authLastUsedFlow = new AuthLastUsedFlow();
+  // Pre-fetch passkey credential ids
   $effect(() =>
     authLastUsedFlow.init(
       lastUsedIdentities.map(({ identityNumber }) => identityNumber),
     ),
   );
-
-  const handleSwitchIdentity = async (identityNumber: bigint) => {
-    isIdentityPopoverOpen = false;
-    await sessionStore.reset();
-    const chosenIdentity =
-      $lastUsedIdentitiesStore.identities[identityNumber.toString()];
-    await authLastUsedFlow.authenticate(chosenIdentity);
-    await switchToIdentity(identityNumber);
-  };
 
   // Hide mobile sidebar on navigation
   afterNavigate(() => {
@@ -369,23 +367,9 @@
       </div>
     </header>
     <!-- Page content -->
-    <main
-      class={[
-        "flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12",
-        "transition-opacity duration-200",
-        isSwitchingIdentity && "pointer-events-none opacity-0",
-      ]}
-    >
+    <main class="flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12">
       {@render children()}
     </main>
-    {#if isSwitchingIdentity}
-      <div
-        class="absolute top-1/2 left-1/2 -translate-1/2"
-        transition:fade={{ duration: 200 }}
-      >
-        <ProgressRing class="text-fg-tertiary size-14" />
-      </div>
-    {/if}
     <div class="h-[env(safe-area-inset-bottom)]"></div>
   </div>
 </div>
@@ -393,7 +377,12 @@
 {#if isIdentityPopoverOpen}
   <Popover
     anchor={identityButtonRef}
-    onClose={() => (isIdentityPopoverOpen = false)}
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      isIdentityPopoverOpen = false;
+    }}
     direction="down"
     align="end"
     distance="0.75rem"
@@ -401,39 +390,47 @@
     <IdentitySwitcher
       selected={$authenticatedStore.identityNumber}
       identities={lastUsedIdentities}
-      switchIdentity={handleSwitchIdentity}
-      useAnotherIdentity={() => {
+      onSwitchIdentity={handleSignIn}
+      onUseAnotherIdentity={() => {
         isIdentityPopoverOpen = false;
         isAuthDialogOpen = true;
       }}
+      onError={(error) => {
+        isIdentityPopoverOpen = false;
+        isAuthenticating = false;
+        handleError(error);
+      }}
       onClose={() => (isIdentityPopoverOpen = false)}
-      onLogout={handleLogout}
+      onSignOut={handleSignOut}
     />
   </Popover>
 {/if}
 
 {#if isAuthDialogOpen}
   <Dialog
-    onClose={() => (isAuthDialogOpen = false)}
-    showCloseButton={!isAuthenticating}
-    closeOnOutsideClick={!isAuthenticating}
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      isAuthDialogOpen = false;
+    }}
   >
     <AuthWizard
-      bind:isAuthenticating
       onSignIn={handleSignIn}
       onSignUp={handleSignUp}
-      onMigration={handleMigration}
+      onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
+        isAuthenticating = false;
         handleError(error);
       }}
       withinDialog
     >
       <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-        {$t`Use another identity`}
+        {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`choose method`}
+        {$t`choose method to continue`}
       </p>
     </AuthWizard>
   </Dialog>

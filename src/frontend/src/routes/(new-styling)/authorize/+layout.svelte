@@ -24,8 +24,11 @@
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
 
   const { children, data }: LayoutProps = $props();
+
+  const authLastUsedFlow = new AuthLastUsedFlow();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
@@ -40,21 +43,30 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
 
-  const onSignIn = async (identityNumber: bigint) => {
+  const handleSignIn = async (identityNumber: bigint) => {
+    isAuthenticating = true;
+    if ($authenticationStore?.identityNumber !== identityNumber) {
+      // Sign in if not authenticated with this identity yet
+      await sessionStore.reset();
+      await authLastUsedFlow.authenticate(
+        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+      );
+    }
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    isIdentityPopoverOpen = false;
     isAuthDialogOpen = false;
+    isAuthenticating = false;
   };
-  const onSignUp = async (identityNumber: bigint) => {
+  const handleSignUp = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
     toaster.success({
       title: $t`You're all set. Your identity has been created.`,
       duration: 4000,
     });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isAuthDialogOpen = false;
   };
-  const onMigration = async () => {
+  const handleUpgrade = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
     await goto("/authorize/upgrade-success");
-    isAuthDialogOpen = false;
   };
 
   onMount(() => {
@@ -63,6 +75,13 @@
       legacyProtocol: data.legacyProtocol,
     });
   });
+
+  // Pre-fetch passkey credential ids
+  $effect(() =>
+    authLastUsedFlow.init(
+      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
+    ),
+  );
 
   // Remove legacyProtocol param from URL bar after initializing
   afterNavigate(() => {
@@ -100,7 +119,12 @@
       {#if isIdentityPopoverOpen}
         <Popover
           anchor={identityButtonRef}
-          onClose={() => (isIdentityPopoverOpen = false)}
+          onClose={() => {
+            if (isAuthenticating) {
+              return;
+            }
+            isIdentityPopoverOpen = false;
+          }}
           direction="down"
           align="end"
           distance="0.75rem"
@@ -108,15 +132,14 @@
           <IdentitySwitcher
             selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
-            switchIdentity={async (identityNumber) => {
-              authenticationStore.reset();
-              await sessionStore.reset();
-              lastUsedIdentitiesStore.selectIdentity(identityNumber);
-              isIdentityPopoverOpen = false;
-            }}
-            useAnotherIdentity={() => {
+            onSwitchIdentity={handleSignIn}
+            onUseAnotherIdentity={() => {
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
+            }}
+            onError={(error) => {
+              isIdentityPopoverOpen = false;
+              handleError(error);
             }}
             onClose={() => (isIdentityPopoverOpen = false)}
           />
@@ -124,15 +147,17 @@
       {/if}
       {#if isAuthDialogOpen}
         <Dialog
-          onClose={() => (isAuthDialogOpen = false)}
-          showCloseButton={!isAuthenticating}
-          closeOnOutsideClick={!isAuthenticating}
+          onClose={() => {
+            if (isAuthenticating) {
+              return;
+            }
+            isAuthDialogOpen = false;
+          }}
         >
           <AuthWizard
-            bind:isAuthenticating
-            {onSignIn}
-            {onSignUp}
-            {onMigration}
+            onSignIn={handleSignIn}
+            onSignUp={handleSignUp}
+            onUpgrade={handleUpgrade}
             onError={(error) => {
               isAuthDialogOpen = false;
               handleError(error);
@@ -140,10 +165,10 @@
             withinDialog
           >
             <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
-              {$t`Use another identity`}
+              {$t`Sign in`}
             </h1>
             <p class="text-text-secondary mb-6 self-start text-sm">
-              {$t`choose method`}
+              {$t`choose method to continue`}
             </p>
           </AuthWizard>
         </Dialog>
