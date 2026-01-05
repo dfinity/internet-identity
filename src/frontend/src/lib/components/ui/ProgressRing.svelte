@@ -4,14 +4,19 @@
 
   type Props = SVGAttributes<SVGSVGElement> & {
     value?: number;
+    strokeWidth?: number;
   };
 
-  const { value, class: className }: Props = $props();
+  const {
+    value,
+    class: className,
+    strokeWidth: overrideStrokeWidth,
+  }: Props = $props();
 
-  const strokeWidth = 2;
+  const strokeWidth = overrideStrokeWidth ?? 2;
   let clientWidth = $state(0);
   const circumference = $derived(
-    2 * Math.PI * ((clientWidth - strokeWidth) * 0.5),
+    2 * Math.PI * ((Math.max(clientWidth, strokeWidth) - strokeWidth) * 0.5),
   );
 </script>
 
@@ -28,7 +33,7 @@
   <circle
     class={["fill-none stroke-current/20"]}
     stroke-width={strokeWidth}
-    r={(clientWidth - strokeWidth) / 2}
+    r={(Math.max(clientWidth, strokeWidth) - strokeWidth) / 2}
     cx={clientWidth / 2}
     cy={clientWidth / 2}
   />
@@ -36,7 +41,7 @@
     class={["fill-none stroke-current", isNullish(value) && "progress_pulsate"]}
     stroke-linecap="round"
     stroke-width={strokeWidth}
-    r={(clientWidth - strokeWidth) / 2}
+    r={(Math.max(clientWidth, strokeWidth) - strokeWidth) / 2}
     cx={clientWidth / 2}
     cy={clientWidth / 2}
     stroke-dasharray={circumference}

@@ -25,7 +25,6 @@
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import { LARGE_GOOGLE_BUTTON } from "$lib/state/featureFlags";
   import { t } from "$lib/stores/locale.store";
 
   const { data }: PageProps = $props();
@@ -42,7 +41,7 @@
   const onMigration = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
     toaster.success({
-      title: $t`Migration completed successfully`,
+      title: $t`Upgrade completed successfully`,
       duration: 4000,
     });
     isAuthDialogOpen = false;
@@ -91,9 +90,6 @@
   onMount(() => {
     authenticationV2Funnel.init({
       origin: window.location.origin,
-      abTestGroup: $LARGE_GOOGLE_BUTTON
-        ? "largeGoogleButton"
-        : "smallGoogleButton",
     });
   });
 </script>
