@@ -7,6 +7,7 @@
     XIcon,
     LifeBuoyIcon,
     CodeIcon,
+    LanguagesIcon,
     InfoIcon,
     UserIcon,
   } from "@lucide/svelte";
@@ -23,18 +24,24 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import { sessionStore } from "$lib/stores/session.store";
-  import { formatDate, t } from "$lib/stores/locale.store";
+  import {
+    formatDate,
+    locales,
+    localeStore,
+    t,
+  } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { Trans } from "$lib/components/locale";
-  import { getMetadataString } from "$lib/utils/openID";
-  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
-  import Avatar from "$lib/components/ui/Avatar.svelte";
+  import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
   import { nanosToMillis } from "$lib/utils/time";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
+  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
+  import { Trans } from "$lib/components/locale";
+  import { getMetadataString } from "$lib/utils/openID";
 
   const { children, data }: LayoutProps = $props();
 
@@ -44,6 +51,7 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isSwitchingIdentity = $state(false);
+  let isLanguageDialogOpen = $state(false);
   let isRecoveryPhraseSetUpDismissed = $state(false);
 
   const lastUsedIdentities = $derived(
@@ -297,6 +305,12 @@
     <div class="mb-5 flex flex-col gap-0.5 px-4">
       <ul class="contents">
         <li class="contents">
+          <NavItem onclick={() => (isLanguageDialogOpen = true)}>
+            <LanguagesIcon class="size-5 sm:max-md:mx-auto" />
+            <span class="uppercase sm:max-md:hidden">{$localeStore}</span>
+          </NavItem>
+        </li>
+        <li class="contents">
           <NavItem href={SUPPORT_URL} target="_blank" rel="noopener">
             <LifeBuoyIcon class="size-5 sm:max-md:mx-auto" />
             <span class="sm:max-md:hidden">{$t`Support`}</span>
@@ -422,5 +436,18 @@
         {$t`choose method`}
       </p>
     </AuthWizard>
+  </Dialog>
+{/if}
+
+{#if isLanguageDialogOpen}
+  <Dialog onClose={() => (isLanguageDialogOpen = false)}>
+    <ChooseLanguage
+      locales={$locales}
+      value={$localeStore}
+      onChange={(value) => {
+        isLanguageDialogOpen = false;
+        localeStore.setOrReset(value);
+      }}
+    />
   </Dialog>
 {/if}
