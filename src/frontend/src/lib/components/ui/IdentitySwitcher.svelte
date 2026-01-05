@@ -91,7 +91,7 @@
             <Checkbox
               checked
               size="md"
-              class="pointer-events-none mr-1 ml-auto !rounded-full"
+              class="pointer-events-none mr-1 ml-auto [&_div]:rounded-full"
               tabindex={-1}
               aria-hidden
             />
