@@ -43,6 +43,7 @@
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { Trans } from "$lib/components/locale";
   import { getMetadataString } from "$lib/utils/openID";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   const { children, data }: LayoutProps = $props();
 
