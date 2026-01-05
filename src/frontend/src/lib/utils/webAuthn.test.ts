@@ -29,6 +29,7 @@ describe("webauthn", () => {
 
     it("should return valid AAGUID", () => {
       expect(extractAAGUID(authData)).toEqual(
+        // iCloud Keychain
         new Uint8Array([
           251, 252, 48, 7, 21, 78, 78, 204, 140, 11, 110, 2, 5, 87, 215, 189,
         ]),
