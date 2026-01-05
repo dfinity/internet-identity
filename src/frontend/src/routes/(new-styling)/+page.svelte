@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { building } from "$app/environment";
   import Footer from "$lib/components/layout/Footer.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import TextFade from "$lib/components/ui/TextFade.svelte";
   import FullControlIllustration from "$lib/components/illustrations/landing/FullControlIllustration.svelte";
   import EasyAccessIllustration from "$lib/components/illustrations/landing/EasyAccessIllustration.svelte";
@@ -11,9 +11,8 @@
     FAQ_PASSKEY_URL,
     II_DEVELOPER_DOCS_URL,
   } from "$lib/config";
-  import LandingHeader from "$lib/components/layout/LandingHeader.svelte";
   import { manuallyReroute } from "$lib/utils/reroute";
-  import { localeOptions, localeStore, t } from "$lib/stores/locale.store";
+  import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import {
     ChevronDownIcon,
@@ -23,7 +22,74 @@
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
   import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
-  import Select from "$lib/components/ui/Select.svelte";
+  import Logo from "$lib/components/ui/Logo.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import { AuthWizard } from "$lib/components/wizards/auth";
+  import {
+    afterNavigate,
+    beforeNavigate,
+    goto,
+    preloadData,
+  } from "$app/navigation";
+  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
+  import { toaster } from "$lib/components/utils/toaster";
+  import {
+    AuthenticationV2Events,
+    authenticationV2Funnel,
+  } from "$lib/utils/analytics/authenticationV2Funnel";
+  import { page } from "$app/state";
+  import { authenticationStore } from "$lib/stores/authentication.store";
+  import { sessionStore } from "$lib/stores/session.store";
+  import Popover from "$lib/components/ui/Popover.svelte";
+  import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+
+  const authLastUsedFlow = new AuthLastUsedFlow();
+
+  let next = $state("/manage");
+  let isAuthDialogOpen = $state(false);
+  let isIdentityPopoverOpen = $state(false);
+  let isAuthenticating = $state(false);
+  let identityButtonRef = $state<HTMLButtonElement>();
+
+  const lastUsedIdentities = $derived(
+    Object.values($lastUsedIdentitiesStore.identities)
+      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
+      .slice(0, 3), // Only show 3 last used since entries can't be removed yet
+  );
+  const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
+
+  const handleSignIn = async (identityNumber: bigint) => {
+    isAuthenticating = true;
+    if ($authenticationStore?.identityNumber !== identityNumber) {
+      // Switch sign in if not authenticated with this identity yet
+      await sessionStore.reset();
+      await authLastUsedFlow.authenticate(
+        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+      );
+    }
+    lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    await preloadData(next);
+    await goto(next, { replaceState: true });
+    isIdentityPopoverOpen = false;
+    isAuthDialogOpen = false;
+    isAuthenticating = false;
+  };
+  const handleUpgrade = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
+    toaster.success({
+      title: $t`Upgrade completed successfully`,
+      duration: 4000,
+    });
+  };
+  const handleSignUp = async (identityNumber: bigint) => {
+    await handleSignIn(identityNumber);
+    toaster.success({
+      title: $t`You're all set. Your identity has been created.`,
+      duration: 2000,
+    });
+  };
 
   // Add rerouting back on this SSG route
   $effect(() => {
@@ -39,6 +105,43 @@
     return () => {
       clearAnimation?.();
     };
+  });
+
+  // Automatically show sign-in when triggered by another page
+  afterNavigate(() => {
+    if (!("login" in page.state)) {
+      return;
+    }
+    if (typeof page.state.login === "string") {
+      next = page.state.login;
+    }
+    isAuthDialogOpen = true;
+  });
+
+  // Pre-fetch passkey credential ids
+  $effect(() =>
+    authLastUsedFlow.init(
+      lastUsedIdentities.map(({ identityNumber }) => identityNumber),
+    ),
+  );
+
+  // Open authentication funnel once started
+  $effect(() => {
+    if (!isAuthDialogOpen) {
+      return;
+    }
+    authenticationV2Funnel.init({
+      origin: window.location.origin,
+    });
+  });
+
+  // Close authentication funnel once completed
+  beforeNavigate((navigation) => {
+    if (!navigation.to?.url.pathname.startsWith("/manage")) {
+      return;
+    }
+    authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
+    authenticationV2Funnel.close();
   });
 </script>
 
@@ -77,68 +180,75 @@
     ></div>
   </div>
   <div class="h-[env(safe-area-inset-top)]"></div>
-  <LandingHeader class="w-full flex-col md:flex-row">
-    <div
-      class="border-border-secondary flex w-full flex-1 flex-row items-center justify-center gap-5 border-y py-3 md:justify-end md:border-0"
-    >
-      <!-- TODO: Re-position language selector for now on mobile till updated design is implemented -->
-      <Select
-        options={$localeOptions}
-        direction="down"
-        align="start"
-        distance="0.25rem"
-        class="!w-18"
-      >
-        <Button
-          variant="tertiary"
-          class="uppercase max-md:absolute max-md:top-3 max-md:right-3"
+  <header
+    class="from-bg-primary flex h-16 flex-row items-center bg-gradient-to-b to-transparent px-4 md:px-6 lg:px-8"
+  >
+    <Logo class="text-fg-primary me-4 h-5.5" />
+    <h1 class="text-text-primary hidden text-base font-semibold sm:block">
+      Internet Identity
+    </h1>
+    {#if !building}
+      {#if selectedIdentity === undefined}
+        <button onclick={() => (isAuthDialogOpen = true)} class="btn ms-auto">
+          {$t`Sign in`}
+        </button>
+      {:else}
+        <button
+          bind:this={identityButtonRef}
+          onclick={() => (isIdentityPopoverOpen = true)}
+          class="btn btn-tertiary ms-auto gap-2.5 pr-3"
+          aria-label={$t`Switch identity`}
         >
-          {$localeStore}
+          <span>
+            {selectedIdentity.name ?? selectedIdentity.identityNumber}
+          </span>
           <ChevronDownIcon class="size-4" />
-        </Button>
-      </Select>
-      <Button variant="secondary" href={II_DEVELOPER_DOCS_URL} target="_blank">
-        {$t`For developers`}
-      </Button>
-      <Button variant="primary" href="/login">{$t`Manage Identity`}</Button>
-    </div>
-  </LandingHeader>
+        </button>
+      {/if}
+    {/if}
+  </header>
   <div class="flex h-[392px] w-full flex-row px-4 sm:h-[512px]">
     <div
-      class="fade-in flex w-full flex-col items-center justify-center gap-6 opacity-0"
+      class="fade-in flex w-full flex-col items-center justify-center opacity-0"
     >
-      <div class="flex w-full flex-col gap-2">
-        <h1
-          class="text-text-disabled text-center text-4xl md:text-5xl lg:text-7xl"
-        >
-          {$t({
-            message: "Experience",
-            context:
-              "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy",
-          })}
-        </h1>
-        <TextFade
-          texts={[
-            $t`Real Privacy`,
-            $t`Full Ownership`,
-            $t`Seamless Access`,
-            "Internet Identity",
-          ]}
-          duration={500}
-          delayBetween={2000}
-          startDelay={2800}
-          textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
-          containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center"
-        />
-      </div>
+      <h1
+        class="text-text-disabled mb-2 text-center text-4xl md:text-5xl lg:text-7xl"
+      >
+        {$t({
+          message: "Experience",
+          context:
+            "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy",
+        })}
+      </h1>
+      <TextFade
+        texts={[
+          $t`Real Privacy`,
+          $t`Full Ownership`,
+          $t`Seamless Access`,
+          "Internet Identity",
+        ]}
+        duration={500}
+        delayBetween={2000}
+        startDelay={2800}
+        textClass="text-4xl md:text-5xl lg:text-7xl text-text-primary"
+        containerClass="h-[40px] md:h-[48px] lg:h-[72px] w-full flex items-center justify-center mb-6"
+      />
       <p
-        class="text-text-tertiary max-w-[600px] text-center text-base text-balance"
+        class="text-text-tertiary mb-4 max-w-[600px] text-center text-base text-balance"
       >
         <Trans>
           Internet Identity lets you access apps and services securely, without
           creating passwords, sharing personal data, or giving up control.
         </Trans>
       </p>
+      <a
+        href={II_DEVELOPER_DOCS_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="btn btn-secondary btn-sm"
+      >
+        {$t`For developers`}
+      </a>
     </div>
   </div>
   <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
@@ -458,6 +568,68 @@
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+{#if isAuthDialogOpen}
+  <Dialog
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      isAuthDialogOpen = false;
+    }}
+  >
+    <AuthWizard
+      onSignIn={handleSignIn}
+      onSignUp={handleSignUp}
+      onUpgrade={handleUpgrade}
+      onError={(error) => {
+        isAuthDialogOpen = false;
+        isAuthenticating = false;
+        handleError(error);
+      }}
+      withinDialog={true}
+    >
+      <h1 class="text-text-primary my-2 self-start text-2xl font-medium">
+        {$t`Sign in`}
+      </h1>
+      <p class="text-text-secondary mb-6 self-start text-sm">
+        {$t`choose method to continue`}
+      </p>
+    </AuthWizard>
+  </Dialog>
+{/if}
+
+{#if isIdentityPopoverOpen && selectedIdentity !== undefined}
+  <Popover
+    anchor={identityButtonRef}
+    onClose={() => {
+      if (isAuthenticating) {
+        return;
+      }
+      isIdentityPopoverOpen = false;
+    }}
+    direction="down"
+    align="end"
+    distance="0.75rem"
+  >
+    <IdentitySwitcher
+      selected={selectedIdentity.identityNumber}
+      identities={lastUsedIdentities}
+      onSwitchIdentity={handleSignIn}
+      onUseAnotherIdentity={() => {
+        isIdentityPopoverOpen = false;
+        isAuthDialogOpen = true;
+      }}
+      onManageIdentity={() => handleSignIn(selectedIdentity.identityNumber)}
+      onError={(error) => {
+        isIdentityPopoverOpen = false;
+        isAuthenticating = false;
+        handleError(error);
+      }}
+      onClose={() => (isIdentityPopoverOpen = false)}
+    />
+  </Popover>
+{/if}
 
 <style>
   .fade-in {
