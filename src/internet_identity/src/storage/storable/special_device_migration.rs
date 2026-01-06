@@ -1,6 +1,9 @@
 use candid::CandidType;
 use internet_identity_interface::internet_identity::types::{KeyType, Purpose};
 use minicbor::{Decode, Encode};
+use serde_bytes::ByteBuf;
+
+use crate::storage::storable::credential_id;
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
 pub enum StorablePurpose {
@@ -72,5 +75,32 @@ impl From<(&Option<Vec<u8>>, &Purpose, &KeyType)> for SpecialDeviceMigration {
             purpose,
             key_type,
         }
+    }
+}
+
+impl From<SpecialDeviceMigration> for (Option<ByteBuf>, Purpose, KeyType) {
+    fn from(value: SpecialDeviceMigration) -> Self {
+        let SpecialDeviceMigration {
+            credential_id,
+            purpose,
+            key_type,
+        } = value;
+
+        let credential_id = credential_id.map(ByteBuf::from);
+
+        let purpose = match purpose {
+            StorablePurpose::Recovery => Purpose::Recovery,
+            StorablePurpose::Authentication => Purpose::Authentication,
+        };
+
+        let key_type = match key_type {
+            StorableKeyType::Unknown => KeyType::Unknown,
+            StorableKeyType::Platform => KeyType::Platform,
+            StorableKeyType::CrossPlatform => KeyType::CrossPlatform,
+            StorableKeyType::SeedPhrase => KeyType::SeedPhrase,
+            StorableKeyType::BrowserStorageKey => KeyType::BrowserStorageKey,
+        };
+
+        (credential_id, purpose, key_type)
     }
 }

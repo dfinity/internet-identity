@@ -12,6 +12,7 @@ use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
+use rand_core::le;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::fmt;
@@ -370,6 +371,120 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 recovery_keys,
             },
         )
+    }
+}
+
+impl From<(AnchorNumber, StorableAnchor)> for Anchor {
+    fn from((anchor_number, storable_anchor): (AnchorNumber, StorableAnchor)) -> Self {
+        let StorableAnchor {
+            name,
+            created_at_ns: created_at,
+            openid_credentials,
+            passkey_credentials,
+            recovery_keys,
+        } = storable_anchor;
+
+        let name = storable_anchor.name.clone();
+
+        let openid_credentials = storable_anchor
+            .openid_credentials
+            .into_iter()
+            .map(OpenIdCredential::from)
+            .collect();
+
+        let mut devices = passkey_credentials
+            .unwrap_or_default()
+            .into_iter()
+            .map(
+                |StorablePasskeyCredential {
+                     pubkey,
+                     credential_id,
+                     origin,
+                     created_at_ns: _,
+                     last_usage_timestamp_ns,
+                     alias,
+                     aaguid,
+                     special_device_migration,
+                 }| {
+                    let (credential_id, purpose, key_type) =
+                        if let Some(special_device_migration) = special_device_migration {
+                            // Special case: trust what we had before
+                            special_device_migration.into()
+                        } else {
+                            // Happy case: clearly a valid passkey
+                            (
+                                Some(ByteBuf::from(credential_id)),
+                                Purpose::Authentication,
+                                KeyType::CrossPlatform,
+                            )
+                        };
+
+                    Device {
+                        pubkey: DeviceKey::from(pubkey),
+                        alias: alias.unwrap_or_default(),
+                        credential_id,
+                        aaguid: aaguid.map(|src| {
+                            let mut aaguid_array = [0u8; 16];
+                            aaguid_array.copy_from_slice(&src);
+                            aaguid_array
+                        }),
+                        purpose,
+                        key_type,
+                        protection: DeviceProtection::Unprotected, // Defaulting to Unprotected; we don't store protection in stable memory for passkeys
+                        origin: Some(origin),
+                        last_usage_timestamp: last_usage_timestamp_ns,
+                        metadata: None, // Not stored in stable memory
+                    }
+                },
+            )
+            .collect::<Vec<_>>();
+
+        devices.extend(recovery_keys.unwrap_or_default().into_iter().map(
+            |StorableRecoveryKey {
+                 pubkey,
+                 created_at_ns: _,
+                 last_usage_timestamp_ns,
+                 is_protected,
+                 special_device_migration,
+             }| {
+                let (credential_id, purpose, key_type) =
+                    if let Some(special_device_migration) = special_device_migration {
+                        // Special case: trust what we had before
+                        special_device_migration.into()
+                    } else {
+                        // Happy case: clearly a valid recovery phrase
+                        (None, Purpose::Recovery, KeyType::SeedPhrase)
+                    };
+
+                Device {
+                    credential_id,
+                    purpose,
+                    key_type,
+                    alias: "Recovery Key".to_string(),
+                    pubkey: DeviceKey::from(pubkey),
+                    aaguid: None,
+                    protection: if is_protected.unwrap_or(false) {
+                        DeviceProtection::Protected
+                    } else {
+                        DeviceProtection::Unprotected
+                    },
+                    origin: None,
+                    last_usage_timestamp: last_usage_timestamp_ns,
+                    metadata: None, // Not stored in stable memory
+                }
+            },
+        ));
+
+        let metadata = None; // Deprecated field; not stored in stable memory
+
+        Anchor {
+            anchor_number,
+            name,
+            created_at,
+            openid_credentials,
+            devices,
+            metadata,
+        }
     }
 }
 

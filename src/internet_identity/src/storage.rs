@@ -747,7 +747,6 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
-        // Read fixed 4KB anchor
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
 
         let num_anchors = self.header.num_anchors;
@@ -763,27 +762,11 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::BadAnchorNumber(anchor_number));
         }
 
-        let address = self.record_address(record_number);
-
-        let mut reader = Reader::new(&self.anchor_memory, address);
-        let mut buf = vec![0; self.header.entry_size as usize];
-
-        reader.read_exact(&mut buf).expect("failed to read memory");
-
-        // Anchors that are allocated but have never been written to, due to a previously missing
-        // allocation cleanup implementation, are handled as if they don't exist.
-        if buf.iter().all(|&b| b == 0) {
+        let Some(storable_anchor) = self.stable_anchor_memory.get(&anchor_number) else {
             return Err(StorageError::AnchorNotFound { anchor_number });
-        }
+        };
 
-        // Read unbounded stable structures anchor
-        let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
-        let storable_anchor = self.stable_anchor_memory.get(&anchor_number);
-        Ok(Anchor::from((
-            anchor_number,
-            storable_fixed_anchor,
-            storable_anchor,
-        )))
+        Ok(Anchor::from((anchor_number, storable_anchor)))
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
