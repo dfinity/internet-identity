@@ -197,7 +197,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 (
                     Some(credential_id),
                     Purpose::Authentication,
-                    KeyType::Platform | KeyType::CrossPlatform,
+                    KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
                 ) => {
                     if protection == &DeviceProtection::Protected {
                         ic_cdk::println!(
@@ -214,7 +214,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 (
                     Some(credential_id),
                     Purpose::Recovery,
-                    KeyType::Platform | KeyType::CrossPlatform,
+                    KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
                 ) => {
                     let credential_id = Some(credential_id);
                     let special_device_migration = Some(SpecialDeviceMigration::from((
