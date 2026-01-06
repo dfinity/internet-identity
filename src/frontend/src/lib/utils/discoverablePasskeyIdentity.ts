@@ -146,7 +146,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   #credentialRequestOptions?: CredentialRequestOptionsWithoutChallenge;
   #authenticatorAttachment?: AuthenticatorAttachment;
   #credentialId?: ArrayBuffer;
-  #aaguid?: string;
+  #aaguid?: Uint8Array;
   #publicKey?: CosePublicKey;
 
   #getPublicKey: (
@@ -204,7 +204,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     return this.#credentialId;
   }
 
-  getAaguid(): string | undefined {
+  getAaguid(): Uint8Array | undefined {
     return this.#aaguid;
   }
 

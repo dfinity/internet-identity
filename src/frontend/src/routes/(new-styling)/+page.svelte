@@ -56,7 +56,7 @@
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
       .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3),
+      .slice(0, 3), // Only show 3 last used since entries can't be removed yet
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
@@ -108,7 +108,7 @@
   });
 
   // Automatically show sign-in when triggered by another page
-  afterNavigate(async () => {
+  afterNavigate(() => {
     if (!("login" in page.state)) {
       return;
     }
@@ -584,6 +584,7 @@
       onUpgrade={handleUpgrade}
       onError={(error) => {
         isAuthDialogOpen = false;
+        isAuthenticating = false;
         handleError(error);
       }}
       withinDialog={true}

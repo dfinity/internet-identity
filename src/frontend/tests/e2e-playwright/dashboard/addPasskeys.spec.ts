@@ -41,12 +41,12 @@ test("User can log into the dashboard and add a new passkey from the same device
   await expect(
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
-  await renamePasskey(page, "Chrome", "Old passkey");
+  await renamePasskey(page, "Unknown", "Old passkey");
 
   // Start the "add passkey" flow
   const auth2 = dummyAuth();
   await addPasskeyCurrentDevice(page, auth2);
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify we have two passkeys
   await expect(
@@ -129,7 +129,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(page.getByText("Unknown")).toHaveCount(1);
 
   // Start the "add passkey" flow
   await page.getByRole("button", { name: "Add new" }).click();
@@ -217,12 +217,12 @@ test("User can add a new passkey and use it with cached identity without clearin
   await expect(
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
-  await renamePasskey(page, "Chrome", "Old passkey");
+  await renamePasskey(page, "Unknown", "Old passkey");
 
   // Start the "add passkey" flow
   const auth2 = dummyAuth();
   await addPasskeyCurrentDevice(page, auth2);
-  await renamePasskey(page, "Chrome", "New Passkey");
+  await renamePasskey(page, "Unknown", "New Passkey");
 
   // Verify we have two passkeys
   await expect(

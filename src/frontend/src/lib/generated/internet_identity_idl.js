@@ -85,6 +85,7 @@ export const idlFactory = ({ IDL }) => {
     'unknown' : IDL.Null,
     'browser_storage_key' : IDL.Null,
   });
+  const Aaguid = IDL.Vec(IDL.Nat8);
   const Purpose = IDL.Variant({
     'authentication' : IDL.Null,
     'recovery' : IDL.Null,
@@ -97,7 +98,7 @@ export const idlFactory = ({ IDL }) => {
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
-    'aaguid' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+    'aaguid' : IDL.Opt(Aaguid),
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
@@ -138,7 +139,7 @@ export const idlFactory = ({ IDL }) => {
   const PublicKeyAuthn = IDL.Record({ 'pubkey' : PublicKey });
   const WebAuthn = IDL.Record({
     'pubkey' : PublicKey,
-    'aaguid' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+    'aaguid' : IDL.Opt(Aaguid),
     'credential_id' : CredentialId,
   });
   const AuthnMethod = IDL.Variant({
@@ -275,7 +276,7 @@ export const idlFactory = ({ IDL }) => {
     'protection' : DeviceProtection,
     'pubkey' : DeviceKey,
     'key_type' : KeyType,
-    'aaguid' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+    'aaguid' : IDL.Opt(Aaguid),
     'purpose' : Purpose,
     'credential_id' : IDL.Opt(CredentialId),
   });
@@ -739,7 +740,7 @@ export const idlFactory = ({ IDL }) => {
     'lookup_caller_identity_by_recovery_phrase' : IDL.Func(
         [],
         [IDL.Opt(IdentityNumber)],
-        ['query'],
+        [],
       ),
     'lookup_device_key' : IDL.Func(
         [IDL.Vec(IDL.Nat8)],

@@ -150,7 +150,7 @@ export type { ChallengeResult } from "$lib/generated/internet_identity_types";
  */
 export interface IIWebAuthnIdentity extends SignIdentity {
   rawId: ArrayBuffer;
-  aaguid?: string;
+  aaguid?: Uint8Array;
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
 }

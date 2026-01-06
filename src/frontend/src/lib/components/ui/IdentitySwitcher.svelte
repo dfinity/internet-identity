@@ -14,6 +14,7 @@
   import { nonNullish } from "@dfinity/utils";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
+  import { canisterConfig } from "$lib/globals";
   import { formatDate, t } from "$lib/stores/locale.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
@@ -39,6 +40,9 @@
     onSignOut,
   }: Props = $props();
 
+  const manageIdentityUrl: string | undefined =
+    canisterConfig?.new_flow_origins[0]?.[0];
+
   let switchingToIdentity = $state<bigint>();
   let isNavigatingToManage = $state(false);
   let isSigningOut = $state(false);
@@ -55,9 +59,13 @@
   };
 
   const handleManageIdentity = async () => {
+    if (onManageIdentity === undefined) {
+      window.open(manageIdentityUrl, "_blank");
+      return;
+    }
     try {
       isNavigatingToManage = true;
-      await onManageIdentity?.();
+      await onManageIdentity();
     } catch (error) {
       onError(error);
     } finally {
@@ -135,7 +143,7 @@
               <Checkbox
                 checked
                 size="md"
-                class="pointer-events-none mr-1 ml-auto !rounded-full"
+                class="pointer-events-none mr-1 ml-auto [&_div]:rounded-full"
                 tabindex={-1}
                 aria-hidden
               />
@@ -162,7 +170,7 @@
       {/if}
       <span>{$t`Sign Out`}</span>
     </button>
-  {:else if onManageIdentity !== undefined}
+  {:else}
     <button onclick={handleManageIdentity} class="btn btn-tertiary gap-2">
       {#if isNavigatingToManage}
         <ProgressRing />
