@@ -12,7 +12,6 @@ use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
 use internet_identity_interface::internet_identity::types::*;
-use rand_core::le;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::fmt;
@@ -384,10 +383,7 @@ impl From<(AnchorNumber, StorableAnchor)> for Anchor {
             recovery_keys,
         } = storable_anchor;
 
-        let name = storable_anchor.name.clone();
-
-        let openid_credentials = storable_anchor
-            .openid_credentials
+        let openid_credentials = openid_credentials
             .into_iter()
             .map(OpenIdCredential::from)
             .collect();

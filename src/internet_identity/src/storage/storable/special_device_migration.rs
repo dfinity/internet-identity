@@ -3,8 +3,6 @@ use internet_identity_interface::internet_identity::types::{KeyType, Purpose};
 use minicbor::{Decode, Encode};
 use serde_bytes::ByteBuf;
 
-use crate::storage::storable::credential_id;
-
 #[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
 pub enum StorablePurpose {
     #[n(0)]
