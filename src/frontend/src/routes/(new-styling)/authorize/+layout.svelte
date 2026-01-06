@@ -33,6 +33,7 @@
     openWindowWithAuth,
   } from "../internal-auth/utils";
   import { Trans } from "$lib/components/locale";
+  import ContinueToManage from "$lib/components/views/ContinueToManage.svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -79,11 +80,22 @@
   };
   const handleManageIdentity = async () => {
     if ($authenticationStore !== undefined) {
-      await openWindowWithAuth("/manage", $authenticationStore);
+      handleContinueToManageIdentity();
     } else {
+      // If not authenticated yet, we'll need to authenticate and then show a
+      // dialog to continue, since opening a window requires user interaction.
       await handleSignIn(selectedIdentity!.identityNumber);
       isContinueToManageDialogOpen = true;
     }
+  };
+  const handleContinueToManageIdentity = () => {
+    if ($authenticationStore === undefined) {
+      return;
+    }
+    // Now that we've authenticated and have a user interaction,
+    // we can open a new window and send authentication to it.
+    openWindowWithAuth("/manage", $authenticationStore);
+    isContinueToManageDialogOpen = false;
   };
 
   onMount(() => {
@@ -208,29 +220,11 @@
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
 
-<!-- Renders any error status or late success status dialog when needed -->
-<AuthorizeError {status} />
-
-{#if isContinueToManageDialogOpen && $authenticationStore !== undefined}
+{#if isContinueToManageDialogOpen && $authenticationStore}
   <Dialog onClose={() => (isContinueToManageDialogOpen = false)}>
-    <h2 class="text-text-primary mb-3 text-2xl">
-      {$t`Almost there`}
-    </h2>
-    <p class="text-text-tertiary mb-6 text-base">
-      <Trans>
-        You have been successfully authenticated and can now manage your
-        identity in a new window.
-      </Trans>
-    </p>
-    <button
-      onclick={async () => {
-        void openWindowWithAuth("/manage", $authenticationStore);
-        isContinueToManageDialogOpen = false;
-      }}
-      class="btn btn-xl"
-    >
-      <span>{$t`Manage identity`}</span>
-      <ExternalLinkIcon class="size-5" />
-    </button>
+    <ContinueToManage onContinue={handleContinueToManageIdentity} />
   </Dialog>
 {/if}
+
+<!-- Renders any error status or late success status dialog when needed -->
+<AuthorizeError {status} />
