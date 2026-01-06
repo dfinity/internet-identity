@@ -10,7 +10,7 @@
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import { ChevronDownIcon, ExternalLinkIcon } from "@lucide/svelte";
+  import { ChevronDownIcon } from "@lucide/svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -25,14 +25,7 @@
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import { waitForWindowReadyResponse } from "$lib/utils/internalPostMessage";
-  import {
-    type InternalAuthResponse,
-    isInternalAuthRequest,
-    authenticatedToJson,
-    openWindowWithAuth,
-  } from "../internal-auth/utils";
-  import { Trans } from "$lib/components/locale";
+  import { openWindowWithAuth } from "../internal-auth/utils";
   import ContinueToManage from "$lib/components/views/ContinueToManage.svelte";
 
   const { children, data }: LayoutProps = $props();
