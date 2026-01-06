@@ -25,7 +25,7 @@ interface JsonnableAuthenticated {
 /**
  * Map `Authenticated` object to jsonnable object
  * @param authenticated object
- * @return jssonable object
+ * @return jsonnable object
  */
 export const authenticatedToJson = (
   authenticated: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
