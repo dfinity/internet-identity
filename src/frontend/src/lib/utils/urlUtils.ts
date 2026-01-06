@@ -26,8 +26,12 @@ export const isSameOrigin = (urlA: string, urlB: string): boolean => {
  * @param url that might be absolute
  * @return relative URL string
  */
-export const toRelative = (url: string): string => {
-  const dummyBase = "https://id.ai"; // Any valid base fallback URL will do
-  const { pathname, search, hash } = new URL(url, dummyBase);
-  return pathname + search + hash;
+export const toRelative = (url: string): string | null => {
+  try {
+    const dummyBase = "https://id.ai"; // Any valid base fallback URL will do
+    const { pathname, search, hash } = new URL(url, dummyBase)!;
+    return pathname + search + hash;
+  } catch {
+    return null;
+  }
 };

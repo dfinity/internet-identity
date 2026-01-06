@@ -7,5 +7,8 @@ export const load: PageLoad = ({ url }) => {
     return;
   }
   const next = toRelative(param);
+  if (next === null) {
+    return;
+  }
   return { next };
 };
