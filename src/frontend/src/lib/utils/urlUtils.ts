@@ -20,3 +20,14 @@ export const isSameOrigin = (urlA: string, urlB: string): boolean => {
     return urlA === urlB;
   }
 };
+
+/**
+ * Convert a possibly absolute URL string to a relative URL.
+ * @param url that might be absolute
+ * @return relative URL string
+ */
+export const toRelative = (url: string): string => {
+  const dummyBase = "https://id.ai"; // Any valid base fallback URL will do
+  const { pathname, search, hash } = new URL(url, dummyBase);
+  return pathname + search + hash;
+};

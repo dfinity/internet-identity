@@ -22,6 +22,11 @@ interface JsonnableAuthenticated {
     | { recoveryPhrase: { principal: string } };
 }
 
+/**
+ * Map `Authenticated` object to jsonnable object
+ * @param authenticated object
+ * @return jssonable object
+ */
 export const authenticatedToJson = (
   authenticated: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
 ): JsonnableAuthenticated => {
@@ -50,6 +55,11 @@ export const authenticatedToJson = (
   return { identityNumber, delegation, authMethod };
 };
 
+/**
+ * Reconstruct `Authenticated` object from json.
+ * @param jsonnable object
+ * @return `Authenticated` object
+ */
 export const authenticatedFromJson = (
   json: JsonnableAuthenticated,
 ): Omit<Authenticated, "agent" | "actor" | "salt" | "nonce"> => {
@@ -103,6 +113,11 @@ export const isInternalAuthResponse = (
 ): data is InternalAuthResponse =>
   typeof data === "object" && data !== null && "ii_auth_response" in data;
 
+/**
+ * Open authenticated window, sends authentication state to window
+ * @param pathname to navigate to in new window
+ * @param authenticated state to send to new window
+ */
 export const openWindowWithAuth = async (
   pathname: string,
   authenticated: Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">,
@@ -137,6 +152,9 @@ export const openWindowWithAuth = async (
   window.addEventListener("message", listener);
 };
 
+/**
+ * Request authentication state from window opener through PostMessage
+ */
 export const requestAuthFromOpener = async (): Promise<
   Omit<Authenticated, "agent" | "actor" | "salt" | "nonce">
 > => {

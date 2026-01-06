@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSameOrigin } from "./urlUtils";
+import { isSameOrigin, toRelative } from "./urlUtils";
 
 describe("urlUtils", () => {
   describe("isSameOrigin", () => {
@@ -69,6 +69,19 @@ describe("urlUtils", () => {
     it("should handle invalid URLs by falling back to string comparison", () => {
       expect(isSameOrigin("invalid-url", "invalid-url")).toBe(true);
       expect(isSameOrigin("invalid-url", "another-invalid-url")).toBe(false);
+    });
+  });
+
+  describe("toRelative", () => {
+    it("should return relative url for absolute URL", () => {
+      expect(
+        toRelative("https://example.com/hello/world?abc=1&xyz=2#hello"),
+      ).toBe("/hello/world?abc=1&xyz=2#hello");
+    });
+    it("should return relative url as is", () => {
+      expect(toRelative("/hello/world?abc=1&xyz=2#hello")).toBe(
+        "/hello/world?abc=1&xyz=2#hello",
+      );
     });
   });
 });

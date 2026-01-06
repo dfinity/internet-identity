@@ -8,11 +8,12 @@
 
   const { data }: PageProps = $props();
 
-  // Uses authentication state from window opener
+  // Receives authentication state from window opener
+  // and then redirects to next from search params.
   onMount(async () => {
     const authenticated = await requestAuthFromOpener();
     await authenticationStore.set(authenticated);
-    await goto(data.next, { replaceState: true });
+    await goto(data.next ?? "/manage", { replaceState: true });
   });
 </script>
 
