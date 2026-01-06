@@ -12,6 +12,7 @@ use ic_stable_structures::{Memory, VectorMemory};
 use internet_identity_interface::internet_identity::types::{
     ArchiveConfig, DeviceProtection, KeyType, Purpose,
 };
+use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
@@ -516,7 +517,7 @@ fn sample_device() -> Device {
         purpose: Purpose::Authentication,
         key_type: KeyType::Unknown,
         protection: DeviceProtection::Unprotected,
-        origin: None,
+        origin: Some("https://id.ai".to_string()),
         last_usage_timestamp: Some(1234),
         metadata: None,
     }
@@ -574,6 +575,7 @@ mod application_lookup_tests {
     use super::*;
     use crate::storage::storable::application::StorableOriginSha256;
     use ic_stable_structures::VectorMemory;
+    use pretty_assertions::assert_eq;
 
     #[track_caller]
     fn assert_application_lookup<M: Memory + Clone>(
@@ -735,6 +737,7 @@ mod application_lookup_tests {
 mod storable_origin_sha256_tests {
     use crate::storage::storable::application::StorableOriginSha256;
     use ic_stable_structures::Storable;
+    use pretty_assertions::assert_eq;
     use std::borrow::Cow;
 
     #[test]
@@ -817,6 +820,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
     use crate::storage::anchor::Device;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{KeyType, PublicKey};
+    use pretty_assertions::assert_eq;
 
     fn pubkey(n: u8) -> PublicKey {
         vec![n].into()
