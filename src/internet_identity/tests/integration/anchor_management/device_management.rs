@@ -7,6 +7,7 @@ use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
+use pretty_assertions::assert_eq;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -752,9 +753,12 @@ fn should_replace_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that metadata is stored.
+/// Verifies that metadata is not stored anymore and origin defaults to https://identity.ic0.app.
+/// The reason metadata is not stored anymore is because we now rely on proper fields to store
+/// all authentication-related information. This origin used to be assumed implicitly back when
+/// there was just one II domain.
 #[test]
-fn should_keep_metadata() -> Result<(), RejectResponse> {
+fn should_default_to_legacy_origin_and_not_keep_metadata() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let device = DeviceData {
@@ -769,7 +773,14 @@ fn should_keep_metadata() -> Result<(), RejectResponse> {
 
     let devices = api::get_anchor_info(&env, canister_id, device.principal(), user_number)?
         .into_device_data();
-    assert_eq!(devices, vec![device]);
+    assert_eq!(
+        devices,
+        vec![DeviceData {
+            metadata: None,
+            origin: Some("https://identity.ic0.app".to_string()),
+            ..device
+        }]
+    );
     Ok(())
 }
 
