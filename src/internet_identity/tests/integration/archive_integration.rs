@@ -273,7 +273,7 @@ mod pull_entries_tests {
                     pubkey: device_data_1().pubkey,
                     credential_id: device_data_1().credential_id,
                     purpose: Purpose::Authentication,
-                    key_type: KeyType::Unknown,
+                    key_type: KeyType::CrossPlatform,
                     protection: DeviceProtection::Unprotected,
                     origin: device_data_1().origin,
                     metadata_keys: None,
