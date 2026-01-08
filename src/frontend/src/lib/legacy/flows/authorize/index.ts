@@ -247,7 +247,10 @@ const authenticate = async (
   // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
   // may have already closed the II window
   if (!authSuccess.newAnchor) {
-    await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+    // Disable this check for now since it would always get triggered.
+    // Due to anchor migration, we're no longer keeping track of the
+    // necessary anchor metadata to make this check work correctly.
+    // await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
   }
 
   // Ignore the response of committing the metadata because it's not crucial.

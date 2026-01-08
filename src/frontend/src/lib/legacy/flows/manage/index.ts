@@ -153,7 +153,10 @@ export const authFlowManage = async (connection: Connection) => {
   // Here, if the user is returning & doesn't have any recovery device, we prompt them to add
   // one. The exact flow depends on the device they use.
   if (!newAnchor) {
-    await recoveryWizard(userNumber, authenticatedConnection);
+    // Disable this check for now since it would always get triggered.
+    // Due to anchor migration, we're no longer keeping track of the
+    // necessary anchor metadata to make this check work correctly.
+    // await recoveryWizard(userNumber, authenticatedConnection);
   }
   // From here on, the user is authenticated to II.
   return renderManage({
