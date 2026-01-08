@@ -58,30 +58,35 @@ pub struct SpecialDeviceMigration {
     pub purpose: StorablePurpose,
     #[n(2)]
     pub key_type: StorableKeyType,
+    #[n(3)]
+    pub origin: Option<String>,
 }
 
-impl From<(&Option<Vec<u8>>, &Purpose, &KeyType)> for SpecialDeviceMigration {
-    fn from(value: (&Option<Vec<u8>>, &Purpose, &KeyType)) -> Self {
-        let (credential_id, purpose, key_type) = value;
+impl From<(&Option<Vec<u8>>, &Purpose, &KeyType, &Option<String>)> for SpecialDeviceMigration {
+    fn from(value: (&Option<Vec<u8>>, &Purpose, &KeyType, &Option<String>)) -> Self {
+        let (credential_id, purpose, key_type, origin) = value;
 
         let credential_id = credential_id.clone();
         let purpose = purpose.clone().into();
         let key_type = key_type.clone().into();
+        let origin = origin.clone();
 
         Self {
             credential_id,
             purpose,
             key_type,
+            origin,
         }
     }
 }
 
-impl From<SpecialDeviceMigration> for (Option<ByteBuf>, Purpose, KeyType) {
+impl From<SpecialDeviceMigration> for (Option<ByteBuf>, Purpose, KeyType, Option<String>) {
     fn from(value: SpecialDeviceMigration) -> Self {
         let SpecialDeviceMigration {
             credential_id,
             purpose,
             key_type,
+            origin,
         } = value;
 
         let credential_id = credential_id.map(ByteBuf::from);
@@ -99,6 +104,8 @@ impl From<SpecialDeviceMigration> for (Option<ByteBuf>, Purpose, KeyType) {
             StorableKeyType::BrowserStorageKey => KeyType::BrowserStorageKey,
         };
 
-        (credential_id, purpose, key_type)
+        let origin = origin.clone();
+
+        (credential_id, purpose, key_type, origin)
     }
 }
