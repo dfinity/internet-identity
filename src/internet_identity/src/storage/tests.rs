@@ -515,7 +515,7 @@ fn sample_device() -> Device {
         credential_id: Some(ByteBuf::from("this is the credential id")),
         aaguid: None,
         purpose: Purpose::Authentication,
-        key_type: KeyType::Unknown,
+        key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Unprotected,
         origin: Some("https://id.ai".to_string()),
         last_usage_timestamp: Some(1234),
