@@ -30,10 +30,7 @@ import {
   tempKeyWarningBox,
   tempKeysSection,
 } from "$lib/legacy/flows/manage/tempKeys";
-import {
-  addPhrase,
-  recoveryWizard,
-} from "$lib/legacy/flows/recovery/recoveryWizard";
+import { addPhrase } from "$lib/legacy/flows/recovery/recoveryWizard";
 import {
   setupKey,
   setupPhrase,
