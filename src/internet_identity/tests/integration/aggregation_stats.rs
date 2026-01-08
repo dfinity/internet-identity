@@ -302,16 +302,10 @@ fn assert_expected_aggregation(
 /// in the legacy pin-flow that is now deprecated.
 fn create_identity(env: &PocketIc, canister_id: CanisterId, ii_origin: &str) -> IdentityNumber {
     let authn_method = AuthnMethodData {
-        metadata: HashMap::from([
-            (
-                "origin".to_string(),
-                MetadataEntryV2::String(format!("https://identity.{ii_origin}")),
-            ),
-            (
-                "usage".to_string(),
-                MetadataEntryV2::String("browser_storage_key".to_string()),
-            ),
-        ]),
+        metadata: HashMap::from([(
+            "origin".to_string(),
+            MetadataEntryV2::String(format!("https://identity.{ii_origin}")),
+        )]),
         ..test_authn_method()
     };
     create_identity_with_authn_method(env, canister_id, &authn_method)

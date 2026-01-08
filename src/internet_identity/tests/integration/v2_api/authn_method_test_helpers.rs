@@ -40,8 +40,10 @@ pub fn assert_eq_ignoring_last_authentication(
 
 pub fn test_authn_method() -> AuthnMethodData {
     AuthnMethodData {
-        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+        authn_method: AuthnMethod::WebAuthn(WebAuthn {
             pubkey: ByteBuf::from(vec![0; 32]),
+            credential_id: ByteBuf::from(vec![0; 16]),
+            aaguid: None,
         }),
         metadata: Default::default(),
         security_settings: AuthnMethodSecuritySettings {
