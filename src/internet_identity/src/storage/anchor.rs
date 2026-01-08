@@ -217,13 +217,13 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
                 // Special case: valid passkey but without an origin
                 (
-                    Some(credential_id),
+                    credential_id @ Some(_),
                     Purpose::Authentication,
                     key_type @ (KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown),
                     None,
                 ) => {
                     let special_device_migration = Some(SpecialDeviceMigration::from((
-                        &Some(credential_id),
+                        &credential_id,
                         &Purpose::Authentication,
                         key_type,
                         &None::<String>,
@@ -236,7 +236,7 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                             anchor_number,
                         );
                     }
-                    (Some(credential_id), special_device_migration)
+                    (credential_id, special_device_migration)
                 }
 
                 // Special case: recovery passkey
