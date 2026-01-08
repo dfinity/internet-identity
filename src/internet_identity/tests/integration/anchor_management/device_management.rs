@@ -753,12 +753,12 @@ fn should_replace_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that metadata is not stored anymore and origin defaults to https://identity.ic0.app.
+/// Verifies that metadata is not stored anymore.
+///
 /// The reason metadata is not stored anymore is because we now rely on proper fields to store
-/// all authentication-related information. This origin used to be assumed implicitly back when
-/// there was just one II domain.
+/// all authentication-related information.
 #[test]
-fn should_default_to_legacy_origin_and_not_keep_metadata() -> Result<(), RejectResponse> {
+fn should_not_keep_metadata() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let device = DeviceData {
@@ -777,7 +777,6 @@ fn should_default_to_legacy_origin_and_not_keep_metadata() -> Result<(), RejectR
         devices,
         vec![DeviceData {
             metadata: None,
-            origin: Some("https://identity.ic0.app".to_string()),
             ..device
         }]
     );
