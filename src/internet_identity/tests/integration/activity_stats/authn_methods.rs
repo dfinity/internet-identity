@@ -142,11 +142,22 @@ fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let authn_method = AuthnMethodData {
-        metadata: HashMap::from([(
-            "origin".to_string(),
-            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
-        )]),
-        ..test_authn_method()
+        authn_method: AuthnMethod::WebAuthn(WebAuthn {
+            pubkey: ByteBuf::from("example pubkey"),
+            credential_id: ByteBuf::from("example credential id"),
+            aaguid: None,
+        }),
+        metadata: HashMap::from([
+            (
+                "origin".to_string(),
+                MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+            )
+        ]),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
     };
 
     // ensure stats are initially absent
@@ -167,7 +178,7 @@ fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
 
     assert_metric(
         &get_metrics(&env, canister_id),
-        "internet_identity_daily_active_authn_methods{type=\"other\"}",
+        "internet_identity_daily_active_authn_methods{type=\"webauthn_auth\"}",
         1f64,
     );
 
@@ -237,21 +248,21 @@ fn should_report_active_openid_authn_methods() {
 }
 
 fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
-    let webauthn_authn_method = AuthnMethod::WebAuthn(WebAuthn {
-        pubkey: ByteBuf::from("example pubkey"),
-        credential_id: ByteBuf::from("example credential id"),
-        aaguid: None,
-    });
-    let ii_domain_entry = (
-        "origin".to_string(),
-        MetadataEntryV2::String("https://identity.ic0.app".to_string()),
-    );
     vec![
         (
             "webauthn_auth".to_string(),
             AuthnMethodData {
-                authn_method: webauthn_authn_method.clone(),
-                metadata: HashMap::from([ii_domain_entry.clone()]),
+                authn_method: AuthnMethod::WebAuthn(WebAuthn {
+                    pubkey: ByteBuf::from("example pubkey"),
+                    credential_id: ByteBuf::from("example credential id"),
+                    aaguid: None,
+                }),
+                metadata: HashMap::from([
+                    (
+                        "origin".to_string(),
+                        MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+                    )
+                ]),
                 security_settings: AuthnMethodSecuritySettings {
                     protection: AuthnMethodProtection::Unprotected,
                     purpose: AuthnMethodPurpose::Authentication,
