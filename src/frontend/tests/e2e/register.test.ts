@@ -26,7 +26,7 @@ test("Register new identity and login with it", async () => {
   });
 }, 300_000);
 
-test.only("Register new identity and login without prefilled identity number", async () => {
+test("Register new identity and login without prefilled identity number", async () => {
   await runInBrowser(async (browser: WebdriverIO.Browser) => {
     await browser.url(II_URL);
     await addVirtualAuthenticator(browser);
