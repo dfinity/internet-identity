@@ -70,22 +70,24 @@ impl ActivityCounter for AuthnMethodCounter {
         match authorization_key {
             AuthorizationKey::DeviceKey(device_key) => {
                 if let Some(device) = anchor.device(device_key) {
-                    // Only increase counter if device has an II domain
-                    if device.ii_domain().is_some() {
-                        match device.key_type {
-                            KeyType::SeedPhrase => self.recovery_phrase_counter += 1,
-                            KeyType::BrowserStorageKey => self.browser_storage_key_counter += 1,
-                            KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown => {
-                                if device.credential_id.is_none() {
-                                    // if the credential id is not set, it is not WebAuthn
-                                    self.other_counter += 1;
-                                    return;
-                                }
+                    match device.key_type {
+                        KeyType::SeedPhrase => self.recovery_phrase_counter += 1,
+                        KeyType::BrowserStorageKey => self.browser_storage_key_counter += 1,
+                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown => {
+                            if device.ii_domain().is_none() {
+                                // Only increase counter if device has an II domain
+                                return;
+                            }
+                            
+                            if device.credential_id.is_none() {
+                                // if the credential id is not set, it is not WebAuthn
+                                self.other_counter += 1;
+                                return;
+                            }
 
-                                match device.purpose {
-                                    Purpose::Authentication => self.webauthn_auth_counter += 1,
-                                    Purpose::Recovery => self.webauthn_recovery_counter += 1,
-                                }
+                            match device.purpose {
+                                Purpose::Authentication => self.webauthn_auth_counter += 1,
+                                Purpose::Recovery => self.webauthn_recovery_counter += 1,
                             }
                         }
                     }

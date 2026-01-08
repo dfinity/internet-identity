@@ -11,23 +11,19 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn,
+    AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn, PublicKeyAuthn
 };
 use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::Duration;
-use AuthnMethodProtection::Unprotected;
 
 const DAY_SECONDS: u64 = 24 * 60 * 60;
 const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
 
-const AUTHN_METHOD_TYPES: [&str; 5] = [
-    "other",
+const AUTHN_METHOD_TYPES: [&str; 2] = [
     "webauthn_auth",
-    "webauthn_recovery",
     "recovery_phrase",
-    "browser_storage_key",
 ];
 
 /// Tests that daily active authn_methods are counted correctly.
@@ -252,56 +248,34 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
     );
     vec![
         (
-            "other".to_string(),
-            AuthnMethodData {
-                metadata: HashMap::from([ii_domain_entry.clone()]),
-                ..test_authn_method()
-            },
-        ),
-        (
             "webauthn_auth".to_string(),
             AuthnMethodData {
                 authn_method: webauthn_authn_method.clone(),
                 metadata: HashMap::from([ii_domain_entry.clone()]),
-                ..test_authn_method()
-            },
-        ),
-        (
-            "webauthn_recovery".to_string(),
-            AuthnMethodData {
-                authn_method: webauthn_authn_method,
                 security_settings: AuthnMethodSecuritySettings {
-                    purpose: AuthnMethodPurpose::Recovery,
-                    protection: Unprotected,
+                    protection: AuthnMethodProtection::Unprotected,
+                    purpose: AuthnMethodPurpose::Authentication,
                 },
-                metadata: HashMap::from([ii_domain_entry.clone()]),
-                ..test_authn_method()
+                last_authentication: None,
             },
         ),
         (
             "recovery_phrase".to_string(),
             AuthnMethodData {
+                authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+                    pubkey: ByteBuf::from(vec![0; 32]),
+                }),
                 metadata: HashMap::from([
                     (
                         "usage".to_string(),
                         MetadataEntryV2::String("recovery_phrase".to_string()),
                     ),
-                    ii_domain_entry.clone(),
                 ]),
-                ..test_authn_method()
-            },
-        ),
-        (
-            "browser_storage_key".to_string(),
-            AuthnMethodData {
-                metadata: HashMap::from([
-                    (
-                        "usage".to_string(),
-                        MetadataEntryV2::String("browser_storage_key".to_string()),
-                    ),
-                    ii_domain_entry.clone(),
-                ]),
-                ..test_authn_method()
+                security_settings: AuthnMethodSecuritySettings {
+                    protection: AuthnMethodProtection::Unprotected,
+                    purpose: AuthnMethodPurpose::Recovery,
+                },
+                last_authentication: None,
             },
         ),
     ]
