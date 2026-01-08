@@ -15,10 +15,7 @@ impl DeviceData {
             credential_id: None,
             aaguid: None,
             purpose: Purpose::Authentication,
-            // This enables the fallback storage case for legacy pin-flow.
-            // Otherwise, a key without `credential_id` and with `Purpose::Authentication` would
-            // not be treated as inconsistent (falling into the recovery key case).
-            key_type: KeyType::BrowserStorageKey,
+            key_type: KeyType::CrossPlatform,
             protection: DeviceProtection::Unprotected,
             origin: None,
             metadata: None,
