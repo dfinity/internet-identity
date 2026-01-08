@@ -144,12 +144,10 @@ fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {
             credential_id: ByteBuf::from("example credential id"),
             aaguid: None,
         }),
-        metadata: HashMap::from([
-            (
-                "origin".to_string(),
-                MetadataEntryV2::String("https://identity.ic0.app".to_string()),
-            )
-        ]),
+        metadata: HashMap::from([(
+            "origin".to_string(),
+            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+        )]),
         security_settings: AuthnMethodSecuritySettings {
             protection: AuthnMethodProtection::Unprotected,
             purpose: AuthnMethodPurpose::Authentication,
@@ -254,12 +252,10 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
                     credential_id: ByteBuf::from("example credential id"),
                     aaguid: None,
                 }),
-                metadata: HashMap::from([
-                    (
-                        "origin".to_string(),
-                        MetadataEntryV2::String("https://identity.ic0.app".to_string()),
-                    )
-                ]),
+                metadata: HashMap::from([(
+                    "origin".to_string(),
+                    MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+                )]),
                 security_settings: AuthnMethodSecuritySettings {
                     protection: AuthnMethodProtection::Unprotected,
                     purpose: AuthnMethodPurpose::Authentication,
