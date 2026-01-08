@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, sample_pubkey_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
@@ -85,7 +85,7 @@ fn should_replace_authn_method_metadata() -> Result<(), RejectResponse> {
             purpose: AuthnMethodPurpose::Recovery,
             protection: AuthnMethodProtection::Unprotected,
         },
-        ..sample_pubkey_authn_method(0)
+        ..sample_webauthn_authn_method(0)
     };
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 

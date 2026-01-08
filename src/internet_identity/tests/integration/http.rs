@@ -3,7 +3,7 @@
 
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_methods,
-    sample_pubkey_authn_method, test_authn_method,
+    sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::api::{http_request, internet_identity as api};
@@ -1077,14 +1077,14 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
             "origin".to_string(),
             MetadataEntryV2::String("https://identity.ic0.app".to_string()),
         )]),
-        ..sample_pubkey_authn_method(1)
+        ..sample_webauthn_authn_method(1)
     };
     let authn_method_internetcomputer = AuthnMethodData {
         metadata: HashMap::from([(
             "origin".to_string(),
             MetadataEntryV2::String("https://identity.internetcomputer.org".to_string()),
         )]),
-        ..sample_pubkey_authn_method(2)
+        ..sample_webauthn_authn_method(2)
     };
 
     let env = env();

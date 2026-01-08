@@ -39,19 +39,7 @@ pub fn assert_eq_ignoring_last_authentication(
 }
 
 pub fn test_authn_method() -> AuthnMethodData {
-    AuthnMethodData {
-        authn_method: AuthnMethod::WebAuthn(WebAuthn {
-            pubkey: ByteBuf::from(vec![0; 32]),
-            credential_id: ByteBuf::from(vec![0; 16]),
-            aaguid: None,
-        }),
-        metadata: Default::default(),
-        security_settings: AuthnMethodSecuritySettings {
-            protection: AuthnMethodProtection::Unprotected,
-            purpose: AuthnMethodPurpose::Authentication,
-        },
-        last_authentication: None,
-    }
+    sample_webauthn_authn_method(0)
 }
 
 pub fn create_identity_with_authn_method(
@@ -142,15 +130,6 @@ pub fn create_identity_with_openid_credential(
     .identity_number
 }
 
-pub fn sample_pubkey_authn_method(i: u8) -> AuthnMethodData {
-    AuthnMethodData {
-        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
-            pubkey: ByteBuf::from(vec![i; 32]),
-        }),
-        ..test_authn_method()
-    }
-}
-
 pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
     AuthnMethodData {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
@@ -178,7 +157,7 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
                 MetadataEntryV2::String("Test Authn Method 1".to_string()),
             ),
         ]),
-        ..sample_pubkey_authn_method(0)
+        ..sample_webauthn_authn_method(0)
     };
 
     let authn_method2 = AuthnMethodData {
@@ -208,7 +187,7 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
             protection: AuthnMethodProtection::Protected,
             purpose: AuthnMethodPurpose::Recovery,
         },
-        ..sample_pubkey_authn_method(2)
+        ..sample_webauthn_authn_method(2)
     };
 
     let authn_method4 = AuthnMethodData {

@@ -1,6 +1,6 @@
 use crate::v2_api::authn_method_test_helpers::{
     assert_eq_ignoring_last_authentication, create_identity_with_authn_method,
-    sample_pubkey_authn_method, sample_webauthn_authn_method,
+    sample_webauthn_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
@@ -18,7 +18,7 @@ use std::collections::HashMap;
 fn should_replace_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method_1 = sample_pubkey_authn_method(1);
+    let authn_method_1 = sample_webauthn_authn_method(1);
     let authn_method_2 = sample_webauthn_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
@@ -49,8 +49,8 @@ fn should_replace_authn_method() -> Result<(), RejectResponse> {
 fn should_require_authentication_to_replace_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method_1 = sample_pubkey_authn_method(1);
-    let authn_method_2 = sample_pubkey_authn_method(2);
+    let authn_method_1 = sample_webauthn_authn_method(1);
+    let authn_method_2 = sample_webauthn_authn_method(2);
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
     let result = api_v2::authn_method_replace(
@@ -84,7 +84,7 @@ fn should_require_authentication_to_replace_authn_method() -> Result<(), RejectR
 fn should_validate_metadata_of_new_authn_method() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method_1 = sample_pubkey_authn_method(1);
+    let authn_method_1 = sample_webauthn_authn_method(1);
     let authn_method_2 = AuthnMethodData {
         metadata: HashMap::from([(
             "alias".to_string(),
