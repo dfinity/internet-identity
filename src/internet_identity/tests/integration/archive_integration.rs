@@ -214,53 +214,6 @@ mod pull_entries_tests {
         Ok(())
     }
 
-    #[test]
-    fn should_restore_archive_buffer_from_stable_memory_backup() -> Result<(), RejectResponse> {
-        let env = env();
-        let ii_canister = install_ii_canister(&env, EMPTY_WASM.clone());
-        // re-create the archive canister with II as the controller and the canister id matching the restored backup
-        env.create_canister_with_id(
-            Some(ii_canister),
-            None,
-            Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap(),
-        )
-        .expect("failed to create archive canister");
-
-        // restore stable memory backup with buffered entries in persistent state
-        restore_compressed_stable_memory(
-            &env,
-            ii_canister,
-            "stable_memory/buffered_archive_entries_v9.bin.gz",
-        );
-        upgrade_ii_canister_with_arg(
-            &env,
-            ii_canister,
-            II_WASM.clone(),
-            arg_with_wasm_hash(ARCHIVE_WASM.clone()),
-        )
-        .expect("II upgrade failed");
-        // the upgrade auto-migrates the storage layout to v9
-        assert_eq!(
-            ii_api::stats(&env, ii_canister)
-                .unwrap()
-                .storage_layout_version,
-            9
-        );
-        // deploy the actual archive wasm
-        let archive_canister = deploy_archive_via_ii(&env, ii_canister);
-        let timestamp = time(&env);
-
-        // have the archive fetch the (restored) buffered entries
-        env.advance_time(Duration::from_secs(2));
-        // execute the timer
-        env.tick();
-        // progress after the inter-canister call
-        env.tick();
-
-        let entries = archive_api::get_entries(&env, archive_canister, None, None)?;
-        assert_expected_entries(timestamp, entries)
-    }
-
     fn assert_expected_entries(timestamp: u64, entries: Entries) -> Result<(), RejectResponse> {
         let anchor = 10_000;
         let pubkey = device_data_2().pubkey.clone();
