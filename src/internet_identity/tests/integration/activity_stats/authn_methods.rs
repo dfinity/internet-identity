@@ -11,7 +11,7 @@ use canister_tests::framework::{
 };
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
-    AuthnMethodSecuritySettings, MetadataEntryV2, WebAuthn, PublicKeyAuthn
+    AuthnMethodSecuritySettings, MetadataEntryV2, PublicKeyAuthn, WebAuthn,
 };
 use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
@@ -21,10 +21,7 @@ use std::time::Duration;
 const DAY_SECONDS: u64 = 24 * 60 * 60;
 const MONTH_SECONDS: u64 = 30 * DAY_SECONDS;
 
-const AUTHN_METHOD_TYPES: [&str; 2] = [
-    "webauthn_auth",
-    "recovery_phrase",
-];
+const AUTHN_METHOD_TYPES: [&str; 2] = ["webauthn_auth", "recovery_phrase"];
 
 /// Tests that daily active authn_methods are counted correctly.
 #[test]
@@ -276,12 +273,10 @@ fn authn_methods_all_types() -> Vec<(String, AuthnMethodData)> {
                 authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
                     pubkey: ByteBuf::from(vec![0; 32]),
                 }),
-                metadata: HashMap::from([
-                    (
-                        "usage".to_string(),
-                        MetadataEntryV2::String("recovery_phrase".to_string()),
-                    ),
-                ]),
+                metadata: HashMap::from([(
+                    "usage".to_string(),
+                    MetadataEntryV2::String("recovery_phrase".to_string()),
+                )]),
                 security_settings: AuthnMethodSecuritySettings {
                     protection: AuthnMethodProtection::Unprotected,
                     purpose: AuthnMethodPurpose::Recovery,

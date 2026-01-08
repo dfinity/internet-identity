@@ -78,7 +78,7 @@ impl ActivityCounter for AuthnMethodCounter {
                                 // Only increase counter if device has an II domain
                                 return;
                             }
-                            
+
                             if device.credential_id.is_none() {
                                 // if the credential id is not set, it is not WebAuthn
                                 self.other_counter += 1;
