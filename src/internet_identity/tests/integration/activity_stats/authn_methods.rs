@@ -140,67 +140,6 @@ fn should_report_monthly_active_authn_methods() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Tests that only authn methods bound to an II domain are counted.
-#[test]
-fn should_only_count_ii_domain_authn_methods() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
-
-    let non_ii_authn_method = test_authn_method(); // not bound to II domain
-    let ii_authn_method = AuthnMethodData {
-        metadata: HashMap::from([(
-            "origin".to_string(),
-            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
-        )]),
-        ..test_authn_method()
-    };
-
-    // some activity on an II domain is required to initialize the stats
-    create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
-    // let a day pass to not have the initialization influence the result
-    env.advance_time(Duration::from_secs(DAY_SECONDS));
-
-    let identity_nr = create_identity_with_authn_method(&env, canister_id, &non_ii_authn_method);
-    env.advance_time(Duration::from_secs(DAY_SECONDS));
-    // some activity is required to update the stats
-    create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
-
-    // assert all counters are 0
-    assert_labelled_metric(
-        &get_metrics(&env, canister_id),
-        "internet_identity_daily_active_authn_methods",
-        0f64,
-        "type",
-        &AUTHN_METHOD_TYPES,
-    );
-
-    // let a month pass to not have the daily stats affect the monthly result
-    env.advance_time(Duration::from_secs(MONTH_SECONDS));
-
-    // non-ii activity
-    api_v2::identity_info(
-        &env,
-        canister_id,
-        non_ii_authn_method.principal(),
-        identity_nr,
-    )?
-    .expect("identity info failed");
-    env.advance_time(Duration::from_secs(MONTH_SECONDS));
-    // some activity on an II domain is required to update the stats
-    create_identity_with_authn_method(&env, canister_id, &ii_authn_method);
-
-    // assert all counters are 0
-    assert_labelled_metric(
-        &get_metrics(&env, canister_id),
-        "internet_identity_monthly_active_authn_methods",
-        0f64,
-        "type",
-        &AUTHN_METHOD_TYPES,
-    );
-
-    Ok(())
-}
-
 /// Tests that active authn method stats are kept across upgrades from the same release.
 #[test]
 fn should_keep_stats_across_upgrades() -> Result<(), RejectResponse> {

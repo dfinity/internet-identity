@@ -547,11 +547,13 @@ pub fn parse_metric(body: &str, metric: &str) -> (f64, u64) {
     (metric, metric_timestamp)
 }
 
+#[track_caller]
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert_eq!(value, expected, "metric {metric_name} does not match");
 }
 
+#[track_caller]
 pub fn assert_metric_approx(metrics: &str, metric_name: &str, expected: f64, tolerance: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert!((value - expected).abs() <= tolerance, "metric {metric_name} is too far off: value={value}, expected={expected}, tolerance={tolerance}");
@@ -559,6 +561,7 @@ pub fn assert_metric_approx(metrics: &str, metric_name: &str, expected: f64, tol
 
 /// Asserts that the given metric is present in the metrics string and that it has the expected value
 /// across all the provided label values for the given label.
+#[track_caller]
 pub fn assert_labelled_metric(
     metrics: &str,
     metric_name: &str,
