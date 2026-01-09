@@ -320,7 +320,7 @@ test("Open dashboard from authorize page", async ({ page }) => {
     const pagePromise = page.context().waitForEvent("page");
     await authPage.getByRole("button", { name: "Manage identity" }).click();
     const managePage = await pagePromise;
-    await expect(managePage).toHaveURL(II_URL + "/manage");
+    await expect(managePage).toHaveURL(II_URL + "/internal-auth");
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
