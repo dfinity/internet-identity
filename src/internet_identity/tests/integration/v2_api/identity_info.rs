@@ -1,7 +1,7 @@
 //! Tests that `get_identity_info` returns the correct information.
 
 use crate::v2_api::authn_method_test_helpers::{
-    assert_eq_ignoring_last_authentication, create_identity_with_authn_method,
+    assert_eq_ignoring_last_authentication_multiple, create_identity_with_authn_method,
     create_identity_with_authn_methods, sample_authn_methods,
 };
 use candid::Principal;
@@ -31,7 +31,7 @@ fn should_get_identity_info() -> Result<(), RejectResponse> {
     )?
     .expect("identity info failed");
 
-    assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &authn_methods);
+    assert_eq_ignoring_last_authentication_multiple(&identity_info.authn_methods, &authn_methods);
     assert_eq!(identity_info.authn_method_registration, None);
 
     // check that the last authentication timestamp is set correctly

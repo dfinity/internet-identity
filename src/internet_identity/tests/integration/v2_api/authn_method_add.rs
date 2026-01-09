@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, eq_ignoring_last_authentication,
+    assert_eq_ignoring_last_authentication, create_identity_with_authn_method,
     sample_webauthn_authn_method,
 };
 use candid::Principal;
@@ -33,10 +33,7 @@ fn should_add_authn_method() -> Result<(), RejectResponse> {
     let identity_info = api_v2::identity_info(&env, canister_id, principal, identity_number)?
         .expect("identity info failed");
 
-    assert!(eq_ignoring_last_authentication(
-        &identity_info.authn_methods[1],
-        &authn_method_2
-    ));
+    assert_eq_ignoring_last_authentication(&identity_info.authn_methods[1], &authn_method_2);
     Ok(())
 }
 

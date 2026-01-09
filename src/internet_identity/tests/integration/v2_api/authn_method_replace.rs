@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    assert_eq_ignoring_last_authentication, create_identity_with_authn_method,
+    assert_eq_ignoring_last_authentication_multiple, create_identity_with_authn_method,
     sample_webauthn_authn_method,
 };
 use candid::Principal;
@@ -40,7 +40,10 @@ fn should_replace_authn_method() -> Result<(), RejectResponse> {
     )?
     .expect("identity info failed");
 
-    assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &[authn_method_2]);
+    assert_eq_ignoring_last_authentication_multiple(
+        &identity_info.authn_methods,
+        &[authn_method_2],
+    );
 
     Ok(())
 }
@@ -75,7 +78,10 @@ fn should_require_authentication_to_replace_authn_method() -> Result<(), RejectR
         identity_number,
     )?
     .expect("identity info failed");
-    assert_eq_ignoring_last_authentication(&identity_info.authn_methods, &[authn_method_1]);
+    assert_eq_ignoring_last_authentication_multiple(
+        &identity_info.authn_methods,
+        &[authn_method_1],
+    );
 
     Ok(())
 }

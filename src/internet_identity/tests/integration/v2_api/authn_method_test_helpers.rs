@@ -11,19 +11,20 @@ use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
-pub fn eq_ignoring_last_authentication(a: &AuthnMethodData, b: &AuthnMethodData) -> bool {
-    let a = AuthnMethodData {
-        last_authentication: None,
-        ..a.clone()
-    };
-    let b = AuthnMethodData {
-        last_authentication: None,
-        ..b.clone()
-    };
-    a == b
+pub fn assert_eq_ignoring_last_authentication(a: &AuthnMethodData, b: &AuthnMethodData) {
+    assert_eq!(
+        AuthnMethodData {
+            last_authentication: None,
+            ..a.clone()
+        },
+        AuthnMethodData {
+            last_authentication: None,
+            ..b.clone()
+        }
+    );
 }
 
-pub fn assert_eq_ignoring_last_authentication(
+pub fn assert_eq_ignoring_last_authentication_multiple(
     authn_methods1: &[AuthnMethodData],
     authn_methods2: &[AuthnMethodData],
 ) {
@@ -31,10 +32,7 @@ pub fn assert_eq_ignoring_last_authentication(
         .iter()
         .zip(authn_methods2.iter())
         .for_each(|(a, b)| {
-            assert!(
-                eq_ignoring_last_authentication(a, b),
-                "authn methods are not equal: {a:?} != {b:?}"
-            )
+            assert_eq_ignoring_last_authentication(a, b);
         });
 }
 
@@ -160,10 +158,16 @@ fn sample_recovery_authn_method(i: u8) -> AuthnMethodData {
         authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
             pubkey: ByteBuf::from(vec![i; 32]),
         }),
-        metadata: HashMap::from([(
-            "usage".to_string(),
-            MetadataEntryV2::String("recovery_phrase".to_string()),
-        )]),
+        metadata: HashMap::from([
+            (
+                "alias".to_string(),
+                MetadataEntryV2::String("Recovery Key".to_string()),
+            ),
+            (
+                "usage".to_string(),
+                MetadataEntryV2::String("recovery_phrase".to_string()),
+            ),
+        ]),
         security_settings: AuthnMethodSecuritySettings {
             protection: AuthnMethodProtection::Unprotected,
             purpose: AuthnMethodPurpose::Recovery,
