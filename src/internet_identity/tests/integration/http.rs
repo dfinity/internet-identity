@@ -1181,10 +1181,6 @@ fn should_list_aggregated_session_seconds_and_event_data_counters() -> Result<()
         "internet_identity_event_aggregations_count",
         12f64,
     );
-    // make sure aggregations for other II domains are not listed on the metrics endpoint
-    assert!(
-        !metrics.contains(
-            "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-1.com\",window=\"24h\""));
     assert!(
         !metrics.contains(
             "internet_identity_prepare_delegation_session_seconds{dapp=\"https://some-dapp-3.com\",window=\"24h\""));

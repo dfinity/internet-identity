@@ -12,7 +12,7 @@ impl DeviceData {
         Self {
             pubkey: ByteBuf::from([0; 32]),
             alias: "test device".to_string(),
-            credential_id: None,
+            credential_id: Some(ByteBuf::from([1; 16])),
             aaguid: None,
             purpose: Purpose::Authentication,
             key_type: KeyType::CrossPlatform,
