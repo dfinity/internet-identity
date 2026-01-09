@@ -745,10 +745,23 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Reads the data of the specified anchor from legacy stable memory.
-    fn read_legacy(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
+    /// Reads the data of the specified anchor from stable memory.
+    pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         // Read fixed 4KB anchor
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
+
+        let num_anchors = self.header.num_anchors;
+
+        if record_number >= num_anchors {
+            ic_cdk::println!(
+                "ERROR: Requested anchor number {} maps to record number {}, but only {} anchors \
+                 are allocated.",
+                anchor_number,
+                record_number,
+                num_anchors,
+            );
+            return Err(StorageError::BadAnchorNumber(anchor_number));
+        }
 
         let address = self.record_address(record_number);
 
@@ -765,37 +778,12 @@ impl<M: Memory + Clone> Storage<M> {
 
         // Read unbounded stable structures anchor
         let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
-
-        Ok(Anchor::from((anchor_number, storable_fixed_anchor, None)))
-    }
-
-    /// Reads the data of the specified anchor from stable memory.
-    pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
-        let record_number = self.anchor_number_to_record_number(anchor_number)?;
-
-        // This value is no longer used for reading, but we keep the check for consistency.
-        let num_anchors = self.header.num_anchors;
-
-        if record_number >= num_anchors {
-            ic_cdk::println!(
-                "ERROR: Requested anchor number {} maps to record number {}, but only {} anchors \
-                 are allocated.",
-                anchor_number,
-                record_number,
-                num_anchors,
-            );
-            return Err(StorageError::BadAnchorNumber(anchor_number));
-        }
-
-        let Some(storable_anchor) = self.stable_anchor_memory.get(&anchor_number) else {
-            ic_cdk::println!(
-                "Falling back to legacy read for anchor number {}",
-                anchor_number
-            );
-            return self.read_legacy(anchor_number);
-        };
-
-        Ok(Anchor::from((anchor_number, storable_anchor)))
+        let storable_anchor = self.stable_anchor_memory.get(&anchor_number);
+        Ok(Anchor::from((
+            anchor_number,
+            storable_fixed_anchor,
+            storable_anchor,
+        )))
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
