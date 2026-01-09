@@ -134,7 +134,7 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), RejectRe
     expect_user_error_with_message(
         result,
         CanisterCalledTrap,
-        Regex::new("Only recovery phrases can be locked but key type is Unknown").unwrap(),
+        Regex::new("Only recovery phrases can be locked but key type is CrossPlatform").unwrap(),
     );
     Ok(())
 }
