@@ -8,7 +8,6 @@ import { withLoader } from "$lib/templates/loader";
 import { showMessage } from "$lib/templates/message";
 import { showSpinner } from "$lib/templates/spinner";
 import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
-import { recoveryWizard } from "$lib/legacy/flows/recovery/recoveryWizard";
 import { I18n } from "$lib/legacy/i18n";
 import { getAnchorIfLastUsed, setKnownPrincipal } from "$lib/legacy/storage";
 import { Connection } from "$lib/utils/iiConnection";
@@ -247,7 +246,10 @@ const authenticate = async (
   // XXX: Must happen before auth protocol is done, otherwise the authenticating dapp
   // may have already closed the II window
   if (!authSuccess.newAnchor) {
-    await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
+    // Disable this check for now since it would always get triggered.
+    // Due to anchor migration, we're no longer keeping track of the
+    // necessary anchor metadata to make this check work correctly.
+    // await recoveryWizard(authSuccess.userNumber, authSuccess.connection);
   }
 
   // Ignore the response of committing the metadata because it's not crucial.

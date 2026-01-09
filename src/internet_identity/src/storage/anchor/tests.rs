@@ -785,6 +785,7 @@ mod from_conversion_tests {
                 credential_id: Some(vec![13, 14, 15]),
                 purpose: Purpose::Recovery.into(),
                 key_type: KeyType::CrossPlatform.into(),
+                origin: Some("https://identity.ic0.app".to_string()),
             })
         );
     }
@@ -1051,6 +1052,7 @@ mod from_conversion_tests {
                 credential_id: None,
                 purpose: Purpose::Authentication.into(),
                 key_type: KeyType::BrowserStorageKey.into(),
+                origin: Some("https://id.ai".to_string()),
             })
         );
         assert_eq!(passkeys[0].credential_id, vec![0xde, 0xad, 0xbe, 0xef]);
@@ -1110,6 +1112,7 @@ mod from_conversion_tests {
                         credential_id: Some(vec![83, 84, 85]),
                         purpose: Purpose::Recovery.into(),
                         key_type: KeyType::Unknown.into(),
+                        origin: Some("https://id.ai".to_string()),
                     }),
                 }
             ]
@@ -1158,6 +1161,7 @@ mod from_conversion_tests {
                     credential_id: None,
                     purpose: Purpose::Authentication.into(),
                     key_type: KeyType::Unknown.into(),
+                    origin: Some("https://id.ai".to_string()),
                 })
             }]
         );

@@ -16,7 +16,6 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
-use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -356,10 +355,7 @@ pub fn large_size_device() -> DeviceData {
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
-        metadata: Some(HashMap::from([(
-            "key".to_string(),
-            MetadataEntry::String("a".repeat(100)),
-        )])),
+        metadata: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -370,6 +366,8 @@ pub fn recovery_device_data_1() -> DeviceData {
         alias: "Recovery Phrase 1".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        origin: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -380,6 +378,8 @@ pub fn recovery_device_data_2() -> DeviceData {
         alias: "Recovery Phrase 2".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        origin: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -547,11 +547,13 @@ pub fn parse_metric(body: &str, metric: &str) -> (f64, u64) {
     (metric, metric_timestamp)
 }
 
+#[track_caller]
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert_eq!(value, expected, "metric {metric_name} does not match");
 }
 
+#[track_caller]
 pub fn assert_metric_approx(metrics: &str, metric_name: &str, expected: f64, tolerance: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert!((value - expected).abs() <= tolerance, "metric {metric_name} is too far off: value={value}, expected={expected}, tolerance={tolerance}");
@@ -559,6 +561,7 @@ pub fn assert_metric_approx(metrics: &str, metric_name: &str, expected: f64, tol
 
 /// Asserts that the given metric is present in the metrics string and that it has the expected value
 /// across all the provided label values for the given label.
+#[track_caller]
 pub fn assert_labelled_metric(
     metrics: &str,
     metric_name: &str,
