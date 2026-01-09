@@ -5,7 +5,7 @@ use ic_cdk::api::management_canister::main::CanisterId;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
     AuthnMethodSecuritySettings, IdentityNumber, MetadataEntryV2, OpenIDRegFinishArg,
-    PublicKeyAuthn, RegistrationFlowNextStep, WebAuthn,
+    RegistrationFlowNextStep, WebAuthn,
 };
 use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
@@ -137,7 +137,15 @@ pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
             credential_id: ByteBuf::from(vec![i * 2; 32]),
             aaguid: None,
         }),
-        ..test_authn_method()
+        metadata: HashMap::from([(
+            "origin".to_string(),
+            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+        )]),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
     }
 }
 

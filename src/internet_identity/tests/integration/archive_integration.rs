@@ -1,7 +1,6 @@
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
-use candid::Principal;
 use canister_tests::api::archive as archive_api;
 use canister_tests::api::internet_identity as ii_api;
 use canister_tests::api::internet_identity::api_v2;
