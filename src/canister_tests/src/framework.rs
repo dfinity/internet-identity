@@ -16,7 +16,6 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
-use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
