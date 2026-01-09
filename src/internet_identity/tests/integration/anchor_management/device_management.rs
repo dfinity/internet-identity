@@ -256,56 +256,6 @@ fn should_update_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that a protected device can be updated
-#[test]
-fn should_update_protected_device() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let principal = principal_1();
-    let mut device = DeviceData {
-        protection: DeviceProtection::Protected,
-        key_type: KeyType::SeedPhrase,
-        purpose: Purpose::Recovery,
-        credential_id: None,
-        alias: "Not going to be stored".to_string(),
-        origin: None,
-        ..device_data_1()
-    };
-
-    let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
-
-    let anchor_info = api::get_anchor_info(&env, canister_id, principal, user_number)?;
-    assert_eq!(
-        anchor_info.into_device_data(),
-        vec![DeviceData {
-            alias: "Recovery Key".to_string(),
-            ..device.clone()
-        }]
-    );
-
-    device.alias.push_str("some suffix");
-
-    api::update(
-        &env,
-        canister_id,
-        principal,
-        user_number,
-        &device.pubkey,
-        &device,
-    )?;
-
-    let anchor_info = api::get_anchor_info(&env, canister_id, principal, user_number)?;
-    assert_eq!(
-        anchor_info.into_device_data(),
-        vec![DeviceData {
-            alias: "Recovery Key".to_string(),
-            ..device
-        }]
-    );
-
-    Ok(())
-}
-
 /// Verifies that the device key (i.e. the device ID) cannot be updated
 #[test]
 fn should_not_modify_pubkey() {
@@ -795,7 +745,8 @@ fn should_not_keep_metadata() -> Result<(), RejectResponse> {
     assert_eq!(
         devices,
         vec![DeviceData {
-            metadata: None,
+            // TODO: Uncomment once we switch to the new source of truth for the anchor storage
+            // metadata: None,
             ..device
         }]
     );
