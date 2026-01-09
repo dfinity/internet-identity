@@ -90,8 +90,18 @@ fn get_anchor_migration_special_cases(anchor_number: AnchorNumber) -> Vec<Specia
 }
 
 #[query(hidden = true)]
-fn get_anchor_migration_special_cases_keys() -> Vec<AnchorNumber> {
-    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect())
+fn get_anchor_migration_special_cases_keys(lo: usize, hi: usize) -> Vec<AnchorNumber> {
+    use std::cmp::{max, min};
+
+    let anchor_numbers: Vec<_> =
+        ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect());
+
+    let lo = max(0, lo);
+    let hi = min(anchor_numbers.len(), hi);
+
+    let (lo, hi) = (min(lo, hi), max(lo, hi));
+
+    anchor_numbers[lo..hi].to_vec()
 }
 
 /// Temporary function to list migration errors.

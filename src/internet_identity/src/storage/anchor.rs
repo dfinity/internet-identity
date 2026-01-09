@@ -206,8 +206,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 ) => {
                     if protection == &DeviceProtection::Protected {
                         ic_cdk::println!(
-                            "Warning: Passkey with protected device protection found. \
-                             PubKey: {:?}, Anchor: {}",
+                            "Warning: Passkey with device protection found. PubKey: {:?}, \
+                             Anchor: {}",
                             hex::encode(&pubkey),
                             anchor_number,
                         );
@@ -230,8 +230,8 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     )));
                     if protection == &DeviceProtection::Protected {
                         ic_cdk::println!(
-                            "Warning: Passkey without origin with protected device protection \
-                             found. PubKey: {:?}, Anchor: {}",
+                            "Warning: Passkey without origin with device protection found. \
+                             PubKey: {:?}, Anchor: {}",
                             hex::encode(&pubkey),
                             anchor_number,
                         );
@@ -253,6 +253,15 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                         key_type,
                         origin,
                     )));
+
+                    if protection == &DeviceProtection::Protected {
+                        ic_cdk::println!(
+                            "Warning: Recovery passkey with device protection found. PubKey: {:?}, \
+                             Anchor: {}",
+                            hex::encode(&pubkey),
+                            anchor_number,
+                        );
+                    }
 
                     // No logging for a legitimate legacy recovery device.
 
@@ -303,12 +312,46 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
 
             // Store special cases to aid observability (they will also be persisted in stable memory).
             if let Some(special_device_migration) = &special_device_migration {
-                ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow_mut(|cases| {
-                    cases
-                        .entry(anchor_number)
-                        .or_default()
-                        .push(special_device_migration.clone())
-                })
+                // To avoid storing too much data on the heap, we filter this down to only contain
+                // the most exotic cases.
+
+                let is_valid_passkey_but_without_an_origin = matches!(
+                    (&credential_id, purpose, key_type, origin, protection),
+                    (
+                        Some(_),
+                        Purpose::Authentication,
+                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
+                        None,
+                        DeviceProtection::Unprotected,
+                    )
+                );
+
+                let is_recovery_passkey = matches!(
+                    (&credential_id, purpose, key_type, protection),
+                    (
+                        Some(_),
+                        Purpose::Recovery,
+                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
+                        DeviceProtection::Unprotected,
+                    )
+                );
+
+                let is_legacy_pin_flow = matches!(
+                    (&credential_id, purpose, key_type),
+                    (None, Purpose::Authentication, KeyType::BrowserStorageKey)
+                );
+
+                if !is_valid_passkey_but_without_an_origin
+                    && !is_recovery_passkey
+                    && !is_legacy_pin_flow
+                {
+                    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow_mut(|cases| {
+                        cases
+                            .entry(anchor_number)
+                            .or_default()
+                            .push(special_device_migration.clone())
+                    })
+                }
             }
 
             if let Some(credential_id) = credential_id {
