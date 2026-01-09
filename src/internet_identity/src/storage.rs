@@ -779,6 +779,15 @@ impl<M: Memory + Clone> Storage<M> {
         // Read unbounded stable structures anchor
         let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
         let storable_anchor = self.stable_anchor_memory.get(&anchor_number);
+
+        if storable_anchor.is_none() {
+            ic_cdk::println!(
+                "Warning: Anchor number {} has no corresponding StorableAnchor in stable memory.
+                 Falling back to reading from legacy anchor memory.",
+                anchor_number,
+            );
+        }
+
         Ok(Anchor::from((
             anchor_number,
             storable_fixed_anchor,

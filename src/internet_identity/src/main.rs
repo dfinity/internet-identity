@@ -90,8 +90,11 @@ fn get_anchor_migration_special_cases(anchor_number: AnchorNumber) -> Vec<Specia
 }
 
 #[query(hidden = true)]
-fn get_anchor_migration_special_cases_keys() -> Vec<AnchorNumber> {
-    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect())
+fn get_anchor_migration_special_cases_keys(lo: usize, hi: usize) -> Vec<AnchorNumber> {
+    let stuff: Vec<_> =
+        ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect());
+
+    stuff[lo..hi].to_vec()
 }
 
 /// Temporary function to list migration errors.
