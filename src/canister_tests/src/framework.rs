@@ -370,6 +370,8 @@ pub fn recovery_device_data_1() -> DeviceData {
         alias: "Recovery Phrase 1".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        origin: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -380,6 +382,8 @@ pub fn recovery_device_data_2() -> DeviceData {
         alias: "Recovery Phrase 2".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        origin: None,
         ..DeviceData::auth_test_device()
     }
 }

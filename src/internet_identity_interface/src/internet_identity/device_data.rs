@@ -17,7 +17,7 @@ impl DeviceData {
             purpose: Purpose::Authentication,
             key_type: KeyType::CrossPlatform,
             protection: DeviceProtection::Unprotected,
-            origin: None,
+            origin: Some("https://id.ai".to_string()),
             metadata: None,
         }
     }
