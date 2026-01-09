@@ -137,10 +137,16 @@ pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
             credential_id: ByteBuf::from(vec![i * 2; 32]),
             aaguid: None,
         }),
-        metadata: HashMap::from([(
-            "origin".to_string(),
-            MetadataEntryV2::String("https://identity.ic0.app".to_string()),
-        )]),
+        metadata: HashMap::from([
+            (
+                "origin".to_string(),
+                MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+            ),
+            (
+                "authenticator_attachment".to_string(),
+                MetadataEntryV2::String("cross_platform".to_string()),
+            ),
+        ]),
         security_settings: AuthnMethodSecuritySettings {
             protection: AuthnMethodProtection::Unprotected,
             purpose: AuthnMethodPurpose::Authentication,
