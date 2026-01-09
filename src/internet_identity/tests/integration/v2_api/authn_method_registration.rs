@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, sample_pubkey_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
@@ -79,7 +79,7 @@ fn should_register_authn_method() -> Result<(), RejectResponse> {
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -116,7 +116,7 @@ fn should_verify_authn_method_after_failed_attempt() -> Result<(), RejectRespons
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -162,7 +162,7 @@ fn identity_info_should_return_authn_method() -> Result<(), RejectResponse> {
     )?
     .expect("authn_method_registration_mode_enter failed");
 
-    let authn_method2 = sample_pubkey_authn_method(1);
+    let authn_method2 = sample_webauthn_authn_method(1);
     let AuthnMethodConfirmationCode { expiration, .. } =
         api_v2::authn_method_register(&env, canister_id, identity_number, &authn_method2)?
             .expect("authn_method_register failed");
@@ -194,7 +194,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), Reject
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?;
 
     assert!(matches!(
@@ -223,7 +223,7 @@ fn should_reject_authn_method_if_not_in_registration_mode() -> Result<(), Reject
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?;
 
     assert!(matches!(
@@ -257,7 +257,7 @@ fn should_reject_authn_method_if_registration_mode_is_expired() -> Result<(), Re
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?;
 
     assert!(matches!(
@@ -321,7 +321,7 @@ fn should_reject_confirmation_with_wrong_code() -> Result<(), RejectResponse> {
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -391,7 +391,7 @@ fn should_return_registrations_when_tentative_device_not_verified() -> Result<()
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -426,7 +426,7 @@ fn should_return_no_registrations_when_tentative_device_verified() -> Result<(),
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -471,7 +471,7 @@ fn should_return_no_registrations_after_registration_mode_exit() -> Result<(), R
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -583,7 +583,7 @@ fn should_return_none_after_tentative_device_confirmation() -> Result<(), Reject
         &env,
         canister_id,
         identity_number,
-        &sample_pubkey_authn_method(1),
+        &sample_webauthn_authn_method(1),
     )?
     .expect("authn_method_register failed");
 
@@ -696,7 +696,7 @@ fn should_handle_multiple_registration_ids() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method1 = test_authn_method();
-    let authn_method2 = sample_pubkey_authn_method(1);
+    let authn_method2 = sample_webauthn_authn_method(1);
 
     let identity_number1 = create_identity_with_authn_method(&env, canister_id, &authn_method1);
     let identity_number2 = create_identity_with_authn_method(&env, canister_id, &authn_method2);
@@ -749,7 +749,7 @@ fn should_exit_registrations_separately() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method1 = test_authn_method();
-    let authn_method2 = sample_pubkey_authn_method(1);
+    let authn_method2 = sample_webauthn_authn_method(1);
 
     let identity_number1 = create_identity_with_authn_method(&env, canister_id, &authn_method1);
     let identity_number2 = create_identity_with_authn_method(&env, canister_id, &authn_method2);

@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, sample_pubkey_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
@@ -15,77 +15,25 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
 #[test]
-fn should_write_authn_method_metadata() -> Result<(), RejectResponse> {
-    const METADATA_KEY: &str = "some-key";
-
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method = test_authn_method();
-    let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
-
-    let identity_info =
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
-            .expect("identity info failed");
-    let actual_metadata = &identity_info
-        .authn_methods
-        .first()
-        .expect("expect authn_methods not to be empty")
-        .metadata;
-    assert!(actual_metadata.is_empty());
-
-    let metadata = HashMap::from([(
-        METADATA_KEY.to_string(),
-        MetadataEntryV2::String("some value".to_string()),
-    )]);
-
-    api_v2::authn_method_metadata_replace(
-        &env,
-        canister_id,
-        authn_method.principal(),
-        identity_number,
-        &authn_method.public_key(),
-        &metadata,
-    )?
-    .expect("identity metadata replace failed");
-
-    let identity_info =
-        api_v2::identity_info(&env, canister_id, authn_method.principal(), identity_number)?
-            .expect("identity info failed");
-    let actual_metadata = &identity_info
-        .authn_methods
-        .first()
-        .expect("expect authn_methods not to be empty")
-        .metadata;
-    assert_eq!(actual_metadata, &metadata);
-    Ok(())
-}
-
-#[test]
 fn should_replace_authn_method_metadata() -> Result<(), RejectResponse> {
-    const METADATA_KEY: &str = "some-key";
-
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let authn_method = AuthnMethodData {
         metadata: HashMap::from([
             (
-                "recovery_metadata_1".to_string(),
-                MetadataEntryV2::String("recovery data 1".to_string()),
-            ),
-            (
                 "origin".to_string(),
                 MetadataEntryV2::String("https://identity.ic0.app".to_string()),
             ),
             (
-                "usage".to_string(),
-                MetadataEntryV2::String("recovery_phrase".to_string()),
+                "authenticator_attachment".to_string(),
+                MetadataEntryV2::String("cross_platform".to_string()),
             ),
         ]),
         security_settings: AuthnMethodSecuritySettings {
-            purpose: AuthnMethodPurpose::Recovery,
+            purpose: AuthnMethodPurpose::Authentication,
             protection: AuthnMethodProtection::Unprotected,
         },
-        ..sample_pubkey_authn_method(0)
+        ..sample_webauthn_authn_method(0)
     };
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -99,10 +47,16 @@ fn should_replace_authn_method_metadata() -> Result<(), RejectResponse> {
         .metadata;
     assert_eq!(stored_metadata, &authn_method.metadata);
 
-    let new_metadata = HashMap::from([(
-        METADATA_KEY.to_string(),
-        MetadataEntryV2::String("some value".to_string()),
-    )]);
+    let new_metadata = HashMap::from([
+        (
+            "origin".to_string(),
+            MetadataEntryV2::String("https://identity.internetcomputer.org".to_string()),
+        ),
+        (
+            "authenticator_attachment".to_string(),
+            MetadataEntryV2::String("cross_platform".to_string()),
+        ),
+    ]);
 
     api_v2::authn_method_metadata_replace(
         &env,

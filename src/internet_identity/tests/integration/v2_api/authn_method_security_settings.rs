@@ -1,12 +1,11 @@
-use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
-};
+use crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method;
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose, AuthnMethodSecuritySettings,
-    AuthnMethodSecuritySettingsReplaceError, MetadataEntryV2,
+    AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+    AuthnMethodSecuritySettings, AuthnMethodSecuritySettingsReplaceError, MetadataEntryV2,
+    PublicKeyAuthn,
 };
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
@@ -137,10 +136,17 @@ fn should_check_authn_method_exists() -> Result<(), RejectResponse> {
 
 fn recovery_phrase_authn_method() -> AuthnMethodData {
     AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(vec![0; 32]),
+        }),
         metadata: HashMap::from([(
             "usage".to_string(),
             MetadataEntryV2::String("recovery_phrase".to_string()),
         )]),
-        ..test_authn_method()
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Recovery,
+        },
+        last_authentication: None,
     }
 }
