@@ -782,7 +782,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         if storable_anchor.is_none() {
             ic_cdk::println!(
-                "Warning: Anchor number {} has no corresponding StorableAnchor in stable memory.
+                "Warning: Anchor number {} has no corresponding StorableAnchor in stable memory. \
                  Falling back to reading from legacy anchor memory.",
                 anchor_number,
             );
