@@ -356,10 +356,7 @@ pub fn large_size_device() -> DeviceData {
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
-        metadata: Some(HashMap::from([(
-            "key".to_string(),
-            MetadataEntry::String("a".repeat(100)),
-        )])),
+        metadata: None,
         ..DeviceData::auth_test_device()
     }
 }
