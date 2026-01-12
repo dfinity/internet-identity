@@ -17,7 +17,7 @@
       if (!(element instanceof HTMLElement)) {
         return;
       }
-      // Move 1Password to top layer
+      // Move 1Password to the top layer
       element.setAttribute("popover", "manual");
       element.showPopover();
     }).observe(document.documentElement, {
