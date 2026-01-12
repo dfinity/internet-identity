@@ -10,6 +10,22 @@
     // 2. Show page once it has fully loaded (see app.html)
     document.documentElement.removeAttribute("data-hide-ssg");
 
+    // Fix z position of password managers
+    new MutationObserver(() => {
+      // Currently this is only needed for 1Password
+      const element = document.querySelector("com-1password-notification");
+      if (!(element instanceof HTMLElement)) {
+        return;
+      }
+      // Move 1Password to top layer
+      element.setAttribute("popover", "manual");
+      element.showPopover();
+    }).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+
+    // Initialize analytics
     initAnalytics(canisterConfig.analytics_config[0]?.[0]);
     analytics.pageView();
   });
