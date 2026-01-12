@@ -1,6 +1,8 @@
 # List of approved files that can be changed by a bot via an automated PR
 # This is to increase security and prevent accidentally updating files that shouldn't be changed by a bot
 src/frontend/src/flows/dappsExplorer/dapps.json
+src/frontend/src/lib/assets/aaguid/password_managers.json
+src/frontend/src/lib/assets/aaguid/security_keys.json
 README.md
 src/frontend/src/assets/icons/*.svg
 src/frontend/src/assets/icons/*.png
