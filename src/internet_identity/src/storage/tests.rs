@@ -1235,7 +1235,7 @@ fn test_anchor_storage_migration_round_trip() {
                         credential_id: Some(ByteBuf::from("credential_id_123")),
                         aaguid: Some([1u8; 16]),
                         purpose: Purpose::Authentication,
-                        key_type: KeyType::Platform,
+                        key_type: KeyType::CrossPlatform,
                         protection: DeviceProtection::Unprotected,
                         origin: Some("https://identity.ic0.app".to_string()),
                         last_usage_timestamp: Some(now),
@@ -1632,7 +1632,7 @@ fn test_anchor_storage_migration_round_trip() {
                         credential_id: Some(ByteBuf::from("cred_with_metadata")),
                         aaguid: None,
                         purpose: Purpose::Authentication,
-                        key_type: KeyType::Platform,
+                        key_type: KeyType::CrossPlatform,
                         protection: DeviceProtection::Unprotected,
                         origin: Some("https://identity.ic0.app".to_string()),
                         last_usage_timestamp: Some(now),
@@ -1731,6 +1731,10 @@ fn test_anchor_storage_migration_round_trip() {
             "device protection defaults to unprotected for passkeys",
             {
                 let mut anchor = storage.allocate_anchor(now).unwrap();
+                // NOTE: We assign directly to `anchor.devices` here to construct a legacy
+                //       anchor state that may not satisfy the invariants enforced by
+                //       `add_device()`. This is intentional for testing migration logic
+                //       and should not be used as a pattern in regular tests.
                 anchor.devices = vec![Device {
                     pubkey: ByteBuf::from("protected_passkey"),
                     alias: "Protected Passkey".to_string(),
@@ -1771,6 +1775,10 @@ fn test_anchor_storage_migration_round_trip() {
             "fallthrough case - recovery with browser storage key and origin",
             {
                 let mut anchor = storage.allocate_anchor(now).unwrap();
+                // NOTE: We assign directly to `anchor.devices` here to construct a legacy
+                //       anchor state that may not satisfy the invariants enforced by
+                //       `add_device()`. This is intentional for testing migration logic
+                //       and should not be used as a pattern in regular tests.
                 anchor.devices = vec![Device {
                     pubkey: ByteBuf::from("unusual_device"),
                     alias: "Unusual Device".to_string(),
@@ -1846,6 +1854,88 @@ fn test_anchor_storage_migration_round_trip() {
                 created_at: Some(now),
             },
         ),
+        // Test case 18: Passkey key_type defaults to CrossPlatform (Platform -> CrossPlatform)
+        (
+            "passkey key_type Platform defaults to CrossPlatform",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("platform_passkey"),
+                        alias: "Platform Passkey".to_string(),
+                        credential_id: Some(ByteBuf::from("platform_cred")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::Platform, // Will be normalized to CrossPlatform
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 18,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("platform_passkey"),
+                    alias: "Platform Passkey".to_string(),
+                    credential_id: Some(ByteBuf::from("platform_cred")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::CrossPlatform, // Defaults to CrossPlatform
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 19: Passkey key_type defaults to CrossPlatform (Unknown -> CrossPlatform)
+        (
+            "passkey key_type Unknown defaults to CrossPlatform",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("unknown_keytype_passkey_2"),
+                        alias: "Unknown Type Passkey".to_string(),
+                        credential_id: Some(ByteBuf::from("unknown_cred_2")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::Unknown, // Will be normalized to CrossPlatform
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 19,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("unknown_keytype_passkey_2"),
+                    alias: "Unknown Type Passkey".to_string(),
+                    credential_id: Some(ByteBuf::from("unknown_cred_2")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::CrossPlatform, // Defaults to CrossPlatform
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
     ];
 
     for (label, anchor, expected_anchor) in test_cases {
@@ -1866,7 +1956,3 @@ fn test_anchor_storage_migration_round_trip() {
         );
     }
 }
-
-/// Tests that anchors created using `Storage.write` handle edge cases during migration.
-#[test]
-fn test_anchor_storage_migration_edge_cases() {}
