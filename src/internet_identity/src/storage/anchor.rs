@@ -25,12 +25,12 @@ mod tests;
 /// to this module.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Anchor {
-    anchor_number: AnchorNumber,
-    devices: Vec<Device>,
-    openid_credentials: Vec<OpenIdCredential>,
-    metadata: Option<HashMap<String, MetadataEntry>>,
-    name: Option<String>,
-    created_at: Option<Timestamp>,
+    pub(crate) anchor_number: AnchorNumber,
+    pub(crate) devices: Vec<Device>,
+    pub(crate) openid_credentials: Vec<OpenIdCredential>,
+    pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
+    pub(crate) name: Option<String>,
+    pub(crate) created_at: Option<Timestamp>,
 }
 
 impl Device {

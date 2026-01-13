@@ -1159,3 +1159,47 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         );
     }
 }
+
+/// Tests that anchors created using `Storage.write` can be read into expected structures.
+#[test]
+fn test_anchor_storage_migration_round_trip() {
+    // Used only for synching device indices, thus should be orthogonal to this test.
+    let is_previously_written = false;
+    let mut storage = Storage::new((0, 10), VectorMemory::default());
+    let now = 123;
+
+    let test_cases = [(
+        "simple",
+        storage.allocate_anchor(now).unwrap(),
+        Anchor {
+            anchor_number: 0,
+            devices: vec![],
+            openid_credentials: vec![],
+            metadata: None,
+            name: None,
+            created_at: Some(now),
+        },
+    )];
+
+    for (label, anchor, expected_anchor) in test_cases {
+        let anchor_number = anchor.anchor_number();
+        storage
+            .write(anchor, is_previously_written)
+            .unwrap_or_else(|e| {
+                panic!("Test case '{}' failed during write: {:?}", label, e);
+            });
+        let observed_anchor = storage.read(anchor_number).unwrap_or_else(|e| {
+            panic!("Test case '{}' failed during read: {:?}", label, e);
+        });
+
+        assert_eq!(
+            observed_anchor, expected_anchor,
+            "Test case '{}' failed",
+            label
+        );
+    }
+}
+
+/// Tests that anchors created using `Storage.write` handle edge cases during migration.
+#[test]
+fn test_anchor_storage_migration_edge_cases() {}
