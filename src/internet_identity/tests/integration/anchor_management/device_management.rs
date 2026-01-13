@@ -745,8 +745,7 @@ fn should_not_keep_metadata() -> Result<(), RejectResponse> {
     assert_eq!(
         devices,
         vec![DeviceData {
-            // TODO: Uncomment once we switch to the new source of truth for the anchor storage
-            // metadata: None,
+            metadata: None,
             ..device
         }]
     );
