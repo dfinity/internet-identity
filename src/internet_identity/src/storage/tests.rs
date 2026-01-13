@@ -1165,21 +1165,688 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
 fn test_anchor_storage_migration_round_trip() {
     // Used only for synching device indices, thus should be orthogonal to this test.
     let is_previously_written = false;
-    let mut storage = Storage::new((0, 10), VectorMemory::default());
+    let mut storage = Storage::new((0, 100), VectorMemory::default());
     let now = 123;
 
-    let test_cases = [(
-        "simple",
-        storage.allocate_anchor(now).unwrap(),
-        Anchor {
-            anchor_number: 0,
-            devices: vec![],
-            openid_credentials: vec![],
-            metadata: None,
-            name: None,
-            created_at: Some(now),
-        },
-    )];
+    let test_cases = [
+        // Test case 0: Empty anchor
+        (
+            "empty anchor",
+            storage.allocate_anchor(now).unwrap(),
+            Anchor {
+                anchor_number: 0,
+                devices: vec![],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 1: Valid recovery phrase (happy case)
+        (
+            "valid recovery phrase",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("recovery_key_pubkey"),
+                        alias: "Recovery Key".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::SeedPhrase,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 1,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("recovery_key_pubkey"),
+                    alias: "Recovery Key".to_string(),
+                    credential_id: None,
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::SeedPhrase,
+                    protection: DeviceProtection::Unprotected,
+                    origin: None,
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 2: Valid passkey with origin (happy case)
+        (
+            "valid passkey with origin",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("passkey_pubkey"),
+                        alias: "My Passkey".to_string(),
+                        credential_id: Some(ByteBuf::from("credential_id_123")),
+                        aaguid: Some([1u8; 16]),
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::Platform,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 2,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("passkey_pubkey"),
+                    alias: "My Passkey".to_string(),
+                    credential_id: Some(ByteBuf::from("credential_id_123")),
+                    aaguid: Some([1u8; 16]),
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::CrossPlatform,
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 3: Valid passkey without origin (special case)
+        (
+            "passkey without origin",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("passkey_no_origin"),
+                        alias: "Passkey No Origin".to_string(),
+                        credential_id: Some(ByteBuf::from("cred_id_no_origin")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::CrossPlatform,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 3,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("passkey_no_origin"),
+                    alias: "Passkey No Origin".to_string(),
+                    credential_id: Some(ByteBuf::from("cred_id_no_origin")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::CrossPlatform,
+                    protection: DeviceProtection::Unprotected,
+                    origin: None,
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 4: Recovery passkey with origin (special case)
+        (
+            "recovery passkey with origin",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("recovery_passkey"),
+                        alias: "Recovery Passkey".to_string(),
+                        credential_id: Some(ByteBuf::from("recovery_cred_id")),
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::Platform,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 4,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("recovery_passkey"),
+                    alias: "Recovery Passkey".to_string(),
+                    credential_id: Some(ByteBuf::from("recovery_cred_id")),
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::Platform,
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 5: Recovery passkey without origin (special case)
+        (
+            "recovery passkey without origin",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("recovery_passkey_no_origin"),
+                        alias: "Recovery Passkey No Origin".to_string(),
+                        credential_id: Some(ByteBuf::from("recovery_cred_id_no_origin")),
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::Unknown,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 5,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("recovery_passkey_no_origin"),
+                    alias: "Recovery Passkey No Origin".to_string(),
+                    credential_id: Some(ByteBuf::from("recovery_cred_id_no_origin")),
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::Unknown,
+                    protection: DeviceProtection::Unprotected,
+                    origin: None,
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 6: Legacy pin-flow with BrowserStorageKey and Authentication purpose (special case)
+        (
+            "legacy pin-flow authentication",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("browser_storage_key_auth"),
+                        alias: "Browser Storage".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::BrowserStorageKey,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 6,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("browser_storage_key_auth"),
+                    alias: "Browser Storage".to_string(),
+                    credential_id: None,
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::BrowserStorageKey,
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 7: Legacy pin-flow with BrowserStorageKey and Recovery purpose (special case)
+        (
+            "legacy pin-flow recovery",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("browser_storage_key_recovery"),
+                        alias: "Browser Storage Recovery".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::BrowserStorageKey,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 7,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("browser_storage_key_recovery"),
+                    alias: "Browser Storage Recovery".to_string(),
+                    credential_id: None,
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::BrowserStorageKey,
+                    protection: DeviceProtection::Unprotected,
+                    origin: None,
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 8: Multiple devices of different types
+        (
+            "mixed device types",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("passkey1"),
+                        alias: "Passkey 1".to_string(),
+                        credential_id: Some(ByteBuf::from("cred1")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::CrossPlatform,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("recovery_phrase"),
+                        alias: "Recovery Key".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::SeedPhrase,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now + 10),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 8,
+                devices: vec![
+                    Device {
+                        pubkey: ByteBuf::from("passkey1"),
+                        alias: "Passkey 1".to_string(),
+                        credential_id: Some(ByteBuf::from("cred1")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::CrossPlatform,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    },
+                    Device {
+                        pubkey: ByteBuf::from("recovery_phrase"),
+                        alias: "Recovery Key".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::SeedPhrase,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now + 10),
+                        metadata: None,
+                    },
+                ],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 9: Anchor with OpenID credentials
+        (
+            "anchor with openid credentials",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor.add_openid_credential(openid_credential(1)).unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 9,
+                devices: vec![],
+                openid_credentials: vec![openid_credential(1)],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 10: Anchor with name
+        (
+            "anchor with name",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor.set_name(Some("My Test Anchor".to_string())).unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 10,
+                devices: vec![],
+                openid_credentials: vec![],
+                metadata: None,
+                name: Some("My Test Anchor".to_string()),
+                created_at: Some(now),
+            },
+        ),
+        // Test case 11: Passkey with KeyType::Unknown (should be handled correctly)
+        (
+            "passkey with unknown key type",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("unknown_keytype_passkey"),
+                        alias: "Unknown KeyType".to_string(),
+                        credential_id: Some(ByteBuf::from("unknown_cred")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::Unknown,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 11,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("unknown_keytype_passkey"),
+                    alias: "Unknown KeyType".to_string(),
+                    credential_id: Some(ByteBuf::from("unknown_cred")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::CrossPlatform,
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 12: Device metadata is not preserved
+        (
+            "device metadata not preserved",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                let mut device_metadata = HashMap::new();
+                device_metadata.insert(
+                    "custom_field".to_string(),
+                    internet_identity_interface::internet_identity::types::MetadataEntry::String(
+                        "custom_value".to_string(),
+                    ),
+                );
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("device_with_metadata"),
+                        alias: "Device With Metadata".to_string(),
+                        credential_id: Some(ByteBuf::from("cred_with_metadata")),
+                        aaguid: None,
+                        purpose: Purpose::Authentication,
+                        key_type: KeyType::Platform,
+                        protection: DeviceProtection::Unprotected,
+                        origin: Some("https://identity.ic0.app".to_string()),
+                        last_usage_timestamp: Some(now),
+                        metadata: Some(device_metadata),
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 12,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("device_with_metadata"),
+                    alias: "Device With Metadata".to_string(),
+                    credential_id: Some(ByteBuf::from("cred_with_metadata")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::CrossPlatform,
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None, // Metadata not preserved in stable memory
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 13: Identity metadata is not preserved
+        (
+            "identity metadata not preserved",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                let mut identity_metadata = HashMap::new();
+                identity_metadata.insert(
+                    "identity_field".to_string(),
+                    internet_identity_interface::internet_identity::types::MetadataEntry::String(
+                        "identity_value".to_string(),
+                    ),
+                );
+                anchor.replace_identity_metadata(identity_metadata).unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 13,
+                devices: vec![],
+                openid_credentials: vec![],
+                metadata: None, // Identity metadata not preserved in stable memory
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 14: Device protection is preserved for recovery phrases.
+        (
+            "device protection preserved for recovery phrase",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("protected_recovery_key"),
+                        alias: "Recovery Key".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::SeedPhrase,
+                        protection: DeviceProtection::Protected,
+                        origin: None,
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 14,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("protected_recovery_key"),
+                    alias: "Recovery Key".to_string(),
+                    credential_id: None,
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::SeedPhrase,
+                    protection: DeviceProtection::Protected, // Protection is preserved
+                    origin: None,
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 15: Device protection is preserved for passkeys.
+        (
+            "device protection defaults to unprotected for passkeys",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor.devices = vec![Device {
+                    pubkey: ByteBuf::from("protected_passkey"),
+                    alias: "Protected Passkey".to_string(),
+                    credential_id: Some(ByteBuf::from("protected_cred")),
+                    aaguid: None,
+                    // To make this test more realistic, we opt for (legacy) recovery passkeys.
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::CrossPlatform,
+                    protection: DeviceProtection::Protected,
+                    origin: Some("https://id.ai".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }];
+                anchor
+            },
+            Anchor {
+                anchor_number: 15,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("protected_passkey"),
+                    alias: "Protected Passkey".to_string(),
+                    credential_id: Some(ByteBuf::from("protected_cred")),
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::CrossPlatform,
+                    protection: DeviceProtection::Unprotected, // Protection is NOT preserved
+                    origin: Some("https://id.ai".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 16: Fallthrough case - unusual combination that doesn't match other patterns
+        (
+            "fallthrough case - recovery with browser storage key and origin",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor.devices = vec![Device {
+                    pubkey: ByteBuf::from("unusual_device"),
+                    alias: "Unusual Device".to_string(),
+                    credential_id: Some(ByteBuf::from("unusual_cred")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::SeedPhrase, // Unusual: SeedPhrase with credential_id
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }];
+                anchor
+            },
+            Anchor {
+                anchor_number: 16,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("unusual_device"),
+                    alias: "Unusual Device".to_string(),
+                    credential_id: Some(ByteBuf::from("unusual_cred")),
+                    aaguid: None,
+                    purpose: Purpose::Authentication,
+                    key_type: KeyType::SeedPhrase,
+                    protection: DeviceProtection::Unprotected,
+                    origin: Some("https://identity.ic0.app".to_string()),
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+        // Test case 17: Recovery phrase alias defaults to "Recovery Key"
+        (
+            "recovery phrase alias defaults to 'Recovery Key'",
+            {
+                let mut anchor = storage.allocate_anchor(now).unwrap();
+                anchor
+                    .add_device(Device {
+                        pubkey: ByteBuf::from("recovery_phrase_custom_alias"),
+                        alias: "My Custom Recovery Alias".to_string(),
+                        credential_id: None,
+                        aaguid: None,
+                        purpose: Purpose::Recovery,
+                        key_type: KeyType::SeedPhrase,
+                        protection: DeviceProtection::Unprotected,
+                        origin: None,
+                        last_usage_timestamp: Some(now),
+                        metadata: None,
+                    })
+                    .unwrap();
+                anchor
+            },
+            Anchor {
+                anchor_number: 17,
+                devices: vec![Device {
+                    pubkey: ByteBuf::from("recovery_phrase_custom_alias"),
+                    alias: "Recovery Key".to_string(), // Alias defaults to "Recovery Key"
+                    credential_id: None,
+                    aaguid: None,
+                    purpose: Purpose::Recovery,
+                    key_type: KeyType::SeedPhrase,
+                    protection: DeviceProtection::Unprotected,
+                    origin: None,
+                    last_usage_timestamp: Some(now),
+                    metadata: None,
+                }],
+                openid_credentials: vec![],
+                metadata: None,
+                name: None,
+                created_at: Some(now),
+            },
+        ),
+    ];
 
     for (label, anchor, expected_anchor) in test_cases {
         let anchor_number = anchor.anchor_number();
