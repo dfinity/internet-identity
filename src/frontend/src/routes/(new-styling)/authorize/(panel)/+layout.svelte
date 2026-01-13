@@ -12,9 +12,9 @@
   import { Trans } from "$lib/components/locale";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { handleError } from "$lib/components/utils/error";
-  import { toaster } from "$lib/components/utils/toaster";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { GUIDED_UPGRADE } from "$lib/state/featureFlags";
+  import { goto } from "$app/navigation";
 
   const { children }: LayoutProps = $props();
 
@@ -34,14 +34,11 @@
     ),
   );
 
-  const onUpgrade = (identityNumber: bigint) => {
+  const onUpgrade = async (identityNumber: bigint) => {
     lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    toaster.success({
-      title: $t`Upgrade completed successfully`,
-      duration: 4000,
-    });
     isUpgrading = false;
     isUpgradeCollapsed = true;
+    await goto("/authorize/upgrade-success");
   };
 
   $effect(() => {
