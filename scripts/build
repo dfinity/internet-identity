@@ -165,11 +165,53 @@ function build_canister() {
           release="${version_parts[1]}"
           if [ -n "$release" ]
           then
-              asset_name="internet_identity_dev.wasm.gz"
+              asset_name="internet_identity_production.wasm.gz"
               wasm_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name"
               wasm_hash_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name.sha256"
-              # init_arg that disables the captcha, appropriate for the dev build
-              init_arg="(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})"
+
+              init_arg=$(cat <<'EOF'
+                (opt record {
+                    captcha_config = opt record {
+                        max_unsolved_captchas = 50:nat64;
+                        captcha_trigger = variant {
+                            Static = variant { CaptchaDisabled }
+                        }
+                    };
+                    openid_configs = opt vec {
+                        record {
+                            name = "Google";
+                            logo = "<svg viewBox=\"0 0 24 24\"><clipPath id=\"__google-logo-path\"><path d=\"M12 10v4.5h6.47c-.5 2.7-3 4.74-6.47 4.74-3.9 0-7.1-3.3-7.1-7.25S8.1 4.75 12 4.75c1.8 0 3.35.6 4.6 1.8l3.4-3.4C18 1.2 15.24 0 12 0 5.4 0 0 5.4 0 12s5.4 12 12 12c7 0 11.5-4.9 11.5-11.7 0-.8-.1-1.54-.2-2.3H12z\"></path></clipPath><g style=\"clip-path:url(#__google-logo-path); transform: scale(0.75); transform-origin: center center;\"><foreignObject height=\"28\" transform=\"translate(-2,-2)\" width=\"28\"><div style=\"width:100%;height:100%;background:conic-gradient(#FF4641,#FD5061 40deg,#FD5061 60deg,#3186FF 85deg,#3186FF 117deg,#00A5B7 142deg,#0EBC5F 167deg,#0EBC5F 200deg,#6CC500 226deg,#FFCC00 253deg,#FFD314 268deg,#FFCC00 292deg,#FF4641 327deg)\"></div></foreignObject><rect fill=\"#3186FF\" height=\"8\" width=\"16\" x=\"11\" y=\"8\"></rect></g></svg>";
+                            issuer = "https://accounts.google.com";
+                            client_id = "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com";
+                            jwks_uri = "https://www.googleapis.com/oauth2/v3/certs";
+                            auth_uri = "https://accounts.google.com/o/oauth2/v2/auth";
+                            auth_scope = vec { "openid"; "profile"; "email" };
+                            fedcm_uri = opt "";
+                        };
+                        record {
+                            name = "Apple";
+                            logo = "<svg viewBox=\"0 0 24 24\"><path d=\"M14.8 3.2c1-1.2 1.2-2.7 1-3.2-1 0-2.2.7-2.9 1.5-.9 1.2-1.1 2.6-.9 3 .6.2 2-.3 2.8-1.3ZM9.2 20c1.2 0 1.6-.8 3.2-.8 1.5 0 1.8.8 3.1.8s2.3-1.2 3-2.5c1-1.4 1.3-2.8 1.4-2.8 0 0-2.6-1.2-2.6-4.1 0-2.5 2-3.7 2.1-3.8a4.5 4.5 0 0 0-3.9-2c-1.4 0-2.6.8-3.4.8-.8 0-1.9-.8-3.2-.8-2.3 0-4.8 2-4.8 6 0 2.3 1 4.8 2 6.5 1 1.5 1.9 2.7 3 2.7Z\" style=\"fill: currentColor;\"></path></svg>";
+                            issuer = "https://appleid.apple.com";
+                            client_id = "ai.id.beta.auth";
+                            jwks_uri = "https://appleid.apple.com/auth/keys";
+                            auth_uri = "https://appleid.apple.com/auth/authorize";
+                            auth_scope = vec { "openid" };
+                            fedcm_uri = opt "";
+                        };
+                        record {
+                            name = "Microsoft";
+                            logo = "<svg viewBox=\"0 0 24 24\"><path fill=\"#f25124\" d=\"M2.5 2.5h9v9h-9z\"/><path fill=\"#7eba02\" d=\"M12.5 2.5h9v9h-9z\"/><path fill=\"#01a3ee\" d=\"M2.5 12.5h9v9h-9z\"/><path fill=\"#feba01\" d=\"M12.5 12.5h9v9h-9z\"/></svg>";
+                            issuer = "https://login.microsoftonline.com/{tid}/v2.0";
+                            client_id = "d948c073-eebd-4ab8-861d-055f7ab49e17";
+                            jwks_uri = "https://login.microsoftonline.com/common/discovery/v2.0/keys";
+                            auth_uri = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
+                            auth_scope = vec { "openid"; "profile"; "email" };
+                            fedcm_uri = opt "";
+                        };
+                    }
+                })
+                EOF
+              )
               init_guide="Use '(null)' for sensible defaults. See the candid interface for more details."
               metadata_json=$(echo '{}' | jq -cMr \
                   --arg wasm_url "$wasm_url" \
