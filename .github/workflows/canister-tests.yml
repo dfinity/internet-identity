@@ -954,8 +954,8 @@ jobs:
       - name: Create sha for dfx pull
         run: |
           shasum -a 256 \
-            ./internet_identity_dev.wasm.gz > \
-            ./internet_identity_dev.wasm.gz.sha256
+            ./internet_identity_production.wasm.gz > \
+            ./internet_identity_production.wasm.gz.sha256
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/release-')
@@ -965,8 +965,8 @@ jobs:
             --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
             -- \
             internet_identity_production.wasm.gz \
+            internet_identity_production.wasm.gz.sha256 \
             internet_identity_dev.wasm.gz \
-            internet_identity_dev.wasm.gz.sha256 \
             internet_identity_test.wasm.gz \
             src/internet_identity/internet_identity.did \
             archive.wasm.gz \
