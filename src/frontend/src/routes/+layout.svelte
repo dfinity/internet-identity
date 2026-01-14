@@ -45,6 +45,7 @@
     </style>
     <script>
       if (
+        // TODO: Remove this branch once we move legacy domains to new interface
         window.location.hostname.startsWith("identity.") ||
         window.location.hostname.startsWith("beta.identity.")
       ) {
