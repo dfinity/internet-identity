@@ -2,7 +2,7 @@ import { browser } from "@wdio/globals";
 
 describe("authentication", () => {
   it("works without webauthn", async () => {
-    await browser.url("/");
+    await browser.url("/?feature_flag_discoverable_passkey_flow=false");
 
     await browser.$("h1").waitForExist();
 
