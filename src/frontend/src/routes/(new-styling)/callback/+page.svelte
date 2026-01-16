@@ -78,8 +78,7 @@
               )
               .then(throwCanisterError);
 
-            console.log("window.opener = ", window.opener);
-
+            // This is just for a demo, don't use this in production!!!
             window.opener.postMessage(
               {
                 jsonrpc: "2.0",
@@ -88,7 +87,7 @@
                   email: metadata.email,
                 },
               },
-              "http://localhost:8081",
+              "*",
             );
 
             await authorizationStore.authorize(account.account_number[0]);
