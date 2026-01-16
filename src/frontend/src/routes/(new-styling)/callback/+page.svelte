@@ -91,7 +91,7 @@
               "http://localhost:8081",
             );
 
-            // await authorizationStore.authorize(account.account_number[0]);
+            await authorizationStore.authorize(account.account_number[0]);
           } catch (error) {
             handleError(error);
           }
