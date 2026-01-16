@@ -77,7 +77,21 @@
                 context.effectiveOrigin,
               )
               .then(throwCanisterError);
-            await authorizationStore.authorize(account.account_number[0]);
+
+            console.log("window.opener = ", window.opener);
+
+            window.opener.postMessage(
+              {
+                jsonrpc: "2.0",
+                id: 123,
+                result: {
+                  email: metadata.email,
+                },
+              },
+              "http://localhost:8081",
+            );
+
+            // await authorizationStore.authorize(account.account_number[0]);
           } catch (error) {
             handleError(error);
           }
