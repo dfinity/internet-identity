@@ -80,7 +80,7 @@
     "47ab2fb4-66ac-4184-9ae1-86be814012d5", // YubiKey latest firmware (5.7)
     "ed042a3a-4b22-4455-bb69-a267b652ae7e", // YubiKey latest firmware (5.7)
   ];
-  const verifiedUnsupportedProviders = {
+  const verifiedUnsupportedProviders: Record<string, string> = {
     "cb69481e-8ff7-4039-93ec-0a2729a154a8": $t`This YubiKey has older firmware (5.1) that's incompatible.`,
     "fa2b99dc-9e39-4257-8f92-4a30d23c4118": $t`This YubiKey has older firmware (5.1) that's incompatible.`,
     "f8a011f3-8c0a-4d15-8006-17111f9edc7d": $t`This YubiKey has older firmware (5.1) that's incompatible.`,
@@ -92,7 +92,7 @@
     "1d8cac46-47a1-3386-af50-e88ae46fe802": $t`Ledger has been confirmed to be incompatible.`,
     "fcb1bcb4-f370-078c-6993-bc24d0ae3fbe": $t`Ledger has been confirmed to be incompatible.`,
   };
-  const possiblyUnsupportedProviders = {
+  const possiblyUnsupportedProviders: Record<string, string> = {
     "b92c3f9a-c014-4056-887f-140a2501163b": $t`This YubiKey has older firmware (5.2) that might be incompatible.`,
     "ee882879-721c-4913-9775-3dfcce97072a": $t`This YubiKey has older firmware (5.2 - 5.4) that might be incompatible.`,
     "2fc0579f-8113-47ea-b116-bb5a8db9202a": $t`This YubiKey has older firmware (5.2 - 5.4) that might be incompatible.`,
@@ -119,12 +119,12 @@
     devices.some(
       (device) =>
         device.credential_id[0] !== undefined &&
-        device.origin[0].endsWith("id.ai"),
+        device.origin[0]?.endsWith("id.ai"),
     );
   const lookupByPasskey = async () => {
     const identityResult = await new Promise<IdentityResult>(
       async (resolve) => {
-        let identityNumber: bigint;
+        let identityNumber = BigInt(-1);
         const passkeyIdentity = await DiscoverablePasskeyIdentity.useExisting({
           getPublicKey: (result) =>
             new Promise(async (resolve) => {
@@ -250,7 +250,11 @@
           })
           .map((entry) => {
             const [identityNumber, { lastUsedTimestamp }] = entry;
-            return { identityNumber, lastUsed: lastUsedTimestamp };
+            return {
+              identityNumber,
+              name: undefined,
+              lastUsed: lastUsedTimestamp,
+            };
           }),
         // Add entries from new storage
         ...Object.entries($lastUsedIdentitiesStore.identities)
@@ -385,7 +389,7 @@
         <div class="text-text-tertiary text-sm text-balance">
           <Trans>Try the lookup and checkout the other domains:</Trans>
           <ul class="mt-1 flex flex-col gap-0.5">
-            {#each canisterConfig.related_origins[0].filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
+            {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
               <li>
                 <a
                   href={relatedOrigin + "/debug"}
@@ -429,13 +433,15 @@
             >
               <div class="flex flex-row items-center">
                 <div class="text-text-primary text-base font-medium">
-                  {provider.name}
+                  {provider?.name ?? $t`Unknown`}
                 </div>
                 <Badge
                   size="lg"
                   class="ms-auto !flex flex-row items-center gap-1"
                 >
-                  {#if verifiedSupportedProviders.includes(testResult.aaguid)}
+                  {#if testResult.aaguid === undefined}
+                    <span>{$t`Unknown`}</span>
+                  {:else if verifiedSupportedProviders.includes(testResult.aaguid)}
                     <CheckIcon class="text-text-success-primary size-5" />
                     <span class="text-text-success-primary">
                       {$t`Supported`}
@@ -456,11 +462,13 @@
                 </Badge>
               </div>
               <div class="text-text-tertiary mb-4 text-sm">
-                {testResult.aaguid}
+                {testResult.aaguid ?? $t`Unknown`}
               </div>
               <div class="flex flex-row items-end">
                 <div class="text-text-primary text-xs">
-                  {#if testResult.aaguid in verifiedUnsupportedProviders}
+                  {#if testResult.aaguid === undefined}
+                    {$t`The passkey could not be identified, support unknown.`}
+                  {:else if testResult.aaguid in verifiedUnsupportedProviders}
                     {verifiedUnsupportedProviders[testResult.aaguid]}
                   {:else if testResult.aaguid in possiblyUnsupportedProviders}
                     {possiblyUnsupportedProviders[testResult.aaguid]}
