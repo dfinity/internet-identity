@@ -112,11 +112,11 @@
   let testResults = $state<TestResult[]>([]);
   let highlightIdentity = $state<bigint>();
 
-  const hasUpgradedPasskey = (devices: DeviceData[]) =>
+  const missingUpgradedPasskey = (devices: DeviceData[]) =>
     // Has at least one passkey (else likely OpenID sign-in identity)
     devices.some((device) => device.credential_id[0] !== undefined) &&
-    // Has at least one passkey with the upgraded origin
-    devices.some(
+    // Has no passkeys with the upgraded origin
+    !devices.some(
       (device) =>
         device.credential_id[0] !== undefined &&
         device.origin[0]?.endsWith("id.ai"),
@@ -162,7 +162,7 @@
         })(identityNumber);
         resolve({
           identityNumber,
-          legacy: !hasUpgradedPasskey(info.devices),
+          legacy: missingUpgradedPasskey(info.devices),
           devices: info.devices,
           name: info.name[0],
           lastUsed: Math.max(
@@ -272,7 +272,7 @@
           identities.map(async ({ identityNumber: key, name, lastUsed }) => {
             const identityNumber = BigInt(key);
             const devices = await anonymousActor.lookup(identityNumber);
-            const legacy = !hasUpgradedPasskey(devices);
+            const legacy = missingUpgradedPasskey(devices);
             return { identityNumber, legacy, name, lastUsed, devices };
           }),
         ),
