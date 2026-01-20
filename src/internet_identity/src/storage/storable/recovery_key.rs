@@ -1,4 +1,4 @@
-use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
+use crate::storage::storable::special_device_migration::{SpecialDeviceMigration, StorablePurpose};
 use minicbor::{Decode, Encode};
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

@@ -818,6 +818,7 @@ mod storable_origin_sha256_tests {
 mod sync_anchor_with_recovery_phrase_principal_index_tests {
     use super::*;
     use crate::storage::anchor::Device;
+    use crate::storage::storable::recovery_key::StorableRecoveryKey;
     use candid::Principal;
     use internet_identity_interface::internet_identity::types::{KeyType, PublicKey};
     use pretty_assertions::assert_eq;
@@ -845,24 +846,34 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         Device {
             pubkey,
             alias: "other".to_string(),
-            credential_id: None,
+            credential_id: Some(ByteBuf::from(vec![1, 2, 3])),
             aaguid: None,
             purpose: Purpose::Authentication,
             key_type: KeyType::Unknown,
             protection: DeviceProtection::Unprotected,
-            origin: None,
-            metadata: None,
+            origin: Some("https://id.ai".to_string()),
             last_usage_timestamp: None,
+            metadata: None,
+        }
+    }
+
+    fn device_to_recovery_key(device: &Device) -> StorableRecoveryKey {
+        StorableRecoveryKey {
+            pubkey: device.pubkey.clone().into_vec(),
+            created_at_ns: None,
+            last_usage_timestamp_ns: device.last_usage_timestamp,
+            is_protected: Some(device.protection == DeviceProtection::Protected),
+            special_device_migration: None,
         }
     }
 
     fn pre_populate_index<M: Memory + Clone>(
         storage: &mut Storage<M>,
         anchor_number: u64,
-        devices: &[Device],
+        recovery_keys: &[StorableRecoveryKey],
     ) {
-        for d in devices {
-            let principal = Principal::self_authenticating(&d.pubkey);
+        for recovery_key in recovery_keys {
+            let principal = Principal::self_authenticating(&recovery_key.pubkey);
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
                 .insert(principal, anchor_number);
@@ -874,7 +885,13 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
         let anchor_number = 1;
         let prev = vec![];
-        let curr = vec![seed_phrase_device(pubkey(42)), other_device(pubkey(99))];
+        let curr_devices = vec![seed_phrase_device(pubkey(42)), other_device(pubkey(99))];
+        // Only convert seed phrase devices to recovery keys
+        let curr: Vec<StorableRecoveryKey> = curr_devices
+            .iter()
+            .filter(|d| d.key_type == KeyType::SeedPhrase)
+            .map(device_to_recovery_key)
+            .collect();
 
         storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number, &prev, &curr);
 
@@ -897,7 +914,12 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         // Bonus: What if the same recovery phrase is used again by another user?
         let another_anchor_number = 2;
         let prev = vec![];
-        let curr = vec![seed_phrase_device(pubkey(42))];
+        let curr_devices = vec![seed_phrase_device(pubkey(42))];
+        let curr: Vec<StorableRecoveryKey> = curr_devices
+            .iter()
+            .filter(|d| d.key_type == KeyType::SeedPhrase)
+            .map(device_to_recovery_key)
+            .collect();
 
         storage.sync_anchor_with_recovery_phrase_principal_index(
             another_anchor_number,
@@ -918,8 +940,12 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
     fn removes_old_seed_phrase_principals() {
         let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
         let anchor_number = 2;
-        let prev = vec![seed_phrase_device(pubkey(1)), seed_phrase_device(pubkey(2))];
-        let curr = vec![seed_phrase_device(pubkey(2))];
+        let prev_devices = vec![seed_phrase_device(pubkey(1)), seed_phrase_device(pubkey(2))];
+        let curr_devices = vec![seed_phrase_device(pubkey(2))];
+        let prev: Vec<StorableRecoveryKey> =
+            prev_devices.iter().map(device_to_recovery_key).collect();
+        let curr: Vec<StorableRecoveryKey> =
+            curr_devices.iter().map(device_to_recovery_key).collect();
 
         pre_populate_index(&mut storage, anchor_number, &prev);
 
@@ -945,8 +971,12 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
     fn no_change_if_same_devices() {
         let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
         let anchor_number = 3;
-        let prev = vec![seed_phrase_device(pubkey(7))];
-        let curr = vec![seed_phrase_device(pubkey(7))];
+        let prev_devices = vec![seed_phrase_device(pubkey(7))];
+        let curr_devices = vec![seed_phrase_device(pubkey(7))];
+        let prev: Vec<StorableRecoveryKey> =
+            prev_devices.iter().map(device_to_recovery_key).collect();
+        let curr: Vec<StorableRecoveryKey> =
+            curr_devices.iter().map(device_to_recovery_key).collect();
 
         pre_populate_index(&mut storage, anchor_number, &prev);
 
@@ -984,16 +1014,20 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
     fn adds_and_removes_seed_phrase_principals_in_single_call() {
         let mut storage = Storage::new((0, 10), ic_stable_structures::DefaultMemoryImpl::default());
         let anchor_number = 5;
-        let prev = vec![
+        let prev_devices = vec![
             seed_phrase_device(pubkey(1)),
             seed_phrase_device(pubkey(2)),
             seed_phrase_device(pubkey(3)),
         ];
-        let curr = vec![
+        let curr_devices = vec![
             seed_phrase_device(pubkey(2)),
             seed_phrase_device(pubkey(4)),
             seed_phrase_device(pubkey(5)),
         ];
+        let prev: Vec<StorableRecoveryKey> =
+            prev_devices.iter().map(device_to_recovery_key).collect();
+        let curr: Vec<StorableRecoveryKey> =
+            curr_devices.iter().map(device_to_recovery_key).collect();
 
         pre_populate_index(&mut storage, anchor_number, &prev);
 
@@ -1053,19 +1087,22 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         let device_unique_2 = seed_phrase_device(pubkey(2));
 
         // Pre-populate index for both anchors
-        pre_populate_index(
-            &mut storage,
-            anchor_number_1,
-            &[device_shared.clone(), device_unique_1.clone()],
-        );
-        pre_populate_index(
-            &mut storage,
-            anchor_number_2,
-            &[device_shared.clone(), device_unique_2.clone()],
-        );
+        let recovery_keys_1: Vec<StorableRecoveryKey> =
+            [device_shared.clone(), device_unique_1.clone()]
+                .iter()
+                .map(device_to_recovery_key)
+                .collect();
+        let recovery_keys_2: Vec<StorableRecoveryKey> =
+            [device_shared.clone(), device_unique_2.clone()]
+                .iter()
+                .map(device_to_recovery_key)
+                .collect();
+
+        pre_populate_index(&mut storage, anchor_number_1, &recovery_keys_1);
+        pre_populate_index(&mut storage, anchor_number_2, &recovery_keys_2);
 
         // Remove device_shared and device_unique_1 from anchor_number_1
-        let prev = vec![device_shared.clone(), device_unique_1.clone()];
+        let prev = recovery_keys_1;
         let curr = vec![]; // all removed for anchor_number_1
 
         storage.sync_anchor_with_recovery_phrase_principal_index(anchor_number_1, &prev, &curr);

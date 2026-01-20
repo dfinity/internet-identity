@@ -89,7 +89,7 @@ use ic_stable_structures::cell::ValueError;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::ops::RangeInclusive;
 use storable::account_reference_list::StorableAccountReferenceList;
 use storable::anchor_number_list::StorableAnchorNumberList;

@@ -65,12 +65,6 @@ const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
 
-/// Number of anchors to process in one batch during the recovery phrase migration.
-pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_SIZE: u64 = 2000;
-
-/// Batch dispatch frequency to minimize the chance of DoS.
-pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
 thread_local! {
     // TODO: Remove this state after the data migration is complete.
     pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = const { RefCell::new(0) };
