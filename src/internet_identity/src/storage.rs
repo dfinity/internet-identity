@@ -1735,10 +1735,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(record_number)
     }
 
-    fn record_address(&self, record_number: u32) -> u64 {
-        record_number as u64 * self.header.entry_size as u64
-    }
-
     pub fn write_persistent_state(&mut self, state: &PersistentState) {
         // The virtual memory is not limited in size, so for the expected size of the persistent state
         // this operation is infallible. The size of the persistent state is monitored and an alert

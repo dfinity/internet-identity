@@ -28,7 +28,7 @@ use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::time::Duration;
+
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
