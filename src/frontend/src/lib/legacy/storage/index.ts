@@ -192,7 +192,7 @@ export const setKnownPrincipal = async ({
 /** Accessing functions */
 
 // Simply read the storage without updating it
-const readStorage = (): Promise<Storage> => {
+export const readStorage = (): Promise<Storage> => {
   return updateStorage((storage) => {
     return { ret: storage, updated: false };
   });
