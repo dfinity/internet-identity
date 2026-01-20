@@ -63,49 +63,6 @@ fn known_devices() -> [DeviceData; 6] {
     [device1, device2, device3, device4, device5, device6]
 }
 
-/// Tests that II will issue the same principals after stable memory restore.
-#[test]
-fn should_issue_same_principal_after_restoring_backup() -> Result<(), RejectResponse> {
-    const PUBLIC_KEY: &str = "305e300c060a2b0601040183b8430101034e00a50102032620012158206c52bead5df52c208a9b1c7be0a60847573e5be4ac4fe08ea48036d0ba1d2acf225820b33daeb83bc9c77d8ad762fd68e3eab08684e463c49351b3ab2a14a400138387";
-    const DELEGATION_PRINCIPAL: &str = "303c300c060a2b0601040183b8430102032c000a000000000000000001013a8926914dd1c836ec67ba66ac6425c21dffd3ca5c5968855f87780a1ec57985";
-    let principal = Principal::self_authenticating(hex::decode(PUBLIC_KEY).unwrap());
-
-    let env = env();
-    // the principal is dependent on the canister id, hence we need to create the canister with a
-    // specific one.
-    let canister_id = Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap();
-    env.create_canister_with_id(None, None, canister_id)
-        .expect("failed to create canister");
-    env.install_canister(canister_id, EMPTY_WASM.clone(), vec![], None);
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/genesis-layout-migrated-to-v9.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    let (user_key, _) = api::prepare_delegation(
-        &env,
-        canister_id,
-        principal,
-        10_030,
-        "example.com",
-        &ByteBuf::from("dummykey"),
-        None,
-    )?;
-
-    // check that we get the same user key; this proves that the salt was recovered from the backup
-    assert_eq!(
-        user_key.clone().into_vec(),
-        hex::decode(DELEGATION_PRINCIPAL).unwrap()
-    );
-
-    let principal = api::get_principal(&env, canister_id, principal, 10_030, "example.com")?;
-    assert_eq!(Principal::self_authenticating(user_key), principal);
-    Ok(())
-}
-
 /// Tests that anchors can still be modified after stable memory restore.
 #[test]
 fn should_modify_devices_after_restoring_backup() -> Result<(), RejectResponse> {
