@@ -83,15 +83,14 @@ pub fn post_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operat
 
 /// Adds a device to the given anchor and returns the operation to be archived.
 /// Panics if this operation violates anchor constraints (see [Anchor]).
-pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Operation {
-    let new_device = Device::from(device_data);
-    anchor
-        .add_device(new_device.clone())
-        .unwrap_or_else(|err| trap(&format!("failed to add device: {err}")));
+pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Result<Operation, AnchorError> {
+    let device = Device::from(device_data);
 
-    Operation::AddDevice {
-        device: DeviceDataWithoutAlias::from(new_device),
-    }
+    anchor.add_device(device.clone())?;
+
+    let device = DeviceDataWithoutAlias::from(device);
+
+    Ok(Operation::AddDevice { device })
 }
 
 /// Updates a device of the given anchor and returns the operation to be archived.

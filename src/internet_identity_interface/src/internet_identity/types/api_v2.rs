@@ -103,6 +103,7 @@ pub enum IdentityRegisterError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodAddError {
     InvalidMetadata(String),
+    DeviceAddError(String),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

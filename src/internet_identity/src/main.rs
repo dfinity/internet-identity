@@ -206,7 +206,10 @@ fn verify_tentative_device(
             if let Some(confirmed_device) = maybe_confirmed_device {
                 // Add device to anchor with bookkeeping if it has been confirmed
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-                let operation = anchor_management::add_device(&mut anchor, confirmed_device);
+
+                let operation = anchor_management::add_device(&mut anchor, confirmed_device)
+                    .unwrap_or_else(|err| trap(&format!("failed to add device: {err}")));
+
                 if let Err(err) = state::storage_borrow_mut(|storage| storage.update(anchor)) {
                     trap(&format!("{err}"));
                 }
@@ -252,7 +255,11 @@ fn register(
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
+        Ok::<_, String>((
+            (),
+            anchor_management::add_device(anchor, device_data)
+                .unwrap_or_else(|err| trap(&format!("failed to add device: {err}"))),
+        ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
 }
@@ -929,9 +936,19 @@ mod v2_api {
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
     ) -> Result<(), AuthnMethodAddError> {
-        DeviceWithUsage::try_from(authn_method)
-            .map(|device| add(identity_number, DeviceData::from(device)))
-            .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))
+        let device = DeviceWithUsage::try_from(authn_method)
+            .map(|device| DeviceData::from(device))
+            .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))?;
+
+        anchor_operation_with_authz_check(identity_number, |anchor| {
+            let operation = anchor_management::add_device(anchor, device)
+                .map_err(|err| format!("failed to add device: {err}"))?;
+
+            Ok::<_, String>(((), operation))
+        })
+        .map_err(|err| AuthnMethodAddError::DeviceAddError(err))?;
+
+        Ok(())
     }
 
     #[update]
@@ -1075,7 +1092,13 @@ mod v2_api {
                 })?;
             // Add device to anchor with bookkeeping
             let mut anchor = state::anchor(identity_number);
-            let operation = anchor_management::add_device(&mut anchor, device_data.clone());
+
+            let operation = anchor_management::add_device(&mut anchor, device_data.clone())
+                .map_err(|err| {
+                    let msg = format!("failed to add device: {err}");
+                    AuthnMethodRegistrationModeExitError::InternalCanisterError(msg)
+                })?;
+
             state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
                 AuthnMethodRegistrationModeExitError::InternalCanisterError(err.to_string())
             })?;
@@ -1152,7 +1175,13 @@ mod v2_api {
         if let Some(confirmed_device) = maybe_confirmed_device {
             // Add device to anchor with bookkeeping if it has been confirmed
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-            let operation = anchor_management::add_device(&mut anchor, confirmed_device);
+
+            let operation =
+                anchor_management::add_device(&mut anchor, confirmed_device).map_err(|err| {
+                    let msg = format!("failed to add device: {err}");
+                    AuthnMethodConfirmationError::InternalCanisterError(msg)
+                })?;
+
             state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
                 AuthnMethodConfirmationError::InternalCanisterError(err.to_string())
             })?;
