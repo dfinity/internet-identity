@@ -203,9 +203,10 @@
     const date = Date.now();
     const json = JSON.stringify(
       {
+        origin: window.location.origin,
+        date,
         identities: identityResults,
         tests: testResults,
-        date,
       },
       (_, value) =>
         value instanceof Uint8Array
@@ -219,7 +220,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${date}-debug.json`;
+    a.download = `${window.location.hostname}-${date}-debug.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
