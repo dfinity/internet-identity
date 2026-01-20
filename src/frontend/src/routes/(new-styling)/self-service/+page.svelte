@@ -326,51 +326,57 @@
             >
               <div class="mb-1 flex flex-row items-center gap-2">
                 {#if identityResult.name !== undefined}
-                  <span class="text-text-primary text-base font-medium">
+                  <span
+                    class="text-text-primary overflow-hidden text-sm font-medium overflow-ellipsis whitespace-nowrap sm:text-base"
+                  >
                     {identityResult.name}
                   </span>
-                  <span class="text-text-tertiary text-base">
+                  <span class="text-text-tertiary me-4 text-sm sm:text-base">
                     {identityResult.identityNumber}
                   </span>
                 {:else}
-                  <span class="text-text-primary text-base font-medium">
+                  <span
+                    class="text-text-primary me-4 text-sm font-medium sm:text-base"
+                  >
                     {identityResult.identityNumber}
                   </span>
                 {/if}
                 {#if identityResult.legacy}
-                  <Badge size="lg" class="ms-auto">
+                  <Badge class="ms-auto whitespace-nowrap">
                     {$t`Not upgraded`}
                   </Badge>
                 {/if}
               </div>
-              <div class="flex flex-row items-center gap-2">
-                <div
-                  class="text-text-tertiary flex flex-row items-center gap-1 text-sm"
-                >
-                  <PasskeyIcon class="!size-4" />
-                  <span>
-                    {$plural(passkeys.length, {
-                      one: "# Passkey",
-                      other: "# Passkeys",
-                    })}
-                  </span>
-                </div>
-                <div
-                  class="text-text-tertiary flex flex-row items-center gap-1 text-sm"
-                >
-                  {#if isRecoveryPhraseSetUp}
-                    <CircleCheckIcon
-                      class="text-text-success-primary !size-4"
-                    />
+              <div class="flex flex-col gap-4 sm:flex-row">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div
+                    class="text-text-tertiary flex flex-row items-center gap-1 text-sm"
+                  >
+                    <PasskeyIcon class="!size-4" />
                     <span>
-                      {$t`Recovery phrase set`}
+                      {$plural(passkeys.length, {
+                        one: "# Passkey",
+                        other: "# Passkeys",
+                      })}
                     </span>
-                  {:else}
-                    <CircleXIcon class="!size-4" />
-                    <span>
-                      {$t`No recovery phrase`}
-                    </span>
-                  {/if}
+                  </div>
+                  <div
+                    class="text-text-tertiary flex flex-row items-center gap-1 text-sm"
+                  >
+                    {#if isRecoveryPhraseSetUp}
+                      <CircleCheckIcon
+                        class="text-text-success-primary !size-4"
+                      />
+                      <span>
+                        {$t`Recovery phrase set`}
+                      </span>
+                    {:else}
+                      <CircleXIcon class="!size-4" />
+                      <span>
+                        {$t`No recovery phrase`}
+                      </span>
+                    {/if}
+                  </div>
                 </div>
                 <div class="text-text-tertiary ms-auto text-sm">
                   {$formatRelative(new Date(identityResult.lastUsed), {
@@ -388,7 +394,7 @@
           {$t`Can't find your identity?`}
         </div>
         <div class="text-text-tertiary text-sm text-balance">
-          <Trans>Try the lookup and checkout the other domains:</Trans>
+          <Trans>Checkout the other domains:</Trans>
           <ul class="mt-1 flex flex-col gap-0.5">
             {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
               <li>
@@ -432,14 +438,11 @@
             <div
               class="border-border-secondary bg-bg-tertiary rounded-xl border p-4"
             >
-              <div class="flex flex-row items-center">
+              <div class="flex flex-row items-start">
                 <div class="text-text-primary text-base font-medium">
                   {provider?.name ?? $t`Unknown`}
                 </div>
-                <Badge
-                  size="lg"
-                  class="ms-auto !flex flex-row items-center gap-1"
-                >
+                <Badge class="ms-auto !flex flex-row items-center gap-1">
                   {#if testResult.aaguid === undefined}
                     <span>{$t`Unknown`}</span>
                   {:else if verifiedSupportedProviders.includes(testResult.aaguid)}
@@ -465,7 +468,7 @@
               <div class="text-text-tertiary mb-4 text-sm">
                 {testResult.aaguid ?? $t`Unknown`}
               </div>
-              <div class="flex flex-row items-end">
+              <div class="flex flex-col items-end gap-4 sm:flex-row">
                 <div class="text-text-primary text-xs">
                   {#if testResult.aaguid === undefined}
                     {$t`The passkey could not be identified, support unknown.`}
