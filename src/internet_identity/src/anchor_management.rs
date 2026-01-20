@@ -301,14 +301,14 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
             iss: openid_credential.iss.clone()
         })
     );
-    storage_borrow_mut(|storage| storage.update(anchor_0.clone()).unwrap());
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
 
     // Check if adding OpenID credential twice returns an error
     assert_eq!(
         add_openid_credential(&mut anchor_0, openid_credential.clone()),
         Err(AnchorError::OpenIdCredentialAlreadyRegistered)
     );
-    storage_borrow_mut(|storage| storage.update(anchor_0.clone()).unwrap());
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
 
     // Check if adding OpenID credential to another anchor returns an error
     assert_eq!(
@@ -323,7 +323,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
             iss: openid_credential.iss.clone()
         })
     );
-    storage_borrow_mut(|storage| storage.update(anchor_0.clone()).unwrap());
+    storage_borrow_mut(|storage| storage.write(anchor_0.clone()).unwrap());
     assert_eq!(
         add_openid_credential(&mut anchor_1, openid_credential.clone()),
         Ok(Operation::AddOpenIdCredential {

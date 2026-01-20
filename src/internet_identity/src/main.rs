@@ -197,7 +197,7 @@ fn verify_tentative_device(
                 // Add device to anchor with bookkeeping if it has been confirmed
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
-                if let Err(err) = state::storage_borrow_mut(|storage| storage.update(anchor)) {
+                if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
                     trap(&format!("{err}"));
                 }
                 anchor_management::post_operation_bookkeeping(anchor_number, operation);
@@ -1032,7 +1032,7 @@ mod v2_api {
             // Add device to anchor with bookkeeping
             let mut anchor = state::anchor(identity_number);
             let operation = anchor_management::add_device(&mut anchor, device_data.clone());
-            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+            state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
                 AuthnMethodRegistrationModeExitError::InternalCanisterError(err.to_string())
             })?;
             anchor_management::post_operation_bookkeeping(identity_number, operation);
@@ -1109,7 +1109,7 @@ mod v2_api {
             // Add device to anchor with bookkeeping if it has been confirmed
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
-            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+            state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
                 AuthnMethodConfirmationError::InternalCanisterError(err.to_string())
             })?;
             anchor_management::post_operation_bookkeeping(identity_number, operation);
@@ -1225,7 +1225,7 @@ mod openid_api {
         let mut anchor = state::anchor(anchor_number);
         update_openid_credential(&mut anchor, openid_credential.clone())
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
-        state::storage_borrow_mut(|storage| storage.update(anchor))
+        state::storage_borrow_mut(|storage| storage.write(anchor))
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
         let (user_key, expiration) = openid_credential

@@ -66,7 +66,7 @@ fn should_read_previous_write() {
     let anchor_number = anchor.anchor_number();
 
     anchor.add_device(sample_device()).unwrap();
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
 
     let read_anchor = storage.read(anchor_number).unwrap();
     assert_eq!(anchor, read_anchor);
@@ -80,7 +80,7 @@ fn should_not_write_using_anchor_number_outside_allocated_range() {
 
     let anchor = Anchor::new(222, 333);
 
-    let result = storage.update(anchor);
+    let result = storage.write(anchor);
     assert!(
         matches!(result, Err(StorageError::BadAnchorNumber(_))),
         "result = {:?}",
@@ -131,7 +131,7 @@ fn should_not_overwrite_persistent_state_with_next_anchor_v9() {
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
 
     let anchor = storage.allocate_anchor(0).unwrap();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     assert_eq!(storage.read_persistent_state(), sample_persistent_state());
 }
@@ -153,7 +153,7 @@ fn should_write_and_update_openid_credential_lookup() {
         .unwrap();
 
     // Check if both anchor and OpenID credential lookups are written to storage
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
     assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
     assert_eq!(
         storage
@@ -172,7 +172,7 @@ fn should_write_and_update_openid_credential_lookup() {
     anchor
         .remove_openid_credential(&openid_credential_0.key())
         .unwrap();
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
         None
@@ -188,7 +188,7 @@ fn should_write_and_update_openid_credential_lookup() {
     anchor
         .add_openid_credential(openid_credential_2.clone())
         .unwrap();
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_openid_credential(&openid_credential_0.key()),
         None
@@ -232,7 +232,7 @@ fn should_write_and_update_device_credential_lookup() {
     anchor.add_device(device_1.clone()).unwrap();
 
     // Check if both anchor and device credential lookups are written to storage
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
     assert_eq!(storage.read(anchor.anchor_number()).unwrap(), anchor);
     assert_eq!(
         storage
@@ -249,7 +249,7 @@ fn should_write_and_update_device_credential_lookup() {
 
     // Check if device credential lookup is cleaned up from storage when anchor is written
     anchor.remove_device(&device_0.pubkey).unwrap();
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
         None
@@ -263,7 +263,7 @@ fn should_write_and_update_device_credential_lookup() {
 
     // Check if device credential lookup is written to storage when anchor is written
     anchor.add_device(device_2.clone()).unwrap();
-    storage.update(anchor.clone()).unwrap();
+    storage.write(anchor.clone()).unwrap();
     assert_eq!(
         storage.lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap()),
         None
@@ -303,8 +303,8 @@ fn should_not_overwrite_device_credential_lookup() {
     anchor_1.add_device(device_1.clone()).unwrap();
 
     // Make sure that lookup of anchor_0 is not overwritten with anchor_1
-    storage.update(anchor_0.clone()).unwrap();
-    storage.update(anchor_1.clone()).unwrap();
+    storage.write(anchor_0.clone()).unwrap();
+    storage.write(anchor_1.clone()).unwrap();
     assert_eq!(
         storage
             .lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap())
@@ -313,7 +313,7 @@ fn should_not_overwrite_device_credential_lookup() {
     );
     // Make sure that lookup of anchor_0 is not remove by anchor_1
     anchor_1.remove_device(&device_1.pubkey).unwrap();
-    storage.update(anchor_1.clone()).unwrap();
+    storage.write(anchor_1.clone()).unwrap();
     assert_eq!(
         storage
             .lookup_anchor_with_device_credential(&device_0.credential_id.clone().unwrap())
@@ -331,7 +331,7 @@ fn should_set_account_last_used() {
     // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // Create an additional account for this anchor and origin
     let account = storage
@@ -407,7 +407,7 @@ fn should_set_account_last_used_for_synthethic_account() {
     // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // Set last_used for the synthetic account (account_number = None)
     let timestamp = 555555u64;
@@ -436,7 +436,7 @@ fn should_set_account_last_used_for_synthetic_account_with_reference() {
     // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // Create an additional account to force creation of account references
     storage
@@ -473,7 +473,7 @@ fn should_return_none_when_setting_last_used_for_nonexistent_account() {
     // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // Try to set last_used for a non-existent account number
     let nonexistent_account_number = 99999u64;
@@ -497,7 +497,7 @@ fn should_return_none_when_setting_last_used_for_nonexistent_origin() {
     // Create an anchor
     let anchor = storage.allocate_anchor(0).unwrap();
     let anchor_number = anchor.anchor_number();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // Try to set last_used for an origin that hasn't been registered
     let nonexistent_origin = "https://nonexistent.com".to_string();
@@ -1146,13 +1146,13 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         anchor_a.add_device(d2.clone()).unwrap();
 
         // Code under test (I)
-        storage.update(anchor_a.clone()).unwrap();
+        storage.write(anchor_a.clone()).unwrap();
 
         let mut anchor_b = storage.allocate_anchor(222).unwrap();
         anchor_b.add_device(d3.clone()).unwrap();
 
         // Code under test (II)
-        storage.update(anchor_b.clone()).unwrap();
+        storage.write(anchor_b.clone()).unwrap();
 
         let principal_d2 = Principal::self_authenticating(&d2.pubkey);
 
@@ -1169,7 +1169,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         anchor_a.remove_device(&d2.pubkey).unwrap();
 
         // Code under test (III)
-        storage.update(anchor_a).unwrap();
+        storage.write(anchor_a).unwrap();
 
         // No recovery devices are left in the index.
         assert_eq!(
@@ -1184,7 +1184,7 @@ mod sync_anchor_with_recovery_phrase_principal_index_tests {
         anchor_b.add_device(d2).unwrap();
 
         // Code under test (IV)
-        storage.update(anchor_b.clone()).unwrap();
+        storage.write(anchor_b.clone()).unwrap();
 
         // d2 should now be indexed for anchor_b only
         assert_eq!(
@@ -1975,7 +1975,7 @@ fn test_anchor_storage_migration_round_trip() {
 
     for (label, anchor, expected_anchor) in test_cases {
         let anchor_number = anchor.anchor_number();
-        storage.update(anchor).unwrap_or_else(|e| {
+        storage.write(anchor).unwrap_or_else(|e| {
             panic!("Test case '{}' failed during write: {:?}", label, e);
         });
         let observed_anchor = storage.read(anchor_number).unwrap_or_else(|e| {

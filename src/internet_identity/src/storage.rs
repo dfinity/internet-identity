@@ -600,7 +600,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         let result = f(&mut identity)?;
 
-        self.update(identity).map_err(E::from)?;
+        self.write(identity).map_err(E::from)?;
 
         // Important! Only increment num_anchors after the anchor creation succeeds.
         self.header.num_anchors = self.header.num_anchors.saturating_add(1);
@@ -616,10 +616,7 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// Therefore, this information is passed as an additional argument,
     /// this argument can be removed once `anchor_memory` is removed.
-    ///
-    /// *TODO*: remove `pub(crate)` after the `sync_anchor_indices` migration. Do **NOT**,
-    /// under _any_ circumstances, use this method directly. Use `create` or `update` instead.
-    pub(crate) fn update(&mut self, data: Anchor) -> Result<(), StorageError> {
+    pub(crate) fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
         let (_, storable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
 
@@ -680,10 +677,6 @@ impl<M: Memory + Clone> Storage<M> {
             storable_anchor.openid_credentials,
         );
 
-        // Sync device-based indices with the legacy source of truth (`StorableFixedAnchor`).
-        //
-        // Update `CredentialId` to `AnchorNumber` lookup map
-
         self.sync_anchor_with_recovery_phrase_principal_index(
             anchor_number,
             &previous_recovery_keys,
@@ -719,7 +712,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         let Some(storable_anchor) = storable_anchor else {
             ic_cdk::println!(
-                "Falling back to legacy read for anchor number {}",
+                "Anchor not found in stable_anchor_memory for anchor number {}",
                 anchor_number
             );
             return Err(StorageError::AnchorNotFound { anchor_number });

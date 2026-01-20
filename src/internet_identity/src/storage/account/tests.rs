@@ -107,7 +107,7 @@ fn should_list_accounts() {
 
     // 2. Save anchor to stable memory
     let anchor = storage.allocate_anchor(0).unwrap();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // 3. List accounts returns default account
     let listed_accounts = storage.list_accounts(anchor_number, &origin);
@@ -173,7 +173,7 @@ fn should_list_all_identity_accounts() {
 
     // 2. Save anchor to stable memory
     let anchor = storage.allocate_anchor(0).unwrap();
-    storage.update(anchor).unwrap();
+    storage.write(anchor).unwrap();
 
     // 3. List accounts returns default account
     let listed_accounts = storage.list_identity_account_references(anchor_number);
@@ -366,7 +366,7 @@ fn should_count_accounts_different_anchors() {
 
     // --- Anchor 1 ---
     let anchor_1 = storage.allocate_anchor(0).unwrap();
-    storage.update(anchor_1.clone()).unwrap();
+    storage.write(anchor_1.clone()).unwrap();
     let anchor_number_1 = anchor_1.anchor_number();
     let origin_1: FrontendHostname = "https://origin1.com".to_string();
     let account_name_1 = "account_anchor1".to_string();
@@ -430,7 +430,7 @@ fn should_count_accounts_different_anchors() {
 
     // --- Anchor 2 ---
     let anchor_2 = storage.allocate_anchor(0).unwrap();
-    storage.update(anchor_2.clone()).unwrap();
+    storage.write(anchor_2.clone()).unwrap();
     let anchor_number_2 = anchor_2.anchor_number();
     let origin_2: FrontendHostname = "https://origin2.com".to_string();
     let account_name_2 = "account_anchor2".to_string();

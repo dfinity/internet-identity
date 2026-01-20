@@ -1035,7 +1035,7 @@ fn check_anchor_invariants(
     identity_metadata: &Option<HashMap<String, MetadataEntry>>,
 ) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further
-    /// by only allowing 8 devices with purpose `authentication` to make sure there is always
+    /// by only allowing 16 devices with purpose `authentication` to make sure there is always
     /// a slot for the recovery devices.
     /// Note however, that a free device slot does not guarantee that it will fit the anchor
     /// due to the `VARIABLE_FIELDS_LIMIT`.
@@ -1046,8 +1046,8 @@ fn check_anchor_invariants(
     /// In order to not give away all the anchor space to the device vector and identity metadata,
     /// we limit the sum of the size of all variable fields of all devices plus the identity metadata.
     /// This ensures that we have the flexibility to expand or change anchors in the future.
-    /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
-    /// plus an additional 452 bytes to fit new fields introduced since.
+    /// The limit is chosen to accommodate pre-memory-migration anchors (limited to 2048 bytes)
+    /// while leaving additional room for new fields introduced since.
     const VARIABLE_FIELDS_LIMIT: usize = 5000;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
