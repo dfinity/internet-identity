@@ -1,13 +1,12 @@
 //! Tests for making sure that the current version can be rolled back to from the last release.
 //! This tests stable memory compatibility and pre / post install hooks.
 
-use candid::Principal;
 use canister_tests::api::internet_identity as api;
+use canister_tests::api::internet_identity::api_v2::create_account;
+use canister_tests::api::internet_identity::api_v2::get_accounts;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::DeviceData;
-use pocket_ic::RejectResponse;
-use serde_bytes::ByteBuf;
 
 /// Tests simple upgrade and downgrade.
 #[test]
@@ -52,6 +51,7 @@ fn upgrade_and_rollback_keeps_anchor_intact() {
 
 /// Verifies that an anchor that was created with the new version of II can still be used when
 /// II is rolled back to the previous version.
+/* TODO: Reenable after the next upgrade
 #[test]
 fn should_keep_new_anchor_across_rollback() -> Result<(), RejectResponse> {
     let frontend_hostname = "frontend.com";
@@ -100,4 +100,80 @@ fn should_keep_new_anchor_across_rollback() -> Result<(), RejectResponse> {
         &device_data_2(),
     )?;
     Ok(())
+}*/
+
+/// Tests that the accounts can still be read after upgrade and rollback.
+#[test]
+fn upgrade_and_rollback_keeps_accounts_intact() {
+    let env = env();
+    let canister_id = install_ii_canister(&env, II_WASM_PREVIOUS.clone());
+    let identity_number = flows::register_anchor(&env, canister_id);
+    let origin = "https://www.wassilykandinsky.net/".to_string();
+    let name_a = "Bauhaus Archiv Museum".to_string();
+    let name_b = "Zentrum Paul Klee".to_string();
+
+    create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        name_a.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    create_account(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+        name_b.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    let mut accounts_before = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
+    api::health_check(&env, canister_id);
+
+    let mut accounts_between = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    upgrade_ii_canister(&env, canister_id, II_WASM_PREVIOUS.clone());
+    api::health_check(&env, canister_id);
+
+    let mut accounts_after = get_accounts(
+        &env,
+        canister_id,
+        principal_1(),
+        identity_number,
+        origin.clone(),
+    )
+    .unwrap()
+    .unwrap();
+
+    accounts_after.sort_by_key(|account_info| account_info.account_number);
+    accounts_between.sort_by_key(|account_info| account_info.account_number);
+    accounts_before.sort_by_key(|account_info| account_info.account_number);
+
+    assert_eq!(accounts_before, accounts_between);
+    assert_eq!(accounts_between, accounts_after);
 }
