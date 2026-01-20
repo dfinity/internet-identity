@@ -937,7 +937,7 @@ mod v2_api {
         authn_method: AuthnMethodData,
     ) -> Result<(), AuthnMethodAddError> {
         let device = DeviceWithUsage::try_from(authn_method)
-            .map(|device| DeviceData::from(device))
+            .map(DeviceData::from)
             .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))?;
 
         anchor_operation_with_authz_check(identity_number, |anchor| {
@@ -946,7 +946,7 @@ mod v2_api {
 
             Ok::<_, String>(((), operation))
         })
-        .map_err(|err| AuthnMethodAddError::DeviceAddError(err))?;
+        .map_err(AuthnMethodAddError::DeviceAddError)?;
 
         Ok(())
     }
