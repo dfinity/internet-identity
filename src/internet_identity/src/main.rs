@@ -839,7 +839,7 @@ async fn random_salt() -> Salt {
 mod v2_api {
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
-        state::get_identity_number_by_registration_id,
+        state::get_identity_number_by_registration_id, storage::anchor::AnchorError,
     };
 
     use super::*;
@@ -941,12 +941,18 @@ mod v2_api {
             .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))?;
 
         anchor_operation_with_authz_check(identity_number, |anchor| {
-            let operation = anchor_management::add_device(anchor, device)
-                .map_err(|err| format!("failed to add device: {err}"))?;
-
-            Ok::<_, String>(((), operation))
-        })
-        .map_err(AuthnMethodAddError::DeviceAddError)?;
+            match anchor_management::add_device(anchor, device) {
+                Ok(operation) => Ok(((), operation)),
+                Err(AnchorError::TooManyDevices {
+                    limit,
+                    num_devices: _,
+                }) => Err(AuthnMethodAddError::AuthnMethodLimitReached { limit }),
+                Err(err) => {
+                    let msg = format!("failed to add device: {err}");
+                    Err(AuthnMethodAddError::InternalCanisterError(msg))
+                }
+            }
+        })?;
 
         Ok(())
     }

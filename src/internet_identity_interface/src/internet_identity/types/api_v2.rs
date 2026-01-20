@@ -103,7 +103,10 @@ pub enum IdentityRegisterError {
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub enum AuthnMethodAddError {
     InvalidMetadata(String),
-    DeviceAddError(String),
+    Unauthorized(Principal),
+    StorageError(IdentityNumber, String),
+    InternalCanisterError(String),
+    AuthnMethodLimitReached { limit: usize },
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

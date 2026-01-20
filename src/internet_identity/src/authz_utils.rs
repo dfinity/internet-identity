@@ -7,7 +7,7 @@ use candid::Principal;
 use ic_cdk::caller;
 use internet_identity_interface::archive::types::Operation;
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, AuthorizationKey, IdentityNumber,
+    AnchorNumber, AuthnMethodAddError, AuthorizationKey, IdentityNumber,
 };
 use std::fmt::{Display, Formatter};
 
@@ -55,6 +55,17 @@ impl Display for IdentityUpdateError {
 impl From<IdentityUpdateError> for String {
     fn from(err: IdentityUpdateError) -> Self {
         format!("{err}")
+    }
+}
+
+impl From<IdentityUpdateError> for AuthnMethodAddError {
+    fn from(value: IdentityUpdateError) -> Self {
+        match value {
+            IdentityUpdateError::Unauthorized(p) => Self::Unauthorized(p),
+            IdentityUpdateError::StorageError(identity_number, err) => {
+                Self::StorageError(identity_number, err.to_string())
+            }
+        }
     }
 }
 
