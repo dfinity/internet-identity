@@ -4,11 +4,9 @@ use crate::v2_api::authn_method_test_helpers::{
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
-use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
+use canister_tests::framework::{env, install_ii_with_archive};
 use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntryV2};
-use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
-use regex::Regex;
 use serde_bytes::ByteBuf;
 
 #[test]
@@ -50,12 +48,12 @@ fn should_require_authentication_to_add_authn_method() -> Result<(), RejectRespo
         Principal::anonymous(),
         identity_number,
         &authn_method,
-    );
+    )
+    .unwrap();
 
-    expect_user_error_with_message(
+    assert_eq!(
         result,
-        CanisterCalledTrap,
-        Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
+        Err(AuthnMethodAddError::Unauthorized(Principal::anonymous()))
     );
     Ok(())
 }
