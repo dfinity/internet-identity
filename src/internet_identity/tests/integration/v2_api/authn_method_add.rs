@@ -5,7 +5,7 @@ use crate::v2_api::authn_method_test_helpers::{
 use candid::Principal;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{env, expect_user_error_with_message, install_ii_with_archive};
-use internet_identity_interface::internet_identity::types::MetadataEntryV2;
+use internet_identity_interface::internet_identity::types::{AuthnMethodAddError, MetadataEntryV2};
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
 use regex::Regex;
@@ -74,16 +74,19 @@ fn should_report_error_on_failed_conversion() -> Result<(), RejectResponse> {
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method_1);
 
-    let error = api_v2::authn_method_add(
+    let result = api_v2::authn_method_add(
         &env,
         canister_id,
         principal,
         identity_number,
         &authn_method_2,
     )
-    .unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("failed to add device: Metadata key 'usage' is reserved and cannot be used."));
+    .unwrap();
+    assert_eq!(
+        result,
+        Err(AuthnMethodAddError::InvalidMetadata(
+            "Metadata key 'usage' is reserved and cannot be used.".to_string()
+        ))
+    );
     Ok(())
 }

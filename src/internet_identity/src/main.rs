@@ -947,6 +947,11 @@ mod v2_api {
                     limit,
                     num_devices: _,
                 }) => Err(AuthnMethodAddError::AuthnMethodLimitReached { limit }),
+                Err(AnchorError::ReservedMetadataKey { key }) => {
+                    Err(AuthnMethodAddError::InvalidMetadata(format!(
+                        "Metadata key '{key}' is reserved and cannot be used."
+                    )))
+                }
                 Err(err) => {
                     let msg = format!("failed to add device: {err}");
                     Err(AuthnMethodAddError::InternalCanisterError(msg))
