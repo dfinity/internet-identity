@@ -1017,8 +1017,18 @@ fn should_list_virtual_memory_metrics() -> Result<(), RejectResponse> {
     );
     assert_metric(
         &metrics,
-        "internet_identity_virtual_memory_size_pages{memory=\"identities\"}",
-        0f64,
+        "internet_identity_virtual_memory_size_pages{memory=\"stable_identities\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"stable_accounts\"}",
+        1f64,
+    );
+    assert_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"stable_applications\"}",
+        1f64,
     );
     assert_metric(
         &metrics,
@@ -1057,7 +1067,7 @@ fn should_list_virtual_memory_metrics() -> Result<(), RejectResponse> {
     );
     assert_metric(
         &metrics,
-        "internet_identity_virtual_memory_size_pages{memory=\"identities\"}",
+        "internet_identity_virtual_memory_size_pages{memory=\"stable_identities\"}",
         1f64,
     );
 
