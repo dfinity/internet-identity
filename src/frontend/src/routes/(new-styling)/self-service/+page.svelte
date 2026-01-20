@@ -394,7 +394,7 @@
           {$t`Can't find your identity?`}
         </div>
         <div class="text-text-tertiary text-sm text-balance">
-          <Trans>Checkout the other domains:</Trans>
+          <Trans>Check out the other domains:</Trans>
           <ul class="mt-1 flex flex-col gap-0.5">
             {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
               <li>
