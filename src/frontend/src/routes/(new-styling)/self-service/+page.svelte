@@ -188,7 +188,7 @@
   const testPasskeyCreation = async () => {
     try {
       const identity = await DiscoverablePasskeyIdentity.createNew(
-        `${window.location.hostname}/debug (Test Passkey – Safe to Delete)`,
+        `self-service (Test passkey – safe to delete)`,
       );
       const aaguid = await identity.getAaguid();
       testResults.push({
@@ -220,7 +220,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${window.location.hostname}-${date}-debug.json`;
+    a.download = `${window.location.hostname}-${date}-self-service.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -393,11 +393,11 @@
             {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
               <li>
                 <a
-                  href={relatedOrigin + "/debug"}
+                  href={relatedOrigin + "/self-service"}
                   target="_blank"
                   class="text-text-primary hover:underline"
                 >
-                  {relatedOrigin}/debug
+                  {relatedOrigin}/self-service
                 </a>
               </li>
             {/each}
