@@ -82,7 +82,7 @@ pub fn post_operation_bookkeeping(anchor_number: AnchorNumber, operation: Operat
 }
 
 /// Adds a device to the given anchor and returns the operation to be archived.
-/// Panics if this operation violates anchor constraints (see [Anchor]).
+/// Returns an error if this operation violates anchor constraints (see [Anchor]).
 pub fn add_device(anchor: &mut Anchor, device_data: DeviceData) -> Result<Operation, AnchorError> {
     let device = Device::from(device_data);
 
