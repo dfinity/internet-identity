@@ -201,7 +201,7 @@ fn should_respect_total_size_limit() -> Result<(), RejectResponse> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
-    for i in 0..3u8 {
+    for i in 0..8u8 {
         let mut device = large_size_device();
         device.pubkey = ByteBuf::from([i; 300]);
         api::add(&env, canister_id, principal_1(), user_number, &device)?;
