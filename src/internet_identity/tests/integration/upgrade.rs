@@ -5,8 +5,6 @@ use std::time::Duration;
 
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
-use canister_tests::api::internet_identity::api_v2::create_account;
-use canister_tests::api::internet_identity::api_v2::get_accounts;
 use canister_tests::flows;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;

@@ -5,9 +5,7 @@ use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
-use crate::{
-    ANCHOR_MIGRATION_SPECIAL_CASES, IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN,
-};
+use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
@@ -309,50 +307,6 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     (credential_id, special_device_migration)
                 }
             };
-
-            // Store special cases to aid observability (they will also be persisted in stable memory).
-            if let Some(special_device_migration) = &special_device_migration {
-                // To avoid storing too much data on the heap, we filter this down to only contain
-                // the most exotic cases.
-
-                let is_valid_passkey_but_without_an_origin = matches!(
-                    (&credential_id, purpose, key_type, origin, protection),
-                    (
-                        Some(_),
-                        Purpose::Authentication,
-                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
-                        None,
-                        DeviceProtection::Unprotected,
-                    )
-                );
-
-                let is_recovery_passkey = matches!(
-                    (&credential_id, purpose, key_type, protection),
-                    (
-                        Some(_),
-                        Purpose::Recovery,
-                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
-                        DeviceProtection::Unprotected,
-                    )
-                );
-
-                let is_legacy_pin_flow = matches!(
-                    (&credential_id, purpose, key_type),
-                    (None, Purpose::Authentication, KeyType::BrowserStorageKey)
-                );
-
-                if !is_valid_passkey_but_without_an_origin
-                    && !is_recovery_passkey
-                    && !is_legacy_pin_flow
-                {
-                    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow_mut(|cases| {
-                        cases
-                            .entry(anchor_number)
-                            .or_default()
-                            .push(special_device_migration.clone())
-                    })
-                }
-            }
 
             if let Some(credential_id) = credential_id {
                 let alias = if alias.is_empty() {

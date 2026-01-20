@@ -4,7 +4,6 @@ use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
-use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -26,8 +25,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
@@ -64,65 +62,6 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
-
-thread_local! {
-    // TODO: Remove this state after the data migration is complete.
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = const { RefCell::new(0) };
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
-    pub(crate) static ANCHOR_MIGRATION_SPECIAL_CASES: RefCell<BTreeMap<AnchorNumber, Vec<SpecialDeviceMigration>>> = const { RefCell::new(BTreeMap::new()) };
-}
-
-#[query(hidden = true)]
-fn get_anchor_migration_special_cases(anchor_number: AnchorNumber) -> Vec<SpecialDeviceMigration> {
-    ANCHOR_MIGRATION_SPECIAL_CASES
-        .with_borrow(|cases| cases.get(&anchor_number).cloned().unwrap_or_default())
-}
-
-#[query(hidden = true)]
-fn get_anchor_migration_special_cases_keys(lo: usize, hi: usize) -> Vec<AnchorNumber> {
-    use std::cmp::{max, min};
-
-    let anchor_numbers: Vec<_> =
-        ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect());
-
-    let lo = max(0, lo);
-    let hi = min(anchor_numbers.len(), hi);
-
-    let (lo, hi) = (min(lo, hi), max(lo, hi));
-
-    anchor_numbers[lo..hi].to_vec()
-}
-
-/// Temporary function to list migration errors.
-///
-/// Can be called to retrieve any errors that occurred during the recovery phrase migration.
-#[update(hidden = true)]
-fn list_recovery_phrase_migration_errors() -> Vec<String> {
-    RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
-}
-
-/// Temporary function to fetch the current migration batch id.
-///
-/// Can be called to retrieve the current batch id of the ongoing data recovery phrase migration.
-///
-/// The special value `u64::MAX` indicates that the migration is complete.
-#[query(hidden = true)]
-fn list_recovery_phrase_migration_current_batch_id() -> u64 {
-    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| *id)
-}
-
-/// Temporary function to count migrated recovery phrases.
-///
-/// Can be called to retrieve the number of recovery phrases indexed so far.
-#[query(hidden = true)]
-fn count_recovery_phrases() -> u64 {
-    state::storage_borrow(|storage| {
-        storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
-            .len()
-    })
-}
 
 #[update]
 async fn init_salt() {
