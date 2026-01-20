@@ -3,7 +3,7 @@ use internet_identity_interface::internet_identity::types::{KeyType, Purpose};
 use minicbor::{Decode, Encode};
 use serde_bytes::ByteBuf;
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType, Eq, PartialOrd, Ord)]
 pub enum StorablePurpose {
     #[n(0)]
     Recovery,
@@ -20,7 +20,7 @@ impl From<Purpose> for StorablePurpose {
     }
 }
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType, Eq, PartialOrd, Ord)]
 pub enum StorableKeyType {
     #[n(0)]
     Unknown,
@@ -49,7 +49,7 @@ impl From<KeyType> for StorableKeyType {
 /// Auxiliary data originating from the fields of `Device` during the anchor migration from bounded
 /// to unbounded storage. Useful for analyzing special cases, since clients were allowed to create
 /// inconsistent device data, e.g., `(Some(credential_id), Authentication, SeedPhrase)`.
-#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, CandidType, Eq, PartialOrd, Ord)]
 #[cbor(map)]
 pub struct SpecialDeviceMigration {
     #[n(0)]

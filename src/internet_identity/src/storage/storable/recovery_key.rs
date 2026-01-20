@@ -1,7 +1,7 @@
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use minicbor::{Decode, Encode};
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[cbor(map)]
 pub struct StorableRecoveryKey {
     #[cbor(n(0), with = "minicbor::bytes")]

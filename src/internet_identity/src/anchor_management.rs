@@ -301,7 +301,7 @@ fn should_register_openid_credential_only_for_a_single_anchor() {
             iss: openid_credential.iss.clone()
         })
     );
-    storage_borrow_mut(|storage| storage.create(anchor_0.clone()).unwrap());
+    storage_borrow_mut(|storage| storage.update(anchor_0.clone()).unwrap());
 
     // Check if adding OpenID credential twice returns an error
     assert_eq!(

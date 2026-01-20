@@ -14,7 +14,6 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::TimerId;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::openid::{
@@ -38,7 +37,6 @@ mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
-mod migrations;
 
 /// Type conversions between internal and external types.
 mod conversions;
@@ -79,8 +77,6 @@ thread_local! {
     pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
     pub(crate) static ANCHOR_MIGRATION_SPECIAL_CASES: RefCell<BTreeMap<AnchorNumber, Vec<SpecialDeviceMigration>>> = const { RefCell::new(BTreeMap::new()) };
-
-    static TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
 }
 
 #[query(hidden = true)]
@@ -647,37 +643,6 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     initialize(maybe_arg);
 }
 
-async fn run_periodic_tasks() {
-    state::storage_borrow_mut(|storage| {
-        let now_nanos = ic_cdk::api::time();
-        storage.sync_anchor_indices(now_nanos, RECOVERY_PHRASE_MIGRATION_BATCH_SIZE);
-    });
-
-    if RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
-        // Migration complete, clear timer.
-        TIMER_ID.with_borrow_mut(|saved_timer_id| {
-            if let Some(saved_timer_id) = *saved_timer_id {
-                ic_cdk_timers::clear_timer(saved_timer_id);
-            }
-            *saved_timer_id = None;
-        });
-    }
-}
-
-fn init_timers() {
-    let new_timer_id =
-        ic_cdk_timers::set_timer_interval(RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS, || {
-            ic_cdk::spawn(run_periodic_tasks())
-        });
-
-    TIMER_ID.with_borrow_mut(|saved_timer_id| {
-        if let Some(saved_timer_id) = *saved_timer_id {
-            ic_cdk_timers::clear_timer(saved_timer_id);
-        }
-        saved_timer_id.replace(new_timer_id);
-    });
-}
-
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
@@ -685,9 +650,6 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::load_persistent_state();
 
     initialize(maybe_arg);
-
-    // TODO: Remove the data migration.
-    init_timers();
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {

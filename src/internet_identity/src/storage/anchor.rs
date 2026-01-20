@@ -1039,7 +1039,7 @@ fn check_anchor_invariants(
     /// a slot for the recovery devices.
     /// Note however, that a free device slot does not guarantee that it will fit the anchor
     /// due to the `VARIABLE_FIELDS_LIMIT`.
-    const MAX_DEVICES_PER_ANCHOR: usize = 10;
+    const MAX_DEVICES_PER_ANCHOR: usize = 20;
 
     /// One device can fill more than one tenth of the available space for a single anchor (4 KB)
     /// with the variable length fields alone.
@@ -1048,7 +1048,7 @@ fn check_anchor_invariants(
     /// This ensures that we have the flexibility to expand or change anchors in the future.
     /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
     /// plus an additional 452 bytes to fit new fields introduced since.
-    const VARIABLE_FIELDS_LIMIT: usize = 2500;
+    const VARIABLE_FIELDS_LIMIT: usize = 5000;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
         return Err(AnchorError::TooManyDevices {
