@@ -229,8 +229,8 @@
       return;
     }
     document
-      .querySelector(`[data-identity-result=${highlightIdentity}]`)
-      ?.scrollIntoView({ behavior: "smooth" });
+      .querySelector(`[data-identity-result="${highlightIdentity}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
   });
 
   onMount(() => {
