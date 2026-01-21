@@ -15,7 +15,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 import {
-  ForwardedMessage,
+  forwardMessage,
   isForwardedMessage,
 } from "../../../../routes/(new-styling)/(cross-origin)/utils";
 
@@ -142,10 +142,7 @@ export async function authenticationProtocol({
   // Also send a message to be forwarded to the parent window,
   // in case the authorization flow is cross-origin embedded.
   canisterConfig.related_origins[0]?.forEach((origin) =>
-    window.parent?.postMessage(
-      { __ii_forward: { data: AuthReady, origin: "*" } },
-      origin,
-    ),
+    window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
   );
 
   onProgress("waiting");
@@ -217,13 +214,10 @@ export async function authenticationProtocol({
   } satisfies AuthResponse;
 
   if (requestResult.forwardFromOrigin !== undefined) {
-    const message: ForwardedMessage = {
-      __ii_forwarded: {
-        data: response,
-        origin: authContext.requestOrigin,
-      },
-    };
-    window.parent.postMessage(message, requestResult.forwardFromOrigin);
+    window.parent.postMessage(
+      forwardMessage(response, authContext.requestOrigin),
+      requestResult.forwardFromOrigin,
+    );
   } else {
     window.opener.postMessage(response, authContext.requestOrigin);
   }

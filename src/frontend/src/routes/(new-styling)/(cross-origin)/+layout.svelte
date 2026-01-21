@@ -1,8 +1,8 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
   import { getPrimaryOrigin } from "$lib/globals";
-  import { building } from "$app/environment";
-  import { ForwardedMessage, isForwardedMessage } from "./utils";
+  import { isForwardedMessage } from "./utils";
+  import { forwardMessage } from "./utils.ts";
 
   const { children, data }: LayoutProps = $props();
 
@@ -24,22 +24,17 @@
         event.origin === primaryOrigin &&
         isForwardedMessage(event)
       ) {
-        console.log("unwrap message", event);
         // Unwrap and forward messages coming from iframe
         window.opener.postMessage(
           event.data.__ii_forwarded.data,
           event.data.__ii_forwarded.origin,
         );
       } else {
-        console.log("wrap message", event);
         // Wrap and forward other messages towards iframe
-        const message: ForwardedMessage = {
-          __ii_forwarded: {
-            data: event.data,
-            origin: event.origin,
-          },
-        };
-        (iframeRef.contentWindow as Window).postMessage(message, primaryOrigin);
+        (iframeRef.contentWindow as Window).postMessage(
+          forwardMessage(event.data, event.origin),
+          primaryOrigin,
+        );
       }
     });
   });

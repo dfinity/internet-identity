@@ -1,12 +1,38 @@
 <script lang="ts">
   import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
-  import { canisterConfig } from "$lib/globals";
+  import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
   import { onMount } from "svelte";
   import { page } from "$app/state";
 
   const { children } = $props();
 
   onMount(() => {
+    // Always redirect to primary origin
+    const primaryOrigin = getPrimaryOrigin();
+    if (
+      primaryOrigin !== undefined &&
+      window.location.origin !== primaryOrigin &&
+      // Don't redirect if we're coming from legacy AuthClient
+      !(
+        window.location.pathname === "/" &&
+        window.location.hash === "#authorize"
+      ) &&
+      // Don't redirect if we're visiting legacy verifiable credentials
+      window.location.pathname !== "/vc-flow" &&
+      // Don't redirect if we're visiting self-service
+      window.location.pathname !== "/self-service" &&
+      // TODO: Remove this once we move all legacy domains to new interface
+      !window.location.origin.endsWith("identity.internetcomputer.org")
+    ) {
+      window.location.replace(
+        primaryOrigin +
+          window.location.pathname +
+          window.location.search +
+          window.location.hash,
+      );
+      return;
+    }
+
     // 2. Show page once it has fully loaded (see app.html)
     document.documentElement.removeAttribute("data-hide-ssg");
 
@@ -33,30 +59,28 @@
 
 <svelte:head>
   {#if page.url.pathname === "/"}
-    <!--    <style>-->
-    <!--      html[data-temp-hide-ssg] body > div {-->
-    <!--        display: none !important;-->
-    <!--      }-->
+    <style>
+      html[data-temp-hide-ssg] body > div {
+        display: none !important;
+      }
 
-    <!--      html[data-temp-hide-ssg="legacy"] body {-->
-    <!--        /* Make sure page background matches legacy (&#45;&#45;nvc-surface-dark in src/frontend/src/lib/legacy/styles/main.css) */-->
-    <!--        background: oklch(0.15 0.0236 261.52) !important;-->
-    <!--      }-->
-    <!--    </style>-->
+      html[data-temp-hide-ssg="legacy"] body {
+        /* Make sure page background matches legacy (--nvc-surface-dark in src/frontend/src/lib/legacy/styles/main.css) */
+        background: oklch(0.15 0.0236 261.52) !important;
+      }
+    </style>
     <script>
-      // if (
-      //   // TODO: Remove this branch once we move legacy domains to new interface
-      //   window.location.hostname.startsWith("identity.") ||
-      //   window.location.hostname.startsWith("beta.identity.")
-      // ) {
-      //   // 1A. Hide page until it has fully loaded on legacy domains,
-      //   // this avoids showing the SSG landing page beforehand.
-      //   document.documentElement.setAttribute("data-temp-hide-ssg", "legacy");
-      // } else
-      if (window.location.hash.length > 0) {
+      if (
+        // TODO: Remove this branch once we move all legacy domains to new interface
+        window.location.origin.endsWith("identity.internetcomputer.org")
+      ) {
+        // 1A. Hide page until it has fully loaded on legacy domains,
+        // this avoids showing the SSG landing page beforehand.
+        document.documentElement.setAttribute("data-temp-hide-ssg", "legacy");
+      } else if (window.location.hash.length > 0) {
         // 1B. Hide page until it has redirected on new domains,
         // this avoids showing the SSG landing page beforehand.
-        // document.documentElement.setAttribute("data-temp-hide-ssg", "fragment");
+        document.documentElement.setAttribute("data-temp-hide-ssg", "fragment");
       }
     </script>
   {/if}

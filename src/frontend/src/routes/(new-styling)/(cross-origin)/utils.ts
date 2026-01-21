@@ -1,4 +1,4 @@
-export interface ForwardedMessage {
+interface ForwardedMessage {
   __ii_forwarded: {
     data: unknown;
     origin: string;
@@ -17,3 +17,13 @@ export const isForwardedMessage = (
     typeof event.data.__ii_forwarded.origin === "string"
   );
 };
+
+export const forwardMessage = (
+  data: unknown,
+  origin: string,
+): ForwardedMessage => ({
+  __ii_forwarded: {
+    data,
+    origin,
+  },
+});
