@@ -83,7 +83,10 @@ export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   true,
   // TODO: Remove this once we move all legacy domains to new interface
   (featureFlag) => {
-    if (window.location.hostname.endsWith("identity.internetcomputer.org")) {
+    if (
+      window.location.origin === "https://identity.internetcomputer.org" ||
+      window.location.origin === "https://beta.identity.internetcomputer.org"
+    ) {
       featureFlag.temporaryOverride(false);
     }
   },

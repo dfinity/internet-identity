@@ -72,7 +72,8 @@
     <script>
       if (
         // TODO: Remove this branch once we move all legacy domains to new interface
-        window.location.origin.endsWith("identity.internetcomputer.org")
+        window.location.origin === "https://identity.internetcomputer.org" ||
+        window.location.origin === "https://beta.identity.internetcomputer.org"
       ) {
         // 1A. Hide page until it has fully loaded on legacy domains,
         // this avoids showing the SSG landing page beforehand.
