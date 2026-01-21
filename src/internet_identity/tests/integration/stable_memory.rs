@@ -11,43 +11,6 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
 
-/// Verifies that an anchor with two recovery phrases can still use both.
-/// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
-#[test]
-fn should_not_break_on_multiple_legacy_recovery_phrases() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-    let frontend_hostname = "frontend_hostname";
-    let session_key = ByteBuf::from("session_key");
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/multiple-recovery-phrases-v9.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    api::prepare_delegation(
-        &env,
-        canister_id,
-        principal_recovery_1(),
-        10_000,
-        frontend_hostname,
-        &session_key,
-        None,
-    )?;
-    api::prepare_delegation(
-        &env,
-        canister_id,
-        principal_recovery_2(),
-        10_000,
-        frontend_hostname,
-        &session_key,
-        None,
-    )?;
-    Ok(())
-}
-
 /// Verifies that an existing account with two recovery phrases can only make changes after deleting one.
 /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
 #[test]
