@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
   import { getPrimaryOrigin } from "$lib/globals";
-  import { isForwardedMessage } from "./utils";
-  import { forwardMessage } from "./utils.ts";
+  import { forwardMessage, isForwardedMessage } from "./utils";
 
   const { children, data }: LayoutProps = $props();
 
@@ -19,8 +18,11 @@
       return;
     }
     window.addEventListener("message", (event) => {
+      if (iframeRef === undefined) {
+        return;
+      }
       if (
-        event.source === iframeRef.contentWindow &&
+        event.source === iframeRef?.contentWindow &&
         event.origin === primaryOrigin &&
         isForwardedMessage(event)
       ) {
@@ -48,6 +50,7 @@
       window.location.search +
       window.location.hash}
     allow="publickey-credentials-create; publickey-credentials-get"
+    title="Embedded page"
     class="absolute inset-0 box-border h-full w-full"
   ></iframe>
 {:else}
