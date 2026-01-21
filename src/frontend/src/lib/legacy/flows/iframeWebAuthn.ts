@@ -5,7 +5,7 @@ import {
 } from "$lib/utils/internalPostMessage";
 import { isNullish } from "@dfinity/utils";
 
-export const WEBAUTHN_IFRAME_PATH = "#iframe/webauthn";
+export const WEBAUTHN_IFRAME_PATH = "/iframe/webauthn";
 
 interface CredentialRequest {
   ii_credential_request: {

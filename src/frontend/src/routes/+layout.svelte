@@ -22,7 +22,6 @@
       // Don't redirect if we're visiting self-service
       window.location.pathname !== "/self-service" &&
       // Don't redirect if we're visiting webauthn iframe used for migration
-      window.location.pathname !== "#iframe/webauthn" &&
       window.location.pathname !== "/iframe/webauthn" &&
       // TODO: Remove this once we move all legacy domains to new interface
       !window.location.origin.endsWith("identity.internetcomputer.org")
