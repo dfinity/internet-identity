@@ -455,7 +455,13 @@ jobs:
         # Both settings are combined in one single matrix variable as otherwise there would be
         # excessively many combinations to be run and it would be questionable how much more of
         # a signal we would get from that.
-        settings: [{ domain: "https://identity.ic0.app", captcha: "disabled" }]
+        settings:
+          [
+            {
+              domain: "https://identity.internetcomputer.org",
+              captcha: "disabled",
+            },
+          ]
         # Specify some shards for jest (a jest instance will only run a subset of files
         # based on the shard assigned to it)
         # The jest parameter is actually 1/N, 2/N etc but we use a artifact-friendly
