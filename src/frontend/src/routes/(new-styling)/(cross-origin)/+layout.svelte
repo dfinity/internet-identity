@@ -11,8 +11,11 @@
     primaryOrigin !== undefined &&
     window.location.origin !== primaryOrigin;
   const iframeSrc = $derived.by(() => {
+    if (primaryOrigin === undefined) {
+      return;
+    }
     const url = new URL(window.location.href);
-    url.origin = primaryOrigin;
+    url.hostname = new URL(primaryOrigin).hostname;
     url.searchParams.set("feature_flag_guided_upgrade", "true");
     return url.href;
   });
@@ -48,7 +51,7 @@
   });
 </script>
 
-{#if shouldEmbed}
+{#if shouldEmbed && iframeSrc !== undefined}
   <iframe
     bind:this={iframeRef}
     src={iframeSrc}
