@@ -6,7 +6,7 @@ import { ECDSAKeyIdentity, DelegationChain, DelegationIdentity } from "@icp-sdk/
 const transport = new PostMessageTransport({
     url: window.location.origin.includes("localhost")
         ? "http://localhost:5173/authorize?openid=google"
-        : "https://beta.id.ai/authorize?openid=google",
+        : "https://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app/authorize?openid=google",
 });
 
 const signer = new Signer({ transport, autoCloseTransportChannel: false });
