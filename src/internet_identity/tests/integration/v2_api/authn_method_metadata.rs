@@ -114,7 +114,7 @@ fn should_not_write_too_large_identity_metadata_map() -> Result<(), RejectRespon
     const METADATA_KEY: &str = "some-key";
     // Variable fields limit as it is enforced by the II canister.
     // This limit ensures that users cannot spend all their allocated space on just metadata.
-    const VARIABLE_FIELDS_LIMIT: usize = 2500;
+    const VARIABLE_FIELDS_LIMIT: usize = 5000;
 
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
