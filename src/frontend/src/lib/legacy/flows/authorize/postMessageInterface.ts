@@ -208,7 +208,7 @@ export async function authenticationProtocol({
         requestResult.forwardFromOrigin,
       );
     } else {
-      window.opener.postMessage(response, authContext.requestOrigin);
+      window.opener.postMessage(response);
     }
     return authenticateResult.kind;
   }
