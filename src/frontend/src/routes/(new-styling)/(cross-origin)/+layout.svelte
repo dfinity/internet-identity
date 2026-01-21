@@ -10,6 +10,12 @@
     data.legacyProtocol &&
     primaryOrigin !== undefined &&
     window.location.origin !== primaryOrigin;
+  const iframeSrc = $derived.by(() => {
+    const url = new URL(window.location.href);
+    url.origin = primaryOrigin;
+    url.searchParams.set("feature_flag_guided_upgrade", "true");
+    return url.href;
+  });
 
   let iframeRef = $state<HTMLIFrameElement>();
 
@@ -45,10 +51,7 @@
 {#if shouldEmbed}
   <iframe
     bind:this={iframeRef}
-    src={primaryOrigin +
-      window.location.pathname +
-      window.location.search +
-      window.location.hash}
+    src={iframeSrc}
     allow="publickey-credentials-create; publickey-credentials-get"
     title="Embedded page"
     class="absolute inset-0 box-border h-full w-full"
