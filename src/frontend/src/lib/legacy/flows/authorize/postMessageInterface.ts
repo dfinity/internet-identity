@@ -198,10 +198,18 @@ export async function authenticationProtocol({
       origin: requestOrigin,
       failureReason: authenticateResult.text,
     });
-    window.opener.postMessage({
+    const response = {
       kind: "authorize-client-failure",
       text: authenticateResult.text,
-    } satisfies AuthResponse);
+    } satisfies AuthResponse;
+    if (requestResult.forwardFromOrigin !== undefined) {
+      window.parent.postMessage(
+        forwardMessage(response, authContext.requestOrigin),
+        requestResult.forwardFromOrigin,
+      );
+    } else {
+      window.opener.postMessage(response, authContext.requestOrigin);
+    }
     return authenticateResult.kind;
   }
   void (authenticateResult.kind satisfies "success");

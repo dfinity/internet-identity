@@ -26,7 +26,7 @@
     if (!shouldEmbed) {
       return;
     }
-    window.addEventListener("message", (event) => {
+    const listener = (event: MessageEvent) => {
       if (iframeRef === undefined) {
         return;
       }
@@ -40,14 +40,18 @@
           event.data.__ii_forwarded.data,
           event.data.__ii_forwarded.origin,
         );
-      } else {
+      } else if (event.source === window.opener) {
         // Wrap and forward other messages towards iframe
         (iframeRef.contentWindow as Window).postMessage(
           forwardMessage(event.data, event.origin),
           primaryOrigin,
         );
       }
-    });
+    };
+    window.addEventListener("message", listener);
+    return () => {
+      window.removeEventListener("message", listener);
+    };
   });
 </script>
 

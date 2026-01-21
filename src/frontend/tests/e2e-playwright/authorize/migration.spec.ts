@@ -62,7 +62,6 @@ test.skip("Migration from an app", () => {
         await expect(dialog).toBeVisible();
         await dialog.getByRole("button", { name: "Upgrade" }).click();
         const authAuthenticatorId = await addVirtualAuthenticator(authPage);
-        console.log("credential", credential, authAuthenticatorId);
         await addCredentialToVirtualAuthenticator(
           authPage,
           authAuthenticatorId,
