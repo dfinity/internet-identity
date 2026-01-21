@@ -61,7 +61,7 @@
     src={iframeSrc}
     allow="publickey-credentials-create; publickey-credentials-get"
     title="Embedded page"
-    class="absolute inset-0 box-border h-full w-full"
+    class="absolute inset-0 box-border h-full w-full border-t border-t-orange-500"
   ></iframe>
 {:else}
   {@render children()}
