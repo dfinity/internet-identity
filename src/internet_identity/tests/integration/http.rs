@@ -16,8 +16,8 @@ use ic_response_verification::verify_request_response_pair;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt, FrontendHostname,
-    InternetIdentityInit, MetadataEntryV2,
+    AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt,
+    FrontendHostname, InternetIdentityInit, MetadataEntryV2,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -816,15 +816,75 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), R
     let canister_id = install_ii_canister(&env, II_WASM.clone());
 
     let metrics = get_metrics(&env, canister_id);
-    let (initial_memory_pages, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
+    let (initial_memory_pages, _) = parse_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"stable_identities\"}",
+    );
 
-    // the anchor offset is 2 pages -> adding a single anchor increases stable memory usage by
-    // one bucket (i.e. 128 pages) allocated by the memory manager.
-    flows::register_anchor(&env, canister_id);
+    // registering 25 anchors with 20 devices each to reach 500 devices total
+    // this is much faster than 500 individual registrations
+    for i in 0..25u16 {
+        let mut authn_method = test_authn_method();
+        // unique pubkey for each anchor registration
+        if let AuthnMethod::WebAuthn(ref mut webauthn) = authn_method.authn_method {
+            let mut pubkey = vec![0u8; 32];
+            pubkey[0..2].copy_from_slice(&i.to_le_bytes());
+            webauthn.pubkey = ByteBuf::from(pubkey);
+        }
+        // ~200 bytes of metadata to help fill memory
+        authn_method
+            .metadata
+            .insert("data".to_string(), MetadataEntryV2::String("a".repeat(200)));
+
+        let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+        // add 19 more devices to the same anchor
+        for j in 1..20u16 {
+            let mut device = test_authn_method();
+            if let AuthnMethod::WebAuthn(ref mut webauthn) = device.authn_method {
+                let mut pubkey = vec![0u8; 32];
+                pubkey[0..2].copy_from_slice(&i.to_le_bytes());
+                pubkey[2..4].copy_from_slice(&j.to_le_bytes());
+                webauthn.pubkey = ByteBuf::from(pubkey);
+
+                let mut cred_id = vec![0u8; 64];
+                cred_id[0..2].copy_from_slice(&i.to_le_bytes());
+                cred_id[2..4].copy_from_slice(&j.to_le_bytes());
+                webauthn.credential_id = ByteBuf::from(cred_id);
+            }
+            device
+                .metadata
+                .insert("data".to_string(), MetadataEntryV2::String("a".repeat(200)));
+
+            api_v2::authn_method_add(
+                &env,
+                canister_id,
+                authn_method.principal(),
+                identity_number,
+                &device,
+            )
+            .unwrap()
+            .unwrap();
+        }
+    }
+
+    let canister_stats = api::stats(&env, canister_id).unwrap();
+    assert!(canister_stats.users_registered >= 25);
 
     let metrics = get_metrics(&env, canister_id);
-    let (pages_with_users, _) = parse_metric(&metrics, "internet_identity_stable_memory_pages");
-    assert!(initial_memory_pages < pages_with_users);
+    let (pages_with_users, _) = parse_metric(
+        &metrics,
+        "internet_identity_virtual_memory_size_pages{memory=\"stable_identities\"}",
+    );
+    if initial_memory_pages >= pages_with_users {
+        println!("Test failed. Metrics:\n{}", metrics);
+    }
+    assert!(
+        initial_memory_pages < pages_with_users,
+        "initial_memory_pages ({}) should be less than pages_with_users ({}) after registering 100 large anchors",
+        initial_memory_pages,
+        pages_with_users
+    );
     Ok(())
 }
 
