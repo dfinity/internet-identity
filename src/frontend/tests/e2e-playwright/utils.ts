@@ -6,7 +6,7 @@ import { isNullish } from "@dfinity/utils";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
-export const LEGACY_II_URL = "https://identity.internetcomputer.org";
+export const LEGACY_II_URL = "https://identity.ic0.app";
 export const TEST_APP_URL = "https://nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
