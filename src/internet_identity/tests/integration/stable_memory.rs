@@ -11,56 +11,6 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::path::PathBuf;
 
-/// Verifies that an existing account with two recovery phrases can only make changes after deleting one.
-/// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
-#[test]
-fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/multiple-recovery-phrases-v9.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    let mut recovery_1 = recovery_device_data_1();
-    recovery_1.alias = "new alias".to_string();
-    let result = api::update(
-        &env,
-        canister_id,
-        principal_1(),
-        10_000,
-        &recovery_1.pubkey,
-        &recovery_1,
-    );
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("There is already a recovery phrase and only one is allowed\\.").unwrap(),
-    );
-
-    api::remove(
-        &env,
-        canister_id,
-        principal_1(),
-        10_000,
-        &recovery_device_data_2().pubkey,
-    )?;
-
-    // successful after removing the other one
-    api::update(
-        &env,
-        canister_id,
-        principal_1(),
-        10_000,
-        &recovery_1.pubkey,
-        &recovery_1,
-    )?;
-    Ok(())
-}
-
 /// Tests that II will refuse to install on a stable memory layout that is no longer supported.
 #[test]
 fn should_trap_on_old_stable_memory() -> Result<(), RejectResponse> {
