@@ -459,7 +459,7 @@ jobs:
           [
             {
               domain: "https://identity.internetcomputer.org",
-              captcha: "disabled",
+              captcha: "enabled",
             },
           ]
         # Specify some shards for jest (a jest instance will only run a subset of files
