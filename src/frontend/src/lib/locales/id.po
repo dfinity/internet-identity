@@ -28,6 +28,9 @@ msgstr "Akun {name}"
 msgid "{name} logo"
 msgstr "Logo {name}"
 
+msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
+msgstr ""
+
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Internet Identity tampilan baru yang modern. Desain baru ini intuitif dan lebih mudah dinavigasi, sehingga pengalaman pengguna menjadi lebih lancar."
 
@@ -129,6 +132,9 @@ msgstr "Karakter CAPTCHA"
 
 msgid "Characters are case-sensitive"
 msgstr "Karakter membedakan huruf besar/kecil"
+
+msgid "Check out the other domains:"
+msgstr ""
 
 msgid "Checking recovery phrase"
 msgstr ""
@@ -232,6 +238,9 @@ msgstr "Saat ini masuk dengan akun ini"
 msgid "Currently signed in with this passkey"
 msgstr "Saat ini masuk dengan passkey ini"
 
+msgid "Dashlane has been confirmed to be incompatible."
+msgstr ""
+
 msgid "Default"
 msgstr "Default"
 
@@ -274,6 +283,9 @@ msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang priba
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Rasakan"
+
+msgid "Export JSON"
+msgstr ""
 
 msgid "FAQs"
 msgstr "Pertanyaan yang Sering Diajukan"
@@ -368,8 +380,14 @@ msgstr "Identitas sudah ditingkatkan"
 msgid "Identity found"
 msgstr ""
 
+msgid "Identity list"
+msgstr ""
+
 msgid "Identity name"
 msgstr "Nama identitas"
+
+msgid "Identity not found"
+msgstr ""
 
 msgid "Identity number"
 msgstr "Nomor identitas"
@@ -479,6 +497,9 @@ msgstr "Terakhir digunakan"
 msgid "Learn how to open links in your browser"
 msgstr "Pelajari cara membuka tautan di peramban Anda"
 
+msgid "Ledger has been confirmed to be incompatible."
+msgstr ""
+
 msgid "Let's get started"
 msgstr "Mari mulai"
 
@@ -493,6 +514,9 @@ msgstr ""
 
 msgid "Long-press the link that opened this page."
 msgstr "Tekan lama tautan yang membuka halaman ini."
+
+msgid "Lookup by passkey"
+msgstr ""
 
 msgid "Lost access to your identity?"
 msgstr ""
@@ -554,8 +578,20 @@ msgstr "Tidak ada data yang dibagikan kepada Google, Microsoft, atau Apple menge
 msgid "No identity found"
 msgstr "Tidak ada identitas yang ditemukan"
 
+msgid "No passkey tests yet"
+msgstr ""
+
+msgid "No recovery phrase"
+msgstr ""
+
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau membuka passkey Anda. Data biometrik Anda tidak pernah dibagikan dengan Internet Identity atau situs web dan aplikasi lain yang Anda gunakan."
+
+msgid "NordPass has been confirmed to be incompatible."
+msgstr ""
+
+msgid "Not upgraded"
+msgstr ""
 
 msgid "Number of access methods"
 msgstr "Jumlah metode akses"
@@ -589,6 +625,9 @@ msgstr "Passkey telah didaftarkan dari perangkat lain."
 
 msgid "Passkey name"
 msgstr "Nama passkey"
+
+msgid "Passkey testing"
+msgstr ""
 
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 msgstr "Passkey adalah cara yang aman dan mudah untuk masuk tanpa menggunakan kata sandi. Passkey disimpan di pengelola kata sandi Anda (Google Password Manager, iCloud Keychain, 1Password, dll.) dan dapat dilindungi dengan sidik jari, wajah, atau kode perangkat."
@@ -639,6 +678,9 @@ msgid "Recovery phrase not activated"
 msgstr "Frasa pemulihan tidak diaktifkan"
 
 msgid "Recovery phrase not verified"
+msgstr ""
+
+msgid "Recovery phrase set"
 msgstr ""
 
 msgid "Redirecting to the app"
@@ -697,6 +739,9 @@ msgstr ""
 
 msgid "Right now"
 msgstr "Saat ini"
+
+msgid "Run a passkey test to see results"
+msgstr ""
 
 msgid "Save changes"
 msgstr "Simpan perubahan"
@@ -800,6 +845,9 @@ msgstr "Berhasil memulihkan akses ke identitas Anda"
 msgid "Support"
 msgstr "Dukungan"
 
+msgid "Supported"
+msgstr ""
+
 msgid "Switch identity"
 msgstr "Ganti identitas"
 
@@ -807,6 +855,12 @@ msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr ""
 
 msgid "Tap on the highlighted <0>back</0> button."
+msgstr ""
+
+msgid "Test passkey support"
+msgstr ""
+
+msgid "Test passkey support and view authenticator details"
 msgstr ""
 
 msgid "The <0>existing device</0> is preparing to continue."
@@ -817,6 +871,9 @@ msgstr "<0>Perangkat baru</0> sedang bersiap untuk melanjutkan."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "Integrasi dengan Google, Microsoft, dan Apple menggunakan protokol autentikasi standar yang disebut OpenID. Ini adalah protokol yang sama yang digunakan aplikasi lain untuk masuk dengan Google."
+
+msgid "The passkey could not be identified, support unknown."
+msgstr ""
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr ""
@@ -836,8 +893,29 @@ msgstr "Identitas ini sudah ditingkatkan ke pengalaman baru."
 msgid "This may take a few seconds"
 msgstr ""
 
+msgid "This passkey is no longer associated with any identity."
+msgstr ""
+
 msgid "This takes a few seconds."
 msgstr "Proses ini butuh beberapa detik."
+
+msgid "This YubiKey has older firmware (5.1) that's incompatible."
+msgstr ""
+
+msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
+msgstr ""
+
+msgid "This YubiKey has older firmware (5.2) that might be incompatible."
+msgstr ""
+
+msgid "This YubiKey has older firmware (5.4) that might be incompatible."
+msgstr ""
+
+msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
+msgstr ""
+
+msgid "This YubiKey has older firmware (5.6) that might be incompatible."
+msgstr ""
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Untuk mengonfirmasi ini Anda, masukkan kode di bawah ini di <0>perangkat Anda yang ada</0>."
@@ -890,6 +968,9 @@ msgstr ""
 msgid "Unlock to continue"
 msgstr ""
 
+msgid "Unsupported"
+msgstr ""
+
 msgid "Unsupported Browser"
 msgstr "Peramban Tidak Didukung"
 
@@ -938,11 +1019,17 @@ msgstr ""
 msgid "Verifying..."
 msgstr "Memverifikasi..."
 
+msgid "View your last used identities"
+msgstr ""
+
 msgid "Waiting for your existing device"
 msgstr "Menunggu perangkat Anda yang ada"
 
 msgid "Waiting for your new device"
 msgstr "Menunggu perangkat baru Anda"
+
+msgid "Warning"
+msgstr ""
 
 msgid "We didn't recognize that activation code."
 msgstr "Kami tidak mengenali kode aktivasi tersebut."

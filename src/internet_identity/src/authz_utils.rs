@@ -82,7 +82,7 @@ where
     let (ret, operation) = op(&mut anchor)?;
 
     // write back anchor
-    state::storage_borrow_mut(|storage| storage.update(anchor))
+    state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| E::from(IdentityUpdateError::StorageError(anchor_number, err)))?;
 
     post_operation_bookkeeping(anchor_number, operation);
@@ -147,7 +147,7 @@ pub fn check_authz_and_record_activity(
         _ => None,
     };
     anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-    state::storage_borrow_mut(|storage| storage.update(anchor))
+    state::storage_borrow_mut(|storage| storage.write(anchor))
         .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
     Ok(maybe_domain)
 }

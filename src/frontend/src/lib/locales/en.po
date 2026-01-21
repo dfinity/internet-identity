@@ -28,6 +28,9 @@ msgstr "{name} account"
 msgid "{name} logo"
 msgstr "{name} logo"
 
+msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
+msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
+
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 
@@ -129,6 +132,9 @@ msgstr "CAPTCHA characters"
 
 msgid "Characters are case-sensitive"
 msgstr "Characters are case-sensitive"
+
+msgid "Check out the other domains:"
+msgstr "Check out the other domains:"
 
 msgid "Checking recovery phrase"
 msgstr "Checking recovery phrase"
@@ -232,6 +238,9 @@ msgstr "Currently signed in with this account"
 msgid "Currently signed in with this passkey"
 msgstr "Currently signed in with this passkey"
 
+msgid "Dashlane has been confirmed to be incompatible."
+msgstr "Dashlane has been confirmed to be incompatible."
+
 msgid "Default"
 msgstr "Default"
 
@@ -274,6 +283,9 @@ msgstr "Everything you need to know about Internet Identity, your private, secur
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
 msgstr "Experience"
+
+msgid "Export JSON"
+msgstr "Export JSON"
 
 msgid "FAQs"
 msgstr "FAQs"
@@ -368,8 +380,14 @@ msgstr "Identity already upgraded"
 msgid "Identity found"
 msgstr "Identity found"
 
+msgid "Identity list"
+msgstr "Identity list"
+
 msgid "Identity name"
 msgstr "Identity name"
+
+msgid "Identity not found"
+msgstr "Identity not found"
 
 msgid "Identity number"
 msgstr "Identity number"
@@ -479,6 +497,9 @@ msgstr "Last used"
 msgid "Learn how to open links in your browser"
 msgstr "Learn how to open links in your browser"
 
+msgid "Ledger has been confirmed to be incompatible."
+msgstr "Ledger has been confirmed to be incompatible."
+
 msgid "Let's get started"
 msgstr "Let's get started"
 
@@ -493,6 +514,9 @@ msgstr "Locked legacy recovery phrase"
 
 msgid "Long-press the link that opened this page."
 msgstr "Long-press the link that opened this page."
+
+msgid "Lookup by passkey"
+msgstr "Lookup by passkey"
 
 msgid "Lost access to your identity?"
 msgstr "Lost access to your identity?"
@@ -554,8 +578,20 @@ msgstr "No data is shared with Google, Microsoft or Apple on which applications 
 msgid "No identity found"
 msgstr "No identity found"
 
+msgid "No passkey tests yet"
+msgstr "No passkey tests yet"
+
+msgid "No recovery phrase"
+msgstr "No recovery phrase"
+
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
+
+msgid "NordPass has been confirmed to be incompatible."
+msgstr "NordPass has been confirmed to be incompatible."
+
+msgid "Not upgraded"
+msgstr "Not upgraded"
 
 msgid "Number of access methods"
 msgstr "Number of access methods"
@@ -589,6 +625,9 @@ msgstr "Passkey has been registered from another device."
 
 msgid "Passkey name"
 msgstr "Passkey name"
+
+msgid "Passkey testing"
+msgstr "Passkey testing"
 
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 msgstr "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
@@ -640,6 +679,9 @@ msgstr "Recovery phrase not activated"
 
 msgid "Recovery phrase not verified"
 msgstr "Recovery phrase not verified"
+
+msgid "Recovery phrase set"
+msgstr "Recovery phrase set"
 
 msgid "Redirecting to the app"
 msgstr "Redirecting to the app"
@@ -697,6 +739,9 @@ msgstr "Return to application"
 
 msgid "Right now"
 msgstr "Right now"
+
+msgid "Run a passkey test to see results"
+msgstr "Run a passkey test to see results"
 
 msgid "Save changes"
 msgstr "Save changes"
@@ -800,6 +845,9 @@ msgstr "Successfully restored access to your identity"
 msgid "Support"
 msgstr "Support"
 
+msgid "Supported"
+msgstr "Supported"
+
 msgid "Switch identity"
 msgstr "Switch identity"
 
@@ -809,6 +857,12 @@ msgstr "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Tap on the highlighted <0>back</0> button."
 
+msgid "Test passkey support"
+msgstr "Test passkey support"
+
+msgid "Test passkey support and view authenticator details"
+msgstr "Test passkey support and view authenticator details"
+
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "The <0>existing device</0> is preparing to continue."
 
@@ -817,6 +871,9 @@ msgstr "The <0>new device</0> is preparing to continue."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
 msgstr "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
+
+msgid "The passkey could not be identified, support unknown."
+msgstr "The passkey could not be identified, support unknown."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "The phrase was entered correctly but belongs to a product other than Internet Identity."
@@ -836,8 +893,29 @@ msgstr "This identity has already been upgraded to the new experience."
 msgid "This may take a few seconds"
 msgstr "This may take a few seconds"
 
+msgid "This passkey is no longer associated with any identity."
+msgstr "This passkey is no longer associated with any identity."
+
 msgid "This takes a few seconds."
 msgstr "This takes a few seconds."
+
+msgid "This YubiKey has older firmware (5.1) that's incompatible."
+msgstr "This YubiKey has older firmware (5.1) that's incompatible."
+
+msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
+msgstr "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
+
+msgid "This YubiKey has older firmware (5.2) that might be incompatible."
+msgstr "This YubiKey has older firmware (5.2) that might be incompatible."
+
+msgid "This YubiKey has older firmware (5.4) that might be incompatible."
+msgstr "This YubiKey has older firmware (5.4) that might be incompatible."
+
+msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
+msgstr "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
+
+msgid "This YubiKey has older firmware (5.6) that might be incompatible."
+msgstr "This YubiKey has older firmware (5.6) that might be incompatible."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "To confirm it's you, enter below code on your <0>existing device</0>."
@@ -890,6 +968,9 @@ msgstr "Unlock and reset"
 msgid "Unlock to continue"
 msgstr "Unlock to continue"
 
+msgid "Unsupported"
+msgstr "Unsupported"
+
 msgid "Unsupported Browser"
 msgstr "Unsupported Browser"
 
@@ -938,11 +1019,17 @@ msgstr "Verify your recovery phrase"
 msgid "Verifying..."
 msgstr "Verifying..."
 
+msgid "View your last used identities"
+msgstr "View your last used identities"
+
 msgid "Waiting for your existing device"
 msgstr "Waiting for your existing device"
 
 msgid "Waiting for your new device"
 msgstr "Waiting for your new device"
+
+msgid "Warning"
+msgstr "Warning"
 
 msgid "We didn't recognize that activation code."
 msgstr "We didn't recognize that activation code."
