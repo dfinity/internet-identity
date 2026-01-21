@@ -670,7 +670,6 @@ impl<M: Memory + Clone> Storage<M> {
             previous_openid_credentials,
             storable_anchor.openid_credentials,
         );
-
         self.sync_anchor_with_recovery_phrase_principal_index(
             anchor_number,
             &previous_recovery_keys,
@@ -678,8 +677,8 @@ impl<M: Memory + Clone> Storage<M> {
         );
         self.sync_anchors_with_passkey_credential_index(
             anchor_number,
-            previous_passkey_credentials,
-            storable_anchor.passkey_credentials.unwrap_or_default(),
+            &previous_passkey_credentials,
+            &storable_anchor.passkey_credentials.unwrap_or_default(),
         );
 
         Ok(())
@@ -726,8 +725,10 @@ impl<M: Memory + Clone> Storage<M> {
             previous.into_iter().map(|cred| cred.key()).collect();
         let current_set: BTreeSet<StorableOpenIdCredentialKey> =
             current.into_iter().map(|cred| cred.key()).collect();
+
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
+
         credential_to_be_removed.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
                 .remove(&key);
@@ -763,15 +764,21 @@ impl<M: Memory + Clone> Storage<M> {
         previous_recovery_keys: &[StorableRecoveryKey],
         current_recovery_keys: &[StorableRecoveryKey],
     ) {
-        let previous_recovery_keys = previous_recovery_keys.iter().collect::<BTreeSet<_>>();
-        let current_recovery_keys = current_recovery_keys.iter().collect::<BTreeSet<_>>();
+        let previous_recovery_principals = previous_recovery_keys
+            .iter()
+            .map(|recovery_key| Principal::self_authenticating(&recovery_key.pubkey))
+            .collect::<BTreeSet<_>>();
+        let current_recovery_principals = current_recovery_keys
+            .iter()
+            .map(|recovery_key| Principal::self_authenticating(&recovery_key.pubkey))
+            .collect::<BTreeSet<_>>();
 
-        for recovery_key in previous_recovery_keys.difference(&current_recovery_keys) {
-            let recovery_principal = Principal::self_authenticating(&recovery_key.pubkey);
-
+        for recovery_principal in
+            previous_recovery_principals.difference(&current_recovery_principals)
+        {
             let Some(existing_anchor_number) = self
                 .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&recovery_principal)
+                .get(recovery_principal)
             else {
                 // This principal is not indexed, nothing to do.
                 continue;
@@ -781,12 +788,10 @@ impl<M: Memory + Clone> Storage<M> {
                 continue;
             }
             self.lookup_anchor_with_recovery_phrase_principal_memory
-                .remove(&recovery_principal);
+                .remove(recovery_principal);
         }
 
-        for recovery_key in current_recovery_keys {
-            let recovery_principal = Principal::self_authenticating(&recovery_key.pubkey);
-
+        for recovery_principal in current_recovery_principals {
             if self
                 .lookup_anchor_with_recovery_phrase_principal_memory
                 .contains_key(&recovery_principal)
@@ -804,25 +809,28 @@ impl<M: Memory + Clone> Storage<M> {
     fn sync_anchors_with_passkey_credential_index(
         &mut self,
         anchor_number: AnchorNumber,
-        previous_passkey_credentials: Vec<StorablePasskeyCredential>,
-        current_passkey_credentials: Vec<StorablePasskeyCredential>,
+        previous_passkey_credentials: &[StorablePasskeyCredential],
+        current_passkey_credentials: &[StorablePasskeyCredential],
     ) {
-        let previous_passkey_credentials = previous_passkey_credentials
-            .into_iter()
+        let previous_passkey_credential_ids = previous_passkey_credentials
+            .iter()
+            .map(|passkey_credential| {
+                StorableCredentialId::from_bytes(Cow::Borrowed(&passkey_credential.credential_id))
+            })
             .collect::<BTreeSet<_>>();
-        let current_passkey_credentials = current_passkey_credentials
-            .into_iter()
+        let current_passkey_credential_ids = current_passkey_credentials
+            .iter()
+            .map(|passkey_credential| {
+                StorableCredentialId::from_bytes(Cow::Borrowed(&passkey_credential.credential_id))
+            })
             .collect::<BTreeSet<_>>();
 
-        for passkey_credential in
-            previous_passkey_credentials.difference(&current_passkey_credentials)
+        for credential_id in
+            previous_passkey_credential_ids.difference(&current_passkey_credential_ids)
         {
-            let credential_id =
-                StorableCredentialId::from_bytes(Cow::Borrowed(&passkey_credential.credential_id));
-
             let Some(indexed_anchor_number) = self
                 .lookup_anchor_with_passkey_credential_memory
-                .get(&credential_id)
+                .get(credential_id)
             else {
                 continue;
             };
@@ -833,13 +841,10 @@ impl<M: Memory + Clone> Storage<M> {
             }
 
             self.lookup_anchor_with_passkey_credential_memory
-                .remove(&credential_id);
+                .remove(credential_id);
         }
 
-        for passkey_credential in current_passkey_credentials {
-            let credential_id =
-                StorableCredentialId::from_bytes(Cow::Borrowed(&passkey_credential.credential_id));
-
+        for credential_id in current_passkey_credential_ids {
             // Only insert if the credential id isn't yet assigned to an anchor.
             if self
                 .lookup_anchor_with_passkey_credential_memory

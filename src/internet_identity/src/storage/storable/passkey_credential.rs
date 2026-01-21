@@ -1,7 +1,7 @@
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use minicbor::{Decode, Encode};
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq)]
 #[cbor(map)]
 pub struct StorablePasskeyCredential {
     #[cbor(n(0), with = "minicbor::bytes")]

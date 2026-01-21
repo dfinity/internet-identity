@@ -831,10 +831,6 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), R
             pubkey[0..2].copy_from_slice(&i.to_le_bytes());
             webauthn.pubkey = ByteBuf::from(pubkey);
         }
-        // ~200 bytes of metadata to help fill memory
-        authn_method
-            .metadata
-            .insert("data".to_string(), MetadataEntryV2::String("a".repeat(200)));
 
         let identity_number = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
@@ -869,19 +865,21 @@ fn metrics_stable_memory_pages_should_increase_with_more_users() -> Result<(), R
     }
 
     let canister_stats = api::stats(&env, canister_id).unwrap();
-    assert!(canister_stats.users_registered >= 25);
+    assert_eq!(canister_stats.users_registered, 25);
 
     let metrics = get_metrics(&env, canister_id);
     let (pages_with_users, _) = parse_metric(
         &metrics,
         "internet_identity_virtual_memory_size_pages{memory=\"stable_identities\"}",
     );
-    if initial_memory_pages >= pages_with_users {
-        println!("Test failed. Metrics:\n{}", metrics);
-    }
-    assert!(
-        initial_memory_pages < pages_with_users,
-        "initial_memory_pages ({}) should be less than pages_with_users ({}) after registering 100 large anchors",
+
+    // Metrics are historically f64 values, but conceptually we expect integer values
+    let initial_memory_pages = initial_memory_pages as u64;
+    let pages_with_users = pages_with_users as u64;
+
+    assert_eq!(
+        initial_memory_pages + 1, pages_with_users,
+        "initial_memory_pages ({}) + 1 should be equal to pages_with_users ({}) after registering 25 large anchors",
         initial_memory_pages,
         pages_with_users
     );

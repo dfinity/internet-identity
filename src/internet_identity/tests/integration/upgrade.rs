@@ -1,9 +1,6 @@
 //! Tests for making sure that the current version can be upgraded to from the last release.
 //! This tests stable memory compatibility and pre / post install hooks.
 
-use std::time::Duration;
-
-use candid::Principal;
 use canister_tests::api::internet_identity as api;
 use canister_tests::flows;
 use canister_tests::framework::*;
@@ -11,9 +8,6 @@ use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
 use regex::Regex;
-use serde_bytes::ByteBuf;
-
-use crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name;
 
 /// Basic upgrade test.
 #[test]

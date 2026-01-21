@@ -49,9 +49,9 @@ fn upgrade_and_rollback_keeps_anchor_intact() {
     assert_eq!(devices_before, devices_after);
 }
 
+/* TODO: Reenable after the next upgrade
 /// Verifies that an anchor that was created with the new version of II can still be used when
 /// II is rolled back to the previous version.
-/* TODO: Reenable after the next upgrade
 #[test]
 fn should_keep_new_anchor_across_rollback() -> Result<(), RejectResponse> {
     let frontend_hostname = "frontend.com";
