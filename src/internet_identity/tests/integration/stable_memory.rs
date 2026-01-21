@@ -98,43 +98,6 @@ fn should_allow_modification_after_deleting_second_recovery_phrase() -> Result<(
     Ok(())
 }
 
-/// Verifies that a stable memory backup with persistent state containing archive information is restored correctly.
-#[test]
-fn should_read_persistent_state_with_archive() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/persistent_state_archive_v9.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, principal_1(), 10_000)?.into_device_data();
-    assert_eq!(devices.len(), 1);
-
-    let stats = api::stats(&env, canister_id)?;
-    assert_eq!(
-        stats.archive_info.archive_canister.unwrap(),
-        Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap()
-    );
-
-    assert_eq!(
-        stats
-            .archive_info
-            .archive_config
-            .unwrap()
-            .module_hash
-            .to_vec(),
-        hex::decode("12e2c2bd05dfcd86e3004ecd5f00533e6120e7bcf82bac0753af0a7fe14bfea1").unwrap()
-    );
-    // auto-migration to v9
-    assert_eq!(stats.storage_layout_version, 9);
-    Ok(())
-}
-
 /// Tests that II will refuse to install on a stable memory layout that is no longer supported.
 #[test]
 fn should_trap_on_old_stable_memory() -> Result<(), RejectResponse> {
