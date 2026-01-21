@@ -2,7 +2,7 @@ import { get } from "svelte/store";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { redirect } from "@sveltejs/kit";
 import { nonNullish } from "@dfinity/utils";
-import { PageLoad } from "./$types";
+import { PageLoad } from "../../../../../../../../.svelte-kit/types/src/frontend";
 
 let firstVisit = true;
 

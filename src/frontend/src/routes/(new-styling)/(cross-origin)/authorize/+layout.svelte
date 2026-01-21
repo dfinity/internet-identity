@@ -24,7 +24,7 @@
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte.js";
 
   const { children, data }: LayoutProps = $props();
 

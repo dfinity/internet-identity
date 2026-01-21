@@ -14,7 +14,7 @@
   } from "$lib/utils/analytics/authenticationV2Funnel";
   import { isNullish, nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte.js";
   import { plural, t } from "$lib/stores/locale.store";
   import Button from "$lib/components/ui/Button.svelte";
   import Toggle from "$lib/components/ui/Toggle.svelte";

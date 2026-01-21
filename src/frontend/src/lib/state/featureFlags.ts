@@ -81,15 +81,15 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
   true,
-  // TODO: Remove this once we move legacy domains to new interface
-  (featureFlag) => {
-    if (
-      window.location.hostname.startsWith("identity.") ||
-      window.location.hostname.startsWith("beta.identity.")
-    ) {
-      featureFlag.temporaryOverride(false);
-    }
-  },
+  // // TODO: Remove this once we move legacy domains to new interface
+  // (featureFlag) => {
+  //   if (
+  //     window.location.hostname.startsWith("identity.") ||
+  //     window.location.hostname.startsWith("beta.identity.")
+  //   ) {
+  //     featureFlag.temporaryOverride(false);
+  //   }
+  // },
 );
 
 export const ENABLE_ALL_LOCALES = createFeatureFlagStore(

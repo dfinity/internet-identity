@@ -33,29 +33,30 @@
 
 <svelte:head>
   {#if page.url.pathname === "/"}
-    <style>
-      html[data-temp-hide-ssg] body > div {
-        display: none !important;
-      }
+    <!--    <style>-->
+    <!--      html[data-temp-hide-ssg] body > div {-->
+    <!--        display: none !important;-->
+    <!--      }-->
 
-      html[data-temp-hide-ssg="legacy"] body {
-        /* Make sure page background matches legacy (--nvc-surface-dark in src/frontend/src/lib/legacy/styles/main.css) */
-        background: oklch(0.15 0.0236 261.52) !important;
-      }
-    </style>
+    <!--      html[data-temp-hide-ssg="legacy"] body {-->
+    <!--        /* Make sure page background matches legacy (&#45;&#45;nvc-surface-dark in src/frontend/src/lib/legacy/styles/main.css) */-->
+    <!--        background: oklch(0.15 0.0236 261.52) !important;-->
+    <!--      }-->
+    <!--    </style>-->
     <script>
-      if (
-        // TODO: Remove this branch once we move legacy domains to new interface
-        window.location.hostname.startsWith("identity.") ||
-        window.location.hostname.startsWith("beta.identity.")
-      ) {
-        // 1A. Hide page until it has fully loaded on legacy domains,
-        // this avoids showing the SSG landing page beforehand.
-        document.documentElement.setAttribute("data-temp-hide-ssg", "legacy");
-      } else if (window.location.hash.length > 0) {
+      // if (
+      //   // TODO: Remove this branch once we move legacy domains to new interface
+      //   window.location.hostname.startsWith("identity.") ||
+      //   window.location.hostname.startsWith("beta.identity.")
+      // ) {
+      //   // 1A. Hide page until it has fully loaded on legacy domains,
+      //   // this avoids showing the SSG landing page beforehand.
+      //   document.documentElement.setAttribute("data-temp-hide-ssg", "legacy");
+      // } else
+      if (window.location.hash.length > 0) {
         // 1B. Hide page until it has redirected on new domains,
         // this avoids showing the SSG landing page beforehand.
-        document.documentElement.setAttribute("data-temp-hide-ssg", "fragment");
+        // document.documentElement.setAttribute("data-temp-hide-ssg", "fragment");
       }
     </script>
   {/if}

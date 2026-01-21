@@ -13,6 +13,11 @@ import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
+import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
+import {
+  ForwardedMessage,
+  isForwardedMessage,
+} from "../../../../routes/(new-styling)/(cross-origin)/utils";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -111,8 +116,13 @@ export async function authenticationProtocol({
   "orphan" | "closed" | "invalid" | "success" | "failure" | "unverified-origin"
 > {
   authorizeClientFunnel.init();
+  const primaryOrigin = getPrimaryOrigin();
+  const isEmbedded =
+    primaryOrigin !== undefined &&
+    window.origin === primaryOrigin &&
+    window.self !== window.top;
 
-  if (window.opener === null) {
+  if (window.opener === null && !isEmbedded) {
     if (window.history.length > 1) {
       // If there's no `window.opener` and a user has manually navigated to "/#authorize".
       // Signal that there will never be an authentication request incoming.
@@ -128,7 +138,15 @@ export async function authenticationProtocol({
   // NOTE: Because `window.opener.origin` cannot be accessed, this message
   // is sent with "*" as the target origin. This is safe as no sensitive
   // information is being communicated here.
-  window.opener.postMessage(AuthReady, "*");
+  window.opener?.postMessage(AuthReady, "*");
+  // Also send a message to be forwarded to the parent window,
+  // in case the authorization flow is cross-origin embedded.
+  canisterConfig.related_origins[0]?.forEach((origin) =>
+    window.parent?.postMessage(
+      { __ii_forward: { data: AuthReady, origin: "*" } },
+      origin,
+    ),
+  );
 
   onProgress("waiting");
 
@@ -191,16 +209,24 @@ export async function authenticationProtocol({
   }
   void (authenticateResult.kind satisfies "success");
   authorizeClientFunnel.trigger(AuthorizeClientEvents.AuthenticateSuccess);
+  const response = {
+    kind: "authorize-client-success",
+    delegations: authenticateResult.delegations,
+    userPublicKey: authenticateResult.userPublicKey,
+    authnMethod: authenticateResult.authnMethod,
+  } satisfies AuthResponse;
 
-  window.opener.postMessage(
-    {
-      kind: "authorize-client-success",
-      delegations: authenticateResult.delegations,
-      userPublicKey: authenticateResult.userPublicKey,
-      authnMethod: authenticateResult.authnMethod,
-    } satisfies AuthResponse,
-    authContext.requestOrigin,
-  );
+  if (requestResult.forwardFromOrigin !== undefined) {
+    const message: ForwardedMessage = {
+      __ii_forwarded: {
+        data: response,
+        origin: authContext.requestOrigin,
+      },
+    };
+    window.parent.postMessage(message, requestResult.forwardFromOrigin);
+  } else {
+    window.opener.postMessage(response, authContext.requestOrigin);
+  }
 
   return "success";
 }
@@ -211,6 +237,8 @@ const waitForRequest = (): Promise<
       kind: "received";
       request: AuthRequest;
       origin: string;
+      // Optional trusted II origin that forwarded the message
+      forwardFromOrigin?: string;
     }
   | { kind: "timeout" }
   | { kind: "invalid" }
@@ -222,11 +250,23 @@ const waitForRequest = (): Promise<
     );
     const messageEventHandler = (event: MessageEvent) => {
       if (event.origin === window.location.origin) {
-        // Ignore messages from own origin (e.g. from browser extensions)
+        // Ignore messages from own origin (e.g. from browser extensions),
         console.warn("Ignoring message from own origin", event);
         return;
       }
-      const message: unknown = event.data;
+      const {
+        message,
+        origin,
+        forwardFromOrigin,
+      }: { message: unknown; origin: string; forwardFromOrigin?: string } =
+        canisterConfig.related_origins[0]?.includes(event.origin) === true &&
+        isForwardedMessage(event)
+          ? {
+              message: event.data.__ii_forwarded.data,
+              origin: event.data.__ii_forwarded.origin,
+              forwardFromOrigin: event.origin,
+            }
+          : { message: event.data, origin: event.origin };
       const result = AuthRequest.safeParse(message);
 
       if (!result.success) {
@@ -248,7 +288,12 @@ const waitForRequest = (): Promise<
       clearTimeout(timeout);
       window.removeEventListener("message", messageEventHandler);
 
-      resolve({ kind: "received", request: result.data, origin: event.origin });
+      resolve({
+        kind: "received",
+        request: result.data,
+        origin,
+        forwardFromOrigin,
+      });
     };
 
     // Set up an event listener for receiving messages from the client.
