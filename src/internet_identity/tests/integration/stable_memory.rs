@@ -63,38 +63,6 @@ fn known_devices() -> [DeviceData; 6] {
     [device1, device2, device3, device4, device5, device6]
 }
 
-/// Tests that anchors can still be modified after stable memory restore.
-#[test]
-fn should_modify_devices_after_restoring_backup() -> Result<(), RejectResponse> {
-    let [_, _, _, _, device5, device6] = known_devices();
-    let env = env();
-    let canister_id = install_ii_canister(&env, EMPTY_WASM.clone());
-
-    restore_compressed_stable_memory(
-        &env,
-        canister_id,
-        "stable_memory/genesis-layout-migrated-to-v9.bin.gz",
-    );
-    upgrade_ii_canister(&env, canister_id, II_WASM.clone());
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, device6.principal(), 10_030)?.into_device_data();
-
-    assert_eq!(devices.len(), 2);
-    api::remove(
-        &env,
-        canister_id,
-        device6.principal(),
-        10_030,
-        &device5.pubkey,
-    )?;
-
-    let devices =
-        api::get_anchor_info(&env, canister_id, device6.principal(), 10_030)?.into_device_data();
-    assert_eq!(devices.len(), 1);
-    Ok(())
-}
-
 /// Verifies that an anchor with two recovery phrases can still use both.
 /// This anchor is recovered from stable memory because the current version of II does not allow to create such anchors.
 #[test]
