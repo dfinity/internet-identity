@@ -39,7 +39,7 @@
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { toaster } from "$lib/components/utils/toaster";
 
-  const MAX_PASSKEYS = 8;
+  const MAX_PASSKEYS = 16;
 
   const { data }: PageProps = $props();
 
