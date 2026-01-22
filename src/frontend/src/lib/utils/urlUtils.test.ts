@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSameOrigin } from "./urlUtils";
+import { isSameOrigin, toRelative } from "./urlUtils";
 
 describe("urlUtils", () => {
   describe("isSameOrigin", () => {
@@ -69,6 +69,51 @@ describe("urlUtils", () => {
     it("should handle invalid URLs by falling back to string comparison", () => {
       expect(isSameOrigin("invalid-url", "invalid-url")).toBe(true);
       expect(isSameOrigin("invalid-url", "another-invalid-url")).toBe(false);
+    });
+  });
+
+  describe("toRelative", () => {
+    describe("absolute URLs", () => {
+      it("returns path, query, and hash for absolute URL", () => {
+        expect(
+          toRelative("https://example.com/hello/world?abc=1&xyz=2#hello"),
+        ).toBe("/hello/world?abc=1&xyz=2#hello");
+      });
+
+      it("returns '/' for absolute URL without path (root)", () => {
+        expect(toRelative("https://example.com")).toBe("/");
+      });
+
+      it("preserves query and hash for origin-only absolute URL", () => {
+        expect(toRelative("https://example.com?x=1#y")).toBe("/?x=1#y");
+      });
+
+      it("resolves protocol-relative URLs to path only", () => {
+        expect(toRelative("//example.com/path/to")).toBe("/path/to");
+      });
+    });
+
+    describe("relative inputs", () => {
+      it("returns input unchanged when already relative with leading slash", () => {
+        expect(toRelative("/hello/world?abc=1&xyz=2#hello")).toBe(
+          "/hello/world?abc=1&xyz=2#hello",
+        );
+      });
+
+      it("normalizes relative path without leading slash", () => {
+        expect(toRelative("hello/world")).toBe("/hello/world");
+      });
+
+      it("anchors hash-only input to root", () => {
+        expect(toRelative("#section")).toBe("/#section");
+      });
+    });
+
+    describe("invalid inputs", () => {
+      it("returns null for invalid URL strings", () => {
+        // Missing hostname with explicit protocol is invalid even with a base
+        expect(toRelative("http://")).toBeNull();
+      });
     });
   });
 });

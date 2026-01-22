@@ -305,3 +305,24 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
     },
   );
 });
+
+test("Open dashboard from authorize page", async ({ page }) => {
+  const auth = dummyAuth();
+  await authorize(page, async (authPage) => {
+    await authPage
+      .getByRole("button", { name: "Continue with Passkey" })
+      .click();
+    await authPage.getByRole("button", { name: "Create new identity" }).click();
+    await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
+    auth(authPage);
+    await authPage.getByRole("button", { name: "Create identity" }).click();
+    await authPage.getByRole("button", { name: "Switch identity" }).click();
+    const pagePromise = page.context().waitForEvent("page");
+    await authPage.getByRole("button", { name: "Manage identity" }).click();
+    const managePage = await pagePromise;
+    await expect(managePage).toHaveURL(II_URL + "/internal-auth");
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
+});

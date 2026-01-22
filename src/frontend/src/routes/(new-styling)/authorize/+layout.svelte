@@ -25,6 +25,8 @@
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { openWindowWithAuth } from "../internal-auth/utils";
+  import ContinueToManage from "$lib/components/views/ContinueToManage.svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -42,6 +44,7 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isContinueToManageDialogOpen = $state(false);
 
   const handleSignIn = async (identityNumber: bigint) => {
     isAuthenticating = true;
@@ -67,6 +70,25 @@
   const handleUpgrade = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
     await goto("/authorize/upgrade-success");
+  };
+  const handleManageIdentity = async () => {
+    if ($authenticationStore !== undefined) {
+      handleContinueToManageIdentity();
+    } else {
+      // If not authenticated yet, we'll need to authenticate and then show a
+      // dialog to continue, since opening a window requires user interaction.
+      await handleSignIn(selectedIdentity!.identityNumber);
+      isContinueToManageDialogOpen = true;
+    }
+  };
+  const handleContinueToManageIdentity = () => {
+    if ($authenticationStore === undefined) {
+      return;
+    }
+    // Now that we've authenticated and have a user interaction,
+    // we can open a new window and send authentication to it.
+    openWindowWithAuth("/manage", $authenticationStore);
+    isContinueToManageDialogOpen = false;
   };
 
   onMount(() => {
@@ -137,6 +159,7 @@
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
             }}
+            onManageIdentity={handleManageIdentity}
             onError={(error) => {
               isIdentityPopoverOpen = false;
               handleError(error);
@@ -189,6 +212,12 @@
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+{#if isContinueToManageDialogOpen && $authenticationStore}
+  <Dialog onClose={() => (isContinueToManageDialogOpen = false)}>
+    <ContinueToManage onContinue={handleContinueToManageIdentity} />
+  </Dialog>
+{/if}
 
 <!-- Renders any error status or late success status dialog when needed -->
 <AuthorizeError {status} />
