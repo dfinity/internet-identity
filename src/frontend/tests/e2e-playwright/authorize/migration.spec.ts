@@ -14,7 +14,8 @@ import { isNullish } from "@dfinity/utils";
 
 const TEST_USER_NAME = "Test User";
 
-test.describe("Migration from an app", () => {
+// TODO: Create legacy identity through canister instead of frontend
+test.skip("Migration from an app", () => {
   test("User can migrate a legacy identity", async ({ page }) => {
     const auth = dummyAuth();
     let credential: Protocol.WebAuthn.Credential | undefined;

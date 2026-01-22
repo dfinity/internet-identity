@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { LayoutProps } from "../$types";
+  import type { LayoutProps } from "./$types";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import { fly, scale } from "svelte/transition";
   import { nonNullish } from "@dfinity/utils";

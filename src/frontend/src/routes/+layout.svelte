@@ -1,12 +1,40 @@
 <script lang="ts">
   import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
-  import { canisterConfig } from "$lib/globals";
+  import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
   import { onMount } from "svelte";
   import { page } from "$app/state";
 
   const { children } = $props();
 
   onMount(() => {
+    // Always redirect to primary origin
+    const primaryOrigin = getPrimaryOrigin();
+    if (
+      primaryOrigin !== undefined &&
+      window.location.origin !== primaryOrigin &&
+      // Don't redirect if we're coming from legacy AuthClient
+      !(
+        window.location.pathname === "/" &&
+        window.location.hash === "#authorize"
+      ) &&
+      // Don't redirect if we're visiting legacy verifiable credentials
+      window.location.pathname !== "/vc-flow" &&
+      // Don't redirect if we're visiting self-service
+      window.location.pathname !== "/self-service" &&
+      // Don't redirect if we're visiting webauthn iframe used for migration
+      window.location.pathname !== "/iframe/webauthn" &&
+      // TODO: Remove this once we move all legacy domains to new interface
+      !window.location.origin.endsWith("identity.internetcomputer.org")
+    ) {
+      window.location.replace(
+        primaryOrigin +
+          window.location.pathname +
+          window.location.search +
+          window.location.hash,
+      );
+      return;
+    }
+
     // 2. Show page once it has fully loaded (see app.html)
     document.documentElement.removeAttribute("data-hide-ssg");
 
@@ -45,9 +73,9 @@
     </style>
     <script>
       if (
-        // TODO: Remove this branch once we move legacy domains to new interface
-        window.location.hostname.startsWith("identity.") ||
-        window.location.hostname.startsWith("beta.identity.")
+        // TODO: Remove this branch once we move all legacy domains to new interface
+        window.location.origin === "https://identity.internetcomputer.org" ||
+        window.location.origin === "https://beta.identity.internetcomputer.org"
       ) {
         // 1A. Hide page until it has fully loaded on legacy domains,
         // this avoids showing the SSG landing page beforehand.

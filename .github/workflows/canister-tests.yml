@@ -461,7 +461,6 @@ jobs:
               domain: "https://identity.internetcomputer.org",
               captcha: "enabled",
             },
-            { domain: "https://identity.ic0.app", captcha: "disabled" },
           ]
         # Specify some shards for jest (a jest instance will only run a subset of files
         # based on the shard assigned to it)

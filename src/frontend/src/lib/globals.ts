@@ -37,3 +37,7 @@ export const initGlobals = () => {
     canisterId,
   });
 };
+
+// Get primary origin (either https://id.ai or https://beta.id.ai) when deployed on beta or prod
+export const getPrimaryOrigin = () =>
+  canisterConfig.related_origins[0]?.find((origin) => origin.endsWith("id.ai"));
