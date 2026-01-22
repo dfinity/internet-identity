@@ -267,7 +267,7 @@ test("User can add a new passkey and use it with cached identity without clearin
   await newPage.close();
 });
 
-test("User can log into the dashboard and add up to 7 additional passkeys", async ({
+test("User can log into the dashboard and add up to 15 additional passkeys", async ({
   page,
 }) => {
   const auth = dummyAuth();
@@ -297,15 +297,15 @@ test("User can log into the dashboard and add up to 7 additional passkeys", asyn
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
 
-  // Add 7 more passkeys
-  for (let i = 0; i < 7; i++) {
+  // Add 15 more passkeys
+  for (let i = 0; i < 15; i++) {
     await addPasskeyCurrentDevice(page, dummyAuth());
   }
 
-  // Verify we have 8 passkeys
+  // Verify we have 16 passkeys
   await expect(
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
-  ).toHaveCount(8);
+  ).toHaveCount(16);
 
   // Verify we cannot add more passkeys
   await page.getByRole("button", { name: "Add new" }).click();
