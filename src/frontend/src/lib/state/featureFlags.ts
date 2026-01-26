@@ -1,6 +1,7 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
 import { isNullish, nonNullish } from "@dfinity/utils";
+import { getPrimaryOrigin } from "$lib/globals";
 
 declare global {
   interface Window {
@@ -97,7 +98,20 @@ export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
   false,
 );
 
-export const GUIDED_UPGRADE = createFeatureFlagStore("GUIDED_UPGRADE", false);
+export const GUIDED_UPGRADE = createFeatureFlagStore(
+  "GUIDED_UPGRADE",
+  false,
+  // Enable guide upgrade flow if page is visited from domain other than id.ai
+  (featureFlag) => {
+    const primaryOrigin = getPrimaryOrigin();
+    if (
+      primaryOrigin !== undefined &&
+      primaryOrigin !== window.location.origin
+    ) {
+      featureFlag.temporaryOverride(true);
+    }
+  },
+);
 
 export default {
   DOMAIN_COMPATIBILITY,

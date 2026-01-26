@@ -6,7 +6,14 @@
   const { children, data }: LayoutProps = $props();
 
   const primaryOrigin = getPrimaryOrigin();
+  const isDesktopSafari =
+    /^((?!chrome|chromium|android|edg|opr|firefox).)*safari/i.test(
+      navigator.userAgent,
+    ) && !/mobile/i.test(navigator.userAgent);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const supportsIframeCredentialsCreate = !isIOS && !isDesktopSafari;
   const shouldEmbed =
+    supportsIframeCredentialsCreate &&
     data.legacyProtocol &&
     primaryOrigin !== undefined &&
     window.location.origin !== primaryOrigin;
