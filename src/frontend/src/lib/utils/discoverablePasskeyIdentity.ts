@@ -9,6 +9,7 @@ import borc from "borc";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { extractAAGUID } from "$lib/utils/webAuthn";
 import { bufFromBufLike } from "$lib/utils/utils";
+import { getPrimaryOrigin } from "$lib/globals";
 
 /**
  * From the documentation;
@@ -273,42 +274,54 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
 
 export const creationOptions = (
   name: string,
-): CredentialCreationOptionsWithoutChallenge => ({
-  publicKey: {
-    // Identify the AAGUID of the passkey provider
-    attestation: "direct",
-    authenticatorSelection: {
-      // For maximum compatibility with various passkey provider,
-      // should not be set to either platform or cross-platform.
-      authenticatorAttachment: undefined,
-      // Require passkeys to verify the user e.g. TouchID
-      userVerification: "required",
-      // Require passkeys to be discoverable
-      residentKey: "required",
-      requireResidentKey: true,
+): CredentialCreationOptionsWithoutChallenge => {
+  const primaryOrigin = getPrimaryOrigin();
+  return {
+    publicKey: {
+      // Identify the AAGUID of the passkey provider
+      attestation: "direct",
+      authenticatorSelection: {
+        // For maximum compatibility with various passkey provider,
+        // should not be set to either platform or cross-platform.
+        authenticatorAttachment: undefined,
+        // Require passkeys to verify the user e.g. TouchID
+        userVerification: "required",
+        // Require passkeys to be discoverable
+        residentKey: "required",
+        requireResidentKey: true,
+      },
+      // extensions: {
+      //   credProps: true,
+      // },
+      // Algorithms supported by the Internet Computer
+      pubKeyCredParams: [
+        { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
+        { type: "public-key", alg: PubKeyCoseAlgo.ED25519 },
+        { type: "public-key", alg: PubKeyCoseAlgo.RSA_WITH_SHA256 },
+      ],
+      // How II will identify itself
+      rp: {
+        name: "Internet Identity Service",
+        // Discoverable passkeys should always be created for primary origin,
+        // mostly this is through an iframe, but it's unsupported in Safari.
+        //
+        // Therefore, we fall back to using related origin requests in Safari.
+        id:
+          primaryOrigin !== undefined &&
+          primaryOrigin !== window.location.origin
+            ? new URL(primaryOrigin).hostname
+            : undefined,
+      },
+      // User id is set to a random value since it's not used by II,
+      // the passkey is created before the actual user is created.
+      user: {
+        id: window.crypto.getRandomValues(new Uint8Array(16)),
+        displayName: name,
+        name,
+      },
     },
-    // extensions: {
-    //   credProps: true,
-    // },
-    // Algorithms supported by the Internet Computer
-    pubKeyCredParams: [
-      { type: "public-key", alg: PubKeyCoseAlgo.ECDSA_WITH_SHA256 },
-      { type: "public-key", alg: PubKeyCoseAlgo.ED25519 },
-      { type: "public-key", alg: PubKeyCoseAlgo.RSA_WITH_SHA256 },
-    ],
-    // How II will identify itself
-    rp: {
-      name: "Internet Identity Service",
-    },
-    // User id is set to a random value since it's not used by II,
-    // the passkey is created before the actual user is created.
-    user: {
-      id: window.crypto.getRandomValues(new Uint8Array(16)),
-      displayName: name,
-      name,
-    },
-  },
-});
+  };
+};
 
 export const requestOptions = (
   credentialIds?: Uint8Array[],
