@@ -22,9 +22,7 @@
       // Don't redirect if we're visiting self-service
       window.location.pathname !== "/self-service" &&
       // Don't redirect if we're visiting webauthn iframe used for migration
-      window.location.pathname !== "/iframe/webauthn" &&
-      // TODO: Remove this once we move all legacy domains to new interface
-      !window.location.origin.endsWith("identity.internetcomputer.org")
+      window.location.pathname !== "/iframe/webauthn"
     ) {
       window.location.replace(
         primaryOrigin +
@@ -65,22 +63,9 @@
       html[data-temp-hide-ssg] body > div {
         display: none !important;
       }
-
-      html[data-temp-hide-ssg="legacy"] body {
-        /* Make sure page background matches legacy (--nvc-surface-dark in src/frontend/src/lib/legacy/styles/main.css) */
-        background: oklch(0.15 0.0236 261.52) !important;
-      }
     </style>
     <script>
-      if (
-        // TODO: Remove this branch once we move all legacy domains to new interface
-        window.location.origin === "https://identity.internetcomputer.org" ||
-        window.location.origin === "https://beta.identity.internetcomputer.org"
-      ) {
-        // 1A. Hide page until it has fully loaded on legacy domains,
-        // this avoids showing the SSG landing page beforehand.
-        document.documentElement.setAttribute("data-temp-hide-ssg", "legacy");
-      } else if (window.location.hash.length > 0) {
+      if (window.location.hash.length > 0) {
         // 1B. Hide page until it has redirected on new domains,
         // this avoids showing the SSG landing page beforehand.
         document.documentElement.setAttribute("data-temp-hide-ssg", "fragment");
