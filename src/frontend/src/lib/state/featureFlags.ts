@@ -82,15 +82,6 @@ export const HARDWARE_KEY_TEST = createFeatureFlagStore(
 export const DISCOVERABLE_PASSKEY_FLOW = createFeatureFlagStore(
   "DISCOVERABLE_PASSKEY_FLOW",
   true,
-  // TODO: Remove this once we move all legacy domains to new interface
-  (featureFlag) => {
-    if (
-      window.location.origin === "https://identity.internetcomputer.org" ||
-      window.location.origin === "https://beta.identity.internetcomputer.org"
-    ) {
-      featureFlag.temporaryOverride(false);
-    }
-  },
 );
 
 export const ENABLE_ALL_LOCALES = createFeatureFlagStore(
