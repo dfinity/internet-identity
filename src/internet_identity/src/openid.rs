@@ -115,15 +115,16 @@ impl OpenIdCredential {
         )
     }
 
-    pub async fn prepare_jwt_attributes_no_root_hash_update(
+    /// Does not ensure the salt is initialized.
+    ///
+    /// Does not update the root hash, intended to be used in contexts where multiple.
+    pub fn prepare_jwt_attributes_no_root_hash_update(
         &self,
         session_key: SessionKey,
         anchor_number: AnchorNumber,
         attributes: &Vec<(String, String)>,
         issued_at_timestamp_ns: Timestamp,
     ) {
-        state::ensure_salt_set().await;
-
         let expiration_timestamp_ns =
             issued_at_timestamp_ns.saturating_add(OPENID_SESSION_DURATION_NS);
         let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);

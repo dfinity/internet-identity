@@ -19,6 +19,7 @@ pub type FailedAttemptsCounter = u8;
 pub type AccountNumber = u64;
 
 mod api_v2;
+pub mod attributes;
 pub mod openid;
 pub mod vc_mvp;
 

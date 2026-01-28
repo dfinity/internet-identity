@@ -10,6 +10,7 @@ use ic_canister_sig_creation::{
 };
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
+use ic_representation_independent_hash::{representation_independent_hash, Value};
 use internet_identity_interface::internet_identity::types::*;
 use sha2::{Digest, Sha256};
 use std::net::IpAddr;
@@ -151,6 +152,24 @@ pub fn add_attribute_signature(
     attribute_value: &str,
     expiration: Timestamp,
 ) {
+    // TODO: This function should eventually be moved to a library crete.
+    fn attribute_signature_msg(
+        pubkey: &[u8],
+        attribute_key: &str,
+        attribute_value: &str,
+        expiration: u64,
+    ) -> Vec<u8> {
+        let m: Vec<(String, Value)> = vec![
+            ("pubkey".into(), Value::Bytes(pubkey.to_vec())),
+            ("expiration".into(), Value::Number(expiration)),
+            (
+                attribute_key.into(),
+                Value::String(attribute_value.to_string()),
+            ),
+        ];
+        representation_independent_hash(m.as_slice()).to_vec()
+    }
+
     let inputs = CanisterSigInputs {
         domain: b"ii-request-attribute",
         seed,
