@@ -1,0 +1,16 @@
+{
+  "canisters": {
+    "google_signin_demo": {
+      "type": "custom",
+      "candid": "google_signin_demo.did",
+      "wasm": "google_signin_demo.wasm",
+      "build": "./build.sh"
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": ""
+    }
+  },
+  "version": 1
+}

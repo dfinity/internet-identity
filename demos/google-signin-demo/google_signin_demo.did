@@ -1,0 +1,27 @@
+type HeaderField = record { text; text; };
+
+type HttpRequest = record {
+    method: text;
+    url: text;
+    headers: vec HeaderField;
+    body: blob;
+    certificate_version: opt nat16;
+};
+
+type HttpResponse = record {
+    status_code: nat16;
+    headers: vec HeaderField;
+    body: blob;
+};
+
+type AlternativeOriginsMode = variant {
+    CertifiedContent;
+    UncertifiedContent;
+    Redirect: record { location: text; };
+}
+
+service : {
+  whoami: () -> (principal) query;
+  update_alternative_origins: (text, AlternativeOriginsMode) -> ();
+  http_request: (request: HttpRequest) -> (HttpResponse) query;
+}
