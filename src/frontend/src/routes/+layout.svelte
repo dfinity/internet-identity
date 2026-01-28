@@ -22,7 +22,9 @@
       // Don't redirect if we're visiting self-service
       window.location.pathname !== "/self-service" &&
       // Don't redirect if we're visiting webauthn iframe used for migration
-      window.location.pathname !== "/iframe/webauthn"
+      window.location.pathname !== "/iframe/webauthn" &&
+      // Don't redirect if we're visiting callback used for OpenID flows
+      window.location.pathname !== "/callback"
     ) {
       window.location.replace(
         primaryOrigin +
