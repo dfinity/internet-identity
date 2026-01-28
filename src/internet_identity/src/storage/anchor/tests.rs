@@ -48,14 +48,14 @@ fn should_modify_device() {
 #[test]
 fn should_enforce_max_number_of_devices() {
     let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
-    for i in 0..10 {
+    for i in 0..20 {
         anchor.add_device(device(i)).unwrap();
     }
 
-    let result = anchor.add_device(device(10));
+    let result = anchor.add_device(device(20));
 
     assert!(matches!(result, Err(AnchorError::TooManyDevices { .. })));
-    assert_eq!(anchor.devices().len(), 10);
+    assert_eq!(anchor.devices().len(), 20);
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn should_enforce_unique_device_keys() {
 fn should_enforce_cumulative_device_limit() {
     let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
 
-    for i in 0..4 {
+    for i in 0..8 {
         anchor.add_device(large_device(i)).unwrap();
     }
     let device = Device {
@@ -140,7 +140,7 @@ fn should_enforce_cumulative_device_limit() {
         result,
         Err(AnchorError::CumulativeDataLimitExceeded { .. })
     ));
-    assert_eq!(anchor.devices().len(), 4);
+    assert_eq!(anchor.devices().len(), 8);
 }
 
 #[test]
@@ -149,7 +149,7 @@ fn should_enforce_cumulative_size_limit_on_identity_metadata() {
 
     let metadata = HashMap::from_iter(vec![(
         "some key".to_string(),
-        MetadataEntry::String("a".repeat(3000)),
+        MetadataEntry::String("a".repeat(5001)),
     )]);
 
     let result = anchor.replace_identity_metadata(metadata);
@@ -165,7 +165,7 @@ fn should_enforce_cumulative_size_limit_on_identity_metadata() {
 fn should_enforce_cumulative_size_limit_on_device_and_metadata() {
     let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
 
-    for i in 0..4 {
+    for i in 0..8 {
         anchor.add_device(large_device(i)).unwrap();
     }
     let metadata = HashMap::from_iter(vec![(

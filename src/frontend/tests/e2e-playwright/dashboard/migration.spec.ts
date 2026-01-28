@@ -41,7 +41,8 @@ const upgradeLegacyIdentity = async (
   await dialog.getByRole("button", { name: "Upgrade identity" }).click();
 };
 
-test.describe("Migration", () => {
+// TODO: Create legacy identity through canister instead of frontend
+test.skip("Migration", () => {
   test("User can migrate a legacy identity", async ({ page }) => {
     // Step 1: Create a legacy identity
     await page.goto(LEGACY_II_URL);

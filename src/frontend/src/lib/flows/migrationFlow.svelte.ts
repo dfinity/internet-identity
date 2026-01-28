@@ -166,7 +166,8 @@ export class MigrationFlow {
   ): Promise<Omit<DeviceData, "alias">[]> => {
     const actor = await get(sessionStore).actor;
     const allDevices = await actor.lookup(userNumber);
-    return allDevices.filter((device) => "authentication" in device.purpose);
+    // Attempt to authenticate with any device that has a credential id
+    return allDevices.filter((device) => device.credential_id[0] !== undefined);
   };
 
   #authenticate = async ({

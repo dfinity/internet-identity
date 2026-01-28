@@ -421,7 +421,7 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
 }
 
 pub fn verify_security_headers(headers: &[HeaderField], related_origins: &Option<Vec<String>>) {
-    let public_key_credentials_get = related_origins
+    let public_key_credentials_create_get = related_origins
         .clone()
         .unwrap_or_default()
         .iter()
@@ -458,7 +458,8 @@ midi=(),\
 navigation-override=(),\
 payment=(),\
 picture-in-picture=(),\
-publickey-credentials-get=({public_key_credentials_get}),\
+publickey-credentials-create=({public_key_credentials_create_get}),\
+publickey-credentials-get=({public_key_credentials_create_get}),\
 screen-wake-lock=(),\
 serial=(),\
 speaker-selection=(),\

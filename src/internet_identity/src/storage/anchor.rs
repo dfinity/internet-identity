@@ -5,9 +5,7 @@ use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
-use crate::{
-    ANCHOR_MIGRATION_SPECIAL_CASES, IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN,
-};
+use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
@@ -309,50 +307,6 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     (credential_id, special_device_migration)
                 }
             };
-
-            // Store special cases to aid observability (they will also be persisted in stable memory).
-            if let Some(special_device_migration) = &special_device_migration {
-                // To avoid storing too much data on the heap, we filter this down to only contain
-                // the most exotic cases.
-
-                let is_valid_passkey_but_without_an_origin = matches!(
-                    (&credential_id, purpose, key_type, origin, protection),
-                    (
-                        Some(_),
-                        Purpose::Authentication,
-                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
-                        None,
-                        DeviceProtection::Unprotected,
-                    )
-                );
-
-                let is_recovery_passkey = matches!(
-                    (&credential_id, purpose, key_type, protection),
-                    (
-                        Some(_),
-                        Purpose::Recovery,
-                        KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
-                        DeviceProtection::Unprotected,
-                    )
-                );
-
-                let is_legacy_pin_flow = matches!(
-                    (&credential_id, purpose, key_type),
-                    (None, Purpose::Authentication, KeyType::BrowserStorageKey)
-                );
-
-                if !is_valid_passkey_but_without_an_origin
-                    && !is_recovery_passkey
-                    && !is_legacy_pin_flow
-                {
-                    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow_mut(|cases| {
-                        cases
-                            .entry(anchor_number)
-                            .or_default()
-                            .push(special_device_migration.clone())
-                    })
-                }
-            }
 
             if let Some(credential_id) = credential_id {
                 let alias = if alias.is_empty() {
@@ -1035,20 +989,20 @@ fn check_anchor_invariants(
     identity_metadata: &Option<HashMap<String, MetadataEntry>>,
 ) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further
-    /// by only allowing 8 devices with purpose `authentication` to make sure there is always
+    /// by only allowing 16 devices with purpose `authentication` to make sure there is always
     /// a slot for the recovery devices.
     /// Note however, that a free device slot does not guarantee that it will fit the anchor
     /// due to the `VARIABLE_FIELDS_LIMIT`.
-    const MAX_DEVICES_PER_ANCHOR: usize = 10;
+    const MAX_DEVICES_PER_ANCHOR: usize = 20;
 
     /// One device can fill more than one tenth of the available space for a single anchor (4 KB)
     /// with the variable length fields alone.
     /// In order to not give away all the anchor space to the device vector and identity metadata,
     /// we limit the sum of the size of all variable fields of all devices plus the identity metadata.
     /// This ensures that we have the flexibility to expand or change anchors in the future.
-    /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
-    /// plus an additional 452 bytes to fit new fields introduced since.
-    const VARIABLE_FIELDS_LIMIT: usize = 2500;
+    /// The limit is chosen to accommodate pre-memory-migration anchors (limited to 2048 bytes)
+    /// while leaving additional room for new fields introduced since.
+    const VARIABLE_FIELDS_LIMIT: usize = 5000;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
         return Err(AnchorError::TooManyDevices {

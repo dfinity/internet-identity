@@ -101,7 +101,7 @@ pub fn register(
 
     // write anchor to stable memory
     state::storage_borrow_mut(|storage| {
-        storage.create(anchor).unwrap_or_else(|err| {
+        storage.write(anchor).unwrap_or_else(|err| {
             trap(&format!(
                 "failed to write data of anchor {anchor_number}: {err}"
             ))
