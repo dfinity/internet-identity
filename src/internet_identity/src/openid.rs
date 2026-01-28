@@ -1,4 +1,6 @@
-use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
+use crate::delegation::{
+    add_attribute_signature, add_delegation_signature, der_encode_canister_sig_key,
+};
 use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
 use candid::{CandidType, Deserialize, Principal};
@@ -111,6 +113,34 @@ impl OpenIdCredential {
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
             expiration,
         )
+    }
+
+    pub async fn prepare_jwt_attributes_no_root_hash_update(
+        &self,
+        session_key: SessionKey,
+        anchor_number: AnchorNumber,
+        attributes: &Vec<(String, String)>,
+        issued_at_timestamp_ns: Timestamp,
+    ) {
+        state::ensure_salt_set().await;
+
+        let expiration_timestamp_ns =
+            issued_at_timestamp_ns.saturating_add(OPENID_SESSION_DURATION_NS);
+        let seed = calculate_delegation_seed(&self.aud, &self.key(), anchor_number);
+
+        state::signature_map_mut(|sigs| {
+            for (attribute_key, attribute_value) in attributes {
+                let pk = session_key.clone();
+                add_attribute_signature(
+                    sigs,
+                    pk,
+                    &seed,
+                    attribute_key,
+                    attribute_value,
+                    expiration_timestamp_ns,
+                );
+            }
+        });
     }
 
     pub fn get_jwt_delegation(

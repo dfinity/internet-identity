@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -xeuo pipefail
 
 # Usage: ./deploy-pr-to-beta <PR_NUMBER>
 PR_NUMBER="$1"
@@ -19,7 +19,7 @@ ARTIFACT_NAME="internet_identity_production.wasm.gz"
 ZIP_FILE="$ARTIFACT_NAME.zip"
 EXTRACTED_FILE="$ARTIFACT_NAME"
 WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
-BETA_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
+BETA_CANISTER_ID="jqajs-xiaaa-aaaad-aab5q-cai"
 
 # -------------------------
 # Cleanup handler
@@ -100,6 +100,8 @@ dfx canister \
     --wallet "$WALLET_CANISTER_ID" \
     install "$BETA_CANISTER_ID" \
     --mode upgrade \
+    --upgrade-unchanged \
+    --argument-file arg.txt \
     --wasm "$ROOT_DIR/$EXTRACTED_FILE"
 
 echo "Upgrade complete."

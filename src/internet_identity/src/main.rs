@@ -1,6 +1,7 @@
 use crate::anchor_management::tentative_device_registration;
 use crate::archive::ArchiveState;
 use crate::assets::init_assets;
+use crate::attribute_sharing::PrepareAttributeRequest;
 use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
@@ -1210,8 +1211,258 @@ mod openid_api {
     }
 }
 
+mod attribute_sharing {
+    use super::*;
+    use candid::CandidType;
+    use serde::{Deserialize, Serialize};
+    use std::collections::{BTreeMap, BTreeSet};
+
+    #[derive(PartialEq, Eq, PartialOrd, Ord)]
+    enum AttributeField {
+        Email,
+        Name,
+    }
+
+    impl TryFrom<&str> for AttributeField {
+        type Error = String;
+
+        fn try_from(value: &str) -> Result<Self, Self::Error> {
+            match value {
+                "email" => Ok(AttributeField::Email),
+                "name" => Ok(AttributeField::Name),
+                _ => Err(format!("Unknown attribute: {}", value)),
+            }
+        }
+    }
+
+    impl std::fmt::Display for AttributeField {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                AttributeField::Email => write!(f, "email"),
+                AttributeField::Name => write!(f, "name"),
+            }
+        }
+    }
+
+    #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+    enum AttributeScope {
+        Default,
+        OpenId { issuer: String },
+    }
+
+    impl TryFrom<String> for AttributeScope {
+        type Error = String;
+
+        /// Splits by ':', setting the attribute scope to the first component and processing
+        /// possible additional attributes as needed.
+        ///
+        /// The special value `AttributeScope::Default` cannot be constructed via this method
+        /// and needs to be constructed directly.
+        fn try_from(value: String) -> Result<Self, Self::Error> {
+            let mut parts = value.splitn(2, ':');
+            let scope_str = parts
+                .next()
+                .ok_or_else(|| format!("Invalid attribute request: {}", value))?;
+            match scope_str {
+                "openid" => {
+                    let issuer = parts
+                        .next()
+                        .ok_or_else(|| format!("Missing issuer in attribute scope: {}", value))?
+                        .to_string();
+                    Ok(AttributeScope::OpenId { issuer })
+                }
+                _ => Err(format!("Unknown attribute scope: {}", scope_str)),
+            }
+        }
+    }
+
+    #[derive(PartialEq, Eq, PartialOrd, Ord)]
+    struct AttributeRequest {
+        pub scope: AttributeScope,
+        pub field: AttributeField,
+    }
+
+    impl TryFrom<String> for AttributeRequest {
+        type Error = String;
+
+        /// Splits by ':', setting the attribute scope to all components by the last, and setting
+        /// the attribute name to the second component.
+        fn try_from(value: String) -> Result<Self, Self::Error> {
+            let mut parts = value.rsplitn(2, ':');
+            let name = parts
+                .next()
+                .ok_or_else(|| format!("Invalid attribute request: {}", value))?
+                .to_string();
+            let name = AttributeField::try_from(name.as_str())?;
+            let scope_str = parts
+                .next()
+                .ok_or_else(|| format!("Invalid attribute request: {}", value))?;
+            let scope = AttributeScope::try_from(scope_str.to_string())?;
+
+            Ok(AttributeRequest { scope, field: name })
+        }
+    }
+
+    impl std::fmt::Display for AttributeRequest {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match &self.scope {
+                AttributeScope::Default => write!(f, "{}", self.field),
+                AttributeScope::OpenId { issuer } => {
+                    write!(f, "openid:{}:{}", issuer, self.field)
+                }
+            }
+        }
+    }
+
+    #[derive(CandidType, Deserialize)]
+    pub struct PrepareAttributeRequest {
+        pub anchor_number: AnchorNumber,
+        pub origin: FrontendHostname,
+        pub account_number: Option<AccountNumber>,
+        pub session_key: SessionKey,
+        pub attributes: Vec<String>,
+    }
+
+    pub struct ValidatedPrepareAttributeRequest {
+        pub anchor_number: AnchorNumber,
+        pub origin: FrontendHostname,
+        pub account_number: Option<AccountNumber>,
+        pub session_key: SessionKey,
+        pub attributes: BTreeMap<AttributeScope, BTreeSet<AttributeField>>,
+    }
+
+    impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
+        type Error = String;
+
+        fn try_from(value: PrepareAttributeRequest) -> Result<Self, Self::Error> {
+            let PrepareAttributeRequest {
+                anchor_number,
+                origin,
+                account_number,
+                session_key,
+                attributes: unparsed_attributes,
+            } = value;
+
+            let mut attributes = BTreeMap::new();
+            let mut errors = Vec::new();
+
+            for unparsed_attribute in unparsed_attributes {
+                let AttributeRequest { scope, field } = match unparsed_attribute.try_into() {
+                    Ok(attr) => attr,
+                    Err(err) => {
+                        errors.push(err);
+                        continue;
+                    }
+                };
+                attributes
+                    .entry(scope)
+                    .or_insert_with(BTreeSet::new)
+                    .insert(field);
+            }
+
+            if !errors.is_empty() {
+                return Err(errors.join(", "));
+            }
+
+            Ok(Self {
+                anchor_number,
+                origin,
+                account_number,
+                session_key,
+                attributes,
+            })
+        }
+    }
+
+    #[derive(CandidType, Serialize)]
+    pub struct PrepareAttributeResponse {
+        pub issued_at_timestamp_ns: Timestamp,
+        pub certified_attributes: Vec<String>,
+    }
+
+    #[update]
+    async fn prepare_attributes(
+        request: PrepareAttributeRequest,
+    ) -> Result<PrepareAttributeResponse, String> {
+        let ValidatedPrepareAttributeRequest {
+            anchor_number,
+            session_key,
+            mut attributes,
+            origin: _,
+            account_number: _,
+        } = ValidatedPrepareAttributeRequest::try_from(request)?;
+
+        let (anchor, _authorization_key) =
+            check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
+
+        let issued_at_timestamp_ns = ic_cdk::api::time();
+
+        let mut certified_attributes = Vec::new();
+
+        // Process scope `openid` ...
+        for openid_credential in anchor.openid_credentials {
+            // E.g., `openid:google.com`
+            let scope = AttributeScope::OpenId {
+                issuer: openid_credential.iss.clone(),
+            };
+            // E.g., {`email`, `name`}
+            let Some(fields) = attributes.remove(&scope) else {
+                continue;
+            };
+
+            let attribute_requests: BTreeMap<String, AttributeRequest> = fields
+                .into_iter()
+                .map(|field| {
+                    let attribute_field = format!("{}", field);
+                    let scope = scope.clone();
+                    (attribute_field, AttributeRequest { scope, field })
+                })
+                .collect();
+
+            let attributes = openid_credential
+                .metadata
+                .iter()
+                .filter_map(|(attribute_field, attribute_value)| {
+                    let Some(attribute_request) = attribute_requests.get(attribute_field) else {
+                        return None;
+                    };
+
+                    // E.g., `openid:google.com:email`
+                    let attribute_key = format!("{}", attribute_request);
+
+                    let MetadataEntryV2::String(attribute_value) = attribute_value else {
+                        return None;
+                    };
+
+                    Some((attribute_key, attribute_value.clone()))
+                })
+                .collect::<Vec<(String, String)>>();
+
+            openid_credential
+                .prepare_jwt_attributes_no_root_hash_update(
+                    session_key.clone(),
+                    anchor_number,
+                    &attributes,
+                    issued_at_timestamp_ns,
+                )
+                .await;
+
+            certified_attributes.extend(attributes.into_iter().map(
+                |(attribute_key, attribute_value)| format!("{}:{}", attribute_key, attribute_value),
+            ));
+        }
+
+        update_root_hash();
+
+        Ok(PrepareAttributeResponse {
+            issued_at_timestamp_ns,
+            certified_attributes,
+        })
+    }
+}
+
 /// API for the attribute sharing mvp
-mod attribute_sharing_mvp {
+mod attribute_sharing_old_vc {
     use super::*;
 
     #[update]

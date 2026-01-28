@@ -143,6 +143,22 @@ pub fn add_delegation_signature(
     sigs.add_signature(&inputs);
 }
 
+pub fn add_attribute_signature(
+    sigs: &mut SignatureMap,
+    pk: PublicKey,
+    seed: &[u8],
+    attribute_key: &str,
+    attribute_value: &str,
+    expiration: Timestamp,
+) {
+    let inputs = CanisterSigInputs {
+        domain: b"ii-request-attribute",
+        seed,
+        message: &attribute_signature_msg(&pk, attribute_key, attribute_value, expiration),
+    };
+    sigs.add_signature(&inputs);
+}
+
 pub(crate) fn check_frontend_length(frontend: &FrontendHostname) {
     const FRONTEND_HOSTNAME_LIMIT: usize = 255;
 
