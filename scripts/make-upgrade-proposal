@@ -52,8 +52,8 @@ NOT_MOCKED_COMMANDS=(
   wait_for_archive_canister_hash
   download_wasms
   request_verification_command
-  deploy_release_candidate
-  test_release_candidate
+  deploy_to_beta
+  test_on_beta
   download_proposal_text
   prepare_proposal_argument
   append_proposal_argument
@@ -288,19 +288,17 @@ request_verification_command() {
   echo "./scripts/verify-hash --ii-hash $II_WASM_SHA --archive-hash $ARCHIVE_WASM_SHA"
 }
 
-deploy_release_candidate() {
-  echo "Deploying II release candidate with same arguments as prod"
-  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install jqajs-xiaaa-aaaad-aab5q-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
+deploy_to_beta() {
+  echo "Deploying II release to beta"
   dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install fgte5-ciaaa-aaaad-aaatq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
-  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install y2aaj-miaaa-aaaad-aacxq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
 }
 
-test_release_candidate() {
+test_on_beta() {
   echo "Copy the following text and share it on Slack #eng-identity-private"
   echo "----------"
   echo "This is a call for help 🙏"
   echo ""
-  echo "New release candidate has been deployed and is ready for testing"
+  echo "New II release has been deployed to beta and is ready for testing"
   echo ""
   echo "Beta 1.0: https://beta.identity.ic0.app/"
   echo "Beta 2.0: https://beta.id.ai/"
@@ -425,9 +423,9 @@ confirm_manual "Request Run Verification Command" request_verification_command
 confirm_cmd download_proposal_text
 confirm_cmd prepare_proposal_argument
 confirm_cmd append_proposal_argument
-confirm_cmd deploy_release_candidate
+confirm_cmd deploy_to_beta
 confirm_manual "Confirm proposal arguments" confirm_proposal_arguments
-confirm_manual "Test release candidate" test_release_candidate
+confirm_manual "Test beta release" test_on_beta
 confirm_manual "Share Proposal.md contents on Slack" share_proposal
 confirm_cmd dry_run_proposal
 confirm_manual "Review proposal" echo "Review the proposal above"
