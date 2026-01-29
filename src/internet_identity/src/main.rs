@@ -16,8 +16,8 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
-    AttributeRequest, AttributeScope, PrepareAttributeRequest, PrepareAttributeResponse,
-    ValidatedPrepareAttributeRequest,
+    AttributeRequest, AttributeScope, PrepareAttributeError, PrepareAttributeRequest,
+    PrepareAttributeResponse, ValidatedPrepareAttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
@@ -1214,16 +1214,17 @@ mod openid_api {
 }
 
 mod attribute_sharing {
-    use super::*;
+    use crate::authz_utils::AuthorizationError;
 
+    use super::*;
     use std::collections::BTreeMap;
 
     #[update]
     async fn prepare_attributes(
         request: PrepareAttributeRequest,
-    ) -> Result<PrepareAttributeResponse, String> {
+    ) -> Result<PrepareAttributeResponse, PrepareAttributeError> {
         let ValidatedPrepareAttributeRequest {
-            anchor_number,
+            identity_number,
             session_key,
             mut attributes,
             origin: _,
@@ -1231,7 +1232,9 @@ mod attribute_sharing {
         } = request.try_into()?;
 
         let (anchor, _authorization_key) =
-            check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                PrepareAttributeError::AuthorizationError(principal)
+            })?;
 
         // This is the only async operation, so we do it first, then check the clock.
         state::ensure_salt_set().await;
@@ -1278,7 +1281,7 @@ mod attribute_sharing {
 
             openid_credential.prepare_jwt_attributes_no_root_hash_update(
                 session_key.clone(),
-                anchor_number,
+                identity_number,
                 &attributes,
                 issued_at_timestamp_ns,
             );

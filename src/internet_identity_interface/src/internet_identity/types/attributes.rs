@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use candid::CandidType;
+use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 
 use crate::internet_identity::types::{
@@ -106,7 +106,7 @@ impl std::fmt::Display for AttributeRequest {
 
 #[derive(CandidType, Deserialize)]
 pub struct PrepareAttributeRequest {
-    pub anchor_number: AnchorNumber,
+    pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub session_key: SessionKey,
@@ -114,19 +114,19 @@ pub struct PrepareAttributeRequest {
 }
 
 pub struct ValidatedPrepareAttributeRequest {
-    pub anchor_number: AnchorNumber,
+    pub identity_number: AnchorNumber,
+    pub session_key: SessionKey,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub session_key: SessionKey,
     pub attributes: BTreeMap<AttributeScope, BTreeSet<AttributeField>>,
 }
 
 impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
-    type Error = String;
+    type Error = PrepareAttributeError;
 
     fn try_from(value: PrepareAttributeRequest) -> Result<Self, Self::Error> {
         let PrepareAttributeRequest {
-            anchor_number,
+            identity_number: anchor_number,
             origin,
             account_number,
             session_key,
@@ -134,13 +134,13 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
         } = value;
 
         let mut attributes = BTreeMap::new();
-        let mut errors = Vec::new();
+        let mut problems = Vec::new();
 
         for unparsed_attribute in unparsed_attributes {
             let AttributeRequest { scope, field } = match unparsed_attribute.try_into() {
                 Ok(attr) => attr,
                 Err(err) => {
-                    errors.push(err);
+                    problems.push(err);
                     continue;
                 }
             };
@@ -150,12 +150,12 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
                 .insert(field);
         }
 
-        if !errors.is_empty() {
-            return Err(errors.join(", "));
+        if !problems.is_empty() {
+            return Err(PrepareAttributeError::ValidationError { problems });
         }
 
         Ok(Self {
-            anchor_number,
+            identity_number: anchor_number,
             origin,
             account_number,
             session_key,
@@ -168,4 +168,10 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
 pub struct PrepareAttributeResponse {
     pub issued_at_timestamp_ns: Timestamp,
     pub certified_attributes: Vec<String>,
+}
+
+#[derive(CandidType, Serialize)]
+pub enum PrepareAttributeError {
+    ValidationError { problems: Vec<String> },
+    AuthorizationError(Principal),
 }
