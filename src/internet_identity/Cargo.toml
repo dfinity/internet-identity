@@ -41,6 +41,7 @@ ic-metrics-encoder.workspace = true
 ic-stable-structures.workspace = true
 ic-canister-sig-creation.workspace = true
 ic-verifiable-credentials.workspace = true
+ic-representation-independent-hash.workspace = true
 
 [target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["custom"] }

@@ -15,6 +15,10 @@ use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::attributes::{
+    AttributeRequest, AttributeScope, PrepareAttributeRequest, PrepareAttributeResponse,
+    ValidatedPrepareAttributeRequest,
+};
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
     OpenIdPrepareDelegationResponse,
@@ -26,7 +30,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
@@ -1210,8 +1213,94 @@ mod openid_api {
     }
 }
 
+mod attribute_sharing {
+    use super::*;
+
+    use std::collections::BTreeMap;
+
+    #[update]
+    async fn prepare_attributes(
+        request: PrepareAttributeRequest,
+    ) -> Result<PrepareAttributeResponse, String> {
+        let ValidatedPrepareAttributeRequest {
+            anchor_number,
+            session_key,
+            mut attributes,
+            origin: _,
+            account_number: _,
+        } = request.try_into()?;
+
+        let (anchor, _authorization_key) =
+            check_authorization(anchor_number).map_err(IdentityUpdateError::from)?;
+
+        // This is the only async operation, so we do it first, then check the clock.
+        state::ensure_salt_set().await;
+        let issued_at_timestamp_ns = ic_cdk::api::time();
+
+        let mut certified_attributes = Vec::new();
+
+        // Process scope `openid` ...
+        for openid_credential in anchor.openid_credentials {
+            // E.g., `openid:google.com`
+            let scope = AttributeScope::OpenId {
+                issuer: openid_credential.iss.clone(),
+            };
+            // E.g., {`email`, `name`}
+            let Some(fields) = attributes.remove(&scope) else {
+                continue;
+            };
+
+            let attribute_requests: BTreeMap<String, AttributeRequest> = fields
+                .into_iter()
+                .map(|field| {
+                    let attribute_field = format!("{}", field);
+                    let scope = scope.clone();
+                    (attribute_field, AttributeRequest { scope, field })
+                })
+                .collect();
+
+            let attributes = openid_credential
+                .metadata
+                .iter()
+                .filter_map(|(attribute_field, attribute_value)| {
+                    let Some(attribute_request) = attribute_requests.get(attribute_field) else {
+                        return None;
+                    };
+
+                    // E.g., `openid:google.com:email`
+                    let attribute_key = format!("{}", attribute_request);
+
+                    let MetadataEntryV2::String(attribute_value) = attribute_value else {
+                        return None;
+                    };
+
+                    Some((attribute_key, attribute_value.clone()))
+                })
+                .collect::<Vec<(String, String)>>();
+
+            openid_credential.prepare_jwt_attributes_no_root_hash_update(
+                session_key.clone(),
+                anchor_number,
+                &attributes,
+                issued_at_timestamp_ns,
+            );
+
+            certified_attributes.extend(attributes.into_iter().map(
+                |(attribute_key, attribute_value)| format!("{}:{}", attribute_key, attribute_value),
+            ));
+        }
+
+        update_root_hash();
+
+        Ok(PrepareAttributeResponse {
+            issued_at_timestamp_ns,
+            certified_attributes,
+        })
+    }
+}
+
 /// API for the attribute sharing mvp
-mod attribute_sharing_mvp {
+mod attribute_sharing_old_vc {
     use super::*;
 
     #[update]

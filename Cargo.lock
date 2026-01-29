@@ -2054,6 +2054,7 @@ dependencies = [
  "ic-certification 2.6.0",
  "ic-http-certification",
  "ic-metrics-encoder",
+ "ic-representation-independent-hash",
  "ic-response-verification",
  "ic-stable-structures",
  "ic-verifiable-credentials",
