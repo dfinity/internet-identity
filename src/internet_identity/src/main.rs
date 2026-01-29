@@ -1263,9 +1263,7 @@ mod attribute_sharing {
                 .metadata
                 .iter()
                 .filter_map(|(attribute_field, attribute_value)| {
-                    let Some(attribute_request) = attribute_requests.get(attribute_field) else {
-                        return None;
-                    };
+                    let attribute_request = attribute_requests.get(attribute_field)?;
 
                     // E.g., `openid:google.com:email`
                     let attribute_key = format!("{}", attribute_request);
