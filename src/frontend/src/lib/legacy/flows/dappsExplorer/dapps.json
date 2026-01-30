@@ -587,6 +587,7 @@
     "logo": "neuronpool_logo.svg",
     "authOrigins": [
       "https://stake.neuronpool.com",
+      "https://vectors.neuronpool.com",
       "https://t3c6p-zqaaa-aaaar-qafuq-cai.icp0.io"
     ]
   },

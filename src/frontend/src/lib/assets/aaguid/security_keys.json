@@ -124,6 +124,7 @@
   "59f85fe7-faa5-4c92-9f52-697b9d4d5473": "RSA Authenticator 4 for Android",
   "d41f5a69-b817-4144-a13c-9ebd6d9254d6": "ATKey.Card CTAP2.0",
   "2c0df832-92de-4be1-8412-88a8f074df4a": "Feitian FIDO Smart Card",
+  "0f00cc22-4640-41e7-9585-384ec73ffe9b": "Taglio CTAP2.1 BIO",
   "be727034-574a-f799-5c76-0929e0430973": "Crayonic KeyVault K1 (USB-NFC-BLE FIDO2 Authenticator)",
   "d821a7d4-e97c-4cb6-bd82-4237731fd4be": "Hyper FIDO Bio Security Key",
   "820d89ed-d65a-409e-85cb-f73f0578f82a": "IDmelon iOS Authenticator",
