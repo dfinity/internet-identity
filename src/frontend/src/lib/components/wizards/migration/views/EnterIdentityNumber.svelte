@@ -8,7 +8,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { parentIFrameOrigin } from "$lib/globals";
+  import { getPrimaryOrigin, parentIFrameOrigin } from "$lib/globals";
 
   interface Props {
     onSubmit: (
@@ -16,6 +16,14 @@
       attachElement?: HTMLElement,
     ) => Promise<void | "cancelled" | "wrongDomain">;
   }
+
+  const primaryOrigin = getPrimaryOrigin();
+  const selfServiceOrigin =
+    parentIFrameOrigin !== undefined
+      ? parentIFrameOrigin
+      : window.location.origin !== primaryOrigin
+        ? window.location.origin
+        : "https://identity.ic0.app";
 
   let { onSubmit }: Props = $props();
 
@@ -101,7 +109,7 @@
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="flex flex-row items-center justify-between gap-4">
     <a
-      href={`${parentIFrameOrigin ?? "https://identity.ic0.app"}/self-service`}
+      href={`${selfServiceOrigin}/self-service`}
       target="_blank"
       rel="noopener noreferrer"
       class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
