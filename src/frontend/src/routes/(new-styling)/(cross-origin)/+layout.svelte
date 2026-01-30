@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import { getPrimaryOrigin } from "$lib/globals";
+  import { getPrimaryOrigin, IFRAME_PARENT_PARAM } from "$lib/globals";
   import { forwardMessage, isForwardedMessage } from "./utils";
 
   const { children, data }: LayoutProps = $props();
@@ -24,6 +24,7 @@
     const url = new URL(window.location.href);
     url.hostname = new URL(primaryOrigin).hostname;
     url.searchParams.set("feature_flag_guided_upgrade", "true");
+    url.searchParams.set(IFRAME_PARENT_PARAM, window.location.origin);
     return url.href;
   });
 
