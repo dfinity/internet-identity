@@ -16,8 +16,8 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
-    AttributeRequest, AttributeScope, PrepareAttributeError, PrepareAttributeRequest,
-    PrepareAttributeResponse, ValidatedPrepareAttributeRequest,
+    PrepareAttributeError, PrepareAttributeRequest, PrepareAttributeResponse,
+    ValidatedPrepareAttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
@@ -39,6 +39,7 @@ mod archive;
 mod assets;
 mod authz_utils;
 
+mod attributes;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
@@ -1214,73 +1215,42 @@ mod openid_api {
 }
 
 mod attribute_sharing {
-    use crate::authz_utils::AuthorizationError;
-
     use super::*;
-    use std::collections::BTreeMap;
+    use crate::authz_utils::AuthorizationError;
 
     #[update]
     async fn prepare_attributes(
         request: PrepareAttributeRequest,
     ) -> Result<PrepareAttributeResponse, PrepareAttributeError> {
         let ValidatedPrepareAttributeRequest {
+            // Arguments for computing the seed
             identity_number,
-            session_key,
-            mut attributes,
             origin: _,
             account_number: _,
+
+            // Which attributes to prepare
+            requested_attributes,
         } = request.try_into()?;
 
-        let (anchor, _authorization_key) =
+        let (anchor, _) =
             check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
                 PrepareAttributeError::AuthorizationError(principal)
             })?;
+
+        let mut attributes_to_certify = anchor.prepare_openid_attributes(requested_attributes);
+        let mut certified_attributes = Vec::new();
 
         // This is the only async operation, so we do it first, then check the clock.
         state::ensure_salt_set().await;
         let issued_at_timestamp_ns = ic_cdk::api::time();
 
-        let mut certified_attributes = Vec::new();
-
         // Process scope `openid` ...
         for openid_credential in anchor.openid_credentials {
-            // E.g., `openid:google.com`
-            let scope = AttributeScope::OpenId {
-                issuer: openid_credential.iss.clone(),
-            };
-            // E.g., {`email`, `name`}
-            let Some(fields) = attributes.remove(&scope) else {
+            let Some(attributes) = attributes_to_certify.remove(&openid_credential.key()) else {
                 continue;
             };
 
-            let attribute_requests: BTreeMap<String, AttributeRequest> = fields
-                .into_iter()
-                .map(|field| {
-                    let attribute_field = format!("{}", field);
-                    let scope = scope.clone();
-                    (attribute_field, AttributeRequest { scope, field })
-                })
-                .collect();
-
-            let attributes = openid_credential
-                .metadata
-                .iter()
-                .filter_map(|(attribute_field, attribute_value)| {
-                    let attribute_request = attribute_requests.get(attribute_field)?;
-
-                    // E.g., `openid:google.com:email`
-                    let attribute_key = format!("{}", attribute_request);
-
-                    let MetadataEntryV2::String(attribute_value) = attribute_value else {
-                        return None;
-                    };
-
-                    Some((attribute_key, attribute_value.clone()))
-                })
-                .collect::<Vec<(String, String)>>();
-
             openid_credential.prepare_jwt_attributes_no_root_hash_update(
-                session_key.clone(),
                 identity_number,
                 &attributes,
                 issued_at_timestamp_ns,
@@ -1297,6 +1267,27 @@ mod attribute_sharing {
             issued_at_timestamp_ns,
             certified_attributes,
         })
+    }
+
+    #[query]
+    fn get_attributes(
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+        account_number: Option<AccountNumber>,
+        session_key: SessionKey,
+        expiration: Timestamp,
+    ) -> Result<Vec<(String, String)>, String> {
+        todo!()
+        // match check_authorization(anchor_number) {
+        //     Ok(_) => account_management::get_account_delegation(
+        //         anchor_number,
+        //         &origin,
+        //         account_number,
+        //         session_key,
+        //         expiration,
+        //     ),
+        //     Err(err) => Err(err.into()),
+        // }
     }
 }
 

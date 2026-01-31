@@ -847,6 +847,7 @@ type PrepareAttributeError = variant {
         problems : vec text;
     };
     AuthorizationError : principal;
+    ScopeNotSupported : text;
 };
 
 type PrepareAttributeResponse = record {

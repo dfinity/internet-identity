@@ -146,22 +146,22 @@ pub fn add_delegation_signature(
 
 pub fn add_attribute_signature(
     sigs: &mut SignatureMap,
-    pk: PublicKey,
     seed: &[u8],
     attribute_key: &str,
     attribute_value: &str,
-    expiration: Timestamp,
+    expiration: u64,
+    issued_at: u64,
 ) {
     // TODO: This function should eventually be moved to a library crete.
     fn attribute_signature_msg(
-        pubkey: &[u8],
         attribute_key: &str,
         attribute_value: &str,
         expiration: u64,
+        issued_at: u64,
     ) -> Vec<u8> {
         let m: Vec<(String, Value)> = vec![
-            ("pubkey".into(), Value::Bytes(pubkey.to_vec())),
-            ("expiration".into(), Value::Number(expiration)),
+            ("issued_at_timestamp_ns".into(), Value::Number(issued_at)),
+            ("expires_at_timestamp_ns".into(), Value::Number(expiration)),
             (
                 attribute_key.into(),
                 Value::String(attribute_value.to_string()),
@@ -173,7 +173,7 @@ pub fn add_attribute_signature(
     let inputs = CanisterSigInputs {
         domain: b"ii-request-attribute",
         seed,
-        message: &attribute_signature_msg(&pk, attribute_key, attribute_value, expiration),
+        message: &attribute_signature_msg(attribute_key, attribute_value, expiration, issued_at),
     };
     sigs.add_signature(&inputs);
 }
