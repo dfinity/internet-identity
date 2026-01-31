@@ -13,7 +13,7 @@ jobs:
   deploy-rc:
     runs-on: ubuntu-latest
     env:
-      ii_canister_id: jqajs-xiaaa-aaaad-aab5q-cai
+      ii_canister_id: y2aaj-miaaa-aaaad-aacxq-cai
       testnet_app_canister_id: jlfvx-nqaaa-aaaad-aab7a-cai
       wallet_canister_id: cvthj-wyaaa-aaaad-aaaaq-cai
     steps:
