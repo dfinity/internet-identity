@@ -825,6 +825,35 @@ type IdentityPropertiesReplaceError = variant {
     InternalCanisterError : text;
 };
 
+type PrepareAttributeRequest = record {
+    // Identity for which the attributes should be prepared.
+    identity_number : IdentityNumber;
+
+    // Session key to be used for this attribute sharing flow.
+    session_key : SessionKey;
+
+    // Origin of the relying party in the attribute sharing flow.
+    origin : FrontendHostname;
+
+    // II account for the relying party.
+    account_number : opt AccountNumber;
+
+    // The attribute to be prepared.
+    attributes : vec text;
+};
+
+type PrepareAttributeError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+};
+
+type PrepareAttributeResponse = record {
+    issued_at_timestamp_ns : Timestamp;
+    certified_attributes : vec text;
+}
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -939,8 +968,12 @@ service : (opt InternetIdentityInit) -> {
     prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
     get_delegation : (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
-    // Attribute Sharing MVP API
-    // =========================
+    // Attribute sharing protocol
+    // ===========================
+    prepare_attributes : (PrepareAttributeRequest) -> (variant { Ok : PrepareAttributeResponse; Err : PrepareAttributeError });
+
+    // Old Verifiable Credentials API
+    // ==============================
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.
     prepare_id_alias : (PrepareIdAliasRequest) -> (variant { Ok : PreparedIdAlias; Err : PrepareIdAliasError });
     get_id_alias : (GetIdAliasRequest) -> (variant { Ok : IdAliasCredentials; Err : GetIdAliasError }) query;
