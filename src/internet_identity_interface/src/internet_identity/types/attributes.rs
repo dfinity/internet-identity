@@ -55,11 +55,9 @@ impl std::fmt::Display for AttributeScope {
 impl TryFrom<&str> for AttributeScope {
     type Error = String;
 
-    /// Splits by ':', setting the attribute scope to the first component and processing
-    /// possible additional attributes as needed.
+    /// Parses an attribute scope string by splitting on the first `':'`.
     ///
-    /// The special value `AttributeScope::Default` cannot be constructed via this method
-    /// and needs to be constructed directly.
+    /// Currently, only scopes of the form `openid:<issuer>` are supported.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut parts = value.splitn(2, ':');
         let scope_str = parts
@@ -246,6 +244,7 @@ impl TryFrom<(String, String)> for Attribute {
     }
 }
 
+#[derive(Debug)]
 pub struct ValidatedGetAttributesRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
@@ -332,7 +331,6 @@ pub enum GetAttributesError {
     ValidationError { problems: Vec<String> },
     AuthorizationError(Principal),
     GetAccountError(GetAccountError),
-    CertificateNotFound,
 }
 
 #[cfg(test)]
@@ -591,6 +589,189 @@ mod tests {
             };
             assert!(req1 < req2);
             assert!(req1 < req3);
+        }
+    }
+
+    mod attribute_tests {
+        use super::*;
+
+        #[test]
+        fn test_attribute_try_from_valid() {
+            let attribute =
+                Attribute::try_from(("email".to_string(), "user@example.com".to_string())).unwrap();
+            let expected_key = AttributeKey::try_from("email".to_string()).unwrap();
+
+            pretty_assert_eq!(
+                attribute,
+                Attribute {
+                    key: expected_key,
+                    value: "user@example.com".to_string(),
+                }
+            );
+        }
+
+        #[test]
+        fn test_attribute_try_from_invalid_key() {
+            let result = Attribute::try_from(("invalid".to_string(), "value".to_string()));
+            pretty_assert_eq!(result, Err("Unknown attribute: invalid".to_string()));
+        }
+
+        #[test]
+        fn test_attribute_try_from_value_too_long() {
+            let long_value = "x".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
+            let length = long_value.len();
+            let result = Attribute::try_from(("email".to_string(), long_value));
+            pretty_assert_eq!(
+                result,
+                Err(format!(
+                    "Attribute value length {} exceeds limit of {} bytes",
+                    length, MAX_ATTRIBUTE_VALUE_LENGTH
+                ))
+            );
+        }
+    }
+
+    mod validated_get_attributes_request_tests {
+        use super::*;
+        use std::collections::{BTreeMap, BTreeSet};
+
+        #[test]
+        fn test_try_from_valid_request_multiple_scopes() {
+            let request = GetAttributesRequest {
+                identity_number: 987,
+                origin: "example.com".to_string(),
+                account_number: Some(7),
+                issued_at_timestamp_ns: 42,
+                attributes: vec![
+                    ("email".to_string(), "user@example.com".to_string()),
+                    (
+                        "openid:google.com:email".to_string(),
+                        "google@example.com".to_string(),
+                    ),
+                ],
+            };
+
+            let validated = ValidatedGetAttributesRequest::try_from(request).unwrap();
+            pretty_assert_eq!(validated.identity_number, 987);
+            pretty_assert_eq!(validated.account_number, Some(7));
+            pretty_assert_eq!(validated.issued_at_timestamp_ns, 42);
+
+            let mut expected = BTreeMap::new();
+
+            let mut default_scope = BTreeSet::new();
+            default_scope.insert(
+                Attribute::try_from(("email".to_string(), "user@example.com".to_string())).unwrap(),
+            );
+            expected.insert(None, default_scope);
+
+            let mut google_scope = BTreeSet::new();
+            google_scope.insert(
+                Attribute::try_from((
+                    "openid:google.com:email".to_string(),
+                    "google@example.com".to_string(),
+                ))
+                .unwrap(),
+            );
+            expected.insert(
+                Some(AttributeScope::OpenId {
+                    issuer: "google.com".to_string(),
+                }),
+                google_scope,
+            );
+
+            pretty_assert_eq!(validated.attributes, expected);
+        }
+
+        #[test]
+        fn test_try_from_deduplicates_attributes() {
+            let request = GetAttributesRequest {
+                identity_number: 111,
+                origin: "example.com".to_string(),
+                account_number: None,
+                issued_at_timestamp_ns: 1,
+                attributes: vec![
+                    ("email".to_string(), "alias".to_string()),
+                    ("email".to_string(), "alias".to_string()),
+                ],
+            };
+
+            let validated = ValidatedGetAttributesRequest::try_from(request).unwrap();
+
+            let mut expected = BTreeMap::new();
+            let mut attrs = BTreeSet::new();
+            attrs.insert(Attribute::try_from(("email".to_string(), "alias".to_string())).unwrap());
+            expected.insert(None, attrs);
+
+            pretty_assert_eq!(validated.attributes, expected);
+        }
+
+        #[test]
+        fn test_try_from_validation_errors_combined() {
+            let long_origin = "x".repeat(FRONTEND_HOSTNAME_LIMIT + 1);
+            let long_value = "y".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
+            let long_value_len = long_value.len();
+
+            let request = GetAttributesRequest {
+                identity_number: 222,
+                origin: long_origin.clone(),
+                account_number: None,
+                issued_at_timestamp_ns: 2,
+                attributes: vec![
+                    ("invalid".to_string(), "value".to_string()),
+                    ("email".to_string(), long_value),
+                ],
+            };
+
+            let err = ValidatedGetAttributesRequest::try_from(request).unwrap_err();
+            match err {
+                GetAttributesError::ValidationError { problems } => {
+                    pretty_assert_eq!(
+                        problems,
+                        vec![
+                            format!(
+                                "Frontend hostname length {} exceeds limit of {} bytes",
+                                long_origin.len(),
+                                FRONTEND_HOSTNAME_LIMIT
+                            ),
+                            "Unknown attribute: invalid".to_string(),
+                            format!(
+                                "Attribute value length {} exceeds limit of {} bytes",
+                                long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
+                            ),
+                        ],
+                    );
+                }
+                other => panic!("Expected validation error, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn test_try_from_too_many_attributes() {
+            let attributes = (0..=MAX_ATTRIBUTES_PER_REQUEST)
+                .map(|i| ("email".to_string(), format!("value-{i}")))
+                .collect::<Vec<_>>();
+
+            let request = GetAttributesRequest {
+                identity_number: 333,
+                origin: "example.com".to_string(),
+                account_number: None,
+                issued_at_timestamp_ns: 3,
+                attributes,
+            };
+
+            let err = ValidatedGetAttributesRequest::try_from(request).unwrap_err();
+            match err {
+                GetAttributesError::ValidationError { problems } => {
+                    assert!(problems.iter().any(|p| {
+                        p == &format!(
+                            "Number of attributes {} exceeds limit of {}",
+                            MAX_ATTRIBUTES_PER_REQUEST + 1,
+                            MAX_ATTRIBUTES_PER_REQUEST
+                        )
+                    }));
+                }
+                other => panic!("Expected validation error, got {other:?}"),
+            }
         }
     }
 

@@ -1246,7 +1246,7 @@ mod attribute_sharing {
         let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
             .map_err(PrepareAttributeError::GetAccountError)?;
 
-        // This is the only async operation, so we do it first, call operations that depend of
+        // This is the only async operation, so we do it first, call operations that depend on
         // the time. TODO: refactor to avoid asynchronicity here.
         state::ensure_salt_set().await;
         let issued_at_timestamp_ns = ic_cdk::api::time();

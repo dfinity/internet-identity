@@ -897,7 +897,6 @@ type GetAttributesError = variant {
     };
     AuthorizationError : principal;
     GetAccountError : GetAccountError;
-    CertificateNotFound;
 };
 
 service : (opt InternetIdentityInit) -> {
