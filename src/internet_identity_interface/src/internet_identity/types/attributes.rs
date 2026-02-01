@@ -197,13 +197,13 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
     }
 }
 
-#[derive(CandidType, Serialize)]
+#[derive(CandidType, Serialize, Deserialize)]
 pub struct PrepareAttributeResponse {
     pub issued_at_timestamp_ns: Timestamp,
     pub attributes: Vec<(String, String)>,
 }
 
-#[derive(Debug, PartialEq, CandidType, Serialize)]
+#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub enum PrepareAttributeError {
     ValidationError { problems: Vec<String> },
     AuthorizationError(Principal),
@@ -313,20 +313,20 @@ impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
     }
 }
 
-#[derive(Debug, PartialEq, CandidType, Serialize, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize, Eq, PartialOrd, Ord)]
 pub struct CertifiedAttribute {
     pub key: String,
     pub value: String,
     pub signature: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq, CandidType, Serialize)]
+#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub struct CertifiedAttributes {
     pub certified_attributes: Vec<CertifiedAttribute>,
     pub expires_at_timestamp_ns: Timestamp,
 }
 
-#[derive(Debug, PartialEq, CandidType, Serialize)]
+#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub enum GetAttributesError {
     ValidationError { problems: Vec<String> },
     AuthorizationError(Principal),

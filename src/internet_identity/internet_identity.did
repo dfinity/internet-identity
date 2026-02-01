@@ -1014,7 +1014,7 @@ service : (opt InternetIdentityInit) -> {
     get_delegation : (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
     // Attribute sharing protocol
-    // ===========================
+    // ==========================
     prepare_attributes : (PrepareAttributeRequest) -> (variant { Ok : PrepareAttributeResponse; Err : PrepareAttributeError });
     get_attributes : (GetAttributesRequest) -> (variant { Ok : CertifiedAttributes; Err : GetAttributesError }) query;
 
@@ -1025,7 +1025,7 @@ service : (opt InternetIdentityInit) -> {
     get_id_alias : (GetIdAliasRequest) -> (variant { Ok : IdAliasCredentials; Err : GetIdAliasError }) query;
 
     // OpenID credentials protocol
-    // =========================
+    // ===========================
     openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
     openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
