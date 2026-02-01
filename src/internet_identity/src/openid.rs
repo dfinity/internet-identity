@@ -1,7 +1,4 @@
-use crate::delegation::{
-    add_attribute_signature, add_delegation_signature, der_encode_canister_sig_key,
-};
-use crate::storage::account::Account;
+use crate::delegation::{add_delegation_signature, der_encode_canister_sig_key};
 use crate::MINUTE_NS;
 use crate::{state, update_root_hash};
 use candid::{CandidType, Deserialize, Principal};
@@ -24,7 +21,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 mod generic;
 
-const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
+pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;
@@ -114,33 +111,6 @@ impl OpenIdCredential {
             ByteBuf::from(der_encode_canister_sig_key(seed.to_vec())),
             expiration,
         )
-    }
-
-    /// Does not ensure the salt is initialized.
-    ///
-    /// Does not update the root hash, intended to be used in contexts where multiple.
-    pub fn prepare_jwt_attributes_no_root_hash_update(
-        &self,
-        account: Account,
-        attributes: &Vec<(String, String)>,
-        issued_at_timestamp_ns: Timestamp,
-    ) {
-        let expiration_timestamp_ns =
-            issued_at_timestamp_ns.saturating_add(OPENID_SESSION_DURATION_NS);
-
-        let seed = account.calculate_seed();
-
-        state::signature_map_mut(|sigs| {
-            for (attribute_key, attribute_value) in attributes {
-                add_attribute_signature(
-                    sigs,
-                    &seed,
-                    attribute_key,
-                    attribute_value,
-                    expiration_timestamp_ns,
-                );
-            }
-        });
     }
 
     pub fn get_jwt_delegation(

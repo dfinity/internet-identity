@@ -1,4 +1,5 @@
 use candid::{CandidType, Deserialize, Principal};
+use serde::Serialize;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
@@ -428,6 +429,17 @@ pub enum AccountNameValidationError {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct DummyAuthConfig {
     pub prompt_for_index: bool,
+}
+
+#[derive(CandidType, Debug, Deserialize, PartialEq, Serialize)]
+pub enum GetAccountError {
+    NoSuchOrigin {
+        anchor_number: AnchorNumber,
+    },
+    NoSuchAccount {
+        anchor_number: AnchorNumber,
+        origin: FrontendHostname,
+    },
 }
 
 #[derive(CandidType, Debug, Deserialize, PartialEq)]

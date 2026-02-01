@@ -1216,7 +1216,7 @@ mod openid_api {
 
 mod attribute_sharing {
     use super::*;
-    use crate::authz_utils::AuthorizationError;
+    use crate::{account_management::get_account_for_origin, authz_utils::AuthorizationError};
 
     #[update]
     async fn prepare_attributes(
@@ -1225,8 +1225,8 @@ mod attribute_sharing {
         let ValidatedPrepareAttributeRequest {
             // Arguments for computing the seed
             identity_number,
-            origin: _,
-            account_number: _,
+            origin,
+            account_number,
 
             // Which attributes to prepare
             requested_attributes,
@@ -1237,57 +1237,21 @@ mod attribute_sharing {
                 PrepareAttributeError::AuthorizationError(principal)
             })?;
 
-        let mut attributes_to_certify = anchor.prepare_openid_attributes(requested_attributes);
-        let mut certified_attributes = Vec::new();
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(PrepareAttributeError::GetAccountError)?;
 
-        // This is the only async operation, so we do it first, then check the clock.
+        // This is the only async operation, so we do it first, call operations that depend of
+        // the time. TODO: refactor to avoid asynchronicity here.
         state::ensure_salt_set().await;
         let issued_at_timestamp_ns = ic_cdk::api::time();
 
-        // Process scope `openid` ...
-        for openid_credential in anchor.openid_credentials {
-            let Some(attributes) = attributes_to_certify.remove(&openid_credential.key()) else {
-                continue;
-            };
-
-            openid_credential.prepare_jwt_attributes_no_root_hash_update(
-                identity_number,
-                &attributes,
-                issued_at_timestamp_ns,
-            );
-
-            certified_attributes.extend(attributes.into_iter().map(
-                |(attribute_key, attribute_value)| format!("{}:{}", attribute_key, attribute_value),
-            ));
-        }
-
-        update_root_hash();
+        let certified_attributes =
+            anchor.prepare_attributes(requested_attributes, account, issued_at_timestamp_ns);
 
         Ok(PrepareAttributeResponse {
             issued_at_timestamp_ns,
             certified_attributes,
         })
-    }
-
-    #[query]
-    fn get_attributes(
-        anchor_number: AnchorNumber,
-        origin: FrontendHostname,
-        account_number: Option<AccountNumber>,
-        session_key: SessionKey,
-        expiration: Timestamp,
-    ) -> Result<Vec<(String, String)>, String> {
-        todo!()
-        // match check_authorization(anchor_number) {
-        //     Ok(_) => account_management::get_account_delegation(
-        //         anchor_number,
-        //         &origin,
-        //         account_number,
-        //         session_key,
-        //         expiration,
-        //     ),
-        //     Err(err) => Err(err.into()),
-        // }
     }
 }
 

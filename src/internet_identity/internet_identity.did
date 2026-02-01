@@ -829,9 +829,6 @@ type PrepareAttributeRequest = record {
     // Identity for which the attributes should be prepared.
     identity_number : IdentityNumber;
 
-    // Session key to be used for this attribute sharing flow.
-    session_key : SessionKey;
-
     // Origin of the relying party in the attribute sharing flow.
     origin : FrontendHostname;
 

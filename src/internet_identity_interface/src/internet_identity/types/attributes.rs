@@ -4,7 +4,7 @@ use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 
 use crate::internet_identity::types::{
-    AccountNumber, AnchorNumber, FrontendHostname, SessionKey, Timestamp,
+    AccountNumber, AnchorNumber, FrontendHostname, GetAccountError, Timestamp,
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -119,14 +119,12 @@ pub struct PrepareAttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub session_key: SessionKey,
     pub requested_attributes: Vec<String>,
 }
 
 #[derive(Debug)]
 pub struct ValidatedPrepareAttributeRequest {
     pub identity_number: AnchorNumber,
-    pub session_key: SessionKey,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeField>>,
@@ -140,7 +138,6 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
             identity_number: anchor_number,
             origin,
             account_number,
-            session_key,
             requested_attributes: unparsed_attributes,
         } = value;
 
@@ -169,7 +166,6 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
             identity_number: anchor_number,
             origin,
             account_number,
-            session_key,
             requested_attributes: attributes,
         })
     }
@@ -185,6 +181,7 @@ pub struct PrepareAttributeResponse {
 pub enum PrepareAttributeError {
     ValidationError { problems: Vec<String> },
     AuthorizationError(Principal),
+    GetAccountError(GetAccountError),
 }
 
 #[cfg(test)]
@@ -458,7 +455,6 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: ByteBuf::from(vec![1, 2, 3]),
                 requested_attributes: vec!["email".to_string()],
             };
 
@@ -483,7 +479,6 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: Some(1),
-                session_key: ByteBuf::from(vec![1, 2, 3]),
                 requested_attributes: vec!["email".to_string(), "name".to_string()],
             };
 
@@ -505,7 +500,6 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: vec![1, 2, 3].into(),
                 requested_attributes: vec![
                     "email".to_string(),
                     "openid:google.com:email".to_string(),
@@ -538,7 +532,6 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: ByteBuf::from(vec![1, 2, 3]),
                 requested_attributes: vec!["email".to_string(), "email".to_string()],
             };
 
@@ -559,7 +552,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: ByteBuf::from(vec![1, 2, 3]),
+
                 requested_attributes: vec!["invalid".to_string()],
             };
 
@@ -579,7 +572,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: ByteBuf::from(vec![1, 2, 3]),
+
                 requested_attributes: vec!["invalid1".to_string(), "invalid2".to_string()],
             };
 
@@ -602,7 +595,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: ByteBuf::from(vec![1, 2, 3]),
+
                 requested_attributes: vec!["email".to_string(), "invalid".to_string()],
             };
 
@@ -622,7 +615,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                session_key: ByteBuf::from(vec![1, 2, 3]),
+
                 requested_attributes: vec![],
             };
 
@@ -640,7 +633,6 @@ mod tests {
                 identity_number: 67890,
                 origin: "app.example.com".to_string(),
                 account_number: Some(42),
-                session_key: ByteBuf::from(vec![4, 5, 6, 7, 8]),
                 requested_attributes: vec![
                     "name".to_string(),
                     "openid:google.com:email".to_string(),

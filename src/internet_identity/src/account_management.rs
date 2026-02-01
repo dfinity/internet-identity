@@ -26,7 +26,7 @@ use internet_identity_interface::{
     archive::types::{Operation, Private},
     internet_identity::types::{
         AccountInfo, AccountNumber, AccountUpdate, AnchorNumber, ApplicationNumber,
-        CheckMaxAccountError, CreateAccountError, Delegation, FrontendHostname,
+        CheckMaxAccountError, CreateAccountError, Delegation, FrontendHostname, GetAccountError,
         GetDefaultAccountError, SessionKey, SetDefaultAccountError, SignedDelegation, Timestamp,
         UpdateAccountError,
     },
@@ -49,12 +49,12 @@ pub fn get_accounts_for_origin(
 ///
 /// This function is applicable only to numbered accounts; synthetic accounts are not currently
 /// stored in the memory and thus cannot be fetched from the storage.
-fn try_read_account_info(
+fn try_read_account(
     anchor_number: AnchorNumber,
-    origin: FrontendHostname,
+    origin: &FrontendHostname,
     application_number: ApplicationNumber,
     account_number: AccountNumber,
-) -> Result<AccountInfo, String> {
+) -> Result<Account, String> {
     let Some(account) = storage_borrow(|storage| {
         storage.read_account(ReadAccountParams {
             account_number: Some(account_number),
@@ -71,7 +71,46 @@ fn try_read_account_info(
         return Err(message);
     };
 
-    Ok(account.to_info())
+    Ok(account)
+}
+
+fn try_read_account_info(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    application_number: ApplicationNumber,
+    account_number: AccountNumber,
+) -> Result<AccountInfo, String> {
+    try_read_account(anchor_number, &origin, application_number, account_number)
+        .map(|account| account.to_info())
+}
+
+pub fn get_account_for_origin(
+    anchor_number: AnchorNumber,
+    origin: FrontendHostname,
+    account_number: Option<AccountNumber>,
+) -> Result<Account, GetAccountError> {
+    // If the account_number is not specific, there is a *synthetic account* to return for any
+    // (anchor, origin) pair.
+    let Some(account_number) = account_number else {
+        return Ok(Account::synthetic(anchor_number, origin));
+    };
+
+    // If the account is specified, there must be a known app for this origin.
+    let Some(application_number) =
+        storage_borrow(|storage| storage.lookup_application_number_with_origin(&origin))
+    else {
+        return Err(GetAccountError::NoSuchOrigin { anchor_number });
+    };
+
+    // Once we know the (anchor, origin, app, account_number), we can try reading  the corresponding
+    // account.
+    let account = try_read_account(anchor_number, &origin, application_number, account_number)
+        .map_err(|_| GetAccountError::NoSuchAccount {
+            anchor_number,
+            origin,
+        })?;
+
+    Ok(account)
 }
 
 /// Best effort to determine the default account for the given (anchor, origin).

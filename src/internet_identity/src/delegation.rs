@@ -10,7 +10,6 @@ use ic_canister_sig_creation::{
 };
 use ic_cdk::{id, trap};
 use ic_certification::Hash;
-use ic_representation_independent_hash::{representation_independent_hash, Value};
 use internet_identity_interface::internet_identity::types::*;
 use sha2::{Digest, Sha256};
 use std::net::IpAddr;
@@ -140,40 +139,6 @@ pub fn add_delegation_signature(
         domain: DELEGATION_SIG_DOMAIN,
         seed,
         message: &delegation_signature_msg(&pk, expiration, None),
-    };
-    sigs.add_signature(&inputs);
-}
-
-pub fn add_attribute_signature(
-    sigs: &mut SignatureMap,
-    seed: &[u8],
-    attribute_key: &str,
-    attribute_value: &str,
-    expiration: u64,
-    issued_at: u64,
-) {
-    // TODO: This function should eventually be moved to a library crete.
-    fn attribute_signature_msg(
-        attribute_key: &str,
-        attribute_value: &str,
-        expiration: u64,
-        issued_at: u64,
-    ) -> Vec<u8> {
-        let m: Vec<(String, Value)> = vec![
-            ("issued_at_timestamp_ns".into(), Value::Number(issued_at)),
-            ("expires_at_timestamp_ns".into(), Value::Number(expiration)),
-            (
-                attribute_key.into(),
-                Value::String(attribute_value.to_string()),
-            ),
-        ];
-        representation_independent_hash(m.as_slice()).to_vec()
-    }
-
-    let inputs = CanisterSigInputs {
-        domain: b"ii-request-attribute",
-        seed,
-        message: &attribute_signature_msg(attribute_key, attribute_value, expiration, issued_at),
     };
     sigs.add_signature(&inputs);
 }
