@@ -450,6 +450,7 @@ mod tests {
         #[test]
         fn test_attribute_extraction_scenarios() {
             // Test case: (label, metadata, requested_attrs, expected_attr_count, expected_pairs_opt)
+            #[allow(clippy::type_complexity)]
             let test_cases: Vec<(
                 &str,
                 HashMap<String, MetadataEntryV2>,

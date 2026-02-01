@@ -221,7 +221,7 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
 fn can_remove_google_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
-    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+    let (jwt, salt, _claims, test_time, test_principal, test_authn_method) =
         openid_google_test_data();
 
     let identity_number = create_identity_with_authn_method(&env, canister_id, &test_authn_method);
