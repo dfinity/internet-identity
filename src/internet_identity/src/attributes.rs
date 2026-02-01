@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
 use ic_representation_independent_hash::{representation_independent_hash, Value};
 use internet_identity_interface::internet_identity::types::{
-    attributes::{AttributeField, AttributeRequest, AttributeScope},
+    attributes::{AttributeKey, AttributeRequest, AttributeScope},
     MetadataEntryV2, Timestamp,
 };
 
@@ -21,7 +21,7 @@ impl Anchor {
     /// `requested_attributes` is mutated to remove the attributes for which values were found.
     fn prepare_openid_attributes(
         &self,
-        mut requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeField>>,
+        mut requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>>,
     ) -> BTreeMap<OpenIdCredentialKey, Vec<(String, String)>> {
         self.openid_credentials
             .iter()
@@ -31,16 +31,14 @@ impl Anchor {
                     issuer: openid_credential.iss.clone(),
                 });
                 // E.g., {`email`, `name`}
-                let Some(fields) = requested_attributes.remove(&scope) else {
-                    return None;
-                };
+                let fields = requested_attributes.remove(&scope)?;
 
                 let attribute_requests: BTreeMap<String, AttributeRequest> = fields
                     .into_iter()
                     .map(|field| {
                         let field_str = format!("{}", field);
                         let scope = scope.clone();
-                        (field_str, AttributeRequest { scope, field })
+                        (field_str, AttributeRequest { scope, key: field })
                     })
                     .collect();
 
@@ -71,7 +69,7 @@ impl Anchor {
     /// the list of issued attribute keys.
     pub fn prepare_attributes(
         &self,
-        requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeField>>,
+        requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>>,
         account: Account,
         now_timestamp_ns: Timestamp,
     ) -> Vec<String> {

@@ -8,28 +8,28 @@ use crate::internet_identity::types::{
 };
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AttributeField {
+pub enum AttributeKey {
     Email,
     Name,
 }
 
-impl TryFrom<&str> for AttributeField {
+impl TryFrom<&str> for AttributeKey {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "email" => Ok(AttributeField::Email),
-            "name" => Ok(AttributeField::Name),
+            "email" => Ok(AttributeKey::Email),
+            "name" => Ok(AttributeKey::Name),
             _ => Err(format!("Unknown attribute: {}", value)),
         }
     }
 }
 
-impl std::fmt::Display for AttributeField {
+impl std::fmt::Display for AttributeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttributeField::Email => write!(f, "email"),
-            AttributeField::Name => write!(f, "name"),
+            AttributeKey::Email => write!(f, "email"),
+            AttributeKey::Name => write!(f, "name"),
         }
     }
 }
@@ -82,7 +82,7 @@ pub struct AttributeRequest {
     pub scope: Option<AttributeScope>,
 
     /// E.g., "email", "name"
-    pub field: AttributeField,
+    pub key: AttributeKey,
 }
 
 impl TryFrom<String> for AttributeRequest {
@@ -93,15 +93,15 @@ impl TryFrom<String> for AttributeRequest {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let mut parts = value.rsplitn(2, ':');
 
-        let field = parts
+        let key = parts
             .next()
             .ok_or_else(|| format!("Invalid attribute request: {}", value))?;
 
-        let field = AttributeField::try_from(field)?;
+        let key = AttributeKey::try_from(key)?;
 
         let scope = parts.next().map(AttributeScope::try_from).transpose()?;
 
-        Ok(AttributeRequest { scope, field })
+        Ok(AttributeRequest { scope, key })
     }
 }
 
@@ -110,7 +110,7 @@ impl std::fmt::Display for AttributeRequest {
         if let Some(scope) = &self.scope {
             write!(f, "{}:", scope)?;
         }
-        write!(f, "{}", self.field)
+        write!(f, "{}", self.key)
     }
 }
 
@@ -127,7 +127,7 @@ pub struct ValidatedPrepareAttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeField>>,
+    pub requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>>,
 }
 
 impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
@@ -145,7 +145,7 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
         let mut problems = Vec::new();
 
         for unparsed_attribute in unparsed_attributes {
-            let AttributeRequest { scope, field } = match unparsed_attribute.try_into() {
+            let AttributeRequest { scope, key } = match unparsed_attribute.try_into() {
                 Ok(attr) => attr,
                 Err(err) => {
                     problems.push(err);
@@ -155,7 +155,7 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
             attributes
                 .entry(scope)
                 .or_insert_with(BTreeSet::new)
-                .insert(field);
+                .insert(key);
         }
 
         if !problems.is_empty() {
@@ -190,49 +190,48 @@ mod tests {
     use pretty_assertions::assert_eq as pretty_assert_eq;
     use serde_bytes::ByteBuf;
 
-    // AttributeField Tests
-    mod attribute_field_tests {
+    mod attribute_key_tests {
         use super::*;
 
         #[test]
         fn test_try_from_str_email() {
-            let result = AttributeField::try_from("email");
-            assert_eq!(result, Ok(AttributeField::Email));
+            let result = AttributeKey::try_from("email");
+            assert_eq!(result, Ok(AttributeKey::Email));
         }
 
         #[test]
         fn test_try_from_str_name() {
-            let result = AttributeField::try_from("name");
-            assert_eq!(result, Ok(AttributeField::Name));
+            let result = AttributeKey::try_from("name");
+            assert_eq!(result, Ok(AttributeKey::Name));
         }
 
         #[test]
         fn test_try_from_str_unknown() {
-            let result = AttributeField::try_from("unknown");
+            let result = AttributeKey::try_from("unknown");
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), "Unknown attribute: unknown");
         }
 
         #[test]
         fn test_try_from_str_empty() {
-            let result = AttributeField::try_from("");
+            let result = AttributeKey::try_from("");
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), "Unknown attribute: ");
         }
 
         #[test]
         fn test_display_email() {
-            assert_eq!(AttributeField::Email.to_string(), "email");
+            assert_eq!(AttributeKey::Email.to_string(), "email");
         }
 
         #[test]
         fn test_display_name() {
-            assert_eq!(AttributeField::Name.to_string(), "name");
+            assert_eq!(AttributeKey::Name.to_string(), "name");
         }
 
         #[test]
         fn test_ordering() {
-            assert!(AttributeField::Email < AttributeField::Name);
+            assert!(AttributeKey::Email < AttributeKey::Name);
         }
     }
 
@@ -319,13 +318,13 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_try_from_string_field_only() {
+        fn test_try_from_string_key_only() {
             let result = AttributeRequest::try_from("email".to_string());
             assert_eq!(
                 result,
                 Ok(AttributeRequest {
                     scope: None,
-                    field: AttributeField::Email,
+                    key: AttributeKey::Email,
                 })
             );
         }
@@ -339,7 +338,7 @@ mod tests {
                     scope: Some(AttributeScope::OpenId {
                         issuer: "google.com".to_string()
                     }),
-                    field: AttributeField::Email,
+                    key: AttributeKey::Email,
                 })
             );
         }
@@ -353,7 +352,7 @@ mod tests {
                     scope: Some(AttributeScope::OpenId {
                         issuer: "accounts.google.com".to_string()
                     }),
-                    field: AttributeField::Name,
+                    key: AttributeKey::Name,
                 })
             );
         }
@@ -367,13 +366,13 @@ mod tests {
                     scope: Some(AttributeScope::OpenId {
                         issuer: "issuer:with:colons".to_string()
                     }),
-                    field: AttributeField::Email,
+                    key: AttributeKey::Email,
                 })
             );
         }
 
         #[test]
-        fn test_try_from_string_invalid_field() {
+        fn test_try_from_string_invalid_key() {
             let result = AttributeRequest::try_from("openid:google.com:invalid".to_string());
             assert_eq!(result, Err("Unknown attribute: invalid".to_string()));
         }
@@ -391,10 +390,10 @@ mod tests {
         }
 
         #[test]
-        fn test_display_field_only() {
+        fn test_display_key_only() {
             let req = AttributeRequest {
                 scope: None,
-                field: AttributeField::Email,
+                key: AttributeKey::Email,
             };
             assert_eq!(req.to_string(), "email");
         }
@@ -405,13 +404,13 @@ mod tests {
                 scope: Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
                 }),
-                field: AttributeField::Email,
+                key: AttributeKey::Email,
             };
             assert_eq!(req.to_string(), "openid:google.com:email");
         }
 
         #[test]
-        fn test_round_trip_conversion_field_only() {
+        fn test_round_trip_conversion_key_only() {
             let original = "name".to_string();
             let req = AttributeRequest::try_from(original.clone()).unwrap();
             assert_eq!(req.to_string(), original);
@@ -428,17 +427,17 @@ mod tests {
         fn test_ordering() {
             let req1 = AttributeRequest {
                 scope: None,
-                field: AttributeField::Email,
+                key: AttributeKey::Email,
             };
             let req2 = AttributeRequest {
                 scope: None,
-                field: AttributeField::Name,
+                key: AttributeKey::Name,
             };
             let req3 = AttributeRequest {
                 scope: Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
                 }),
-                field: AttributeField::Email,
+                key: AttributeKey::Email,
             };
             assert!(req1 < req2);
             assert!(req1 < req3);
@@ -467,7 +466,7 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
-            s.insert(AttributeField::Email);
+            s.insert(AttributeKey::Email);
             expected.insert(None, s);
 
             assert_eq!(validated.requested_attributes, expected);
@@ -487,8 +486,8 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
-            s.insert(AttributeField::Email);
-            s.insert(AttributeField::Name);
+            s.insert(AttributeKey::Email);
+            s.insert(AttributeKey::Name);
             expected.insert(None, s);
 
             assert_eq!(validated.requested_attributes, expected);
@@ -511,11 +510,11 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut default_set = BTreeSet::new();
-            default_set.insert(AttributeField::Email);
+            default_set.insert(AttributeKey::Email);
             expected.insert(None, default_set);
 
             let mut google_set = BTreeSet::new();
-            google_set.insert(AttributeField::Email);
+            google_set.insert(AttributeKey::Email);
             expected.insert(
                 Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
@@ -540,7 +539,7 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
-            s.insert(AttributeField::Email);
+            s.insert(AttributeKey::Email);
             expected.insert(None, s);
 
             assert_eq!(validated.requested_attributes, expected);
@@ -622,7 +621,7 @@ mod tests {
             let result = ValidatedPrepareAttributeRequest::try_from(req);
             let validated = result.expect("Should successfully validate");
 
-            let expected: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeField>> =
+            let expected: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>> =
                 BTreeMap::new();
             assert_eq!(validated.requested_attributes, expected);
         }
@@ -648,12 +647,12 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut default_set = BTreeSet::new();
-            default_set.insert(AttributeField::Name);
+            default_set.insert(AttributeKey::Name);
             expected.insert(None, default_set);
 
             let mut google_set = BTreeSet::new();
-            google_set.insert(AttributeField::Email);
-            google_set.insert(AttributeField::Name);
+            google_set.insert(AttributeKey::Email);
+            google_set.insert(AttributeKey::Name);
             expected.insert(
                 Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
@@ -662,7 +661,7 @@ mod tests {
             );
 
             let mut github_set = BTreeSet::new();
-            github_set.insert(AttributeField::Email);
+            github_set.insert(AttributeKey::Email);
             expected.insert(
                 Some(AttributeScope::OpenId {
                     issuer: "github.com".to_string(),
