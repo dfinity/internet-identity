@@ -836,7 +836,17 @@ type PrepareAttributeRequest = record {
     account_number : opt AccountNumber;
 
     // The attribute to be prepared.
-    attributes : vec text;
+    attribute_keys : vec text;
+};
+
+type GetAccountError = variant {
+    NoSuchOrigin : record {
+        anchor_number : UserNumber;
+    };
+    NoSuchAccount : record {
+        anchor_number : UserNumber;
+        origin : FrontendHostname;
+    };
 };
 
 type PrepareAttributeError = variant {
@@ -844,13 +854,51 @@ type PrepareAttributeError = variant {
         problems : vec text;
     };
     AuthorizationError : principal;
-    ScopeNotSupported : text;
+    GetAccountError : GetAccountError;
 };
 
 type PrepareAttributeResponse = record {
     issued_at_timestamp_ns : Timestamp;
-    certified_attributes : vec text;
-}
+    attributes : vec record { text; text };
+};
+
+type GetAttributesRequest = record {
+    // Identity for which the attributes should be prepared.
+    identity_number : IdentityNumber;
+
+    // Origin of the relying party in the attribute sharing flow.
+    origin : FrontendHostname;
+
+    // II account for the relying party.
+    account_number : opt AccountNumber;
+
+    // Timestamp received from the prepare_attributes call.
+    issued_at_timestamp_ns : Timestamp;
+
+    // The attribute to be retrieved, must be a subset of certified_attributes from
+    // the prepare_attributes response.
+    attributes : vec record { text; text };
+};
+
+type CertifiedAttribute = record {
+    key : text;
+    value : text;
+    signature : blob;
+};
+
+type CertifiedAttributes = record {
+    expires_at_timestamp_ns : Timestamp;
+    certified_attributes : vec CertifiedAttribute;
+};
+
+type GetAttributesError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+    GetAccountError : GetAccountError;
+    CertificateNotFound;
+};
 
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
@@ -969,6 +1017,7 @@ service : (opt InternetIdentityInit) -> {
     // Attribute sharing protocol
     // ===========================
     prepare_attributes : (PrepareAttributeRequest) -> (variant { Ok : PrepareAttributeResponse; Err : PrepareAttributeError });
+    get_attributes : (GetAttributesRequest) -> (variant { Ok : CertifiedAttributes; Err : GetAttributesError }) query;
 
     // Old Verifiable Credentials API
     // ==============================

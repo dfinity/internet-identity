@@ -1,40 +1,45 @@
-use std::collections::{BTreeMap, BTreeSet};
-
-use candid::{CandidType, Principal};
-use serde::{Deserialize, Serialize};
-
 use crate::internet_identity::types::{
     AccountNumber, AnchorNumber, FrontendHostname, GetAccountError, Timestamp,
 };
+use candid::{CandidType, Principal};
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum AttributeKey {
+// TODO: Refer to the same constant as in `internet_identity::delegation::check_frontend_length`
+pub const FRONTEND_HOSTNAME_LIMIT: usize = 255;
+
+pub const MAX_ATTRIBUTES_PER_REQUEST: usize = 100;
+
+pub const MAX_ATTRIBUTE_VALUE_LENGTH: usize = 50_000;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
+pub enum AttributeName {
     Email,
     Name,
 }
 
-impl TryFrom<&str> for AttributeKey {
+impl TryFrom<&str> for AttributeName {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "email" => Ok(AttributeKey::Email),
-            "name" => Ok(AttributeKey::Name),
+            "email" => Ok(AttributeName::Email),
+            "name" => Ok(AttributeName::Name),
             _ => Err(format!("Unknown attribute: {}", value)),
         }
     }
 }
 
-impl std::fmt::Display for AttributeKey {
+impl std::fmt::Display for AttributeName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttributeKey::Email => write!(f, "email"),
-            AttributeKey::Name => write!(f, "name"),
+            AttributeName::Email => write!(f, "email"),
+            AttributeName::Name => write!(f, "name"),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub enum AttributeScope {
     OpenId { issuer: String },
 }
@@ -76,16 +81,16 @@ impl TryFrom<&str> for AttributeScope {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct AttributeRequest {
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
+pub struct AttributeKey {
     /// E.g., `Some("openid:google.com")` in "openid:google.com:email" or `None` in "name".
     pub scope: Option<AttributeScope>,
 
     /// E.g., "email", "name"
-    pub key: AttributeKey,
+    pub attribute_name: AttributeName,
 }
 
-impl TryFrom<String> for AttributeRequest {
+impl TryFrom<String> for AttributeKey {
     type Error = String;
 
     /// Splits by ':', setting the attribute name to the last component, and setting
@@ -97,20 +102,23 @@ impl TryFrom<String> for AttributeRequest {
             .next()
             .ok_or_else(|| format!("Invalid attribute request: {}", value))?;
 
-        let key = AttributeKey::try_from(key)?;
+        let key = AttributeName::try_from(key)?;
 
         let scope = parts.next().map(AttributeScope::try_from).transpose()?;
 
-        Ok(AttributeRequest { scope, key })
+        Ok(AttributeKey {
+            scope,
+            attribute_name: key,
+        })
     }
 }
 
-impl std::fmt::Display for AttributeRequest {
+impl std::fmt::Display for AttributeKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(scope) = &self.scope {
             write!(f, "{}:", scope)?;
         }
-        write!(f, "{}", self.key)
+        write!(f, "{}", self.attribute_name)
     }
 }
 
@@ -119,7 +127,7 @@ pub struct PrepareAttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub requested_attributes: Vec<String>,
+    pub attribute_keys: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -127,7 +135,7 @@ pub struct ValidatedPrepareAttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>>,
+    pub attribute_keys: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
 }
 
 impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
@@ -138,21 +146,41 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
             identity_number: anchor_number,
             origin,
             account_number,
-            requested_attributes: unparsed_attributes,
+            attribute_keys: unparsed_attributes,
         } = value;
 
-        let mut attributes = BTreeMap::new();
         let mut problems = Vec::new();
 
+        if origin.len() > FRONTEND_HOSTNAME_LIMIT {
+            problems.push(format!(
+                "Frontend hostname length {} exceeds limit of {} bytes",
+                origin.len(),
+                FRONTEND_HOSTNAME_LIMIT
+            ));
+        }
+
+        if unparsed_attributes.len() > MAX_ATTRIBUTES_PER_REQUEST {
+            problems.push(format!(
+                "Number of attributes {} exceeds limit of {}",
+                unparsed_attributes.len(),
+                MAX_ATTRIBUTES_PER_REQUEST
+            ));
+        }
+
+        let mut attribute_keys = BTreeMap::new();
+
         for unparsed_attribute in unparsed_attributes {
-            let AttributeRequest { scope, key } = match unparsed_attribute.try_into() {
+            let AttributeKey {
+                scope,
+                attribute_name: key,
+            } = match unparsed_attribute.try_into() {
                 Ok(attr) => attr,
                 Err(err) => {
                     problems.push(err);
                     continue;
                 }
             };
-            attributes
+            attribute_keys
                 .entry(scope)
                 .or_insert_with(BTreeSet::new)
                 .insert(key);
@@ -166,7 +194,7 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
             identity_number: anchor_number,
             origin,
             account_number,
-            requested_attributes: attributes,
+            attribute_keys,
         })
     }
 }
@@ -174,7 +202,7 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
 #[derive(CandidType, Serialize)]
 pub struct PrepareAttributeResponse {
     pub issued_at_timestamp_ns: Timestamp,
-    pub certified_attributes: Vec<String>,
+    pub attributes: Vec<(String, String)>,
 }
 
 #[derive(Debug, PartialEq, CandidType, Serialize)]
@@ -182,6 +210,129 @@ pub enum PrepareAttributeError {
     ValidationError { problems: Vec<String> },
     AuthorizationError(Principal),
     GetAccountError(GetAccountError),
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct GetAttributesRequest {
+    pub identity_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub issued_at_timestamp_ns: Timestamp,
+    pub attributes: Vec<(String, String)>,
+}
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
+pub struct Attribute {
+    pub key: AttributeKey,
+    pub value: String,
+}
+
+impl TryFrom<(String, String)> for Attribute {
+    type Error = String;
+
+    fn try_from(value: (String, String)) -> Result<Self, Self::Error> {
+        let (key, value) = value;
+
+        let key = AttributeKey::try_from(key)?;
+
+        if value.len() > MAX_ATTRIBUTE_VALUE_LENGTH {
+            return Err(format!(
+                "Attribute value length {} exceeds limit of {} bytes",
+                value.len(),
+                MAX_ATTRIBUTE_VALUE_LENGTH
+            ));
+        }
+
+        Ok(Attribute { key, value })
+    }
+}
+
+pub struct ValidatedGetAttributesRequest {
+    pub identity_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub issued_at_timestamp_ns: Timestamp,
+    pub attributes: BTreeMap<Option<AttributeScope>, BTreeSet<Attribute>>,
+}
+
+impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
+    type Error = GetAttributesError;
+
+    fn try_from(value: GetAttributesRequest) -> Result<Self, Self::Error> {
+        let GetAttributesRequest {
+            identity_number,
+            origin,
+            account_number,
+            issued_at_timestamp_ns,
+            attributes: unparsed_attributes,
+        } = value;
+
+        let mut problems = Vec::new();
+
+        if origin.len() > FRONTEND_HOSTNAME_LIMIT {
+            problems.push(format!(
+                "Frontend hostname length {} exceeds limit of {} bytes",
+                origin.len(),
+                FRONTEND_HOSTNAME_LIMIT
+            ));
+        }
+
+        if unparsed_attributes.len() > MAX_ATTRIBUTES_PER_REQUEST {
+            problems.push(format!(
+                "Number of attributes {} exceeds limit of {}",
+                unparsed_attributes.len(),
+                MAX_ATTRIBUTES_PER_REQUEST
+            ));
+        }
+
+        let mut attributes = BTreeMap::new();
+
+        for unparsed_attribute in unparsed_attributes {
+            let attribute: Attribute = match unparsed_attribute.try_into() {
+                Ok(attr) => attr,
+                Err(err) => {
+                    problems.push(err);
+                    continue;
+                }
+            };
+            attributes
+                .entry(attribute.key.scope.clone())
+                .or_insert_with(BTreeSet::new)
+                .insert(attribute);
+        }
+
+        if !problems.is_empty() {
+            return Err(GetAttributesError::ValidationError { problems });
+        }
+
+        Ok(Self {
+            identity_number,
+            origin,
+            account_number,
+            issued_at_timestamp_ns,
+            attributes,
+        })
+    }
+}
+
+#[derive(Debug, PartialEq, CandidType, Serialize, Eq, PartialOrd, Ord)]
+pub struct CertifiedAttribute {
+    pub key: String,
+    pub value: String,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, CandidType, Serialize)]
+pub struct CertifiedAttributes {
+    pub certified_attributes: Vec<CertifiedAttribute>,
+    pub expires_at_timestamp_ns: Timestamp,
+}
+
+#[derive(Debug, PartialEq, CandidType, Serialize)]
+pub enum GetAttributesError {
+    ValidationError { problems: Vec<String> },
+    AuthorizationError(Principal),
+    GetAccountError(GetAccountError),
+    CertificateNotFound,
 }
 
 #[cfg(test)]
@@ -194,43 +345,43 @@ mod tests {
 
         #[test]
         fn test_try_from_str_email() {
-            let result = AttributeKey::try_from("email");
-            assert_eq!(result, Ok(AttributeKey::Email));
+            let result = AttributeName::try_from("email");
+            assert_eq!(result, Ok(AttributeName::Email));
         }
 
         #[test]
         fn test_try_from_str_name() {
-            let result = AttributeKey::try_from("name");
-            assert_eq!(result, Ok(AttributeKey::Name));
+            let result = AttributeName::try_from("name");
+            assert_eq!(result, Ok(AttributeName::Name));
         }
 
         #[test]
         fn test_try_from_str_unknown() {
-            let result = AttributeKey::try_from("unknown");
+            let result = AttributeName::try_from("unknown");
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), "Unknown attribute: unknown");
         }
 
         #[test]
         fn test_try_from_str_empty() {
-            let result = AttributeKey::try_from("");
+            let result = AttributeName::try_from("");
             assert!(result.is_err());
             assert_eq!(result.unwrap_err(), "Unknown attribute: ");
         }
 
         #[test]
         fn test_display_email() {
-            assert_eq!(AttributeKey::Email.to_string(), "email");
+            assert_eq!(AttributeName::Email.to_string(), "email");
         }
 
         #[test]
         fn test_display_name() {
-            assert_eq!(AttributeKey::Name.to_string(), "name");
+            assert_eq!(AttributeName::Name.to_string(), "name");
         }
 
         #[test]
         fn test_ordering() {
-            assert!(AttributeKey::Email < AttributeKey::Name);
+            assert!(AttributeName::Email < AttributeName::Name);
         }
     }
 
@@ -318,92 +469,92 @@ mod tests {
 
         #[test]
         fn test_try_from_string_key_only() {
-            let result = AttributeRequest::try_from("email".to_string());
+            let result = AttributeKey::try_from("email".to_string());
             assert_eq!(
                 result,
-                Ok(AttributeRequest {
+                Ok(AttributeKey {
                     scope: None,
-                    key: AttributeKey::Email,
+                    attribute_name: AttributeName::Email,
                 })
             );
         }
 
         #[test]
         fn test_try_from_string_with_scope() {
-            let result = AttributeRequest::try_from("openid:google.com:email".to_string());
+            let result = AttributeKey::try_from("openid:google.com:email".to_string());
             assert_eq!(
                 result,
-                Ok(AttributeRequest {
+                Ok(AttributeKey {
                     scope: Some(AttributeScope::OpenId {
                         issuer: "google.com".to_string()
                     }),
-                    key: AttributeKey::Email,
+                    attribute_name: AttributeName::Email,
                 })
             );
         }
 
         #[test]
         fn test_try_from_string_with_complex_issuer() {
-            let result = AttributeRequest::try_from("openid:accounts.google.com:name".to_string());
+            let result = AttributeKey::try_from("openid:accounts.google.com:name".to_string());
             assert_eq!(
                 result,
-                Ok(AttributeRequest {
+                Ok(AttributeKey {
                     scope: Some(AttributeScope::OpenId {
                         issuer: "accounts.google.com".to_string()
                     }),
-                    key: AttributeKey::Name,
+                    attribute_name: AttributeName::Name,
                 })
             );
         }
 
         #[test]
         fn test_try_from_string_with_issuer_containing_colons() {
-            let result = AttributeRequest::try_from("openid:issuer:with:colons:email".to_string());
+            let result = AttributeKey::try_from("openid:issuer:with:colons:email".to_string());
             assert_eq!(
                 result,
-                Ok(AttributeRequest {
+                Ok(AttributeKey {
                     scope: Some(AttributeScope::OpenId {
                         issuer: "issuer:with:colons".to_string()
                     }),
-                    key: AttributeKey::Email,
+                    attribute_name: AttributeName::Email,
                 })
             );
         }
 
         #[test]
         fn test_try_from_string_invalid_key() {
-            let result = AttributeRequest::try_from("openid:google.com:invalid".to_string());
+            let result = AttributeKey::try_from("openid:google.com:invalid".to_string());
             assert_eq!(result, Err("Unknown attribute: invalid".to_string()));
         }
 
         #[test]
         fn test_try_from_string_invalid_scope() {
-            let result = AttributeRequest::try_from("unknown:issuer:email".to_string());
+            let result = AttributeKey::try_from("unknown:issuer:email".to_string());
             assert_eq!(result, Err("Unknown attribute scope: unknown".to_string()));
         }
 
         #[test]
         fn test_try_from_string_empty() {
-            let result = AttributeRequest::try_from("".to_string());
+            let result = AttributeKey::try_from("".to_string());
             assert_eq!(result, Err("Unknown attribute: ".to_string()));
         }
 
         #[test]
         fn test_display_key_only() {
-            let req = AttributeRequest {
+            let req = AttributeKey {
                 scope: None,
-                key: AttributeKey::Email,
+                attribute_name: AttributeName::Email,
             };
             assert_eq!(req.to_string(), "email");
         }
 
         #[test]
         fn test_display_with_scope() {
-            let req = AttributeRequest {
+            let req = AttributeKey {
                 scope: Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
                 }),
-                key: AttributeKey::Email,
+                attribute_name: AttributeName::Email,
             };
             assert_eq!(req.to_string(), "openid:google.com:email");
         }
@@ -411,32 +562,32 @@ mod tests {
         #[test]
         fn test_round_trip_conversion_key_only() {
             let original = "name".to_string();
-            let req = AttributeRequest::try_from(original.clone()).unwrap();
+            let req = AttributeKey::try_from(original.clone()).unwrap();
             assert_eq!(req.to_string(), original);
         }
 
         #[test]
         fn test_round_trip_conversion_with_scope() {
             let original = "openid:google.com:email".to_string();
-            let req = AttributeRequest::try_from(original.clone()).unwrap();
+            let req = AttributeKey::try_from(original.clone()).unwrap();
             assert_eq!(req.to_string(), original);
         }
 
         #[test]
         fn test_ordering() {
-            let req1 = AttributeRequest {
+            let req1 = AttributeKey {
                 scope: None,
-                key: AttributeKey::Email,
+                attribute_name: AttributeName::Email,
             };
-            let req2 = AttributeRequest {
+            let req2 = AttributeKey {
                 scope: None,
-                key: AttributeKey::Name,
+                attribute_name: AttributeName::Name,
             };
-            let req3 = AttributeRequest {
+            let req3 = AttributeKey {
                 scope: Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
                 }),
-                key: AttributeKey::Email,
+                attribute_name: AttributeName::Email,
             };
             assert!(req1 < req2);
             assert!(req1 < req3);
@@ -453,7 +604,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                requested_attributes: vec!["email".to_string()],
+                attribute_keys: vec!["email".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -464,10 +615,10 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
-            s.insert(AttributeKey::Email);
+            s.insert(AttributeName::Email);
             expected.insert(None, s);
 
-            assert_eq!(validated.requested_attributes, expected);
+            assert_eq!(validated.attribute_keys, expected);
         }
 
         #[test]
@@ -476,7 +627,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: Some(1),
-                requested_attributes: vec!["email".to_string(), "name".to_string()],
+                attribute_keys: vec!["email".to_string(), "name".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -484,11 +635,11 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
-            s.insert(AttributeKey::Email);
-            s.insert(AttributeKey::Name);
+            s.insert(AttributeName::Email);
+            s.insert(AttributeName::Name);
             expected.insert(None, s);
 
-            assert_eq!(validated.requested_attributes, expected);
+            assert_eq!(validated.attribute_keys, expected);
         }
 
         #[test]
@@ -497,10 +648,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                requested_attributes: vec![
-                    "email".to_string(),
-                    "openid:google.com:email".to_string(),
-                ],
+                attribute_keys: vec!["email".to_string(), "openid:google.com:email".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -508,11 +656,11 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut default_set = BTreeSet::new();
-            default_set.insert(AttributeKey::Email);
+            default_set.insert(AttributeName::Email);
             expected.insert(None, default_set);
 
             let mut google_set = BTreeSet::new();
-            google_set.insert(AttributeKey::Email);
+            google_set.insert(AttributeName::Email);
             expected.insert(
                 Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
@@ -520,7 +668,7 @@ mod tests {
                 google_set,
             );
 
-            assert_eq!(validated.requested_attributes, expected);
+            assert_eq!(validated.attribute_keys, expected);
         }
 
         #[test]
@@ -529,7 +677,7 @@ mod tests {
                 identity_number: 12345,
                 origin: "example.com".to_string(),
                 account_number: None,
-                requested_attributes: vec!["email".to_string(), "email".to_string()],
+                attribute_keys: vec!["email".to_string(), "email".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -537,10 +685,10 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
-            s.insert(AttributeKey::Email);
+            s.insert(AttributeName::Email);
             expected.insert(None, s);
 
-            assert_eq!(validated.requested_attributes, expected);
+            assert_eq!(validated.attribute_keys, expected);
         }
 
         #[test]
@@ -550,7 +698,7 @@ mod tests {
                 origin: "example.com".to_string(),
                 account_number: None,
 
-                requested_attributes: vec!["invalid".to_string()],
+                attribute_keys: vec!["invalid".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -570,7 +718,7 @@ mod tests {
                 origin: "example.com".to_string(),
                 account_number: None,
 
-                requested_attributes: vec!["invalid1".to_string(), "invalid2".to_string()],
+                attribute_keys: vec!["invalid1".to_string(), "invalid2".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -593,7 +741,7 @@ mod tests {
                 origin: "example.com".to_string(),
                 account_number: None,
 
-                requested_attributes: vec!["email".to_string(), "invalid".to_string()],
+                attribute_keys: vec!["email".to_string(), "invalid".to_string()],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
@@ -613,15 +761,15 @@ mod tests {
                 origin: "example.com".to_string(),
                 account_number: None,
 
-                requested_attributes: vec![],
+                attribute_keys: vec![],
             };
 
             let result = ValidatedPrepareAttributeRequest::try_from(req);
             let validated = result.expect("Should successfully validate");
 
-            let expected: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>> =
+            let expected: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
                 BTreeMap::new();
-            assert_eq!(validated.requested_attributes, expected);
+            assert_eq!(validated.attribute_keys, expected);
         }
 
         #[test]
@@ -630,7 +778,7 @@ mod tests {
                 identity_number: 67890,
                 origin: "app.example.com".to_string(),
                 account_number: Some(42),
-                requested_attributes: vec![
+                attribute_keys: vec![
                     "name".to_string(),
                     "openid:google.com:email".to_string(),
                     "openid:google.com:name".to_string(),
@@ -645,12 +793,12 @@ mod tests {
 
             let mut expected = BTreeMap::new();
             let mut default_set = BTreeSet::new();
-            default_set.insert(AttributeKey::Name);
+            default_set.insert(AttributeName::Name);
             expected.insert(None, default_set);
 
             let mut google_set = BTreeSet::new();
-            google_set.insert(AttributeKey::Email);
-            google_set.insert(AttributeKey::Name);
+            google_set.insert(AttributeName::Email);
+            google_set.insert(AttributeName::Name);
             expected.insert(
                 Some(AttributeScope::OpenId {
                     issuer: "google.com".to_string(),
@@ -659,7 +807,7 @@ mod tests {
             );
 
             let mut github_set = BTreeSet::new();
-            github_set.insert(AttributeKey::Email);
+            github_set.insert(AttributeName::Email);
             expected.insert(
                 Some(AttributeScope::OpenId {
                     issuer: "github.com".to_string(),
@@ -667,7 +815,7 @@ mod tests {
                 github_set,
             );
 
-            assert_eq!(validated.requested_attributes, expected);
+            assert_eq!(validated.attribute_keys, expected);
         }
     }
 }

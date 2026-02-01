@@ -16,8 +16,8 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
-    PrepareAttributeError, PrepareAttributeRequest, PrepareAttributeResponse,
-    ValidatedPrepareAttributeRequest,
+    CertifiedAttributes, GetAttributesError, GetAttributesRequest, PrepareAttributeError,
+    PrepareAttributeRequest, PrepareAttributeResponse, ValidatedPrepareAttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
@@ -1215,6 +1215,11 @@ mod openid_api {
 }
 
 mod attribute_sharing {
+    use internet_identity_interface::internet_identity::types::attributes::{
+        Attribute, CertifiedAttributes, GetAttributesError, GetAttributesRequest,
+        ValidatedGetAttributesRequest,
+    };
+
     use super::*;
     use crate::{account_management::get_account_for_origin, authz_utils::AuthorizationError};
 
@@ -1222,6 +1227,7 @@ mod attribute_sharing {
     async fn prepare_attributes(
         request: PrepareAttributeRequest,
     ) -> Result<PrepareAttributeResponse, PrepareAttributeError> {
+        // Parse and validate API request into internal types.
         let ValidatedPrepareAttributeRequest {
             // Arguments for computing the seed
             identity_number,
@@ -1229,7 +1235,7 @@ mod attribute_sharing {
             account_number,
 
             // Which attributes to prepare
-            requested_attributes,
+            attribute_keys,
         } = request.try_into()?;
 
         let (anchor, _) =
@@ -1245,13 +1251,45 @@ mod attribute_sharing {
         state::ensure_salt_set().await;
         let issued_at_timestamp_ns = ic_cdk::api::time();
 
-        let certified_attributes =
-            anchor.prepare_attributes(requested_attributes, account, issued_at_timestamp_ns);
+        let attributes = anchor.prepare_attributes(attribute_keys, account, issued_at_timestamp_ns);
+
+        // Convert response to API types.
+        let attributes = attributes
+            .into_iter()
+            .map(|Attribute { key, value }| (key.to_string(), value))
+            .collect();
 
         Ok(PrepareAttributeResponse {
             issued_at_timestamp_ns,
-            certified_attributes,
+            attributes,
         })
+    }
+
+    #[query]
+    fn get_attributes(
+        request: GetAttributesRequest,
+    ) -> Result<CertifiedAttributes, GetAttributesError> {
+        // Parse and validate API request into internal types.
+        let ValidatedGetAttributesRequest {
+            identity_number,
+            origin,
+            account_number,
+            issued_at_timestamp_ns,
+            attributes,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                GetAttributesError::AuthorizationError(principal)
+            })?;
+
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(GetAttributesError::GetAccountError)?;
+
+        let certified_attributes =
+            anchor.get_attributes(attributes, account, issued_at_timestamp_ns);
+
+        Ok(certified_attributes)
     }
 }
 
