@@ -15,6 +15,45 @@ use crate::{
 };
 
 impl Anchor {
+    /// Processes `requested_attributes` for all attribute scopes, prepares signatures for
+    /// the (attribute_key, attribute_value) pairs that can be fulfilled for this (anchor, account).
+    ///
+    /// Returns the list of attribute keys certified with expiry `now_timestamp_ns + OPENID_SESSION_DURATION_NS`.
+    pub fn prepare_attributes(
+        &self,
+        requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>>,
+        account: Account,
+        now_timestamp_ns: Timestamp,
+    ) -> Vec<String> {
+        let mut certified_attributes = Vec::new();
+
+        // Process scope `openid` ...
+        let mut openid_attributes_to_certify = self.prepare_openid_attributes(requested_attributes);
+
+        for openid_credential in &self.openid_credentials {
+            let Some(attributes) = openid_attributes_to_certify.remove(&openid_credential.key())
+            else {
+                continue;
+            };
+
+            openid_credential.prepare_attributes_no_root_hash_update(
+                &account,
+                &attributes,
+                now_timestamp_ns,
+            );
+
+            certified_attributes.extend(
+                attributes
+                    .into_iter()
+                    .map(|(attribute_key, _)| attribute_key),
+            );
+        }
+
+        update_root_hash();
+
+        certified_attributes
+    }
+
     /// Returns `(attribute_key, attribute_value)` pairs for attributes from `requested_attributes`
     /// for which we have values in our OpenID credentials' JWT.
     ///
@@ -62,44 +101,6 @@ impl Anchor {
                 Some((openid_credential.key(), attributes))
             })
             .collect()
-    }
-
-    /// Processes attribute requests from all attribute scopes, prepares signatures for
-    /// the (attribute_key, attribute_value) pairs that can be fulfilled, and returns
-    /// the list of issued attribute keys.
-    pub fn prepare_attributes(
-        &self,
-        requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeKey>>,
-        account: Account,
-        now_timestamp_ns: Timestamp,
-    ) -> Vec<String> {
-        let mut certified_attributes = Vec::new();
-
-        // Process scope `openid` ...
-        let mut opedid_attributes_to_certify = self.prepare_openid_attributes(requested_attributes);
-
-        for openid_credential in &self.openid_credentials {
-            let Some(attributes) = opedid_attributes_to_certify.remove(&openid_credential.key())
-            else {
-                continue;
-            };
-
-            openid_credential.prepare_attributes_no_root_hash_update(
-                &account,
-                &attributes,
-                now_timestamp_ns,
-            );
-
-            certified_attributes.extend(
-                attributes
-                    .into_iter()
-                    .map(|(attribute_key, _)| attribute_key),
-            );
-        }
-
-        update_root_hash();
-
-        certified_attributes
     }
 }
 

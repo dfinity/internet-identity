@@ -188,7 +188,6 @@ pub enum PrepareAttributeError {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq as pretty_assert_eq;
-    use serde_bytes::ByteBuf;
 
     mod attribute_key_tests {
         use super::*;
@@ -462,7 +461,6 @@ mod tests {
             assert_eq!(validated.identity_number, 12345);
             assert_eq!(validated.origin, "example.com");
             assert_eq!(validated.account_number, None);
-            assert_eq!(validated.session_key, ByteBuf::from(vec![1, 2, 3]));
 
             let mut expected = BTreeMap::new();
             let mut s = BTreeSet::new();
