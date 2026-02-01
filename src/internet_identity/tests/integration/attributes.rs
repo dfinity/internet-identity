@@ -12,6 +12,7 @@ use std::time::Duration;
 #[test]
 fn should_get_certified_attributes() {
     let env = env();
+    #[allow(unused_variables)]
     let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
         crate::openid::openid_google_test_data();
 
