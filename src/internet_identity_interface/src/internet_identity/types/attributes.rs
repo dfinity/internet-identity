@@ -342,39 +342,34 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_try_from_str_email() {
-            let result = AttributeName::try_from("email");
-            assert_eq!(result, Ok(AttributeName::Email));
+        fn test_attribute_name_conversions() {
+            let test_cases = vec![
+                ("email", "email", Ok(AttributeName::Email)),
+                ("name", "name", Ok(AttributeName::Name)),
+                (
+                    "unknown",
+                    "unknown",
+                    Err("Unknown attribute: unknown".to_string()),
+                ),
+                ("empty", "", Err("Unknown attribute: ".to_string())),
+            ];
+
+            for (label, input, expected) in test_cases {
+                let result = AttributeName::try_from(input);
+                pretty_assert_eq!(result, expected, "Failed test case: {}", label);
+            }
         }
 
         #[test]
-        fn test_try_from_str_name() {
-            let result = AttributeName::try_from("name");
-            assert_eq!(result, Ok(AttributeName::Name));
-        }
+        fn test_attribute_name_display() {
+            let test_cases = vec![
+                ("email", AttributeName::Email, "email"),
+                ("name", AttributeName::Name, "name"),
+            ];
 
-        #[test]
-        fn test_try_from_str_unknown() {
-            let result = AttributeName::try_from("unknown");
-            assert!(result.is_err());
-            assert_eq!(result.unwrap_err(), "Unknown attribute: unknown");
-        }
-
-        #[test]
-        fn test_try_from_str_empty() {
-            let result = AttributeName::try_from("");
-            assert!(result.is_err());
-            assert_eq!(result.unwrap_err(), "Unknown attribute: ");
-        }
-
-        #[test]
-        fn test_display_email() {
-            assert_eq!(AttributeName::Email.to_string(), "email");
-        }
-
-        #[test]
-        fn test_display_name() {
-            assert_eq!(AttributeName::Name.to_string(), "name");
+            for (label, input, expected) in test_cases {
+                pretty_assert_eq!(input.to_string(), expected, "Failed test case: {}", label);
+            }
         }
 
         #[test]
@@ -388,65 +383,58 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_try_from_str_openid() {
-            let result = AttributeScope::try_from("openid:google.com");
-            assert_eq!(
-                result,
-                Ok(AttributeScope::OpenId {
-                    issuer: "google.com".to_string()
-                })
-            );
+        fn test_attribute_scope_conversions() {
+            let test_cases = vec![
+                (
+                    "openid",
+                    "openid:google.com",
+                    Ok(AttributeScope::OpenId {
+                        issuer: "google.com".to_string(),
+                    }),
+                ),
+                (
+                    "openid complex issuer",
+                    "openid:accounts.google.com",
+                    Ok(AttributeScope::OpenId {
+                        issuer: "accounts.google.com".to_string(),
+                    }),
+                ),
+                (
+                    "openid with colon in issuer",
+                    "openid:issuer:with:colons",
+                    Ok(AttributeScope::OpenId {
+                        issuer: "issuer:with:colons".to_string(),
+                    }),
+                ),
+                (
+                    "openid missing issuer",
+                    "openid:",
+                    Err("Missing issuer in attribute scope: openid:".to_string()),
+                ),
+                (
+                    "openid no colon",
+                    "openid",
+                    Err("Missing issuer in attribute scope: openid".to_string()),
+                ),
+                (
+                    "unknown scope",
+                    "unknown:issuer",
+                    Err("Unknown attribute scope: unknown".to_string()),
+                ),
+            ];
+
+            for (label, input, expected) in test_cases {
+                let result = AttributeScope::try_from(input);
+                pretty_assert_eq!(result, expected, "Failed test case: {}", label);
+            }
         }
 
         #[test]
-        fn test_try_from_str_openid_complex_issuer() {
-            let result = AttributeScope::try_from("openid:accounts.google.com");
-            assert_eq!(
-                result,
-                Ok(AttributeScope::OpenId {
-                    issuer: "accounts.google.com".to_string()
-                })
-            );
-        }
-
-        #[test]
-        fn test_try_from_str_openid_with_colon_in_issuer() {
-            let result = AttributeScope::try_from("openid:issuer:with:colons");
-            assert_eq!(
-                result,
-                Ok(AttributeScope::OpenId {
-                    issuer: "issuer:with:colons".to_string()
-                })
-            );
-        }
-
-        #[test]
-        fn test_try_from_str_openid_missing_issuer() {
-            let result = AttributeScope::try_from("openid:");
-            assert!(result.is_err());
-            assert!(result.unwrap_err().contains("Missing issuer"));
-        }
-
-        #[test]
-        fn test_try_from_str_openid_no_colon() {
-            let result = AttributeScope::try_from("openid");
-            assert!(result.is_err());
-            assert!(result.unwrap_err().contains("Missing issuer"));
-        }
-
-        #[test]
-        fn test_try_from_str_unknown_scope() {
-            let result = AttributeScope::try_from("unknown:issuer");
-            assert!(result.is_err());
-            assert!(result.unwrap_err().contains("Unknown attribute scope"));
-        }
-
-        #[test]
-        fn test_display_openid() {
+        fn test_attribute_scope_display() {
             let scope = AttributeScope::OpenId {
                 issuer: "google.com".to_string(),
             };
-            assert_eq!(scope.to_string(), "openid:google.com");
+            pretty_assert_eq!(scope.to_string(), "openid:google.com");
         }
 
         #[test]
@@ -466,109 +454,76 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_try_from_string_key_only() {
-            let result = AttributeKey::try_from("email".to_string());
-            assert_eq!(
-                result,
-                Ok(AttributeKey {
-                    scope: None,
-                    attribute_name: AttributeName::Email,
-                })
-            );
-        }
-
-        #[test]
-        fn test_try_from_string_with_scope() {
-            let result = AttributeKey::try_from("openid:google.com:email".to_string());
-            assert_eq!(
-                result,
-                Ok(AttributeKey {
-                    scope: Some(AttributeScope::OpenId {
-                        issuer: "google.com".to_string()
+        fn test_attribute_key_conversions() {
+            let test_cases = vec![
+                (
+                    "key only",
+                    "email",
+                    Ok(AttributeKey {
+                        scope: None,
+                        attribute_name: AttributeName::Email,
                     }),
-                    attribute_name: AttributeName::Email,
-                })
-            );
-        }
-
-        #[test]
-        fn test_try_from_string_with_complex_issuer() {
-            let result = AttributeKey::try_from("openid:accounts.google.com:name".to_string());
-            assert_eq!(
-                result,
-                Ok(AttributeKey {
-                    scope: Some(AttributeScope::OpenId {
-                        issuer: "accounts.google.com".to_string()
+                ),
+                (
+                    "with scope",
+                    "openid:google.com:email",
+                    Ok(AttributeKey {
+                        scope: Some(AttributeScope::OpenId {
+                            issuer: "google.com".to_string(),
+                        }),
+                        attribute_name: AttributeName::Email,
                     }),
-                    attribute_name: AttributeName::Name,
-                })
-            );
-        }
-
-        #[test]
-        fn test_try_from_string_with_issuer_containing_colons() {
-            let result = AttributeKey::try_from("openid:issuer:with:colons:email".to_string());
-            assert_eq!(
-                result,
-                Ok(AttributeKey {
-                    scope: Some(AttributeScope::OpenId {
-                        issuer: "issuer:with:colons".to_string()
+                ),
+                (
+                    "complex issuer",
+                    "openid:accounts.google.com:name",
+                    Ok(AttributeKey {
+                        scope: Some(AttributeScope::OpenId {
+                            issuer: "accounts.google.com".to_string(),
+                        }),
+                        attribute_name: AttributeName::Name,
                     }),
-                    attribute_name: AttributeName::Email,
-                })
-            );
+                ),
+                (
+                    "issuer with colons",
+                    "openid:issuer:with:colons:email",
+                    Ok(AttributeKey {
+                        scope: Some(AttributeScope::OpenId {
+                            issuer: "issuer:with:colons".to_string(),
+                        }),
+                        attribute_name: AttributeName::Email,
+                    }),
+                ),
+                (
+                    "invalid key",
+                    "openid:google.com:invalid",
+                    Err("Unknown attribute: invalid".to_string()),
+                ),
+                (
+                    "invalid scope",
+                    "unknown:issuer:email",
+                    Err("Unknown attribute scope: unknown".to_string()),
+                ),
+                ("empty", "", Err("Unknown attribute: ".to_string())),
+            ];
+
+            for (label, input, expected) in test_cases {
+                let result = AttributeKey::try_from(input.to_string());
+                pretty_assert_eq!(result, expected, "Failed test case: {}", label);
+            }
         }
 
         #[test]
-        fn test_try_from_string_invalid_key() {
-            let result = AttributeKey::try_from("openid:google.com:invalid".to_string());
-            assert_eq!(result, Err("Unknown attribute: invalid".to_string()));
-        }
+        fn test_attribute_key_display_and_round_trip() {
+            let test_cases = vec![
+                ("key only", "name"),
+                ("with scope", "openid:google.com:email"),
+            ];
 
-        #[test]
-        fn test_try_from_string_invalid_scope() {
-            let result = AttributeKey::try_from("unknown:issuer:email".to_string());
-            assert_eq!(result, Err("Unknown attribute scope: unknown".to_string()));
-        }
-
-        #[test]
-        fn test_try_from_string_empty() {
-            let result = AttributeKey::try_from("".to_string());
-            assert_eq!(result, Err("Unknown attribute: ".to_string()));
-        }
-
-        #[test]
-        fn test_display_key_only() {
-            let req = AttributeKey {
-                scope: None,
-                attribute_name: AttributeName::Email,
-            };
-            assert_eq!(req.to_string(), "email");
-        }
-
-        #[test]
-        fn test_display_with_scope() {
-            let req = AttributeKey {
-                scope: Some(AttributeScope::OpenId {
-                    issuer: "google.com".to_string(),
-                }),
-                attribute_name: AttributeName::Email,
-            };
-            assert_eq!(req.to_string(), "openid:google.com:email");
-        }
-
-        #[test]
-        fn test_round_trip_conversion_key_only() {
-            let original = "name".to_string();
-            let req = AttributeKey::try_from(original.clone()).unwrap();
-            assert_eq!(req.to_string(), original);
-        }
-
-        #[test]
-        fn test_round_trip_conversion_with_scope() {
-            let original = "openid:google.com:email".to_string();
-            let req = AttributeKey::try_from(original.clone()).unwrap();
-            assert_eq!(req.to_string(), original);
+            for (label, input) in test_cases {
+                let key = AttributeKey::try_from(input.to_string()).unwrap();
+                pretty_assert_eq!(key.to_string(), input, "Failed test case: {}", label);
+            }
         }
 
         #[test]
@@ -596,181 +551,209 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_attribute_try_from_valid() {
-            let attribute =
-                Attribute::try_from(("email".to_string(), "user@example.com".to_string())).unwrap();
-            let expected_key = AttributeKey::try_from("email".to_string()).unwrap();
-
-            pretty_assert_eq!(
-                attribute,
-                Attribute {
-                    key: expected_key,
-                    value: "user@example.com".to_string(),
-                }
-            );
-        }
-
-        #[test]
-        fn test_attribute_try_from_invalid_key() {
-            let result = Attribute::try_from(("invalid".to_string(), "value".to_string()));
-            pretty_assert_eq!(result, Err("Unknown attribute: invalid".to_string()));
-        }
-
-        #[test]
-        fn test_attribute_try_from_value_too_long() {
+        fn test_attribute_conversions() {
             let long_value = "x".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
-            let length = long_value.len();
-            let result = Attribute::try_from(("email".to_string(), long_value));
-            pretty_assert_eq!(
-                result,
-                Err(format!(
-                    "Attribute value length {} exceeds limit of {} bytes",
-                    length, MAX_ATTRIBUTE_VALUE_LENGTH
-                ))
-            );
+            let long_value_len = long_value.len();
+
+            let test_cases = vec![
+                (
+                    "valid",
+                    ("email".to_string(), "user@example.com".to_string()),
+                    Ok(Attribute {
+                        key: AttributeKey::try_from("email".to_string()).unwrap(),
+                        value: "user@example.com".to_string(),
+                    }),
+                ),
+                (
+                    "invalid key",
+                    ("invalid".to_string(), "value".to_string()),
+                    Err("Unknown attribute: invalid".to_string()),
+                ),
+                (
+                    "value too long",
+                    ("email".to_string(), long_value),
+                    Err(format!(
+                        "Attribute value length {} exceeds limit of {} bytes",
+                        long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
+                    )),
+                ),
+            ];
+
+            for (label, input, expected) in test_cases {
+                let result = Attribute::try_from(input);
+                pretty_assert_eq!(result, expected, "Failed test case: {}", label);
+            }
         }
     }
 
     mod validated_get_attributes_request_tests {
         use super::*;
-        use std::collections::{BTreeMap, BTreeSet};
 
         #[test]
-        fn test_try_from_valid_request_multiple_scopes() {
-            let request = GetAttributesRequest {
-                identity_number: 987,
-                origin: "example.com".to_string(),
-                account_number: Some(7),
-                issued_at_timestamp_ns: 42,
-                attributes: vec![
-                    ("email".to_string(), "user@example.com".to_string()),
-                    (
-                        "openid:google.com:email".to_string(),
-                        "google@example.com".to_string(),
-                    ),
-                ],
-            };
-
-            let validated = ValidatedGetAttributesRequest::try_from(request).unwrap();
-            pretty_assert_eq!(validated.identity_number, 987);
-            pretty_assert_eq!(validated.account_number, Some(7));
-            pretty_assert_eq!(validated.issued_at_timestamp_ns, 42);
-
-            let mut expected = BTreeMap::new();
-
-            let mut default_scope = BTreeSet::new();
-            default_scope.insert(
-                Attribute::try_from(("email".to_string(), "user@example.com".to_string())).unwrap(),
-            );
-            expected.insert(None, default_scope);
-
-            let mut google_scope = BTreeSet::new();
-            google_scope.insert(
-                Attribute::try_from((
-                    "openid:google.com:email".to_string(),
-                    "google@example.com".to_string(),
-                ))
-                .unwrap(),
-            );
-            expected.insert(
-                Some(AttributeScope::OpenId {
-                    issuer: "google.com".to_string(),
-                }),
-                google_scope,
-            );
-
-            pretty_assert_eq!(validated.attributes, expected);
-        }
-
-        #[test]
-        fn test_try_from_deduplicates_attributes() {
-            let request = GetAttributesRequest {
-                identity_number: 111,
-                origin: "example.com".to_string(),
-                account_number: None,
-                issued_at_timestamp_ns: 1,
-                attributes: vec![
-                    ("email".to_string(), "alias".to_string()),
-                    ("email".to_string(), "alias".to_string()),
-                ],
-            };
-
-            let validated = ValidatedGetAttributesRequest::try_from(request).unwrap();
-
-            let mut expected = BTreeMap::new();
-            let mut attrs = BTreeSet::new();
-            attrs.insert(Attribute::try_from(("email".to_string(), "alias".to_string())).unwrap());
-            expected.insert(None, attrs);
-
-            pretty_assert_eq!(validated.attributes, expected);
-        }
-
-        #[test]
-        fn test_try_from_validation_errors_combined() {
-            let long_origin = "x".repeat(FRONTEND_HOSTNAME_LIMIT + 1);
-            let long_value = "y".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
-            let long_value_len = long_value.len();
-
-            let request = GetAttributesRequest {
-                identity_number: 222,
-                origin: long_origin.clone(),
-                account_number: None,
-                issued_at_timestamp_ns: 2,
-                attributes: vec![
-                    ("invalid".to_string(), "value".to_string()),
-                    ("email".to_string(), long_value),
-                ],
-            };
-
-            let err = ValidatedGetAttributesRequest::try_from(request).unwrap_err();
-            match err {
-                GetAttributesError::ValidationError { problems } => {
-                    pretty_assert_eq!(
-                        problems,
-                        vec![
-                            format!(
-                                "Frontend hostname length {} exceeds limit of {} bytes",
-                                long_origin.len(),
-                                FRONTEND_HOSTNAME_LIMIT
-                            ),
-                            "Unknown attribute: invalid".to_string(),
-                            format!(
-                                "Attribute value length {} exceeds limit of {} bytes",
-                                long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
+        fn test_try_from_valid_get_attributes_requests() {
+            let test_cases = vec![
+                (
+                    "multiple scopes",
+                    GetAttributesRequest {
+                        identity_number: 987,
+                        origin: "example.com".to_string(),
+                        account_number: Some(7),
+                        issued_at_timestamp_ns: 42,
+                        attributes: vec![
+                            ("email".to_string(), "user@example.com".to_string()),
+                            (
+                                "openid:google.com:email".to_string(),
+                                "google@example.com".to_string(),
                             ),
                         ],
-                    );
-                }
-                other => panic!("Expected validation error, got {other:?}"),
+                    },
+                    (987, Some(7), 42, {
+                        let mut m = BTreeMap::new();
+                        m.insert(None, {
+                            let mut s = BTreeSet::new();
+                            s.insert(
+                                Attribute::try_from((
+                                    "email".to_string(),
+                                    "user@example.com".to_string(),
+                                ))
+                                .unwrap(),
+                            );
+                            s
+                        });
+                        m.insert(
+                            Some(AttributeScope::OpenId {
+                                issuer: "google.com".to_string(),
+                            }),
+                            {
+                                let mut s = BTreeSet::new();
+                                s.insert(
+                                    Attribute::try_from((
+                                        "openid:google.com:email".to_string(),
+                                        "google@example.com".to_string(),
+                                    ))
+                                    .unwrap(),
+                                );
+                                s
+                            },
+                        );
+                        m
+                    }),
+                ),
+                (
+                    "deduplicates attributes",
+                    GetAttributesRequest {
+                        identity_number: 111,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        issued_at_timestamp_ns: 1,
+                        attributes: vec![
+                            ("email".to_string(), "alias".to_string()),
+                            ("email".to_string(), "alias".to_string()),
+                        ],
+                    },
+                    (111, None, 1, {
+                        let mut m = BTreeMap::new();
+                        let mut attrs = BTreeSet::new();
+                        attrs.insert(
+                            Attribute::try_from(("email".to_string(), "alias".to_string()))
+                                .unwrap(),
+                        );
+                        m.insert(None, attrs);
+                        m
+                    }),
+                ),
+            ];
+
+            for (label, input, expected) in test_cases {
+                let validated = ValidatedGetAttributesRequest::try_from(input).expect(label);
+                pretty_assert_eq!(
+                    (
+                        validated.identity_number,
+                        validated.account_number,
+                        validated.issued_at_timestamp_ns,
+                        validated.attributes
+                    ),
+                    expected,
+                    "Failed test case: {}",
+                    label
+                );
             }
         }
 
         #[test]
-        fn test_try_from_too_many_attributes() {
-            let attributes = (0..=MAX_ATTRIBUTES_PER_REQUEST)
-                .map(|i| ("email".to_string(), format!("value-{i}")))
-                .collect::<Vec<_>>();
+        fn test_try_from_invalid_get_attributes_requests() {
+            let long_origin = "x".repeat(FRONTEND_HOSTNAME_LIMIT + 1);
+            let long_value = "y".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
+            let long_value_len = long_value.len();
 
-            let request = GetAttributesRequest {
-                identity_number: 333,
-                origin: "example.com".to_string(),
-                account_number: None,
-                issued_at_timestamp_ns: 3,
-                attributes,
-            };
+            let test_cases = vec![
+                (
+                    "validation errors combined",
+                    GetAttributesRequest {
+                        identity_number: 222,
+                        origin: long_origin.clone(),
+                        account_number: None,
+                        issued_at_timestamp_ns: 2,
+                        attributes: vec![
+                            ("invalid".to_string(), "value".to_string()),
+                            ("email".to_string(), long_value),
+                        ],
+                    },
+                    vec![
+                        format!(
+                            "Frontend hostname length {} exceeds limit of {} bytes",
+                            long_origin.len(),
+                            FRONTEND_HOSTNAME_LIMIT
+                        ),
+                        "Unknown attribute: invalid".to_string(),
+                        format!(
+                            "Attribute value length {} exceeds limit of {} bytes",
+                            long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
+                        ),
+                    ],
+                ),
+                (
+                    "too many attributes",
+                    GetAttributesRequest {
+                        identity_number: 333,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        issued_at_timestamp_ns: 3,
+                        attributes: (0..=MAX_ATTRIBUTES_PER_REQUEST)
+                            .map(|i| ("email".to_string(), format!("value-{i}")))
+                            .collect::<Vec<_>>(),
+                    },
+                    vec![format!(
+                        "Number of attributes {} exceeds limit of {}",
+                        MAX_ATTRIBUTES_PER_REQUEST + 1,
+                        MAX_ATTRIBUTES_PER_REQUEST
+                    )],
+                ),
+            ];
 
-            let err = ValidatedGetAttributesRequest::try_from(request).unwrap_err();
-            match err {
-                GetAttributesError::ValidationError { problems } => {
-                    assert!(problems.iter().any(|p| {
-                        p == &format!(
-                            "Number of attributes {} exceeds limit of {}",
-                            MAX_ATTRIBUTES_PER_REQUEST + 1,
-                            MAX_ATTRIBUTES_PER_REQUEST
-                        )
-                    }));
+            for (label, input, expected_problems) in test_cases {
+                let err = ValidatedGetAttributesRequest::try_from(input).unwrap_err();
+                match err {
+                    GetAttributesError::ValidationError { problems } => {
+                        // For the "too many attributes" case, we might have more problems if the values were also invalid,
+                        // but here we just check for inclusion or exact match.
+                        if label == "too many attributes" {
+                            assert!(
+                                problems.iter().any(|p| p == &expected_problems[0]),
+                                "Failed test case: {}",
+                                label
+                            );
+                        } else {
+                            pretty_assert_eq!(
+                                problems,
+                                expected_problems,
+                                "Failed test case: {}",
+                                label
+                            );
+                        }
+                    }
+                    other => panic!("Expected validation error for {}, got {:?}", label, other),
                 }
-                other => panic!("Expected validation error, got {other:?}"),
             }
         }
     }
@@ -780,223 +763,202 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_try_from_single_attribute() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-                attribute_keys: vec!["email".to_string()],
-            };
+        fn test_try_from_valid_prepare_attribute_requests() {
+            let test_cases = vec![
+                (
+                    "single attribute",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec!["email".to_string()],
+                    },
+                    (12345, "example.com".to_string(), None, {
+                        let mut m = BTreeMap::new();
+                        let mut s = BTreeSet::new();
+                        s.insert(AttributeName::Email);
+                        m.insert(None, s);
+                        m
+                    }),
+                ),
+                (
+                    "multiple attributes same scope",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: Some(1),
+                        attribute_keys: vec!["email".to_string(), "name".to_string()],
+                    },
+                    (12345, "example.com".to_string(), Some(1), {
+                        let mut m = BTreeMap::new();
+                        let mut s = BTreeSet::new();
+                        s.insert(AttributeName::Email);
+                        s.insert(AttributeName::Name);
+                        m.insert(None, s);
+                        m
+                    }),
+                ),
+                (
+                    "multiple attributes different scopes",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec![
+                            "email".to_string(),
+                            "openid:google.com:email".to_string(),
+                        ],
+                    },
+                    (12345, "example.com".to_string(), None, {
+                        let mut m = BTreeMap::new();
+                        let mut default_set = BTreeSet::new();
+                        default_set.insert(AttributeName::Email);
+                        m.insert(None, default_set);
+                        let mut google_set = BTreeSet::new();
+                        google_set.insert(AttributeName::Email);
+                        m.insert(
+                            Some(AttributeScope::OpenId {
+                                issuer: "google.com".to_string(),
+                            }),
+                            google_set,
+                        );
+                        m
+                    }),
+                ),
+                (
+                    "duplicate attributes",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec!["email".to_string(), "email".to_string()],
+                    },
+                    (12345, "example.com".to_string(), None, {
+                        let mut m = BTreeMap::new();
+                        let mut s = BTreeSet::new();
+                        s.insert(AttributeName::Email);
+                        m.insert(None, s);
+                        m
+                    }),
+                ),
+                (
+                    "empty attributes",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec![],
+                    },
+                    (12345, "example.com".to_string(), None, BTreeMap::new()),
+                ),
+                (
+                    "complex scenario",
+                    PrepareAttributeRequest {
+                        identity_number: 67890,
+                        origin: "app.example.com".to_string(),
+                        account_number: Some(42),
+                        attribute_keys: vec![
+                            "name".to_string(),
+                            "openid:google.com:email".to_string(),
+                            "openid:google.com:name".to_string(),
+                            "openid:github.com:email".to_string(),
+                        ],
+                    },
+                    (67890, "app.example.com".to_string(), Some(42), {
+                        let mut m = BTreeMap::new();
+                        let mut default_set = BTreeSet::new();
+                        default_set.insert(AttributeName::Name);
+                        m.insert(None, default_set);
+                        let mut google_set = BTreeSet::new();
+                        google_set.insert(AttributeName::Email);
+                        google_set.insert(AttributeName::Name);
+                        m.insert(
+                            Some(AttributeScope::OpenId {
+                                issuer: "google.com".to_string(),
+                            }),
+                            google_set,
+                        );
+                        let mut github_set = BTreeSet::new();
+                        github_set.insert(AttributeName::Email);
+                        m.insert(
+                            Some(AttributeScope::OpenId {
+                                issuer: "github.com".to_string(),
+                            }),
+                            github_set,
+                        );
+                        m
+                    }),
+                ),
+            ];
 
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let validated = result.expect("Should successfully validate");
-            assert_eq!(validated.identity_number, 12345);
-            assert_eq!(validated.origin, "example.com");
-            assert_eq!(validated.account_number, None);
-
-            let mut expected = BTreeMap::new();
-            let mut s = BTreeSet::new();
-            s.insert(AttributeName::Email);
-            expected.insert(None, s);
-
-            assert_eq!(validated.attribute_keys, expected);
+            for (label, input, expected) in test_cases {
+                let validated = ValidatedPrepareAttributeRequest::try_from(input).expect(label);
+                pretty_assert_eq!(
+                    (
+                        validated.identity_number,
+                        validated.origin,
+                        validated.account_number,
+                        validated.attribute_keys
+                    ),
+                    expected,
+                    "Failed test case: {}",
+                    label
+                );
+            }
         }
 
         #[test]
-        fn test_try_from_multiple_attributes_same_scope() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: Some(1),
-                attribute_keys: vec!["email".to_string(), "name".to_string()],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let validated = result.expect("Should successfully validate");
-
-            let mut expected = BTreeMap::new();
-            let mut s = BTreeSet::new();
-            s.insert(AttributeName::Email);
-            s.insert(AttributeName::Name);
-            expected.insert(None, s);
-
-            assert_eq!(validated.attribute_keys, expected);
-        }
-
-        #[test]
-        fn test_try_from_multiple_attributes_different_scopes() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-                attribute_keys: vec!["email".to_string(), "openid:google.com:email".to_string()],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let validated = result.expect("Should successfully validate");
-
-            let mut expected = BTreeMap::new();
-            let mut default_set = BTreeSet::new();
-            default_set.insert(AttributeName::Email);
-            expected.insert(None, default_set);
-
-            let mut google_set = BTreeSet::new();
-            google_set.insert(AttributeName::Email);
-            expected.insert(
-                Some(AttributeScope::OpenId {
-                    issuer: "google.com".to_string(),
-                }),
-                google_set,
-            );
-
-            assert_eq!(validated.attribute_keys, expected);
-        }
-
-        #[test]
-        fn test_try_from_duplicate_attributes() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-                attribute_keys: vec!["email".to_string(), "email".to_string()],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let validated = result.expect("Should successfully validate");
-
-            let mut expected = BTreeMap::new();
-            let mut s = BTreeSet::new();
-            s.insert(AttributeName::Email);
-            expected.insert(None, s);
-
-            assert_eq!(validated.attribute_keys, expected);
-        }
-
-        #[test]
-        fn test_try_from_invalid_attribute() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-
-                attribute_keys: vec!["invalid".to_string()],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let err = result.unwrap_err();
-            pretty_assert_eq!(
-                err,
-                PrepareAttributeError::ValidationError {
-                    problems: vec!["Unknown attribute: invalid".to_string()]
-                }
-            );
-        }
-
-        #[test]
-        fn test_try_from_multiple_invalid_attributes() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-
-                attribute_keys: vec!["invalid1".to_string(), "invalid2".to_string()],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let err = result.unwrap_err();
-            pretty_assert_eq!(
-                err,
-                PrepareAttributeError::ValidationError {
-                    problems: vec![
+        fn test_try_from_invalid_prepare_attribute_requests() {
+            let test_cases = vec![
+                (
+                    "invalid attribute",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec!["invalid".to_string()],
+                    },
+                    vec!["Unknown attribute: invalid".to_string()],
+                ),
+                (
+                    "multiple invalid attributes",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec!["invalid1".to_string(), "invalid2".to_string()],
+                    },
+                    vec![
                         "Unknown attribute: invalid1".to_string(),
-                        "Unknown attribute: invalid2".to_string()
-                    ]
+                        "Unknown attribute: invalid2".to_string(),
+                    ],
+                ),
+                (
+                    "mixed valid and invalid",
+                    PrepareAttributeRequest {
+                        identity_number: 12345,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attribute_keys: vec!["email".to_string(), "invalid".to_string()],
+                    },
+                    vec!["Unknown attribute: invalid".to_string()],
+                ),
+            ];
+
+            for (label, input, expected_problems) in test_cases {
+                let err = ValidatedPrepareAttributeRequest::try_from(input).unwrap_err();
+                match err {
+                    PrepareAttributeError::ValidationError { problems } => {
+                        pretty_assert_eq!(
+                            problems,
+                            expected_problems,
+                            "Failed test case: {}",
+                            label
+                        );
+                    }
+                    other => panic!("Expected validation error for {}, got {:?}", label, other),
                 }
-            );
-        }
-
-        #[test]
-        fn test_try_from_mixed_valid_and_invalid() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-
-                attribute_keys: vec!["email".to_string(), "invalid".to_string()],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let err = result.unwrap_err();
-            pretty_assert_eq!(
-                err,
-                PrepareAttributeError::ValidationError {
-                    problems: vec!["Unknown attribute: invalid".to_string()]
-                }
-            );
-        }
-
-        #[test]
-        fn test_try_from_empty_attributes() {
-            let req = PrepareAttributeRequest {
-                identity_number: 12345,
-                origin: "example.com".to_string(),
-                account_number: None,
-
-                attribute_keys: vec![],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let validated = result.expect("Should successfully validate");
-
-            let expected: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> =
-                BTreeMap::new();
-            assert_eq!(validated.attribute_keys, expected);
-        }
-
-        #[test]
-        fn test_try_from_complex_scenario() {
-            let req = PrepareAttributeRequest {
-                identity_number: 67890,
-                origin: "app.example.com".to_string(),
-                account_number: Some(42),
-                attribute_keys: vec![
-                    "name".to_string(),
-                    "openid:google.com:email".to_string(),
-                    "openid:google.com:name".to_string(),
-                    "openid:github.com:email".to_string(),
-                ],
-            };
-
-            let result = ValidatedPrepareAttributeRequest::try_from(req);
-            let validated = result.expect("Should successfully validate");
-            assert_eq!(validated.identity_number, 67890);
-            assert_eq!(validated.account_number, Some(42));
-
-            let mut expected = BTreeMap::new();
-            let mut default_set = BTreeSet::new();
-            default_set.insert(AttributeName::Name);
-            expected.insert(None, default_set);
-
-            let mut google_set = BTreeSet::new();
-            google_set.insert(AttributeName::Email);
-            google_set.insert(AttributeName::Name);
-            expected.insert(
-                Some(AttributeScope::OpenId {
-                    issuer: "google.com".to_string(),
-                }),
-                google_set,
-            );
-
-            let mut github_set = BTreeSet::new();
-            github_set.insert(AttributeName::Email);
-            expected.insert(
-                Some(AttributeScope::OpenId {
-                    issuer: "github.com".to_string(),
-                }),
-                github_set,
-            );
-
-            assert_eq!(validated.attribute_keys, expected);
+            }
         }
     }
 }
