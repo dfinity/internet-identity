@@ -1271,11 +1271,16 @@ mod attribute_sharing {
     ) -> Result<CertifiedAttributes, GetAttributesError> {
         // Parse and validate API request into internal types.
         let ValidatedGetAttributesRequest {
+            // Arguments for computing the seed
             identity_number,
             origin,
             account_number,
-            issued_at_timestamp_ns,
+
+            // Which attributes to prepare
             attributes,
+
+            // When were the attribute certificates issued
+            issued_at_timestamp_ns,
         } = request.try_into()?;
 
         let (anchor, _) =
