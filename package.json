@@ -121,6 +121,7 @@
     "src/vc-api",
     "demos/test-app",
     "demos/vc_issuer",
+    "demos/google-signin-demo",
     "src/vite-plugins",
     "src/sig-verifier-js"
   ]
