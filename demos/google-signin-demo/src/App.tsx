@@ -8,7 +8,7 @@ import { AttributeResultCodec, verifyCanisterSignature } from "./utils";
 import { concat, uint8Equals } from "@icp-sdk/core/candid";
 import { domain_sep, hashOfMap } from "@icp-sdk/core/agent";
 
-const iiCanisterId = Principal.fromText(
+const canisterId = Principal.fromText(
   window.location.origin.includes("localhost")
     ? "uxrrr-q7777-77774-qaaaq-cai"
     : "jqajs-xiaaa-aaaad-aab5q-cai",
@@ -21,7 +21,7 @@ const openIdAttributes = [
 const transport = new PostMessageTransport({
   url: window.location.origin.includes("localhost")
     ? `http://localhost:5173/authorize?openid=${encodeURIComponent(openIdIssuer)}`
-    : `https://${iiCanisterId}.ic0.app/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
+    : `https://${canisterId}.ic0.app/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
 });
 const signer = new Signer({ transport });
 
@@ -73,44 +73,41 @@ const App: React.FC = () => {
 
     // Verify delegation chain
     const nowNanos = BigInt(Date.now()) * BigInt(1_000_000);
-    if (delegationChain.delegations.length === 0) {
-      throw new Error("Delegation chain is missing delegations");
+    if (delegationChain.delegations.length !== 1) {
+      // II delegations only include a single signature
+      throw new Error("Delegation chain length is incorrect");
     }
-    if (delegationChain.delegations.length > 10) {
-      throw new Error("Delegation chain is too long");
+    const signedDelegation = delegationChain.delegations[0];
+    if (
+      !uint8Equals(
+        signedDelegation.delegation.pubkey,
+        sessionIdentity.getPublicKey().toDer(),
+      )
+    ) {
+      throw new Error("Delegation pubkey is incorrect");
     }
-    for (let index = 0; index < delegationChain.delegations.length; index++) {
-      const {
-        delegation: { pubkey, targets, expiration },
-        signature,
-      } = delegationChain.delegations[index];
-      const targetPubKey =
-        index === 0
-          ? sessionIdentity.getPublicKey().toDer()
-          : delegationChain.delegations[index - 1].delegation.pubkey;
-      if (!uint8Equals(pubkey, targetPubKey)) {
-        throw new Error("Delegation pubkey is incorrect");
-      }
-      if (expiration < nowNanos) {
-        throw new Error("Delegation has expired");
-      }
-      if (targets !== undefined) {
-        throw new Error("Delegation targets should be unrestricted");
-      }
-      const canisterId = await verifyCanisterSignature({
-        rootKey: agent.rootKey,
-        publicKey: delegationChain.publicKey,
-        message: concat(
-          domain_sep("ic-request-auth-delegation"),
-          hashOfMap({ pubkey, expiration }),
-        ),
-        signature,
-      });
-      if (canisterId.toText() !== iiCanisterId.toText()) {
-        throw new Error(
-          `Delegation signature is not from ${iiCanisterId.toText()}`,
-        );
-      }
+    if (signedDelegation.delegation.expiration < nowNanos) {
+      throw new Error("Delegation has expired");
+    }
+    if (signedDelegation.delegation.targets !== undefined) {
+      throw new Error("Delegation targets should be unspecified");
+    }
+    const delegationCanisterId = await verifyCanisterSignature({
+      rootKey: agent.rootKey,
+      publicKey: delegationChain.publicKey,
+      message: concat(
+        domain_sep("ic-request-auth-delegation"),
+        hashOfMap({
+          pubkey: signedDelegation.delegation.pubkey,
+          expiration: signedDelegation.delegation.expiration,
+        }),
+      ),
+      signature: signedDelegation.signature,
+    });
+    if (delegationCanisterId.toText() !== canisterId.toText()) {
+      throw new Error(
+        `Delegation signature is not from ${canisterId.toText()}`,
+      );
     }
 
     // Verify all attributes one by one
@@ -120,7 +117,7 @@ const App: React.FC = () => {
       if (expiration < nowNanos) {
         throw new Error("Attribute has expired");
       }
-      const canisterId = await verifyCanisterSignature({
+      const attributeCanisterId = await verifyCanisterSignature({
         rootKey: agent.rootKey,
         publicKey: delegationChain.publicKey,
         message: concat(
@@ -129,9 +126,9 @@ const App: React.FC = () => {
         ),
         signature,
       });
-      if (canisterId.toText() !== iiCanisterId.toText()) {
+      if (attributeCanisterId.toText() !== canisterId.toText()) {
         throw new Error(
-          `Attribute signature is not from ${iiCanisterId.toText()}`,
+          `Attribute signature is not from ${canisterId.toText()}`,
         );
       }
     }
