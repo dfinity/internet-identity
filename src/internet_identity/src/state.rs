@@ -14,8 +14,13 @@ use asset_util::CertifiedAssets;
 use candid::{CandidType, Deserialize, Principal};
 use ic_canister_sig_creation::signature_map::SignatureMap;
 use ic_cdk::trap;
+use ic_http_certification::{
+    DefaultCelBuilder, DefaultResponseCertification, DefaultResponseOnlyCelExpression,
+    HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpResponse,
+};
 use ic_stable_structures::DefaultMemoryImpl;
 use internet_identity_interface::internet_identity::types::*;
+use lazy_static::lazy_static;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -36,9 +41,30 @@ pub const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = RateLimitConfig {
     max_tokens: 20_000,
 };
 
+#[derive(Clone)]
+pub(crate) struct CertifiedHttpResponse<'a> {
+    pub response: HttpResponse<'a>,
+    pub certification: HttpCertification,
+}
+
 thread_local! {
     static STATE: State = State::default();
     static ASSETS: RefCell<CertifiedAssets> = RefCell::new(CertifiedAssets::default());
+
+    pub(crate) static HTTP_TREE: RefCell<HttpCertificationTree> = RefCell::new(HttpCertificationTree::default());
+    pub(crate) static RESPONSES: RefCell<HashMap<String, CertifiedHttpResponse<'static>>> = RefCell::new(HashMap::new());
+}
+
+lazy_static! {
+    pub(crate) static ref ASSET_CEL_EXPR_DEF: DefaultResponseOnlyCelExpression<'static> =
+        DefaultCelBuilder::response_only_certification()
+            .with_response_certification(DefaultResponseCertification::response_header_exclusions(
+                vec![],
+            ))
+            .build();
+    pub(crate) static ref OPTIONS_REQUEST_PATH: &'static str = "";
+    pub(crate) static ref OPTIONS_TREE_PATH: HttpCertificationPath<'static> =
+        HttpCertificationPath::wildcard(*OPTIONS_REQUEST_PATH);
 }
 
 #[derive(Clone)]

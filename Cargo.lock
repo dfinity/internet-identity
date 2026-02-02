@@ -127,7 +127,7 @@ dependencies = [
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.16.0",
  "ic-certification 2.6.0",
- "ic-representation-independent-hash",
+ "ic-representation-independent-hash 2.6.0",
  "include_dir",
  "internet_identity_interface",
  "lazy_static",
@@ -361,6 +361,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "234113d19d0d7d613b40e86fb654acf958910802bcceab913a4f9e7cda03b1a4"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -489,7 +499,7 @@ dependencies = [
  "flate2",
  "hex",
  "ic-cdk 0.16.0",
- "ic-representation-independent-hash",
+ "ic-representation-independent-hash 2.6.0",
  "ic-verifiable-credentials",
  "identity_jose",
  "internet_identity_interface",
@@ -1217,6 +1227,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32085ea23f3234fc7846555e85283ba4de91e21016dc0455a16286d87a292d64"
 
 [[package]]
+name = "globset"
+version = "0.4.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54a1028dfc5f5df5da8a56a73e6c153c9a9708ec57232470703592a3f18e49f5"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax 0.8.4",
+]
+
+[[package]]
 name = "group"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1478,6 +1501,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-asset-certification"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c43805022a5e4f408de44ca26396128697a2c39f83f4fdaf33f8aa3ac653d78e"
+dependencies = [
+ "globset",
+ "http 1.1.0",
+ "ic-certification 3.0.3",
+ "ic-http-certification 3.0.3",
+ "thiserror 1.0.63",
+]
+
+[[package]]
 name = "ic-canister-sig-creation"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1487,7 +1523,7 @@ dependencies = [
  "hex",
  "ic-cdk 0.14.1",
  "ic-certification 2.6.0",
- "ic-representation-independent-hash",
+ "ic-representation-independent-hash 2.6.0",
  "lazy_static",
  "serde",
  "serde_bytes",
@@ -1657,8 +1693,25 @@ dependencies = [
  "candid",
  "http 0.2.12",
  "ic-certification 2.6.0",
- "ic-representation-independent-hash",
+ "ic-representation-independent-hash 2.6.0",
  "serde",
+ "thiserror 1.0.63",
+ "urlencoding",
+]
+
+[[package]]
+name = "ic-http-certification"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d1a65b0ffb568e954750067f660e254f4564394f5c064a88e0e93b2eea4a532"
+dependencies = [
+ "base64 0.22.1",
+ "candid",
+ "http 1.1.0",
+ "ic-certification 3.0.3",
+ "ic-representation-independent-hash 3.0.3",
+ "serde",
+ "serde_cbor",
  "thiserror 1.0.63",
  "urlencoding",
 ]
@@ -1691,6 +1744,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-representation-independent-hash"
+version = "3.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2800ba4910f21d9e1cb7b6ecbbbb0f76074bd2e127b4688c57d0936206caa6e"
+dependencies = [
+ "leb128",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "ic-response-verification"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1704,8 +1767,8 @@ dependencies = [
  "ic-cbor",
  "ic-certificate-verification",
  "ic-certification 2.6.0",
- "ic-http-certification",
- "ic-representation-independent-hash",
+ "ic-http-certification 2.6.0",
+ "ic-representation-independent-hash 2.6.0",
  "leb128",
  "log",
  "nom",
@@ -2047,12 +2110,13 @@ dependencies = [
  "flate2",
  "getrandom 0.2.15",
  "hex",
+ "ic-asset-certification",
  "ic-canister-sig-creation",
  "ic-cdk 0.16.0",
  "ic-cdk-macros 0.16.0",
  "ic-cdk-timers",
  "ic-certification 2.6.0",
- "ic-http-certification",
+ "ic-http-certification 3.0.3",
  "ic-metrics-encoder",
  "ic-response-verification",
  "ic-stable-structures",
@@ -2083,6 +2147,7 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "ic-cdk 0.16.0",
+ "ic-http-certification 3.0.3",
  "serde",
  "serde_bytes",
 ]
