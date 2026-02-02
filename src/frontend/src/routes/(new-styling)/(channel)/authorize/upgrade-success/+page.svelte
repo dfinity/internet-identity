@@ -1,31 +1,46 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
-  import { authorizationStore } from "$lib/stores/authorization.store";
+  import {
+    authorizationStore,
+    DelegationResultSchema,
+  } from "$lib/stores/authorization.store";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
 
   const COUNTDOWN_SECONDS = 5;
   let countdown = $state(COUNTDOWN_SECONDS);
   let intervalId: number | undefined;
   let redirected = $state(false);
 
-  const handleRedirect = () => {
-    if (redirected) return;
+  const handleRedirect = async (): Promise<void> => {
+    window.clearInterval(intervalId);
+    if (redirected) {
+      return;
+    }
     redirected = true;
-    if (intervalId) window.clearInterval(intervalId);
-    authorizationStore.authorize(undefined);
+    const { requestId, delegationChain } =
+      await authorizationStore.authorize(undefined);
+    const result = DelegationResultSchema.encode(delegationChain);
+    await $establishedChannelStore.send({
+      jsonrpc: "2.0",
+      id: requestId,
+      result,
+    });
   };
 
   onMount(() => {
     intervalId = window.setInterval(() => {
       countdown -= 1;
-      if (countdown <= 0) handleRedirect();
+      if (countdown <= 0) {
+        handleRedirect();
+      }
     }, 1000);
 
     return () => {
-      if (intervalId) window.clearInterval(intervalId);
+      window.clearInterval(intervalId);
     };
   });
 </script>

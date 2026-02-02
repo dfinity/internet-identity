@@ -2,13 +2,10 @@
   import { analytics } from "$lib/utils/analytics/analytics";
   import { onMount } from "svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import { authenticationStore } from "$lib/stores/authentication.store";
   import {
     authorizationStatusStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
-  import { throwCanisterError } from "$lib/utils/utils";
-  import { handleError } from "$lib/components/utils/error";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { ArrowRightIcon } from "@lucide/svelte";
@@ -16,6 +13,12 @@
   import { decodeJWT, findConfig } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import { t } from "$lib/stores/locale.store";
+  import { channelStore } from "$lib/stores/channelStore";
+  import { z } from "zod";
+  import {
+    DelegationParamsSchema,
+    DelegationResultSchema,
+  } from "$lib/utils/transport/utils";
 
   analytics.event("page-redirect-callback");
 
@@ -58,32 +61,41 @@
         if (isNullish(config)) {
           return;
         }
-        const result = await authFlow.continueWithOpenId(config, jwt);
-        if (result.type === "signUp") {
-          await authFlow.completeOpenIdRegistration(result.name!);
+        const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+        if (authFlowResult.type === "signUp") {
+          await authFlow.completeOpenIdRegistration(authFlowResult.name!);
         }
-        authorizationStore.subscribe(async ({ context, status }) => {
+        const channel = await channelStore.establish({ allowedOrigin: origin });
+        channel.addEventListener("request", async (request) => {
           if (
-            status !== "authenticating" ||
-            isNullish(context) ||
-            isNullish($authenticationStore)
+            request.id === undefined ||
+            request.method !== "icrc34_delegation" ||
+            $authorizationStore.status !== "init"
           ) {
             return;
           }
-          try {
-            const account = await $authenticationStore.actor
-              .get_default_account(
-                $authenticationStore.identityNumber,
-                context.effectiveOrigin,
-              )
-              .then(throwCanisterError);
-            await authorizationStore.authorize(account.account_number[0]);
-          } catch (error) {
-            handleError(error);
+          const paramsResult = DelegationParamsSchema.safeParse(request.params);
+          if (!paramsResult.success) {
+            await channel.send({
+              jsonrpc: "2.0",
+              id: request.id,
+              error: {
+                code: -32602,
+                message: z.prettifyError(paramsResult.error),
+              },
+            });
+            return;
           }
+          await authorizationStore.handleRequest(
+            channel.origin,
+            request.id,
+            paramsResult.data,
+          );
+          const { delegationChain } =
+            await authorizationStore.authorize(undefined);
+          const result = DelegationResultSchema.encode(delegationChain);
+          await channel.send({ jsonrpc: "2.0", id: request.id, result });
         });
-        await authorizationStore.init({ allowedOrigin: origin });
-        return;
       }
     }
 

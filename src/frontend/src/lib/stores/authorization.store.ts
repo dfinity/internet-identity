@@ -1,9 +1,5 @@
 import { type Readable, derived, writable, get } from "svelte/store";
-import { isNullish, nonNullish } from "@dfinity/utils";
-import {
-  authenticationProtocol,
-  AuthRequest,
-} from "$lib/legacy/flows/authorize/postMessageInterface";
+import { AuthRequest } from "$lib/legacy/flows/authorize/postMessageInterface";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
@@ -15,10 +11,12 @@ import {
 import { features } from "$lib/legacy/features";
 import { canisterConfig } from "$lib/globals";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
-import { rpcAuthenticationProtocol } from "$lib/utils/postMessageInterface";
+import { DelegationChain } from "@icp-sdk/core/identity";
+import { DelegationParams } from "$lib/utils/transport/utils";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest; // Additional details e.g. derivation origin
+  requestId: string | number; // The ID of the JSON RPC request
   requestOrigin: string; // Displayed to the user to identify the app
   effectiveOrigin: string; // Used for last used storage and delegations
 };
@@ -46,20 +44,22 @@ export type AuthorizationStatus =
   | "unverified-origin"
   | "failure";
 
-interface ProtocolOptions {
-  legacyProtocol?: boolean;
-  allowedOrigin?: string;
-}
-
 type AuthorizationStore = Readable<{
   context?: AuthorizationContext;
   status: AuthorizationStatus;
 }> & {
-  init: (options: ProtocolOptions) => Promise<void>;
+  handleRequest: (
+    requestOrigin: string,
+    requestId: string | number,
+    params: DelegationParams,
+  ) => Promise<void>;
   authorize: (
     accountNumber: Promise<bigint | undefined> | bigint | undefined,
     artificialDelay?: number,
-  ) => Promise<void>;
+  ) => Promise<{
+    requestId: string | number;
+    delegationChain: DelegationChain;
+  }>;
 };
 
 const internalStore = writable<{
@@ -67,136 +67,93 @@ const internalStore = writable<{
   status: AuthorizationStatus;
 }>({ status: "init" });
 
-let authorize: (
-  accountNumber: Promise<bigint | undefined> | bigint | undefined,
-  artificialDelay?: number,
-) => Promise<void>;
+export class UnverifiedOriginError extends Error {
+  get message() {
+    return `Invalid derivation origin: ${super.message}`;
+  }
+}
 
 export const authorizationStore: AuthorizationStore = {
-  init: async (options) => {
-    const status = await (
-      options.legacyProtocol === true
-        ? authenticationProtocol
-        : rpcAuthenticationProtocol
-    )({
-      ...options,
-      authenticate: async (context) => {
-        const effectiveOrigin = remapToLegacyDomain(
-          context.authRequest.derivationOrigin ?? context.requestOrigin,
-        );
-        internalStore.set({
-          context: { ...context, effectiveOrigin },
-          status: "authenticating",
-        });
-
-        const validationResult = await validateDerivationOrigin({
-          requestOrigin: context.requestOrigin,
-          derivationOrigin: context.authRequest.derivationOrigin,
-        });
-
-        if (validationResult.result === "invalid") {
-          internalStore.update((value) => ({
-            ...value,
-            status: "unverified-origin",
-          }));
-          return {
-            kind: "unverified-origin",
-            text: `Invalid derivation origin: ${validationResult.message}`,
-          };
-        }
-
-        return new Promise((resolve) => {
-          authorize = async (
-            accountNumberMaybePromise,
-            artificialDelay = 0,
-          ) => {
-            internalStore.update((value) => ({
-              ...value,
-              status: "authorizing",
-            }));
-            const { identityNumber, actor } = get(authenticatedStore);
-            const artificialDelayPromise = waitFor(
-              features.DUMMY_AUTH ||
-                nonNullish(canisterConfig.dummy_auth[0]?.[0])
-                ? 0
-                : artificialDelay,
-            );
-            try {
-              const accountNumber = await accountNumberMaybePromise;
-              const { user_key, expiration } = await actor
-                .prepare_account_delegation(
-                  identityNumber,
-                  effectiveOrigin,
-                  nonNullish(accountNumber) ? [accountNumber] : [],
-                  context.authRequest.sessionPublicKey,
-                  nonNullish(context.authRequest.maxTimeToLive)
-                    ? [context.authRequest.maxTimeToLive]
-                    : [],
-                )
-                .then(throwCanisterError);
-              const delegation = await retryFor(5, () =>
-                actor
-                  .get_account_delegation(
-                    identityNumber,
-                    effectiveOrigin,
-                    nonNullish(accountNumber) ? [accountNumber] : [],
-                    context.authRequest.sessionPublicKey,
-                    expiration,
-                  )
-                  .then(throwCanisterError)
-                  .then(transformSignedDelegation),
-              );
-              await artificialDelayPromise;
-              resolve({
-                kind: "success",
-                delegations: [delegation],
-                userPublicKey: new Uint8Array(user_key),
-                // This is a authnMethod forwarded to the app that requested authorization.
-                // We don't want to leak which authnMethod was used.
-                authnMethod: "passkey",
-              });
-            } catch {
-              resolve({
-                kind: "failure",
-                text: "Couldn't fetch delegation",
-              });
-            }
-          };
-        });
-      },
-      onProgress: (status) =>
-        internalStore.update((value) => ({ ...value, status })),
+  handleRequest: async (requestOrigin, requestId, params) => {
+    internalStore.set({
+      status: "validating",
     });
-    internalStore.update((value) => ({ ...value, status }));
-    if (status === "success") {
-      const LATE_SUCCESS_MESSAGE_DELAY_MS = 2000;
-      // If the user is still here after 2 seconds, show a message
-      // "Authentication successful, close page"
-      const lateSuccessTimeout = setTimeout(() => {
-        internalStore.update((value) => ({
-          ...value,
-          status: "late-success",
-        }));
-      }, LATE_SUCCESS_MESSAGE_DELAY_MS);
-      internalStore.subscribe(({ status }) => {
-        if (status !== "success") {
-          clearTimeout(lateSuccessTimeout);
-        }
-      });
+    const effectiveOrigin = remapToLegacyDomain(
+      params.icrc95DerivationOrigin ?? origin,
+    );
+    const validationResult = await validateDerivationOrigin({
+      requestOrigin,
+      derivationOrigin: params.icrc95DerivationOrigin,
+    });
+    if (validationResult.result === "invalid") {
+      throw new UnverifiedOriginError(validationResult.message);
     }
+    internalStore.set({
+      context: {
+        authRequest: {
+          kind: "authorize-client",
+          sessionPublicKey: params.publicKey.toDer(),
+          maxTimeToLive: params.maxTimeToLive,
+          derivationOrigin: params.icrc95DerivationOrigin,
+        },
+        requestId,
+        requestOrigin,
+        effectiveOrigin,
+      },
+      status: "authenticating",
+    });
   },
   subscribe: (...args) => internalStore.subscribe(...args),
-  authorize: (accountNumber, artificialDelay) => {
-    if (isNullish(authorize)) {
-      throw new Error("Not ready yet for authorization");
-    }
-    return authorize(accountNumber, artificialDelay);
+  authorize: async (accountNumberMaybePromise, artificialDelay) => {
+    const context = get(authorizationContextStore);
+    internalStore.set({
+      context,
+      status: "authorizing",
+    });
+    const { identityNumber, actor } = get(authenticatedStore);
+    const artificialDelayPromise = waitFor(
+      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+        ? 0
+        : (artificialDelay ?? 0),
+    );
+    const accountNumber = await accountNumberMaybePromise;
+    const { user_key, expiration } = await actor
+      .prepare_account_delegation(
+        identityNumber,
+        context.effectiveOrigin,
+        accountNumber !== undefined ? [accountNumber] : [],
+        context.authRequest.sessionPublicKey,
+        context.authRequest.maxTimeToLive !== undefined
+          ? [context.authRequest.maxTimeToLive]
+          : [],
+      )
+      .then(throwCanisterError);
+    const delegationChain = await retryFor(5, () =>
+      actor
+        .get_account_delegation(
+          identityNumber,
+          context.effectiveOrigin,
+          accountNumber !== undefined ? [accountNumber] : [],
+          context.authRequest.sessionPublicKey,
+          expiration,
+        )
+        .then(throwCanisterError)
+        .then(transformSignedDelegation)
+        .then((delegation) =>
+          DelegationChain.fromDelegations(
+            [delegation],
+            new Uint8Array(user_key),
+          ),
+        ),
+    );
+    await artificialDelayPromise;
+    return { requestId: context.requestId, delegationChain };
   },
 };
 
 export const authorizationContextStore: Readable<AuthorizationContext> =
   derived(authorizationStore, ({ context }) => {
-    if (isNullish(context)) {
+    if (context === undefined) {
       throw new Error("Authorization context is not available yet");
     }
     return context;

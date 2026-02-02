@@ -14,10 +14,11 @@ import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core
 import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
-import {
-  forwardMessage,
-  isForwardedMessage,
-} from "../../../../routes/(new-styling)/(cross-origin)/utils";
+// import {
+//   forwardMessage,
+//   isForwardedMessage,
+// } from "../../../../routes/(new-styling)/(cross-origin)/utils";
+// TODO: Remove message forwarding from this file
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -141,9 +142,9 @@ export async function authenticationProtocol({
   window.opener?.postMessage(AuthReady, "*");
   // Also send a message to be forwarded to the parent window,
   // in case the authorization flow is cross-origin embedded.
-  canisterConfig.related_origins[0]?.forEach((origin) =>
-    window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
-  );
+  // canisterConfig.related_origins[0]?.forEach((origin) =>
+  //   window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
+  // );
 
   onProgress("waiting");
 
@@ -203,10 +204,10 @@ export async function authenticationProtocol({
       text: authenticateResult.text,
     } satisfies AuthResponse;
     if (requestResult.forwardFromOrigin !== undefined) {
-      window.parent.postMessage(
-        forwardMessage(response, authContext.requestOrigin),
-        requestResult.forwardFromOrigin,
-      );
+      // window.parent.postMessage(
+      //   forwardMessage(response, authContext.requestOrigin),
+      //   requestResult.forwardFromOrigin,
+      // );
     } else {
       window.opener.postMessage(response);
     }
@@ -222,10 +223,10 @@ export async function authenticationProtocol({
   } satisfies AuthResponse;
 
   if (requestResult.forwardFromOrigin !== undefined) {
-    window.parent.postMessage(
-      forwardMessage(response, authContext.requestOrigin),
-      requestResult.forwardFromOrigin,
-    );
+    // window.parent.postMessage(
+    //   forwardMessage(response, authContext.requestOrigin),
+    //   requestResult.forwardFromOrigin,
+    // );
   } else {
     window.opener.postMessage(response, authContext.requestOrigin);
   }
@@ -262,7 +263,7 @@ const waitForRequest = (): Promise<
         forwardFromOrigin,
       }: { message: unknown; origin: string; forwardFromOrigin?: string } =
         canisterConfig.related_origins[0]?.includes(event.origin) === true &&
-        isForwardedMessage(event)
+        false // isForwardedMessage(event)
           ? {
               message: event.data.__ii_forwarded.data,
               origin: event.data.__ii_forwarded.origin,

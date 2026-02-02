@@ -1,9 +1,8 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import { onMount } from "svelte";
   import {
-    authorizationStore,
     authorizationStatusStore,
+    authorizationStore,
   } from "$lib/stores/authorization.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
@@ -20,11 +19,13 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { page } from "$app/state";
   import { sessionStore } from "$lib/stores/session.store";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { z } from "zod";
+  import { DelegationParamsSchema } from "$lib/utils/transport/utils";
 
   const { children, data }: LayoutProps = $props();
 
@@ -69,13 +70,6 @@
     await goto("/authorize/upgrade-success");
   };
 
-  onMount(() => {
-    authorizationStore.init({
-      // Use either legacy PostMessage protocol or ICRC-29 PostMessage protocol
-      legacyProtocol: data.legacyProtocol,
-    });
-  });
-
   // Pre-fetch passkey credential ids
   $effect(() =>
     authLastUsedFlow.init(
@@ -83,15 +77,7 @@
     ),
   );
 
-  // Remove legacyProtocol param from URL bar after initializing
-  afterNavigate(() => {
-    if (page.url.searchParams.has("legacyProtocol")) {
-      const next = new URL(page.url);
-      next.searchParams.delete("legacyProtocol");
-      replaceState(next, {});
-    }
-  });
-
+  // TODO: Move and change this (make sure X check doesn't break)
   $effect(() => {
     if (status === "orphan") {
       goto("/unsupported", {
@@ -100,6 +86,33 @@
       });
     }
   });
+
+  // Forward incoming delegation request to authorization store
+  $effect(() =>
+    $establishedChannelStore.addEventListener("request", (request) => {
+      if (
+        request.id === undefined ||
+        request.method !== "icrc34_delegation" ||
+        $authorizationStore.status !== "init"
+      ) {
+        return;
+      }
+      const result = DelegationParamsSchema.safeParse(request.params);
+      if (!result.success) {
+        $establishedChannelStore.send({
+          jsonrpc: "2.0",
+          id: request.id,
+          error: { code: -32602, message: z.prettifyError(result.error) },
+        });
+        return;
+      }
+      authorizationStore.handleRequest(
+        $establishedChannelStore.origin,
+        request.id,
+        result.data,
+      );
+    }),
+  );
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">

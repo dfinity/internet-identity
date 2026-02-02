@@ -18,9 +18,7 @@ export const reroute: Reroute = ({ url }) => {
     return "/vc-flow/index";
   }
   if (url.hash === "#authorize") {
-    return get(DISCOVERABLE_PASSKEY_FLOW)
-      ? "/legacy-authorize-protocol"
-      : "/legacy/authorize";
+    return get(DISCOVERABLE_PASSKEY_FLOW) ? "/authorize" : "/legacy/authorize";
   }
   // Load direct authorization page instead if openid param is present
   if (url.pathname === "/authorize" && url.searchParams.has("openid")) {
