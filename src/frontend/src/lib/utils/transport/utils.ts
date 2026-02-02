@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Delegation, DelegationChain } from "@icp-sdk/core/identity";
 import { type Signature } from "@icp-sdk/core/agent";
+import { AuthRequest } from "$lib/legacy/flows/authorize/postMessageInterface";
 
 export interface ChannelOptions {
   allowedOrigin?: string;
@@ -113,6 +114,15 @@ export const StringToBigIntCodec = z.codec(z.string(), z.bigint(), {
   encode: (bigint) => bigint.toString(),
 });
 
+export const StringOrNumberToBigIntCodec = z.codec(
+  z.union([z.string(), z.number(), z.bigint()]),
+  z.bigint(),
+  {
+    decode: (value) => BigInt(value),
+    encode: (bigint) => bigint.toString(),
+  },
+);
+
 export const OriginSchema = z.string().refine(
   (value) => {
     try {
@@ -172,6 +182,36 @@ export const DelegationResultSchema = z.codec(
         },
         signature: Base64ToBytesCodec.encode(delegation.signature),
       })),
+    }),
+  },
+);
+
+export const AuthRequestToDelegationParamsCodec = z.codec(
+  AuthRequest,
+  DelegationParamsSchema,
+  {
+    decode: (request) => ({
+      publicKey: Base64ToBytesCodec.encode(request.sessionPublicKey),
+      maxTimeToLive:
+        request.maxTimeToLive !== undefined
+          ? StringToBigIntCodec.encode(request.maxTimeToLive)
+          : undefined,
+      icrc95DerivationOrigin:
+        request.derivationOrigin !== undefined
+          ? OriginSchema.parse(request.derivationOrigin)
+          : undefined,
+    }),
+    encode: (params) => ({
+      kind: "authorize-client" as const,
+      sessionPublicKey: Base64ToBytesCodec.decode(params.publicKey),
+      maxTimeToLive:
+        params.maxTimeToLive !== undefined
+          ? StringToBigIntCodec.decode(params.maxTimeToLive)
+          : undefined,
+      derivationOrigin:
+        params.icrc95DerivationOrigin !== undefined
+          ? OriginSchema.parse(params.icrc95DerivationOrigin)
+          : undefined,
     }),
   },
 );

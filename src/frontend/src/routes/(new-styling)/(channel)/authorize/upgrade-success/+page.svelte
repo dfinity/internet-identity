@@ -1,14 +1,12 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
-  import {
-    authorizationStore,
-    DelegationResultSchema,
-  } from "$lib/stores/authorization.store";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { DelegationResultSchema } from "$lib/utils/transport/utils";
 
   const COUNTDOWN_SECONDS = 5;
   let countdown = $state(COUNTDOWN_SECONDS);
