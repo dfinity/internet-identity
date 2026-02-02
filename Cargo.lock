@@ -2054,6 +2054,7 @@ dependencies = [
  "ic-certification 2.6.0",
  "ic-http-certification",
  "ic-metrics-encoder",
+ "ic-representation-independent-hash",
  "ic-response-verification",
  "ic-stable-structures",
  "ic-verifiable-credentials",
@@ -2083,6 +2084,7 @@ version = "0.1.0"
 dependencies = [
  "candid",
  "ic-cdk 0.16.0",
+ "pretty_assertions",
  "serde",
  "serde_bytes",
 ]

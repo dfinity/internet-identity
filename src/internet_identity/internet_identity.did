@@ -825,6 +825,80 @@ type IdentityPropertiesReplaceError = variant {
     InternalCanisterError : text;
 };
 
+type PrepareAttributeRequest = record {
+    // Identity for which the attributes should be prepared.
+    identity_number : IdentityNumber;
+
+    // Origin of the relying party in the attribute sharing flow.
+    origin : FrontendHostname;
+
+    // II account for the relying party.
+    account_number : opt AccountNumber;
+
+    // The attribute to be prepared.
+    attribute_keys : vec text;
+};
+
+type GetAccountError = variant {
+    NoSuchOrigin : record {
+        anchor_number : UserNumber;
+    };
+    NoSuchAccount : record {
+        anchor_number : UserNumber;
+        origin : FrontendHostname;
+    };
+};
+
+type PrepareAttributeError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+    GetAccountError : GetAccountError;
+};
+
+type PrepareAttributeResponse = record {
+    issued_at_timestamp_ns : Timestamp;
+    attributes : vec record { text; text };
+};
+
+type GetAttributesRequest = record {
+    // Identity for which the attributes should be prepared.
+    identity_number : IdentityNumber;
+
+    // Origin of the relying party in the attribute sharing flow.
+    origin : FrontendHostname;
+
+    // II account for the relying party.
+    account_number : opt AccountNumber;
+
+    // Timestamp received from the prepare_attributes call.
+    issued_at_timestamp_ns : Timestamp;
+
+    // The attribute to be retrieved, must be a subset of certified_attributes from
+    // the prepare_attributes response.
+    attributes : vec record { text; text };
+};
+
+type CertifiedAttribute = record {
+    key : text;
+    value : text;
+    signature : blob;
+};
+
+type CertifiedAttributes = record {
+    expires_at_timestamp_ns : Timestamp;
+    certified_attributes : vec CertifiedAttribute;
+};
+
+type GetAttributesError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+    GetAccountError : GetAccountError;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -939,14 +1013,19 @@ service : (opt InternetIdentityInit) -> {
     prepare_delegation : (UserNumber, FrontendHostname, SessionKey, maxTimeToLive : opt nat64) -> (UserKey, Timestamp);
     get_delegation : (UserNumber, FrontendHostname, SessionKey, Timestamp) -> (GetDelegationResponse) query;
 
-    // Attribute Sharing MVP API
-    // =========================
+    // Attribute sharing protocol
+    // ==========================
+    prepare_attributes : (PrepareAttributeRequest) -> (variant { Ok : PrepareAttributeResponse; Err : PrepareAttributeError });
+    get_attributes : (GetAttributesRequest) -> (variant { Ok : CertifiedAttributes; Err : GetAttributesError }) query;
+
+    // Old Verifiable Credentials API
+    // ==============================
     // The methods below are used to generate ID-alias credentials during attribute sharing flow.
     prepare_id_alias : (PrepareIdAliasRequest) -> (variant { Ok : PreparedIdAlias; Err : PrepareIdAliasError });
     get_id_alias : (GetIdAliasRequest) -> (variant { Ok : IdAliasCredentials; Err : GetIdAliasError }) query;
 
     // OpenID credentials protocol
-    // =========================
+    // ===========================
     openid_identity_registration_finish : (OpenIDRegFinishArg) -> (variant { Ok : IdRegFinishResult; Err : IdRegFinishError });
     openid_credential_add : (IdentityNumber, JWT, Salt) -> (variant { Ok; Err : OpenIdCredentialAddError });
     openid_credential_remove : (IdentityNumber, OpenIdCredentialKey) -> (variant { Ok; Err : OpenIdCredentialRemoveError });
