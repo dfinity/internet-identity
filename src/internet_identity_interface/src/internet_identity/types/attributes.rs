@@ -67,7 +67,7 @@ fn validate_openid_credential_issues_identifier(issuer: &str) -> Result<(), Stri
     let mut problems = vec![];
 
     if issuer.is_empty() {
-        problems.push("Empty issuer in attribute scope".to_string());
+        problems.push("Empty issuer".to_string());
     }
 
     if issuer.len() > OPENID_ISSUER_MAX_LENGTH {
@@ -466,12 +466,12 @@ mod tests {
                 (
                     "openid extra colon",
                     "openid::",
-                    Err("Invalid issuer in attribute scope: Empty issuer in attribute scope, Invalid issuer `:` in attribute scope (must start with https://)".to_string()),
+                    Err("Invalid issuer in attribute scope: Invalid issuer `:` in attribute scope (must start with https://)".to_string()),
                 ),
                 (
                     "openid missing issuer",
                     "openid:",
-                    Err("Invalid issuer in attribute scope: Empty issuer in attribute scope, Invalid issuer `` in attribute scope (must start with https://)".to_string()),
+                    Err("Invalid issuer in attribute scope: Empty issuer, Invalid issuer `` in attribute scope (must start with https://)".to_string()),
                 ),
                 (
                     "openid no colon",
