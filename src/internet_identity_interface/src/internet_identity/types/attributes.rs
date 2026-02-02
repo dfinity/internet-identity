@@ -441,7 +441,19 @@ mod tests {
 
         #[test]
         fn test_attribute_scope_conversions() {
-            let test_cases = vec![
+            // Create owned strings for dynamic test cases to avoid lifetime issues
+            let max_length_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH - 8));
+            let max_length_input = format!("openid:{}", max_length_issuer);
+
+            let too_long_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH));
+            let too_long_input = format!("openid:{}", too_long_issuer);
+            let too_long_error = format!(
+                "Invalid issuer in attribute scope: Issuer `https://{}...` in attribute scope is too long (max {} chars)",
+                "a".repeat(OPENID_ISSUER_MAX_LENGTH - 11),
+                OPENID_ISSUER_MAX_LENGTH
+            );
+
+            let test_cases: Vec<(&str, &str, Result<AttributeScope, String>)> = vec![
                 (
                     "openid",
                     "openid:https://google.com",
@@ -482,6 +494,67 @@ mod tests {
                     "unknown scope",
                     "unknown:issuer",
                     Err("Unknown attribute scope: unknown".to_string()),
+                ),
+                // Test https:// requirement
+                (
+                    "http instead of https",
+                    "openid:http://google.com",
+                    Err("Invalid issuer in attribute scope: Invalid issuer `http://google.com` in attribute scope (must start with https://)".to_string()),
+                ),
+                (
+                    "no protocol",
+                    "openid:google.com",
+                    Err("Invalid issuer in attribute scope: Invalid issuer `google.com` in attribute scope (must start with https://)".to_string()),
+                ),
+                // Test query parameter rejection
+                (
+                    "issuer with query parameter",
+                    "openid:https://google.com?param=value",
+                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com?param=value` in attribute scope (must not contain query '?' characters)".to_string()),
+                ),
+                (
+                    "issuer with multiple query parameters",
+                    "openid:https://google.com?foo=bar&baz=qux",
+                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com?foo=bar&baz=qux` in attribute scope (must not contain query '?' characters)".to_string()),
+                ),
+                // Test fragment rejection
+                (
+                    "issuer with fragment",
+                    "openid:https://google.com#section",
+                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com#section` in attribute scope (must not contain fragment '#' characters)".to_string()),
+                ),
+                (
+                    "issuer with query and fragment",
+                    "openid:https://google.com?param=value#section",
+                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com?param=value#section` in attribute scope (must not contain query '?' characters), Invalid issuer `https://google.com?param=value#section` in attribute scope (must not contain fragment '#' characters)".to_string()),
+                ),
+                // Test IPv6 address support
+                (
+                    "issuer with IPv6 address",
+                    "openid:https://[2001:db8::1]:8080",
+                    Ok(AttributeScope::OpenId {
+                        issuer: "https://[2001:db8::1]:8080".to_string(),
+                    }),
+                ),
+                (
+                    "issuer with IPv6 localhost",
+                    "openid:https://[::1]",
+                    Ok(AttributeScope::OpenId {
+                        issuer: "https://[::1]".to_string(),
+                    }),
+                ),
+                // Test length limit
+                (
+                    "issuer at max length",
+                    &max_length_input,
+                    Ok(AttributeScope::OpenId {
+                        issuer: max_length_issuer.clone(),
+                    }),
+                ),
+                (
+                    "issuer exceeds max length",
+                    &too_long_input,
+                    Err(too_long_error.clone()),
                 ),
             ];
 
