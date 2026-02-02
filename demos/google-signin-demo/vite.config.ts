@@ -42,24 +42,24 @@ export default defineConfig(({ command, mode }) => ({
       },
     },
   },
-  plugins: [react(), nodePolyfills({ include: ["buffer"] })],
+  plugins: [react()],
   server:
     command !== "serve"
       ? undefined
       : {
-        port: 8081,
-        // Set up a proxy that redirects API calls and /index.html to the
-        // replica; the rest we serve from here.
-        proxy: {
-          "/api": getReplicaHost(),
-          "/.well-known/ii-alternative-origins": {
-            target: getReplicaHost(),
-            rewrite: rewriteRoute,
-          },
-          "/.well-known/evil-alternative-origins": {
-            target: getReplicaHost(),
-            rewrite: rewriteRoute,
+          port: 8081,
+          // Set up a proxy that redirects API calls and /index.html to the
+          // replica; the rest we serve from here.
+          proxy: {
+            "/api": getReplicaHost(),
+            "/.well-known/ii-alternative-origins": {
+              target: getReplicaHost(),
+              rewrite: rewriteRoute,
+            },
+            "/.well-known/evil-alternative-origins": {
+              target: getReplicaHost(),
+              rewrite: rewriteRoute,
+            },
           },
         },
-      },
 }));

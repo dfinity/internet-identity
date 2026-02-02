@@ -1,81 +1,154 @@
 import React from "react";
 import { Signer } from "@slide-computer/signer";
 import { PostMessageTransport } from "@slide-computer/signer-web";
-import {
-  ECDSAKeyIdentity,
-  DelegationChain,
-  DelegationIdentity,
-} from "@icp-sdk/core/identity";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
+import { HttpAgent } from "@icp-sdk/core/agent";
+import { Principal } from "@icp-sdk/core/principal";
+import { AttributeResultCodec, verifyCanisterSignature } from "./utils";
+import { concat, uint8Equals } from "@icp-sdk/core/candid";
+import { domain_sep, hashOfMap } from "@icp-sdk/core/agent";
 
+const iiCanisterId = Principal.fromText(
+  window.location.origin.includes("localhost")
+    ? "uxrrr-q7777-77774-qaaaq-cai"
+    : "jqajs-xiaaa-aaaad-aab5q-cai",
+);
+const openIdIssuer = "https://accounts.google.com";
+const openIdAttributes = [
+  `openid:${openIdIssuer}:name`,
+  `openid:${openIdIssuer}:email`,
+];
 const transport = new PostMessageTransport({
   url: window.location.origin.includes("localhost")
-    ? `http://localhost:5173/authorize?openid=${encodeURIComponent("https://accounts.google.com")}`
-    : `https://jqajs-xiaaa-aaaad-aab5q-cai.ic0.app/authorize?openid=${encodeURIComponent("https://accounts.google.com")}`,
+    ? `http://localhost:5173/authorize?openid=${encodeURIComponent(openIdIssuer)}`
+    : `https://${iiCanisterId}.ic0.app/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
 });
-
-const signer = new Signer({ transport, autoCloseTransportChannel: false });
+const signer = new Signer({ transport });
 
 const App: React.FC = () => {
+  const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [principal, setPrincipal] = React.useState("");
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
   const handleSignIn = async () => {
-    try {
-      const sessionIdentity = await ECDSAKeyIdentity.generate();
-      const publicKey = sessionIdentity.getPublicKey().toDer();
+    // Send ICRC-34 delegation request
+    const sessionIdentity = await ECDSAKeyIdentity.generate();
+    const delegationPromise = signer.delegation({
+      publicKey: sessionIdentity.getPublicKey().toDer(),
+    });
 
-      const delegationPromise = signer.delegation({
-        publicKey,
-      });
+    // Send II attributes request
+    const requestId = window.crypto.randomUUID();
+    const attributesPromise = signer.sendRequest({
+      jsonrpc: "2.0",
+      method: "ii_attributes",
+      id: requestId,
+      params: {
+        attributes: openIdAttributes,
+      },
+    });
 
-      const requestId = window.crypto.randomUUID();
-      const attributesPromise = signer.sendRequest({
-        jsonrpc: "2.0",
-        method: "ii_attributes",
-        id: requestId,
-        params: {
-          attributes: [
-            "openid:https://accounts.google.com:name",
-            "openid:https://accounts.google.com:email",
-          ],
-        },
-      });
+    // Wait for both requests to receive a response
+    const [delegationChain, attributesResponse] = await Promise.all([
+      delegationPromise,
+      attributesPromise,
+    ]);
 
-      const [delegationChain, attributesResponse] = await Promise.all([
-        delegationPromise,
-        attributesPromise,
-      ]);
-      await signer.closeChannel();
-
-      // Extract principal from delegation
-      const identity = DelegationIdentity.fromDelegation(
-        sessionIdentity,
-        delegationChain,
-      );
-      const principalText = identity.getPrincipal().toText();
-      setPrincipal(principalText);
-
-      if (!("result" in attributesResponse)) {
-        throw new Error("Didn't receive result");
-      }
-      console.log("delegationChain", delegationChain);
-      console.log("attributes", attributesResponse.result);
-      const emailAttribute =
-        // @ts-ignore
-        attributesResponse.result.attributes[
-          "openid:https://accounts.google.com:email"
-        ];
-      setEmail(emailAttribute.value);
-      setIsSignedIn(true);
-    } catch (error) {
-      console.error("Sign in failed", error);
+    // Get attributes from response
+    if (!("result" in attributesResponse)) {
+      throw new Error("Attributes response is missing result");
     }
+    const { attributes } = AttributeResultCodec.parse(
+      attributesResponse.result,
+    );
+
+    // Fetch IC root key if needed
+    const agent = await HttpAgent.create({
+      shouldFetchRootKey: window.location.origin.includes("localhost"),
+    });
+    if (!agent.rootKey) {
+      throw new Error("Agent is missing root key");
+    }
+
+    // Verify delegation chain
+    const nowNanos = BigInt(Date.now()) * BigInt(1_000_000);
+    if (delegationChain.delegations.length === 0) {
+      throw new Error("Delegation chain is missing delegations");
+    }
+    if (delegationChain.delegations.length > 10) {
+      throw new Error("Delegation chain is too long");
+    }
+    for (let index = 0; index < delegationChain.delegations.length; index++) {
+      const {
+        delegation: { pubkey, targets, expiration },
+        signature,
+      } = delegationChain.delegations[index];
+      const targetPubKey =
+        index === 0
+          ? sessionIdentity.getPublicKey().toDer()
+          : delegationChain.delegations[index - 1].delegation.pubkey;
+      if (!uint8Equals(pubkey, targetPubKey)) {
+        throw new Error("Delegation pubkey is incorrect");
+      }
+      if (expiration < nowNanos) {
+        throw new Error("Delegation has expired");
+      }
+      if (targets !== undefined) {
+        throw new Error("Delegation targets should be unrestricted");
+      }
+      const canisterId = await verifyCanisterSignature({
+        rootKey: agent.rootKey,
+        publicKey: delegationChain.publicKey,
+        message: concat(
+          domain_sep("ic-request-auth-delegation"),
+          hashOfMap({ pubkey, expiration }),
+        ),
+        signature,
+      });
+      if (canisterId.toText() !== iiCanisterId.toText()) {
+        throw new Error(
+          `Delegation signature is not from ${iiCanisterId.toText()}`,
+        );
+      }
+    }
+
+    // Verify all attributes one by one
+    for (let [key, { value, signature, expiration }] of Object.entries(
+      attributes,
+    )) {
+      if (expiration < nowNanos) {
+        throw new Error("Attribute has expired");
+      }
+      const canisterId = await verifyCanisterSignature({
+        rootKey: agent.rootKey,
+        publicKey: delegationChain.publicKey,
+        message: concat(
+          domain_sep("ii-request-attribute"),
+          hashOfMap({ [key]: value, expiration }),
+        ),
+        signature,
+      });
+      if (canisterId.toText() !== iiCanisterId.toText()) {
+        throw new Error(
+          `Attribute signature is not from ${iiCanisterId.toText()}`,
+        );
+      }
+    }
+
+    // Update interface with principal and email attribute
+    setPrincipal(
+      Principal.selfAuthenticating(delegationChain.publicKey).toText(),
+    );
+    setName(attributes[`openid:${openIdIssuer}:name`].value);
+    setEmail(attributes[`openid:${openIdIssuer}:email`].value);
+    setIsSignedIn(true);
   };
 
   const handleSignOut = () => {
-    setEmail("");
     setPrincipal("");
+    setName("");
+    setEmail("");
     setIsSignedIn(false);
   };
 
@@ -164,6 +237,17 @@ const App: React.FC = () => {
             type="text"
             placeholder="Principal ID"
             value={principal}
+            readOnly
+          />
+        </div>
+
+        <div className="input-group">
+          <label htmlFor="email">Name</label>
+          <input
+            id="name"
+            type="text"
+            placeholder="John Doe"
+            value={name}
             readOnly
           />
         </div>

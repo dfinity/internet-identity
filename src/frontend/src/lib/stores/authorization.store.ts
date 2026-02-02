@@ -79,7 +79,7 @@ export const authorizationStore: AuthorizationStore = {
       status: "validating",
     });
     const effectiveOrigin = remapToLegacyDomain(
-      params.icrc95DerivationOrigin ?? origin,
+      params.icrc95DerivationOrigin ?? requestOrigin,
     );
     const validationResult = await validateDerivationOrigin({
       requestOrigin,

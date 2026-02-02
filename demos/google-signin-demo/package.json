@@ -3,14 +3,15 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@icp-sdk/core": "*",
-    "@slide-computer/signer": "*",
-    "@slide-computer/signer-web": "*",
-    "@noble/hashes": "*",
+    "@icp-sdk/core": "^5.0.0",
+    "@slide-computer/signer": "^4.1.0",
+    "@slide-computer/signer-web": "^4.1.0",
+    "@noble/hashes": "^2.0.1",
     "buffer": "^6.0.3",
     "jose": "^5.1.2",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "zod": "^4.3.6"
   },
   "scripts": {
     "dev": "vite --config ./vite.config.ts",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@dfinity/internet-identity-vite-plugins": "*",
+    "@dfinity/standalone-sig-verifier-web": "^1.0.0",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.0",
