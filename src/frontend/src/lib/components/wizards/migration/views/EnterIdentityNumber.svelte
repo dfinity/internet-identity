@@ -1,6 +1,5 @@
 <script lang="ts">
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
-  import Button from "$lib/components/ui/Button.svelte";
   import Input from "$lib/components/ui/Input.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { UPGRADE_SUPPORT_URL } from "$lib/config";
@@ -9,6 +8,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+  import { getPrimaryOrigin, parentIFrameOrigin } from "$lib/globals";
 
   interface Props {
     onSubmit: (
@@ -16,6 +16,14 @@
       attachElement?: HTMLElement,
     ) => Promise<void | "cancelled" | "wrongDomain">;
   }
+
+  const primaryOrigin = getPrimaryOrigin();
+  const selfServiceOrigin =
+    parentIFrameOrigin !== undefined
+      ? parentIFrameOrigin
+      : window.location.origin !== primaryOrigin
+        ? window.location.origin
+        : "https://identity.ic0.app";
 
   let { onSubmit }: Props = $props();
 
@@ -100,16 +108,21 @@
   </Tooltip>
   <div class="border-border-tertiary my-5 border-t"></div>
   <div class="flex flex-row items-center justify-between gap-4">
-    <p class="text-text-secondary text-sm">
-      {$t`Forgot your identity number?`}
-    </p>
+    <a
+      href={`${selfServiceOrigin}/self-service`}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
+    >
+      {$t`Lookup identity`}
+    </a>
     <a
       href={UPGRADE_SUPPORT_URL}
       target="_blank"
       rel="noopener noreferrer"
       class="text-text-primary text-sm font-semibold outline-0 hover:underline focus-visible:underline"
     >
-      {$t`Help`}
+      {$t`FAQ & Support`}
     </a>
   </div>
 </form>

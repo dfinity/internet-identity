@@ -665,7 +665,7 @@ jobs:
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
             --wasm internet_identity_production.wasm.gz \
-            fgte5-ciaaa-aaaad-aaatq-cai
+            y2aaj-miaaa-aaaad-aacxq-cai
 
       - name: "Download test app wasm"
         uses: actions/download-artifact@v4
@@ -697,7 +697,7 @@ jobs:
             --wasm vc_demo_issuer.wasm.gz \
             v2yvn-myaaa-aaaad-aad4q-cai
           ./demos/vc_issuer/provision \
-            --ii-canister-id fgte5-ciaaa-aaaad-aaatq-cai \
+            --ii-canister-id y2aaj-miaaa-aaaad-aacxq-cai \
             --dfx-network ic \
             --issuer-canister v2yvn-myaaa-aaaad-aad4q-cai \
             --wallet "$wallet"
@@ -706,7 +706,7 @@ jobs:
         run: |
           # Needed to surpass dfx error to use the insecure plaintext identity
           export DFX_WARNING=-mainnet_plaintext_identity
-          scripts/deploy-archive --wasm archive.wasm.gz --canister-id fgte5-ciaaa-aaaad-aaatq-cai --network ic
+          scripts/deploy-archive --wasm archive.wasm.gz --canister-id y2aaj-miaaa-aaaad-aacxq-cai --network ic
 
   # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
   # On release tags, a new release is created and the assets are uploaded.

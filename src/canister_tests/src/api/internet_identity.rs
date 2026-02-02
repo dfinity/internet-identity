@@ -459,5 +459,37 @@ pub fn lookup_device_key(
     .map(|(x,)| x)
 }
 
+pub fn prepare_attributes(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::PrepareAttributeRequest,
+) -> Result<
+    Result<types::attributes::PrepareAttributeResponse, types::attributes::PrepareAttributeError>,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_attributes",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_attributes(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::GetAttributesRequest,
+) -> Result<
+    Result<types::attributes::CertifiedAttributes, types::attributes::GetAttributesError>,
+    RejectResponse,
+> {
+    query_candid_as(env, canister_id, sender, "get_attributes", (request,)).map(|(x,)| x)
+}
+
 /// A "compatibility" module for the previous version of II to handle API changes.
 pub mod compat {}

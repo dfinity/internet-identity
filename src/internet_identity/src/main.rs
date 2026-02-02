@@ -15,6 +15,10 @@ use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::attributes::{
+    CertifiedAttributes, GetAttributesError, GetAttributesRequest, PrepareAttributeError,
+    PrepareAttributeRequest, PrepareAttributeResponse, ValidatedPrepareAttributeRequest,
+};
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
     OpenIdPrepareDelegationResponse,
@@ -26,7 +30,6 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
@@ -36,6 +39,7 @@ mod archive;
 mod assets;
 mod authz_utils;
 
+mod attributes;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
@@ -1210,8 +1214,92 @@ mod openid_api {
     }
 }
 
+mod attribute_sharing {
+    use internet_identity_interface::internet_identity::types::attributes::{
+        Attribute, CertifiedAttributes, GetAttributesError, GetAttributesRequest,
+        ValidatedGetAttributesRequest,
+    };
+
+    use super::*;
+    use crate::{account_management::get_account_for_origin, authz_utils::AuthorizationError};
+
+    #[update]
+    async fn prepare_attributes(
+        request: PrepareAttributeRequest,
+    ) -> Result<PrepareAttributeResponse, PrepareAttributeError> {
+        // Parse and validate API request into internal types.
+        let ValidatedPrepareAttributeRequest {
+            // Arguments for computing the seed
+            identity_number,
+            origin,
+            account_number,
+
+            // Which attributes to prepare
+            attribute_keys,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                PrepareAttributeError::AuthorizationError(principal)
+            })?;
+
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(PrepareAttributeError::GetAccountError)?;
+
+        // This is the only async operation, so we do it first, call operations that depend on
+        // the time. TODO: refactor to avoid asynchronicity here.
+        state::ensure_salt_set().await;
+        let issued_at_timestamp_ns = ic_cdk::api::time();
+
+        let attributes = anchor.prepare_attributes(attribute_keys, account, issued_at_timestamp_ns);
+
+        // Convert response to API types.
+        let attributes = attributes
+            .into_iter()
+            .map(|Attribute { key, value }| (key.to_string(), value))
+            .collect();
+
+        Ok(PrepareAttributeResponse {
+            issued_at_timestamp_ns,
+            attributes,
+        })
+    }
+
+    #[query]
+    fn get_attributes(
+        request: GetAttributesRequest,
+    ) -> Result<CertifiedAttributes, GetAttributesError> {
+        // Parse and validate API request into internal types.
+        let ValidatedGetAttributesRequest {
+            // Arguments for computing the seed
+            identity_number,
+            origin,
+            account_number,
+
+            // Which attributes to prepare
+            attributes,
+
+            // When were the attribute certificates issued
+            issued_at_timestamp_ns,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                GetAttributesError::AuthorizationError(principal)
+            })?;
+
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(GetAttributesError::GetAccountError)?;
+
+        let certified_attributes =
+            anchor.get_attributes(attributes, account, issued_at_timestamp_ns);
+
+        Ok(certified_attributes)
+    }
+}
+
 /// API for the attribute sharing mvp
-mod attribute_sharing_mvp {
+mod attribute_sharing_old_vc {
     use super::*;
 
     #[update]
