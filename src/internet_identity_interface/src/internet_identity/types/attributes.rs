@@ -54,7 +54,7 @@ impl std::fmt::Display for AttributeScope {
     }
 }
 
-fn elipsized(s: &str, max_len: usize) -> String {
+fn ellipsized(s: &str, max_len: usize) -> String {
     if s.len() > max_len {
         format!("{}{}", &s[..max_len - 3], "...")
     } else {
@@ -63,7 +63,7 @@ fn elipsized(s: &str, max_len: usize) -> String {
 }
 
 /// https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-12.2.1
-fn validate_openid_credential_issues_identifier(issuer: &str) -> Result<(), String> {
+fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), String> {
     let mut problems = vec![];
 
     if issuer.is_empty() {
@@ -73,7 +73,7 @@ fn validate_openid_credential_issues_identifier(issuer: &str) -> Result<(), Stri
     if issuer.len() > OPENID_ISSUER_MAX_LENGTH {
         problems.push(format!(
             "Issuer `{}` in attribute scope is too long (max {} chars)",
-            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH),
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH),
             OPENID_ISSUER_MAX_LENGTH
         ));
     }
@@ -81,21 +81,21 @@ fn validate_openid_credential_issues_identifier(issuer: &str) -> Result<(), Stri
     if !issuer.starts_with("https://") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must start with https://)",
-            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
     if issuer.contains("?") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must not contain query '?' characters)",
-            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
     if issuer.contains("#") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must not contain fragment '#' characters)",
-            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
@@ -126,7 +126,7 @@ impl TryFrom<&str> for AttributeScope {
                     .ok_or_else(|| format!("Missing issuer in attribute scope: {}", value))?
                     .to_string();
 
-                validate_openid_credential_issues_identifier(&issuer)
+                validate_openid_credential_issuer_identifier(&issuer)
                     .map_err(|err| format!("Invalid issuer in attribute scope: {}", err))?;
 
                 Ok(AttributeScope::OpenId { issuer })
