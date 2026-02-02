@@ -16,9 +16,12 @@
   import { channelStore } from "$lib/stores/channelStore";
   import { z } from "zod";
   import {
+    AttributesParamsSchema,
     DelegationParamsSchema,
     DelegationResultSchema,
   } from "$lib/utils/transport/utils";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { retryFor, throwCanisterError, toBase64 } from "$lib/utils/utils.ts";
 
   analytics.event("page-redirect-callback");
 
@@ -95,6 +98,60 @@
             await authorizationStore.authorize(undefined);
           const result = DelegationResultSchema.encode(delegationChain);
           await channel.send({ jsonrpc: "2.0", id: request.id, result });
+        });
+        channel.addEventListener("request", async (request) => {
+          if (request.id === undefined || request.method !== "ii_attributes") {
+            return;
+          }
+          if (!("attributes" in request.params)) {
+          }
+          const paramsResult = AttributesParamsSchema.safeParse(request.params);
+          if (!paramsResult.success) {
+            await channel.send({
+              jsonrpc: "2.0",
+              id: request.id,
+              error: {
+                code: -32602,
+                message: z.prettifyError(paramsResult.error),
+              },
+            });
+            return;
+          }
+          const { attributes, issued_at_timestamp_ns } =
+            await $authenticatedStore.actor
+              .prepare_attributes({
+                origin: channel.origin,
+                attribute_keys: paramsResult.data.attributes,
+                account_number: [],
+                identity_number: $authenticatedStore.identityNumber,
+              })
+              .then((x) => throwCanisterError(x));
+          const { certified_attributes, expires_at_timestamp_ns } =
+            await retryFor(5, () =>
+              $authenticatedStore.actor.get_attributes({
+                origin: channel.origin,
+                account_number: [],
+                identity_number: $authenticatedStore.identityNumber,
+                attributes,
+                issued_at_timestamp_ns,
+              }),
+            ).then((x) => throwCanisterError(x));
+          await channel.send({
+            jsonrpc: "2.0",
+            id: request.id,
+            result: {
+              attributes: Object.fromEntries(
+                certified_attributes.map((attribute) => [
+                  attribute.key,
+                  {
+                    value: attribute.value,
+                    signature: toBase64(new Uint8Array(attribute.signature)),
+                    expiration: expires_at_timestamp_ns.toString(),
+                  },
+                ]),
+              ),
+            },
+          });
         });
       }
     }

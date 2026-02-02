@@ -3,54 +3,39 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { onMount } from "svelte";
   import { createRedirectURL } from "$lib/utils/openID";
-  import { HeartbeatServer } from "@slide-computer/signer-web";
   import { sessionStore } from "$lib/stores/session.store";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-
-  // The maximum amount of time in milliseconds we're willing to wait before
-  // having to consider the establishment of the ICRC-29 channel a failure.
-  //
-  // Waiting any longer than this would likely not result in a successful ICRC-29
-  // channel establishment while making the user wait too long for visual feedback.
-  const establishTimeout = 2000;
+  import { channelStore } from "$lib/stores/channelStore";
 
   const { data }: PageProps = $props();
 
   let timedOut = $state(false);
 
-  onMount(() => {
-    new HeartbeatServer({
-      status: "pending",
-      onEstablish(origin: string): void {
-        const next = createRedirectURL(
-          {
-            clientId: data.config.client_id,
-            authURL: data.config.auth_uri,
-            authScope: data.config.auth_scope.join(" "),
-          },
-          {
-            nonce: $sessionStore.nonce,
-            mediation: "required",
-          },
-        );
-        sessionStorage.setItem(
-          "ii-direct-authorize-openid",
-          JSON.stringify({ origin, state: next.searchParams.get("state") }),
-        );
-        window.location.assign(next);
+  onMount(async () => {
+    const channel = await channelStore.establish({ pending: true });
+    const next = createRedirectURL(
+      {
+        clientId: data.config.client_id,
+        authURL: data.config.auth_uri,
+        authScope: data.config.auth_scope.join(" "),
       },
-      establishTimeout,
-      onEstablishTimeout(): void {
-        timedOut = true;
+      {
+        nonce: $sessionStore.nonce,
+        mediation: "required",
       },
-      onDisconnect(): void {
-        // Unreachable, we redirect immediately after establishing
-      },
-    });
+    );
+    sessionStorage.setItem(
+      "ii-direct-authorize-openid",
+      JSON.stringify({
+        origin: channel.origin,
+        state: next.searchParams.get("state"),
+      }),
+    );
+    window.location.assign(next);
   });
 </script>
 

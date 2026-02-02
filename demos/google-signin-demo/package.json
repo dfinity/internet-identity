@@ -1,0 +1,30 @@
+{
+  "name": "@dfinity/google-signin-demo",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@icp-sdk/core": "*",
+    "@slide-computer/signer": "*",
+    "@slide-computer/signer-web": "*",
+    "@noble/hashes": "*",
+    "buffer": "^6.0.3",
+    "jose": "^5.1.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "scripts": {
+    "dev": "vite --config ./vite.config.ts",
+    "check": "tsc --noEmit",
+    "watch": "npm run check -- --watch",
+    "build": "npm run check && vite --config ./vite.config.ts build"
+  },
+  "devDependencies": {
+    "@dfinity/internet-identity-vite-plugins": "*",
+    "@types/react": "^18.2.38",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "5.2.2",
+    "vite": "^6.4.1",
+    "vite-plugin-node-polyfills": "^0.23.0"
+  }
+}

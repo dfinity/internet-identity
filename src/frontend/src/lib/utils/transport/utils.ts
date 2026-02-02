@@ -215,3 +215,7 @@ export const AuthRequestToDelegationParamsCodec = z.codec(
     }),
   },
 );
+
+export const AttributesParamsSchema = z.object({
+  attributes: z.array(z.string()),
+});
