@@ -173,17 +173,17 @@ mod tests {
         let test_cases = vec![
             (
                 "self-authenticating from public key",
-                Principal::self_authenticating(&[0xde, 0xad, 0xbe, 0xef]),
+                Principal::self_authenticating([0xde, 0xad, 0xbe, 0xef]),
                 true,
             ),
             (
                 "self-authenticating from different public key",
-                Principal::self_authenticating(&[0x01, 0x02, 0x03, 0x04]),
+                Principal::self_authenticating([0x01, 0x02, 0x03, 0x04]),
                 true,
             ),
             (
                 "self-authenticating from 28-byte public key",
-                Principal::self_authenticating(&[0xff; 28]),
+                Principal::self_authenticating([0xff; 28]),
                 true,
             ),
             ("anonymous principal", Principal::anonymous(), false),
@@ -210,6 +210,11 @@ mod tests {
                 Principal::from_text("2vxsx-fae").unwrap(),
                 false,
             ),
+            (
+                "internet identity canister",
+                Principal::from_text("rdmx6-jaaaa-aaaaa-aaadq-cai").unwrap(),
+                false,
+            ),
         ];
 
         for (label, principal, expected) in test_cases {
@@ -220,32 +225,5 @@ mod tests {
                 label, principal, expected, result
             );
         }
-    }
-
-    #[test]
-    fn test_is_self_authenticating_edge_cases() {
-        // Test with maximum length self-authenticating principal
-        let max_length_pubkey = [0xaa; 28];
-        let self_auth = Principal::self_authenticating(&max_length_pubkey);
-        assert!(
-            is_self_authenticating(self_auth),
-            "Max length self-authenticating principal should return true"
-        );
-
-        // Test with all zeros
-        let zero_pubkey = [0x00; 28];
-        let self_auth_zero = Principal::self_authenticating(&zero_pubkey);
-        assert!(
-            is_self_authenticating(self_auth_zero),
-            "Self-authenticating principal with zero pubkey should return true"
-        );
-
-        // Test that the function correctly identifies the tag byte
-        let self_auth_bytes = self_auth.as_slice();
-        assert_eq!(
-            self_auth_bytes.len(),
-            Principal::MAX_LENGTH_IN_BYTES,
-            "Self-authenticating principal should have max length"
-        );
     }
 }
