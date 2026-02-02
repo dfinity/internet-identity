@@ -67,6 +67,8 @@ export class RegisterAccessMethodFlow {
 
   #registerSession = async (identityNumber: bigint): Promise<void> => {
     const session = get(sessionStore);
+    // Note: session.actor uses a self-authenticating identity (ECDSAKeyIdentity)
+    // not an anonymous identity
     const confirmation = await session.actor
       .authn_method_session_register(identityNumber)
       .then(throwCanisterError);

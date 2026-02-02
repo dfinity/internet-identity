@@ -138,6 +138,7 @@ pub enum AuthnMethodRegisterError {
     RegistrationModeOff,
     RegistrationAlreadyInProgress,
     InvalidMetadata(String),
+    NotSelfAuthenticating(Principal),
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

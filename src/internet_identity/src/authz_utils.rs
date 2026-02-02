@@ -151,3 +151,101 @@ pub fn check_authz_and_record_activity(
         .map_err(|err| IdentityUpdateError::StorageError(anchor_number, err))?;
     Ok(maybe_domain)
 }
+
+pub fn is_self_authenticating(principal: Principal) -> bool {
+    let principal_bytes = principal.as_slice();
+    if principal_bytes.len() != Principal::MAX_LENGTH_IN_BYTES {
+        return false;
+    }
+    // Take some self-authenticating principal, compute its tag, and use that.
+    let self_authenticating = Principal::self_authenticating([0xde, 0xad, 0xbe, 0xef]);
+    let self_authenticating_bytes = self_authenticating.as_slice();
+
+    principal_bytes.last() == self_authenticating_bytes.last()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_self_authenticating() {
+        let test_cases = vec![
+            (
+                "self-authenticating from public key",
+                Principal::self_authenticating(&[0xde, 0xad, 0xbe, 0xef]),
+                true,
+            ),
+            (
+                "self-authenticating from different public key",
+                Principal::self_authenticating(&[0x01, 0x02, 0x03, 0x04]),
+                true,
+            ),
+            (
+                "self-authenticating from 28-byte public key",
+                Principal::self_authenticating(&[0xff; 28]),
+                true,
+            ),
+            ("anonymous principal", Principal::anonymous(), false),
+            (
+                "management canister",
+                Principal::management_canister(),
+                false,
+            ),
+            (
+                "opaque principal (short)",
+                Principal::from_slice(&[0x01, 0x02, 0x03]),
+                false,
+            ),
+            (
+                "opaque principal (medium)",
+                {
+                    let bytes = [0xca; 10];
+                    Principal::from_slice(&bytes)
+                },
+                false,
+            ),
+            (
+                "derived principal",
+                Principal::from_text("2vxsx-fae").unwrap(),
+                false,
+            ),
+        ];
+
+        for (label, principal, expected) in test_cases {
+            let result = is_self_authenticating(principal);
+            assert_eq!(
+                result, expected,
+                "Failed test case '{}': principal = {}, expected = {}, got = {}",
+                label, principal, expected, result
+            );
+        }
+    }
+
+    #[test]
+    fn test_is_self_authenticating_edge_cases() {
+        // Test with maximum length self-authenticating principal
+        let max_length_pubkey = [0xaa; 28];
+        let self_auth = Principal::self_authenticating(&max_length_pubkey);
+        assert!(
+            is_self_authenticating(self_auth),
+            "Max length self-authenticating principal should return true"
+        );
+
+        // Test with all zeros
+        let zero_pubkey = [0x00; 28];
+        let self_auth_zero = Principal::self_authenticating(&zero_pubkey);
+        assert!(
+            is_self_authenticating(self_auth_zero),
+            "Self-authenticating principal with zero pubkey should return true"
+        );
+
+        // Test that the function correctly identifies the tag byte
+        let self_auth_bytes = self_auth.as_slice();
+        assert_eq!(
+            self_auth_bytes.len(),
+            Principal::MAX_LENGTH_IN_BYTES,
+            "Self-authenticating principal should have max length"
+        );
+    }
+}
