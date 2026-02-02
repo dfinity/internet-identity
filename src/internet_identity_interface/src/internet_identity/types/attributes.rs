@@ -12,6 +12,8 @@ pub const MAX_ATTRIBUTES_PER_REQUEST: usize = 100;
 
 pub const MAX_ATTRIBUTE_VALUE_LENGTH: usize = 50_000;
 
+pub const OPENID_ISSUER_MAX_LENGTH: usize = 1024;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub enum AttributeName {
     Email,
@@ -52,6 +54,58 @@ impl std::fmt::Display for AttributeScope {
     }
 }
 
+fn elipsized(s: &str, max_len: usize) -> String {
+    if s.len() > max_len {
+        format!("{}{}", &s[..max_len - 3], "...")
+    } else {
+        s.to_string()
+    }
+}
+
+/// https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-12.2.1
+fn validate_openid_credential_issues_identifier(issuer: &str) -> Result<(), String> {
+    let mut problems = vec![];
+
+    if issuer.is_empty() {
+        problems.push("Empty issuer in attribute scope".to_string());
+    }
+
+    if issuer.len() > OPENID_ISSUER_MAX_LENGTH {
+        problems.push(format!(
+            "Issuer `{}` in attribute scope is too long (max {} chars)",
+            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH),
+            OPENID_ISSUER_MAX_LENGTH
+        ));
+    }
+
+    if !issuer.starts_with("https://") {
+        problems.push(format!(
+            "Invalid issuer `{}` in attribute scope (must start with https://)",
+            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+        ));
+    }
+
+    if issuer.contains("?") {
+        problems.push(format!(
+            "Invalid issuer `{}` in attribute scope (must not contain query '?' characters)",
+            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+        ));
+    }
+
+    if issuer.contains("#") {
+        problems.push(format!(
+            "Invalid issuer `{}` in attribute scope (must not contain fragment '#' characters)",
+            elipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+        ));
+    }
+
+    if !problems.is_empty() {
+        return Err(problems.join(", "));
+    }
+
+    Ok(())
+}
+
 impl TryFrom<&str> for AttributeScope {
     type Error = String;
 
@@ -60,18 +114,21 @@ impl TryFrom<&str> for AttributeScope {
     /// Currently, only scopes of the form `openid:<issuer>` are supported.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut parts = value.splitn(2, ':');
+
         let scope_str = parts
             .next()
             .ok_or_else(|| format!("Invalid attribute request: {}", value))?;
+
         match scope_str {
             "openid" => {
                 let issuer = parts
                     .next()
                     .ok_or_else(|| format!("Missing issuer in attribute scope: {}", value))?
                     .to_string();
-                if issuer.is_empty() {
-                    return Err(format!("Missing issuer in attribute scope: {}", value));
-                }
+
+                validate_openid_credential_issues_identifier(&issuer)
+                    .map_err(|err| format!("Invalid issuer in attribute scope: {}", err))?;
+
                 Ok(AttributeScope::OpenId { issuer })
             }
             _ => Err(format!("Unknown attribute scope: {}", scope_str)),
@@ -81,7 +138,7 @@ impl TryFrom<&str> for AttributeScope {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub struct AttributeKey {
-    /// E.g., `Some("openid:google.com")` in "openid:google.com:email" or `None` in "name".
+    /// E.g., `Some("openid:https://google.com")` in "openid:https://google.com:email" or `None` in "name".
     pub scope: Option<AttributeScope>,
 
     /// E.g., "email", "name"
@@ -387,29 +444,34 @@ mod tests {
             let test_cases = vec![
                 (
                     "openid",
-                    "openid:google.com",
+                    "openid:https://google.com",
                     Ok(AttributeScope::OpenId {
-                        issuer: "google.com".to_string(),
+                        issuer: "https://google.com".to_string(),
                     }),
                 ),
                 (
                     "openid complex issuer",
-                    "openid:accounts.google.com",
+                    "openid:https://accounts.google.com",
                     Ok(AttributeScope::OpenId {
-                        issuer: "accounts.google.com".to_string(),
+                        issuer: "https://accounts.google.com".to_string(),
                     }),
                 ),
                 (
                     "openid with colon in issuer",
-                    "openid:issuer:with:colons",
+                    "openid:https://issuer:with:colons",
                     Ok(AttributeScope::OpenId {
-                        issuer: "issuer:with:colons".to_string(),
+                        issuer: "https://issuer:with:colons".to_string(),
                     }),
+                ),
+                (
+                    "openid extra colon",
+                    "openid::",
+                    Err("Invalid issuer in attribute scope: Empty issuer in attribute scope, Invalid issuer `:` in attribute scope (must start with https://)".to_string()),
                 ),
                 (
                     "openid missing issuer",
                     "openid:",
-                    Err("Missing issuer in attribute scope: openid:".to_string()),
+                    Err("Invalid issuer in attribute scope: Empty issuer in attribute scope, Invalid issuer `` in attribute scope (must start with https://)".to_string()),
                 ),
                 (
                     "openid no colon",
@@ -432,18 +494,18 @@ mod tests {
         #[test]
         fn test_attribute_scope_display() {
             let scope = AttributeScope::OpenId {
-                issuer: "google.com".to_string(),
+                issuer: "https://google.com".to_string(),
             };
-            pretty_assert_eq!(scope.to_string(), "openid:google.com");
+            pretty_assert_eq!(scope.to_string(), "openid:https://google.com");
         }
 
         #[test]
         fn test_ordering() {
             let scope1 = AttributeScope::OpenId {
-                issuer: "a.com".to_string(),
+                issuer: "https://a.com".to_string(),
             };
             let scope2 = AttributeScope::OpenId {
-                issuer: "b.com".to_string(),
+                issuer: "https://b.com".to_string(),
             };
             assert!(scope1 < scope2);
         }
@@ -466,42 +528,42 @@ mod tests {
                 ),
                 (
                     "with scope",
-                    "openid:google.com:email",
+                    "openid:https://google.com:email",
                     Ok(AttributeKey {
                         scope: Some(AttributeScope::OpenId {
-                            issuer: "google.com".to_string(),
+                            issuer: "https://google.com".to_string(),
                         }),
                         attribute_name: AttributeName::Email,
                     }),
                 ),
                 (
                     "complex issuer",
-                    "openid:accounts.google.com:name",
+                    "openid:https://accounts.google.com:name",
                     Ok(AttributeKey {
                         scope: Some(AttributeScope::OpenId {
-                            issuer: "accounts.google.com".to_string(),
+                            issuer: "https://accounts.google.com".to_string(),
                         }),
                         attribute_name: AttributeName::Name,
                     }),
                 ),
                 (
                     "issuer with colons",
-                    "openid:issuer:with:colons:email",
+                    "openid:https://issuer:with:colons:email",
                     Ok(AttributeKey {
                         scope: Some(AttributeScope::OpenId {
-                            issuer: "issuer:with:colons".to_string(),
+                            issuer: "https://issuer:with:colons".to_string(),
                         }),
                         attribute_name: AttributeName::Email,
                     }),
                 ),
                 (
                     "invalid key",
-                    "openid:google.com:invalid",
+                    "openid:https://google.com:invalid",
                     Err("Unknown attribute: invalid".to_string()),
                 ),
                 (
                     "invalid scope",
-                    "unknown:issuer:email",
+                    "unknown:https://issuer:email",
                     Err("Unknown attribute scope: unknown".to_string()),
                 ),
                 ("empty", "", Err("Unknown attribute: ".to_string())),
@@ -517,7 +579,7 @@ mod tests {
         fn test_attribute_key_display_and_round_trip() {
             let test_cases = vec![
                 ("key only", "name"),
-                ("with scope", "openid:google.com:email"),
+                ("with scope", "openid:https://google.com:email"),
             ];
 
             for (label, input) in test_cases {
@@ -538,7 +600,7 @@ mod tests {
             };
             let req3 = AttributeKey {
                 scope: Some(AttributeScope::OpenId {
-                    issuer: "google.com".to_string(),
+                    issuer: "https://google.com".to_string(),
                 }),
                 attribute_name: AttributeName::Email,
             };
@@ -602,7 +664,7 @@ mod tests {
                         attributes: vec![
                             ("email".to_string(), "user@example.com".to_string()),
                             (
-                                "openid:google.com:email".to_string(),
+                                "openid:https://google.com:email".to_string(),
                                 "google@example.com".to_string(),
                             ),
                         ],
@@ -622,13 +684,13 @@ mod tests {
                         });
                         m.insert(
                             Some(AttributeScope::OpenId {
-                                issuer: "google.com".to_string(),
+                                issuer: "https://google.com".to_string(),
                             }),
                             {
                                 let mut s = BTreeSet::new();
                                 s.insert(
                                     Attribute::try_from((
-                                        "openid:google.com:email".to_string(),
+                                        "openid:https://google.com:email".to_string(),
                                         "google@example.com".to_string(),
                                     ))
                                     .unwrap(),
@@ -806,7 +868,7 @@ mod tests {
                         account_number: None,
                         attribute_keys: vec![
                             "email".to_string(),
-                            "openid:google.com:email".to_string(),
+                            "openid:https://google.com:email".to_string(),
                         ],
                     },
                     (12345, "example.com".to_string(), None, {
@@ -818,7 +880,7 @@ mod tests {
                         google_set.insert(AttributeName::Email);
                         m.insert(
                             Some(AttributeScope::OpenId {
-                                issuer: "google.com".to_string(),
+                                issuer: "https://google.com".to_string(),
                             }),
                             google_set,
                         );
@@ -859,9 +921,9 @@ mod tests {
                         account_number: Some(42),
                         attribute_keys: vec![
                             "name".to_string(),
-                            "openid:google.com:email".to_string(),
-                            "openid:google.com:name".to_string(),
-                            "openid:github.com:email".to_string(),
+                            "openid:https://google.com:email".to_string(),
+                            "openid:https://google.com:name".to_string(),
+                            "openid:https://github.com:email".to_string(),
                         ],
                     },
                     (67890, "app.example.com".to_string(), Some(42), {
@@ -874,7 +936,7 @@ mod tests {
                         google_set.insert(AttributeName::Name);
                         m.insert(
                             Some(AttributeScope::OpenId {
-                                issuer: "google.com".to_string(),
+                                issuer: "https://google.com".to_string(),
                             }),
                             google_set,
                         );
@@ -882,7 +944,7 @@ mod tests {
                         github_set.insert(AttributeName::Email);
                         m.insert(
                             Some(AttributeScope::OpenId {
-                                issuer: "github.com".to_string(),
+                                issuer: "https://github.com".to_string(),
                             }),
                             github_set,
                         );
