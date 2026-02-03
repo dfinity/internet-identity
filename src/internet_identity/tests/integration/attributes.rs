@@ -112,12 +112,12 @@ fn should_get_certified_attributes() {
             certified_attributes: vec![
                 CertifiedAttribute {
                     key: "openid:https://accounts.google.com:email".into(),
-                    value: "andri.schatz@dfinity.org".into(),
+                    value: b"andri.schatz@dfinity.org".to_vec(),
                     signature: vec![] // redacted
                 },
                 CertifiedAttribute {
                     key: "openid:https://accounts.google.com:name".into(),
-                    value: "Andri Schatz".into(),
+                    value: b"Andri Schatz".to_vec(),
                     signature: vec![],
                 },
             ],
