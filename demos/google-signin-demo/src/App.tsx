@@ -1,29 +1,19 @@
 import React from "react";
-import { Signer } from "@slide-computer/signer";
-import { PostMessageTransport } from "@slide-computer/signer-web";
-import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
-import { HttpAgent } from "@icp-sdk/core/agent";
+import { DelegationChain, ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
-import { AttributeResultCodec, verifyCanisterSignature } from "./utils";
-import { concat, uint8Equals } from "@icp-sdk/core/candid";
-import { domain_sep, hashOfMap } from "@icp-sdk/core/agent";
+import { authenticate, JsonToCertifiedAttributesCodec, verify } from "./utils";
 
-const canisterId = Principal.fromText(
-  window.location.origin.includes("localhost")
-    ? "uxrrr-q7777-77774-qaaaq-cai"
-    : "jqajs-xiaaa-aaaad-aab5q-cai",
-);
-const openIdIssuer = "https://accounts.google.com";
-const openIdAttributes = [
-  `openid:${openIdIssuer}:name`,
-  `openid:${openIdIssuer}:email`,
-];
-const transport = new PostMessageTransport({
-  url: window.location.origin.includes("localhost")
-    ? `http://localhost:5173/authorize?openid=${encodeURIComponent(openIdIssuer)}`
-    : `https://${canisterId}.ic0.app/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
-});
-const signer = new Signer({ transport });
+// Internet Identity
+const iiCanisterId = Principal.fromText("jqajs-xiaaa-aaaad-aab5q-cai");
+const iiURL = `https://${iiCanisterId}.ic0.app`; // `https://id.ai` on prod
+
+// OpenID issuer and attributes
+const googleIssuer = "https://accounts.google.com";
+const googleNameAttribute = `openid:${googleIssuer}:name`;
+const googleEmailAttribute = `openid:${googleIssuer}:email`;
+
+// Session: created in backend and public key sent to frontend
+let sessionIdentity = ECDSAKeyIdentity.generate();
 
 const App: React.FC = () => {
   const [name, setName] = React.useState("");
@@ -31,122 +21,67 @@ const App: React.FC = () => {
   const [principal, setPrincipal] = React.useState("");
   const [isSignedIn, setIsSignedIn] = React.useState(false);
 
+  // Client side
   const handleSignIn = async () => {
-    // Send ICRC-34 delegation request
-    const sessionIdentity = await ECDSAKeyIdentity.generate();
-    const delegationPromise = signer.delegation({
-      publicKey: sessionIdentity.getPublicKey().toDer(),
+    const { delegationChain, certifiedAttributes } = await authenticate({
+      identityProvider: iiURL,
+      sessionPublicKey: (await sessionIdentity).getPublicKey().toDer(),
+      // Below properties are optional, omit to authenticate without OpenID
+      directOpenIdAuth: googleIssuer,
+      attributes: [googleNameAttribute, googleEmailAttribute],
     });
 
-    // Send II attributes request
-    const requestId = window.crypto.randomUUID();
-    const attributesPromise = signer.sendRequest({
-      jsonrpc: "2.0",
-      method: "ii_attributes",
-      id: requestId,
-      params: {
-        attributes: openIdAttributes,
-      },
-    });
+    // Send JSON payload to server
+    await handleAuthRequest(
+      JSON.stringify({
+        delegationChain: delegationChain.toJSON(),
+        certifiedAttributes:
+          JsonToCertifiedAttributesCodec.encode(certifiedAttributes),
+      }),
+    );
+  };
 
-    // Wait for both requests to receive a response
-    const [delegationChain, attributesResponse] = await Promise.all([
-      delegationPromise,
-      attributesPromise,
-    ]);
-
-    // Get attributes from response
-    if (!("result" in attributesResponse)) {
-      throw new Error("Attributes response is missing result");
-    }
-    const { attributes } = AttributeResultCodec.parse(
-      attributesResponse.result,
+  // Server side
+  const handleAuthRequest = async (payload: string) => {
+    // Parse payload
+    const data = JSON.parse(payload);
+    const delegationChain = DelegationChain.fromJSON(data.delegationChain);
+    const certifiedAttributes = JsonToCertifiedAttributesCodec.parse(
+      data.certifiedAttributes,
     );
 
-    // Fetch IC root key if needed
-    const agent = await HttpAgent.create({
-      shouldFetchRootKey: window.location.origin.includes("localhost"),
+    // Verify all signatures
+    const valid = await verify({
+      sessionPublicKey: (await sessionIdentity).getPublicKey().toDer(),
+      canisterId: iiCanisterId,
+      delegationChain,
+      certifiedAttributes,
     });
-    if (!agent.rootKey) {
-      throw new Error("Agent is missing root key");
+    if (!valid) {
+      throw new Error("Invalid authentication data");
     }
 
-    // Verify delegation chain
-    const nowNanos = BigInt(Date.now()) * BigInt(1_000_000);
-    if (delegationChain.delegations.length !== 1) {
-      // II delegations only include a single signature
-      throw new Error("Delegation chain length is incorrect");
-    }
-    const signedDelegation = delegationChain.delegations[0];
-    if (
-      !uint8Equals(
-        signedDelegation.delegation.pubkey,
-        sessionIdentity.getPublicKey().toDer(),
-      )
-    ) {
-      throw new Error("Delegation pubkey is incorrect");
-    }
-    if (signedDelegation.delegation.expiration < nowNanos) {
-      throw new Error("Delegation has expired");
-    }
-    if (signedDelegation.delegation.targets !== undefined) {
-      throw new Error("Delegation targets should be unspecified");
-    }
-    const delegationCanisterId = await verifyCanisterSignature({
-      rootKey: agent.rootKey,
-      publicKey: delegationChain.publicKey,
-      message: concat(
-        domain_sep("ic-request-auth-delegation"),
-        hashOfMap({
-          pubkey: signedDelegation.delegation.pubkey,
-          expiration: signedDelegation.delegation.expiration,
-        }),
-      ),
-      signature: signedDelegation.signature,
-    });
-    if (delegationCanisterId.toText() !== canisterId.toText()) {
-      throw new Error(
-        `Delegation signature is not from ${canisterId.toText()}`,
-      );
-    }
+    // Verified principal and attributes
+    const principal = Principal.selfAuthenticating(delegationChain.publicKey);
+    const name = certifiedAttributes[googleNameAttribute].value;
+    const email = certifiedAttributes[googleEmailAttribute].value;
 
-    // Verify all attributes one by one
-    for (let [key, { value, signature, expiration }] of Object.entries(
-      attributes,
-    )) {
-      if (expiration < nowNanos) {
-        throw new Error("Attribute has expired");
-      }
-      const attributeCanisterId = await verifyCanisterSignature({
-        rootKey: agent.rootKey,
-        publicKey: delegationChain.publicKey,
-        message: concat(
-          domain_sep("ii-request-attribute"),
-          hashOfMap({ [key]: value, expiration }),
-        ),
-        signature,
-      });
-      if (attributeCanisterId.toText() !== canisterId.toText()) {
-        throw new Error(
-          `Attribute signature is not from ${canisterId.toText()}`,
-        );
-      }
-    }
-
-    // Update interface with principal and email attribute
-    setPrincipal(
-      Principal.selfAuthenticating(delegationChain.publicKey).toText(),
-    );
-    setName(attributes[`openid:${openIdIssuer}:name`].value);
-    setEmail(attributes[`openid:${openIdIssuer}:email`].value);
+    // For this demo: Update interface with principal and email attribute
+    setPrincipal(principal.toText());
+    setName(name);
+    setEmail(email);
     setIsSignedIn(true);
   };
 
+  // Client side
   const handleSignOut = () => {
     setPrincipal("");
     setName("");
     setEmail("");
     setIsSignedIn(false);
+
+    // Server side (session should be reset)
+    sessionIdentity = ECDSAKeyIdentity.generate();
   };
 
   return (

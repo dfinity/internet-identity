@@ -1,16 +1,22 @@
 import {
   Cbor,
   Certificate,
+  domain_sep,
+  hashOfMap,
   type HashTree,
   hashValue,
+  IC_ROOT_KEY,
   lookup_path,
   LookupPathStatus,
   reconstruct,
   unwrapDER,
 } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
-import { uint8Equals } from "@icp-sdk/core/candid";
+import { concat, uint8Equals } from "@icp-sdk/core/candid";
 import { z } from "zod";
+import { DelegationChain } from "@icp-sdk/core/identity";
+import { Signer } from "@slide-computer/signer";
+import { PostMessageTransport } from "@slide-computer/signer-web";
 
 const CANISTER_SIGNATURE_OID = Uint8Array.from([
   ...[0x30, 0x0c], // SEQUENCE
@@ -26,7 +32,7 @@ interface VerifyCanisterSignatureParams {
 }
 export const verifyCanisterSignature = async (
   params: VerifyCanisterSignatureParams,
-): Promise<Principal> => {
+): Promise<Principal | undefined> => {
   // Decode signature into certificate and tree
   const decodedSignature = Cbor.decode<{
     certificate: Uint8Array;
@@ -54,12 +60,10 @@ export const verifyCanisterSignature = async (
     "certified_data",
   ]);
   if (witness.status !== LookupPathStatus.Found) {
-    throw new Error(
-      "Could not find certified data for this canister in the certificate",
-    );
+    return;
   }
   if (!uint8Equals(witness.value, reconstructed)) {
-    throw new Error("Witness != Tree passed in ic-certification");
+    return;
   }
 
   // Verify that message is within tree
@@ -68,62 +72,193 @@ export const verifyCanisterSignature = async (
     decodedSignature.tree,
   );
   if (lookupPath.status !== LookupPathStatus.Found) {
-    throw new Error("Could not find message in tree");
+    return;
   }
 
   // Return principal of canister that made the signature
   return canisterId;
 };
 
-export const AttributeResultCodec = z.codec(
+const JsonnableCertifiedAttributesSchema = z.record(
+  z.string(),
   z.object({
-    attributes: z.record(
-      z.string(),
-      z.object({
-        value: z.string(),
-        signature: z.base64(),
-        expiration: z.string(),
-      }),
-    ),
+    value: z.string(),
+    signature: z.base64(),
+    expiration: z.string(),
   }),
+);
+
+export type JsonnableCertifiedAttributes = z.infer<
+  typeof JsonnableCertifiedAttributesSchema
+>;
+
+const CertifiedAttributesSchema = z.record(
+  z.string(),
   z.object({
-    attributes: z.record(
-      z.string(),
-      z.object({
-        value: z.string(),
-        signature: z.instanceof(Uint8Array),
-        expiration: z.bigint(),
-      }),
-    ),
+    value: z.string(),
+    signature: z.instanceof(Uint8Array),
+    expiration: z.bigint(),
   }),
+);
+
+export type CertifiedAttributes = z.infer<typeof CertifiedAttributesSchema>;
+
+export const JsonToCertifiedAttributesCodec = z.codec(
+  JsonnableCertifiedAttributesSchema,
+  CertifiedAttributesSchema,
   {
-    decode: (json) => ({
-      attributes: Object.fromEntries(
-        Object.entries(json.attributes).map(
-          ([key, { value, signature, expiration }]) => [
-            key,
-            {
-              value,
-              signature: z.util.base64ToUint8Array(signature),
-              expiration: BigInt(expiration),
-            },
-          ],
-        ),
+    decode: (json) =>
+      Object.fromEntries(
+        Object.entries(json).map(([key, { value, signature, expiration }]) => [
+          key,
+          {
+            value,
+            signature: z.util.base64ToUint8Array(signature),
+            expiration: BigInt(expiration),
+          },
+        ]),
       ),
-    }),
-    encode: (data) => ({
-      attributes: Object.fromEntries(
-        Object.entries(data.attributes).map(
-          ([key, { value, signature, expiration }]) => [
-            key,
-            {
-              value,
-              signature: z.util.uint8ArrayToBase64(signature),
-              expiration: expiration.toString(),
-            },
-          ],
-        ),
+    encode: (data) =>
+      Object.fromEntries(
+        Object.entries(data).map(([key, { value, signature, expiration }]) => [
+          key,
+          {
+            value,
+            signature: z.util.uint8ArrayToBase64(signature),
+            expiration: expiration.toString(),
+          },
+        ]),
       ),
-    }),
   },
 );
+
+interface AuthenticationData {
+  delegationChain: DelegationChain;
+  certifiedAttributes: CertifiedAttributes;
+}
+
+interface AuthenticateParams {
+  identityProvider: string;
+  sessionPublicKey: Uint8Array;
+  directOpenIdAuth?: string;
+  attributes?: string[];
+}
+
+export const authenticate = async (
+  params: AuthenticateParams,
+): Promise<AuthenticationData> => {
+  // Create ICRC-29 PostMessage transport
+  const authorizeURL = new URL(params.identityProvider);
+  authorizeURL.pathname = "/authorize";
+  if (params.directOpenIdAuth !== undefined) {
+    authorizeURL.searchParams.set("openid", params.directOpenIdAuth);
+  }
+  const transport = new PostMessageTransport({ url: authorizeURL.href });
+  const signer = new Signer({ transport });
+
+  // Send ICRC-34 delegation request
+  const delegationPromise = signer.delegation({
+    publicKey: params.sessionPublicKey,
+  });
+
+  // Send II attributes request
+  const requestId = window.crypto.randomUUID();
+  const attributesPromise: Promise<CertifiedAttributes> =
+    params.attributes !== undefined && params.attributes.length > 0
+      ? signer
+          .sendRequest({
+            jsonrpc: "2.0",
+            method: "ii_attributes",
+            id: requestId,
+            params: {
+              attributes: params.attributes,
+            },
+          })
+          .then((response) => {
+            if (
+              !("result" in response) ||
+              typeof response.result !== "object" ||
+              response.result === null ||
+              !("attributes" in response.result)
+            ) {
+              throw new Error("Attributes response is missing result");
+            }
+            return JsonToCertifiedAttributesCodec.parse(response.result);
+          })
+      : Promise.resolve({});
+
+  // Wait for both requests to receive a response
+  const [delegationChain, certifiedAttributes] = await Promise.all([
+    delegationPromise,
+    attributesPromise,
+  ]);
+  return { delegationChain, certifiedAttributes };
+};
+
+export const verify = async (
+  params: AuthenticationData & {
+    sessionPublicKey: Uint8Array;
+    canisterId: Principal;
+  },
+): Promise<boolean> => {
+  // Get IC root key from agent-js
+  const rootKey = z.util.hexToUint8Array(IC_ROOT_KEY);
+
+  // Verify delegation chain
+  const nowNanos = BigInt(Date.now()) * BigInt(1_000_000);
+  if (params.delegationChain.delegations.length !== 1) {
+    return false;
+  }
+  const signedDelegation = params.delegationChain.delegations[0];
+  if (
+    !uint8Equals(signedDelegation.delegation.pubkey, params.sessionPublicKey) ||
+    signedDelegation.delegation.expiration < nowNanos ||
+    signedDelegation.delegation.targets !== undefined
+  ) {
+    return false;
+  }
+  const delegationCanisterId = await verifyCanisterSignature({
+    rootKey,
+    publicKey: params.delegationChain.publicKey,
+    message: concat(
+      domain_sep("ic-request-auth-delegation"),
+      hashOfMap({
+        pubkey: signedDelegation.delegation.pubkey,
+        expiration: signedDelegation.delegation.expiration,
+      }),
+    ),
+    signature: signedDelegation.signature,
+  });
+  if (
+    delegationCanisterId === undefined ||
+    delegationCanisterId.toText() !== params.canisterId.toText()
+  ) {
+    return false;
+  }
+
+  // Verify all attributes one by one
+  for (let [key, { value, signature, expiration }] of Object.entries(
+    params.certifiedAttributes,
+  )) {
+    if (expiration < nowNanos) {
+      return false;
+    }
+    const attributeCanisterId = await verifyCanisterSignature({
+      rootKey,
+      publicKey: params.delegationChain.publicKey,
+      message: concat(
+        domain_sep("ii-request-attribute"),
+        hashOfMap({ [key]: value, expiration }),
+      ),
+      signature,
+    });
+    if (
+      attributeCanisterId === undefined ||
+      attributeCanisterId.toText() !== params.canisterId.toText()
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
