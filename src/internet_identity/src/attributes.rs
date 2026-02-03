@@ -165,7 +165,7 @@ impl Anchor {
 
                         let attribute = Attribute {
                             key,
-                            value: value.clone(),
+                            value: value.as_bytes().to_vec(),
                         };
 
                         Some(attribute)
@@ -207,7 +207,7 @@ fn attribute_signature_msg(attribute: &Attribute, expiration_timestamp_ns: u64) 
         ("expiration".into(), Value::Number(expiration_timestamp_ns)),
         (
             attribute.key.to_string(),
-            Value::String(attribute.value.to_string()),
+            Value::Bytes(attribute.value.clone()),
         ),
     ];
     representation_independent_hash(m.as_slice()).to_vec()
@@ -289,7 +289,12 @@ mod tests {
     fn attribute_pairs(attributes: &[Attribute]) -> BTreeSet<(String, String)> {
         attributes
             .iter()
-            .map(|attr| (attr.key.to_string(), attr.value.clone()))
+            .map(|attr| {
+                (
+                    attr.key.to_string(),
+                    String::from_utf8_lossy(&attr.value).to_string(),
+                )
+            })
             .collect()
     }
 
@@ -299,7 +304,7 @@ mod tests {
                 scope: openid_attribute_scope(),
                 attribute_name: name,
             },
-            value: value.to_string(),
+            value: value.as_bytes().to_vec(),
         }
     }
 
@@ -360,7 +365,7 @@ mod tests {
                 ("expiration".into(), Value::Number(1_234_567)),
                 (
                     attr_email.key.to_string(),
-                    Value::String(attr_email.value.to_string()),
+                    Value::Bytes(attr_email.value.clone()),
                 ),
             ])
             .to_vec();
@@ -421,7 +426,7 @@ mod tests {
                 ("expiration".into(), Value::Number(0)),
                 (
                     attr_email.key.to_string(),
-                    Value::String(attr_email.value.to_string()),
+                    Value::Bytes(attr_email.value.clone()),
                 ),
             ])
             .to_vec();
@@ -436,7 +441,7 @@ mod tests {
                 ("expiration".into(), Value::Number(u64::MAX)),
                 (
                     attr_email.key.to_string(),
-                    Value::String(attr_email.value.to_string()),
+                    Value::Bytes(attr_email.value.clone()),
                 ),
             ])
             .to_vec();

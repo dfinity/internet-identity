@@ -54,12 +54,39 @@ impl std::fmt::Display for AttributeScope {
     }
 }
 
-fn ellipsized(s: &str, max_len: usize) -> String {
-    if s.len() > max_len {
-        format!("{}{}", &s[..max_len - 3], "...")
-    } else {
-        s.to_string()
+/// Returns a possibly modified version of `s` that fits within the specified bounds (in terms of
+/// the number of UTF-8 characters).
+///
+/// More precisely, middle characters are removed such that the return value has at most `max_len`
+/// characters. Some examples:
+/// ```
+/// println!("{}", clamp_string_len("abcdef", 5));  // a...f
+/// println!("{}", clamp_string_len("abcde", 5));   // abcde
+/// println!("{}", clamp_string_len("abcd", 5));    // abcd
+/// ```
+///
+/// This is analogous to the clamp method on numeric types in that this bounds the value.
+pub fn clamp_string_len(s: &str, max_len: usize) -> String {
+    let ellipsis = "...";
+
+    // Collect into a vector so that we can safely index the input.
+    let chars: Vec<_> = s.chars().collect();
+
+    if max_len <= ellipsis.len() {
+        return chars.into_iter().take(max_len).collect();
     }
+
+    if chars.len() <= max_len {
+        return s.to_string();
+    }
+
+    let mut end = max_len - ellipsis.len();
+
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+
+    format!("{}{}", chars[..end].iter().collect::<String>(), ellipsis)
 }
 
 /// https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-12.2.1
@@ -73,7 +100,7 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     if issuer.len() > OPENID_ISSUER_MAX_LENGTH {
         problems.push(format!(
             "Issuer `{}` in attribute scope is too long (max {} chars)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH),
+            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH),
             OPENID_ISSUER_MAX_LENGTH
         ));
     }
@@ -81,21 +108,21 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     if !issuer.starts_with("https://") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must start with https://)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
     if issuer.contains("?") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must not contain query '?' characters)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
     if issuer.contains("#") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must not contain fragment '#' characters)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
+            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
@@ -257,7 +284,7 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct PrepareAttributeResponse {
     pub issued_at_timestamp_ns: Timestamp,
-    pub attributes: Vec<(String, String)>,
+    pub attributes: Vec<(String, Vec<u8>)>,
 }
 
 #[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
@@ -273,18 +300,18 @@ pub struct GetAttributesRequest {
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub issued_at_timestamp_ns: Timestamp,
-    pub attributes: Vec<(String, String)>,
+    pub attributes: Vec<(String, Vec<u8>)>,
 }
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub struct Attribute {
     pub key: AttributeKey,
-    pub value: String,
+    pub value: Vec<u8>,
 }
 
-impl TryFrom<(String, String)> for Attribute {
+impl TryFrom<(String, Vec<u8>)> for Attribute {
     type Error = String;
 
-    fn try_from(value: (String, String)) -> Result<Self, Self::Error> {
+    fn try_from(value: (String, Vec<u8>)) -> Result<Self, Self::Error> {
         let (key, value) = value;
 
         let key = AttributeKey::try_from(key)?;
@@ -373,7 +400,7 @@ impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
 #[derive(Debug, PartialEq, CandidType, Serialize, Deserialize, Eq, PartialOrd, Ord)]
 pub struct CertifiedAttribute {
     pub key: String,
-    pub value: String,
+    pub value: Vec<u8>,
     pub signature: Vec<u8>,
 }
 
@@ -445,11 +472,11 @@ mod tests {
             let max_length_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH - 8));
             let max_length_input = format!("openid:{}", max_length_issuer);
 
-            let too_long_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH));
+            let too_long_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH - 7));
             let too_long_input = format!("openid:{}", too_long_issuer);
             let too_long_error = format!(
-                "Invalid issuer in attribute scope: Issuer `https://{}...` in attribute scope is too long (max {} chars)",
-                "a".repeat(OPENID_ISSUER_MAX_LENGTH - 11),
+                "Invalid issuer in attribute scope: Issuer `{}` in attribute scope is too long (max {} chars)",
+                clamp_string_len(too_long_issuer.as_str(), OPENID_ISSUER_MAX_LENGTH),
                 OPENID_ISSUER_MAX_LENGTH
             );
 
@@ -693,20 +720,20 @@ mod tests {
             let test_cases = vec![
                 (
                     "valid",
-                    ("email".to_string(), "user@example.com".to_string()),
+                    ("email".to_string(), b"user@example.com".to_vec()),
                     Ok(Attribute {
                         key: AttributeKey::try_from("email".to_string()).unwrap(),
-                        value: "user@example.com".to_string(),
+                        value: b"user@example.com".to_vec(),
                     }),
                 ),
                 (
                     "invalid key",
-                    ("invalid".to_string(), "value".to_string()),
+                    ("invalid".to_string(), b"value".to_vec()),
                     Err("Unknown attribute: invalid".to_string()),
                 ),
                 (
                     "value too long",
-                    ("email".to_string(), long_value),
+                    ("email".to_string(), long_value.into_bytes()),
                     Err(format!(
                         "Attribute value length {} exceeds limit of {} bytes",
                         long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
@@ -735,10 +762,10 @@ mod tests {
                         account_number: Some(7),
                         issued_at_timestamp_ns: 42,
                         attributes: vec![
-                            ("email".to_string(), "user@example.com".to_string()),
+                            ("email".to_string(), b"user@example.com".to_vec()),
                             (
                                 "openid:https://google.com:email".to_string(),
-                                "google@example.com".to_string(),
+                                b"google@example.com".to_vec(),
                             ),
                         ],
                     },
@@ -749,7 +776,7 @@ mod tests {
                             s.insert(
                                 Attribute::try_from((
                                     "email".to_string(),
-                                    "user@example.com".to_string(),
+                                    b"user@example.com".to_vec(),
                                 ))
                                 .unwrap(),
                             );
@@ -764,7 +791,7 @@ mod tests {
                                 s.insert(
                                     Attribute::try_from((
                                         "openid:https://google.com:email".to_string(),
-                                        "google@example.com".to_string(),
+                                        b"google@example.com".to_vec(),
                                     ))
                                     .unwrap(),
                                 );
@@ -782,16 +809,15 @@ mod tests {
                         account_number: None,
                         issued_at_timestamp_ns: 1,
                         attributes: vec![
-                            ("email".to_string(), "alias".to_string()),
-                            ("email".to_string(), "alias".to_string()),
+                            ("email".to_string(), b"alias".to_vec()),
+                            ("email".to_string(), b"alias".to_vec()),
                         ],
                     },
                     (111, None, 1, {
                         let mut m = BTreeMap::new();
                         let mut attrs = BTreeSet::new();
                         attrs.insert(
-                            Attribute::try_from(("email".to_string(), "alias".to_string()))
-                                .unwrap(),
+                            Attribute::try_from(("email".to_string(), b"alias".to_vec())).unwrap(),
                         );
                         m.insert(None, attrs);
                         m
@@ -830,8 +856,8 @@ mod tests {
                         account_number: None,
                         issued_at_timestamp_ns: 2,
                         attributes: vec![
-                            ("invalid".to_string(), "value".to_string()),
-                            ("email".to_string(), long_value),
+                            ("invalid".to_string(), b"value".to_vec()),
+                            ("email".to_string(), long_value.into_bytes()),
                         ],
                     },
                     vec![
@@ -855,7 +881,7 @@ mod tests {
                         account_number: None,
                         issued_at_timestamp_ns: 3,
                         attributes: (0..=MAX_ATTRIBUTES_PER_REQUEST)
-                            .map(|i| ("email".to_string(), format!("value-{i}")))
+                            .map(|i| ("email".to_string(), format!("value-{i}").into_bytes()))
                             .collect::<Vec<_>>(),
                     },
                     vec![format!(
