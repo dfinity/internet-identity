@@ -528,6 +528,8 @@ type AuthnMethodRegisterError = variant {
     RegistrationAlreadyInProgress;
     // The metadata of the provided authentication method contains invalid entries.
     InvalidMetadata : text;
+    // The caller's principal is not self-authenticating.
+    NotSelfAuthenticating : principal;
 };
 
 type AuthnMethodConfirmationError = variant {
