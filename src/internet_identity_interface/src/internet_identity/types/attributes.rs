@@ -200,7 +200,7 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct PrepareAttributeResponse {
     pub issued_at_timestamp_ns: Timestamp,
-    pub attributes: Vec<(String, String)>,
+    pub attributes: Vec<(String, Vec<u8>)>,
 }
 
 #[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
@@ -216,18 +216,18 @@ pub struct GetAttributesRequest {
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub issued_at_timestamp_ns: Timestamp,
-    pub attributes: Vec<(String, String)>,
+    pub attributes: Vec<(String, Vec<u8>)>,
 }
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub struct Attribute {
     pub key: AttributeKey,
-    pub value: String,
+    pub value: Vec<u8>,
 }
 
-impl TryFrom<(String, String)> for Attribute {
+impl TryFrom<(String, Vec<u8>)> for Attribute {
     type Error = String;
 
-    fn try_from(value: (String, String)) -> Result<Self, Self::Error> {
+    fn try_from(value: (String, Vec<u8>)) -> Result<Self, Self::Error> {
         let (key, value) = value;
 
         let key = AttributeKey::try_from(key)?;
@@ -316,7 +316,7 @@ impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
 #[derive(Debug, PartialEq, CandidType, Serialize, Deserialize, Eq, PartialOrd, Ord)]
 pub struct CertifiedAttribute {
     pub key: String,
-    pub value: String,
+    pub value: Vec<u8>,
     pub signature: Vec<u8>,
 }
 
@@ -558,20 +558,20 @@ mod tests {
             let test_cases = vec![
                 (
                     "valid",
-                    ("email".to_string(), "user@example.com".to_string()),
+                    ("email".to_string(), b"user@example.com".to_vec()),
                     Ok(Attribute {
                         key: AttributeKey::try_from("email".to_string()).unwrap(),
-                        value: "user@example.com".to_string(),
+                        value: b"user@example.com".to_vec(),
                     }),
                 ),
                 (
                     "invalid key",
-                    ("invalid".to_string(), "value".to_string()),
+                    ("invalid".to_string(), b"value".to_vec()),
                     Err("Unknown attribute: invalid".to_string()),
                 ),
                 (
                     "value too long",
-                    ("email".to_string(), long_value),
+                    ("email".to_string(), long_value.into_bytes()),
                     Err(format!(
                         "Attribute value length {} exceeds limit of {} bytes",
                         long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
@@ -600,10 +600,10 @@ mod tests {
                         account_number: Some(7),
                         issued_at_timestamp_ns: 42,
                         attributes: vec![
-                            ("email".to_string(), "user@example.com".to_string()),
+                            ("email".to_string(), b"user@example.com".to_vec()),
                             (
                                 "openid:google.com:email".to_string(),
-                                "google@example.com".to_string(),
+                                b"google@example.com".to_vec(),
                             ),
                         ],
                     },
@@ -614,7 +614,7 @@ mod tests {
                             s.insert(
                                 Attribute::try_from((
                                     "email".to_string(),
-                                    "user@example.com".to_string(),
+                                    b"user@example.com".to_vec(),
                                 ))
                                 .unwrap(),
                             );
@@ -629,7 +629,7 @@ mod tests {
                                 s.insert(
                                     Attribute::try_from((
                                         "openid:google.com:email".to_string(),
-                                        "google@example.com".to_string(),
+                                        b"google@example.com".to_vec(),
                                     ))
                                     .unwrap(),
                                 );
@@ -647,16 +647,15 @@ mod tests {
                         account_number: None,
                         issued_at_timestamp_ns: 1,
                         attributes: vec![
-                            ("email".to_string(), "alias".to_string()),
-                            ("email".to_string(), "alias".to_string()),
+                            ("email".to_string(), b"alias".to_vec()),
+                            ("email".to_string(), b"alias".to_vec()),
                         ],
                     },
                     (111, None, 1, {
                         let mut m = BTreeMap::new();
                         let mut attrs = BTreeSet::new();
                         attrs.insert(
-                            Attribute::try_from(("email".to_string(), "alias".to_string()))
-                                .unwrap(),
+                            Attribute::try_from(("email".to_string(), b"alias".to_vec())).unwrap(),
                         );
                         m.insert(None, attrs);
                         m
@@ -695,8 +694,8 @@ mod tests {
                         account_number: None,
                         issued_at_timestamp_ns: 2,
                         attributes: vec![
-                            ("invalid".to_string(), "value".to_string()),
-                            ("email".to_string(), long_value),
+                            ("invalid".to_string(), b"value".to_vec()),
+                            ("email".to_string(), long_value.into_bytes()),
                         ],
                     },
                     vec![
@@ -720,7 +719,7 @@ mod tests {
                         account_number: None,
                         issued_at_timestamp_ns: 3,
                         attributes: (0..=MAX_ATTRIBUTES_PER_REQUEST)
-                            .map(|i| ("email".to_string(), format!("value-{i}")))
+                            .map(|i| ("email".to_string(), format!("value-{i}").into_bytes()))
                             .collect::<Vec<_>>(),
                     },
                     vec![format!(
