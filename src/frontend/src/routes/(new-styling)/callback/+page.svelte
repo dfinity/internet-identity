@@ -120,7 +120,7 @@
           certified_attributes.map((attribute) => [
             attribute.key,
             {
-              value: attribute.value,
+              value: toBase64(new Uint8Array(attribute.value)),
               signature: toBase64(new Uint8Array(attribute.signature)),
               expiration: expires_at_timestamp_ns.toString(),
             },

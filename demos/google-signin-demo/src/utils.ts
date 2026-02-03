@@ -82,20 +82,16 @@ export const verifyCanisterSignature = async (
 const JsonnableCertifiedAttributesSchema = z.record(
   z.string(),
   z.object({
-    value: z.string(),
+    value: z.base64(),
     signature: z.base64(),
     expiration: z.string(),
   }),
 );
 
-export type JsonnableCertifiedAttributes = z.infer<
-  typeof JsonnableCertifiedAttributesSchema
->;
-
 const CertifiedAttributesSchema = z.record(
   z.string(),
   z.object({
-    value: z.string(),
+    value: z.instanceof(Uint8Array),
     signature: z.instanceof(Uint8Array),
     expiration: z.bigint(),
   }),
@@ -112,7 +108,7 @@ export const JsonToCertifiedAttributesCodec = z.codec(
         Object.entries(json).map(([key, { value, signature, expiration }]) => [
           key,
           {
-            value,
+            value: z.util.base64ToUint8Array(value),
             signature: z.util.base64ToUint8Array(signature),
             expiration: BigInt(expiration),
           },
@@ -123,7 +119,7 @@ export const JsonToCertifiedAttributesCodec = z.codec(
         Object.entries(data).map(([key, { value, signature, expiration }]) => [
           key,
           {
-            value,
+            value: z.util.uint8ArrayToBase64(value),
             signature: z.util.uint8ArrayToBase64(signature),
             expiration: expiration.toString(),
           },
@@ -183,7 +179,9 @@ export const authenticate = async (
             ) {
               throw new Error("Attributes response is missing result");
             }
-            return JsonToCertifiedAttributesCodec.parse(response.result);
+            return JsonToCertifiedAttributesCodec.parse(
+              response.result.attributes,
+            );
           })
       : Promise.resolve({});
 

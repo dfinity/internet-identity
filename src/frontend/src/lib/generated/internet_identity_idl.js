@@ -305,14 +305,14 @@ export const idlFactory = ({ IDL }) => {
   const GetAttributesRequest = IDL.Record({
     'origin' : FrontendHostname,
     'account_number' : IDL.Opt(AccountNumber),
-    'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)),
+    'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(IDL.Nat8))),
     'issued_at_timestamp_ns' : Timestamp,
     'identity_number' : IdentityNumber,
   });
   const CertifiedAttribute = IDL.Record({
     'key' : IDL.Text,
     'signature' : IDL.Vec(IDL.Nat8),
-    'value' : IDL.Text,
+    'value' : IDL.Vec(IDL.Nat8),
   });
   const CertifiedAttributes = IDL.Record({
     'expires_at_timestamp_ns' : Timestamp,
@@ -493,7 +493,7 @@ export const idlFactory = ({ IDL }) => {
     'identity_number' : IdentityNumber,
   });
   const PrepareAttributeResponse = IDL.Record({
-    'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)),
+    'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(IDL.Nat8))),
     'issued_at_timestamp_ns' : Timestamp,
   });
   const PrepareAttributeError = IDL.Variant({

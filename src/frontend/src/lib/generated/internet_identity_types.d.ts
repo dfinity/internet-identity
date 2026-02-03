@@ -282,7 +282,7 @@ export type CaptchaResult = ChallengeResult;
 export interface CertifiedAttribute {
   'key' : string,
   'signature' : Uint8Array | number[],
-  'value' : string,
+  'value' : Uint8Array | number[],
 }
 export interface CertifiedAttributes {
   'expires_at_timestamp_ns' : Timestamp,
@@ -444,7 +444,7 @@ export interface GetAttributesRequest {
    * The attribute to be retrieved, must be a subset of certified_attributes from
    * the prepare_attributes response.
    */
-  'attributes' : Array<[string, string]>,
+  'attributes' : Array<[string, Uint8Array | number[]]>,
   /**
    * Timestamp received from the prepare_attributes call.
    */
@@ -856,7 +856,7 @@ export interface PrepareAttributeRequest {
   'identity_number' : IdentityNumber,
 }
 export interface PrepareAttributeResponse {
-  'attributes' : Array<[string, string]>,
+  'attributes' : Array<[string, Uint8Array | number[]]>,
   'issued_at_timestamp_ns' : Timestamp,
 }
 export type PrepareIdAliasError = {

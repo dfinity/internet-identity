@@ -68,8 +68,8 @@ const App: React.FC = () => {
 
     // For this demo: Update interface with principal and email attribute
     setPrincipal(principal.toText());
-    setName(name);
-    setEmail(email);
+    setName(new TextDecoder().decode(name));
+    setEmail(new TextDecoder().decode(email));
     setIsSignedIn(true);
   };
 
