@@ -859,7 +859,7 @@ type PrepareAttributeError = variant {
 
 type PrepareAttributeResponse = record {
     issued_at_timestamp_ns : Timestamp;
-    attributes : vec record { text; text };
+    attributes : vec record { text; blob };
 };
 
 type GetAttributesRequest = record {
@@ -877,12 +877,12 @@ type GetAttributesRequest = record {
 
     // The attribute to be retrieved, must be a subset of certified_attributes from
     // the prepare_attributes response.
-    attributes : vec record { text; text };
+    attributes : vec record { text; blob };
 };
 
 type CertifiedAttribute = record {
     key : text;
-    value : text;
+    value : blob;
     signature : blob;
 };
 
