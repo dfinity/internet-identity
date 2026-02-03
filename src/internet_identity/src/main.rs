@@ -1298,7 +1298,8 @@ mod attribute_sharing {
     }
 }
 
-/// API for the attribute sharing mvp
+/// Legacy API for the original attribute sharing MVP (VC-based).
+/// The current attribute sharing protocol endpoints live in `mod attribute_sharing`.
 mod attribute_sharing_old_vc {
     use super::*;
 

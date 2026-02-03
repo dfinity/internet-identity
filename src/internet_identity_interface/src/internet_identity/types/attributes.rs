@@ -55,38 +55,45 @@ impl std::fmt::Display for AttributeScope {
 }
 
 /// Returns a possibly modified version of `s` that fits within the specified bounds (in terms of
-/// the number of UTF-8 characters).
+/// the number of bytes, not UTF-8 characters).
 ///
-/// More precisely, middle characters are removed such that the return value has at most `max_len`
-/// characters. Some examples:
+/// More precisely, end characters are removed such that the return value has at most `max_len`
+/// bytes. Some examples:
 /// ```
-/// println!("{}", clamp_string_len("abcdef", 5));  // a...f
-/// println!("{}", clamp_string_len("abcde", 5));   // abcde
-/// println!("{}", clamp_string_len("abcd", 5));    // abcd
+/// println!("{}", ellipsized("abcdef", 5));   // ab...
+/// println!("{}", ellipsized("abcde", 5));    // abcde
+/// println!("{}", ellipsized("abcd", 5));     // abcd
+/// println!("{}", ellipsized("y̆zy̆", 4));      // y̆zy
+/// println!("{}", ellipsized("y̆zy̆ooooo", 4)); // y...
 /// ```
 ///
-/// This is analogous to the clamp method on numeric types in that this bounds the value.
-pub fn clamp_string_len(s: &str, max_len: usize) -> String {
-    let ellipsis = "...";
-
-    // Collect into a vector so that we can safely index the input.
-    let chars: Vec<_> = s.chars().collect();
-
-    if max_len <= ellipsis.len() {
-        return chars.into_iter().take(max_len).collect();
+/// **Note**: This function respects UTF-8 character boundaries to ensure valid UTF-8 output,
+/// but does not respect grapheme cluster boundaries. This means combining diacritics or other
+/// multi-codepoint characters may be split, resulting in output that is not a visual prefix of
+/// the input (e.g., "y̆" may be truncated to just "y").
+pub fn ellipsized(s: &str, max_bytes: usize) -> String {
+    // Fast path: already fits.
+    if s.len() <= max_bytes {
+        return s.to_owned();
     }
 
-    if chars.len() <= max_len {
-        return s.to_string();
+    // Edge case: not enough room for "..."
+    if max_bytes <= 3 {
+        return ".".repeat(max_bytes);
     }
 
-    let mut end = max_len - ellipsis.len();
+    let keep_bytes = max_bytes - 3;
 
+    // Find the largest prefix ≤ keep_bytes that ends on a UTF-8 boundary.
+    let mut end = keep_bytes;
     while end > 0 && !s.is_char_boundary(end) {
         end -= 1;
     }
 
-    format!("{}{}", chars[..end].iter().collect::<String>(), ellipsis)
+    let mut out = String::with_capacity(max_bytes);
+    out.push_str(&s[..end]);
+    out.push_str("...");
+    out
 }
 
 /// https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#section-12.2.1
@@ -100,7 +107,7 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     if issuer.len() > OPENID_ISSUER_MAX_LENGTH {
         problems.push(format!(
             "Issuer `{}` in attribute scope is too long (max {} chars)",
-            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH),
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH),
             OPENID_ISSUER_MAX_LENGTH
         ));
     }
@@ -108,21 +115,21 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     if !issuer.starts_with("https://") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must start with https://)",
-            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH)
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
     if issuer.contains("?") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must not contain query '?' characters)",
-            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH)
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
     if issuer.contains("#") {
         problems.push(format!(
             "Invalid issuer `{}` in attribute scope (must not contain fragment '#' characters)",
-            clamp_string_len(issuer, OPENID_ISSUER_MAX_LENGTH)
+            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
         ));
     }
 
@@ -422,6 +429,89 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq as pretty_assert_eq;
 
+    mod ellipsized_tests {
+        use super::*;
+
+        #[test]
+        fn test_ellipsized() {
+            let test_cases = vec![
+                // Fast path: already fits
+                ("already fits", "abcde", 5, "abcde"),
+                ("shorter than limit", "abcd", 5, "abcd"),
+                ("empty string", "", 5, ""),
+                ("empty string with zero limit", "", 0, ""),
+                // Needs truncation
+                ("basic truncation", "abcdef", 5, "ab..."),
+                ("truncate long string", "abcdefghij", 8, "abcde..."),
+                // Edge cases with max_bytes <= 3
+                ("max_bytes 0", "abc", 0, ""),
+                ("max_bytes 1", "abc", 1, "."),
+                ("max_bytes 2", "abc", 2, ".."),
+                ("max_bytes 3", "abc", 3, "abc"),
+                ("max_bytes 3 long string", "abcdef", 3, "..."),
+                // UTF-8 boundary handling (combining diacritics)
+                // y̆ is 'y' (1 byte) + combining breve U+0306 (2 bytes) = 3 bytes total
+                // "y̆zy̆" = 7 bytes total
+                ("utf8 boundary case 1", "y̆zy̆", 4, "y..."), // Only 'y' (1 byte) + '...' fits
+                ("utf8 boundary case 2", "y̆zy̆", 7, "y̆zy̆"),  // Exactly fits
+                ("utf8 boundary case 3", "y̆zy̆ooooo", 10, "y̆zy̆..."), // "y̆zy̆" (7 bytes) + "..." (3 bytes)
+                // More UTF-8 tests
+                ("emoji", "😀😀😀😀", 8, "😀..."), // Each emoji is 4 bytes
+                ("mixed ascii and emoji", "hi😀😀", 6, "hi😀"),
+                ("japanese", "こんにちは", 9, "こん..."), // Each char is 3 bytes
+                // Boundary condition at exactly the limit
+                ("exactly at limit", "12345", 5, "12345"),
+                ("one over limit", "123456", 5, "12..."),
+            ];
+
+            for (label, input, max_bytes, expected) in test_cases {
+                let result = ellipsized(input, max_bytes);
+                pretty_assert_eq!(
+                    result,
+                    expected,
+                    "Failed test case: {} (input: {:?}, max_bytes: {})",
+                    label,
+                    input,
+                    max_bytes
+                );
+            }
+        }
+
+        #[test]
+        fn test_ellipsized_preserves_utf8() {
+            // Ensure we never produce invalid UTF-8
+            let test_strings = vec![
+                "hello world",
+                "こんにちは世界",
+                "Hello 世界 🌍",
+                "y̆zy̆",
+                "Ñoño",
+                "Zürich",
+            ];
+
+            for s in test_strings {
+                for max_bytes in 0..=s.len() + 5 {
+                    let result = ellipsized(s, max_bytes);
+                    // Should always be valid UTF-8
+                    assert!(
+                        result.is_ascii() || std::str::from_utf8(result.as_bytes()).is_ok(),
+                        "ellipsized produced invalid UTF-8 for input: {:?}, max_bytes: {}",
+                        s,
+                        max_bytes
+                    );
+                    // Should not exceed max_bytes
+                    assert!(
+                        result.len() <= max_bytes,
+                        "ellipsized exceeded max_bytes: {} > {} for input: {:?}",
+                        result.len(),
+                        max_bytes,
+                        s
+                    );
+                }
+            }
+        }
+    }
+
     mod attribute_key_tests {
         use super::*;
 
@@ -475,8 +565,8 @@ mod tests {
             let too_long_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH - 7));
             let too_long_input = format!("openid:{}", too_long_issuer);
             let too_long_error = format!(
-                "Invalid issuer in attribute scope: Issuer `{}` in attribute scope is too long (max {} chars)",
-                clamp_string_len(too_long_issuer.as_str(), OPENID_ISSUER_MAX_LENGTH),
+                "Invalid issuer in attribute scope: Issuer `{}...` in attribute scope is too long (max {} chars)",
+                too_long_issuer[..OPENID_ISSUER_MAX_LENGTH-"...".len()].to_string(),
                 OPENID_ISSUER_MAX_LENGTH
             );
 

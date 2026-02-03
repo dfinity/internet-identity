@@ -1,4 +1,4 @@
-//! Tests related to prepare_delegation, get_delegation and get_principal II canister calls.
+//! Tests related to prepare_attributes and get_attributes II canister calls.
 
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
