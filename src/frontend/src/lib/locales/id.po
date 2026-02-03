@@ -287,6 +287,9 @@ msgstr "Rasakan"
 msgid "Export JSON"
 msgstr ""
 
+msgid "FAQ & Support"
+msgstr ""
+
 msgid "FAQs"
 msgstr "Pertanyaan yang Sering Diajukan"
 
@@ -298,9 +301,6 @@ msgstr "Misalnya, pengguna A masuk ke Internet Identity dengan akun Google merek
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Lupakan tentang mengingat nama pengguna dan kata sandi yang rumit. Dengan passkey, Anda cukup memilih nama Anda untuk masuk — cepat, aman, dan mudah."
-
-msgid "Forgot your identity number?"
-msgstr ""
 
 msgid "Full control"
 msgstr "Kontrol penuh"
@@ -331,9 +331,6 @@ msgstr "Buka aplikasi - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
 msgstr "Belum digunakan"
-
-msgid "Help"
-msgstr ""
 
 msgid "Help & FAQ"
 msgstr "Bantuan & FAQ"
@@ -516,6 +513,9 @@ msgid "Long-press the link that opened this page."
 msgstr "Tekan lama tautan yang membuka halaman ini."
 
 msgid "Lookup by passkey"
+msgstr ""
+
+msgid "Lookup identity"
 msgstr ""
 
 msgid "Lost access to your identity?"
