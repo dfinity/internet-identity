@@ -15,12 +15,6 @@ use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
-const CANISTER_SIGNATURE_OID: [u8; 14] = [
-    0x30, 0x0c, // SEQUENCE
-    0x06, 0x0a, // OID with 10 bytes
-    0x2b, 0x06, 0x01, 0x04, 0x01, 0x83, 0xb8, 0x43, 0x01, 0x02, // OID DFINITY
-];
-
 fn verify_delegation_and_attribute_signatures(
     env: &PocketIc,
     session_public_key: ByteBuf,
