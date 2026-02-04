@@ -50,11 +50,11 @@ fn verify_delegation_and_attribute_signatures(
 
     assert_eq!(canister_id, ii_backend_canister_id);
 
-    verify_delegation(&env, user_key.clone(), &signed_delegation, &root_key);
+    verify_delegation(env, user_key.clone(), &signed_delegation, &root_key);
 
     for attribute in &attributes {
         verify_attribute(
-            &env,
+            env,
             user_key.clone(),
             attribute,
             attribute_expiration,
