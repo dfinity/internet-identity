@@ -6,13 +6,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 // TODO: Refer to the same constant as in `internet_identity::delegation::check_frontend_length`
-pub const FRONTEND_HOSTNAME_LIMIT: usize = 255;
+pub const FRONTEND_HOSTNAME_MAX_BYTES: usize = 255;
 
 pub const MAX_ATTRIBUTES_PER_REQUEST: usize = 100;
 
-pub const MAX_ATTRIBUTE_VALUE_LENGTH: usize = 50_000;
+pub const ATTRIBUTE_VALUE_MAX_BYTES: usize = 50_000;
 
-pub const OPENID_ISSUER_MAX_LENGTH: usize = 1024;
+pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub enum AttributeName {
@@ -101,36 +101,29 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     let mut problems = vec![];
 
     if issuer.is_empty() {
-        problems.push("Empty issuer".to_string());
+        problems.push("empty issuer".to_string());
     }
 
-    if issuer.len() > OPENID_ISSUER_MAX_LENGTH {
+    if issuer.len() > OPENID_ISSUER_MAX_BYTES {
         problems.push(format!(
-            "Issuer `{}` in attribute scope is too long (max {} chars)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH),
-            OPENID_ISSUER_MAX_LENGTH
+            "must not exceed {} bytes (got {} bytes)",
+            OPENID_ISSUER_MAX_BYTES,
+            issuer.len(),
         ));
     }
 
     if !issuer.starts_with("https://") {
-        problems.push(format!(
-            "Invalid issuer `{}` in attribute scope (must start with https://)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
-        ));
+        problems.push("must start with `https://`".to_string());
     }
 
+    // This check is overly strict, but we keep it for now to avoid pulling in a URL parser.
     if issuer.contains("?") {
-        problems.push(format!(
-            "Invalid issuer `{}` in attribute scope (must not contain query '?' characters)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
-        ));
+        problems.push("must not contain query '?' characters".to_string());
     }
 
+    // This check is overly strict, but we keep it for now to avoid pulling in a URL parser.
     if issuer.contains("#") {
-        problems.push(format!(
-            "Invalid issuer `{}` in attribute scope (must not contain fragment '#' characters)",
-            ellipsized(issuer, OPENID_ISSUER_MAX_LENGTH)
-        ));
+        problems.push("must not contain fragment '#' characters".to_string());
     }
 
     if !problems.is_empty() {
@@ -160,8 +153,13 @@ impl TryFrom<&str> for AttributeScope {
                     .ok_or_else(|| format!("Missing issuer in attribute scope: {}", value))?
                     .to_string();
 
-                validate_openid_credential_issuer_identifier(&issuer)
-                    .map_err(|err| format!("Invalid issuer in attribute scope: {}", err))?;
+                validate_openid_credential_issuer_identifier(&issuer).map_err(|err| {
+                    format!(
+                        "Invalid issuer `{}` in attribute scope: {}",
+                        ellipsized(&issuer, OPENID_ISSUER_MAX_BYTES),
+                        err
+                    )
+                })?;
 
                 Ok(AttributeScope::OpenId { issuer })
             }
@@ -240,11 +238,11 @@ impl TryFrom<PrepareAttributeRequest> for ValidatedPrepareAttributeRequest {
 
         let mut problems = Vec::new();
 
-        if origin.len() > FRONTEND_HOSTNAME_LIMIT {
+        if origin.len() > FRONTEND_HOSTNAME_MAX_BYTES {
             problems.push(format!(
                 "Frontend hostname length {} exceeds limit of {} bytes",
                 origin.len(),
-                FRONTEND_HOSTNAME_LIMIT
+                FRONTEND_HOSTNAME_MAX_BYTES
             ));
         }
 
@@ -323,11 +321,11 @@ impl TryFrom<(String, Vec<u8>)> for Attribute {
 
         let key = AttributeKey::try_from(key)?;
 
-        if value.len() > MAX_ATTRIBUTE_VALUE_LENGTH {
+        if value.len() > ATTRIBUTE_VALUE_MAX_BYTES {
             return Err(format!(
                 "Attribute value length {} exceeds limit of {} bytes",
                 value.len(),
-                MAX_ATTRIBUTE_VALUE_LENGTH
+                ATTRIBUTE_VALUE_MAX_BYTES
             ));
         }
 
@@ -358,11 +356,11 @@ impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
 
         let mut problems = Vec::new();
 
-        if origin.len() > FRONTEND_HOSTNAME_LIMIT {
+        if origin.len() > FRONTEND_HOSTNAME_MAX_BYTES {
             problems.push(format!(
                 "Frontend hostname length {} exceeds limit of {} bytes",
                 origin.len(),
-                FRONTEND_HOSTNAME_LIMIT
+                FRONTEND_HOSTNAME_MAX_BYTES
             ));
         }
 
@@ -457,7 +455,7 @@ mod tests {
                 ("utf8 boundary case 3", "y̆zy̆ooooo", 10, "y̆zy̆..."), // "y̆zy̆" (7 bytes) + "..." (3 bytes)
                 // More UTF-8 tests
                 ("emoji", "😀😀😀😀", 8, "😀..."), // Each emoji is 4 bytes
-                ("mixed ascii and emoji", "hi😀😀", 6, "hi😀"),
+                ("mixed ascii and emoji", "hi😀😀", 6, "hi..."),
                 ("japanese", "こんにちは", 9, "こん..."), // Each char is 3 bytes
                 // Boundary condition at exactly the limit
                 ("exactly at limit", "12345", 5, "12345"),
@@ -559,15 +557,14 @@ mod tests {
         #[test]
         fn test_attribute_scope_conversions() {
             // Create owned strings for dynamic test cases to avoid lifetime issues
-            let max_length_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH - 8));
+            let max_length_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_BYTES - 8));
             let max_length_input = format!("openid:{}", max_length_issuer);
 
-            let too_long_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_LENGTH - 7));
+            let too_long_issuer = format!("https://{}", "a".repeat(OPENID_ISSUER_MAX_BYTES - 7));
             let too_long_input = format!("openid:{}", too_long_issuer);
             let too_long_error = format!(
-                "Invalid issuer in attribute scope: Issuer `{}...` in attribute scope is too long (max {} chars)",
-                too_long_issuer[..OPENID_ISSUER_MAX_LENGTH-"...".len()].to_string(),
-                OPENID_ISSUER_MAX_LENGTH
+                "Invalid issuer `{}...` in attribute scope: must not exceed 1024 bytes (got 1025 bytes)",
+                &too_long_issuer[..OPENID_ISSUER_MAX_BYTES - "...".len()],
             );
 
             let test_cases: Vec<(&str, &str, Result<AttributeScope, String>)> = vec![
@@ -595,13 +592,13 @@ mod tests {
                 (
                     "openid extra colon",
                     "openid::",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `:` in attribute scope (must start with https://)".to_string()),
+                    Err("Invalid issuer `:` in attribute scope: must start with `https://`".to_string()),
                 ),
                 (
                     "openid missing issuer",
                     "openid:",
-                    Err("Invalid issuer in attribute scope: Empty issuer, Invalid issuer `` in attribute scope (must start with https://)".to_string()),
-                ),
+                    Err("Invalid issuer `` in attribute scope: empty issuer, must start with `https://`".to_string()),
+                ),  
                 (
                     "openid no colon",
                     "openid",
@@ -616,34 +613,34 @@ mod tests {
                 (
                     "http instead of https",
                     "openid:http://google.com",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `http://google.com` in attribute scope (must start with https://)".to_string()),
-                ),
+                    Err("Invalid issuer `http://google.com` in attribute scope: must start with `https://`".to_string()),
+                ),  
                 (
                     "no protocol",
                     "openid:google.com",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `google.com` in attribute scope (must start with https://)".to_string()),
+                    Err("Invalid issuer `google.com` in attribute scope: must start with `https://`".to_string()),
                 ),
                 // Test query parameter rejection
                 (
                     "issuer with query parameter",
                     "openid:https://google.com?param=value",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com?param=value` in attribute scope (must not contain query '?' characters)".to_string()),
+                    Err("Invalid issuer `https://google.com?param=value` in attribute scope: must not contain query '?' characters".to_string()),
                 ),
                 (
                     "issuer with multiple query parameters",
                     "openid:https://google.com?foo=bar&baz=qux",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com?foo=bar&baz=qux` in attribute scope (must not contain query '?' characters)".to_string()),
+                    Err("Invalid issuer `https://google.com?foo=bar&baz=qux` in attribute scope: must not contain query '?' characters".to_string()),
                 ),
                 // Test fragment rejection
                 (
                     "issuer with fragment",
                     "openid:https://google.com#section",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com#section` in attribute scope (must not contain fragment '#' characters)".to_string()),
+                    Err("Invalid issuer `https://google.com#section` in attribute scope: must not contain fragment '#' characters".to_string()),
                 ),
                 (
                     "issuer with query and fragment",
                     "openid:https://google.com?param=value#section",
-                    Err("Invalid issuer in attribute scope: Invalid issuer `https://google.com?param=value#section` in attribute scope (must not contain query '?' characters), Invalid issuer `https://google.com?param=value#section` in attribute scope (must not contain fragment '#' characters)".to_string()),
+                    Err("Invalid issuer `https://google.com?param=value#section` in attribute scope: must not contain query '?' characters, must not contain fragment '#' characters".to_string()),
                 ),
                 // Test IPv6 address support
                 (
@@ -804,7 +801,7 @@ mod tests {
 
         #[test]
         fn test_attribute_conversions() {
-            let long_value = "x".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
+            let long_value = "x".repeat(ATTRIBUTE_VALUE_MAX_BYTES + 1);
             let long_value_len = long_value.len();
 
             let test_cases = vec![
@@ -826,7 +823,7 @@ mod tests {
                     ("email".to_string(), long_value.into_bytes()),
                     Err(format!(
                         "Attribute value length {} exceeds limit of {} bytes",
-                        long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
+                        long_value_len, ATTRIBUTE_VALUE_MAX_BYTES
                     )),
                 ),
             ];
@@ -933,8 +930,8 @@ mod tests {
 
         #[test]
         fn test_try_from_invalid_get_attributes_requests() {
-            let long_origin = "x".repeat(FRONTEND_HOSTNAME_LIMIT + 1);
-            let long_value = "y".repeat(MAX_ATTRIBUTE_VALUE_LENGTH + 1);
+            let long_origin = "x".repeat(FRONTEND_HOSTNAME_MAX_BYTES + 1);
+            let long_value = "y".repeat(ATTRIBUTE_VALUE_MAX_BYTES + 1);
             let long_value_len = long_value.len();
 
             let test_cases = vec![
@@ -954,12 +951,12 @@ mod tests {
                         format!(
                             "Frontend hostname length {} exceeds limit of {} bytes",
                             long_origin.len(),
-                            FRONTEND_HOSTNAME_LIMIT
+                            FRONTEND_HOSTNAME_MAX_BYTES
                         ),
                         "Unknown attribute: invalid".to_string(),
                         format!(
                             "Attribute value length {} exceeds limit of {} bytes",
-                            long_value_len, MAX_ATTRIBUTE_VALUE_LENGTH
+                            long_value_len, ATTRIBUTE_VALUE_MAX_BYTES
                         ),
                     ],
                 ),
