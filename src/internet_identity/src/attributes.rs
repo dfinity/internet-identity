@@ -1,8 +1,8 @@
 use crate::{
-    openid::{OpenIdCredential, OpenIdCredentialKey, OPENID_SESSION_DURATION_NS},
+    openid::{OpenIdCredential, OpenIdCredentialKey},
     state,
     storage::{account::Account, anchor::Anchor},
-    update_root_hash,
+    update_root_hash, MINUTE_NS,
 };
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
 use ic_representation_independent_hash::{representation_independent_hash, Value};
@@ -20,7 +20,7 @@ const ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ii-request-attribute";
 
 /// Duration for which attribute certifications are valid. Does not strictly need to be the same
 /// as `OPENID_SESSION_DURATION_NS`, but for simplicity we keep them aligned for now.
-const ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS: u64 = OPENID_SESSION_DURATION_NS;
+const ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 fn expiration_timestamp_ns(issued_at_timestamp_ns: Timestamp) -> Timestamp {
     issued_at_timestamp_ns.saturating_add(ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS)
