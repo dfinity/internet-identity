@@ -21,7 +21,6 @@
   import { z } from "zod";
   import {
     AttributesParamsSchema,
-    DelegationParams,
     DelegationParamsSchema,
     DelegationResultSchema,
     JsonRequest,
