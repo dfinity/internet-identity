@@ -66,7 +66,9 @@
     "name": "Juno",
     "oneLiner": "Build Web3 at Lightning Speed",
     "website": "https://juno.build",
-    "authOrigins": ["https://console.juno.build"],
+    "authOrigins": [
+      "https://console.juno.build"
+    ],
     "logo": "juno_logo.svg"
   },
   {
@@ -323,18 +325,6 @@
     "website": "https://d7dm6-sqaaa-aaaag-qcgma-cai.icp0.io/",
     "oneLiner": "Your AI-powered companion for simplifying and streamlining the Motoko coding experience.",
     "logo": "motokopilot_logo.png"
-  },
-  {
-    "name": "NOBLEBLOCKS",
-    "website": "https://www.nobleblocks.com",
-    "logo": "nobleblocks_logo.webp",
-    "oneLiner": "A Community-Driven DeSci Project for Scientific Publishing"
-  },
-  {
-    "name": "John Dao",
-    "website": "https://johndao.gg",
-    "logo": "john-dao_logo.webp",
-    "oneLiner": "A Twitter/X account controlled by a DAO on the Internet Computer"
   },
   {
     "name": "aVa",
@@ -690,7 +680,10 @@
     "name": "Caffeine",
     "oneLiner": "Self-writing apps platform: the first complete tech stack designed for AI.",
     "website": "https://caffeine.ai",
-    "authOrigins": ["https://caffeine.ai", "https://app.caffeine.ai"],
+    "authOrigins": [
+      "https://caffeine.ai",
+      "https://app.caffeine.ai"
+    ],
     "logo": "caffeine_logo.svg",
     "logoDark": "caffeine_logo_dark.svg"
   }
