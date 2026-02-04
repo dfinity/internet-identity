@@ -402,14 +402,14 @@ impl TryFrom<GetAttributesRequest> for ValidatedGetAttributesRequest {
     }
 }
 
-#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, CandidType, Serialize, Deserialize, Eq, PartialOrd, Ord)]
 pub struct CertifiedAttribute {
     pub key: String,
     pub value: Vec<u8>,
     pub signature: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub struct CertifiedAttributes {
     pub certified_attributes: Vec<CertifiedAttribute>,
     pub expires_at_timestamp_ns: Timestamp,
