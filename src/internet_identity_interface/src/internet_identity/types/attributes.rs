@@ -57,7 +57,7 @@ impl std::fmt::Display for AttributeScope {
 /// Returns a possibly modified version of `s` that fits within the specified bounds (in terms of
 /// the number of bytes, not UTF-8 characters).
 ///
-/// More precisely, end characters are removed such that the return value has at most `max_len`
+/// More precisely, end characters are removed such that the return value has at most `max_bytes`
 /// bytes. Some examples:
 /// ```
 /// println!("{}", ellipsized("abcdef", 5));   // ab...
@@ -118,12 +118,12 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
 
     // This check is overly strict, but we keep it for now to avoid pulling in a URL parser.
     if issuer.contains("?") {
-        problems.push("must not contain query '?' characters".to_string());
+        problems.push("must not contain '?'".to_string());
     }
 
     // This check is overly strict, but we keep it for now to avoid pulling in a URL parser.
     if issuer.contains("#") {
-        problems.push("must not contain fragment '#' characters".to_string());
+        problems.push("must not contain '#'".to_string());
     }
 
     if !problems.is_empty() {
@@ -598,7 +598,7 @@ mod tests {
                     "openid missing issuer",
                     "openid:",
                     Err("Invalid issuer `` in attribute scope: empty issuer, must start with `https://`".to_string()),
-                ),  
+                ),
                 (
                     "openid no colon",
                     "openid",
@@ -614,7 +614,7 @@ mod tests {
                     "http instead of https",
                     "openid:http://google.com",
                     Err("Invalid issuer `http://google.com` in attribute scope: must start with `https://`".to_string()),
-                ),  
+                ),
                 (
                     "no protocol",
                     "openid:google.com",
@@ -624,23 +624,23 @@ mod tests {
                 (
                     "issuer with query parameter",
                     "openid:https://google.com?param=value",
-                    Err("Invalid issuer `https://google.com?param=value` in attribute scope: must not contain query '?' characters".to_string()),
+                    Err("Invalid issuer `https://google.com?param=value` in attribute scope: must not contain '?'".to_string()),
                 ),
                 (
                     "issuer with multiple query parameters",
                     "openid:https://google.com?foo=bar&baz=qux",
-                    Err("Invalid issuer `https://google.com?foo=bar&baz=qux` in attribute scope: must not contain query '?' characters".to_string()),
+                    Err("Invalid issuer `https://google.com?foo=bar&baz=qux` in attribute scope: must not contain '?'".to_string()),
                 ),
                 // Test fragment rejection
                 (
                     "issuer with fragment",
                     "openid:https://google.com#section",
-                    Err("Invalid issuer `https://google.com#section` in attribute scope: must not contain fragment '#' characters".to_string()),
+                    Err("Invalid issuer `https://google.com#section` in attribute scope: must not contain '#'".to_string()),
                 ),
                 (
                     "issuer with query and fragment",
                     "openid:https://google.com?param=value#section",
-                    Err("Invalid issuer `https://google.com?param=value#section` in attribute scope: must not contain query '?' characters, must not contain fragment '#' characters".to_string()),
+                    Err("Invalid issuer `https://google.com?param=value#section` in attribute scope: must not contain '?', must not contain '#'".to_string()),
                 ),
                 // Test IPv6 address support
                 (
