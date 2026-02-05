@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Delegation, DelegationChain } from "@icp-sdk/core/identity";
 import { type Signature } from "@icp-sdk/core/agent";
-import { AuthRequest } from "$lib/legacy/flows/authorize/postMessageInterface";
+import { Principal } from "@icp-sdk/core/principal";
 
 export interface ChannelOptions {
   allowedOrigin?: string;
@@ -186,32 +186,65 @@ export const DelegationResultSchema = z.codec(
   },
 );
 
-export const AuthRequestToDelegationParamsCodec = z.codec(
-  AuthRequest,
-  DelegationParamsCodec,
+// Legacy auth request message
+export const AuthRequestCodec = z.codec(
+  z.object({
+    kind: z.literal("authorize-client"),
+    sessionPublicKey: z.union([z.instanceof(Uint8Array), z.base64()]),
+    maxTimeToLive: z.optional(z.union([z.string(), z.number(), z.bigint()])),
+    derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
+    allowPinAuthentication: z.optional(z.boolean()),
+    autoSelectionPrincipal: z.optional(z.string()),
+  }),
+  z.object({
+    kind: z.literal("authorize-client"),
+    sessionPublicKey: z.instanceof(Uint8Array),
+    maxTimeToLive: z.optional(z.bigint()),
+    derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
+    allowPinAuthentication: z.optional(z.boolean()),
+    autoSelectionPrincipal: z.optional(
+      z.custom<Principal>((arg) => arg instanceof Principal),
+    ),
+  }),
   {
-    decode: (request) => ({
-      publicKey: Base64ToBytesCodec.encode(request.sessionPublicKey),
+    decode: ({
+      kind,
+      sessionPublicKey,
+      maxTimeToLive,
+      derivationOrigin,
+      allowPinAuthentication,
+      autoSelectionPrincipal,
+    }) => ({
+      kind,
+      sessionPublicKey:
+        typeof sessionPublicKey === "string"
+          ? z.util.base64ToUint8Array(sessionPublicKey)
+          : sessionPublicKey,
       maxTimeToLive:
-        request.maxTimeToLive !== undefined
-          ? StringToBigIntCodec.encode(request.maxTimeToLive)
-          : undefined,
-      icrc95DerivationOrigin:
-        request.derivationOrigin !== undefined
-          ? OriginSchema.parse(request.derivationOrigin)
+        maxTimeToLive !== undefined ? BigInt(maxTimeToLive) : undefined,
+      derivationOrigin,
+      allowPinAuthentication,
+      autoSelectionPrincipal:
+        autoSelectionPrincipal !== undefined
+          ? Principal.fromText(autoSelectionPrincipal)
           : undefined,
     }),
-    encode: (params) => ({
-      kind: "authorize-client" as const,
-      sessionPublicKey: Base64ToBytesCodec.decode(params.publicKey),
-      maxTimeToLive:
-        params.maxTimeToLive !== undefined
-          ? StringToBigIntCodec.decode(params.maxTimeToLive)
-          : undefined,
-      derivationOrigin:
-        params.icrc95DerivationOrigin !== undefined
-          ? OriginSchema.parse(params.icrc95DerivationOrigin)
-          : undefined,
+    encode: ({
+      kind,
+      sessionPublicKey,
+      maxTimeToLive,
+      derivationOrigin,
+      allowPinAuthentication,
+      autoSelectionPrincipal,
+    }) => ({
+      kind,
+      sessionPublicKey: z.util.uint8ArrayToBase64(sessionPublicKey),
+      maxTimeToLive: maxTimeToLive?.toString(),
+      derivationOrigin,
+      allowPinAuthentication,
+      autoSelectionPrincipal: autoSelectionPrincipal?.toText(),
     }),
   },
 );
+
+export type AuthRequest = z.output<typeof AuthRequestCodec>;

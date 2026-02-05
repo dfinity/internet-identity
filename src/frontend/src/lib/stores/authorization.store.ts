@@ -1,5 +1,4 @@
 import { type Readable, derived, writable, get } from "svelte/store";
-import { AuthRequest } from "$lib/legacy/flows/authorize/postMessageInterface";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { remapToLegacyDomain } from "$lib/utils/iiConnection";
 import {
@@ -12,7 +11,7 @@ import { features } from "$lib/legacy/features";
 import { canisterConfig } from "$lib/globals";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { DelegationChain } from "@icp-sdk/core/identity";
-import { DelegationParams } from "$lib/utils/transport/utils";
+import { AuthRequest, DelegationParams } from "$lib/utils/transport/utils";
 
 export type AuthorizationContext = {
   authRequest: AuthRequest; // Additional details e.g. derivation origin

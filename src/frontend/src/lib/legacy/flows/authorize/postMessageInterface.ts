@@ -11,13 +11,7 @@ import {
 import { loginFunnel } from "$lib/utils/analytics/loginFunnel";
 import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
-import { Principal } from "@icp-sdk/core/principal";
-import { z } from "zod";
-import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
-import {
-  OriginSchema,
-  StringOrNumberToBigIntCodec,
-} from "$lib/utils/transport/utils";
+import { type AuthRequest, AuthRequestCodec } from "$lib/utils/transport/utils";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -42,26 +36,6 @@ export interface AuthContext {
    */
   requestOrigin: string;
 }
-
-const StringToPrincipalCodec = z.codec(
-  z.string(),
-  z.custom<Principal>((arg) => arg instanceof Principal),
-  {
-    decode: (str) => Principal.fromText(str),
-    encode: (principal) => principal.toText(),
-  },
-);
-
-export const AuthRequest = z.object({
-  kind: z.literal("authorize-client"),
-  sessionPublicKey: z.instanceof(Uint8Array),
-  maxTimeToLive: z.optional(z.lazy(() => StringOrNumberToBigIntCodec)),
-  derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
-  allowPinAuthentication: z.optional(z.boolean()),
-  autoSelectionPrincipal: z.optional(StringToPrincipalCodec),
-});
-
-export type AuthRequest = z.output<typeof AuthRequest>;
 
 export type AuthResponse =
   | {
@@ -102,13 +76,8 @@ export async function authenticationProtocol({
   "orphan" | "closed" | "invalid" | "success" | "failure" | "unverified-origin"
 > {
   authorizeClientFunnel.init();
-  const primaryOrigin = getPrimaryOrigin();
-  const isEmbedded =
-    primaryOrigin !== undefined &&
-    window.origin === primaryOrigin &&
-    window.self !== window.top;
 
-  if (window.opener === null && !isEmbedded) {
+  if (window.opener === null) {
     if (window.history.length > 1) {
       // If there's no `window.opener` and a user has manually navigated to "/#authorize".
       // Signal that there will never be an authentication request incoming.
@@ -206,8 +175,6 @@ const waitForRequest = (): Promise<
       kind: "received";
       request: AuthRequest;
       origin: string;
-      // Optional trusted II origin that forwarded the message
-      forwardFromOrigin?: string;
     }
   | { kind: "timeout" }
   | { kind: "invalid" }
@@ -223,20 +190,8 @@ const waitForRequest = (): Promise<
         console.warn("Ignoring message from own origin", event);
         return;
       }
-      const {
-        message,
-        origin,
-        forwardFromOrigin,
-      }: { message: unknown; origin: string; forwardFromOrigin?: string } =
-        canisterConfig.related_origins[0]?.includes(event.origin) === true &&
-        false // isForwardedMessage(event)
-          ? {
-              message: event.data.__ii_forwarded.data,
-              origin: event.data.__ii_forwarded.origin,
-              forwardFromOrigin: event.origin,
-            }
-          : { message: event.data, origin: event.origin };
-      const result = AuthRequest.safeParse(message);
+
+      const result = AuthRequestCodec.safeParse(event.data);
 
       if (!result.success) {
         const message = `Unexpected error: flow request ` + result.error;
@@ -260,8 +215,7 @@ const waitForRequest = (): Promise<
       resolve({
         kind: "received",
         request: result.data,
-        origin,
-        forwardFromOrigin,
+        origin: event.origin,
       });
     };
 

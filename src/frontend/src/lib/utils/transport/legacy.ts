@@ -6,14 +6,14 @@ import {
   type JsonResponse,
   type Transport,
   DelegationResultSchema,
-  AuthRequestToDelegationParamsCodec,
-  DelegationParamsCodec,
   OriginSchema,
+  AuthRequestCodec,
+  AuthRequest,
+  DelegationParamsCodec,
 } from "$lib/utils/transport/utils";
 import {
   AuthReady,
-  AuthRequest,
-  AuthResponse,
+  type AuthResponse,
 } from "$lib/legacy/flows/authorize/postMessageInterface";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 
@@ -36,20 +36,20 @@ const cleanRedirectHash = () => {
   window.history.replaceState(undefined, "", url);
 };
 
-const delegationParamsFromAuthRequest = (authRequest: AuthRequest) => {
-  return DelegationParamsCodec.encode(
-    AuthRequestToDelegationParamsCodec.decode(AuthRequest.encode(authRequest)),
-  );
-};
-
 const redirectWithMessage = (
   targetOrigin: string,
   message: RedirectMessage,
 ) => {
   // Assign to hash to avoid sending message to server (keeps it client side)
   const redirectURL = new URL(targetOrigin);
+  redirectURL.pathname = "/authorize";
   const searchParams = new URLSearchParams();
-  searchParams.set("redirect_message", JSON.stringify(message));
+  searchParams.set(
+    "redirect_message",
+    JSON.stringify(message, (_, value) =>
+      typeof value === "bigint" ? value.toString() : value,
+    ),
+  );
   redirectURL.hash = searchParams.toString();
 
   // Use an anchor so that we can override referrer policy
@@ -81,7 +81,7 @@ const getRedirectMessage = ():
   }
   return {
     sourceOrigin: referrer.origin,
-    message: RedirectMessageSchema.parse(message),
+    message: RedirectMessageSchema.parse(JSON.parse(message)),
   };
 };
 
@@ -120,13 +120,18 @@ class LegacyChannel implements Channel {
       return () => this.#closeListeners.delete(listener);
     }
 
-    if (event === "request" && this.#authRequest) {
+    const authRequest = this.#authRequest;
+    if (event === "request" && authRequest !== undefined) {
       // Replay auth request if it didn't get a response yet
       listener({
         id: AUTHORIZE_REQUEST_ID,
         jsonrpc: "2.0",
         method: "icrc34_delegation",
-        params: delegationParamsFromAuthRequest(this.#authRequest),
+        params: DelegationParamsCodec.encode({
+          publicKey: { toDer: () => authRequest.sessionPublicKey },
+          maxTimeToLive: authRequest.maxTimeToLive,
+          icrc95DerivationOrigin: authRequest.derivationOrigin,
+        }),
       });
     }
 
@@ -193,7 +198,7 @@ export class LegacyTransport implements Transport {
       return Promise.resolve(
         new LegacyChannel(
           redirectMessage.message.origin,
-          AuthRequest.parse(redirectMessage.message.data),
+          AuthRequestCodec.parse(redirectMessage.message.data),
           redirectMessage.sourceOrigin,
         ),
       );
@@ -217,6 +222,11 @@ export class LegacyTransport implements Transport {
         if (!this.#isValidAuthRequestEvent(event, options)) {
           return;
         }
+        const parsed = AuthRequestCodec.safeParse(event.data);
+        if (!parsed.success) {
+          reject(new Error("Invalid legacy auth request"));
+          return;
+        }
         clearTimeout(timeout);
 
         // Redirect message to primary origin if we're on another origin
@@ -227,17 +237,12 @@ export class LegacyTransport implements Transport {
         ) {
           redirectWithMessage(primaryOrigin, {
             origin: event.origin,
-            data: event.data,
+            data: AuthRequestCodec.encode(event.data),
           });
           return;
         }
 
-        // Else establish channel with parsed auth request
-        const parsed = AuthRequest.safeParse(event.data);
-        if (!parsed.success) {
-          reject(new Error("Invalid legacy auth request"));
-          return;
-        }
+        // Else establish channel with auth request
         resolve(new LegacyChannel(event.origin, parsed.data));
       };
 
