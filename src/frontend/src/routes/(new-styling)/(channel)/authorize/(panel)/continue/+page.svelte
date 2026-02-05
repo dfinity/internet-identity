@@ -23,7 +23,7 @@
     authenticationStore,
     isAuthenticatedStore,
   } from "$lib/stores/authentication.store";
-  import { throwCanisterError, waitFor } from "$lib/utils/utils";
+  import { throwCanisterError } from "$lib/utils/utils";
   import type {
     AccountInfo,
     AccountNumber,
@@ -34,6 +34,8 @@
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { DelegationResultSchema } from "$lib/utils/transport/utils";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
@@ -86,6 +88,16 @@
     authLastUsedFlow.init([selectedIdentityNumber]);
   });
 
+  const authorize = async (accountNumber?: bigint) => {
+    const { requestId, delegationChain } =
+      await authorizationStore.authorize(accountNumber);
+    const result = DelegationResultSchema.encode(delegationChain);
+    await $establishedChannelStore.send({
+      jsonrpc: "2.0",
+      id: requestId,
+      result,
+    });
+  };
   const handleContinueDefault = async () => {
     try {
       isAuthenticatingDefault = true;
@@ -95,7 +107,7 @@
       const { identityNumber, actor } = $authenticationStore!;
       const { effectiveOrigin } = $authorizationContextStore;
       void triggerDropWaveAnimation();
-      await authorizationStore.authorize(
+      await authorize(
         defaultAccountNumber === null
           ? actor
               .get_default_account(identityNumber, effectiveOrigin)
@@ -113,8 +125,7 @@
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
     try {
-      void triggerDropWaveAnimation();
-      await authorizationStore.authorize(accountNumber);
+      await authorize(accountNumber);
     } catch (error) {
       handleError(error);
     }

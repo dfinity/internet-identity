@@ -15,9 +15,14 @@ import { Principal } from "@icp-sdk/core/principal";
 import { z } from "zod";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 import {
-  forwardMessage,
-  isForwardedMessage,
-} from "../../../../routes/(new-styling)/(cross-origin)/utils";
+  OriginSchema,
+  StringOrNumberToBigIntCodec,
+} from "$lib/utils/transport/utils";
+// import {
+//   forwardMessage,
+//   isForwardedMessage,
+// } from "../../../../routes/(new-styling)/(cross-origin)/utils";
+// TODO: Remove message forwarding from this file
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -43,36 +48,22 @@ export interface AuthContext {
   requestOrigin: string;
 }
 
-const zodPrincipal = z.string().transform((val, ctx) => {
-  let principal;
-  try {
-    principal = Principal.fromText(val);
-  } catch {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Not a principal " });
-    return z.NEVER;
-  }
-  return principal;
-});
+const StringToPrincipalCodec = z.codec(
+  z.string(),
+  z.custom<Principal>((arg) => arg instanceof Principal),
+  {
+    decode: (str) => Principal.fromText(str),
+    encode: (principal) => principal.toText(),
+  },
+);
 
 export const AuthRequest = z.object({
   kind: z.literal("authorize-client"),
   sessionPublicKey: z.instanceof(Uint8Array),
-  maxTimeToLive: z
-    .optional(z.union([z.number(), z.bigint()]))
-    .transform((val) => {
-      if (typeof val === "number") {
-        // Temporary work around for clients that use 'number' instead of 'bigint'
-        // https://github.com/dfinity/internet-identity/issues/1050
-        console.warn(
-          "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future",
-        );
-        return BigInt(val);
-      }
-      return val;
-    }),
-  derivationOrigin: z.optional(z.string()),
+  maxTimeToLive: z.optional(z.lazy(() => StringOrNumberToBigIntCodec)),
+  derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
   allowPinAuthentication: z.optional(z.boolean()),
-  autoSelectionPrincipal: z.optional(zodPrincipal),
+  autoSelectionPrincipal: z.optional(StringToPrincipalCodec),
 });
 
 export type AuthRequest = z.output<typeof AuthRequest>;
@@ -141,9 +132,9 @@ export async function authenticationProtocol({
   window.opener?.postMessage(AuthReady, "*");
   // Also send a message to be forwarded to the parent window,
   // in case the authorization flow is cross-origin embedded.
-  canisterConfig.related_origins[0]?.forEach((origin) =>
-    window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
-  );
+  // canisterConfig.related_origins[0]?.forEach((origin) =>
+  //   window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
+  // );
 
   onProgress("waiting");
 
@@ -203,10 +194,10 @@ export async function authenticationProtocol({
       text: authenticateResult.text,
     } satisfies AuthResponse;
     if (requestResult.forwardFromOrigin !== undefined) {
-      window.parent.postMessage(
-        forwardMessage(response, authContext.requestOrigin),
-        requestResult.forwardFromOrigin,
-      );
+      // window.parent.postMessage(
+      //   forwardMessage(response, authContext.requestOrigin),
+      //   requestResult.forwardFromOrigin,
+      // );
     } else {
       window.opener.postMessage(response);
     }
@@ -222,10 +213,10 @@ export async function authenticationProtocol({
   } satisfies AuthResponse;
 
   if (requestResult.forwardFromOrigin !== undefined) {
-    window.parent.postMessage(
-      forwardMessage(response, authContext.requestOrigin),
-      requestResult.forwardFromOrigin,
-    );
+    // window.parent.postMessage(
+    //   forwardMessage(response, authContext.requestOrigin),
+    //   requestResult.forwardFromOrigin,
+    // );
   } else {
     window.opener.postMessage(response, authContext.requestOrigin);
   }
@@ -262,7 +253,7 @@ const waitForRequest = (): Promise<
         forwardFromOrigin,
       }: { message: unknown; origin: string; forwardFromOrigin?: string } =
         canisterConfig.related_origins[0]?.includes(event.origin) === true &&
-        isForwardedMessage(event)
+        false // isForwardedMessage(event)
           ? {
               message: event.data.__ii_forwarded.data,
               origin: event.data.__ii_forwarded.origin,

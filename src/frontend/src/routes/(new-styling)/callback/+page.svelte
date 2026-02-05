@@ -2,13 +2,11 @@
   import { analytics } from "$lib/utils/analytics/analytics";
   import { onMount } from "svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
-  import { authenticationStore } from "$lib/stores/authentication.store";
   import {
+    authorizationContextStore,
     authorizationStatusStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
-  import { throwCanisterError } from "$lib/utils/utils";
-  import { handleError } from "$lib/components/utils/error";
   import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import { ArrowRightIcon } from "@lucide/svelte";
@@ -16,6 +14,19 @@
   import { decodeJWT, findConfig } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import { t } from "$lib/stores/locale.store";
+  import {
+    channelStore,
+    establishedChannelStore,
+  } from "$lib/stores/channelStore";
+  import { z } from "zod";
+  import {
+    AttributesParamsSchema,
+    DelegationParamsSchema,
+    DelegationResultSchema,
+    JsonRequest,
+  } from "$lib/utils/transport/utils";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { retryFor, throwCanisterError, toBase64 } from "$lib/utils/utils.ts";
 
   analytics.event("page-redirect-callback");
 
@@ -29,6 +40,94 @@
         dapp.hasOrigin(directAuthorizeOrigin),
     ),
   );
+
+  const delegationListener = async (request: JsonRequest) => {
+    if (
+      request.id === undefined ||
+      request.method !== "icrc34_delegation" ||
+      $authorizationStore.status !== "init"
+    ) {
+      return;
+    }
+    const paramsResult = DelegationParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      await $establishedChannelStore.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: -32602,
+          message: z.prettifyError(paramsResult.error),
+        },
+      });
+      return;
+    }
+    await authorizationStore.handleRequest(
+      $establishedChannelStore.origin,
+      request.id,
+      paramsResult.data,
+    );
+    $establishedChannelStore.addEventListener("request", attributesListener);
+    const { delegationChain } = await authorizationStore.authorize(undefined);
+    const result = DelegationResultSchema.encode(delegationChain);
+    await $establishedChannelStore.send({
+      jsonrpc: "2.0",
+      id: request.id,
+      result,
+    });
+  };
+  const attributesListener = async (request: JsonRequest) => {
+    if (request.id === undefined || request.method !== "ii_attributes") {
+      return;
+    }
+    const paramsResult = AttributesParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      await $establishedChannelStore.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: -32602,
+          message: z.prettifyError(paramsResult.error),
+        },
+      });
+      return;
+    }
+    const { attributes, issued_at_timestamp_ns } =
+      await $authenticatedStore.actor
+        .prepare_attributes({
+          origin: $authorizationContextStore.effectiveOrigin,
+          attribute_keys: paramsResult.data.attributes,
+          account_number: [],
+          identity_number: $authenticatedStore.identityNumber,
+        })
+        .then(throwCanisterError);
+    const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
+      5,
+      () =>
+        $authenticatedStore.actor.get_attributes({
+          origin: $authorizationContextStore.effectiveOrigin,
+          account_number: [],
+          identity_number: $authenticatedStore.identityNumber,
+          attributes,
+          issued_at_timestamp_ns,
+        }),
+    ).then(throwCanisterError);
+    await $establishedChannelStore.send({
+      jsonrpc: "2.0",
+      id: request.id,
+      result: {
+        attributes: Object.fromEntries(
+          certified_attributes.map((attribute) => [
+            attribute.key,
+            {
+              value: toBase64(new Uint8Array(attribute.value)),
+              signature: toBase64(new Uint8Array(attribute.signature)),
+              expiration: expires_at_timestamp_ns.toString(),
+            },
+          ]),
+        ),
+      },
+    });
+  };
 
   onMount(async () => {
     // If OpenID flow was opened within same window as II,
@@ -58,32 +157,12 @@
         if (isNullish(config)) {
           return;
         }
-        const result = await authFlow.continueWithOpenId(config, jwt);
-        if (result.type === "signUp") {
-          await authFlow.completeOpenIdRegistration(result.name!);
+        const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+        if (authFlowResult.type === "signUp") {
+          await authFlow.completeOpenIdRegistration(authFlowResult.name!);
         }
-        authorizationStore.subscribe(async ({ context, status }) => {
-          if (
-            status !== "authenticating" ||
-            isNullish(context) ||
-            isNullish($authenticationStore)
-          ) {
-            return;
-          }
-          try {
-            const account = await $authenticationStore.actor
-              .get_default_account(
-                $authenticationStore.identityNumber,
-                context.effectiveOrigin,
-              )
-              .then(throwCanisterError);
-            await authorizationStore.authorize(account.account_number[0]);
-          } catch (error) {
-            handleError(error);
-          }
-        });
-        await authorizationStore.init({ allowedOrigin: origin });
-        return;
+        const channel = await channelStore.establish({ allowedOrigin: origin });
+        channel.addEventListener("request", delegationListener);
       }
     }
 
