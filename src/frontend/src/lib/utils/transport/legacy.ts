@@ -215,7 +215,7 @@ export class LegacyTransport implements Transport {
   #establishViaPostMessage(options: ChannelOptions): Promise<LegacyChannel> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        console.error("timeout");
+        window.removeEventListener("message", listener);
         reject(new Error("Legacy channel could not be established"));
       }, ESTABLISH_TIMEOUT_MS);
 
@@ -223,6 +223,7 @@ export class LegacyTransport implements Transport {
         if (!this.#isValidAuthRequestEvent(event, options)) {
           return;
         }
+        window.removeEventListener("message", listener);
         const parsed = AuthRequestCodec.safeParse(event.data);
         if (!parsed.success) {
           reject(new Error("Invalid legacy auth request"));
@@ -238,7 +239,7 @@ export class LegacyTransport implements Transport {
         ) {
           redirectWithMessage(primaryOrigin, {
             origin: event.origin,
-            data: AuthRequestCodec.encode(event.data),
+            data: AuthRequestCodec.encode(parsed.data),
           });
           return;
         }

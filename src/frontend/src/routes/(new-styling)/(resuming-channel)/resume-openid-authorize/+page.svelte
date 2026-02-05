@@ -13,14 +13,9 @@
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { DelegationResultSchema } from "$lib/utils/transport/utils";
 
-  let directAuthorizeOrigin = $state<string>();
   const dapps = getDapps();
   const dapp = $derived(
-    dapps.find(
-      (dapp) =>
-        directAuthorizeOrigin !== undefined &&
-        dapp.hasOrigin(directAuthorizeOrigin),
-    ),
+    dapps.find((dapp) => dapp.hasOrigin($authorizationStore.requestOrigin)),
   );
 
   onMount(async () => {
@@ -40,8 +35,6 @@
       redirectState === openIdAuthorizeState &&
       jwt !== null
     ) {
-      directAuthorizeOrigin = origin;
-
       const authFlow = new AuthFlow({ trackLastUsed: false });
       const { iss, ...metadata } = decodeJWT(jwt);
       const config = findConfig(
@@ -68,38 +61,36 @@
   });
 </script>
 
-{#if directAuthorizeOrigin !== undefined}
-  <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
-    {#if dapp?.logoSrc !== undefined}
-      {@const name = dapp?.name ?? directAuthorizeOrigin}
-      <img
-        src={dapp?.logoSrc}
-        alt={$t`${name} logo`}
-        class="mb-10 h-16 max-w-50 object-contain"
-      />
-    {/if}
-    <p class="text-text-secondary mb-1 text-xl font-semibold">
-      {$t`Signing in securely`}
-    </p>
-    <p class="text-text-tertiary text-sm">{$t`This takes a few seconds.`}</p>
-    <div class="bg-bg-quaternary my-6 h-0.5 w-full max-w-74 rounded-full">
-      <div class="bg-fg-brand-primary animate-grow h-full rounded-full"></div>
-    </div>
-    <p class="text-text-secondary text-base">
-      {$t`Powered by Internet Identity`}
-    </p>
-    <Button
-      href={window.location.origin}
-      target="_blank"
-      variant="tertiary"
-      class="mt-10"
-      size="sm"
-    >
-      <span>{$t`How it works`}</span>
-      <ArrowRightIcon class="size-4" />
-    </Button>
+<div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
+  {#if dapp?.logoSrc !== undefined}
+    {@const name = dapp?.name ?? $authorizationStore.requestOrigin}
+    <img
+      src={dapp?.logoSrc}
+      alt={$t`${name} logo`}
+      class="mb-10 h-16 max-w-50 object-contain"
+    />
+  {/if}
+  <p class="text-text-secondary mb-1 text-xl font-semibold">
+    {$t`Signing in securely`}
+  </p>
+  <p class="text-text-tertiary text-sm">{$t`This takes a few seconds.`}</p>
+  <div class="bg-bg-quaternary my-6 h-0.5 w-full max-w-74 rounded-full">
+    <div class="bg-fg-brand-primary animate-grow h-full rounded-full"></div>
   </div>
-{/if}
+  <p class="text-text-secondary text-base">
+    {$t`Powered by Internet Identity`}
+  </p>
+  <Button
+    href={window.location.origin}
+    target="_blank"
+    variant="tertiary"
+    class="mt-10"
+    size="sm"
+  >
+    <span>{$t`How it works`}</span>
+    <ArrowRightIcon class="size-4" />
+  </Button>
+</div>
 
 <style>
   @keyframes grow {
