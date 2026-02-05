@@ -88,7 +88,9 @@
     authLastUsedFlow.init([selectedIdentityNumber]);
   });
 
-  const authorize = async (accountNumber?: bigint) => {
+  const authorize = async (
+    accountNumber?: Promise<bigint | undefined> | bigint | undefined,
+  ) => {
     const { requestId, delegationChain } =
       await authorizationStore.authorize(accountNumber);
     const result = DelegationResultSchema.encode(delegationChain);
