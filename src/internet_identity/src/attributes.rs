@@ -1,8 +1,8 @@
 use crate::{
-    openid::{OpenIdCredential, OpenIdCredentialKey, OPENID_SESSION_DURATION_NS},
+    openid::{OpenIdCredential, OpenIdCredentialKey},
     state,
     storage::{account::Account, anchor::Anchor},
-    update_root_hash,
+    update_root_hash, MINUTE_NS,
 };
 use ic_canister_sig_creation::signature_map::{CanisterSigInputs, SignatureMap};
 use ic_representation_independent_hash::{representation_independent_hash, Value};
@@ -15,8 +15,12 @@ use internet_identity_interface::internet_identity::types::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Domain separator for attribute certification signatures. Clients need this to verify signatures.
 const ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ii-request-attribute";
-const ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS: u64 = OPENID_SESSION_DURATION_NS;
+
+/// Duration for which attribute certifications are valid. Does not strictly need to be the same
+/// as `OPENID_SESSION_DURATION_NS`, but for simplicity we keep them aligned for now.
+const ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 fn expiration_timestamp_ns(issued_at_timestamp_ns: Timestamp) -> Timestamp {
     issued_at_timestamp_ns.saturating_add(ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS)
@@ -84,7 +88,7 @@ impl Anchor {
     /// Processes `requested_attributes` for all attribute scopes, prepares signatures for
     /// the (attribute_key, attribute_value) pairs that can be fulfilled for this (anchor, account).
     ///
-    /// Returns the list of attribute keys certified with expiry `now_timestamp_ns + OPENID_SESSION_DURATION_NS`.
+    /// Returns the list of attribute keys certified with expiry `now_timestamp_ns + ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS`.
     pub fn prepare_attributes(
         &self,
         requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
@@ -133,6 +137,12 @@ impl Anchor {
                     issuer: openid_credential.iss.clone(),
                 });
                 // E.g., {`email`, `name`}
+                //
+                // Why we do not include `sub` / `aud` into the keys of this map:
+                // --------------------------------------------------------------
+                // Currently, an anchor can only have a single iss linked once. The storage layer
+                // allows for duplicate iss, but the implementation has been restricted to enforce
+                // the one-to-one relationship.
                 let attribute_names = requested_attributes.remove(&scope)?;
 
                 let mut attribute_keys: BTreeMap<AttributeName, AttributeKey> = attribute_names
@@ -165,7 +175,7 @@ impl Anchor {
 
                         let attribute = Attribute {
                             key,
-                            value: value.clone(),
+                            value: value.as_bytes().to_vec(),
                         };
 
                         Some(attribute)
@@ -188,7 +198,8 @@ impl OpenIdCredential {
         attributes: &Vec<Attribute>,
         now_timestamp_ns: Timestamp,
     ) {
-        let expiration_timestamp_ns = now_timestamp_ns.saturating_add(OPENID_SESSION_DURATION_NS);
+        let expiration_timestamp_ns =
+            now_timestamp_ns.saturating_add(ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS);
 
         let seed = account.calculate_seed();
 
@@ -207,7 +218,7 @@ fn attribute_signature_msg(attribute: &Attribute, expiration_timestamp_ns: u64) 
         ("expiration".into(), Value::Number(expiration_timestamp_ns)),
         (
             attribute.key.to_string(),
-            Value::String(attribute.value.to_string()),
+            Value::Bytes(attribute.value.clone()),
         ),
     ];
     representation_independent_hash(m.as_slice()).to_vec()
@@ -289,7 +300,12 @@ mod tests {
     fn attribute_pairs(attributes: &[Attribute]) -> BTreeSet<(String, String)> {
         attributes
             .iter()
-            .map(|attr| (attr.key.to_string(), attr.value.clone()))
+            .map(|attr| {
+                (
+                    attr.key.to_string(),
+                    String::from_utf8_lossy(&attr.value).to_string(),
+                )
+            })
             .collect()
     }
 
@@ -299,7 +315,7 @@ mod tests {
                 scope: openid_attribute_scope(),
                 attribute_name: name,
             },
-            value: value.to_string(),
+            value: value.as_bytes().to_vec(),
         }
     }
 
@@ -360,7 +376,7 @@ mod tests {
                 ("expiration".into(), Value::Number(1_234_567)),
                 (
                     attr_email.key.to_string(),
-                    Value::String(attr_email.value.to_string()),
+                    Value::Bytes(attr_email.value.clone()),
                 ),
             ])
             .to_vec();
@@ -421,7 +437,7 @@ mod tests {
                 ("expiration".into(), Value::Number(0)),
                 (
                     attr_email.key.to_string(),
-                    Value::String(attr_email.value.to_string()),
+                    Value::Bytes(attr_email.value.clone()),
                 ),
             ])
             .to_vec();
@@ -436,7 +452,7 @@ mod tests {
                 ("expiration".into(), Value::Number(u64::MAX)),
                 (
                     attr_email.key.to_string(),
-                    Value::String(attr_email.value.to_string()),
+                    Value::Bytes(attr_email.value.clone()),
                 ),
             ])
             .to_vec();

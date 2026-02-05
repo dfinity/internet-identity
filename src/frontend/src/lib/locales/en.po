@@ -287,6 +287,9 @@ msgstr "Experience"
 msgid "Export JSON"
 msgstr "Export JSON"
 
+msgid "FAQ & Support"
+msgstr "FAQ & Support"
+
 msgid "FAQs"
 msgstr "FAQs"
 
@@ -298,9 +301,6 @@ msgstr "For example, user A logs into Internet Identity with their Google accoun
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
-
-msgid "Forgot your identity number?"
-msgstr "Forgot your identity number?"
 
 msgid "Full control"
 msgstr "Full control"
@@ -331,9 +331,6 @@ msgstr "Go to the app - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
 msgstr "Has not been used yet"
-
-msgid "Help"
-msgstr "Help"
 
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
@@ -517,6 +514,9 @@ msgstr "Long-press the link that opened this page."
 
 msgid "Lookup by passkey"
 msgstr "Lookup by passkey"
+
+msgid "Lookup identity"
+msgstr "Lookup identity"
 
 msgid "Lost access to your identity?"
 msgstr "Lost access to your identity?"

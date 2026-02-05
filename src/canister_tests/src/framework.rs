@@ -7,6 +7,7 @@ use ic_representation_independent_hash::Value;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
+use internet_identity_interface::internet_identity::types::attributes::CertifiedAttribute;
 use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias;
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
@@ -644,6 +645,40 @@ pub fn verify_delegation(
         root_key.to_vec(),
     )
     .expect("delegation signature invalid");
+}
+
+pub fn verify_attribute(
+    env: &PocketIc,
+    user_key: UserKey,
+    certified_attribute: &CertifiedAttribute,
+    expiration: u64,
+    root_key: &[u8],
+) {
+    const DOMAIN_SEPARATOR: &[u8] = b"ii-request-attribute";
+
+    // The signed message is a signature domain separator
+    // followed by the representation independent hash of a map with entries
+    // expiration, attribute-key/attribute-value.
+    let key_value_pairs = vec![
+        ("expiration".to_string(), Value::Number(expiration)),
+        (
+            certified_attribute.key.clone(),
+            Value::Bytes(certified_attribute.value.clone()),
+        ),
+    ];
+    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
+    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    msg.extend_from_slice(
+        &ic_representation_independent_hash::representation_independent_hash(&key_value_pairs),
+    );
+
+    env.verify_canister_signature(
+        msg,
+        certified_attribute.signature.clone(),
+        user_key.into_vec(),
+        root_key.to_vec(),
+    )
+    .expect("attribute signature invalid");
 }
 
 pub fn verify_id_alias_credential_via_env(

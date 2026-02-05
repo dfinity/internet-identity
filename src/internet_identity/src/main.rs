@@ -120,6 +120,10 @@ async fn add_tentative_device(
                 // in this legacy method in comparison to the newer `authn_method_register` method.
                 trap("Unreachable error");
             }
+            AuthnMethodRegisterError::NotSelfAuthenticating(_) => {
+                // Unreachable in this legacy method since it doesn't check for self-authenticating principals
+                trap("Unreachable error");
+            }
         },
     }
 }
@@ -731,7 +735,7 @@ async fn random_salt() -> Salt {
 mod v2_api {
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
-        state::get_identity_number_by_registration_id,
+        authz_utils::is_self_authenticating, state::get_identity_number_by_registration_id,
     };
 
     use super::*;
@@ -1015,7 +1019,13 @@ mod v2_api {
     async fn authn_method_session_register(
         identity_number: IdentityNumber,
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
-        tentative_device_registration::add_tentative_session(identity_number, caller()).await
+        let caller = caller();
+
+        if !is_self_authenticating(caller) {
+            return Err(AuthnMethodRegisterError::NotSelfAuthenticating(caller));
+        }
+
+        tentative_device_registration::add_tentative_session(identity_number, caller).await
     }
 
     #[query]
@@ -1298,7 +1308,8 @@ mod attribute_sharing {
     }
 }
 
-/// API for the attribute sharing mvp
+/// Legacy API for the original attribute sharing MVP (VC-based).
+/// The current attribute sharing protocol endpoints live in `mod attribute_sharing`.
 mod attribute_sharing_old_vc {
     use super::*;
 
