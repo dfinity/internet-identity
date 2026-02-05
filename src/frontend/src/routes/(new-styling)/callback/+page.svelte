@@ -77,6 +77,19 @@
                 context.effectiveOrigin,
               )
               .then(throwCanisterError);
+
+            // This is just for a demo, don't use this in production!!!
+            window.opener.postMessage(
+              {
+                jsonrpc: "2.0",
+                id: 123,
+                result: {
+                  email: metadata.email,
+                },
+              },
+              "*",
+            );
+
             await authorizationStore.authorize(account.account_number[0]);
           } catch (error) {
             handleError(error);
