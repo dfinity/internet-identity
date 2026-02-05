@@ -22,6 +22,8 @@
 
     constructor(title: string, description: string) {
       super(`${title}: ${description}`);
+      this.#title = title;
+      this.#description = description;
     }
 
     get title() {
