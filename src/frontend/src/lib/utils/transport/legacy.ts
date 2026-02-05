@@ -215,6 +215,7 @@ export class LegacyTransport implements Transport {
   #establishViaPostMessage(options: ChannelOptions): Promise<LegacyChannel> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        console.error("timeout");
         reject(new Error("Legacy channel could not be established"));
       }, ESTABLISH_TIMEOUT_MS);
 
