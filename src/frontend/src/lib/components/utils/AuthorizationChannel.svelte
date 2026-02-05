@@ -13,6 +13,7 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { type Snippet } from "svelte";
+  import { goto } from "$app/navigation";
 
   const INVALID_PARAMS_ERROR_CODE = -32602;
 
@@ -94,6 +95,9 @@
       .establish(options)
       .catch((error) => {
         console.error(error); // Log error to console
+        if (window.opener === null) {
+          goto("/unsupported");
+        }
         return Promise.reject(
           new AuthorizeChannelError(
             $t`Unable to connect`,
