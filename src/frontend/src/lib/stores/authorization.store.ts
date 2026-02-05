@@ -41,7 +41,7 @@ const internalStore = writable<AuthorizationContext | undefined>();
 export const authorizationStore: AuthorizationStore = {
   handleRequest: async (requestOrigin, requestId, params) => {
     const effectiveOrigin = remapToLegacyDomain(
-      params.icrc95DerivationOrigin ?? origin,
+      params.icrc95DerivationOrigin ?? requestOrigin,
     );
     const validationResult = await validateDerivationOrigin({
       requestOrigin,
