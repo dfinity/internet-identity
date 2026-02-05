@@ -137,13 +137,13 @@ export const OriginSchema = z.string().refine(
   },
 );
 
-export const DelegationParamsSchema = z.object({
+export const DelegationParamsCodec = z.object({
   publicKey: Base64ToPublicKeyCodec,
   maxTimeToLive: z.optional(StringToBigIntCodec),
   icrc95DerivationOrigin: z.optional(OriginSchema),
 });
 
-export type DelegationParams = z.infer<typeof DelegationParamsSchema>;
+export type DelegationParams = z.infer<typeof DelegationParamsCodec>;
 
 export const DelegationResultSchema = z.codec(
   z.object({
@@ -188,7 +188,7 @@ export const DelegationResultSchema = z.codec(
 
 export const AuthRequestToDelegationParamsCodec = z.codec(
   AuthRequest,
-  DelegationParamsSchema,
+  DelegationParamsCodec,
   {
     decode: (request) => ({
       publicKey: Base64ToBytesCodec.encode(request.sessionPublicKey),

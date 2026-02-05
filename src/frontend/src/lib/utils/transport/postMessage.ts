@@ -25,7 +25,6 @@ class PostMessageChannel implements Channel {
 
     window.addEventListener("message", (event) => {
       const { data, success } = JsonRequestSchema.safeParse(event.data);
-      console.log("Received message", event.data);
       if (
         event.source !== this.#source ||
         event.origin !== this.#origin ||
@@ -35,7 +34,6 @@ class PostMessageChannel implements Channel {
         return;
       }
       this.#requests.push(data);
-      console.log("requests", this.#requests);
       this.#requestListeners.forEach((listener) => listener(data));
     });
   }
@@ -92,7 +90,6 @@ class PostMessageChannel implements Channel {
 export class PostMessageTransport implements Transport {
   establishChannel(options: ChannelOptions): Promise<PostMessageChannel> {
     return new Promise((resolve, reject) => {
-      console.log("establishing");
       let channel: PostMessageChannel;
       new HeartbeatServer({
         status: options?.pending === true ? "pending" : "ready",
@@ -100,7 +97,6 @@ export class PostMessageTransport implements Transport {
         establishTimeout: ESTABLISH_TIMEOUT_MS,
         disconnectTimeout: DISCONNECT_TIMEOUT_MS,
         onEstablish: (origin, source) => {
-          console.log("established!");
           channel = new PostMessageChannel(origin, source);
           resolve(channel);
         },

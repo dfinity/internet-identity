@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   type Channel,
   type ChannelOptions,
@@ -6,7 +7,8 @@ import {
   type Transport,
   DelegationResultSchema,
   AuthRequestToDelegationParamsCodec,
-  DelegationParamsSchema,
+  DelegationParamsCodec,
+  OriginSchema,
 } from "$lib/utils/transport/utils";
 import {
   AuthReady,
@@ -17,18 +19,87 @@ import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 
 const ESTABLISH_TIMEOUT_MS = 2000;
 const AUTHORIZE_REQUEST_ID = "authorize-client";
+const RedirectMessageSchema = z.object({
+  origin: OriginSchema,
+  data: z.unknown(),
+});
+
+type RedirectMessage = z.infer<typeof RedirectMessageSchema>;
+
+const cleanRedirectHash = () => {
+  if (window.location.hash === "") {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  url.hash = "";
+  window.history.replaceState(undefined, "", url);
+};
+
+const delegationParamsFromAuthRequest = (authRequest: AuthRequest) => {
+  return DelegationParamsCodec.encode(
+    AuthRequestToDelegationParamsCodec.decode(AuthRequest.encode(authRequest)),
+  );
+};
+
+const redirectWithMessage = (
+  targetOrigin: string,
+  message: RedirectMessage,
+) => {
+  // Assign to hash to avoid sending message to server (keeps it client side)
+  const redirectURL = new URL(targetOrigin);
+  const searchParams = new URLSearchParams();
+  searchParams.set("redirect_message", JSON.stringify(message));
+  redirectURL.hash = searchParams.toString();
+
+  // Use an anchor so that we can override referrer policy
+  const a = document.createElement("a");
+  a.href = redirectURL.href;
+  a.referrerPolicy = "origin";
+  a.click();
+};
+
+const getRedirectMessage = ():
+  | { sourceOrigin: string; message: RedirectMessage }
+  | undefined => {
+  // Get message from hash
+  const hash = window.location.hash.replace(/^#/, "");
+  const params = new URLSearchParams(hash);
+  const message = params.get("redirect_message");
+
+  // Return if there's no message
+  if (message === null) {
+    return;
+  }
+
+  // Check if the referrer is a trusted origin (II itself)
+  const referrer = new URL(document.referrer);
+  const trusted =
+    canisterConfig.related_origins[0]?.includes(referrer.origin) ?? false;
+  if (!trusted) {
+    throw new Error("Referrer origin is untrusted");
+  }
+  return {
+    sourceOrigin: referrer.origin,
+    message: RedirectMessageSchema.parse(message),
+  };
+};
 
 class LegacyChannel implements Channel {
   #closed = false;
   #origin: string;
-  #redirect_uri?: string;
-  #authRequest: AuthRequest | undefined;
+  #redirectOrigin?: string;
+  #authRequest?: AuthRequest;
   #closeListeners = new Set<() => void>();
 
-  constructor(origin: string, authRequest: AuthRequest, redirect_uri?: string) {
+  constructor(
+    origin: string,
+    authRequest: AuthRequest,
+    redirectOrigin?: string,
+  ) {
     this.#origin = origin;
     this.#authRequest = authRequest;
-    this.#redirect_uri = redirect_uri;
+    this.#redirectOrigin = redirectOrigin;
   }
 
   get origin() {
@@ -44,214 +115,151 @@ class LegacyChannel implements Channel {
       | [event: "close", listener: () => void]
       | [event: "request", listener: (request: JsonRequest) => void]
   ): () => void {
-    switch (event) {
-      case "close":
-        this.#closeListeners.add(listener);
-        return () => {
-          this.#closeListeners.delete(listener);
-        };
-      case "request": {
-        // Replay authorize request if that didn't get a response yet
-        if (this.#authRequest !== undefined) {
-          const params = DelegationParamsSchema.encode(
-            AuthRequestToDelegationParamsCodec.decode(
-              AuthRequest.encode(this.#authRequest),
-            ),
-          );
-          listener({
-            id: AUTHORIZE_REQUEST_ID,
-            jsonrpc: "2.0",
-            method: "icrc34_delegation",
-            params,
-          });
-        }
-        return () => {};
-      }
+    if (event === "close") {
+      this.#closeListeners.add(listener);
+      return () => this.#closeListeners.delete(listener);
     }
+
+    if (event === "request" && this.#authRequest) {
+      // Replay auth request if it didn't get a response yet
+      listener({
+        id: AUTHORIZE_REQUEST_ID,
+        jsonrpc: "2.0",
+        method: "icrc34_delegation",
+        params: delegationParamsFromAuthRequest(this.#authRequest),
+      });
+    }
+
+    return () => {};
   }
 
   send(response: JsonResponse): Promise<void> {
     if (this.#closed) {
       throw new Error("Legacy channel is closed");
     }
+
     if (response.id !== AUTHORIZE_REQUEST_ID) {
       throw new Error("Legacy channel can only respond to authorize requests");
     }
-    // Remove authorize request after it has been given a response
+
     this.#authRequest = undefined;
-    if (this.#redirect_uri !== undefined) {
-      const redirectURL = new URL(this.#redirect_uri);
-      if ("result" in response) {
-        redirectURL.searchParams.set(
-          "redirect_delegation_response",
-          JSON.stringify({
-            origin: this.#origin,
-            result: response.result,
-          }),
-        );
-      } else if ("error" in response) {
-        redirectURL.searchParams.set(
-          "redirect_delegation_response",
-          JSON.stringify({
-            origin: this.#origin,
-            error: response.error,
-          }),
-        );
-      }
-      const a = document.createElement("a");
-      a.href = redirectURL.href;
-      a.referrerPolicy = "origin";
-      a.click();
-      return new Promise(() => {});
+    let data: AuthResponse;
+    if ("result" in response) {
+      const delegationChain = DelegationResultSchema.parse(response.result);
+      data = {
+        kind: "authorize-client-success",
+        delegations: delegationChain.delegations,
+        userPublicKey: delegationChain.publicKey,
+        authnMethod: "passkey",
+      };
     } else {
-      if ("result" in response) {
-        const delegationChain = DelegationResultSchema.parse(response.result);
-        window.opener.postMessage(
-          {
-            kind: "authorize-client-success",
-            delegations: delegationChain.delegations,
-            userPublicKey: delegationChain.publicKey,
-            authnMethod: "passkey",
-          } satisfies AuthResponse,
-          this.#origin,
-        );
-      } else if ("error" in response) {
-        window.opener.postMessage(
-          {
-            kind: "authorize-client-failure",
-            text: response.error.message,
-          } satisfies AuthResponse,
-          this.#origin,
-        );
-      }
+      data = {
+        kind: "authorize-client-failure",
+        text: response.error.message,
+      };
     }
+
+    if (this.#redirectOrigin !== undefined) {
+      redirectWithMessage(this.#redirectOrigin, {
+        origin: this.#origin,
+        data,
+      });
+      return new Promise(() => {});
+    }
+
+    window.opener.postMessage(data, this.#origin);
     return Promise.resolve();
   }
 
   close(): Promise<void> {
     this.#closed = true;
-    this.#closeListeners.forEach((listener) => listener());
+    this.#closeListeners.forEach((l) => l());
     return Promise.resolve();
   }
 }
 
 export class LegacyTransport implements Transport {
   establishChannel(options: ChannelOptions): Promise<LegacyChannel> {
-    const searchParams = new URLSearchParams(window.location.search);
-    const redirectDelegationRequest = searchParams.get(
-      "redirect_delegation_request",
-    );
-    const redirectDelegationResponse = searchParams.get(
-      "redirect_delegation_response",
-    );
-    const cleanedURL = new URL(window.location.href);
-    cleanedURL.searchParams.delete("redirect_delegation_request");
-    cleanedURL.searchParams.delete("redirect_delegation_response");
-    window.history.replaceState(undefined, "", cleanedURL);
-    if (redirectDelegationRequest !== null && document.referrer.length > 0) {
-      const referrer = new URL(document.referrer);
-      if (
-        !(canisterConfig.related_origins[0]?.includes(referrer.origin) ?? false)
-      ) {
-        throw new Error("Referrer origin is untrusted");
-      }
-      const { redirect_uri, origin, params } = JSON.parse(
-        redirectDelegationRequest,
-      );
-      const authRequest = AuthRequest.parse(
-        AuthRequestToDelegationParamsCodec.encode(
-          DelegationParamsSchema.parse(params),
+    const primaryOrigin = getPrimaryOrigin();
+    const redirectMessage = getRedirectMessage();
+
+    if (primaryOrigin === undefined || redirectMessage === undefined) {
+      return this.#establishViaPostMessage(options);
+    }
+
+    cleanRedirectHash();
+    if (window.location.origin === primaryOrigin) {
+      // Establish channel with request from legacy origin
+      return Promise.resolve(
+        new LegacyChannel(
+          redirectMessage.message.origin,
+          AuthRequest.parse(redirectMessage.message.data),
+          redirectMessage.sourceOrigin,
         ),
       );
-      return Promise.resolve(
-        new LegacyChannel(origin, authRequest, redirect_uri),
+    } else {
+      // Forward response from primary origin as-is
+      window.opener.postMessage(
+        redirectMessage.message.data,
+        redirectMessage.message.origin,
       );
-    }
-    if (redirectDelegationResponse !== null && document.referrer.length > 0) {
-      const referrer = new URL(document.referrer);
-      if (
-        !(canisterConfig.related_origins[0]?.includes(referrer.origin) ?? false)
-      ) {
-        throw new Error("Referrer origin is untrusted");
-      }
-      const response = JSON.parse(redirectDelegationResponse);
-      if ("result" in response) {
-        const delegationChain = DelegationResultSchema.parse(response.result);
-        window.opener.postMessage(
-          {
-            kind: "authorize-client-success",
-            delegations: delegationChain.delegations,
-            userPublicKey: delegationChain.publicKey,
-            authnMethod: "passkey",
-          } satisfies AuthResponse,
-          response.origin,
-        );
-      } else if ("error" in response) {
-        window.opener.postMessage(
-          {
-            kind: "authorize-client-failure",
-            text: response.error.message,
-          } satisfies AuthResponse,
-          response.origin,
-        );
-      }
       return new Promise(() => {});
     }
+  }
+
+  #establishViaPostMessage(options: ChannelOptions): Promise<LegacyChannel> {
     return new Promise((resolve, reject) => {
-      const establishTimeout = setTimeout(() => {
+      const timeout = setTimeout(() => {
         reject(new Error("Legacy channel could not be established"));
       }, ESTABLISH_TIMEOUT_MS);
-      const listener = (event: MessageEvent) => {
-        const isSelf = event.origin === window.location.origin;
-        const isOpener = event.source === window.opener;
-        const isAuthRequest =
-          typeof event.data === "object" &&
-          event.data !== null &&
-          "kind" in event.data &&
-          event.data.kind === "authorize-client";
-        const isAllowedOrigin =
-          options?.allowedOrigin === undefined ||
-          event.origin === options?.allowedOrigin;
-        const primaryOrigin = getPrimaryOrigin();
 
-        if (isSelf || !isOpener || !isAuthRequest || !isAllowedOrigin) {
+      const listener = (event: MessageEvent) => {
+        if (!this.#isValidAuthRequestEvent(event, options)) {
           return;
         }
-        const result = AuthRequest.safeParse(event.data);
-        if (!result.success) {
-          reject(new Error("Invalid legacy auth request"));
-          return;
-        }
+        clearTimeout(timeout);
+
+        // Redirect message to primary origin if we're on another origin
+        const primaryOrigin = getPrimaryOrigin();
         if (
           primaryOrigin !== undefined &&
           window.location.origin !== primaryOrigin
         ) {
-          const redirectURL = new URL(primaryOrigin);
-          redirectURL.pathname = "/authorize";
-          redirectURL.searchParams.set(
-            "redirect_delegation_request",
-            JSON.stringify({
-              redirect_uri: window.location.origin + "/authorize",
-              origin: event.origin,
-              params: DelegationParamsSchema.encode(
-                AuthRequestToDelegationParamsCodec.decode(
-                  AuthRequest.encode(result.data),
-                ),
-              ),
-            }),
-          );
-          const a = document.createElement("a");
-          a.href = redirectURL.href;
-          a.referrerPolicy = "origin";
-          a.click();
+          redirectWithMessage(primaryOrigin, {
+            origin: event.origin,
+            data: event.data,
+          });
           return;
         }
-        const channel = new LegacyChannel(event.origin, result.data);
-        clearTimeout(establishTimeout);
-        resolve(channel);
+
+        // Else establish channel with parsed auth request
+        const parsed = AuthRequest.safeParse(event.data);
+        if (!parsed.success) {
+          reject(new Error("Invalid legacy auth request"));
+          return;
+        }
+        resolve(new LegacyChannel(event.origin, parsed.data));
       };
+
       window.addEventListener("message", listener);
       window.opener?.postMessage(AuthReady, "*");
     });
+  }
+
+  #isValidAuthRequestEvent(event: MessageEvent, options: ChannelOptions) {
+    const isSelf = event.origin === window.location.origin;
+    const isOpener = event.source === window.opener;
+
+    const isAuthRequest =
+      typeof event.data === "object" &&
+      event.data !== null &&
+      "kind" in event.data &&
+      event.data.kind === "authorize-client";
+
+    const allowedOrigin =
+      options?.allowedOrigin === undefined ||
+      event.origin === options.allowedOrigin;
+
+    return !isSelf && isOpener && isAuthRequest && allowedOrigin;
   }
 }

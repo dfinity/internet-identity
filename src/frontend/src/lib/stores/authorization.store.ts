@@ -19,35 +19,10 @@ export type AuthorizationContext = {
   requestId: string | number; // The ID of the JSON RPC request
   requestOrigin: string; // Displayed to the user to identify the app
   effectiveOrigin: string; // Used for last used storage and delegations
+  isAuthenticating: boolean; // True if user is being redirect back to app
 };
 
-export type AuthorizationStatus =
-  // Not handled in `authorize/+layout.svelte`.
-  | "init"
-  // Sent in postMessageInterface, kept for backwards compatibility.
-  // Not handled in `authorize/+layout.svelte`.
-  | "waiting"
-  // Sent in postMessageInterface, kept for backwards compatibility
-  // Not handled in `authorize/+layout.svelte`.
-  | "validating"
-  // Set on starting the authenticate flow.
-  | "authenticating"
-  // Set on starting the authorization flow.
-  | "authorizing"
-  // Set after "success" if the user is still here after 2 seconds.
-  | "late-success"
-  // All the following are returned by `authenticationProtocol`
-  | "invalid"
-  | "orphan"
-  | "closed"
-  | "success"
-  | "unverified-origin"
-  | "failure";
-
-type AuthorizationStore = Readable<{
-  context?: AuthorizationContext;
-  status: AuthorizationStatus;
-}> & {
+type AuthorizationStore = Readable<AuthorizationContext | undefined> & {
   handleRequest: (
     requestOrigin: string,
     requestId: string | number,
@@ -62,22 +37,10 @@ type AuthorizationStore = Readable<{
   }>;
 };
 
-const internalStore = writable<{
-  context?: AuthorizationContext;
-  status: AuthorizationStatus;
-}>({ status: "init" });
-
-export class UnverifiedOriginError extends Error {
-  get message() {
-    return `Invalid derivation origin: ${super.message}`;
-  }
-}
+const internalStore = writable<AuthorizationContext | undefined>();
 
 export const authorizationStore: AuthorizationStore = {
   handleRequest: async (requestOrigin, requestId, params) => {
-    internalStore.set({
-      status: "validating",
-    });
     const effectiveOrigin = remapToLegacyDomain(
       params.icrc95DerivationOrigin ?? origin,
     );
@@ -86,29 +49,27 @@ export const authorizationStore: AuthorizationStore = {
       derivationOrigin: params.icrc95DerivationOrigin,
     });
     if (validationResult.result === "invalid") {
-      throw new UnverifiedOriginError(validationResult.message);
+      throw new Error("Unverified origin");
     }
     internalStore.set({
-      context: {
-        authRequest: {
-          kind: "authorize-client",
-          sessionPublicKey: params.publicKey.toDer(),
-          maxTimeToLive: params.maxTimeToLive,
-          derivationOrigin: params.icrc95DerivationOrigin,
-        },
-        requestId,
-        requestOrigin,
-        effectiveOrigin,
+      authRequest: {
+        kind: "authorize-client",
+        sessionPublicKey: params.publicKey.toDer(),
+        maxTimeToLive: params.maxTimeToLive,
+        derivationOrigin: params.icrc95DerivationOrigin,
       },
-      status: "authenticating",
+      requestId,
+      requestOrigin,
+      effectiveOrigin,
+      isAuthenticating: false,
     });
   },
   subscribe: (...args) => internalStore.subscribe(...args),
   authorize: async (accountNumberMaybePromise, artificialDelay) => {
     const context = get(authorizationContextStore);
     internalStore.set({
-      context,
-      status: "authorizing",
+      ...context,
+      isAuthenticating: true,
     });
     const { identityNumber, actor } = get(authenticatedStore);
     const artificialDelayPromise = waitFor(
@@ -152,14 +113,9 @@ export const authorizationStore: AuthorizationStore = {
 };
 
 export const authorizationContextStore: Readable<AuthorizationContext> =
-  derived(authorizationStore, ({ context }) => {
+  derived(authorizationStore, (context) => {
     if (context === undefined) {
       throw new Error("Authorization context is not available yet");
     }
     return context;
   });
-
-export const authorizationStatusStore: Readable<AuthorizationStatus> = derived(
-  internalStore,
-  ({ status }) => status,
-);

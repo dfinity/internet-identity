@@ -5,6 +5,6 @@
   const { children }: LayoutProps = $props();
 </script>
 
-<AuthorizationChannel>
+<AuthorizationChannel options={{ pending: true }}>
   {@render children()}
 </AuthorizationChannel>
