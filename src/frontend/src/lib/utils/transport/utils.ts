@@ -192,7 +192,7 @@ export const AuthRequestCodec = z.codec(
     kind: z.literal("authorize-client"),
     sessionPublicKey: z.union([z.instanceof(Uint8Array), z.base64()]),
     maxTimeToLive: z.optional(z.union([z.string(), z.number(), z.bigint()])),
-    derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
+    derivationOrigin: z.optional(z.string()),
     allowPinAuthentication: z.optional(z.boolean()),
     autoSelectionPrincipal: z.optional(z.string()),
   }),
@@ -200,7 +200,7 @@ export const AuthRequestCodec = z.codec(
     kind: z.literal("authorize-client"),
     sessionPublicKey: z.instanceof(Uint8Array),
     maxTimeToLive: z.optional(z.bigint()),
-    derivationOrigin: z.optional(z.lazy(() => OriginSchema)),
+    derivationOrigin: z.optional(z.string()),
     allowPinAuthentication: z.optional(z.boolean()),
     autoSelectionPrincipal: z.optional(
       z.custom<Principal>((arg) => arg instanceof Principal),
