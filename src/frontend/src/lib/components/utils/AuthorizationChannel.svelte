@@ -79,10 +79,11 @@
             result.data,
           );
           resolve();
-        } catch {
+        } catch (error) {
+          console.error(error); // Log error to console
           reject(
             new AuthorizeChannelError(
-              $t`Invalid request`,
+              $t`Unverified origin`,
               $t`It seems like the request could not be processed.`,
             ),
           );
@@ -120,10 +121,6 @@
           );
         });
         return authorizeChannel(channel);
-      })
-      .catch((error) => {
-        console.error(error);
-        throw error;
       }),
   );
 </script>
