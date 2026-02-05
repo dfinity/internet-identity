@@ -18,11 +18,6 @@ import {
   OriginSchema,
   StringOrNumberToBigIntCodec,
 } from "$lib/utils/transport/utils";
-// import {
-//   forwardMessage,
-//   isForwardedMessage,
-// } from "../../../../routes/(new-styling)/(cross-origin)/utils";
-// TODO: Remove message forwarding from this file
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -130,11 +125,6 @@ export async function authenticationProtocol({
   // is sent with "*" as the target origin. This is safe as no sensitive
   // information is being communicated here.
   window.opener?.postMessage(AuthReady, "*");
-  // Also send a message to be forwarded to the parent window,
-  // in case the authorization flow is cross-origin embedded.
-  // canisterConfig.related_origins[0]?.forEach((origin) =>
-  //   window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
-  // );
 
   onProgress("waiting");
 
@@ -193,14 +183,7 @@ export async function authenticationProtocol({
       kind: "authorize-client-failure",
       text: authenticateResult.text,
     } satisfies AuthResponse;
-    if (requestResult.forwardFromOrigin !== undefined) {
-      // window.parent.postMessage(
-      //   forwardMessage(response, authContext.requestOrigin),
-      //   requestResult.forwardFromOrigin,
-      // );
-    } else {
-      window.opener.postMessage(response);
-    }
+    window.opener.postMessage(response);
     return authenticateResult.kind;
   }
   void (authenticateResult.kind satisfies "success");
@@ -212,14 +195,7 @@ export async function authenticationProtocol({
     authnMethod: authenticateResult.authnMethod,
   } satisfies AuthResponse;
 
-  if (requestResult.forwardFromOrigin !== undefined) {
-    // window.parent.postMessage(
-    //   forwardMessage(response, authContext.requestOrigin),
-    //   requestResult.forwardFromOrigin,
-    // );
-  } else {
-    window.opener.postMessage(response, authContext.requestOrigin);
-  }
+  window.opener.postMessage(response, authContext.requestOrigin);
 
   return "success";
 }
