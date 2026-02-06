@@ -248,3 +248,107 @@ export const AuthRequestCodec = z.codec(
 );
 
 export type AuthRequest = z.output<typeof AuthRequestCodec>;
+
+// Legacy auth response message
+export const AuthResponseCodec = z.codec(
+  z.union([
+    z.object({
+      kind: z.literal("authorize-client-success"),
+      delegations: z.array(
+        z.object({
+          delegation: z.union([
+            z.object({
+              pubkey: z.base64(),
+              expiration: z.string(),
+              targets: z.optional(z.array(z.string())),
+            }),
+            z.instanceof(Delegation),
+          ]),
+          signature: z.union([z.base64(), z.instanceof(Uint8Array)]),
+        }),
+      ),
+      userPublicKey: z.union([z.base64(), z.instanceof(Uint8Array)]),
+      authnMethod: z.union([
+        z.literal("pin"),
+        z.literal("passkey"),
+        z.literal("recovery"),
+      ]),
+    }),
+    z.object({
+      kind: z.literal("authorize-client-failure"),
+      text: z.string(),
+    }),
+  ]),
+  z.union([
+    z.object({
+      kind: z.literal("authorize-client-success"),
+      delegations: z.array(
+        z.object({
+          delegation: z.instanceof(Delegation),
+          signature: z.instanceof(Uint8Array),
+        }),
+      ),
+      userPublicKey: z.instanceof(Uint8Array),
+      authnMethod: z.union([
+        z.literal("pin"),
+        z.literal("passkey"),
+        z.literal("recovery"),
+      ]),
+    }),
+    z.object({
+      kind: z.literal("authorize-client-failure"),
+      text: z.string(),
+    }),
+  ]),
+  {
+    decode: (response) =>
+      response.kind === "authorize-client-success"
+        ? {
+            kind: response.kind,
+            delegations: response.delegations.map(
+              ({ delegation, signature }) => ({
+                delegation:
+                  delegation instanceof Delegation
+                    ? delegation
+                    : new Delegation(
+                        z.util.base64ToUint8Array(delegation.pubkey),
+                        BigInt(delegation.expiration),
+                        delegation.targets?.map((target) =>
+                          Principal.fromText(target),
+                        ),
+                      ),
+                signature:
+                  typeof signature === "string"
+                    ? z.util.base64ToUint8Array(signature)
+                    : signature,
+              }),
+            ),
+            userPublicKey:
+              typeof response.userPublicKey === "string"
+                ? z.util.base64ToUint8Array(response.userPublicKey)
+                : response.userPublicKey,
+            authnMethod: response.authnMethod,
+          }
+        : response,
+    encode: (response) =>
+      response.kind === "authorize-client-success"
+        ? {
+            kind: response.kind,
+            delegations: response.delegations.map(
+              ({ delegation, signature }) => ({
+                delegation: {
+                  pubkey: z.util.uint8ArrayToBase64(delegation.pubkey),
+                  expiration: delegation.expiration.toString(),
+                  targets: delegation.targets?.map((target) => target.toText()),
+                },
+                signature: z.util.uint8ArrayToBase64(signature),
+              }),
+            ),
+            userPublicKey: z.util.uint8ArrayToBase64(response.userPublicKey),
+            authnMethod: response.authnMethod,
+          }
+        : response,
+  },
+);
+
+export type AuthResponse = z.output<typeof AuthResponseCodec>;

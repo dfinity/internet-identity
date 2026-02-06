@@ -5,15 +5,14 @@ import {
   type JsonRequest,
   type JsonResponse,
   type Transport,
+  type AuthRequest,
+  type AuthResponse,
   DelegationResultSchema,
   AuthRequestCodec,
-  AuthRequest,
   DelegationParamsCodec,
+  AuthResponseCodec,
 } from "$lib/utils/transport/utils";
-import {
-  AuthReady,
-  type AuthResponse,
-} from "$lib/legacy/flows/authorize/postMessageInterface";
+import { AuthReady } from "$lib/legacy/flows/authorize/postMessageInterface";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 
 const ESTABLISH_TIMEOUT_MS = 2000;
@@ -166,7 +165,7 @@ class LegacyChannel implements Channel {
     if (this.#redirectOrigin !== undefined) {
       redirectWithMessage(this.#redirectOrigin, {
         origin: this.#origin,
-        data,
+        data: AuthResponseCodec.encode(data),
       });
       return new Promise(() => {});
     }
@@ -202,9 +201,9 @@ export class LegacyTransport implements Transport {
         ),
       );
     } else {
-      // Forward response from primary origin as-is
+      // Forward response from primary origin
       window.opener.postMessage(
-        redirectMessage.message.data,
+        AuthResponseCodec.parse(redirectMessage.message.data),
         redirectMessage.message.origin,
       );
       return new Promise(() => {});

@@ -158,7 +158,7 @@
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
     {#if $authorizationContextStore.isAuthenticating}
-      {#await waitFor(5000)}
+      {#await waitFor(10000)}
         <div class="flex flex-col items-center justify-center gap-4">
           <ProgressRing class="text-fg-primary size-14" />
           <p class="text-text-secondary text-lg">
