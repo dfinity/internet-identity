@@ -11,13 +11,7 @@ import {
 import { loginFunnel } from "$lib/utils/analytics/loginFunnel";
 import { registrationFunnel } from "$lib/utils/analytics/registrationFunnel";
 import { type SignedDelegation as FrontendSignedDelegation } from "@icp-sdk/core/identity";
-import { Principal } from "@icp-sdk/core/principal";
-import { z } from "zod";
-import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
-import {
-  forwardMessage,
-  isForwardedMessage,
-} from "../../../../routes/(new-styling)/(cross-origin)/utils";
+import { type AuthRequest, AuthRequestCodec } from "$lib/utils/transport/utils";
 
 // The type of messages that kick start the flow (II -> RP)
 export const AuthReady = {
@@ -42,40 +36,6 @@ export interface AuthContext {
    */
   requestOrigin: string;
 }
-
-const zodPrincipal = z.string().transform((val, ctx) => {
-  let principal;
-  try {
-    principal = Principal.fromText(val);
-  } catch {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Not a principal " });
-    return z.NEVER;
-  }
-  return principal;
-});
-
-export const AuthRequest = z.object({
-  kind: z.literal("authorize-client"),
-  sessionPublicKey: z.instanceof(Uint8Array),
-  maxTimeToLive: z
-    .optional(z.union([z.number(), z.bigint()]))
-    .transform((val) => {
-      if (typeof val === "number") {
-        // Temporary work around for clients that use 'number' instead of 'bigint'
-        // https://github.com/dfinity/internet-identity/issues/1050
-        console.warn(
-          "maxTimeToLive is 'number' but should be 'bigint', this will be an error in the future",
-        );
-        return BigInt(val);
-      }
-      return val;
-    }),
-  derivationOrigin: z.optional(z.string()),
-  allowPinAuthentication: z.optional(z.boolean()),
-  autoSelectionPrincipal: z.optional(zodPrincipal),
-});
-
-export type AuthRequest = z.output<typeof AuthRequest>;
 
 export type AuthResponse =
   | {
@@ -116,13 +76,8 @@ export async function authenticationProtocol({
   "orphan" | "closed" | "invalid" | "success" | "failure" | "unverified-origin"
 > {
   authorizeClientFunnel.init();
-  const primaryOrigin = getPrimaryOrigin();
-  const isEmbedded =
-    primaryOrigin !== undefined &&
-    window.origin === primaryOrigin &&
-    window.self !== window.top;
 
-  if (window.opener === null && !isEmbedded) {
+  if (window.opener === null) {
     if (window.history.length > 1) {
       // If there's no `window.opener` and a user has manually navigated to "/#authorize".
       // Signal that there will never be an authentication request incoming.
@@ -139,11 +94,6 @@ export async function authenticationProtocol({
   // is sent with "*" as the target origin. This is safe as no sensitive
   // information is being communicated here.
   window.opener?.postMessage(AuthReady, "*");
-  // Also send a message to be forwarded to the parent window,
-  // in case the authorization flow is cross-origin embedded.
-  canisterConfig.related_origins[0]?.forEach((origin) =>
-    window.parent?.postMessage(forwardMessage(AuthReady, "*"), origin),
-  );
 
   onProgress("waiting");
 
@@ -202,14 +152,7 @@ export async function authenticationProtocol({
       kind: "authorize-client-failure",
       text: authenticateResult.text,
     } satisfies AuthResponse;
-    if (requestResult.forwardFromOrigin !== undefined) {
-      window.parent.postMessage(
-        forwardMessage(response, authContext.requestOrigin),
-        requestResult.forwardFromOrigin,
-      );
-    } else {
-      window.opener.postMessage(response);
-    }
+    window.opener.postMessage(response);
     return authenticateResult.kind;
   }
   void (authenticateResult.kind satisfies "success");
@@ -221,14 +164,7 @@ export async function authenticationProtocol({
     authnMethod: authenticateResult.authnMethod,
   } satisfies AuthResponse;
 
-  if (requestResult.forwardFromOrigin !== undefined) {
-    window.parent.postMessage(
-      forwardMessage(response, authContext.requestOrigin),
-      requestResult.forwardFromOrigin,
-    );
-  } else {
-    window.opener.postMessage(response, authContext.requestOrigin);
-  }
+  window.opener.postMessage(response, authContext.requestOrigin);
 
   return "success";
 }
@@ -239,8 +175,6 @@ const waitForRequest = (): Promise<
       kind: "received";
       request: AuthRequest;
       origin: string;
-      // Optional trusted II origin that forwarded the message
-      forwardFromOrigin?: string;
     }
   | { kind: "timeout" }
   | { kind: "invalid" }
@@ -256,20 +190,8 @@ const waitForRequest = (): Promise<
         console.warn("Ignoring message from own origin", event);
         return;
       }
-      const {
-        message,
-        origin,
-        forwardFromOrigin,
-      }: { message: unknown; origin: string; forwardFromOrigin?: string } =
-        canisterConfig.related_origins[0]?.includes(event.origin) === true &&
-        isForwardedMessage(event)
-          ? {
-              message: event.data.__ii_forwarded.data,
-              origin: event.data.__ii_forwarded.origin,
-              forwardFromOrigin: event.origin,
-            }
-          : { message: event.data, origin: event.origin };
-      const result = AuthRequest.safeParse(message);
+
+      const result = AuthRequestCodec.safeParse(event.data);
 
       if (!result.success) {
         const message = `Unexpected error: flow request ` + result.error;
@@ -293,8 +215,7 @@ const waitForRequest = (): Promise<
       resolve({
         kind: "received",
         request: result.data,
-        origin,
-        forwardFromOrigin,
+        origin: event.origin,
       });
     };
 

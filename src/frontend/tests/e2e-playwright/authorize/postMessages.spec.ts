@@ -62,7 +62,7 @@ test("Should show error for invalid message", async ({ page }) => {
 
   // Check for specific error message in II popup
   await expect(
-    iiPage.getByRole("heading", { name: "Invalid request" }),
+    iiPage.getByRole("heading", { name: "Unable to connect" }),
   ).toBeVisible();
 
   // Setup the listener because clicking closes the page immediately
@@ -82,7 +82,7 @@ test("Should show error after not receiving message for 10 seconds", async ({
 
   // Check for specific error message in II popup
   await expect(
-    iiPage.getByRole("heading", { name: "Connection closed" }),
+    iiPage.getByRole("heading", { name: "Unable to connect" }),
   ).toBeVisible();
 
   // Setup the listener because clicking closes the page immediately

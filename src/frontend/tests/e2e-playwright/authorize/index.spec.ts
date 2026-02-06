@@ -238,7 +238,7 @@ test("Authorize with ICRC-29 (directly through OpenID)", async ({ page }) => {
   await authorizeWithUrl(
     page,
     TEST_APP_URL,
-    II_URL + "/authorize?openid=test%20openid",
+    II_URL + "/authorize?openid=http%3A%2F%2Flocalhost%3A11105",
     async (openIdPage) => {
       await openIdPage.waitForURL("http://localhost:11105/interaction/*");
       await expect(
