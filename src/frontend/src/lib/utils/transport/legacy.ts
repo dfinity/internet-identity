@@ -6,7 +6,6 @@ import {
   type JsonResponse,
   type Transport,
   DelegationResultSchema,
-  OriginSchema,
   AuthRequestCodec,
   AuthRequest,
   DelegationParamsCodec,
