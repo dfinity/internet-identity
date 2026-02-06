@@ -20,7 +20,7 @@ import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 const ESTABLISH_TIMEOUT_MS = 2000;
 const AUTHORIZE_REQUEST_ID = "authorize-client";
 const RedirectMessageSchema = z.object({
-  origin: OriginSchema,
+  origin: z.httpUrl(),
   data: z.unknown(),
 });
 
