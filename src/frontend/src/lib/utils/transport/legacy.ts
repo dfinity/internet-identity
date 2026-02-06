@@ -225,11 +225,7 @@ export class LegacyTransport implements Transport {
     ) {
       // Assert message to be a response and forward it to the app
       const response = AuthResponseCodec.parse(params.message.data);
-      window.opener.postMessage(
-        AuthResponseCodec.parse(params.message.data),
-        response,
-        params.message.origin,
-      );
+      window.opener.postMessage(response, params.message.origin);
       // App should immediately close window after receiving the message,
       // so we return an indefinitely pending promise while we wait for it.
       return new Promise(() => {});
