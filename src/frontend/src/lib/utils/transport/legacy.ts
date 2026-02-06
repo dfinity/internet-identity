@@ -24,16 +24,6 @@ const RedirectMessageSchema = z.object({
 
 type RedirectMessage = z.infer<typeof RedirectMessageSchema>;
 
-const cleanRedirectHash = () => {
-  if (window.location.hash === "") {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-  url.hash = "";
-  window.history.replaceState(undefined, "", url);
-};
-
 const redirectWithMessage = (
   targetOrigin: string,
   message: RedirectMessage,
