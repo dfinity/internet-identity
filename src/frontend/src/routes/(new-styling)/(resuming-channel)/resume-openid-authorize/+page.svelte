@@ -15,7 +15,9 @@
 
   const dapps = getDapps();
   const dapp = $derived(
-    dapps.find((dapp) => dapp.hasOrigin($authorizationStore.requestOrigin)),
+    dapps.find((dapp) =>
+      dapp.hasOrigin($authorizationContextStore.requestOrigin),
+    ),
   );
 
   onMount(async () => {
@@ -63,7 +65,7 @@
 
 <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
   {#if dapp?.logoSrc !== undefined}
-    {@const name = dapp?.name ?? $authorizationStore.requestOrigin}
+    {@const name = dapp?.name ?? $authorizationContextStore.requestOrigin}
     <img
       src={dapp?.logoSrc}
       alt={$t`${name} logo`}
