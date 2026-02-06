@@ -14,6 +14,7 @@ const DISCONNECT_TIMEOUT_MS = 2000;
 class PostMessageChannel implements Channel {
   #origin: string;
   #source: WindowProxy;
+  #windowListener: (event: MessageEvent) => void;
   #closed = false;
   #requests: JsonRequest[] = [];
   #requestListeners = new Set<(request: JsonRequest) => void>();
@@ -22,8 +23,7 @@ class PostMessageChannel implements Channel {
   constructor(origin: string, source: WindowProxy) {
     this.#origin = origin;
     this.#source = source;
-
-    window.addEventListener("message", (event) => {
+    this.#windowListener = (event: MessageEvent) => {
       const { data, success } = JsonRequestSchema.safeParse(event.data);
       if (
         event.source !== this.#source ||
@@ -35,7 +35,9 @@ class PostMessageChannel implements Channel {
       }
       this.#requests.push(data);
       this.#requestListeners.forEach((listener) => listener(data));
-    });
+    };
+
+    window.addEventListener("message", this.#windowListener);
   }
 
   get origin() {
@@ -81,6 +83,8 @@ class PostMessageChannel implements Channel {
   }
 
   close(): Promise<void> {
+    window.removeEventListener("message", this.#windowListener);
+
     this.#closed = true;
     this.#closeListeners.forEach((listener) => listener());
     return Promise.resolve();
