@@ -70,6 +70,11 @@ const getRedirectMessage = ():
     return;
   }
 
+  // Clean up redirect message from URL for end-user (remove hash)
+  const url = new URL(window.location.href);
+  url.hash = "";
+  window.history.replaceState(undefined, "", url);
+
   // Check if the referrer is a trusted origin (II itself)
   const referrer = new URL(document.referrer);
   const trusted =
@@ -183,31 +188,64 @@ class LegacyChannel implements Channel {
 
 export class LegacyTransport implements Transport {
   establishChannel(options: ChannelOptions): Promise<LegacyChannel> {
+    // Primary origin (either https://id.ai or https://beta.id.ai) when deployed on beta or prod
     const primaryOrigin = getPrimaryOrigin();
+
+    // Message received from prior redirect (either forwarded request or response)
     const redirectMessage = getRedirectMessage();
 
+    // Either:
+    // - There's no primary origin, thus redirects don't apply
+    // - There's no message received from a prior redirect
     if (primaryOrigin === undefined || redirectMessage === undefined) {
+      // Establish channel as usual via post message
       return this.#establishViaPostMessage(options);
     }
 
-    cleanRedirectHash();
-    if (window.location.origin === primaryOrigin) {
-      // Establish channel with request from legacy origin
+    // If there's a message received from prior redirect,
+    // remove it from the url to not confuse the end-user.
+    return this.#processRedirectMessage({
+      primaryOrigin,
+      sourceOrigin: redirectMessage.sourceOrigin,
+      targetOrigin: window.location.origin,
+      message: redirectMessage.message,
+    });
+  }
+
+  #processRedirectMessage(params: {
+    primaryOrigin: string;
+    sourceOrigin: string;
+    targetOrigin: string;
+    message: RedirectMessage;
+  }): Promise<LegacyChannel> {
+    if (
+      // Message sent from legacy origin to primary origin through redirect
+      params.sourceOrigin !== params.primaryOrigin &&
+      params.targetOrigin === params.primaryOrigin
+    ) {
+      // Assert message to be a request and establish channel with it
+      const request = AuthRequestCodec.parse(params.message.data);
       return Promise.resolve(
-        new LegacyChannel(
-          redirectMessage.message.origin,
-          AuthRequestCodec.parse(redirectMessage.message.data),
-          redirectMessage.sourceOrigin,
-        ),
+        new LegacyChannel(params.message.origin, request, params.sourceOrigin),
       );
-    } else {
-      // Forward response from primary origin
+    } else if (
+      // Message sent from primary origin to legacy origin through redirect
+      params.sourceOrigin === params.primaryOrigin &&
+      params.targetOrigin !== params.primaryOrigin
+    ) {
+      // Assert message to be a response and forward it to the app
+      const response = AuthResponseCodec.parse(params.message.data);
       window.opener.postMessage(
-        AuthResponseCodec.parse(redirectMessage.message.data),
-        redirectMessage.message.origin,
+        AuthResponseCodec.parse(params.message.data),
+        response,
+        params.message.origin,
       );
+      // App should immediately close window after receiving the message,
+      // so we return an indefinitely pending promise while we wait for it.
       return new Promise(() => {});
     }
+
+    return Promise.reject("Redirect message could not be processed");
   }
 
   #establishViaPostMessage(options: ChannelOptions): Promise<LegacyChannel> {
