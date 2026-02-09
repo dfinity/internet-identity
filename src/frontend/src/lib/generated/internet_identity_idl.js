@@ -171,6 +171,7 @@ export const idlFactory = ({ IDL }) => {
   const AuthnMethodRegisterError = IDL.Variant({
     'RegistrationModeOff' : IDL.Null,
     'RegistrationAlreadyInProgress' : IDL.Null,
+    'NotSelfAuthenticating' : IDL.Principal,
     'InvalidMetadata' : IDL.Text,
   });
   const RegistrationId = IDL.Text;
@@ -301,6 +302,34 @@ export const idlFactory = ({ IDL }) => {
     'devices' : IDL.Vec(DeviceWithUsage),
     'openid_credentials' : IDL.Opt(IDL.Vec(OpenIdCredential)),
     'device_registration' : IDL.Opt(DeviceRegistrationInfo),
+  });
+  const GetAttributesRequest = IDL.Record({
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(IDL.Nat8))),
+    'issued_at_timestamp_ns' : Timestamp,
+    'identity_number' : IdentityNumber,
+  });
+  const CertifiedAttribute = IDL.Record({
+    'key' : IDL.Text,
+    'signature' : IDL.Vec(IDL.Nat8),
+    'value' : IDL.Vec(IDL.Nat8),
+  });
+  const CertifiedAttributes = IDL.Record({
+    'expires_at_timestamp_ns' : Timestamp,
+    'certified_attributes' : IDL.Vec(CertifiedAttribute),
+  });
+  const GetAccountError = IDL.Variant({
+    'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
+    'NoSuchAccount' : IDL.Record({
+      'origin' : FrontendHostname,
+      'anchor_number' : UserNumber,
+    }),
+  });
+  const GetAttributesError = IDL.Variant({
+    'AuthorizationError' : IDL.Principal,
+    'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
+    'GetAccountError' : GetAccountError,
   });
   const GetDefaultAccountError = IDL.Variant({
     'NoSuchOrigin' : IDL.Record({ 'anchor_number' : UserNumber }),
@@ -457,6 +486,21 @@ export const idlFactory = ({ IDL }) => {
   const PrepareAccountDelegation = IDL.Record({
     'user_key' : UserKey,
     'expiration' : Timestamp,
+  });
+  const PrepareAttributeRequest = IDL.Record({
+    'origin' : FrontendHostname,
+    'attribute_keys' : IDL.Vec(IDL.Text),
+    'account_number' : IDL.Opt(AccountNumber),
+    'identity_number' : IdentityNumber,
+  });
+  const PrepareAttributeResponse = IDL.Record({
+    'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Vec(IDL.Nat8))),
+    'issued_at_timestamp_ns' : Timestamp,
+  });
+  const PrepareAttributeError = IDL.Variant({
+    'AuthorizationError' : IDL.Principal,
+    'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
+    'GetAccountError' : GetAccountError,
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
@@ -669,6 +713,16 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'get_anchor_info' : IDL.Func([UserNumber], [IdentityAnchorInfo], []),
+    'get_attributes' : IDL.Func(
+        [GetAttributesRequest],
+        [
+          IDL.Variant({
+            'Ok' : CertifiedAttributes,
+            'Err' : GetAttributesError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_default_account' : IDL.Func(
         [UserNumber, FrontendHostname],
         [IDL.Variant({ 'Ok' : AccountInfo, 'Err' : GetDefaultAccountError })],
@@ -794,6 +848,16 @@ export const idlFactory = ({ IDL }) => {
           IDL.Variant({
             'Ok' : PrepareAccountDelegation,
             'Err' : AccountDelegationError,
+          }),
+        ],
+        [],
+      ),
+    'prepare_attributes' : IDL.Func(
+        [PrepareAttributeRequest],
+        [
+          IDL.Variant({
+            'Ok' : PrepareAttributeResponse,
+            'Err' : PrepareAttributeError,
           }),
         ],
         [],

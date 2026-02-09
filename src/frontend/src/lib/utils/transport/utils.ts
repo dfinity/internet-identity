@@ -352,3 +352,7 @@ export const AuthResponseCodec = z.codec(
 );
 
 export type AuthResponse = z.output<typeof AuthResponseCodec>;
+
+export const AttributesParamsSchema = z.object({
+  attributes: z.array(z.string()),
+});

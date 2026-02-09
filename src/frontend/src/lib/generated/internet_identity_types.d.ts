@@ -173,6 +173,12 @@ export type AuthnMethodRegisterError = {
   } |
   {
     /**
+     * The caller's principal is not self-authenticating.
+     */
+    'NotSelfAuthenticating' : Principal
+  } |
+  {
+    /**
      * The metadata of the provided authentication method contains invalid entries.
      */
     'InvalidMetadata' : string
@@ -279,6 +285,15 @@ export interface CaptchaConfig {
     },
 }
 export type CaptchaResult = ChallengeResult;
+export interface CertifiedAttribute {
+  'key' : string,
+  'signature' : Uint8Array | number[],
+  'value' : Uint8Array | number[],
+}
+export interface CertifiedAttributes {
+  'expires_at_timestamp_ns' : Timestamp,
+  'certified_attributes' : Array<CertifiedAttribute>,
+}
 export interface Challenge {
   'png_base64' : string,
   'challenge_key' : ChallengeKey,
@@ -408,8 +423,43 @@ export interface DummyAuthConfig {
   'prompt_for_index' : boolean,
 }
 export type FrontendHostname = string;
+export type GetAccountError = {
+    'NoSuchOrigin' : { 'anchor_number' : UserNumber }
+  } |
+  {
+    'NoSuchAccount' : {
+      'origin' : FrontendHostname,
+      'anchor_number' : UserNumber,
+    }
+  };
 export type GetAccountsError = { 'InternalCanisterError' : string } |
   { 'Unauthorized' : Principal };
+export type GetAttributesError = { 'AuthorizationError' : Principal } |
+  { 'ValidationError' : { 'problems' : Array<string> } } |
+  { 'GetAccountError' : GetAccountError };
+export interface GetAttributesRequest {
+  /**
+   * Origin of the relying party in the attribute sharing flow.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * II account for the relying party.
+   */
+  'account_number' : [] | [AccountNumber],
+  /**
+   * The attribute to be retrieved, must be a subset of certified_attributes from
+   * the prepare_attributes response.
+   */
+  'attributes' : Array<[string, Uint8Array | number[]]>,
+  /**
+   * Timestamp received from the prepare_attributes call.
+   */
+  'issued_at_timestamp_ns' : Timestamp,
+  /**
+   * Identity for which the attributes should be prepared.
+   */
+  'identity_number' : IdentityNumber,
+}
 export type GetDefaultAccountError = {
     'NoSuchOrigin' : { 'anchor_number' : UserNumber }
   } |
@@ -790,6 +840,31 @@ export interface PrepareAccountDelegation {
   'user_key' : UserKey,
   'expiration' : Timestamp,
 }
+export type PrepareAttributeError = { 'AuthorizationError' : Principal } |
+  { 'ValidationError' : { 'problems' : Array<string> } } |
+  { 'GetAccountError' : GetAccountError };
+export interface PrepareAttributeRequest {
+  /**
+   * Origin of the relying party in the attribute sharing flow.
+   */
+  'origin' : FrontendHostname,
+  /**
+   * The attribute to be prepared.
+   */
+  'attribute_keys' : Array<string>,
+  /**
+   * II account for the relying party.
+   */
+  'account_number' : [] | [AccountNumber],
+  /**
+   * Identity for which the attributes should be prepared.
+   */
+  'identity_number' : IdentityNumber,
+}
+export interface PrepareAttributeResponse {
+  'attributes' : Array<[string, Uint8Array | number[]]>,
+  'issued_at_timestamp_ns' : Timestamp,
+}
 export type PrepareIdAliasError = {
     /**
      * Internal canister error. See the error message for details.
@@ -1121,6 +1196,11 @@ export interface _SERVICE {
   >,
   'get_anchor_credentials' : ActorMethod<[UserNumber], AnchorCredentials>,
   'get_anchor_info' : ActorMethod<[UserNumber], IdentityAnchorInfo>,
+  'get_attributes' : ActorMethod<
+    [GetAttributesRequest],
+    { 'Ok' : CertifiedAttributes } |
+      { 'Err' : GetAttributesError }
+  >,
   'get_default_account' : ActorMethod<
     [UserNumber, FrontendHostname],
     { 'Ok' : AccountInfo } |
@@ -1244,7 +1324,7 @@ export interface _SERVICE {
   >,
   /**
    * OpenID credentials protocol
-   * =========================
+   * ===========================
    */
   'openid_identity_registration_finish' : ActorMethod<
     [OpenIDRegFinishArg],
@@ -1268,6 +1348,15 @@ export interface _SERVICE {
       { 'Err' : AccountDelegationError }
   >,
   /**
+   * Attribute sharing protocol
+   * ==========================
+   */
+  'prepare_attributes' : ActorMethod<
+    [PrepareAttributeRequest],
+    { 'Ok' : PrepareAttributeResponse } |
+      { 'Err' : PrepareAttributeError }
+  >,
+  /**
    * Authentication protocol
    * =======================
    */
@@ -1276,8 +1365,8 @@ export interface _SERVICE {
     [UserKey, Timestamp]
   >,
   /**
-   * Attribute Sharing MVP API
-   * =========================
+   * Old Verifiable Credentials API
+   * ==============================
    * The methods below are used to generate ID-alias credentials during attribute sharing flow.
    */
   'prepare_id_alias' : ActorMethod<

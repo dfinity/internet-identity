@@ -11,7 +11,14 @@
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import { t } from "$lib/stores/locale.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { DelegationResultSchema } from "$lib/utils/transport/utils";
+  import {
+    AttributesParamsSchema,
+    DelegationResultSchema,
+    JsonRequest,
+  } from "$lib/utils/transport/utils";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { retryFor, throwCanisterError, toBase64 } from "$lib/utils/utils";
+  import { z } from "zod";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -19,6 +26,64 @@
       dapp.hasOrigin($authorizationContextStore.requestOrigin),
     ),
   );
+
+  const createAttributesListener =
+    (issuer: string) => async (request: JsonRequest) => {
+      if (request.id === undefined || request.method !== "ii_attributes") {
+        return;
+      }
+      const paramsResult = AttributesParamsSchema.safeParse(request.params);
+      if (!paramsResult.success) {
+        await $establishedChannelStore.send({
+          jsonrpc: "2.0",
+          id: request.id,
+          error: {
+            code: -32602,
+            message: z.prettifyError(paramsResult.error),
+          },
+        });
+        return;
+      }
+      const implicitConsentAttributeKeys = paramsResult.data.attributes.filter(
+        (attribute) => attribute.startsWith(`openid:${issuer}:`),
+      );
+      const { attributes, issued_at_timestamp_ns } =
+        await $authenticatedStore.actor
+          .prepare_attributes({
+            origin: $authorizationContextStore.effectiveOrigin,
+            attribute_keys: implicitConsentAttributeKeys,
+            account_number: [],
+            identity_number: $authenticatedStore.identityNumber,
+          })
+          .then(throwCanisterError);
+      const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
+        5,
+        () =>
+          $authenticatedStore.actor.get_attributes({
+            origin: $authorizationContextStore.effectiveOrigin,
+            account_number: [],
+            identity_number: $authenticatedStore.identityNumber,
+            attributes,
+            issued_at_timestamp_ns,
+          }),
+      ).then(throwCanisterError);
+      await $establishedChannelStore.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        result: {
+          attributes: Object.fromEntries(
+            certified_attributes.map((attribute) => [
+              attribute.key,
+              {
+                value: toBase64(new Uint8Array(attribute.value)),
+                signature: toBase64(new Uint8Array(attribute.signature)),
+                expiration: expires_at_timestamp_ns.toString(),
+              },
+            ]),
+          ),
+        },
+      });
+    };
 
   onMount(async () => {
     const searchParams = new URLSearchParams(window.location.hash.slice(1));
@@ -52,6 +117,10 @@
       const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
       if (authFlowResult.type === "signUp") {
         await authFlow.completeOpenIdRegistration(authFlowResult.name!);
+      }
+      if (dapp.certifiedAttributes) {
+        const listener = createAttributesListener(config.issuer);
+        $establishedChannelStore.addEventListener(listener);
       }
       const { delegationChain } = await authorizationStore.authorize(undefined);
       await $establishedChannelStore.send({

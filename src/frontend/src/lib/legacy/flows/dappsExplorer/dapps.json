@@ -639,6 +639,7 @@
     "website": "https://caffeine.ai",
     "authOrigins": ["https://caffeine.ai", "https://app.caffeine.ai"],
     "logo": "caffeine_logo.svg",
-    "logoDark": "caffeine_logo_dark.svg"
+    "logoDark": "caffeine_logo_dark.svg",
+    "certified_attributes": true
   }
 ]
