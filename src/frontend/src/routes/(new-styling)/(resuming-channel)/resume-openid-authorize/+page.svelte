@@ -75,8 +75,8 @@
             certified_attributes.map((attribute) => [
               attribute.key,
               {
-                value: toBase64(new Uint8Array(attribute.value)),
-                signature: toBase64(new Uint8Array(attribute.signature)),
+                value: z.util.uint8ArrayToBase64(new Uint8Array(attribute.value)),
+                signature: z.util.uint8ArrayToBase64(new Uint8Array(attribute.signature)),
                 expiration: expires_at_timestamp_ns.toString(),
               },
             ]),
@@ -118,9 +118,9 @@
       if (authFlowResult.type === "signUp") {
         await authFlow.completeOpenIdRegistration(authFlowResult.name!);
       }
-      if (dapp.certifiedAttributes) {
+      if (dapp?.certifiedAttributes === true) {
         const listener = createAttributesListener(config.issuer);
-        $establishedChannelStore.addEventListener(listener);
+        $establishedChannelStore.addEventListener('request', listener);
       }
       const { delegationChain } = await authorizationStore.authorize(undefined);
       await $establishedChannelStore.send({
