@@ -35,28 +35,25 @@ const openIdClaimCases = [
 
 const returnedClaimKeys = new Set(["name", "email"]);
 
-test.describe(
-  "Authorize with ICRC-29 (directly through OpenID) and request attributes",
-  () => {
-    openIdClaimCases.forEach(({ title, openIdClaims }) => {
-      test.use({ openIdClaims });
+test.describe("Authorize with ICRC-29 (directly through OpenID) and request attributes", () => {
+  openIdClaimCases.forEach(({ title, openIdClaims }) => {
+    test.use({ openIdClaims });
 
-      test(title, async ({ page, openIdIssuer, openIdUser }) => {
-        await authorizeWithUrl(
-          page,
-          TEST_APP_URL,
-          II_URL + `/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
-          (openIdPage) => openIdUser.signIn(openIdPage),
-          true,
-        );
-        expect(page.locator("#certifiedAttributes")).toHaveText(
-          Object.entries(openIdUser.claims)
-            .filter(([key]) => returnedClaimKeys.has(key))
-            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-            .map(([key, value]) => `openid:${openIdIssuer}:${key}: ${value}`)
-            .join("\n"),
-        );
-      });
+    test(title, async ({ page, openIdIssuer, openIdUser }) => {
+      await authorizeWithUrl(
+        page,
+        TEST_APP_URL,
+        II_URL + `/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
+        (openIdPage) => openIdUser.signIn(openIdPage),
+        true,
+      );
+      await expect(page.locator("#certifiedAttributes")).toHaveText(
+        Object.entries(openIdUser.claims)
+          .filter(([key]) => returnedClaimKeys.has(key))
+          .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+          .map(([key, value]) => `openid:${openIdIssuer}:${key}: ${value}`)
+          .join("\n"),
+      );
     });
-  },
-);
+  });
+});
