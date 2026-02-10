@@ -641,5 +641,12 @@
     "logo": "caffeine_logo.svg",
     "logoDark": "caffeine_logo_dark.svg",
     "certified_attributes": true
+  },
+  {
+    "name": "Direct OpenID Sign-In",
+    "oneLiner": "Direct OpenID sign-in test app",
+    "website": "https://4mteh-mqaaa-aaaad-adnaa-cai.icp0.io",
+    "logo": "try-id-ai.svg",
+    "certified_attributes": true
   }
 ]
