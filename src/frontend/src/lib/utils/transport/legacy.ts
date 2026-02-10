@@ -233,7 +233,7 @@ class LegacyChannel implements Channel {
     // Replay auth request if it didn't get a response yet
     const authRequest = this.#authRequest;
     if (event === "request" && authRequest !== undefined) {
-      (async () => {
+      void (async () => {
         // Sign towards intermediate identity instead in redirect flow
         const publicKey =
           this.#redirectOrigin !== undefined
