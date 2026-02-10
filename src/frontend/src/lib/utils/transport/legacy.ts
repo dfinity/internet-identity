@@ -178,7 +178,8 @@ const endRedirectSession = async (
   const sessionDelegationChain = await DelegationChain.create(
     identity,
     { toDer: () => authPublicKey },
-    undefined,
+    // Outer delegation lasts 30 days; chain may expire earlier due to inner delegation.
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     { previous: responsedelegationChain },
   );
   return {
@@ -278,7 +279,8 @@ class LegacyChannel implements Channel {
           ? await DelegationChain.create(
               await this.#intermediateIdentityPromise,
               { toDer: () => requestPublicKey },
-              undefined,
+              // Outer delegation lasts 30 days; chain may expire earlier due to inner delegation.
+              new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
               { previous: delegationChain },
             )
           : delegationChain;
