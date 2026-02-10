@@ -15,11 +15,12 @@
     AttributesParamsSchema,
     DelegationResultSchema,
     INVALID_PARAMS_ERROR_CODE,
-    JsonRequest,
+    type JsonRequest,
   } from "$lib/utils/transport/utils";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { retryFor, throwCanisterError } from "$lib/utils/utils";
   import { z } from "zod";
+  import { canisterConfig } from "$lib/globals";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -90,7 +91,7 @@
             ),
           },
         });
-      } catch {
+      } catch (error) {
         await $establishedChannelStore.send({
           jsonrpc: "2.0",
           id: request.id,
@@ -135,7 +136,10 @@
       if (authFlowResult.type === "signUp") {
         await authFlow.completeOpenIdRegistration(authFlowResult.name!);
       }
-      if (dapp?.certifiedAttributes === true) {
+      if (
+        dapp?.certifiedAttributes === true ||
+        canisterConfig.dummy_auth[0] !== undefined
+      ) {
         const listener = createAttributesListener(config.issuer);
         void $establishedChannelStore.addEventListener("request", listener);
       }
