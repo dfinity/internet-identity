@@ -69,6 +69,10 @@ export class KnownDapp {
   public get website(): string {
     return this.descr.website;
   }
+
+  public get certifiedAttributes(): boolean {
+    return this.descr.certified_attributes ?? false;
+  }
 }
 
 // The list of dapps we showcase

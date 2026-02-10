@@ -3,6 +3,11 @@ import { Delegation, DelegationChain } from "@icp-sdk/core/identity";
 import { type Signature } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 
+// See: https://www.jsonrpc.org/specification#error_object
+export const INVALID_PARAMS_ERROR_CODE = -32602;
+// See: https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md#errors-3
+export const GENERIC_ERROR_CODE = 1000;
+
 export interface ChannelOptions {
   allowedOrigin?: string;
   pending?: boolean;
@@ -174,13 +179,19 @@ export const DelegationResultSchema = z.codec(
         Base64ToBytesCodec.decode(publicKey),
       ),
     encode: (delegationChain) => ({
-      publicKey: Base64ToBytesCodec.encode(delegationChain.publicKey),
+      publicKey: Base64ToBytesCodec.encode(
+        new Uint8Array(delegationChain.publicKey),
+      ),
       signerDelegation: delegationChain.delegations.map((delegation) => ({
         delegation: {
-          pubkey: Base64ToBytesCodec.encode(delegation.delegation.pubkey),
+          pubkey: Base64ToBytesCodec.encode(
+            new Uint8Array(delegation.delegation.pubkey),
+          ),
           expiration: delegation.delegation.expiration.toString(),
         },
-        signature: Base64ToBytesCodec.encode(delegation.signature),
+        signature: Base64ToBytesCodec.encode(
+          new Uint8Array(delegation.signature),
+        ),
       })),
     }),
   },
@@ -352,3 +363,8 @@ export const AuthResponseCodec = z.codec(
 );
 
 export type AuthResponse = z.output<typeof AuthResponseCodec>;
+
+// Parameters schema for "ii_attributes" request
+export const AttributesParamsSchema = z.object({
+  attributes: z.array(z.string()),
+});

@@ -5,6 +5,7 @@
     type Channel,
     type ChannelOptions,
     DelegationParamsCodec,
+    INVALID_PARAMS_ERROR_CODE,
   } from "$lib/utils/transport/utils";
   import { authorizationStore } from "$lib/stores/authorization.store";
   import { z } from "zod";
@@ -14,8 +15,6 @@
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { type Snippet } from "svelte";
   import { goto } from "$app/navigation";
-
-  const INVALID_PARAMS_ERROR_CODE = -32602;
 
   class AuthorizeChannelError extends Error {
     #title: string;
