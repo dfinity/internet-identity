@@ -1,10 +1,6 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import { onMount } from "svelte";
-  import {
-    authorizationStore,
-    authorizationStatusStore,
-  } from "$lib/stores/authorization.store";
+  import { authorizationContextStore } from "$lib/stores/authorization.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -14,17 +10,18 @@
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
-  import { afterNavigate, goto, replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
-  import { page } from "$app/state";
   import { sessionStore } from "$lib/stores/session.store";
-  import AuthorizeError from "$lib/components/views/AuthorizeError.svelte";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { waitFor } from "$lib/utils/utils";
+  import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
+  import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -36,7 +33,6 @@
       .slice(0, 3),
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
-  const status = $derived($authorizationStatusStore);
 
   let identityButtonRef = $state<HTMLElement>();
   let isIdentityPopoverOpen = $state(false);
@@ -69,37 +65,12 @@
     await goto("/authorize/upgrade-success");
   };
 
-  onMount(() => {
-    authorizationStore.init({
-      // Use either legacy PostMessage protocol or ICRC-29 PostMessage protocol
-      legacyProtocol: data.legacyProtocol,
-    });
-  });
-
   // Pre-fetch passkey credential ids
   $effect(() =>
     authLastUsedFlow.init(
       lastUsedIdentities.map(({ identityNumber }) => identityNumber),
     ),
   );
-
-  // Remove legacyProtocol param from URL bar after initializing
-  afterNavigate(() => {
-    if (page.url.searchParams.has("legacyProtocol")) {
-      const next = new URL(page.url);
-      next.searchParams.delete("legacyProtocol");
-      replaceState(next, {});
-    }
-  });
-
-  $effect(() => {
-    if (status === "orphan") {
-      goto("/unsupported", {
-        replaceState: true,
-        invalidateAll: true,
-      });
-    }
-  });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
@@ -176,19 +147,35 @@
     {/if}
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
-    {#if status === "authenticating"}
+    {#if $authorizationContextStore.isAuthenticating}
+      {#await waitFor(10000)}
+        <div class="flex flex-col items-center justify-center gap-4">
+          <ProgressRing class="text-fg-primary size-14" />
+          <p class="text-text-secondary text-lg">
+            {$t`Redirecting to the app`}
+          </p>
+        </div>
+      {:then _}
+        <Dialog>
+          <FeaturedIcon size="lg" class="mb-4 self-start">
+            <CircleAlertIcon class="size-6" />
+          </FeaturedIcon>
+          <h1 class="text-text-primary mb-3 text-2xl font-medium">
+            {$t`Authentication successful`}
+          </h1>
+          <p class="text-text-tertiary mb-6 text-base font-medium">
+            {$t`You may close this page.`}
+          </p>
+          <Button onclick={() => window.close()} variant="secondary">
+            <RotateCcwIcon class="size-4" />
+            <span>{$t`Return to app`}</span>
+          </Button>
+        </Dialog>
+      {/await}
+    {:else}
       {@render children()}
-    {:else if status === "authorizing"}
-      <!-- Spinner is not shown for other statuses to avoid flicker -->
-      <div class="flex flex-col items-center justify-center gap-4">
-        <ProgressRing class="text-fg-primary size-14" />
-        <p class="text-text-secondary text-lg">{$t`Redirecting to the app`}</p>
-      </div>
     {/if}
   </div>
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
-
-<!-- Renders any error status or late success status dialog when needed -->
-<AuthorizeError {status} />
