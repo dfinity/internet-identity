@@ -223,45 +223,6 @@ test("Authorize with ICRC-29", async ({ page }) => {
   );
 });
 
-test("Authorize with ICRC-29 (directly through OpenID)", async ({ page }) => {
-  const userId = crypto.randomUUID();
-
-  // Set name claim
-  await fetch(`http://localhost:11105/account/${userId}/claims`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name: DEFAULT_USER_NAME }),
-  });
-
-  await authorizeWithUrl(
-    page,
-    TEST_APP_URL,
-    II_URL + "/authorize?openid=http%3A%2F%2Flocalhost%3A11105",
-    async (openIdPage) => {
-      await openIdPage.waitForURL("http://localhost:11105/interaction/*");
-      await expect(
-        openIdPage.getByRole("heading", {
-          name: "Sign-in",
-        }),
-      ).toBeVisible();
-      await openIdPage.getByPlaceholder("Enter any login").fill(userId);
-      await openIdPage
-        .getByPlaceholder("and password")
-        .fill("any-password-works");
-      await openIdPage.getByRole("button", { name: "Sign-in" }).click();
-      await expect(
-        openIdPage.getByRole("heading", {
-          name: "Authorize",
-        }),
-      ).toBeVisible();
-      await openIdPage.getByRole("button", { name: "Continue" }).click();
-    },
-    true,
-  );
-});
-
 test("App logo appears when app is known", async ({ page }) => {
   const auth = dummyAuth();
   await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {

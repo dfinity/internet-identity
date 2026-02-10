@@ -78,6 +78,12 @@
           >
           <input type="checkbox" id="useIcrc25" />
         </div>
+        <div>
+          <label for="requestAttributes" style="display: inline-block; width: 200px"
+            >Request attributes:</label
+          >
+          <textarea id="requestAttributes"></textarea>
+        </div>
         <button data-action="authenticate" id="signinBtn">Sign In</button>
         <h3>/.well-known/ii-alternative-origins</h3>
         <div id="alternativeOrigins"></div>
@@ -89,6 +95,8 @@
         <pre id="delegation"></pre>
         <h3>Expiry (ns from now):</h3>
         <div id="expiration"></div>
+        <h3>Certified Attributes:</h3>
+        <pre id="certifiedAttributes"></pre>
       </section>
 
       <section>

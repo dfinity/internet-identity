@@ -14,7 +14,7 @@ import ReactDOM from "react-dom/client";
 
 import { decodeJwt } from "jose";
 
-import { authWithII, extractDelegation } from "./auth";
+import { authWithII, CertifiedAttribute, extractDelegation } from "./auth";
 
 import "./main.css";
 
@@ -60,6 +60,9 @@ const authnMethodEl = document.querySelector(
   '[data-role="authn-method"]',
 ) as HTMLDivElement;
 const delegationEl = document.getElementById("delegation") as HTMLPreElement;
+const certifiedAttributesEl = document.getElementById(
+  "certifiedAttributes",
+) as HTMLPreElement;
 const expirationEl = document.getElementById("expiration") as HTMLDivElement;
 const iiUrlEl = document.getElementById("iiUrl") as HTMLInputElement;
 const maxTimeToLiveEl = document.getElementById(
@@ -75,6 +78,9 @@ const allowPinAuthenticationEl = document.getElementById(
   "allowPinAuthentication",
 ) as HTMLInputElement;
 const useIcrc25El = document.getElementById("useIcrc25") as HTMLInputElement;
+const requestAttributesEl = document.getElementById(
+  "requestAttributes",
+) as HTMLInputElement;
 
 let iiProtocolTestWindow: Window | undefined;
 
@@ -123,9 +129,11 @@ const idlFactory = ({ IDL }: { IDL: any }) => {
 const updateDelegationView = ({
   authnMethod,
   identity,
+  certifiedAttributes,
 }: {
   authnMethod?: string;
   identity: Identity;
+  certifiedAttributes?: Record<string, CertifiedAttribute>;
 }) => {
   principalEl.innerText = identity.getPrincipal().toText();
 
@@ -176,6 +184,16 @@ const updateDelegationView = ({
       nextExpiration -
       BigInt(Date.now()) * BigInt(1000_000)
     ).toString();
+
+    // Display certified attributes if available.
+    if (certifiedAttributes) {
+      certifiedAttributesEl.innerText = Object.entries(certifiedAttributes)
+        .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+        .map(([key, { value }]) => `${key}: ${new TextDecoder().decode(value)}`)
+        .join("\n");
+    } else {
+      certifiedAttributesEl.innerText = "No certified attributes";
+    }
   } else {
     delegationEl.innerText = "Current identity is not a DelegationIdentity";
     expirationEl.innerText = "N/A";
@@ -293,11 +311,16 @@ const init = async () => {
         sessionIdentity: getLocalIdentity(),
         autoSelectionPrincipal,
         useIcrc25: useIcrc25El.checked,
+        requestAttributes: requestAttributesEl.value
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0),
       });
       delegationIdentity = result.identity;
       updateDelegationView({
         identity: delegationIdentity,
         authnMethod: result.authnMethod,
+        certifiedAttributes: result.certifiedAttributes,
       });
     } catch (e) {
       showError(JSON.stringify(e));
