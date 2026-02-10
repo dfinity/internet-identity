@@ -82,6 +82,7 @@ const getRedirectMessage = (
 };
 
 const startRedirectSession = async (
+  authOrigin: string,
   authRequest: AuthRequest,
 ): Promise<AuthRequest> => {
   const identity = await ECDSAKeyIdentity.generate({ extractable: true });
@@ -99,7 +100,9 @@ const startRedirectSession = async (
     JSON.stringify({
       privateJwk,
       publicJwk,
-      sessionPublicKey: z.util.uint8ArrayToBase64(authRequest.sessionPublicKey),
+      authOrigin,
+      authPublicKey: z.util.uint8ArrayToBase64(authRequest.sessionPublicKey),
+      timestamp: Date.now(),
     }),
   );
   return {
@@ -109,20 +112,26 @@ const startRedirectSession = async (
 };
 
 const endRedirectSession = async (
+  authOrigin: string,
   authResponse: AuthResponse,
 ): Promise<AuthResponse> => {
-  if (authResponse.kind !== "authorize-client-success") {
-    return authResponse;
-  }
+  // Clean up session after reading
   const json = sessionStorage.getItem(REDIRECT_SESSION_STORAGE_KEY);
+  sessionStorage.removeItem(REDIRECT_SESSION_STORAGE_KEY);
   if (json === null) {
     throw new Error("No ongoing redirect session found");
+  }
+  if (authResponse.kind !== "authorize-client-success") {
+    return authResponse;
   }
   const {
     privateJwk,
     publicJwk,
-    sessionPublicKey: sessionPublicKeyBase64,
+    authOrigin: previousAuthOrigin,
+    authPublicKey: authPublicKeyBase64,
+    timestamp,
   } = JSON.parse(json);
+  const authPublicKey = z.util.base64ToUint8Array(authPublicKeyBase64);
   const privateKey = await crypto.subtle.importKey(
     "jwk",
     privateJwk,
@@ -148,7 +157,12 @@ const endRedirectSession = async (
     })),
     authResponse.userPublicKey,
   );
-  const sessionPublicKey = z.util.base64ToUint8Array(sessionPublicKeyBase64);
+  if (Date.now() > timestamp + 5 * 60 * 1000) {
+    throw new Error("Redirect session has expired");
+  }
+  if (authOrigin !== previousAuthOrigin) {
+    throw new Error("Auth origin does not match prior auth origin");
+  }
   if (
     !uint8Equals(
       identity.getPublicKey().toDer(),
@@ -163,7 +177,7 @@ const endRedirectSession = async (
   }
   const sessionDelegationChain = await DelegationChain.create(
     identity,
-    { toDer: () => sessionPublicKey },
+    { toDer: () => authPublicKey },
     undefined,
     { previous: responsedelegationChain },
   );
@@ -363,7 +377,10 @@ export class LegacyTransport implements Transport {
     ) {
       // Assert message to be a response and forward it to the app
       const response = AuthResponseCodec.parse(params.message.data);
-      const sessionResponse = await endRedirectSession(response);
+      const sessionResponse = await endRedirectSession(
+        params.message.origin,
+        response,
+      );
       window.opener.postMessage(sessionResponse, params.message.origin);
       // App should immediately close window after receiving the message,
       // so we return an indefinitely pending promise while we wait for it.
@@ -397,7 +414,10 @@ export class LegacyTransport implements Transport {
           this.#redirectOptions !== undefined &&
           this.#redirectOptions.redirectToOrigin !== window.location.origin
         ) {
-          const sessionAuthRequest = await startRedirectSession(parsed.data);
+          const sessionAuthRequest = await startRedirectSession(
+            event.origin,
+            parsed.data,
+          );
           redirectWithMessage(this.#redirectOptions.redirectToOrigin, {
             origin: event.origin,
             data: AuthRequestCodec.encode(sessionAuthRequest),
