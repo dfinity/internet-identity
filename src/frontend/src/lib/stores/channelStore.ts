@@ -12,15 +12,27 @@ import type {
   PermissionScope,
   SupportedStandard,
 } from "@slide-computer/signer";
+import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 
 type ChannelStore = Readable<Channel | undefined> & {
   establish: (options?: ChannelOptions) => Promise<Channel>;
 };
 
-const transports: Transport[] = [
-  new PostMessageTransport(),
-  new LegacyTransport(),
-];
+const getTransports = (): Transport[] => {
+  const primaryOrigin = getPrimaryOrigin();
+  return [
+    new PostMessageTransport(),
+    new LegacyTransport(
+      // Redirect requests and responses between related origins and primary origin
+      primaryOrigin !== undefined
+        ? {
+            redirectToOrigin: primaryOrigin,
+            trustedOrigins: canisterConfig.related_origins[0] ?? [],
+          }
+        : undefined,
+    ),
+  ];
+};
 
 const supportedStandards: SupportedStandard[] = [
   {
@@ -94,7 +106,7 @@ export const channelStore: ChannelStore = {
     }
     // Else establish channel
     const channel = await Promise.any(
-      transports.map((transport) => transport.establishChannel(options)),
+      getTransports().map((transport) => transport.establishChannel(options)),
     );
     // Return default responses for ICRC-25 requests
     channel.addEventListener("request", supportedStandardsListener(channel));

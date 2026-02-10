@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Delegation, DelegationChain } from "@icp-sdk/core/identity";
-import { type Signature } from "@icp-sdk/core/agent";
+import { PublicKey, type Signature } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 
 // See: https://www.jsonrpc.org/specification#error_object
@@ -103,9 +103,14 @@ export const Base64ToBytesCodec = z.codec(
 
 export const Base64ToPublicKeyCodec = z.codec(
   z.base64(),
-  z.object({
-    toDer: z.function({ input: [], output: z.instanceof(Uint8Array) }),
-  }),
+  z.custom<PublicKey>(
+    (arg) =>
+      z
+        .object({
+          toDer: z.function({ input: [], output: z.instanceof(Uint8Array) }),
+        })
+        .safeParse(arg).success,
+  ),
   {
     decode: (base64String) => ({
       toDer: () => z.util.base64ToUint8Array(base64String),

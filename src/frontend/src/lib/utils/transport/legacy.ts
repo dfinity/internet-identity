@@ -13,10 +13,20 @@ import {
   AuthResponseCodec,
 } from "$lib/utils/transport/utils";
 import { AuthReady } from "$lib/legacy/flows/authorize/postMessageInterface";
-import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
+import {
+  Delegation,
+  DelegationChain,
+  ECDSAKeyIdentity,
+} from "@icp-sdk/core/identity";
+import { uint8Equals } from "@icp-sdk/core/candid";
+import { Signature } from "@icp-sdk/core/agent";
 
 const ESTABLISH_TIMEOUT_MS = 2000;
 const AUTHORIZE_REQUEST_ID = "authorize-client";
+const REDIRECT_SESSION_STORAGE_KEY = "ii-legacy-channel-redirect-session";
+const REDIRECT_SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const OUTER_DELEGATION_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 const RedirectMessageSchema = z.object({
   origin: z.httpUrl(),
   data: z.unknown(),
@@ -38,25 +48,23 @@ const redirectWithMessage = (
       typeof value === "bigint" ? value.toString() : value,
     ),
   );
+  searchParams.set("redirect_origin", window.location.origin);
   redirectURL.hash = searchParams.toString();
 
-  // Use an anchor so that we can override referrer policy
-  const a = document.createElement("a");
-  a.href = redirectURL.href;
-  a.referrerPolicy = "origin";
-  a.click();
+  window.location.replace(redirectURL.href);
 };
 
-const getRedirectMessage = ():
-  | { sourceOrigin: string; message: RedirectMessage }
-  | undefined => {
+const getRedirectMessage = (
+  trustedOrigins: string[],
+): { redirectOrigin: string; message: RedirectMessage } | undefined => {
   // Get message from hash
   const hash = window.location.hash.replace(/^#/, "");
   const params = new URLSearchParams(hash);
   const message = params.get("redirect_message");
+  const redirectOrigin = params.get("redirect_origin");
 
-  // Return if there's no message
-  if (message === null) {
+  // Return if there's no message or source origin (not a redirect flow)
+  if (message === null || redirectOrigin === null) {
     return;
   }
 
@@ -65,22 +73,135 @@ const getRedirectMessage = ():
   url.hash = "";
   window.history.replaceState(undefined, "", url);
 
-  // Check if the referrer is a trusted origin (II itself)
-  const referrer = new URL(document.referrer);
-  const trusted =
-    canisterConfig.related_origins[0]?.includes(referrer.origin) ?? false;
-  if (!trusted) {
-    throw new Error("Referrer origin is untrusted");
+  // Check if the redirect origin is a trusted origin (II itself)
+  if (!trustedOrigins.includes(redirectOrigin)) {
+    throw new Error("Redirect origin is untrusted");
   }
   return {
-    sourceOrigin: referrer.origin,
+    redirectOrigin,
     message: RedirectMessageSchema.parse(JSON.parse(message)),
+  };
+};
+
+const startRedirectSession = async (
+  authOrigin: string,
+  authRequest: AuthRequest,
+): Promise<AuthRequest> => {
+  const identity = await ECDSAKeyIdentity.generate({ extractable: true });
+  const keyPair = identity.getKeyPair();
+  const privateJwk = await window.crypto.subtle.exportKey(
+    "jwk",
+    keyPair.privateKey,
+  );
+  const publicJwk = await window.crypto.subtle.exportKey(
+    "jwk",
+    keyPair.publicKey,
+  );
+  sessionStorage.setItem(
+    REDIRECT_SESSION_STORAGE_KEY,
+    JSON.stringify({
+      privateJwk,
+      publicJwk,
+      authOrigin,
+      authPublicKey: z.util.uint8ArrayToBase64(authRequest.sessionPublicKey),
+      timestamp: Date.now(),
+    }),
+  );
+  return {
+    ...authRequest,
+    sessionPublicKey: new Uint8Array(identity.getPublicKey().toDer()),
+  };
+};
+
+const endRedirectSession = async (
+  authOrigin: string,
+  authResponse: AuthResponse,
+): Promise<AuthResponse> => {
+  // Clean up session after reading
+  const json = sessionStorage.getItem(REDIRECT_SESSION_STORAGE_KEY);
+  sessionStorage.removeItem(REDIRECT_SESSION_STORAGE_KEY);
+  if (json === null) {
+    throw new Error("No ongoing redirect session found");
+  }
+  if (authResponse.kind !== "authorize-client-success") {
+    return authResponse;
+  }
+  const {
+    privateJwk,
+    publicJwk,
+    authOrigin: previousAuthOrigin,
+    authPublicKey: authPublicKeyBase64,
+    timestamp,
+  } = JSON.parse(json);
+  const authPublicKey = z.util.base64ToUint8Array(authPublicKeyBase64);
+  const privateKey = await crypto.subtle.importKey(
+    "jwk",
+    privateJwk,
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign"],
+  );
+  const publicKey = await crypto.subtle.importKey(
+    "jwk",
+    publicJwk,
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["verify"],
+  );
+  const identity = await ECDSAKeyIdentity.fromKeyPair({
+    privateKey,
+    publicKey,
+  });
+  const responseDelegationChain = DelegationChain.fromDelegations(
+    authResponse.delegations.map(({ delegation, signature }) => ({
+      delegation: new Delegation(delegation.pubkey, delegation.expiration),
+      signature: new Uint8Array(signature) as Signature,
+    })),
+    authResponse.userPublicKey,
+  );
+  if (Date.now() > timestamp + REDIRECT_SESSION_TIMEOUT_MS) {
+    throw new Error("Redirect session has expired");
+  }
+  if (authOrigin !== previousAuthOrigin) {
+    throw new Error("Auth origin does not match prior auth origin");
+  }
+  if (
+    responseDelegationChain.delegations.length === 0 ||
+    !uint8Equals(
+      identity.getPublicKey().toDer(),
+      responseDelegationChain.delegations[
+        responseDelegationChain.delegations.length - 1
+      ].delegation.pubkey,
+    )
+  ) {
+    throw new Error(
+      "Last public key in delegation chain does not match session identity",
+    );
+  }
+  const sessionDelegationChain = await DelegationChain.create(
+    identity,
+    { toDer: () => authPublicKey },
+    // Outer delegation lasts 30 days; chain may expire earlier due to inner delegation.
+    new Date(Date.now() + OUTER_DELEGATION_EXPIRATION_MS),
+    { previous: responseDelegationChain },
+  );
+  return {
+    kind: "authorize-client-success",
+    delegations: sessionDelegationChain.delegations.map(
+      ({ delegation, signature }) => ({
+        delegation,
+        signature: new Uint8Array(signature),
+      }),
+    ),
+    userPublicKey: new Uint8Array(sessionDelegationChain.publicKey),
+    authnMethod: "passkey",
   };
 };
 
 class LegacyChannel implements Channel {
   #closed = false;
   #origin: string;
+  #intermediateIdentityPromise: Promise<ECDSAKeyIdentity>;
   #redirectOrigin?: string;
   #authRequest?: AuthRequest;
   #closeListeners = new Set<() => void>();
@@ -92,6 +213,7 @@ class LegacyChannel implements Channel {
   ) {
     this.#origin = origin;
     this.#authRequest = authRequest;
+    this.#intermediateIdentityPromise = ECDSAKeyIdentity.generate();
     this.#redirectOrigin = redirectOrigin;
   }
 
@@ -112,42 +234,68 @@ class LegacyChannel implements Channel {
       this.#closeListeners.add(listener);
       return () => this.#closeListeners.delete(listener);
     }
-
+    // Replay auth request if it didn't get a response yet
     const authRequest = this.#authRequest;
     if (event === "request" && authRequest !== undefined) {
-      // Replay auth request if it didn't get a response yet
-      listener({
-        id: AUTHORIZE_REQUEST_ID,
-        jsonrpc: "2.0",
-        method: "icrc34_delegation",
-        params: DelegationParamsCodec.encode({
-          publicKey: { toDer: () => authRequest.sessionPublicKey },
-          maxTimeToLive: authRequest.maxTimeToLive,
-          icrc95DerivationOrigin: authRequest.derivationOrigin,
-        }),
-      });
+      void (async () => {
+        // Sign towards intermediate identity instead in redirect flow
+        const publicKey =
+          this.#redirectOrigin !== undefined
+            ? (await this.#intermediateIdentityPromise).getPublicKey()
+            : { toDer: () => authRequest.sessionPublicKey };
+        listener({
+          id: AUTHORIZE_REQUEST_ID,
+          jsonrpc: "2.0",
+          method: "icrc34_delegation",
+          params: DelegationParamsCodec.encode({
+            publicKey,
+            maxTimeToLive: authRequest.maxTimeToLive,
+            icrc95DerivationOrigin: authRequest.derivationOrigin,
+          }),
+        });
+      })();
     }
 
     return () => {};
   }
 
-  send(response: JsonResponse): Promise<void> {
+  async send(response: JsonResponse): Promise<void> {
     if (this.#closed) {
       throw new Error("Legacy channel is closed");
     }
-
     if (response.id !== AUTHORIZE_REQUEST_ID) {
       throw new Error("Legacy channel can only respond to authorize requests");
     }
 
+    if (this.#authRequest === undefined) {
+      throw new Error("No authorize request to respond to");
+    }
+    const requestPublicKey = this.#authRequest.sessionPublicKey;
     this.#authRequest = undefined;
+
     let data: AuthResponse;
     if ("result" in response) {
+      // Extend delegation from intermediate identity to request public key in redirect flow
       const delegationChain = DelegationResultSchema.parse(response.result);
+      const sessionDelegationChain =
+        this.#redirectOrigin !== undefined
+          ? await DelegationChain.create(
+              await this.#intermediateIdentityPromise,
+              { toDer: () => requestPublicKey },
+              // Outer delegation lasts 30 days; chain may expire earlier due to inner delegation.
+              new Date(Date.now() + OUTER_DELEGATION_EXPIRATION_MS),
+              { previous: delegationChain },
+            )
+          : delegationChain;
       data = {
         kind: "authorize-client-success",
-        delegations: delegationChain.delegations,
-        userPublicKey: delegationChain.publicKey,
+        delegations: sessionDelegationChain.delegations.map(
+          ({ delegation, signature }) => ({
+            delegation,
+            signature: new Uint8Array(signature),
+          }),
+        ),
+        userPublicKey: new Uint8Array(sessionDelegationChain.publicKey),
         authnMethod: "passkey",
       };
     } else {
@@ -176,42 +324,51 @@ class LegacyChannel implements Channel {
   }
 }
 
+interface RedirectOptions {
+  redirectToOrigin: string;
+  trustedOrigins: string[];
+}
+
 export class LegacyTransport implements Transport {
-  establishChannel(options: ChannelOptions): Promise<LegacyChannel> {
-    // Primary origin (either https://id.ai or https://beta.id.ai) when deployed on beta or prod
-    const primaryOrigin = getPrimaryOrigin();
+  #redirectOptions?: RedirectOptions;
 
-    // Message received from prior redirect (either forwarded request or response)
-    const redirectMessage = getRedirectMessage();
-
-    // Either:
-    // - There's no primary origin, thus redirects don't apply
-    // - There's no message received from a prior redirect
-    if (primaryOrigin === undefined || redirectMessage === undefined) {
-      // Establish channel as usual via post message
-      return this.#establishViaPostMessage(options);
-    }
-
-    // If there's a message received from prior redirect,
-    // remove it from the url to not confuse the end-user.
-    return this.#processRedirectMessage({
-      primaryOrigin,
-      sourceOrigin: redirectMessage.sourceOrigin,
-      targetOrigin: window.location.origin,
-      message: redirectMessage.message,
-    });
+  constructor(redirectOptions?: RedirectOptions) {
+    this.#redirectOptions = redirectOptions;
   }
 
-  #processRedirectMessage(params: {
-    primaryOrigin: string;
+  establishChannel(options: ChannelOptions): Promise<LegacyChannel> {
+    if (this.#redirectOptions !== undefined) {
+      // Message received from prior redirect (either forwarded request or response)
+      const redirectMessage = getRedirectMessage(
+        this.#redirectOptions.trustedOrigins,
+      );
+      if (redirectMessage !== undefined) {
+        return this.#processRedirectMessage({
+          redirectToOrigin: this.#redirectOptions.redirectToOrigin,
+          sourceOrigin: redirectMessage.redirectOrigin,
+          targetOrigin: window.location.origin,
+          message: redirectMessage.message,
+        });
+      }
+    }
+
+    return this.#establishViaPostMessage(options);
+  }
+
+  async #processRedirectMessage(params: {
+    redirectToOrigin: string;
     sourceOrigin: string;
     targetOrigin: string;
     message: RedirectMessage;
   }): Promise<LegacyChannel> {
+    if (this.#redirectOptions === undefined) {
+      throw new Error("Redirect options are missing");
+    }
+
     if (
       // Message sent from legacy origin to primary origin through redirect
-      params.sourceOrigin !== params.primaryOrigin &&
-      params.targetOrigin === params.primaryOrigin
+      params.sourceOrigin !== params.redirectToOrigin &&
+      params.targetOrigin === params.redirectToOrigin
     ) {
       // Assert message to be a request and establish channel with it
       const request = AuthRequestCodec.parse(params.message.data);
@@ -220,12 +377,16 @@ export class LegacyTransport implements Transport {
       );
     } else if (
       // Message sent from primary origin to legacy origin through redirect
-      params.sourceOrigin === params.primaryOrigin &&
-      params.targetOrigin !== params.primaryOrigin
+      params.sourceOrigin === params.redirectToOrigin &&
+      params.targetOrigin !== params.redirectToOrigin
     ) {
       // Assert message to be a response and forward it to the app
       const response = AuthResponseCodec.parse(params.message.data);
-      window.opener.postMessage(response, params.message.origin);
+      const sessionResponse = await endRedirectSession(
+        params.message.origin,
+        response,
+      );
+      window.opener.postMessage(sessionResponse, params.message.origin);
       // App should immediately close window after receiving the message,
       // so we return an indefinitely pending promise while we wait for it.
       return new Promise(() => {});
@@ -241,7 +402,7 @@ export class LegacyTransport implements Transport {
         reject(new Error("Legacy channel could not be established"));
       }, ESTABLISH_TIMEOUT_MS);
 
-      const listener = (event: MessageEvent) => {
+      const listener = async (event: MessageEvent) => {
         if (!this.#isValidAuthRequestEvent(event, options)) {
           return;
         }
@@ -254,14 +415,17 @@ export class LegacyTransport implements Transport {
         clearTimeout(timeout);
 
         // Redirect message to primary origin if we're on another origin
-        const primaryOrigin = getPrimaryOrigin();
         if (
-          primaryOrigin !== undefined &&
-          window.location.origin !== primaryOrigin
+          this.#redirectOptions !== undefined &&
+          this.#redirectOptions.redirectToOrigin !== window.location.origin
         ) {
-          redirectWithMessage(primaryOrigin, {
+          const sessionAuthRequest = await startRedirectSession(
+            event.origin,
+            parsed.data,
+          );
+          redirectWithMessage(this.#redirectOptions.redirectToOrigin, {
             origin: event.origin,
-            data: AuthRequestCodec.encode(parsed.data),
+            data: AuthRequestCodec.encode(sessionAuthRequest),
           });
           return;
         }
