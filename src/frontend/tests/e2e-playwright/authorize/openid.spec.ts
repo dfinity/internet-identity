@@ -46,6 +46,7 @@ test.describe("Authorize with ICRC-29 (directly through OpenID) and request attr
         II_URL + `/authorize?openid=${encodeURIComponent(openIdIssuer)}`,
         (openIdPage) => openIdUser.signIn(openIdPage),
         true,
+        Object.keys(openIdClaims).map((key) => `openid:${openIdIssuer}:${key}`),
       );
       await expect(page.locator("#certifiedAttributes")).toHaveText(
         Object.entries(openIdUser.claims)
