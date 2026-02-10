@@ -3,6 +3,8 @@ import { Delegation, DelegationChain } from "@icp-sdk/core/identity";
 import { type Signature } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 
+export const INVALID_PARAMS_ERROR_CODE = -32602;
+
 export interface ChannelOptions {
   allowedOrigin?: string;
   pending?: boolean;

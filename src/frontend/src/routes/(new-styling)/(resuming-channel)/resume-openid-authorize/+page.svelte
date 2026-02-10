@@ -14,10 +14,11 @@
   import {
     AttributesParamsSchema,
     DelegationResultSchema,
+    INVALID_PARAMS_ERROR_CODE,
     JsonRequest,
   } from "$lib/utils/transport/utils";
   import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { retryFor, throwCanisterError, toBase64 } from "$lib/utils/utils";
+  import { retryFor, throwCanisterError } from "$lib/utils/utils";
   import { z } from "zod";
 
   const dapps = getDapps();
@@ -38,7 +39,7 @@
           jsonrpc: "2.0",
           id: request.id,
           error: {
-            code: -32602,
+            code: INVALID_PARAMS_ERROR_CODE,
             message: z.prettifyError(paramsResult.error),
           },
         });
@@ -47,42 +48,58 @@
       const implicitConsentAttributeKeys = paramsResult.data.attributes.filter(
         (attribute) => attribute.startsWith(`openid:${issuer}:`),
       );
-      const { attributes, issued_at_timestamp_ns } =
-        await $authenticatedStore.actor
-          .prepare_attributes({
-            origin: $authorizationContextStore.effectiveOrigin,
-            attribute_keys: implicitConsentAttributeKeys,
-            account_number: [],
-            identity_number: $authenticatedStore.identityNumber,
-          })
-          .then(throwCanisterError);
-      const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
-        5,
-        () =>
-          $authenticatedStore.actor.get_attributes({
-            origin: $authorizationContextStore.effectiveOrigin,
-            account_number: [],
-            identity_number: $authenticatedStore.identityNumber,
-            attributes,
-            issued_at_timestamp_ns,
-          }),
-      ).then(throwCanisterError);
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: {
-          attributes: Object.fromEntries(
-            certified_attributes.map((attribute) => [
-              attribute.key,
-              {
-                value: z.util.uint8ArrayToBase64(new Uint8Array(attribute.value)),
-                signature: z.util.uint8ArrayToBase64(new Uint8Array(attribute.signature)),
-                expiration: expires_at_timestamp_ns.toString(),
-              },
-            ]),
-          ),
-        },
-      });
+      try {
+        const { attributes, issued_at_timestamp_ns } =
+          await $authenticatedStore.actor
+            .prepare_attributes({
+              origin: $authorizationContextStore.effectiveOrigin,
+              attribute_keys: implicitConsentAttributeKeys,
+              account_number: [],
+              identity_number: $authenticatedStore.identityNumber,
+            })
+            .then(throwCanisterError);
+        const { certified_attributes, expires_at_timestamp_ns } =
+          await retryFor(5, () =>
+            $authenticatedStore.actor
+              .get_attributes({
+                origin: $authorizationContextStore.effectiveOrigin,
+                account_number: [],
+                identity_number: $authenticatedStore.identityNumber,
+                attributes,
+                issued_at_timestamp_ns,
+              })
+              .then(throwCanisterError),
+          );
+        await $establishedChannelStore.send({
+          jsonrpc: "2.0",
+          id: request.id,
+          result: {
+            attributes: Object.fromEntries(
+              certified_attributes.map((attribute) => [
+                attribute.key,
+                {
+                  value: z.util.uint8ArrayToBase64(
+                    new Uint8Array(attribute.value),
+                  ),
+                  signature: z.util.uint8ArrayToBase64(
+                    new Uint8Array(attribute.signature),
+                  ),
+                  expiration: expires_at_timestamp_ns.toString(),
+                },
+              ]),
+            ),
+          },
+        });
+      } catch {
+        await $establishedChannelStore.send({
+          jsonrpc: "2.0",
+          id: request.id,
+          error: {
+            code: 1000,
+            message: $t`Encountered an internal error while processing the request.`,
+          },
+        });
+      }
     };
 
   onMount(async () => {
@@ -120,7 +137,7 @@
       }
       if (dapp?.certifiedAttributes === true) {
         const listener = createAttributesListener(config.issuer);
-        $establishedChannelStore.addEventListener('request', listener);
+        void $establishedChannelStore.addEventListener("request", listener);
       }
       const { delegationChain } = await authorizationStore.authorize(undefined);
       await $establishedChannelStore.send({
