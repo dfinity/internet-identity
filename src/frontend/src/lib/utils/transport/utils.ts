@@ -176,13 +176,19 @@ export const DelegationResultSchema = z.codec(
         Base64ToBytesCodec.decode(publicKey),
       ),
     encode: (delegationChain) => ({
-      publicKey: Base64ToBytesCodec.encode(new Uint8Array(delegationChain.publicKey)),
+      publicKey: Base64ToBytesCodec.encode(
+        new Uint8Array(delegationChain.publicKey),
+      ),
       signerDelegation: delegationChain.delegations.map((delegation) => ({
         delegation: {
-          pubkey: Base64ToBytesCodec.encode(new Uint8Array(delegation.delegation.pubkey)),
+          pubkey: Base64ToBytesCodec.encode(
+            new Uint8Array(delegation.delegation.pubkey),
+          ),
           expiration: delegation.delegation.expiration.toString(),
         },
-        signature: Base64ToBytesCodec.encode(new Uint8Array(delegation.signature)),
+        signature: Base64ToBytesCodec.encode(
+          new Uint8Array(delegation.signature),
+        ),
       })),
     }),
   },
