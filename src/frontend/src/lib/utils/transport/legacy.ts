@@ -24,6 +24,8 @@ import { Signature } from "@icp-sdk/core/agent";
 const ESTABLISH_TIMEOUT_MS = 2000;
 const AUTHORIZE_REQUEST_ID = "authorize-client";
 const REDIRECT_SESSION_STORAGE_KEY = "ii-legacy-channel-redirect-session";
+const REDIRECT_SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const OUTER_DELEGATION_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const RedirectMessageSchema = z.object({
   origin: z.httpUrl(),
@@ -150,24 +152,25 @@ const endRedirectSession = async (
     privateKey,
     publicKey,
   });
-  const responsedelegationChain = DelegationChain.fromDelegations(
+  const responseDelegationChain = DelegationChain.fromDelegations(
     authResponse.delegations.map(({ delegation, signature }) => ({
       delegation: new Delegation(delegation.pubkey, delegation.expiration),
       signature: new Uint8Array(signature) as Signature,
     })),
     authResponse.userPublicKey,
   );
-  if (Date.now() > timestamp + 5 * 60 * 1000) {
+  if (Date.now() > timestamp + REDIRECT_SESSION_TIMEOUT_MS) {
     throw new Error("Redirect session has expired");
   }
   if (authOrigin !== previousAuthOrigin) {
     throw new Error("Auth origin does not match prior auth origin");
   }
   if (
+    responseDelegationChain.delegations.length === 0 ||
     !uint8Equals(
       identity.getPublicKey().toDer(),
-      responsedelegationChain.delegations[
-        responsedelegationChain.delegations.length - 1
+      responseDelegationChain.delegations[
+        responseDelegationChain.delegations.length - 1
       ].delegation.pubkey,
     )
   ) {
@@ -179,8 +182,8 @@ const endRedirectSession = async (
     identity,
     { toDer: () => authPublicKey },
     // Outer delegation lasts 30 days; chain may expire earlier due to inner delegation.
-    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    { previous: responsedelegationChain },
+    new Date(Date.now() + OUTER_DELEGATION_EXPIRATION_MS),
+    { previous: responseDelegationChain },
   );
   return {
     kind: "authorize-client-success",
@@ -280,7 +283,7 @@ class LegacyChannel implements Channel {
               await this.#intermediateIdentityPromise,
               { toDer: () => requestPublicKey },
               // Outer delegation lasts 30 days; chain may expire earlier due to inner delegation.
-              new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              new Date(Date.now() + OUTER_DELEGATION_EXPIRATION_MS),
               { previous: delegationChain },
             )
           : delegationChain;
