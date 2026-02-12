@@ -17,7 +17,7 @@ import {
         legacyURL,
         async (authPage) => {
           // Assert that we've been redirected to non-legacy domain
-          await expect(page).toHaveURL((url) => url.origin === II_URL);
+          await expect(authPage).toHaveURL((url) => url.origin === II_URL);
           // Assert that the user is informed about the upgrade
           await expect(
             authPage.getByRole("heading", {
