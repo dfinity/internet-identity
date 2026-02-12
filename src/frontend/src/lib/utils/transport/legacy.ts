@@ -41,6 +41,7 @@ const redirectWithMessage = (
   // Assign to hash to avoid sending message to server (keeps it client side)
   const redirectURL = new URL(targetOrigin);
   redirectURL.pathname = "/authorize";
+  redirectURL.searchParams.set("feature_flag_guided_upgrade", "true");
   const searchParams = new URLSearchParams();
   searchParams.set(
     "redirect_message",
@@ -49,7 +50,6 @@ const redirectWithMessage = (
     ),
   );
   searchParams.set("redirect_origin", window.location.origin);
-  searchParams.set("feature_flag_guided_upgrade", "true");
   redirectURL.hash = searchParams.toString();
 
   window.location.replace(redirectURL.href);
