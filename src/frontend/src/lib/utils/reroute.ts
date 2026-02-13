@@ -39,8 +39,7 @@ export const manuallyReroute = async (): Promise<boolean> => {
   if (next !== undefined) {
     // Capture current URL
     const currentURL = new URL(window.location.href);
-    // Cast to string since `nonNullish` doesn't exclude `void` type
-    const nextURL = new URL(next as string, window.location.origin);
+    const nextURL = new URL(next, window.location.origin);
     // Copy over the current query params
     nextURL.search = currentURL.search;
     // Reroute to destination

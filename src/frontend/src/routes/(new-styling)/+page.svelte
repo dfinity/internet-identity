@@ -141,9 +141,9 @@
     authenticationV2Funnel.close();
   });
 
-  onMount(() => {
+  onMount(async () => {
     // Add rerouting back on this SSG route
-    const rerouted = manuallyReroute();
+    const rerouted = await manuallyReroute();
     // Track page view for landing page unless we have rerouted,
     // in which case it will be tracked on the destination page.
     if (!rerouted) {
