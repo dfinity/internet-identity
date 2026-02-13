@@ -48,11 +48,6 @@ export const analytics = {
   },
   event: (name: string, props?: Record<string, string | number | boolean>) => {
     const state = get(authorizationStore);
-
-    if (props !== undefined && "origin" in props) {
-      throw new Error("Origin is already set in props");
-    }
-
     const authorizationOrigin = state?.effectiveOrigin;
 
     tracker?.trackEvent(name, {
