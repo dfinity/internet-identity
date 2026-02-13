@@ -130,9 +130,7 @@
     if (!isAuthDialogOpen) {
       return;
     }
-    authenticationV2Funnel.init({
-      origin: window.location.origin,
-    });
+    authenticationV2Funnel.init();
   });
 
   // Close authentication funnel once completed
