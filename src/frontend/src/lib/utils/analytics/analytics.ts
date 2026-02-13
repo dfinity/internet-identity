@@ -53,13 +53,13 @@ export const analytics = {
       throw new Error("Origin is already set in props");
     }
 
-    const origin = state?.effectiveOrigin;
+    const authorizationOrigin = state?.effectiveOrigin;
 
-    tracker?.trackEvent(
-      name,
-      {
-        props: origin !== undefined ? { ...props, origin } : props,
-      },
-    );
+    tracker?.trackEvent(name, {
+      props:
+        authorizationOrigin !== undefined
+          ? { ...props, authorizationOrigin }
+          : props,
+    });
   },
 };

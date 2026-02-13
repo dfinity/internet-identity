@@ -39,15 +39,15 @@ export interface AuthContext {
 
 export type AuthResponse =
   | {
-    kind: "authorize-client-failure";
-    text: string;
-  }
+      kind: "authorize-client-failure";
+      text: string;
+    }
   | {
-    kind: "authorize-client-success";
-    delegations: FrontendSignedDelegation[];
-    userPublicKey: Uint8Array;
-    authnMethod: "pin" | "passkey" | "recovery";
-  };
+      kind: "authorize-client-success";
+      delegations: FrontendSignedDelegation[];
+      userPublicKey: Uint8Array;
+      authnMethod: "pin" | "passkey" | "recovery";
+    };
 
 /**
  * The postMessage-based authentication protocol.
@@ -62,11 +62,11 @@ export async function authenticationProtocol({
     requestOrigin: string;
   }) => Promise<
     | {
-      kind: "success";
-      delegations: FrontendSignedDelegation[];
-      userPublicKey: Uint8Array;
-      authnMethod: "pin" | "passkey" | "recovery";
-    }
+        kind: "success";
+        delegations: FrontendSignedDelegation[];
+        userPublicKey: Uint8Array;
+        authnMethod: "pin" | "passkey" | "recovery";
+      }
     | { kind: "failure"; text: string }
     | { kind: "unverified-origin"; text: string }
   >;
@@ -169,10 +169,10 @@ export async function authenticationProtocol({
 // Wait for a request to kickstart the flow
 const waitForRequest = (): Promise<
   | {
-    kind: "received";
-    request: AuthRequest;
-    origin: string;
-  }
+      kind: "received";
+      request: AuthRequest;
+      origin: string;
+    }
   | { kind: "timeout" }
   | { kind: "invalid" }
 > => {

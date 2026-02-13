@@ -21,6 +21,10 @@
   import { retryFor, throwCanisterError } from "$lib/utils/utils";
   import { z } from "zod";
   import { canisterConfig } from "$lib/globals";
+  import {
+    DirectOpenIdEvents,
+    directOpenIdFunnel,
+  } from "$lib/utils/analytics/DirectOpenIdFunnel";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -132,6 +136,10 @@
       if (config === undefined) {
         return;
       }
+      directOpenIdFunnel.addProperties({
+        openid_issuer: config.issuer,
+      });
+      directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
       const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
       if (authFlowResult.type === "signUp") {
         await authFlow.completeOpenIdRegistration(authFlowResult.name!);
@@ -144,6 +152,7 @@
         void $establishedChannelStore.addEventListener("request", listener);
       }
       const { delegationChain } = await authorizationStore.authorize(undefined);
+      directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
       await $establishedChannelStore.send({
         jsonrpc: "2.0",
         id: $authorizationContextStore.requestId,

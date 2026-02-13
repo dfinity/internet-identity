@@ -3,12 +3,14 @@ import { trackWindowSession } from "../trackWindowSession";
 
 export class Funnel<T extends Record<string, string>> {
   #name: string;
+  #prefixEvents: boolean;
   #cleanupSession?: () => void;
   #startTimestamp?: number;
   #properties?: Record<string, string | number>;
 
-  constructor(name: string) {
+  constructor(name: string, prefixEvents = false) {
     this.#name = name;
+    this.#prefixEvents = prefixEvents;
   }
 
   init(properties?: Record<string, string | number>): void {
@@ -73,7 +75,7 @@ export class Funnel<T extends Record<string, string>> {
     };
 
     analytics.event(
-      event,
+      this.#prefixEvents ? `${this.#name}--${event}` : event,
       Object.keys(eventProperties).length > 0 ? eventProperties : undefined,
     );
   }
