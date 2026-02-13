@@ -55,9 +55,11 @@ export const analytics = {
 
     const origin = state?.effectiveOrigin;
 
-    tracker?.trackEvent(name, origin !== undefined ? {
-      ...props,
-      origin
-    } : props);
+    tracker?.trackEvent(
+      name,
+      {
+        props: origin !== undefined ? { ...props, origin } : props,
+      },
+    );
   },
 };
