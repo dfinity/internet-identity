@@ -58,7 +58,6 @@
 
     // Initialize analytics
     initAnalytics(canisterConfig.analytics_config[0]?.[0]);
-    analytics.pageView();
   });
 </script>
 

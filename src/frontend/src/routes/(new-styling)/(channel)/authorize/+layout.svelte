@@ -22,6 +22,8 @@
   import { waitFor } from "$lib/utils/utils";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
+  import { onMount } from "svelte";
+  import { analytics } from "$lib/utils/analytics/analytics";
 
   const { children, data }: LayoutProps = $props();
 
@@ -71,6 +73,11 @@
       lastUsedIdentities.map(({ identityNumber }) => identityNumber),
     ),
   );
+
+  // Track page view for authorization flow
+  onMount(() => {
+    analytics.pageView();
+  });
 </script>
 
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">

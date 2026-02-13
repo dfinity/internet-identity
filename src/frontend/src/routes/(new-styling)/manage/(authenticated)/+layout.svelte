@@ -44,6 +44,8 @@
   import { Trans } from "$lib/components/locale";
   import { getMetadataString } from "$lib/utils/openID";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { analytics } from "$lib/utils/analytics/analytics";
+  import { onMount } from "svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -120,6 +122,11 @@
   // Hide mobile sidebar on navigation
   afterNavigate(() => {
     isMobileSidebarOpen = false;
+  });
+
+  // Track page view for dashboard
+  onMount(() => {
+    analytics.pageView();
   });
 </script>
 
