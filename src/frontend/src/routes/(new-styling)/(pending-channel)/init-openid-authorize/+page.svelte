@@ -4,10 +4,18 @@
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
+  import {
+    DirectOpenIdEvents,
+    directOpenIdFunnel,
+  } from "$lib/utils/analytics/DirectOpenIdFunnel";
 
   const { data }: PageProps = $props();
 
   onMount(() => {
+    directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToOpenId, {
+      openid_issuer: data.config.issuer,
+    });
+
     const next = createRedirectURL(
       {
         clientId: data.config.client_id,

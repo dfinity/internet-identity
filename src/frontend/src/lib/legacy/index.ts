@@ -15,7 +15,7 @@ import { loginFunnel } from "$lib/utils/analytics/loginFunnel";
 
 void createSpa(async (connection) => {
   initAnalytics(connection.canisterConfig.analytics_config[0]?.[0]);
-  analytics.pageView();
+
   // Figure out if user is trying to add a device. If so, use the anchor from the URL.
   const addDeviceAnchor = getAddDeviceAnchor(new URL(window.location.href));
   if (nonNullish(addDeviceAnchor)) {

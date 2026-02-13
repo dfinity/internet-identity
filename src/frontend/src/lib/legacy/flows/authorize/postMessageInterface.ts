@@ -110,11 +110,9 @@ export async function authenticationProtocol({
   authorizeClientFunnel.trigger(AuthorizeClientEvents.RequestReceived);
   const requestOrigin =
     requestResult.request.derivationOrigin ?? requestResult.origin;
-  loginFunnel.init({ origin: requestOrigin });
-  registrationFunnel.init({ origin: requestOrigin });
-  authenticationV2Funnel.init({
-    origin: requestOrigin,
-  });
+  loginFunnel.init();
+  registrationFunnel.init();
+  authenticationV2Funnel.init();
 
   const authContext = {
     authRequest: requestResult.request,
@@ -145,7 +143,6 @@ export async function authenticationProtocol({
     authenticateResult.kind === "unverified-origin"
   ) {
     authorizeClientFunnel.trigger(AuthorizeClientEvents.AuthenticateError, {
-      origin: requestOrigin,
       failureReason: authenticateResult.text,
     });
     const response = {
