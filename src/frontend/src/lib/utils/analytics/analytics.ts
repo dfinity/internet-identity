@@ -47,7 +47,7 @@ export const analytics = {
     tracker?.trackPageview();
   },
   event: (name: string, props?: Record<string, string | number | boolean>) => {
-    let state = get(authorizationStore);
+    const state = get(authorizationStore);
 
     if (props !== undefined && "origin" in props) {
       throw new Error("Origin is already set in props");
