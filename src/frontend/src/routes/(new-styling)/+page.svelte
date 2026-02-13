@@ -44,6 +44,8 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { onMount } from "svelte";
+  import { analytics } from "$lib/utils/analytics/analytics";
 
   const authLastUsedFlow = new AuthLastUsedFlow();
 
@@ -91,11 +93,6 @@
     });
   };
 
-  // Add rerouting back on this SSG route
-  $effect(() => {
-    manuallyReroute();
-  });
-
   let triggerAnimation =
     $state<(opts: FlairAnimationOptions) => Promise<void>>();
   let clearAnimation = $state<() => void>();
@@ -140,6 +137,16 @@
     }
     authenticationV2Funnel.trigger(AuthenticationV2Events.GoToDashboard);
     authenticationV2Funnel.close();
+  });
+
+  onMount(async () => {
+    // Add rerouting back on this SSG route
+    const rerouted = await manuallyReroute();
+    // Track page view for landing page unless we have rerouted,
+    // in which case it will be tracked on the destination page.
+    if (!rerouted) {
+      analytics.pageView();
+    }
   });
 </script>
 
