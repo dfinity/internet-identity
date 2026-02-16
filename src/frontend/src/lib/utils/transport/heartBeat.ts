@@ -80,11 +80,14 @@ export class HeartbeatServer {
     // of browsers like Safari that unload background pages
     // after a certain idle time and requiring an event to
     // wake them up again (e.g. by sending a message to them).
-    if (this.#options.allowedOrigin !== null) {
+    if (
+      this.#options.allowedOrigin !== null &&
+      this.#options.window.opener !== null
+    ) {
       this.#sendStatusResponse(
         "wake-up-client",
         this.#options.allowedOrigin,
-        window.opener,
+        this.#options.window.opener,
       );
     }
 
