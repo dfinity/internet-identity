@@ -2217,7 +2217,9 @@ name = "internet_identity_interface"
 version = "0.1.0"
 dependencies = [
  "candid",
- "ic-cdk 0.16.0",
+ "ic-cdk 0.16.1",
+ "ic-http-certification",
+ "pretty_assertions",
  "serde",
  "serde_bytes",
 ]
