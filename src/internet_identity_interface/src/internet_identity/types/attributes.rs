@@ -112,7 +112,7 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
         ));
     }
 
-    if !issuer.starts_with("https://") {
+    if !issuer.starts_with("https://") && !issuer.starts_with("http://localhost:") {
         problems.push("must start with `https://`".to_string());
     }
 
