@@ -397,8 +397,10 @@ const init = async () => {
 
   updateAlternativeOriginsBtn.onclick = async () => {
     const canisterId = Principal.fromText(readCanisterId());
-    const httpAgent = new HttpAgent({ host: hostUrlEl.value });
-    await httpAgent.fetchRootKey();
+    const httpAgent = await HttpAgent.create({
+      host: hostUrlEl.value,
+      shouldFetchRootKey: true,
+    });
     const actor = Actor.createActor(idlFactory, {
       agent: httpAgent,
       canisterId,
@@ -430,11 +432,11 @@ window.addEventListener("DOMContentLoaded", init);
 
 whoamiBtn.addEventListener("click", async () => {
   const canisterId = Principal.fromText(readCanisterId());
-  const agent = new HttpAgent({
+  const agent = await HttpAgent.create({
     host: hostUrlEl.value,
     identity: delegationIdentity,
+    shouldFetchRootKey: true,
   });
-  await agent.fetchRootKey();
   const actor = Actor.createActor(idlFactory, {
     agent,
     canisterId,
