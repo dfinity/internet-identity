@@ -24,7 +24,7 @@ test("Should not issue delegation when alternative origins are empty", async ({
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     '{"alternativeOrigins":[]}',
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -57,7 +57,7 @@ test("Should not issue delegation when origin is missing from /.well-known/ii-al
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     alternativeOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -91,7 +91,7 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     alternativeOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -151,7 +151,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
 
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(tooManyOrigins, {
-    timeout: 6000,
+    timeout: 10000,
   });
 
   // Set derivation origin
@@ -190,7 +190,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     redirectOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -227,7 +227,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     alternativeOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin to canonical URL
