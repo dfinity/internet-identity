@@ -57,7 +57,11 @@ export const authWithII = async ({
   // Authenticate with signer-js instead if we use the ICRC-25 protocol
   if (useIcrc25) {
     const transport = new PostMessageTransport({ url: url_ });
-    const signer = new Signer({ transport, derivationOrigin });
+    const signer = new Signer({
+      transport,
+      derivationOrigin,
+      autoCloseTransportChannel: false,
+    });
     const attributesRequestId = window.crypto.randomUUID();
     const attributesPromise =
       requestAttributes !== undefined && requestAttributes.length > 0
@@ -104,6 +108,7 @@ export const authWithII = async ({
       delegationPromise,
       attributesPromise,
     ]);
+    await signer.closeChannel();
     return {
       identity: DelegationIdentity.fromDelegation(
         sessionIdentity,
