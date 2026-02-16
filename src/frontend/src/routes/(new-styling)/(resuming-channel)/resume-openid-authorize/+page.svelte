@@ -166,10 +166,21 @@
   {#if dapp?.logoSrc !== undefined}
     {@const name = dapp?.name ?? $authorizationContextStore.requestOrigin}
     <img
-      src={dapp?.logoSrc}
+      src={dapp.logoSrc}
       alt={$t`${name} logo`}
-      class="mb-10 h-16 max-w-50 object-contain"
+      class={[
+        "mb-10 h-16 max-w-50 object-contain",
+        dapp.logoDarkSrc !== undefined && "dark:hidden",
+      ]}
     />
+    {#if dapp.logoDarkSrc !== undefined}
+      <img
+        src={dapp.logoDarkSrc}
+        alt={$t`${name} logo`}
+        class="mb-10 hidden h-16 max-w-50 object-contain dark:block"
+        aria-hidden="true"
+      />
+    {/if}
   {/if}
   <p class="text-text-secondary mb-1 text-xl font-semibold">
     {$t`Signing in securely`}
