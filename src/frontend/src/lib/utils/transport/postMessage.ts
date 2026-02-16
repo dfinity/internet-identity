@@ -6,7 +6,7 @@ import {
   type JsonResponse,
   type Transport,
 } from "$lib/utils/transport/utils";
-import { HeartbeatServer } from "@slide-computer/signer-web";
+import { HeartbeatServer } from "./heartBeat";
 
 const ESTABLISH_TIMEOUT_MS = 2000;
 const DISCONNECT_TIMEOUT_MS = 2000;
