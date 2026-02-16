@@ -6,7 +6,7 @@ import {
   SignedDelegation,
 } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
-import { fromBase64, Signer } from "@slide-computer/signer";
+import { Signer } from "@slide-computer/signer";
 import { PostMessageTransport } from "@slide-computer/signer-web";
 
 // The type of response from II as per the spec
@@ -85,8 +85,10 @@ export const authWithII = async ({
                     [
                       key,
                       {
-                        value: new Uint8Array(fromBase64(value)),
-                        signature: new Uint8Array(fromBase64(signature)),
+                        // @ts-ignore
+                        value: Uint8Array.fromBase64(value),
+                        // @ts-ignore
+                        signature: Uint8Array.fromBase64(signature),
                         expiration: BigInt(expiration),
                       },
                     ] as [string, CertifiedAttribute],
@@ -96,7 +98,7 @@ export const authWithII = async ({
         : Promise.resolve({});
     const delegationPromise = signer.delegation({
       maxTimeToLive,
-      publicKey: new Uint8Array(sessionIdentity.getPublicKey().toDer()).buffer,
+      publicKey: new Uint8Array(sessionIdentity.getPublicKey().toDer()),
     });
     const [delegation, certifiedAttributes] = await Promise.all([
       delegationPromise,
