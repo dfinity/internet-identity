@@ -312,7 +312,7 @@ const init = async () => {
         autoSelectionPrincipal,
         useIcrc25: useIcrc25El.checked,
         requestAttributes: requestAttributesEl.value
-          .split(",")
+          .split("\n")
           .map((s) => s.trim())
           .filter((s) => s.length > 0),
       });
