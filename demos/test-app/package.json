@@ -21,7 +21,7 @@
   "devDependencies": {
     "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/internet-identity-vite-plugins": "*",
-    "@icp-sdk/core": "^5.0.0",
+    "@icp-sdk/core": "^4.2.3",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.0",
