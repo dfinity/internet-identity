@@ -95,8 +95,6 @@
     "@lingui/core": "^5.5.1",
     "@lucide/svelte": "^0.553.0",
     "@noble/hashes": "^1.8.0",
-    "@slide-computer/signer": "^4.0.0",
-    "@slide-computer/signer-web": "^4.0.0",
     "bip39": "^3.0.4",
     "borc": "^2.1.1",
     "buffer": "^6.0.3",

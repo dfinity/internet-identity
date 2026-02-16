@@ -8,10 +8,6 @@ import type {
 } from "$lib/utils/transport/utils";
 import { PostMessageTransport } from "$lib/utils/transport/postMessage";
 import { LegacyTransport } from "$lib/utils/transport/legacy";
-import type {
-  PermissionScope,
-  SupportedStandard,
-} from "@slide-computer/signer";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 
 type ChannelStore = Readable<Channel | undefined> & {
@@ -34,7 +30,7 @@ const getTransports = (): Transport[] => {
   ];
 };
 
-const supportedStandards: SupportedStandard[] = [
+const supportedStandards = [
   {
     name: "ICRC-25",
     url: "https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_25_signer_interaction_standard.md",
@@ -52,7 +48,7 @@ const supportedStandards: SupportedStandard[] = [
     url: "https://github.com/dfinity/wg-identity-authentication/blob/main/topics/icrc_95_derivationorigin.md",
   },
 ];
-const scopes: PermissionScope[] = [
+const scopes = [
   {
     method: "icrc34_delegation",
   },
