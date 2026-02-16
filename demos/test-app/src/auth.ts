@@ -85,9 +85,9 @@ export const authWithII = async ({
                     [
                       key,
                       {
-                        // @ts-ignore
+                        // @ts-ignore Not known in TS types yet but supported in all browsers
                         value: Uint8Array.fromBase64(value),
-                        // @ts-ignore
+                        // @ts-ignore Not known in TS types yet but supported in all browsers
                         signature: Uint8Array.fromBase64(signature),
                         expiration: BigInt(expiration),
                       },
