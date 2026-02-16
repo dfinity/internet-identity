@@ -11,19 +11,20 @@ use pocket_ic::PocketIc;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
-pub fn eq_ignoring_last_authentication(a: &AuthnMethodData, b: &AuthnMethodData) -> bool {
-    let a = AuthnMethodData {
-        last_authentication: None,
-        ..a.clone()
-    };
-    let b = AuthnMethodData {
-        last_authentication: None,
-        ..b.clone()
-    };
-    a == b
+pub fn assert_eq_ignoring_last_authentication(a: &AuthnMethodData, b: &AuthnMethodData) {
+    assert_eq!(
+        AuthnMethodData {
+            last_authentication: None,
+            ..a.clone()
+        },
+        AuthnMethodData {
+            last_authentication: None,
+            ..b.clone()
+        }
+    );
 }
 
-pub fn assert_eq_ignoring_last_authentication(
+pub fn assert_eq_ignoring_last_authentication_multiple(
     authn_methods1: &[AuthnMethodData],
     authn_methods2: &[AuthnMethodData],
 ) {
@@ -31,25 +32,12 @@ pub fn assert_eq_ignoring_last_authentication(
         .iter()
         .zip(authn_methods2.iter())
         .for_each(|(a, b)| {
-            assert!(
-                eq_ignoring_last_authentication(a, b),
-                "authn methods are not equal: {a:?} != {b:?}"
-            )
+            assert_eq_ignoring_last_authentication(a, b);
         });
 }
 
 pub fn test_authn_method() -> AuthnMethodData {
-    AuthnMethodData {
-        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
-            pubkey: ByteBuf::from(vec![0; 32]),
-        }),
-        metadata: Default::default(),
-        security_settings: AuthnMethodSecuritySettings {
-            protection: AuthnMethodProtection::Unprotected,
-            purpose: AuthnMethodPurpose::Authentication,
-        },
-        last_authentication: None,
-    }
+    sample_webauthn_authn_method(0)
 }
 
 pub fn create_identity_with_authn_method(
@@ -140,15 +128,6 @@ pub fn create_identity_with_openid_credential(
     .identity_number
 }
 
-pub fn sample_pubkey_authn_method(i: u8) -> AuthnMethodData {
-    AuthnMethodData {
-        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
-            pubkey: ByteBuf::from(vec![i; 32]),
-        }),
-        ..test_authn_method()
-    }
-}
-
 pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
     AuthnMethodData {
         authn_method: AuthnMethod::WebAuthn(WebAuthn {
@@ -156,46 +135,33 @@ pub fn sample_webauthn_authn_method(i: u8) -> AuthnMethodData {
             credential_id: ByteBuf::from(vec![i * 2; 32]),
             aaguid: None,
         }),
-        ..test_authn_method()
-    }
-}
-
-pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
-    let authn_method1 = AuthnMethodData {
         metadata: HashMap::from([
-            (
-                "some_key".to_string(),
-                MetadataEntryV2::String("some data".to_string()),
-            ),
-            (
-                "origin".to_string(),
-                MetadataEntryV2::String("https://some.origin".to_string()),
-            ),
-            (
-                "alias".to_string(),
-                MetadataEntryV2::String("Test Authn Method 1".to_string()),
-            ),
-        ]),
-        ..sample_pubkey_authn_method(0)
-    };
-
-    let authn_method2 = AuthnMethodData {
-        metadata: HashMap::from([(
-            "different_key".to_string(),
-            MetadataEntryV2::String("other data".to_string()),
-        )]),
-        ..sample_webauthn_authn_method(1)
-    };
-
-    let authn_method3 = AuthnMethodData {
-        metadata: HashMap::from([
-            (
-                "recovery_metadata_1".to_string(),
-                MetadataEntryV2::String("recovery data 1".to_string()),
-            ),
             (
                 "origin".to_string(),
                 MetadataEntryV2::String("https://identity.ic0.app".to_string()),
+            ),
+            (
+                "authenticator_attachment".to_string(),
+                MetadataEntryV2::String("cross_platform".to_string()),
+            ),
+        ]),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    }
+}
+
+fn sample_recovery_authn_method(i: u8) -> AuthnMethodData {
+    AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(vec![i; 32]),
+        }),
+        metadata: HashMap::from([
+            (
+                "alias".to_string(),
+                MetadataEntryV2::String("Recovery Key".to_string()),
             ),
             (
                 "usage".to_string(),
@@ -203,44 +169,19 @@ pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
             ),
         ]),
         security_settings: AuthnMethodSecuritySettings {
-            protection: AuthnMethodProtection::Protected,
-            purpose: AuthnMethodPurpose::Recovery,
-        },
-        ..sample_pubkey_authn_method(2)
-    };
-
-    let authn_method4 = AuthnMethodData {
-        metadata: HashMap::default(),
-        security_settings: AuthnMethodSecuritySettings {
             protection: AuthnMethodProtection::Unprotected,
             purpose: AuthnMethodPurpose::Recovery,
         },
-        ..sample_webauthn_authn_method(3)
-    };
+        last_authentication: None,
+    }
+}
 
-    let authn_method5 = AuthnMethodData {
-        metadata: HashMap::from([
-            (
-                "origin".to_string(),
-                MetadataEntryV2::String("https://identity.internetcomputer.org".to_string()),
-            ),
-            (
-                "alias".to_string(),
-                MetadataEntryV2::String("Test Authn Method 5".to_string()),
-            ),
-            (
-                "usage".to_string(),
-                MetadataEntryV2::String("browser_storage_key".to_string()),
-            ),
-        ]),
-        ..sample_webauthn_authn_method(4)
-    };
-
+pub fn sample_authn_methods() -> Vec<AuthnMethodData> {
     vec![
-        authn_method1,
-        authn_method2,
-        authn_method3,
-        authn_method4,
-        authn_method5,
+        sample_webauthn_authn_method(0),
+        sample_webauthn_authn_method(1),
+        sample_webauthn_authn_method(2),
+        sample_webauthn_authn_method(3),
+        sample_recovery_authn_method(4),
     ]
 }

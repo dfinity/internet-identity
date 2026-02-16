@@ -49,6 +49,15 @@ export class KnownDapp {
     ] as string;
   }
 
+  public get logoDarkSrc(): string | undefined {
+    if (this.descr.logoDark === undefined) {
+      return;
+    }
+    return iconFiles[
+      `/src/frontend/src/lib/icons/${this.descr.logoDark}`
+    ] as string;
+  }
+
   public get name(): string {
     return this.descr.name;
   }
@@ -59,6 +68,10 @@ export class KnownDapp {
 
   public get website(): string {
     return this.descr.website;
+  }
+
+  public get certifiedAttributes(): boolean {
+    return this.descr.certified_attributes ?? false;
   }
 }
 

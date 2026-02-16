@@ -21,7 +21,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 mod generic;
 
-const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
+pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
 pub type OpenIdCredentialKey = (Iss, Sub);
 pub type Iss = String;

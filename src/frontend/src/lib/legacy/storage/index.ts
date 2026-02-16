@@ -192,7 +192,7 @@ export const setKnownPrincipal = async ({
 /** Accessing functions */
 
 // Simply read the storage without updating it
-const readStorage = (): Promise<Storage> => {
+export const readStorage = (): Promise<Storage> => {
   return updateStorage((storage) => {
     return { ret: storage, updated: false };
   });
@@ -480,7 +480,7 @@ const AnchorV1 = z.object({
 
 /** The type of all anchors in storage. */
 type AnchorsV1 = z.infer<typeof AnchorsV1>;
-const AnchorsV1 = z.record(AnchorV1);
+const AnchorsV1 = z.record(z.string(), AnchorV1);
 
 /* Read localStorage data as ls["anchors"] = { "10000": {...}} */
 const migratedV1 = async (): Promise<Storage | undefined> => {
@@ -542,7 +542,7 @@ const AnchorV2 = z.object({
   /** Timestamp (mills since epoch) of when anchor was last used */
   lastUsedTimestamp: z.number(),
 });
-const AnchorsV2 = z.record(AnchorV2);
+const AnchorsV2 = z.record(z.string(), AnchorV2);
 
 const migratedV2 = async (): Promise<Storage | undefined> => {
   const readAnchors = await readIndexedDBV2();
@@ -593,7 +593,7 @@ const AnchorV3 = z.object({
 
   knownPrincipals: z.array(PrincipalDataV3),
 });
-const AnchorsV3 = z.record(AnchorV3);
+const AnchorsV3 = z.record(z.string(), AnchorV3);
 
 /** The type of all anchors in storage. */
 const StorageV3 = z.object({
@@ -659,7 +659,7 @@ const AnchorV4 = z.object({
 
   knownPrincipals: z.array(PrincipalDataV4),
 });
-const AnchorsV4 = z.record(AnchorV4);
+const AnchorsV4 = z.record(z.string(), AnchorV4);
 
 /** The type of all anchors in storage. */
 const StorageV4 = z.object({

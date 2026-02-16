@@ -25,7 +25,7 @@
     "name": "NFID",
     "oneLiner": "Your digital identity for the modern world.",
     "website": "https://nfid.one/",
-    "logo": "nfid_logo.webp"
+    "logo": "nfid_logo.svg"
   },
   {
     "name": "Yuku",
@@ -178,12 +178,6 @@
     "logo": "kontribute_logo.webp"
   },
   {
-    "name": "Factland DAO",
-    "oneLiner": "A Web3 community building decentralized trust in the age of misinformation",
-    "website": "https://factland.org",
-    "logo": "factland_logo.png"
-  },
-  {
     "name": "Saga Tarot",
     "website": "https://5nl7c-zqaaa-aaaah-qaa7a-cai.raw.ic0.app/",
     "logo": "sagatarot_logo.webp"
@@ -192,12 +186,6 @@
     "name": "ICME",
     "website": "https://sygsn-caaaa-aaaaf-qaahq-cai.raw.ic0.app/",
     "logo": "icme_logo.webp"
-  },
-  {
-    "name": "iKnows",
-    "oneLiner": "Explore unlimited knowledge, with Q&A interaction between you and me!",
-    "website": "https://ffxwx-3yaaa-aaaah-qajua-cai.ic0.app",
-    "logo": "iknows_logo.png"
   },
   {
     "name": "Mission Is Possible",
@@ -307,12 +295,6 @@
     "oneLiner": "Rakeoff is a cryptocurrency staking rewards application built on the ICP blockchain."
   },
   {
-    "name": "D-VOTE",
-    "website": "https://7y3zv-rqaaa-aaaag-abswa-cai.icp0.io",
-    "logo": "d-vote_logo.webp",
-    "oneLiner": "Transparent, tamper-proof voting on blockchain."
-  },
-  {
     "name": "IC HUB",
     "oneLiner": "Your gateway to web3 apps: connect, chat and explore all in one place",
     "website": "https://md7ke-jyaaa-aaaak-qbrya-cai.ic0.app/",
@@ -323,18 +305,6 @@
     "website": "https://d7dm6-sqaaa-aaaag-qcgma-cai.icp0.io/",
     "oneLiner": "Your AI-powered companion for simplifying and streamlining the Motoko coding experience.",
     "logo": "motokopilot_logo.png"
-  },
-  {
-    "name": "NOBLEBLOCKS",
-    "website": "https://www.nobleblocks.com",
-    "logo": "nobleblocks_logo.webp",
-    "oneLiner": "A Community-Driven DeSci Project for Scientific Publishing"
-  },
-  {
-    "name": "John Dao",
-    "website": "https://johndao.gg",
-    "logo": "john-dao_logo.webp",
-    "oneLiner": "A Twitter/X account controlled by a DAO on the Internet Computer"
   },
   {
     "name": "aVa",
@@ -365,12 +335,6 @@
     "website": "https://www.doo.co",
     "logo": "doocoins_logo.webp",
     "oneLiner": "Kids rewards dapp"
-  },
-  {
-    "name": "IC WebSocket",
-    "website": "https://demo.icws.io",
-    "logo": "ic-websocket_logo.webp",
-    "oneLiner": "Send updates from canisters to your users"
   },
   {
     "name": "Flower Power DAO",
@@ -445,12 +409,6 @@
     "logo": "blendsafe.svg"
   },
   {
-    "name": "Gitcoin Passport Client",
-    "oneLiner": "A UI that securely retrieves anti-Sybil scoring data from Gitcoin Passport and stores it in a DB.",
-    "website": "https://internet-computer.vporton.name/gitcoin-passport-client/",
-    "logo": "gitcoin-client.png"
-  },
-  {
     "name": "Game Bloc",
     "oneLiner": "A decentralized platform empowering gamers and gaming organizations to create, manage, and participate in game tournaments.",
     "website": "https://cv4ma-4qaaa-aaaal-adntq-cai.icp0.io/",
@@ -478,12 +436,6 @@
     "oneLiner": "First-ever infrastructure layer that allows transferring and swapping of tokens between ICP and blockchains such as Bitcoin, Ethereum, and Solana.",
     "website": "https://app.appic.solutions/",
     "logo": "appic_logo.png"
-  },
-  {
-    "name": "OptiGames",
-    "oneLiner": "Flexible framework for fully onchain multiplayer turn-based games. Bulldog Blast is a semi-realtime multiplayer arcade combat game.",
-    "website": "https://tpxio-7yaaa-aaaak-qdbaa-cai.icp0.io/",
-    "logo": "Optigames_logo.svg"
   },
   {
     "name": "ICPanda DAO",
@@ -587,6 +539,7 @@
     "logo": "neuronpool_logo.svg",
     "authOrigins": [
       "https://stake.neuronpool.com",
+      "https://vectors.neuronpool.com",
       "https://t3c6p-zqaaa-aaaar-qafuq-cai.icp0.io"
     ]
   },
@@ -649,11 +602,6 @@
     "logo": "icptokens_logo.svg"
   },
   {
-    "name": "ICSpore",
-    "website": "https://qnoqa-vaaaa-aaaap-qhima-cai.icp0.io/",
-    "logo": "icspore_logo.webp"
-  },
-  {
     "name": "DAO Venture",
     "website": "https://bpo6s-4qaaa-aaaap-acava-cai.icp0.io/",
     "logo": "daoventure_logo.webp"
@@ -689,7 +637,20 @@
     "name": "Caffeine",
     "oneLiner": "Self-writing apps platform: the first complete tech stack designed for AI.",
     "website": "https://caffeine.ai",
-    "authOrigins": ["https://caffeine.ai", "https://app.caffeine.ai"],
-    "logo": "caffeine_logo.svg"
+    "authOrigins": [
+      "https://caffeine.ai",
+      "https://app.caffeine.ai",
+      "https://dev.caffeine.ai"
+    ],
+    "logo": "caffeine_logo.svg",
+    "logoDark": "caffeine_logo_dark.svg",
+    "certified_attributes": true
+  },
+  {
+    "name": "Direct OpenID Sign-In",
+    "oneLiner": "Direct OpenID sign-in test app",
+    "website": "https://4mteh-mqaaa-aaaad-adnaa-cai.icp0.io",
+    "logo": "try-id-ai.svg",
+    "certified_attributes": true
   }
 ]

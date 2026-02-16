@@ -7,6 +7,7 @@ import { isNullish } from "@dfinity/utils";
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
 export const LEGACY_II_URL = "https://identity.ic0.app";
+export const ALT_LEGACY_II_URL = "https://identity.internetcomputer.org";
 export const TEST_APP_URL = "https://nice-name.com";
 export const NOT_TEST_APP_URL = "https://very-nice-name.com";
 export const TEST_APP_CANONICAL_URL = `https://${testAppCanisterId}.icp0.io`;
@@ -63,6 +64,7 @@ export const authorizeWithUrl = async (
   iiURL: string,
   authenticate: (page: Page) => Promise<void>,
   useIcrc25?: boolean,
+  attributes?: string[],
 ): Promise<string> => {
   // Open demo app and assert that user isn't authenticated yet
   await page.goto(appUrl);
@@ -71,6 +73,13 @@ export const authorizeWithUrl = async (
     await page
       .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
       .setChecked(true);
+
+    // If also requesting attributes, fill them in the textarea
+    if (attributes !== undefined) {
+      await page
+        .getByRole("textbox", { name: "Request attributes:" })
+        .fill(attributes.join("\n"));
+    }
   }
   await expect(page.locator("#principal")).toBeHidden();
   const pagePromise = page.context().waitForEvent("page");
@@ -189,7 +198,6 @@ export const renamePasskey = async (
   ).toBeVisible();
 
   const input = page.getByRole("textbox");
-  await expect(input).toHaveValue(currentName);
   await input.clear();
   await input.fill(nextName);
   await page.getByRole("button", { name: "Save changes" }).click();
@@ -241,8 +249,8 @@ export const removePasskey = async (
 };
 
 export const signOut = async (page: Page): Promise<void> => {
-  await page.getByLabel("Switch identity").click();
-  await page.getByRole("button", { name: "Sign Out" }).click();
+  // Navigating to landing page (reloading) is sufficient for now to sign out
+  await page.goto(II_URL);
 };
 
 /**

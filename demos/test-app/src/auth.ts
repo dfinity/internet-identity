@@ -24,6 +24,12 @@ interface AuthResponseSuccess {
   authnMethod: "pin" | "passkey" | "recovery";
 }
 
+export interface CertifiedAttribute {
+  value: Uint8Array;
+  signature: Uint8Array;
+  expiration: bigint;
+}
+
 // Perform a sign in to II using parameters set in this app
 export const authWithII = async ({
   url: url_,
@@ -33,6 +39,7 @@ export const authWithII = async ({
   sessionIdentity,
   autoSelectionPrincipal,
   useIcrc25,
+  requestAttributes,
 }: {
   url: string;
   maxTimeToLive?: bigint;
@@ -41,20 +48,71 @@ export const authWithII = async ({
   autoSelectionPrincipal?: string;
   sessionIdentity: SignIdentity;
   useIcrc25?: boolean;
-}): Promise<{ identity: DelegationIdentity; authnMethod: string }> => {
+  requestAttributes?: string[];
+}): Promise<{
+  identity: DelegationIdentity;
+  authnMethod: string;
+  certifiedAttributes?: Record<string, CertifiedAttribute>;
+}> => {
   // Authenticate with signer-js instead if we use the ICRC-25 protocol
   if (useIcrc25) {
     const transport = new PostMessageTransport({ url: url_ });
     const signer = new Signer({ transport, derivationOrigin });
-    // We need to cast the delegation from signer-js to avoid a TS issue because one type is imported from cjs and another esm:
-    // Types of property 'delegations' are incompatible.
-    const delegation = (await signer.delegation({
+    const attributesRequestId = window.crypto.randomUUID();
+    const attributesPromise =
+      requestAttributes !== undefined && requestAttributes.length > 0
+        ? signer
+            .sendRequest({
+              jsonrpc: "2.0",
+              method: "ii_attributes",
+              id: attributesRequestId,
+              params: {
+                attributes: requestAttributes,
+              },
+            })
+            .then((response) => {
+              if (
+                !("result" in response) ||
+                typeof response.result !== "object" ||
+                response.result === null ||
+                !("attributes" in response.result)
+              ) {
+                throw new Error("Attributes response is missing result");
+              }
+              return Object.fromEntries(
+                Object.entries(response.result.attributes).map(
+                  ([key, { value, signature, expiration }]) =>
+                    [
+                      key,
+                      {
+                        // @ts-ignore Not known in TS types yet but supported in all browsers
+                        value: Uint8Array.fromBase64(value),
+                        // @ts-ignore Not known in TS types yet but supported in all browsers
+                        signature: Uint8Array.fromBase64(signature),
+                        expiration: BigInt(expiration),
+                      },
+                    ] as [string, CertifiedAttribute],
+                ),
+              );
+            })
+        : Promise.resolve({});
+    const delegationPromise = signer.delegation({
       maxTimeToLive,
-      publicKey: sessionIdentity.getPublicKey().toDer(),
-    })) as unknown as DelegationChain;
+      publicKey: new Uint8Array(sessionIdentity.getPublicKey().toDer()),
+    });
+    const [delegation, certifiedAttributes] = await Promise.all([
+      delegationPromise,
+      attributesPromise,
+    ]);
     return {
-      identity: DelegationIdentity.fromDelegation(sessionIdentity, delegation),
+      identity: DelegationIdentity.fromDelegation(
+        sessionIdentity,
+        // We need to cast the delegation from signer-js to avoid a TS issue because one type is imported from cjs and another esm:
+        // Types of property 'delegations' are incompatible.
+        delegation as unknown as DelegationChain,
+      ),
       authnMethod: "passkey",
+      certifiedAttributes,
     };
   }
 

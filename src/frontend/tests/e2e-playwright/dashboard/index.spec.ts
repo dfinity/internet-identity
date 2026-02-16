@@ -11,7 +11,7 @@ test.describe("Dashboard Navigation", () => {
     await createIdentity(page, TEST_USER_NAME, auth);
     await clearStorage(page);
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -32,7 +32,7 @@ test.describe("Dashboard Navigation", () => {
     await page.getByRole("link", { name: "Access and recovery" }).click();
 
     // Check that we have one passkey listed
-    const passkey = await page.getByText("Chrome");
+    const passkey = await page.getByText("Unknown");
     await expect(passkey).toBeVisible();
     await expect(passkey).toHaveCount(1);
   });
@@ -46,7 +46,7 @@ test.describe("Dashboard Navigation", () => {
 
     // Sign in to dashboard with first identity
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Switch identity" }).click();
     auth1(page);
     await page.getByRole("button", { name: "Test 1" }).click();
 
@@ -66,6 +66,9 @@ test.describe("Dashboard Navigation", () => {
     await page.getByRole("link", { name: "Access and recovery" }).click();
 
     // Switch to second identity
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+    }
     await page.getByRole("button", { name: "Switch identity" }).click();
     auth2(page);
     await page.getByRole("button", { name: "Test 2" }).click();

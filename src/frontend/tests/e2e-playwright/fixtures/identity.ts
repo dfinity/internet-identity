@@ -40,23 +40,8 @@ class IdentityWizard {
     this.#page = page;
   }
 
-  async signInWithPasskey(auth: DummyAuthFn): Promise<void> {
+  async signIn(auth: DummyAuthFn): Promise<void> {
     await this.#goto();
-
-    await this.#page
-      .getByRole("heading", { name: "Manage your Internet Identity" })
-      .waitFor();
-
-    const useAnotherIdentity = this.#page.getByRole("button", {
-      name: "Use another identity",
-    });
-    if (await useAnotherIdentity.isVisible()) {
-      await useAnotherIdentity.click();
-    }
-
-    await this.#page
-      .getByRole("button", { name: "Continue with passkey" })
-      .click();
     auth(this.#page);
     await this.#page
       .getByRole("button", { name: "Use existing identity" })
@@ -64,11 +49,8 @@ class IdentityWizard {
     await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
   }
 
-  async signUpWithPasskey(auth: DummyAuthFn, name: string): Promise<void> {
+  async signUp(auth: DummyAuthFn, name: string): Promise<void> {
     await this.#goto();
-    await this.#page
-      .getByRole("button", { name: "Continue with passkey" })
-      .click();
     await this.#page
       .getByRole("button", { name: "Create new identity" })
       .click();
@@ -83,14 +65,31 @@ class IdentityWizard {
    * of buttons in order (if visible) to get to the intended view from any page.
    */
   async #goto(): Promise<void> {
+    // Wait for any of the buttons we need to click to show up
     const buttons = [
-      this.#page.getByRole("button", { name: "Manage identity" }),
-      this.#page.getByRole("button", { name: "Switch identity" }),
-      this.#page.getByRole("button", { name: "Use another identity" }),
+      "Sign in",
+      "Switch identity",
+      "Use another identity",
+      "Continue with passkey",
     ];
+    await this.#page
+      .getByRole("button", { name: new RegExp(buttons.join("|")) })
+      .first()
+      .waitFor();
+    // If continue with passkey button is already visible,
+    // e.g. after /login redirect we only need to click that.
+    const continueWithPasskeyButton = this.#page.getByRole("button", {
+      name: "Continue with passkey",
+    });
+    if (await continueWithPasskeyButton.isVisible()) {
+      await continueWithPasskeyButton.click();
+      return;
+    }
+    // Else click all buttons in order (if visible)
     for (const button of buttons) {
-      if (await button.isVisible()) {
-        await button.click();
+      const locator = this.#page.getByRole("button", { name: button });
+      if (await locator.isVisible()) {
+        await locator.click();
       }
     }
   }
@@ -104,18 +103,18 @@ export const test = base.extend<{
     const auth = dummyAuth(authIndex);
     const tempContext = await browser.newContext();
     const tempPage = await tempContext.newPage();
-    await tempPage.goto(II_URL + "/login");
+    await tempPage.goto(II_URL);
     const script = (await tempPage.$("[data-canister-id]"))!;
     const canisterId = (await script.getAttribute("data-canister-id"))!;
     const tempWizard = new IdentityWizard(tempPage);
-    await tempWizard.signUpWithPasskey(auth, DEFAULT_NAME);
+    await tempWizard.signUp(auth, DEFAULT_NAME);
     await tempPage.waitForURL(II_URL + "/manage");
     await tempPage.close();
     await use({
       name: DEFAULT_NAME,
       signIn: async () => {
         const wizard = new IdentityWizard(page);
-        await wizard.signInWithPasskey(auth);
+        await wizard.signIn(auth);
       },
       signOut: async () => {
         // Navigating to landing page (reloading) is sufficient for now to sign out

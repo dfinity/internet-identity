@@ -89,14 +89,13 @@ use ic_stable_structures::cell::ValueError;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::ops::RangeInclusive;
 use storable::account_reference_list::StorableAccountReferenceList;
 use storable::anchor_number_list::StorableAnchorNumberList;
 
 use ic_cdk::api::trap;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::reader::Reader;
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::writer::Writer;
 use ic_stable_structures::{
@@ -110,7 +109,7 @@ use crate::state::PersistentState;
 use crate::stats::event_stats::AggregationKey;
 use crate::stats::event_stats::{EventData, EventKey};
 use crate::storage::account::AccountReference;
-use crate::storage::anchor::{Anchor, Device};
+use crate::storage::anchor::Anchor;
 use crate::storage::memory_wrapper::MemoryWrapper;
 use crate::storage::registration_rates::RegistrationRates;
 use crate::storage::storable::account::StorableAccount;
@@ -120,6 +119,8 @@ use crate::storage::storable::accounts_counter::{AccountType, StorableAccountsCo
 use crate::storage::storable::anchor_application_config::AnchorApplicationConfig;
 use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
+use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
+use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -599,7 +600,7 @@ impl<M: Memory + Clone> Storage<M> {
 
         let result = f(&mut identity)?;
 
-        self.create(identity).map_err(E::from)?;
+        self.write(identity).map_err(E::from)?;
 
         // Important! Only increment num_anchors after the anchor creation succeeds.
         self.header.num_anchors = self.header.num_anchors.saturating_add(1);
@@ -608,34 +609,10 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(result)
     }
 
-    /// This method can be replaced with `write` once `anchor_memory` is removed.
-    pub fn create(&mut self, data: Anchor) -> Result<(), StorageError> {
-        self.write(data, false)
-    }
-
-    /// This method can be replaced with `write` once `anchor_memory` is removed.
-    pub fn update(&mut self, data: Anchor) -> Result<(), StorageError> {
-        self.write(data, true)
-    }
-
     /// Writes the data of the specified anchor to stable memory.
-    ///
-    /// It's not possible to know if an anchor has been written before,
-    /// but we need to know this to safely read the previous anchor.
-    ///
-    /// Therefore, this information is passed as an additional argument,
-    /// this argument can be removed once `anchor_memory` is removed.
-    ///
-    /// *TODO*: remove `pub(crate)` after the `sync_anchor_indices` migration. Do **NOT**,
-    /// under _any_ circumstances, use this method directly. Use `create` or `update` instead.
-    pub(crate) fn write(
-        &mut self,
-        data: Anchor,
-        is_previously_written: bool,
-    ) -> Result<(), StorageError> {
+    pub(crate) fn write(&mut self, data: Anchor) -> Result<(), StorageError> {
         let anchor_number = data.anchor_number();
-        let (storable_fixed_anchor, storable_anchor): (StorableFixedAnchor, StorableAnchor) =
-            data.into();
+        let (_, storable_anchor): (StorableFixedAnchor, StorableAnchor) = data.into();
 
         // Get anchor address
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
@@ -656,35 +633,6 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::BadAnchorNumber(anchor_number));
         }
 
-        let address = self.record_address(record_number);
-
-        // Read previous fixed 4KB stable memory anchor (this is used only for synching device indices)
-        let previous_devices = if is_previously_written {
-            let mut reader = Reader::new(&self.anchor_memory, address);
-            let mut read_buf = vec![0; self.header.entry_size as usize];
-            reader
-                .read_exact(&mut read_buf)
-                .expect("failed to read memory");
-            let anchor = StorableFixedAnchor::from_bytes(Cow::Owned(read_buf));
-            anchor.devices
-        } else {
-            vec![]
-        };
-
-        // Write current fixed 4KB stable memory anchor
-        {
-            let write_buf = storable_fixed_anchor.to_bytes();
-            if write_buf.len() > self.header.entry_size as usize {
-                return Err(StorageError::EntrySizeLimitExceeded {
-                    space_required: write_buf.len() as u64,
-                    space_available: self.header.entry_size as u64,
-                });
-            }
-            let mut writer = Writer::new(&mut self.anchor_memory, address);
-            writer.write_all(&write_buf).expect("memory write failed");
-            writer.flush().expect("memory write failed");
-        }
-
         // If there was an anchor stored previously, we need to take its credentials and recovery keys into account
         // while synchronizing the respective indices.
         //
@@ -694,7 +642,7 @@ impl<M: Memory + Clone> Storage<M> {
             .insert(anchor_number, storable_anchor.clone());
 
         // Second, deconstruct the previous anchor, obtaining the previous credentials and recovery keys.
-        let (previous_openid_credentials, _previous_passkey_credentials, _previous_recovery_keys) =
+        let (previous_openid_credentials, previous_passkey_credentials, previous_recovery_keys) =
             if let Some(StorableAnchor {
                 // The following fields need to be compared with the previous anchor
                 openid_credentials,
@@ -722,24 +670,15 @@ impl<M: Memory + Clone> Storage<M> {
             previous_openid_credentials,
             storable_anchor.openid_credentials,
         );
-
-        // Sync device-based indices with the legacy source of truth (`StorableFixedAnchor`).
-        //
-        // TODO: After all anchors are migrated to `StableAnchor`, switch the source of truth to it.
-        //
-        // Update `CredentialId` to `AnchorNumber` lookup map
-
-        let current_devices = storable_fixed_anchor.devices;
-
         self.sync_anchor_with_recovery_phrase_principal_index(
             anchor_number,
-            &previous_devices,
-            &current_devices,
+            &previous_recovery_keys,
+            &storable_anchor.recovery_keys.unwrap_or_default(),
         );
         self.sync_anchors_with_passkey_credential_index(
             anchor_number,
-            previous_devices,
-            current_devices,
+            &previous_passkey_credentials,
+            &storable_anchor.passkey_credentials.unwrap_or_default(),
         );
 
         Ok(())
@@ -747,11 +686,9 @@ impl<M: Memory + Clone> Storage<M> {
 
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
-        // Read fixed 4KB anchor
+        // These values are no longer used for reading, but we keep the check for consistency.
         let record_number = self.anchor_number_to_record_number(anchor_number)?;
-
         let num_anchors = self.header.num_anchors;
-
         if record_number >= num_anchors {
             ic_cdk::println!(
                 "ERROR: Requested anchor number {} maps to record number {}, but only {} anchors \
@@ -763,27 +700,18 @@ impl<M: Memory + Clone> Storage<M> {
             return Err(StorageError::BadAnchorNumber(anchor_number));
         }
 
-        let address = self.record_address(record_number);
-
-        let mut reader = Reader::new(&self.anchor_memory, address);
-        let mut buf = vec![0; self.header.entry_size as usize];
-
-        reader.read_exact(&mut buf).expect("failed to read memory");
-
-        // Anchors that are allocated but have never been written to, due to a previously missing
-        // allocation cleanup implementation, are handled as if they don't exist.
-        if buf.iter().all(|&b| b == 0) {
-            return Err(StorageError::AnchorNotFound { anchor_number });
-        }
-
         // Read unbounded stable structures anchor
-        let storable_fixed_anchor = StorableFixedAnchor::from_bytes(Cow::Owned(buf));
         let storable_anchor = self.stable_anchor_memory.get(&anchor_number);
-        Ok(Anchor::from((
-            anchor_number,
-            storable_fixed_anchor,
-            storable_anchor,
-        )))
+
+        let Some(storable_anchor) = storable_anchor else {
+            ic_cdk::println!(
+                "Anchor not found in stable_anchor_memory for anchor number {}",
+                anchor_number
+            );
+            return Err(StorageError::AnchorNotFound { anchor_number });
+        };
+
+        Ok(Anchor::from((anchor_number, storable_anchor)))
     }
 
     /// Update `OpenIdCredential` to `Vec<AnchorNumber>` lookup map
@@ -797,8 +725,10 @@ impl<M: Memory + Clone> Storage<M> {
             previous.into_iter().map(|cred| cred.key()).collect();
         let current_set: BTreeSet<StorableOpenIdCredentialKey> =
             current.into_iter().map(|cred| cred.key()).collect();
+
         let credential_to_be_removed = previous_set.difference(&current_set);
         let credential_to_be_added = current_set.difference(&previous_set);
+
         credential_to_be_removed.cloned().for_each(|key| {
             self.lookup_anchor_with_openid_credential_memory
                 .remove(&key);
@@ -831,31 +761,24 @@ impl<M: Memory + Clone> Storage<M> {
     fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
-        previous_devices: &[Device],
-        current_devices: &[Device],
+        previous_recovery_keys: &[StorableRecoveryKey],
+        current_recovery_keys: &[StorableRecoveryKey],
     ) {
-        let retain_recovery_phrase_device_principals = |device: &Device| {
-            if !device.is_recovery_phrase() {
-                // lookup_anchor_with_recovery_phrase_principal_memory is not affected by this device.
-                return None;
-            };
-            Some(Principal::self_authenticating(&device.pubkey))
-        };
-
-        let previous_recovery_phrases = previous_devices
+        let previous_recovery_principals = previous_recovery_keys
             .iter()
-            .filter_map(retain_recovery_phrase_device_principals)
+            .map(|recovery_key| Principal::self_authenticating(&recovery_key.pubkey))
+            .collect::<BTreeSet<_>>();
+        let current_recovery_principals = current_recovery_keys
+            .iter()
+            .map(|recovery_key| Principal::self_authenticating(&recovery_key.pubkey))
             .collect::<BTreeSet<_>>();
 
-        let current_recovery_phrases = current_devices
-            .iter()
-            .filter_map(retain_recovery_phrase_device_principals)
-            .collect::<BTreeSet<_>>();
-
-        for key in previous_recovery_phrases.difference(&current_recovery_phrases) {
+        for recovery_principal in
+            previous_recovery_principals.difference(&current_recovery_principals)
+        {
             let Some(existing_anchor_number) = self
                 .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(key)
+                .get(recovery_principal)
             else {
                 // This principal is not indexed, nothing to do.
                 continue;
@@ -865,20 +788,20 @@ impl<M: Memory + Clone> Storage<M> {
                 continue;
             }
             self.lookup_anchor_with_recovery_phrase_principal_memory
-                .remove(key);
+                .remove(recovery_principal);
         }
 
-        for key in current_recovery_phrases {
+        for recovery_principal in current_recovery_principals {
             if self
                 .lookup_anchor_with_recovery_phrase_principal_memory
-                .contains_key(&key)
+                .contains_key(&recovery_principal)
             {
                 // This principal is already occupied; do not overwrite it.
                 continue;
             };
 
             self.lookup_anchor_with_recovery_phrase_principal_memory
-                .insert(key, anchor_number);
+                .insert(recovery_principal, anchor_number);
         }
     }
 
@@ -886,25 +809,28 @@ impl<M: Memory + Clone> Storage<M> {
     fn sync_anchors_with_passkey_credential_index(
         &mut self,
         anchor_number: AnchorNumber,
-        previous: Vec<Device>,
-        current: Vec<Device>,
+        previous_passkey_credentials: &[StorablePasskeyCredential],
+        current_passkey_credentials: &[StorablePasskeyCredential],
     ) {
-        let previous_credential_ids: BTreeSet<CredentialId> = previous
-            .into_iter()
-            .filter_map(|device| device.credential_id)
-            .collect();
+        let previous_passkey_credential_ids = previous_passkey_credentials
+            .iter()
+            .map(|passkey_credential| {
+                StorableCredentialId::from_bytes(Cow::Borrowed(&passkey_credential.credential_id))
+            })
+            .collect::<BTreeSet<_>>();
+        let current_passkey_credential_ids = current_passkey_credentials
+            .iter()
+            .map(|passkey_credential| {
+                StorableCredentialId::from_bytes(Cow::Borrowed(&passkey_credential.credential_id))
+            })
+            .collect::<BTreeSet<_>>();
 
-        let current_credential_ids: BTreeSet<CredentialId> = current
-            .into_iter()
-            .filter_map(|device| device.credential_id)
-            .collect();
-
-        for credential_id in previous_credential_ids.difference(&current_credential_ids) {
-            let credential_id = StorableCredentialId::from(credential_id.clone());
-
+        for credential_id in
+            previous_passkey_credential_ids.difference(&current_passkey_credential_ids)
+        {
             let Some(indexed_anchor_number) = self
                 .lookup_anchor_with_passkey_credential_memory
-                .get(&credential_id)
+                .get(credential_id)
             else {
                 continue;
             };
@@ -915,12 +841,10 @@ impl<M: Memory + Clone> Storage<M> {
             }
 
             self.lookup_anchor_with_passkey_credential_memory
-                .remove(&credential_id);
+                .remove(credential_id);
         }
 
-        for credential_id in current_credential_ids {
-            let credential_id = StorableCredentialId::from(credential_id);
-
+        for credential_id in current_passkey_credential_ids {
             // Only insert if the credential id isn't yet assigned to an anchor.
             if self
                 .lookup_anchor_with_passkey_credential_memory
@@ -1801,10 +1725,6 @@ impl<M: Memory + Clone> Storage<M> {
         let record_number = (anchor_number - self.header.id_range_lo) as u32;
 
         Ok(record_number)
-    }
-
-    fn record_address(&self, record_number: u32) -> u64 {
-        record_number as u64 * self.header.entry_size as u64
     }
 
     pub fn write_persistent_state(&mut self, state: &PersistentState) {

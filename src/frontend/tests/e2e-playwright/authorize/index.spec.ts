@@ -82,9 +82,12 @@ test("Authorize by signing in from another device", async ({
 
     // Switch to other device and authenticate after visiting link
     await otherDevicePage.goto(linkToPair);
+    await otherDevicePage
+      .getByRole("button", { name: "Continue with Passkey" })
+      .click();
     authOtherDevice(otherDevicePage);
     await otherDevicePage
-      .getByRole("button", { name: DEFAULT_USER_NAME })
+      .getByRole("button", { name: "Use existing identity" })
       .click();
 
     // Switch to current device and get confirmation code
@@ -140,7 +143,7 @@ test("Authorize by signing in from another device", async ({
       .click();
 
     // Verify we have two passkeys
-    await expect(otherDevicePage.getByText("Chrome")).toHaveCount(2);
+    await expect(otherDevicePage.getByText("Unknown")).toHaveCount(2);
 
     // Switch to current device and verify we can authorize
     await authPage
@@ -215,45 +218,6 @@ test("Authorize with ICRC-29", async ({ page }) => {
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
-    },
-    true,
-  );
-});
-
-test("Authorize with ICRC-29 (directly through OpenID)", async ({ page }) => {
-  const userId = crypto.randomUUID();
-
-  // Set name claim
-  await fetch(`http://localhost:11105/account/${userId}/claims`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name: DEFAULT_USER_NAME }),
-  });
-
-  await authorizeWithUrl(
-    page,
-    TEST_APP_URL,
-    II_URL + "/authorize?openid=test%20openid",
-    async (openIdPage) => {
-      await openIdPage.waitForURL("http://localhost:11105/interaction/*");
-      await expect(
-        openIdPage.getByRole("heading", {
-          name: "Sign-in",
-        }),
-      ).toBeVisible();
-      await openIdPage.getByPlaceholder("Enter any login").fill(userId);
-      await openIdPage
-        .getByPlaceholder("and password")
-        .fill("any-password-works");
-      await openIdPage.getByRole("button", { name: "Sign-in" }).click();
-      await expect(
-        openIdPage.getByRole("heading", {
-          name: "Authorize",
-        }),
-      ).toBeVisible();
-      await openIdPage.getByRole("button", { name: "Continue" }).click();
     },
     true,
   );

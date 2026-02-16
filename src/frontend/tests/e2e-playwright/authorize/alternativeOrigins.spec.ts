@@ -14,7 +14,7 @@ test("Should not issue delegation when alternative origins are empty", async ({
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
   await page
     .locator("#newAlternativeOrigins")
     .fill('{"alternativeOrigins":[]}');
@@ -24,7 +24,7 @@ test("Should not issue delegation when alternative origins are empty", async ({
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     '{"alternativeOrigins":[]}',
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -46,7 +46,7 @@ test("Should not issue delegation when origin is missing from /.well-known/ii-al
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
   const alternativeOrigins = JSON.stringify({
     alternativeOrigins: [NOT_TEST_APP_URL],
   });
@@ -57,7 +57,7 @@ test("Should not issue delegation when origin is missing from /.well-known/ii-al
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     alternativeOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -83,7 +83,7 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   const alternativeOrigins = JSON.stringify({
     alternativeOrigins: [TEST_APP_URL],
   });
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
   await page.locator("#newAlternativeOrigins").fill(alternativeOrigins);
   await page.locator("#certified").click();
   await page.locator("#updateNewAlternativeOrigins").click();
@@ -91,7 +91,7 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     alternativeOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -126,7 +126,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
 
   // Set up alternative origins with 11 entries (exceeding the 10 limit)
   const tooManyOrigins = JSON.stringify({
@@ -151,7 +151,7 @@ test("Should not issue delegation when /.well-known/ii-alternative-origins has t
 
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(tooManyOrigins, {
-    timeout: 6000,
+    timeout: 10000,
   });
 
   // Set derivation origin
@@ -173,7 +173,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
 
   // Configure the test app
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
 
   // Set up alternative origins that will return a redirect
   const redirectOrigins = JSON.stringify({
@@ -190,7 +190,7 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     redirectOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin
@@ -214,7 +214,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   // First authentication: Test app configured with canonical URL as derivation origin
   await page.goto(TEST_APP_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
 
   // Configure alternative origins to include the nice URL
   const alternativeOrigins = JSON.stringify({
@@ -227,7 +227,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   // Wait for alternative origins to update
   await expect(page.locator("#alternativeOrigins")).toHaveText(
     alternativeOrigins,
-    { timeout: 6000 },
+    { timeout: 10000 },
   );
 
   // Set derivation origin to canonical URL
@@ -263,7 +263,7 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await page.reload();
   await page.goto(TEST_APP_CANONICAL_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
-  await page.locator("#hostUrl").fill("https://icp-api.io");
+  await page.locator("#hostUrl").fill("https://localhost:5173");
 
   // Authenticate with the existing identity
   const pagePromise2 = page.context().waitForEvent("page");

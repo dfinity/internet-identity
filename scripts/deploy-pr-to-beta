@@ -1,11 +1,85 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./deploy-pr-to-beta <PR_NUMBER>
-PR_NUMBER="$1"
+# Usage: ./deploy-pr-to-beta [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] <PR_NUMBER>
+
+print_usage() {
+    cat <<EOF
+Usage: $0 [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] <PR_NUMBER>
+
+Select which staging canister to upgrade.
+
+Options:
+  --staging-a, -sa        Use Staging A (fgte5-ciaaa-aaaad-aaatq-cai)
+  --staging-b, -sb        Use Staging B (jqajs-xiaaa-aaaad-aab5q-cai)
+  --staging-c, -sc        Use Staging C (y2aaj-miaaa-aaaad-aacxq-cai)
+  --staging <CANISTER_ID> Use the provided canister id
+  -h, --help              Show this help
+EOF
+}
+
+PR_NUMBER=""
+STAGING_CANISTER_ID=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        -sa|--staging-a)
+            STAGING_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
+            shift
+            ;;
+        -sb|--staging-b)
+            STAGING_CANISTER_ID="jqajs-xiaaa-aaaad-aab5q-cai"
+            shift
+            ;;
+        -sc|--staging-c)
+            STAGING_CANISTER_ID="y2aaj-miaaa-aaaad-aacxq-cai"
+            shift
+            ;;
+        --staging)
+            shift
+            if [ $# -eq 0 ]; then
+                echo "Error: --staging requires an argument" >&2
+                print_usage
+                exit 1
+            fi
+            STAGING_CANISTER_ID="$1"
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            print_usage
+            exit 1
+            ;;
+        *)
+            if [ -z "$PR_NUMBER" ]; then
+                PR_NUMBER="$1"
+                shift
+            else
+                echo "Unexpected argument: $1" >&2
+                print_usage
+                exit 1
+            fi
+            ;;
+    esac
+done
 
 if [ -z "$PR_NUMBER" ]; then
-    echo "Usage: $0 <PR_NUMBER>"
+    echo "Error: PR number is required" >&2
+    print_usage
+    exit 1
+fi
+
+if [ -z "$STAGING_CANISTER_ID" ]; then
+    echo "Error: staging must be specified (use --staging-a/-sa, --staging-b/-sb, --staging-c/-sc, or --staging <CANISTER_ID>)" >&2
+    print_usage
     exit 1
 fi
 
@@ -19,7 +93,7 @@ ARTIFACT_NAME="internet_identity_production.wasm.gz"
 ZIP_FILE="$ARTIFACT_NAME.zip"
 EXTRACTED_FILE="$ARTIFACT_NAME"
 WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
-BETA_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
+BETA_CANISTER_ID="$STAGING_CANISTER_ID"
 
 # -------------------------
 # Cleanup handler

@@ -9,6 +9,7 @@ import borc from "borc";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { extractAAGUID } from "$lib/utils/webAuthn";
 import { bufFromBufLike } from "$lib/utils/utils";
+import { getPrimaryOrigin } from "$lib/globals";
 
 /**
  * From the documentation;
@@ -146,7 +147,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   #credentialRequestOptions?: CredentialRequestOptionsWithoutChallenge;
   #authenticatorAttachment?: AuthenticatorAttachment;
   #credentialId?: ArrayBuffer;
-  #aaguid?: string;
+  #aaguid?: Uint8Array;
   #publicKey?: CosePublicKey;
 
   #getPublicKey: (
@@ -171,8 +172,9 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   }
 
   static async createNew(name: string): Promise<DiscoverablePasskeyIdentity> {
+    const rpId = getRpId();
     const identity = new DiscoverablePasskeyIdentity({
-      credentialCreationOptions: creationOptions(name),
+      credentialCreationOptions: creationOptions(name, rpId),
     });
     await identity.sign(Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)));
     return identity;
@@ -187,9 +189,10 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
       result: PublicKeyCredentialWithAttachment,
     ) => Promise<CosePublicKey>;
   }): DiscoverablePasskeyIdentity {
+    const rpId = getRpId();
     return new DiscoverablePasskeyIdentity({
       getPublicKey,
-      credentialRequestOptions: requestOptions(credentialIds),
+      credentialRequestOptions: requestOptions(credentialIds, rpId),
     });
   }
 
@@ -204,7 +207,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     return this.#credentialId;
   }
 
-  getAaguid(): string | undefined {
+  getAaguid(): Uint8Array | undefined {
     return this.#aaguid;
   }
 
@@ -271,8 +274,20 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   }
 }
 
+// Discoverable passkeys should always be created for primary origin,
+// mostly this is through an iframe, but it's unsupported in Safari.
+//
+// Therefore, we fall back to using related origin requests in Safari.
+export const getRpId = () => {
+  const primaryOrigin = getPrimaryOrigin();
+  return primaryOrigin !== undefined && primaryOrigin !== window.location.origin
+    ? new URL(primaryOrigin).hostname
+    : undefined;
+};
+
 export const creationOptions = (
   name: string,
+  rpId?: string,
 ): CredentialCreationOptionsWithoutChallenge => ({
   publicKey: {
     // Identify the AAGUID of the passkey provider
@@ -299,6 +314,7 @@ export const creationOptions = (
     // How II will identify itself
     rp: {
       name: "Internet Identity Service",
+      id: rpId,
     },
     // User id is set to a random value since it's not used by II,
     // the passkey is created before the actual user is created.
@@ -312,8 +328,10 @@ export const creationOptions = (
 
 export const requestOptions = (
   credentialIds?: Uint8Array[],
+  rpId?: string,
 ): CredentialRequestOptionsWithoutChallenge => ({
   publicKey: {
+    rpId,
     // Either use the specified credential ids or let the user pick a passkey
     allowCredentials:
       nonNullish(credentialIds) && credentialIds.length > 0

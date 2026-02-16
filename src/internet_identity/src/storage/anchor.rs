@@ -5,9 +5,7 @@ use crate::storage::storable::fixed_anchor::StorableFixedAnchor;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
 use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
-use crate::{
-    ANCHOR_MIGRATION_SPECIAL_CASES, IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN,
-};
+use crate::{IC0_APP_ORIGIN, ID_AI_ORIGIN, INTERNETCOMPUTER_ORG_ORIGIN};
 use candid::{CandidType, Deserialize, Principal};
 use internet_identity_interface::archive::types::DeviceDataWithoutAlias;
 use internet_identity_interface::internet_identity::types::openid::OpenIdCredentialData;
@@ -25,12 +23,12 @@ mod tests;
 /// to this module.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Anchor {
-    anchor_number: AnchorNumber,
-    devices: Vec<Device>,
-    openid_credentials: Vec<OpenIdCredential>,
-    metadata: Option<HashMap<String, MetadataEntry>>,
-    name: Option<String>,
-    created_at: Option<Timestamp>,
+    pub(crate) anchor_number: AnchorNumber,
+    pub(crate) devices: Vec<Device>,
+    pub(crate) openid_credentials: Vec<OpenIdCredential>,
+    pub(crate) metadata: Option<HashMap<String, MetadataEntry>>,
+    pub(crate) name: Option<String>,
+    pub(crate) created_at: Option<Timestamp>,
 }
 
 impl Device {
@@ -188,21 +186,26 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
             // Usually, we take `credential_id` as is. But in some special cases, we need to
             // plug in a dummy `credential_id` in order to be able to later migrate the device
             // without a credential ID as a passkey.
-            let (credential_id, special_device_migration) = match (credential_id, purpose, key_type)
-            {
+            let (credential_id, special_device_migration) = match (
+                credential_id,
+                purpose,
+                key_type,
+                origin,
+            ) {
                 // Happy case: clearly a valid recovery phrase
-                (None, Purpose::Recovery, KeyType::SeedPhrase) => (None, None),
+                (None, Purpose::Recovery, KeyType::SeedPhrase, None) => (None, None),
 
                 // Happy case: clearly a valid passkey
                 (
                     Some(credential_id),
                     Purpose::Authentication,
-                    KeyType::Platform | KeyType::CrossPlatform,
+                    KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
+                    Some(_),
                 ) => {
                     if protection == &DeviceProtection::Protected {
                         ic_cdk::println!(
-                            "Warning: Passkey with protected device protection found. \
-                             PubKey: {:?}, Anchor: {}",
+                            "Warning: Passkey with device protection found. PubKey: {:?}, \
+                             Anchor: {}",
                             hex::encode(&pubkey),
                             anchor_number,
                         );
@@ -210,18 +213,53 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     (Some(credential_id), None)
                 }
 
+                // Special case: valid passkey but without an origin
+                (
+                    credential_id @ Some(_),
+                    Purpose::Authentication,
+                    key_type @ (KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown),
+                    None,
+                ) => {
+                    let special_device_migration = Some(SpecialDeviceMigration::from((
+                        &credential_id,
+                        &Purpose::Authentication,
+                        key_type,
+                        &None::<String>,
+                    )));
+                    if protection == &DeviceProtection::Protected {
+                        ic_cdk::println!(
+                            "Warning: Passkey without origin with device protection found. \
+                             PubKey: {:?}, Anchor: {}",
+                            hex::encode(&pubkey),
+                            anchor_number,
+                        );
+                    }
+                    (credential_id, special_device_migration)
+                }
+
                 // Special case: recovery passkey
                 (
                     Some(credential_id),
                     Purpose::Recovery,
-                    KeyType::Platform | KeyType::CrossPlatform,
+                    KeyType::Platform | KeyType::CrossPlatform | KeyType::Unknown,
+                    origin,
                 ) => {
                     let credential_id = Some(credential_id);
                     let special_device_migration = Some(SpecialDeviceMigration::from((
                         &credential_id,
                         purpose,
                         key_type,
+                        origin,
                     )));
+
+                    if protection == &DeviceProtection::Protected {
+                        ic_cdk::println!(
+                            "Warning: Recovery passkey with device protection found. PubKey: {:?}, \
+                             Anchor: {}",
+                            hex::encode(&pubkey),
+                            anchor_number,
+                        );
+                    }
 
                     // No logging for a legitimate legacy recovery device.
 
@@ -229,9 +267,10 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 }
 
                 // Special case: legacy pin-flow
-                (None, purpose, KeyType::BrowserStorageKey) => {
-                    let special_device_migration =
-                        Some(SpecialDeviceMigration::from((&None, purpose, key_type)));
+                (None, purpose, KeyType::BrowserStorageKey, origin) => {
+                    let special_device_migration = Some(SpecialDeviceMigration::from((
+                        &None, purpose, key_type, origin,
+                    )));
 
                     if matches!(purpose, Purpose::Recovery) {
                         ic_cdk::println!(
@@ -250,11 +289,12 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 }
 
                 // All other special cases
-                (credential_id, purpose, key_type) => {
+                (credential_id, purpose, key_type, origin) => {
                     let special_device_migration = Some(SpecialDeviceMigration::from((
                         &credential_id,
                         purpose,
                         key_type,
+                        origin,
                     )));
 
                     ic_cdk::println!(
@@ -267,16 +307,6 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                     (credential_id, special_device_migration)
                 }
             };
-
-            // Store special cases to aid observability (they will also be persisted in stable memory).
-            if let Some(special_device_migration) = &special_device_migration {
-                ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow_mut(|cases| {
-                    cases
-                        .entry(anchor_number)
-                        .or_default()
-                        .push(special_device_migration.clone())
-                })
-            }
 
             if let Some(credential_id) = credential_id {
                 let alias = if alias.is_empty() {
@@ -370,6 +400,120 @@ impl From<Anchor> for (StorableFixedAnchor, StorableAnchor) {
                 recovery_keys,
             },
         )
+    }
+}
+
+impl From<(AnchorNumber, StorableAnchor)> for Anchor {
+    fn from((anchor_number, storable_anchor): (AnchorNumber, StorableAnchor)) -> Self {
+        let StorableAnchor {
+            name,
+            created_at_ns: created_at,
+            openid_credentials,
+            passkey_credentials,
+            recovery_keys,
+        } = storable_anchor;
+
+        let name = name.clone();
+
+        let openid_credentials = openid_credentials
+            .into_iter()
+            .map(OpenIdCredential::from)
+            .collect();
+
+        let mut devices = passkey_credentials
+            .unwrap_or_default()
+            .into_iter()
+            .map(
+                |StorablePasskeyCredential {
+                     pubkey,
+                     credential_id,
+                     origin,
+                     created_at_ns: _,
+                     last_usage_timestamp_ns,
+                     alias,
+                     aaguid,
+                     special_device_migration,
+                 }| {
+                    let (credential_id, purpose, key_type, origin) =
+                        if let Some(special_device_migration) = special_device_migration {
+                            // Special case: trust what we had before
+                            special_device_migration.into()
+                        } else {
+                            // Happy case: clearly a valid passkey
+                            (
+                                Some(ByteBuf::from(credential_id)),
+                                Purpose::Authentication,
+                                KeyType::CrossPlatform,
+                                Some(origin),
+                            )
+                        };
+
+                    Device {
+                        pubkey: DeviceKey::from(pubkey),
+                        alias: alias.unwrap_or_default(),
+                        credential_id,
+                        aaguid: aaguid.map(|src| {
+                            let mut aaguid_array = [0u8; 16];
+                            aaguid_array.copy_from_slice(&src);
+                            aaguid_array
+                        }),
+                        purpose,
+                        key_type,
+                        protection: DeviceProtection::Unprotected, // Defaulting to Unprotected; we don't store protection in stable memory for passkeys
+                        origin,
+                        last_usage_timestamp: last_usage_timestamp_ns,
+                        metadata: None, // Not stored in stable memory
+                    }
+                },
+            )
+            .collect::<Vec<_>>();
+
+        devices.extend(recovery_keys.unwrap_or_default().into_iter().map(
+            |StorableRecoveryKey {
+                 pubkey,
+                 created_at_ns: _,
+                 last_usage_timestamp_ns,
+                 is_protected,
+                 special_device_migration,
+             }| {
+                let (credential_id, purpose, key_type, origin) =
+                    if let Some(special_device_migration) = special_device_migration {
+                        // Special case: trust what we had before
+                        special_device_migration.into()
+                    } else {
+                        // Happy case: clearly a valid recovery phrase
+                        (None, Purpose::Recovery, KeyType::SeedPhrase, None)
+                    };
+
+                Device {
+                    credential_id,
+                    purpose,
+                    key_type,
+                    alias: "Recovery Key".to_string(),
+                    pubkey: DeviceKey::from(pubkey),
+                    aaguid: None,
+                    protection: if is_protected.unwrap_or(false) {
+                        DeviceProtection::Protected
+                    } else {
+                        DeviceProtection::Unprotected
+                    },
+                    origin,
+                    last_usage_timestamp: last_usage_timestamp_ns,
+                    metadata: None, // Not stored in stable memory
+                }
+            },
+        ));
+
+        let metadata = None; // Deprecated field; not stored in stable memory
+
+        Anchor {
+            anchor_number,
+            name,
+            created_at,
+            openid_credentials,
+            devices,
+            metadata,
+        }
     }
 }
 
@@ -845,20 +989,20 @@ fn check_anchor_invariants(
     identity_metadata: &Option<HashMap<String, MetadataEntry>>,
 ) -> Result<(), AnchorError> {
     /// The number of devices is limited. The front-end limits the devices further
-    /// by only allowing 8 devices with purpose `authentication` to make sure there is always
+    /// by only allowing 16 devices with purpose `authentication` to make sure there is always
     /// a slot for the recovery devices.
     /// Note however, that a free device slot does not guarantee that it will fit the anchor
     /// due to the `VARIABLE_FIELDS_LIMIT`.
-    const MAX_DEVICES_PER_ANCHOR: usize = 10;
+    const MAX_DEVICES_PER_ANCHOR: usize = 20;
 
     /// One device can fill more than one tenth of the available space for a single anchor (4 KB)
     /// with the variable length fields alone.
     /// In order to not give away all the anchor space to the device vector and identity metadata,
     /// we limit the sum of the size of all variable fields of all devices plus the identity metadata.
     /// This ensures that we have the flexibility to expand or change anchors in the future.
-    /// The value 2500 was chosen so to accommodate pre-memory-migration anchors (limited to 2048 bytes)
-    /// plus an additional 452 bytes to fit new fields introduced since.
-    const VARIABLE_FIELDS_LIMIT: usize = 2500;
+    /// The limit is chosen to accommodate pre-memory-migration anchors (limited to 2048 bytes)
+    /// while leaving additional room for new fields introduced since.
+    const VARIABLE_FIELDS_LIMIT: usize = 5000;
 
     if devices.len() > MAX_DEVICES_PER_ANCHOR {
         return Err(AnchorError::TooManyDevices {

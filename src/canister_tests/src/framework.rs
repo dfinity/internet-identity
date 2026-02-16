@@ -7,6 +7,7 @@ use ic_representation_independent_hash::Value;
 use identity_jose::jws::Decoder;
 use internet_identity_interface::archive::types::*;
 use internet_identity_interface::http_gateway::{HeaderField, HttpRequest};
+use internet_identity_interface::internet_identity::types::attributes::CertifiedAttribute;
 use internet_identity_interface::internet_identity::types::vc_mvp::SignedIdAlias;
 use internet_identity_interface::internet_identity::types::*;
 use lazy_static::lazy_static;
@@ -16,7 +17,6 @@ use regex::Regex;
 use serde_bytes::ByteBuf;
 use sha2::Digest;
 use sha2::Sha256;
-use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -356,10 +356,7 @@ pub fn large_size_device() -> DeviceData {
         alias: "a".repeat(64),
         credential_id: Some(ByteBuf::from([7u8; 200])),
         origin: Some("https://rdmx6-jaaaa-aaaaa-aaadq-cai.foobar.icp0.io".to_string()),
-        metadata: Some(HashMap::from([(
-            "key".to_string(),
-            MetadataEntry::String("a".repeat(100)),
-        )])),
+        metadata: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -370,6 +367,8 @@ pub fn recovery_device_data_1() -> DeviceData {
         alias: "Recovery Phrase 1".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        origin: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -380,6 +379,8 @@ pub fn recovery_device_data_2() -> DeviceData {
         alias: "Recovery Phrase 2".to_string(),
         purpose: Purpose::Recovery,
         key_type: KeyType::SeedPhrase,
+        credential_id: None,
+        origin: None,
         ..DeviceData::auth_test_device()
     }
 }
@@ -421,7 +422,7 @@ pub fn expect_user_error_with_message<T: std::fmt::Debug>(
 }
 
 pub fn verify_security_headers(headers: &[HeaderField], related_origins: &Option<Vec<String>>) {
-    let public_key_credentials_get = related_origins
+    let public_key_credentials_create_get = related_origins
         .clone()
         .unwrap_or_default()
         .iter()
@@ -458,7 +459,8 @@ midi=(),\
 navigation-override=(),\
 payment=(),\
 picture-in-picture=(),\
-publickey-credentials-get=({public_key_credentials_get}),\
+publickey-credentials-create=({public_key_credentials_create_get}),\
+publickey-credentials-get=({public_key_credentials_create_get}),\
 screen-wake-lock=(),\
 serial=(),\
 speaker-selection=(),\
@@ -547,11 +549,13 @@ pub fn parse_metric(body: &str, metric: &str) -> (f64, u64) {
     (metric, metric_timestamp)
 }
 
+#[track_caller]
 pub fn assert_metric(metrics: &str, metric_name: &str, expected: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert_eq!(value, expected, "metric {metric_name} does not match");
 }
 
+#[track_caller]
 pub fn assert_metric_approx(metrics: &str, metric_name: &str, expected: f64, tolerance: f64) {
     let (value, _) = parse_metric(metrics, metric_name);
     assert!((value - expected).abs() <= tolerance, "metric {metric_name} is too far off: value={value}, expected={expected}, tolerance={tolerance}");
@@ -559,6 +563,7 @@ pub fn assert_metric_approx(metrics: &str, metric_name: &str, expected: f64, tol
 
 /// Asserts that the given metric is present in the metrics string and that it has the expected value
 /// across all the provided label values for the given label.
+#[track_caller]
 pub fn assert_labelled_metric(
     metrics: &str,
     metric_name: &str,
@@ -640,6 +645,40 @@ pub fn verify_delegation(
         root_key.to_vec(),
     )
     .expect("delegation signature invalid");
+}
+
+pub fn verify_attribute(
+    env: &PocketIc,
+    user_key: UserKey,
+    certified_attribute: &CertifiedAttribute,
+    expiration: u64,
+    root_key: &[u8],
+) {
+    const DOMAIN_SEPARATOR: &[u8] = b"ii-request-attribute";
+
+    // The signed message is a signature domain separator
+    // followed by the representation independent hash of a map with entries
+    // expiration, attribute-key/attribute-value.
+    let key_value_pairs = vec![
+        ("expiration".to_string(), Value::Number(expiration)),
+        (
+            certified_attribute.key.clone(),
+            Value::Bytes(certified_attribute.value.clone()),
+        ),
+    ];
+    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
+    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    msg.extend_from_slice(
+        &ic_representation_independent_hash::representation_independent_hash(&key_value_pairs),
+    );
+
+    env.verify_canister_signature(
+        msg,
+        certified_attribute.signature.clone(),
+        user_key.into_vec(),
+        root_key.to_vec(),
+    )
+    .expect("attribute signature invalid");
 }
 
 pub fn verify_id_alias_credential_via_env(

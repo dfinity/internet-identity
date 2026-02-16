@@ -109,6 +109,15 @@ then
     echo; echo
 fi
 
+init_arg() {
+	local init_arg
+	init_arg=$(cat <<'EOF'
+(opt record { fetch_root_key = opt true; captcha_config = opt record { max_unsolved_captchas = 50:nat64; captcha_trigger = variant { Static = variant { CaptchaDisabled } } };})
+EOF
+)
+	printf '%s\n' "$init_arg"
+}
+
 # Builds a single canister
 # build_canister CANISTER EXTRA_BUILD_ARGS...
 # CANISTER: possible values: [internet_identity, archive]
@@ -170,11 +179,11 @@ function build_canister() {
           release="${version_parts[1]}"
           if [ -n "$release" ]
           then
-              asset_name="internet_identity_dev.wasm.gz"
+              asset_name="internet_identity_production.wasm.gz"
               wasm_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name"
               wasm_hash_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name.sha256"
-              # init_arg that disables the captcha, appropriate for the dev build
-              init_arg="(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})"
+
+              init_arg=$(init_arg)
               init_guide="Use '(null)' for sensible defaults. See the candid interface for more details."
               metadata_json=$(echo '{}' | jq -cMr \
                   --arg wasm_url "$wasm_url" \

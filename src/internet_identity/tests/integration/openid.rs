@@ -221,6 +221,7 @@ fn can_link_microsoft_account_from_different_tenant() -> Result<(), RejectRespon
 fn can_remove_google_account() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = setup_canister(&env);
+    #[allow(unused_variables)]
     let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
         openid_google_test_data();
 
@@ -527,15 +528,15 @@ fn cannot_get_valid_jwt_delegation_after_reassociation() -> Result<(), RejectRes
 #[derive(Deserialize)]
 #[allow(dead_code)]
 pub struct Claims {
-    iss: String,
-    sub: String,
-    aud: String,
-    nonce: String,
-    iat: u64,
+    pub iss: String,
+    pub sub: String,
+    pub aud: String,
+    pub nonce: String,
+    pub iat: u64,
     // Optional Google specific claims
-    email: Option<String>,
-    name: Option<String>,
-    picture: Option<String>,
+    pub email: Option<String>,
+    pub name: Option<String>,
+    pub picture: Option<String>,
 }
 
 impl Claims {
@@ -608,7 +609,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
     canister_id
 }
 
-fn mock_google_certs_response(env: &PocketIc) {
+pub fn mock_google_certs_response(env: &PocketIc) {
     // This is the URL that the canister will fetch the Google certificates
     let url = "https://www.googleapis.com/oauth2/v3/certs";
     // These are the certificates at the time of the related Google JWT mocked data was created.
@@ -624,7 +625,7 @@ fn mock_microsoft_certs_response(env: &PocketIc) {
     mock_certs_response(env, url, mock_certs);
 }
 
-fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
+pub fn mock_certs_response(env: &PocketIc, url: &str, mock_certs: &str) {
     const MAX_ATTEMPTS: u32 = 10;
     let mut attempts = 0;
 

@@ -19,6 +19,10 @@ export let canisterConfig: InternetIdentityInit;
 export let agentOptions: HttpAgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
+export let parentIFrameOrigin: string | undefined;
+
+// Search param passed by parent window to indicate its origin to child window
+export const IFRAME_PARENT_PARAM = "parent_origin";
 
 export const initGlobals = () => {
   canisterId = Principal.fromText(readCanisterId());
@@ -36,4 +40,14 @@ export const initGlobals = () => {
     agent: anonymousAgent,
     canisterId,
   });
+  // Set when `IFRAME_PARENT_PARAM` search param contains a valid related origin
+  parentIFrameOrigin = canisterConfig.related_origins[0]?.find(
+    (origin) =>
+      origin ===
+      new URL(window.location.href).searchParams.get(IFRAME_PARENT_PARAM),
+  );
 };
+
+// Get primary origin (either https://id.ai or https://beta.id.ai) when deployed on beta or prod
+export const getPrimaryOrigin = () =>
+  canisterConfig.related_origins[0]?.find((origin) => origin.endsWith("id.ai"));

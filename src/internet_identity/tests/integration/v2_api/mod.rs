@@ -8,7 +8,6 @@ mod authn_method_session_registration;
 pub mod authn_method_test_helpers;
 mod identity_authn_info;
 mod identity_info;
-mod identity_metadata;
 mod identity_properties;
 mod identity_register;
 mod passkey_aaguid;

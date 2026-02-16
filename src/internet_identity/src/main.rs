@@ -4,7 +4,6 @@ use crate::assets::init_assets;
 use crate::authz_utils::IdentityUpdateError;
 use crate::state::persistent_state;
 use crate::stats::event_stats::all_aggregations_top_n;
-use crate::storage::storable::special_device_migration::SpecialDeviceMigration;
 use anchor_management::registration;
 use authz_utils::{
     anchor_operation_with_authz_check, check_authorization, check_authz_and_record_activity,
@@ -14,9 +13,12 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::TimerId;
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
+use internet_identity_interface::internet_identity::types::attributes::{
+    CertifiedAttributes, GetAttributesError, GetAttributesRequest, PrepareAttributeError,
+    PrepareAttributeRequest, PrepareAttributeResponse, ValidatedPrepareAttributeRequest,
+};
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
     OpenIdPrepareDelegationResponse,
@@ -27,9 +29,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
-use std::time::Duration;
+use std::collections::HashMap;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
@@ -38,8 +38,8 @@ mod anchor_management;
 mod archive;
 mod assets;
 mod authz_utils;
-mod migrations;
 
+mod attributes;
 /// Type conversions between internal and external types.
 mod conversions;
 mod delegation;
@@ -66,63 +66,6 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
-
-/// Number of anchors to process in one batch during the recovery phrase migration.
-pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_SIZE: u64 = 2000;
-
-/// Batch dispatch frequency to minimize the chance of DoS.
-pub(crate) const RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-thread_local! {
-    // TODO: Remove this state after the data migration is complete.
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_BATCH_ID: RefCell<u64> = const { RefCell::new(0) };
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    pub(crate) static RECOVERY_PHRASE_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
-    pub(crate) static ANCHOR_MIGRATION_SPECIAL_CASES: RefCell<BTreeMap<AnchorNumber, Vec<SpecialDeviceMigration>>> = const { RefCell::new(BTreeMap::new()) };
-
-    static TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-#[query(hidden = true)]
-fn get_anchor_migration_special_cases(anchor_number: AnchorNumber) -> Vec<SpecialDeviceMigration> {
-    ANCHOR_MIGRATION_SPECIAL_CASES
-        .with_borrow(|cases| cases.get(&anchor_number).cloned().unwrap_or_default())
-}
-
-#[query(hidden = true)]
-fn get_anchor_migration_special_cases_keys() -> Vec<AnchorNumber> {
-    ANCHOR_MIGRATION_SPECIAL_CASES.with_borrow(|cases| cases.keys().cloned().collect())
-}
-
-/// Temporary function to list migration errors.
-///
-/// Can be called to retrieve any errors that occurred during the recovery phrase migration.
-#[update(hidden = true)]
-fn list_recovery_phrase_migration_errors() -> Vec<String> {
-    RECOVERY_PHRASE_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
-}
-
-/// Temporary function to fetch the current migration batch id.
-///
-/// Can be called to retrieve the current batch id of the ongoing data recovery phrase migration.
-///
-/// The special value `u64::MAX` indicates that the migration is complete.
-#[query(hidden = true)]
-fn list_recovery_phrase_migration_current_batch_id() -> u64 {
-    RECOVERY_PHRASE_MIGRATION_BATCH_ID.with_borrow(|id| *id)
-}
-
-/// Temporary function to count migrated recovery phrases.
-///
-/// Can be called to retrieve the number of recovery phrases indexed so far.
-#[query(hidden = true)]
-fn count_recovery_phrases() -> u64 {
-    state::storage_borrow(|storage| {
-        storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
-            .len()
-    })
-}
 
 #[update]
 async fn init_salt() {
@@ -177,6 +120,10 @@ async fn add_tentative_device(
                 // in this legacy method in comparison to the newer `authn_method_register` method.
                 trap("Unreachable error");
             }
+            AuthnMethodRegisterError::NotSelfAuthenticating(_) => {
+                // Unreachable in this legacy method since it doesn't check for self-authenticating principals
+                trap("Unreachable error");
+            }
         },
     }
 }
@@ -197,7 +144,7 @@ fn verify_tentative_device(
                 // Add device to anchor with bookkeeping if it has been confirmed
                 anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
                 let operation = anchor_management::add_device(&mut anchor, confirmed_device);
-                if let Err(err) = state::storage_borrow_mut(|storage| storage.update(anchor)) {
+                if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
                     trap(&format!("{err}"));
                 }
                 anchor_management::post_operation_bookkeeping(anchor_number, operation);
@@ -332,7 +279,7 @@ fn get_anchor_credentials(anchor_number: AnchorNumber) -> AnchorCredentials {
     )
 }
 
-#[query]
+#[update]
 fn lookup_caller_identity_by_recovery_phrase() -> Option<IdentityNumber> {
     let caller = caller();
     anchor_management::lookup_caller_identity_by_recovery_phrase(caller)
@@ -637,37 +584,6 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
     initialize(maybe_arg);
 }
 
-async fn run_periodic_tasks() {
-    state::storage_borrow_mut(|storage| {
-        let now_nanos = ic_cdk::api::time();
-        storage.sync_anchor_indices(now_nanos, RECOVERY_PHRASE_MIGRATION_BATCH_SIZE);
-    });
-
-    if RECOVERY_PHRASE_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
-        // Migration complete, clear timer.
-        TIMER_ID.with_borrow_mut(|saved_timer_id| {
-            if let Some(saved_timer_id) = *saved_timer_id {
-                ic_cdk_timers::clear_timer(saved_timer_id);
-            }
-            *saved_timer_id = None;
-        });
-    }
-}
-
-fn init_timers() {
-    let new_timer_id =
-        ic_cdk_timers::set_timer_interval(RECOVERY_PHRASE_MIGRATION_BATCH_BACKOFF_SECONDS, || {
-            ic_cdk::spawn(run_periodic_tasks())
-        });
-
-    TIMER_ID.with_borrow_mut(|saved_timer_id| {
-        if let Some(saved_timer_id) = *saved_timer_id {
-            ic_cdk_timers::clear_timer(saved_timer_id);
-        }
-        saved_timer_id.replace(new_timer_id);
-    });
-}
-
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
@@ -675,9 +591,6 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::load_persistent_state();
 
     initialize(maybe_arg);
-
-    // TODO: Remove the data migration.
-    init_timers();
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
@@ -822,7 +735,7 @@ async fn random_salt() -> Salt {
 mod v2_api {
     use crate::{
         anchor_management::tentative_device_registration::ValidatedRegistrationId,
-        state::get_identity_number_by_registration_id,
+        authz_utils::is_self_authenticating, state::get_identity_number_by_registration_id,
     };
 
     use super::*;
@@ -1066,7 +979,7 @@ mod v2_api {
             // Add device to anchor with bookkeeping
             let mut anchor = state::anchor(identity_number);
             let operation = anchor_management::add_device(&mut anchor, device_data.clone());
-            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+            state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
                 AuthnMethodRegistrationModeExitError::InternalCanisterError(err.to_string())
             })?;
             anchor_management::post_operation_bookkeeping(identity_number, operation);
@@ -1106,7 +1019,13 @@ mod v2_api {
     async fn authn_method_session_register(
         identity_number: IdentityNumber,
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
-        tentative_device_registration::add_tentative_session(identity_number, caller()).await
+        let caller = caller();
+
+        if !is_self_authenticating(caller) {
+            return Err(AuthnMethodRegisterError::NotSelfAuthenticating(caller));
+        }
+
+        tentative_device_registration::add_tentative_session(identity_number, caller).await
     }
 
     #[query]
@@ -1143,7 +1062,7 @@ mod v2_api {
             // Add device to anchor with bookkeeping if it has been confirmed
             anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
             let operation = anchor_management::add_device(&mut anchor, confirmed_device);
-            state::storage_borrow_mut(|storage| storage.update(anchor)).map_err(|err| {
+            state::storage_borrow_mut(|storage| storage.write(anchor)).map_err(|err| {
                 AuthnMethodConfirmationError::InternalCanisterError(err.to_string())
             })?;
             anchor_management::post_operation_bookkeeping(identity_number, operation);
@@ -1259,7 +1178,7 @@ mod openid_api {
         let mut anchor = state::anchor(anchor_number);
         update_openid_credential(&mut anchor, openid_credential.clone())
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
-        state::storage_borrow_mut(|storage| storage.update(anchor))
+        state::storage_borrow_mut(|storage| storage.write(anchor))
             .map_err(|_| OpenIdDelegationError::NoSuchAnchor)?;
 
         let (user_key, expiration) = openid_credential
@@ -1305,8 +1224,93 @@ mod openid_api {
     }
 }
 
-/// API for the attribute sharing mvp
-mod attribute_sharing_mvp {
+mod attribute_sharing {
+    use internet_identity_interface::internet_identity::types::attributes::{
+        Attribute, CertifiedAttributes, GetAttributesError, GetAttributesRequest,
+        ValidatedGetAttributesRequest,
+    };
+
+    use super::*;
+    use crate::{account_management::get_account_for_origin, authz_utils::AuthorizationError};
+
+    #[update]
+    async fn prepare_attributes(
+        request: PrepareAttributeRequest,
+    ) -> Result<PrepareAttributeResponse, PrepareAttributeError> {
+        // Parse and validate API request into internal types.
+        let ValidatedPrepareAttributeRequest {
+            // Arguments for computing the seed
+            identity_number,
+            origin,
+            account_number,
+
+            // Which attributes to prepare
+            attribute_keys,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                PrepareAttributeError::AuthorizationError(principal)
+            })?;
+
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(PrepareAttributeError::GetAccountError)?;
+
+        // This is the only async operation, so we do it first, call operations that depend on
+        // the time. TODO: refactor to avoid asynchronicity here.
+        state::ensure_salt_set().await;
+        let issued_at_timestamp_ns = ic_cdk::api::time();
+
+        let attributes = anchor.prepare_attributes(attribute_keys, account, issued_at_timestamp_ns);
+
+        // Convert response to API types.
+        let attributes = attributes
+            .into_iter()
+            .map(|Attribute { key, value }| (key.to_string(), value))
+            .collect();
+
+        Ok(PrepareAttributeResponse {
+            issued_at_timestamp_ns,
+            attributes,
+        })
+    }
+
+    #[query]
+    fn get_attributes(
+        request: GetAttributesRequest,
+    ) -> Result<CertifiedAttributes, GetAttributesError> {
+        // Parse and validate API request into internal types.
+        let ValidatedGetAttributesRequest {
+            // Arguments for computing the seed
+            identity_number,
+            origin,
+            account_number,
+
+            // Which attributes to prepare
+            attributes,
+
+            // When were the attribute certificates issued
+            issued_at_timestamp_ns,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                GetAttributesError::AuthorizationError(principal)
+            })?;
+
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(GetAttributesError::GetAccountError)?;
+
+        let certified_attributes =
+            anchor.get_attributes(attributes, account, issued_at_timestamp_ns);
+
+        Ok(certified_attributes)
+    }
+}
+
+/// Legacy API for the original attribute sharing MVP (VC-based).
+/// The current attribute sharing protocol endpoints live in `mod attribute_sharing`.
+mod attribute_sharing_old_vc {
     use super::*;
 
     #[update]

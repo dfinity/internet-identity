@@ -17,12 +17,12 @@ test("User can log into the dashboard and add a new passkey from the same device
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -41,12 +41,12 @@ test("User can log into the dashboard and add a new passkey from the same device
   await expect(
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
-  await renamePasskey(page, "Chrome", "Old passkey");
+  await renamePasskey(page, "Unknown", "Old passkey");
 
   // Start the "add passkey" flow
   const auth2 = dummyAuth();
   await addPasskeyCurrentDevice(page, auth2);
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify we have two passkeys
   await expect(
@@ -73,7 +73,7 @@ test("User can log into the dashboard and add a new passkey from the same device
   await clearStorage(page);
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
-  await newPage.getByRole("link", { name: "Manage Identity" }).click();
+  await newPage.getByRole("button", { name: "Sign in" }).click();
   await newPage.getByRole("button", { name: "Continue with passkey" }).click();
   auth2(newPage);
   await newPage.getByRole("button", { name: "Use existing identity" }).click();
@@ -108,12 +108,12 @@ test("User can log in the dashboard and add a new passkey from another device", 
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -129,7 +129,7 @@ test("User can log in the dashboard and add a new passkey from another device", 
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
   // Verify we have one passkey
-  await expect(page.getByText("Chrome")).toHaveCount(1);
+  await expect(page.getByText("Unknown")).toHaveCount(1);
 
   // Start the "add passkey" flow
   await page.getByRole("button", { name: "Add new" }).click();
@@ -199,7 +199,7 @@ test("User can add a new passkey and use it with cached identity without clearin
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
 
@@ -217,12 +217,12 @@ test("User can add a new passkey and use it with cached identity without clearin
   await expect(
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
-  await renamePasskey(page, "Chrome", "Old passkey");
+  await renamePasskey(page, "Unknown", "Old passkey");
 
   // Start the "add passkey" flow
   const auth2 = dummyAuth();
   await addPasskeyCurrentDevice(page, auth2);
-  await renamePasskey(page, "Chrome", "New Passkey");
+  await renamePasskey(page, "Unknown", "New Passkey");
 
   // Verify we have two passkeys
   await expect(
@@ -249,12 +249,12 @@ test("User can add a new passkey and use it with cached identity without clearin
   // This should use the cached identity
   const newPage = await context.newPage();
   await newPage.goto(II_URL);
-  await newPage.getByRole("link", { name: "Manage Identity" }).click();
+  await newPage.getByRole("button", { name: "Switch identity" }).click();
 
   // Click on the cached identity button directly
   // But use the new passkey to authenticate
   auth2(newPage);
-  await newPage.getByRole("button", { name: TEST_USER_NAME }).click();
+  await newPage.getByRole("button", { name: "Manage identity" }).click();
 
   // Verify we're logged in with the new passkey
   await newPage.waitForURL(II_URL + "/manage");
@@ -267,17 +267,17 @@ test("User can add a new passkey and use it with cached identity without clearin
   await newPage.close();
 });
 
-test("User can log into the dashboard and add up to 7 additional passkeys", async ({
+test("User can log into the dashboard and add up to 15 additional passkeys", async ({
   page,
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -297,15 +297,15 @@ test("User can log into the dashboard and add up to 7 additional passkeys", asyn
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
   ).toHaveCount(1);
 
-  // Add 7 more passkeys
-  for (let i = 0; i < 7; i++) {
+  // Add 15 more passkeys
+  for (let i = 0; i < 15; i++) {
     await addPasskeyCurrentDevice(page, dummyAuth());
   }
 
-  // Verify we have 8 passkeys
+  // Verify we have 16 passkeys
   await expect(
     page.getByRole("listitem").filter({ hasText: "Passkey" }),
-  ).toHaveCount(8);
+  ).toHaveCount(16);
 
   // Verify we cannot add more passkeys
   await page.getByRole("button", { name: "Add new" }).click();

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import Badge from "$lib/components/ui/Badge.svelte";
   import Ellipsis from "$lib/components/utils/Ellipsis.svelte";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps.js";
@@ -27,16 +26,27 @@
   <div
     class={[
       "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
-      isNullish(dapp?.logoSrc) &&
+      dapp?.logoSrc === undefined &&
         "border-border-tertiary text-fg-primary bg-bg-primary border",
     ]}
   >
-    {#if nonNullish(dapp?.logoSrc)}
+    {#if dapp?.logoSrc !== undefined}
       <img
-        src={dapp?.logoSrc}
-        alt={`${dapp?.name ?? origin} logo`}
-        class="h-16 max-w-50 object-contain"
+        src={dapp.logoSrc}
+        alt={`${dapp.name} logo`}
+        class={[
+          "h-16 max-w-50 object-contain",
+          dapp.logoDarkSrc !== undefined && "dark:hidden",
+        ]}
       />
+      {#if dapp.logoDarkSrc !== undefined}
+        <img
+          src={dapp.logoDarkSrc}
+          alt={`${dapp.name} logo`}
+          class="hidden h-16 max-w-50 object-contain dark:block"
+          aria-hidden="true"
+        />
+      {/if}
     {:else}
       <div class="flex size-16 items-center justify-center" aria-hidden="true">
         <GlobeIcon class="size-6" />

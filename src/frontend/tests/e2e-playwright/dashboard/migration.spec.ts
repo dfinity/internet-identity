@@ -41,7 +41,8 @@ const upgradeLegacyIdentity = async (
   await dialog.getByRole("button", { name: "Upgrade identity" }).click();
 };
 
-test.describe("Migration", () => {
+// TODO: Create legacy identity through canister instead of frontend
+test.skip("Migration", () => {
   test("User can migrate a legacy identity", async ({ page }) => {
     // Step 1: Create a legacy identity
     await page.goto(LEGACY_II_URL);
@@ -51,7 +52,7 @@ test.describe("Migration", () => {
 
     // Step 2: Navigate to the new II_URL to start the migration
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     // Step 3: Perform the migration
     const auth = dummyAuth();
@@ -69,7 +70,7 @@ test.describe("Migration", () => {
 
     // Step 5: Login again
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Switch identity" }).click();
     auth(page);
     await page.getByRole("button", { name: TEST_USER_NAME }).click();
     await page.waitForURL(II_URL + "/manage");
@@ -91,7 +92,7 @@ test.describe("Migration", () => {
 
     // Step 2: Navigate to the new II_URL to start the migration
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     // Step 3: Perform the migration
     const auth = dummyAuth();
@@ -110,7 +111,7 @@ test.describe("Migration", () => {
 
     // Step 5: Login again with discoverable passkey
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -131,7 +132,7 @@ test.describe("Migration", () => {
 
     // Step 2: Navigate to the new II_URL to start the migration
     await page.goto(II_URL);
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     // Step 3: Perform the first migration
     const auth = dummyAuth();
@@ -152,7 +153,7 @@ test.describe("Migration", () => {
     await page.goto(II_URL);
     const auth2 = dummyAuth();
 
-    await page.getByRole("link", { name: "Manage Identity" }).click();
+    await page.getByRole("button", { name: "Switch identity" }).click();
     await page.getByRole("button", { name: "Use another identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     await page.getByRole("button", { name: "Upgrade" }).click();

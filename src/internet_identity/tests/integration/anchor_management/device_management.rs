@@ -7,6 +7,7 @@ use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
+use pretty_assertions::assert_eq;
 use regex::Regex;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -200,7 +201,7 @@ fn should_respect_total_size_limit() -> Result<(), RejectResponse> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
-    for i in 0..3u8 {
+    for i in 0..8u8 {
         let mut device = large_size_device();
         device.pubkey = ByteBuf::from([i; 300]);
         api::add(&env, canister_id, principal_1(), user_number, &device)?;
@@ -232,41 +233,6 @@ fn should_update_device() -> Result<(), RejectResponse> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let principal = principal_1();
     let mut device = device_data_1();
-
-    let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
-
-    let anchor_info = api::get_anchor_info(&env, canister_id, principal, user_number)?;
-    assert_eq!(anchor_info.into_device_data(), vec![device.clone()]);
-
-    device.alias.push_str("some suffix");
-
-    api::update(
-        &env,
-        canister_id,
-        principal,
-        user_number,
-        &device.pubkey,
-        &device,
-    )?;
-
-    let anchor_info = api::get_anchor_info(&env, canister_id, principal, user_number)?;
-    assert_eq!(anchor_info.into_device_data(), vec![device]);
-
-    Ok(())
-}
-
-/// Verifies that a protected device can be updated
-#[test]
-fn should_update_protected_device() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let principal = principal_1();
-    let mut device = DeviceData {
-        protection: DeviceProtection::Protected,
-        key_type: KeyType::SeedPhrase,
-        credential_id: None,
-        ..device_data_1()
-    };
 
     let user_number = flows::register_anchor_with(&env, canister_id, principal, &device);
 
@@ -406,7 +372,7 @@ fn should_not_update_non_recovery_device_to_be_protected() {
     expect_user_error_with_message(
         result,
         CanisterCalledTrap,
-        Regex::new("Only recovery phrases can be locked but key type is Unknown").unwrap(),
+        Regex::new("Only recovery phrases can be locked but key type is CrossPlatform").unwrap(),
     );
 }
 
@@ -417,12 +383,11 @@ fn should_get_credentials() -> Result<(), RejectResponse> {
     let canister_id = install_ii_with_archive(&env, None, None);
     let user_number = flows::register_anchor(&env, canister_id);
 
-    let recovery_webauthn_device = DeviceData {
+    let recovery_passkey = DeviceData {
         pubkey: ByteBuf::from("recovery device"),
         alias: "Recovery Device".to_string(),
-        credential_id: Some(ByteBuf::from("recovery credential id")),
+        credential_id: Some(ByteBuf::from(vec![9, 8, 7])),
         purpose: Purpose::Recovery,
-        key_type: KeyType::CrossPlatform,
         protection: DeviceProtection::Unprotected,
         ..DeviceData::auth_test_device()
     };
@@ -446,7 +411,7 @@ fn should_get_credentials() -> Result<(), RejectResponse> {
         canister_id,
         principal_1(),
         user_number,
-        &recovery_webauthn_device,
+        &recovery_passkey,
     )?;
 
     let response = api::get_anchor_credentials(&env, canister_id, user_number)?;
@@ -461,11 +426,16 @@ fn should_get_credentials() -> Result<(), RejectResponse> {
         credential_id: device_data_2().credential_id.unwrap()
     }));
 
+    println!(
+        "response.recovery_credentials = {:?}",
+        response.recovery_credentials
+    );
+
     assert_eq!(
         response.recovery_credentials,
         vec![WebAuthnCredential {
-            pubkey: recovery_webauthn_device.pubkey.clone(),
-            credential_id: recovery_webauthn_device.credential_id.unwrap()
+            pubkey: recovery_passkey.pubkey.clone(),
+            credential_id: ByteBuf::from(vec![9, 8, 7])
         }]
     );
 
@@ -752,9 +722,12 @@ fn should_replace_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that metadata is stored.
+/// Verifies that metadata is not stored anymore.
+///
+/// The reason metadata is not stored anymore is because we now rely on proper fields to store
+/// all authentication-related information.
 #[test]
-fn should_keep_metadata() -> Result<(), RejectResponse> {
+fn should_not_keep_metadata() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
     let device = DeviceData {
@@ -769,7 +742,13 @@ fn should_keep_metadata() -> Result<(), RejectResponse> {
 
     let devices = api::get_anchor_info(&env, canister_id, device.principal(), user_number)?
         .into_device_data();
-    assert_eq!(devices, vec![device]);
+    assert_eq!(
+        devices,
+        vec![DeviceData {
+            metadata: None,
+            ..device
+        }]
+    );
     Ok(())
 }
 

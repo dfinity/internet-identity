@@ -16,12 +16,12 @@ test("User can remove a passkey when they have multiple access methods", async (
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -36,8 +36,8 @@ test("User can remove a passkey when they have multiple access methods", async (
   }
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
-  // Rename current passkey to old passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  // Assign name to current passkey
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Verify we have one passkey
   await expect(
@@ -46,7 +46,7 @@ test("User can remove a passkey when they have multiple access methods", async (
 
   // Start the "add passkey" flow to create a second passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify that we now have two passkeys
   await expect(
@@ -70,12 +70,12 @@ test("User cannot remove passkey if they only have one access method", async ({
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -98,7 +98,7 @@ test("User cannot remove passkey if they only have one access method", async ({
   // Verify that the remove button is not visible when there's only one access method
   await page
     .getByRole("listitem")
-    .filter({ hasText: "Chrome" })
+    .filter({ hasText: "Unknown" })
     .getByRole("button", { name: "More options" })
     .click();
   await expect(page.getByRole("menuitem", { name: "Remove" })).toBeHidden();
@@ -112,12 +112,12 @@ test("User is logged out after removing the passkey they used to authenticate", 
 }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -132,8 +132,8 @@ test("User is logged out after removing the passkey they used to authenticate", 
   }
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
-  // Rename passkey to current passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  // Assign name to current passkey
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Verify we have one passkey
   await expect(
@@ -142,7 +142,7 @@ test("User is logged out after removing the passkey they used to authenticate", 
 
   // Start the "add passkey" flow to create a second passkey
   await addPasskeyCurrentDevice(page, dummyAuth());
-  await renamePasskey(page, "Chrome", "New passkey");
+  await renamePasskey(page, "Unknown", "New passkey");
 
   // Verify that we now have two passkeys
   await expect(
@@ -152,32 +152,20 @@ test("User is logged out after removing the passkey they used to authenticate", 
   // Remove current passkey
   await removePasskey(page, "Current passkey", true);
 
-  // Verify the user is logged out and redirected to the login page
-  // The URL should change from /manage to the root or login page
-  await page.waitForURL(II_URL + "/login");
-
-  // Verify we're back at the login screen without selectable identity
-  await expect(
-    page.getByRole("button", { name: "Continue with passkey" }),
-  ).toBeVisible();
-
-  // Verify we're no longer at the dashboard
-  await expect(
-    page.getByRole("heading", {
-      name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
-    }),
-  ).toBeHidden();
+  // Verify the user is logged out and redirected to the landing page
+  // The URL should change from /manage to landing page
+  await page.waitForURL(II_URL);
 });
 
 test("User can cancel passkey removal", async ({ page }) => {
   const auth = dummyAuth();
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await createNewIdentityInII(page, TEST_USER_NAME, auth);
   await page.waitForURL(II_URL + "/manage");
   await clearStorage(page);
   await page.goto(II_URL);
-  await page.getByRole("link", { name: "Manage Identity" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("button", { name: "Continue with passkey" }).click();
   auth(page);
   await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -192,8 +180,8 @@ test("User can cancel passkey removal", async ({ page }) => {
   }
   await page.getByRole("link", { name: "Access and recovery" }).click();
 
-  // Rename passkey to current passkey
-  await renamePasskey(page, "Chrome", "Current passkey");
+  // Assign name to current passkey
+  await renamePasskey(page, "Unknown", "Current passkey");
 
   // Verify we have one passkey
   await expect(

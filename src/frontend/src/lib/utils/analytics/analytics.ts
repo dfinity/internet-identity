@@ -1,7 +1,9 @@
 import type { AnalyticsConfig } from "$lib/generated/internet_identity_types";
+import { authorizationStore } from "$lib/stores/authorization.store";
 import { isNullish } from "@dfinity/utils";
 import Plausible from "plausible-tracker";
 import { PlausibleInitOptions } from "plausible-tracker/build/main/lib/tracker";
+import { get } from "svelte/store";
 
 let tracker: undefined | ReturnType<typeof Plausible>;
 
@@ -45,6 +47,14 @@ export const analytics = {
     tracker?.trackPageview();
   },
   event: (name: string, props?: Record<string, string | number | boolean>) => {
-    tracker?.trackEvent(name, { props });
+    const state = get(authorizationStore);
+    const authorizationOrigin = state?.effectiveOrigin;
+
+    tracker?.trackEvent(name, {
+      props:
+        authorizationOrigin !== undefined
+          ? { ...props, authorizationOrigin }
+          : props,
+    });
   },
 };
