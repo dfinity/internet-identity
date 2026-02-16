@@ -113,7 +113,7 @@ fn validate_openid_credential_issuer_identifier(issuer: &str) -> Result<(), Stri
     }
 
     if !issuer.starts_with("https://") && !issuer.starts_with("http://localhost:") {
-        problems.push("must start with `https://`".to_string());
+        problems.push("must start with `https://` or `http://localhost:`".to_string());
     }
 
     // This check is overly strict, but we keep it for now to avoid pulling in a URL parser.
@@ -592,12 +592,12 @@ mod tests {
                 (
                     "openid extra colon",
                     "openid::",
-                    Err("Invalid issuer `:` in attribute scope: must start with `https://`".to_string()),
+                    Err("Invalid issuer `:` in attribute scope: must start with `https://` or `http://localhost:`".to_string()),
                 ),
                 (
                     "openid missing issuer",
                     "openid:",
-                    Err("Invalid issuer `` in attribute scope: empty issuer, must start with `https://`".to_string()),
+                    Err("Invalid issuer `` in attribute scope: empty issuer, must start with `https://` or `http://localhost:`".to_string()),
                 ),
                 (
                     "openid no colon",
@@ -609,18 +609,23 @@ mod tests {
                     "unknown:issuer",
                     Err("Unknown attribute scope: unknown".to_string()),
                 ),
-                // Test https:// requirement
                 (
                     "http instead of https",
                     "openid:http://google.com",
-                    Err("Invalid issuer `http://google.com` in attribute scope: must start with `https://`".to_string()),
+                    Err("Invalid issuer `http://google.com` in attribute scope: must start with `https://` or `http://localhost:`".to_string()),
                 ),
                 (
                     "no protocol",
                     "openid:google.com",
-                    Err("Invalid issuer `google.com` in attribute scope: must start with `https://`".to_string()),
+                    Err("Invalid issuer `google.com` in attribute scope: must start with `https://` or `http://localhost:`".to_string()),
                 ),
-                // Test query parameter rejection
+                (
+                    "http localhost should be allowed",
+                    "openid:http://localhost:8080",
+                    Ok(AttributeScope::OpenId {
+                        issuer: "http://localhost:8080".to_string(),
+                    }),
+                ),
                 (
                     "issuer with query parameter",
                     "openid:https://google.com?param=value",
@@ -631,7 +636,6 @@ mod tests {
                     "openid:https://google.com?foo=bar&baz=qux",
                     Err("Invalid issuer `https://google.com?foo=bar&baz=qux` in attribute scope: must not contain '?'".to_string()),
                 ),
-                // Test fragment rejection
                 (
                     "issuer with fragment",
                     "openid:https://google.com#section",
@@ -642,7 +646,6 @@ mod tests {
                     "openid:https://google.com?param=value#section",
                     Err("Invalid issuer `https://google.com?param=value#section` in attribute scope: must not contain '?', must not contain '#'".to_string()),
                 ),
-                // Test IPv6 address support
                 (
                     "issuer with IPv6 address",
                     "openid:https://[2001:db8::1]:8080",
@@ -657,7 +660,6 @@ mod tests {
                         issuer: "https://[::1]".to_string(),
                     }),
                 ),
-                // Test length limit
                 (
                     "issuer at max length",
                     &max_length_input,
