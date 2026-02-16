@@ -13,6 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+msgid "{0} logo"
+msgstr "{0} logo"
+
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} has moved to the new Internet Identity"
 
@@ -24,9 +27,6 @@ msgstr "{name} | Created {date}"
 
 msgid "{name} account"
 msgstr "{name} account"
-
-msgid "{name} logo"
-msgstr "{name} logo"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
@@ -265,6 +265,9 @@ msgstr "Edit account"
 msgid "Enable multiple accounts"
 msgstr "Enable multiple accounts"
 
+msgid "Encountered an internal error while processing the request."
+msgstr "Encountered an internal error while processing the request."
+
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 
@@ -331,9 +334,6 @@ msgstr "Go to the app - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
 msgstr "Has not been used yet"
-
-msgid "Have your recovery phrase ready before continuing. Keep it private. Don’t let anyone watch you enter it. You can reset it later in your dashboard if you want a new one."
-msgstr "Have your recovery phrase ready before continuing. Keep it private. Don’t let anyone watch you enter it. You can reset it later in your dashboard if you want a new one."
 
 msgid "Help & FAQ"
 msgstr "Help & FAQ"
@@ -473,6 +473,12 @@ msgstr "It seems like an invalid authentication request was received."
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 
+msgid "It seems like the connection with the service could not be re-established."
+msgstr "It seems like the connection with the service could not be re-established."
+
+msgid "It seems like the request could not be processed."
+msgstr "It seems like the request could not be processed."
+
 msgid "It won't be removed from your device or password manager."
 msgstr "It won't be removed from your device or password manager."
 
@@ -544,9 +550,6 @@ msgstr "Maximum length is 32 characters."
 
 msgid "Maximum length is 64 characters."
 msgstr "Maximum length is 64 characters."
-
-msgid "Missing request"
-msgstr "Missing request"
 
 msgid "More information about multiple accounts"
 msgstr "More information about multiple accounts"
@@ -803,9 +806,6 @@ msgstr "Something is wrong!"
 msgid "Something went wrong"
 msgstr "Something went wrong"
 
-msgid "Something went wrong during authentication. Authenticating service was notified and you may close this page."
-msgstr "Something went wrong during authentication. Authenticating service was notified and you may close this page."
-
 msgid "Source code"
 msgstr "Source code"
 
@@ -881,9 +881,6 @@ msgstr "The passkey could not be identified, support unknown."
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "The phrase was entered correctly but belongs to a product other than Internet Identity."
 
-msgid "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
-msgstr "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
-
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 
@@ -947,8 +944,14 @@ msgstr "Type the characters exactly as shown below"
 msgid "Unable to complete setup"
 msgstr "Unable to complete setup"
 
+msgid "Unable to connect"
+msgstr "Unable to connect"
+
 msgid "Understanding Internet Identity"
 msgstr "Understanding Internet Identity"
+
+msgid "Unexpected error"
+msgstr "Unexpected error"
 
 msgid "Unknown"
 msgstr "Unknown"

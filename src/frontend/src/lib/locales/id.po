@@ -13,6 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
+msgid "{0} logo"
+msgstr ""
+
 msgid "{application} has moved to the new Internet Identity"
 msgstr ""
 
@@ -24,9 +27,6 @@ msgstr "{name} | Dibuat {date}"
 
 msgid "{name} account"
 msgstr "Akun {name}"
-
-msgid "{name} logo"
-msgstr "Logo {name}"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr ""
@@ -265,6 +265,9 @@ msgstr "Edit akun"
 msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
 
+msgid "Encountered an internal error while processing the request."
+msgstr ""
+
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr ""
 
@@ -331,9 +334,6 @@ msgstr "Buka aplikasi - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
 msgstr "Belum digunakan"
-
-msgid "Have your recovery phrase ready before continuing. Keep it private. Don’t let anyone watch you enter it. You can reset it later in your dashboard if you want a new one."
-msgstr ""
 
 msgid "Help & FAQ"
 msgstr "Bantuan & FAQ"
@@ -473,6 +473,12 @@ msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
 
+msgid "It seems like the connection with the service could not be re-established."
+msgstr ""
+
+msgid "It seems like the request could not be processed."
+msgstr ""
+
 msgid "It won't be removed from your device or password manager."
 msgstr "Ini tidak akan dihapus dari perangkat atau pengelola kata sandi Anda."
 
@@ -544,9 +550,6 @@ msgstr "Panjang maksimum 32 karakter."
 
 msgid "Maximum length is 64 characters."
 msgstr "Panjang maksimum 64 karakter."
-
-msgid "Missing request"
-msgstr "Permintaan tidak ditemukan"
 
 msgid "More information about multiple accounts"
 msgstr "Informasi lebih lanjut tentang banyak akun"
@@ -803,9 +806,6 @@ msgstr "Ada yang salah!"
 msgid "Something went wrong"
 msgstr "Terjadi kesalahan"
 
-msgid "Something went wrong during authentication. Authenticating service was notified and you may close this page."
-msgstr "Terjadi kesalahan saat autentikasi. Layanan autentikasi telah diberi tahu dan Anda dapat menutup halaman ini."
-
 msgid "Source code"
 msgstr "Kode sumber"
 
@@ -881,9 +881,6 @@ msgstr ""
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr ""
 
-msgid "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
-msgstr "Terjadi kesalahan saat memverifikasi asal permintaan. Layanan autentikasi telah diberi tahu dan Anda dapat menutup halaman ini."
-
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika masalah berlanjut, hubungi pengembang."
 
@@ -947,8 +944,14 @@ msgstr "Ketik karakter persis seperti yang ditunjukkan di bawah"
 msgid "Unable to complete setup"
 msgstr "Tidak dapat menyelesaikan pengaturan"
 
+msgid "Unable to connect"
+msgstr ""
+
 msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
+
+msgid "Unexpected error"
+msgstr ""
 
 msgid "Unknown"
 msgstr "Tidak diketahui"
