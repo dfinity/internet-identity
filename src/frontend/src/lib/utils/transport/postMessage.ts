@@ -8,8 +8,8 @@ import {
 } from "$lib/utils/transport/utils";
 import { HeartbeatServer } from "./heartBeat";
 
-const ESTABLISH_TIMEOUT_MS = 2000;
-const DISCONNECT_TIMEOUT_MS = 2000;
+const ESTABLISH_TIMEOUT_MS = 10000;
+const DISCONNECT_TIMEOUT_MS = 10000;
 
 class PostMessageChannel implements Channel {
   #origin: string;
