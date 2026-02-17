@@ -15,6 +15,7 @@
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { type Snippet } from "svelte";
   import { goto } from "$app/navigation";
+  import { PostMessageUnsupportedError } from "$lib/utils/transport/postMessage";
 
   class AuthorizeChannelError extends Error {
     #title: string;
@@ -95,8 +96,9 @@
       .establish(options)
       .catch((error) => {
         console.error(error); // Log error to console
-        if (window.opener === null) {
+        if (error instanceof PostMessageUnsupportedError) {
           goto("/unsupported");
+          return;
         }
         return Promise.reject(
           new AuthorizeChannelError(
