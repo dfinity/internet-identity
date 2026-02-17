@@ -98,7 +98,7 @@
         console.error(error); // Log error to console
         if (error instanceof PostMessageUnsupportedError) {
           goto("/unsupported");
-          return;
+          return new Promise(() => {}); // Never resolve to render the unsupported page
         }
         return Promise.reject(
           new AuthorizeChannelError(
