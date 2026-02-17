@@ -95,9 +95,9 @@ class PostMessageChannel implements Channel {
 
 export class PostMessageTransport implements Transport {
   establishChannel(options: ChannelOptions): Promise<PostMessageChannel> {
-    // Use shorter timeouts for X's in-app browser since we don't
-    // want to leave users waiting too long if the channel fails
-    // to establish due to X's restrictions on postMessage.
+    // Detect X's in-app browser and reject immediately so we don't
+    // leave users waiting if the channel cannot be established due
+    // to X's restrictions on postMessage.
     const isX = /\bTwitter/i.test(navigator.userAgent);
     if (isX) {
       throw new PostMessageUnsupportedError();
