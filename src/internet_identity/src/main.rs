@@ -120,13 +120,13 @@ async fn add_tentative_device(
             AuthnMethodRegisterError::RegistrationAlreadyInProgress => {
                 AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
             }
+            AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed => {
+                AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed
+            }
             AuthnMethodRegisterError::InvalidMetadata(_) => {
-                // Unreachable since we don't convert from `AuthnMethodData` to `DeviceWithUsage`
-                // in this legacy method in comparison to the newer `authn_method_register` method.
                 trap("Unreachable error");
             }
             AuthnMethodRegisterError::NotSelfAuthenticating(_) => {
-                // Unreachable in this legacy method since it doesn't check for self-authenticating principals
                 trap("Unreachable error");
             }
         },

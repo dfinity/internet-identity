@@ -86,7 +86,6 @@ use account::{
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
-use sha2::Sha256;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
@@ -1837,6 +1836,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_anchor_with_recovery_phrase_principal_memory".to_string(),
                 self.lookup_anchor_with_recovery_phrase_principal_memory_wrapper
+                    .size(),
+            ),
+            (
+                "lookup_anchor_with_passkey_pubkey_hash_memory".to_string(),
+                self.lookup_anchor_with_passkey_pubkey_hash_memory_wrapper
                     .size(),
             ),
         ])
