@@ -523,9 +523,8 @@ jobs:
               "fedcm_uri = opt \"\"; " +
               "}"' | paste -sd';' - | sed 's/;/; /g'
           )
-          echo "OPENID_CONFIGS<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$openid_configs" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          escaped=$(printf '%q' "$openid_configs")
+          echo "OPENID_CONFIGS=$escaped" >> "$GITHUB_OUTPUT"
 
       - name: Deploy canisters
         run: |
