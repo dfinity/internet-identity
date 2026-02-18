@@ -456,7 +456,7 @@ jobs:
     env:
       # Suffix used for tagging artifacts
       artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
-      # OpenID providers configuration
+      # OpenID provider instance ports (see /src/test_openid_provider)
       openid_providers: |
         - 11105
         - 11106
