@@ -2,9 +2,9 @@ import * as oidc from "oidc-provider";
 import express from "express";
 
 const app = express();
-const port = 11105; // "OpenID" (O = 111, I = 105)
+const port = parseInt(process.argv[2], 10) || 11105; // "OpenID" (O = 111, I = 105)
 const accountClaims = new Map();
-const provider = new oidc.Provider("http://localhost:11105", {
+const provider = new oidc.Provider(`http://localhost:${port}`, {
   clients: [
     {
       client_id: "internet_identity",
@@ -18,14 +18,46 @@ const provider = new oidc.Provider("http://localhost:11105", {
     },
   ],
   claims: {
-    openid: ["sub", "name", "email", "preferred_username"],
+    openid: ["sub"],
+  },
+  features: {
+    claimsParameter: {
+      enabled: true,
+      // Allow any claim that's stored in the account
+      async assertClaimsParameter(ctx, claims) {
+        const accountId = ctx.oidc.session?.accountId;
+        if (!accountId) return;
+        
+        const stored = accountClaims.get(accountId) ?? {};
+        
+        // For each requested claim, allow it if it exists in stored data
+        if (claims?.id_token) {
+          for (const claimName of Object.keys(claims.id_token)) {
+            if (claimName !== "sub" && !(claimName in stored)) {
+              delete claims.id_token[claimName];
+            }
+          }
+        }
+        if (claims?.userinfo) {
+          for (const claimName of Object.keys(claims.userinfo)) {
+            if (claimName !== "sub" && !(claimName in stored)) {
+              delete claims.userinfo[claimName];
+            }
+          }
+        }
+      },
+    },
   },
   async findAccount(ctx, id) {
     return {
       accountId: id,
-      claims() {
-        // Return stored claims (can be set with the custom endpoint below)
-        return accountClaims.get(id) ?? {};
+      async claims(use, scope, claimsParameter, rejected) {
+        // Return sub (required) plus all stored claims
+        const stored = accountClaims.get(id) ?? {};
+        return {
+          sub: id,
+          ...stored,
+        };
       },
     };
   },
