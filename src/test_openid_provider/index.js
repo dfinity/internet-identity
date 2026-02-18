@@ -48,10 +48,10 @@ const provider = new oidc.Provider(`http://localhost:${port}`, {
       },
     },
   },
-  async findAccount(ctx, id) {
+  async findAccount(_, id) {
     return {
       accountId: id,
-      async claims(use, scope, claimsParameter, rejected) {
+      async claims() {
         // Return sub (required) plus all stored claims that can be set with the custom endpoint below
         const stored = accountClaims.get(id) ?? {};
         return {
