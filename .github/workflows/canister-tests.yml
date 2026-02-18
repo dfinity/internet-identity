@@ -521,7 +521,7 @@ jobs:
               "auth_uri = \"http://localhost:" + tostring + "/auth\"; " +
               "auth_scope = vec { \"openid\"; \"profile\"; \"email\" }; " +
               "fedcm_uri = opt \"\"; " +
-              "}"' | paste -sd';' - | sed 's/;/; /g'
+              "}"' | paste -sd';' - | sed 's/;/; /g' | sed 's/"/\\"/g'
           )
           echo "OPENID_CONFIGS=$openid_configs" >> "$GITHUB_OUTPUT"
 
