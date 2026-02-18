@@ -139,6 +139,7 @@ pub enum AuthnMethodRegisterError {
     RegistrationAlreadyInProgress,
     InvalidMetadata(String),
     NotSelfAuthenticating(Principal),
+    PasskeyWithThisPublicKeyIsAlreadyUsed,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
@@ -155,6 +156,7 @@ pub enum AuthnMethodRegistrationModeExitError {
     InternalCanisterError(String),
     RegistrationModeOff,
     InvalidMetadata(String),
+    PasskeyWithThisPublicKeyIsAlreadyUsed,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

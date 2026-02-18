@@ -86,6 +86,7 @@ use account::{
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::stable::WASM_PAGE_SIZE_IN_BYTES;
 use ic_stable_structures::cell::ValueError;
+use sha2::Sha256;
 use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 use std::fmt;
@@ -121,6 +122,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::utils::sha256sum;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -177,6 +179,7 @@ const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
+const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -210,6 +213,9 @@ const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
 
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX);
+
+const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -319,6 +325,10 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_recovery_phrase_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) lookup_anchor_with_recovery_phrase_principal_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+
+    lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
+        StableBTreeMap<[u8; 32], StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -400,6 +410,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID);
         let lookup_anchor_with_recovery_phrase_principal_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
+        let lookup_anchor_with_passkey_pubkey_hash_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -493,6 +505,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_recovery_phrase_principal_memory: StableBTreeMap::init(
                 lookup_anchor_with_recovery_phrase_principal_memory,
+            ),
+            lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_passkey_pubkey_hash_memory.clone(),
+            ),
+            lookup_anchor_with_passkey_pubkey_hash_memory: StableBTreeMap::init(
+                lookup_anchor_with_passkey_pubkey_hash_memory,
             ),
         }
     }
@@ -756,6 +774,12 @@ impl<M: Memory + Clone> Storage<M> {
     ) -> Option<AnchorNumber> {
         self.lookup_anchor_with_recovery_phrase_principal_memory
             .get(&key)
+    }
+
+    pub fn lookup_anchor_with_passkey_pubkey(&self, pubkey: &PublicKey) -> Option<AnchorNumber> {
+        let hash = sha256sum(pubkey);
+        self.lookup_anchor_with_passkey_pubkey_hash_memory
+            .get(&hash)
     }
 
     fn sync_anchor_with_recovery_phrase_principal_index(

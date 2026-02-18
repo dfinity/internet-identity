@@ -49,6 +49,7 @@ mod openid;
 mod state;
 mod stats;
 mod storage;
+mod utils;
 mod vc_mvp;
 
 // Some time helpers
@@ -98,6 +99,10 @@ async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
+    if let Err(_) = anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey) {
+        return AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed;
+    };
+
     let result =
         tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
     match result {
@@ -188,6 +193,10 @@ fn register(
 
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
+    if let Err(err) = anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey) {
+        trap(&err);
+    };
+
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
     })
@@ -976,6 +985,11 @@ mod v2_api {
                 .map_err(|err| {
                     AuthnMethodRegistrationModeExitError::InvalidMetadata(err.to_string())
                 })?;
+
+            anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey).map_err(
+                |_| AuthnMethodRegistrationModeExitError::PasskeyWithThisPublicKeyIsAlreadyUsed,
+            )?;
+
             // Add device to anchor with bookkeeping
             let mut anchor = state::anchor(identity_number);
             let operation = anchor_management::add_device(&mut anchor, device_data.clone());
@@ -1007,6 +1021,9 @@ mod v2_api {
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
         let device = DeviceWithUsage::try_from(authn_method)
             .map_err(|err| AuthnMethodRegisterError::InvalidMetadata(err.to_string()))?;
+
+        anchor_management::check_passkey_pubkey_is_not_used(&device.pubkey)
+            .map_err(|_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)?;
 
         tentative_device_registration::add_tentative_device(
             identity_number,
