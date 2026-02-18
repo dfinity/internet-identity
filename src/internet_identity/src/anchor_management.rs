@@ -270,7 +270,7 @@ pub fn lookup_caller_identity_by_recovery_phrase(caller: Principal) -> Option<Id
 pub fn check_passkey_pubkey_is_not_used(pubkey: &PublicKey) -> Result<(), String> {
     storage_borrow(|storage| storage.lookup_anchor_with_passkey_pubkey(pubkey))
         .is_none()
-        .then(|| ())
+        .then_some(())
         .ok_or_else(|| "passkey with this public key is already used".to_string())
 }
 

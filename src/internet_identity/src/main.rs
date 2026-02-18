@@ -99,7 +99,7 @@ async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    if let Err(_) = anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey) {
+    if anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey).is_err() {
         return AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed;
     };
 
