@@ -698,6 +698,8 @@ impl<M: Memory + Clone> Storage<M> {
             &storable_anchor.passkey_credentials.unwrap_or_default(),
         );
 
+        // TODO: DO NOT MERGE: Implement sync_anchor_with_passkey_pubkey_index
+
         Ok(())
     }
 
