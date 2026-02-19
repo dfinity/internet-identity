@@ -32,5 +32,5 @@ ic-cdk-timers.workspace = true
 # The dev_csp feature weakens the CSP in oder to facilitate development with a locally deployed II instance.
 # In particular, this allows
 # * accessing II using http instead of https
-# * II to connect to localhost both on http and https, which is useful when developint a vc issuer
+# * II to connect to localhost both on http and https, which is useful when developing a vc issuer
 dev_csp = []
