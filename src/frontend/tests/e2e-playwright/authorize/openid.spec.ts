@@ -100,7 +100,7 @@ test.describe("Authorize with direct OpenID", () => {
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown scoped attribute
-          `favorite_good`, // Unknown unscoped attribute
+          `favorite_food`, // Unknown unscoped attribute
           `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Missing implicit consent
         ],
       },
