@@ -109,6 +109,7 @@ pub enum AuthnMethodAddError {
 pub enum AuthnMethodReplaceError {
     InvalidMetadata(String),
     AuthnMethodNotFound,
+    PasskeyWithThisPublicKeyIsAlreadyUsed,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

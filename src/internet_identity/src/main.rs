@@ -75,7 +75,7 @@ const ID_AI_ORIGIN: &str = "https://id.ai";
 /// Batch dispatch frequency to minimize the chance of DoS.
 pub(crate) const ANCHOR_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
 
-/// Number of anchors to process in one batch during the recovery phrase migration.
+/// Number of anchors to process in one batch during the anchor migration.
 pub(crate) const ANCHOR_MIGRATION_BATCH_SIZE: u64 = 2000;
 
 thread_local! {
@@ -89,32 +89,28 @@ thread_local! {
 
 /// Temporary function to list migration errors.
 ///
-/// Can be called to retrieve any errors that occurred during the recovery phrase migration.
+/// Can be called to retrieve any errors that occurred during the anchor migration.
 #[update(hidden = true)]
-fn list_recovery_phrase_migration_errors() -> Vec<String> {
+fn list_anchor_migration_errors() -> Vec<String> {
     ANCHOR_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
 }
 
 /// Temporary function to fetch the current migration batch id.
 ///
-/// Can be called to retrieve the current batch id of the ongoing data recovery phrase migration.
+/// Can be called to retrieve the current batch id of the ongoing data anchor migration.
 ///
 /// The special value `u64::MAX` indicates that the migration is complete.
 #[query(hidden = true)]
-fn list_recovery_phrase_migration_current_batch_id() -> u64 {
+fn list_anchor_migration_current_batch_id() -> u64 {
     ANCHOR_MIGRATION_BATCH_ID.with_borrow(|id| *id)
 }
 
-/// Temporary function to count migrated recovery phrases.
+/// Temporary function to count migrated passkeys.
 ///
-/// Can be called to retrieve the number of recovery phrases indexed so far.
+/// Can be called to retrieve the number of passkeys indexed so far.
 #[query(hidden = true)]
-fn count_recovery_phrases() -> u64 {
-    state::storage_borrow(|storage| {
-        storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
-            .len()
-    })
+fn count_passkeys() -> u64 {
+    state::storage_borrow(|storage| storage.lookup_anchor_with_passkey_pubkey_hash_memory.len())
 }
 
 #[update]
@@ -254,6 +250,9 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 
 #[update]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)
+        .unwrap_or_else(|err| trap(&err));
+
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
@@ -265,6 +264,9 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 
 #[update]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+    anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)
+        .unwrap_or_else(|err| trap(&err));
+
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
@@ -947,6 +949,7 @@ mod v2_api {
         let new_device = DeviceWithUsage::try_from(new_authn_method)
             .map(DeviceData::from)
             .map_err(|err| AuthnMethodReplaceError::InvalidMetadata(err.to_string()))?;
+
         replace(identity_number, authn_method_pk, new_device);
         Ok(())
     }

@@ -13,12 +13,12 @@ impl<M: Memory + Clone> Storage<M> {
     ///
     /// The first call to this function saves the ID of the last anchor to be migrated.
     ///
-    /// Stop condition (indicated by `RECOVERY_PHRASE_MIGRATION_BATCH_ID` being set to `u64::MAX`):
+    /// Stop condition (indicated by `ANCHOR_MIGRATION_BATCH_ID` being set to `u64::MAX`):
     /// - Either all anchors up to the last anchor ID have been migrated, or
     /// - All anchors in the current batch failed to migrate.
     ///
-    /// Aggregates errors encountered during migration in `RECOVERY_PHRASE_MIGRATION_ERRORS`
-    /// (can be queried via a separate function `list_recovery_phrase_migration_errors`).
+    /// Aggregates errors encountered during migration in `ANCHOR_MIGRATION_ERRORS`
+    /// (can be queried via a separate function `list_anchor_migration_errors`).
     ///
     /// Must not panic.
     pub fn sync_anchor_indices(&mut self, now_nanos: u64, batch_size: u64) {
@@ -49,7 +49,7 @@ impl<M: Memory + Clone> Storage<M> {
                 });
 
                 // Ensure that migration is not retried endlessly.
-                ic_cdk::println!("Recovery phrase migration CANCELED.");
+                ic_cdk::println!("Anchor migration CANCELED.");
                 ANCHOR_MIGRATION_BATCH_ID.replace(u64::MAX);
                 return;
             };
@@ -141,7 +141,7 @@ impl<M: Memory + Clone> Storage<M> {
             // Mark progress.
             ANCHOR_MIGRATION_BATCH_ID.with_borrow_mut(|id| *id = batch_id.saturating_add(1));
         } else {
-            ic_cdk::println!("Recovery phrase migration COMPLETED.");
+            ic_cdk::println!("Anchor migration COMPLETED.");
             ANCHOR_MIGRATION_BATCH_ID.replace(u64::MAX);
         }
     }
@@ -156,6 +156,7 @@ mod sync_anchor_indices_tests {
     use internet_identity_interface::internet_identity::types::{
         DeviceProtection, KeyType, Purpose,
     };
+    use serde_bytes::ByteBuf;
 
     fn reset_migration_state() {
         crate::ANCHOR_MIGRATION_BATCH_ID.with_borrow_mut(|id| *id = 0);
@@ -195,7 +196,7 @@ mod sync_anchor_indices_tests {
         Device {
             pubkey: pubkey.clone().into(),
             alias: "regular".to_string(),
-            credential_id: None,
+            credential_id: Some(ByteBuf::from([42, 43, 44])),
             aaguid: None,
             purpose: Purpose::Authentication,
             key_type: KeyType::Unknown,
