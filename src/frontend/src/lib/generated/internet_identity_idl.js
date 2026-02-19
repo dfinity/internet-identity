@@ -106,6 +106,7 @@ export const idlFactory = ({ IDL }) => {
   const AddTentativeDeviceResponse = IDL.Variant({
     'device_registration_mode_off' : IDL.Null,
     'another_device_tentatively_added' : IDL.Null,
+    'passkey_with_this_public_key_is_already_used' : IDL.Null,
     'added_tentatively' : IDL.Record({
       'verification_code' : IDL.Text,
       'device_registration_timeout' : Timestamp,
@@ -169,6 +170,7 @@ export const idlFactory = ({ IDL }) => {
     'expiration' : Timestamp,
   });
   const AuthnMethodRegisterError = IDL.Variant({
+    'PasskeyWithThisPublicKeyIsAlreadyUsed' : IDL.Null,
     'RegistrationModeOff' : IDL.Null,
     'RegistrationAlreadyInProgress' : IDL.Null,
     'NotSelfAuthenticating' : IDL.Principal,
@@ -182,12 +184,14 @@ export const idlFactory = ({ IDL }) => {
     'Unauthorized' : IDL.Principal,
   });
   const AuthnMethodRegistrationModeExitError = IDL.Variant({
+    'PasskeyWithThisPublicKeyIsAlreadyUsed' : IDL.Null,
     'InternalCanisterError' : IDL.Text,
     'RegistrationModeOff' : IDL.Null,
     'Unauthorized' : IDL.Principal,
     'InvalidMetadata' : IDL.Text,
   });
   const AuthnMethodReplaceError = IDL.Variant({
+    'PasskeyWithThisPublicKeyIsAlreadyUsed' : IDL.Null,
     'AuthnMethodNotFound' : IDL.Null,
     'InvalidMetadata' : IDL.Text,
   });
