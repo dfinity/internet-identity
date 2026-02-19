@@ -483,7 +483,7 @@ jobs:
       - name: "Run test OpenID providers"
         run: |
           npm ci --prefix ./src/test_openid_provider
-          echo '${{ env.openid_providers }}' | yq -r '.[]' | while read port; do
+          for port in ${{ env.openid_providers }}; do  
             npm start --prefix ./src/test_openid_provider -- "$port" | tee -a > "test-openid-provider-${port}-logs.txt" &
           done
 
