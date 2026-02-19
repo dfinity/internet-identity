@@ -692,13 +692,19 @@ impl<M: Memory + Clone> Storage<M> {
             &previous_recovery_keys,
             &storable_anchor.recovery_keys.unwrap_or_default(),
         );
-        self.sync_anchors_with_passkey_credential_index(
+
+        let current_passkey_credentials = storable_anchor.passkey_credentials.unwrap_or_default();
+
+        self.sync_anchor_with_passkey_credential_index(
             anchor_number,
             &previous_passkey_credentials,
-            &storable_anchor.passkey_credentials.unwrap_or_default(),
+            &current_passkey_credentials,
         );
-
-        // TODO: DO NOT MERGE: Implement sync_anchor_with_passkey_pubkey_index
+        self.sync_anchor_with_passkey_pubkey_index(
+            anchor_number,
+            &previous_passkey_credentials,
+            &current_passkey_credentials,
+        );
 
         Ok(())
     }
@@ -783,6 +789,55 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&hash)
     }
 
+    fn sync_anchor_with_passkey_pubkey_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_passkeys: &[StorablePasskeyCredential],
+        current_passkeys: &[StorablePasskeyCredential],
+    ) {
+        let previous_pubkey_hashes = previous_passkeys
+            .iter()
+            .map(|passkey| sha256sum(&passkey.pubkey))
+            .collect::<BTreeSet<_>>();
+
+        let current_pubkey_hashes = current_passkeys
+            .iter()
+            .map(|passkey| sha256sum(&passkey.pubkey))
+            .collect::<BTreeSet<_>>();
+
+        let pubkey_hashes_to_be_removed = previous_pubkey_hashes.difference(&current_pubkey_hashes);
+        let pubkey_hashes_to_be_added = current_pubkey_hashes.difference(&previous_pubkey_hashes);
+
+        for pubkey_hash in pubkey_hashes_to_be_removed {
+            let Some(existing_anchor_number) = self
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(pubkey_hash)
+            else {
+                // This pubkey hash is not indexed, nothing to do.
+                continue;
+            };
+            if existing_anchor_number != anchor_number {
+                // Ensure that a user can remove only their own passkey pubkey from the index.
+                continue;
+            }
+            self.lookup_anchor_with_passkey_pubkey_hash_memory
+                .remove(pubkey_hash);
+        }
+
+        for pubkey_hash in pubkey_hashes_to_be_added {
+            if self
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .contains_key(pubkey_hash)
+            {
+                // This pubkey hash is already occupied; do not overwrite it.
+                continue;
+            };
+
+            self.lookup_anchor_with_passkey_pubkey_hash_memory
+                .insert(*pubkey_hash, anchor_number);
+        }
+    }
+
     fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
@@ -831,7 +886,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Update `CredentialId` to `AnchorNumber` lookup map
-    fn sync_anchors_with_passkey_credential_index(
+    fn sync_anchor_with_passkey_credential_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous_passkey_credentials: &[StorablePasskeyCredential],
