@@ -484,7 +484,7 @@ jobs:
         run: |
           npm ci --prefix ./src/test_openid_provider
           for port in ${{ env.openid_providers }}; do  
-            npm start --prefix ./src/test_openid_provider -- "$port" | tee -a > "test-openid-provider-${port}-logs.txt" &
+            npm start --prefix ./src/test_openid_provider -- "$port" | tee -a "test-openid-provider-${port}-logs.txt" &
           done
 
       - name: "Run dfx"

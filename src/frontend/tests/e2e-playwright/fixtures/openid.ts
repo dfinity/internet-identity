@@ -21,7 +21,6 @@ export const test = base.extend<{
   openIdConfig: OpenIdConfig;
   openIdUsers: OpenIdUser[];
   signInWithOpenId: (page: Page, userId: string) => Promise<void>;
-  issuerDetails: () => { name: string; url: string };
 }>({
   openIdConfig: {
     defaultPort: DEFAULT_OPENID_PORT,
