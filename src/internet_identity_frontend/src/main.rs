@@ -385,6 +385,7 @@ fn get_static_assets(config: &InternetIdentityInit) -> Vec<AssetUtilAsset> {
 
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
+    // TODO: Make this a deployment arg
     let canister_id = Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
     // Encode config to base64-encoded Candid to avoid JSON escaping issues
     let encoded_config = BASE64.encode(Encode!(config).unwrap());
