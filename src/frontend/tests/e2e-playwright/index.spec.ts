@@ -7,7 +7,6 @@ import {
   II_URL,
 } from "./utils";
 import { test } from "./fixtures";
-import { a } from "vitest/dist/chunks/suite.d.FvehnV49.js";
 
 const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";
