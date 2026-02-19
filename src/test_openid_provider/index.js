@@ -18,46 +18,14 @@ const provider = new oidc.Provider(`http://localhost:${port}`, {
     },
   ],
   claims: {
-    openid: ["sub"],
-  },
-  features: {
-    claimsParameter: {
-      enabled: true,
-      // Allow any claim that's stored in the account
-      async assertClaimsParameter(ctx, claims) {
-        const accountId = ctx.oidc.session?.accountId;
-        if (!accountId) return;
-        
-        const stored = accountClaims.get(accountId) ?? {};
-        
-        // For each requested claim, allow it if it exists in stored data
-        if (claims?.id_token) {
-          for (const claimName of Object.keys(claims.id_token)) {
-            if (claimName !== "sub" && !(claimName in stored)) {
-              delete claims.id_token[claimName];
-            }
-          }
-        }
-        if (claims?.userinfo) {
-          for (const claimName of Object.keys(claims.userinfo)) {
-            if (claimName !== "sub" && !(claimName in stored)) {
-              delete claims.userinfo[claimName];
-            }
-          }
-        }
-      },
-    },
+    openid: ["sub", "name", "email", "preferred_username"],
   },
   async findAccount(_, id) {
     return {
       accountId: id,
-      async claims() {
-        // Return sub (required) plus all stored claims that can be set with the custom endpoint below
-        const stored = accountClaims.get(id) ?? {};
-        return {
-          sub: id,
-          ...stored,
-        };
+      claims() {
+        // Return stored claims (can be set with the custom endpoint below)
+        return accountClaims.get(id) ?? {};
       },
     };
   },
