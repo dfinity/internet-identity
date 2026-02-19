@@ -77,82 +77,6 @@ test.describe("Authorize with direct OpenID", () => {
   });
 
   test.describe("with unavailable attribute", () => {
-    const name = "John Doe";
-
-    test.use({
-      openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name },
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        attributes: [
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable attribute
-        ],
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedAttributes).toEqual({
-        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: name,
-      });
-    });
-
-    test("should omit attribute", async ({
-      authorizePage,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-    });
-  });
-
-  test.describe("with unknown attribute", () => {
-    const name = "John Doe";
-
-    test.use({
-      openIdConfig: {
-        defaultPort: DEFAULT_OPENID_PORT,
-        createUsers: [
-          {
-            claims: { name },
-          },
-        ],
-      },
-      authorizeConfig: {
-        protocol: "icrc25",
-        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
-        attributes: [
-          `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown attribute
-        ],
-      },
-    });
-
-    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
-      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedAttributes).toEqual({
-        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: name,
-      });
-    });
-
-    // TODO: should this either throw an error or omit unknown attribute?
-    test.skip("should throw error", async ({
-      authorizePage,
-      signInWithOpenId,
-      openIdUsers,
-    }) => {
-      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
-    });
-  });
-
-  test.describe("with attribute missing implicit consent", () => {
     const defaultName = "John Doe";
     const alternateName = "Jane Doe";
 
@@ -174,6 +98,9 @@ test.describe("Authorize with direct OpenID", () => {
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
         attributes: [
           `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`, // Unavailable scoped attribute
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:favorite_color`, // Unknown scoped attribute
+          `favorite_good`, // Unknown unscoped attribute
           `openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`, // Missing implicit consent
         ],
       },
@@ -208,7 +135,7 @@ test.describe("Authorize with direct OpenID", () => {
       });
     });
 
-    test("should omit attribute", async ({
+    test("should omit attributes", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
