@@ -13,6 +13,9 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "{0} logo"
+msgstr ""
+
 msgid "{application} has moved to the new Internet Identity"
 msgstr ""
 
@@ -24,9 +27,6 @@ msgstr "{name} | Erstellt {date}"
 
 msgid "{name} account"
 msgstr "{name}-Konto"
-
-msgid "{name} logo"
-msgstr "{name}-Logo"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr ""
@@ -265,6 +265,9 @@ msgstr "Konto bearbeiten"
 msgid "Enable multiple accounts"
 msgstr "Mehrere Konten aktivieren"
 
+msgid "Encountered an internal error while processing the request."
+msgstr ""
+
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr ""
 
@@ -470,6 +473,12 @@ msgstr "Es scheint, als wäre eine ungültige Authentifizierungsanfrage eingegan
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
 
+msgid "It seems like the connection with the service could not be re-established."
+msgstr ""
+
+msgid "It seems like the request could not be processed."
+msgstr ""
+
 msgid "It won't be removed from your device or password manager."
 msgstr "Es wird nicht von Ihrem Gerät oder Passwort-Manager entfernt."
 
@@ -541,9 +550,6 @@ msgstr "Maximale Länge ist 32 Zeichen."
 
 msgid "Maximum length is 64 characters."
 msgstr "Maximale Länge ist 64 Zeichen."
-
-msgid "Missing request"
-msgstr "Fehlende Anfrage"
 
 msgid "More information about multiple accounts"
 msgstr "Weitere Informationen zu mehreren Konten"
@@ -800,9 +806,6 @@ msgstr "Etwas stimmt nicht!"
 msgid "Something went wrong"
 msgstr "Etwas ist schiefgelaufen"
 
-msgid "Something went wrong during authentication. Authenticating service was notified and you may close this page."
-msgstr "Fehler bei der Authentifizierung. Der Dienst wurde informiert. Sie können diese Seite schließen."
-
 msgid "Source code"
 msgstr "Quellcode"
 
@@ -878,9 +881,6 @@ msgstr ""
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr ""
 
-msgid "There was an error verifying the origin of the request. Authenticating service was notified and you may close this page."
-msgstr "Fehler beim Überprüfen des Anfrage-Ursprungs. Der Dienst wurde benachrichtigt und Sie können diese Seite schließen."
-
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Beim Verbinden mit der Anwendung ist ein Problem aufgetreten. Versuchen Sie einen anderen Browser; wenn das Problem weiterhin besteht, kontaktieren Sie den Entwickler."
 
@@ -944,8 +944,14 @@ msgstr "Geben Sie die Zeichen genau wie unten gezeigt ein"
 msgid "Unable to complete setup"
 msgstr "Einrichtung konnte nicht abgeschlossen werden"
 
+msgid "Unable to connect"
+msgstr ""
+
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity verstehen"
+
+msgid "Unexpected error"
+msgstr ""
 
 msgid "Unknown"
 msgstr "Unbekannt"

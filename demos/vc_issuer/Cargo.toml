@@ -15,7 +15,7 @@ candid = "0.10"
 ic-canister-sig-creation = "1.1"
 ic-cdk = "0.16"
 ic-cdk-macros = "0.16"
-ic-certification = "2.6"
+ic-certification = "3.0.3"
 ic-stable-structures = "0.6"
 ic-verifiable-credentials = {git = "https://github.com/dfinity/verifiable-credentials-sdk", rev = "b74c746ea5361af3da207a2c957be4a951f7a72c"}
 # unfortunately required because we have a transitive dependency on getrandom

@@ -27,7 +27,6 @@ type HttpResponse = record {
     headers : vec HeaderField;
     body : blob;
     upgrade : opt bool;
-    streaming_strategy : opt StreamingStrategy;
 };
 
 type StreamingCallbackHttpResponse = record {
