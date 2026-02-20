@@ -43,6 +43,7 @@ lazy_static! {
             ),
         }),
         related_origins: Some(vec![
+            "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
