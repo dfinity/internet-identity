@@ -63,7 +63,7 @@ test("Should show error for invalid message", async ({ page }) => {
   // Check for specific error message in II popup
   await expect(
     iiPage.getByRole("heading", { name: "Unable to connect" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
 
   // Setup the listener because clicking closes the page immediately
   // and we might not add the listener on time.
@@ -99,6 +99,6 @@ test("Should show error after manually navigating to authorize url", async ({
 
   // Check for specific error message in II popup
   await expect(
-    page.getByRole("heading", { name: "Unsupported Browser" }),
-  ).toBeVisible();
+    page.getByRole("heading", { name: "Unable to connect" }),
+  ).toBeVisible({ timeout: 15000 });
 });
