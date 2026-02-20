@@ -8,8 +8,10 @@ import {
 } from "$lib/utils/transport/utils";
 import { HeartbeatServer } from "./heartBeat";
 
-const ESTABLISH_TIMEOUT_MS = 2000;
-const DISCONNECT_TIMEOUT_MS = 2000;
+const ESTABLISH_TIMEOUT_MS = 10000;
+const DISCONNECT_TIMEOUT_MS = 10000;
+
+export class PostMessageUnsupportedError extends Error {}
 
 class PostMessageChannel implements Channel {
   #origin: string;
@@ -93,6 +95,14 @@ class PostMessageChannel implements Channel {
 
 export class PostMessageTransport implements Transport {
   establishChannel(options: ChannelOptions): Promise<PostMessageChannel> {
+    // Detect X's in-app browser and reject immediately so we don't
+    // leave users waiting if the channel cannot be established due
+    // to X's restrictions on postMessage.
+    const isX = /\bTwitter/i.test(navigator.userAgent);
+    if (isX) {
+      throw new PostMessageUnsupportedError();
+    }
+
     return new Promise((resolve, reject) => {
       let channel: PostMessageChannel;
       new HeartbeatServer({

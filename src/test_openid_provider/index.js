@@ -2,9 +2,9 @@ import * as oidc from "oidc-provider";
 import express from "express";
 
 const app = express();
-const port = 11105; // "OpenID" (O = 111, I = 105)
+const port = parseInt(process.argv[2], 10) || 11105; // "OpenID" (O = 111, I = 105)
 const accountClaims = new Map();
-const provider = new oidc.Provider("http://localhost:11105", {
+const provider = new oidc.Provider(`http://localhost:${port}`, {
   clients: [
     {
       client_id: "internet_identity",
@@ -20,7 +20,7 @@ const provider = new oidc.Provider("http://localhost:11105", {
   claims: {
     openid: ["sub", "name", "email", "preferred_username"],
   },
-  async findAccount(ctx, id) {
+  async findAccount(_, id) {
     return {
       accountId: id,
       claims() {

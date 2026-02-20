@@ -1,49 +1,79 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
-export type OpenIdClaims = Record<string, unknown>;
+export const DEFAULT_OPENID_PORT = 11105;
+export const ALTERNATE_OPENID_PORT = 11106;
+
+export type OpenIdConfig = {
+  defaultPort?: number;
+  createUsers: Array<{
+    port?: number;
+    claims?: Record<string, unknown>;
+  }>;
+};
+
 export type OpenIdUser = {
   id: string;
-  claims: OpenIdClaims;
-  signIn: (page?: Page) => Promise<void>;
+  issuer: { name: string; url: string };
+  claims: Record<string, unknown>;
 };
 
 export const test = base.extend<{
-  openIdIssuer: string;
-  openIdClaims: OpenIdClaims;
-  openIdUser: OpenIdUser;
+  openIdConfig: OpenIdConfig;
+  openIdUsers: OpenIdUser[];
+  signInWithOpenId: (page: Page, userId: string) => Promise<void>;
 }>({
-  openIdIssuer: "http://localhost:11105",
-  openIdClaims: { name: "John Doe", email: "john.doe@example.com" },
-  openIdUser: async ({ openIdIssuer, openIdClaims, page }, use) => {
-    const userId = crypto.randomUUID();
-
-    // set claims in the dummy OpenID provider
-    await fetch(`${openIdIssuer}/account/${userId}/claims`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(openIdClaims),
-    });
-
-    const signIn = async (openIdPage = page) => {
-      await openIdPage.waitForURL(`${openIdIssuer}/interaction/*`);
+  openIdConfig: {
+    defaultPort: DEFAULT_OPENID_PORT,
+    createUsers: [
+      {
+        claims: { name: "John Doe", email: "john.doe@example.com" },
+      },
+    ],
+  },
+  openIdUsers: async ({ openIdConfig }, use) => {
+    const defaultPort = openIdConfig.defaultPort ?? DEFAULT_OPENID_PORT;
+    const users: OpenIdUser[] = openIdConfig.createUsers.map((config) => ({
+      id: crypto.randomUUID(),
+      issuer: {
+        name: `Test OpenID ${config.port ?? defaultPort}`,
+        url: `http://localhost:${config.port ?? defaultPort}`,
+      },
+      claims: config.claims ?? {},
+    }));
+    await Promise.all(
+      users.map((user) =>
+        fetch(`${user.issuer.url}/account/${user.id}/claims`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(user.claims ?? {}),
+        }),
+      ),
+    );
+    await use(users);
+  },
+  signInWithOpenId: async ({ openIdUsers }, use) => {
+    await use(async (page: Page, userId?: string) => {
+      const user =
+        userId === undefined
+          ? openIdUsers[0]
+          : openIdUsers.find((u) => u.id === userId);
+      if (user === undefined) {
+        throw new Error("User not found");
+      }
       await expect(
-        openIdPage.getByRole("heading", {
+        page.getByRole("heading", {
           name: "Sign-in",
         }),
       ).toBeVisible();
-      await openIdPage.getByPlaceholder("Enter any login").fill(userId);
-      await openIdPage
-        .getByPlaceholder("and password")
-        .fill("any-password-works");
-      await openIdPage.getByRole("button", { name: "Sign-in" }).click();
+      await page.getByPlaceholder("Enter any login").fill(user.id);
+      await page.getByPlaceholder("and password").fill("any-password-works");
+      await page.getByRole("button", { name: "Sign-in" }).click();
       await expect(
-        openIdPage.getByRole("heading", {
+        page.getByRole("heading", {
           name: "Authorize",
         }),
       ).toBeVisible();
-      await openIdPage.getByRole("button", { name: "Continue" }).click();
-    };
-
-    await use({ id: userId, claims: openIdClaims, signIn });
+      await page.getByRole("button", { name: "Continue" }).click();
+    });
   },
 });
