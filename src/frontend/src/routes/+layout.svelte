@@ -1,11 +1,3 @@
-<script lang="ts" module>
-  declare global {
-    interface Window {
-      __configPromise: Promise<unknown>;
-    }
-  }
-</script>
-
 <script lang="ts">
   import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
   import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
@@ -92,6 +84,4 @@
   </script>
 </svelte:head>
 
-{#await window.__configPromise then}
-  {@render children()}
-{/await}
+{@render children()}
