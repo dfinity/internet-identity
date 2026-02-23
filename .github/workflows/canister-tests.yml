@@ -450,21 +450,7 @@ jobs:
       matrix:
         canister: ["single", "split"] # single = the regular setup with one canister, split = the setup with a separate frontend canister
         device: ["desktop", "mobile"]
-        shard:
-          [
-            "1_12",
-            "2_12",
-            "3_12",
-            "4_12",
-            "5_12",
-            "6_12",
-            "7_12",
-            "8_12",
-            "9_12",
-            "10_12",
-            "11_12",
-            "12_12",
-          ]
+        shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
