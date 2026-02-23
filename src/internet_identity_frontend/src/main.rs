@@ -427,6 +427,8 @@ fn http_request(request: HttpRequest) -> HttpResponse {
 // Order dependent: do not move above any exposed canister method!
 candid::export_service!();
 
+fn main() {}
+
 #[cfg(test)]
 mod test {
     use crate::__export_service;
@@ -447,5 +449,3 @@ mod test {
         });
     }
 }
-
-fn main() {}
