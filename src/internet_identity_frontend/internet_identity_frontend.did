@@ -16,7 +16,6 @@ type HttpResponse = record {
     headers : vec HeaderField;
     body : blob;
     upgrade : opt bool;
-    streaming_strategy : opt StreamingStrategy;
 };
 
 type StreamingCallbackHttpResponse = record {
@@ -33,6 +32,41 @@ type StreamingStrategy = variant {
     };
 };
 
-service : (opt record {}) -> {
+type AnalyticsConfig = variant {
+    Plausible : record {
+        domain : opt text;
+        hash_mode : opt bool;
+        track_localhost : opt bool;
+        api_host : opt text;
+    };
+};
+
+type DummyAuthConfig = record {
+    // Prompts user for a index value (0 - 255) when set to true,
+    // this is used in e2e to have multiple dummy auth identities.
+    prompt_for_index : bool;
+};
+
+type OpenIdConfig = record {
+    name : text;
+    logo : text;
+    issuer : text;
+    client_id : text;
+    jwks_uri : text;
+    auth_uri : text;
+    auth_scope : vec text;
+    fedcm_uri : opt text;
+};
+
+type InternetIdentityFrontendInit = record {
+    backend_canister_id : opt principal;
+    related_origins : opt vec text;
+    fetch_root_key : opt bool;
+    analytics_config : opt opt AnalyticsConfig;
+    dummy_auth : opt opt DummyAuthConfig;
+    openid_configs : opt vec OpenIdConfig;
+};
+
+service : (opt InternetIdentityFrontendInit) -> {
     http_request : (request : HttpRequest) -> (HttpResponse) query;
 };
