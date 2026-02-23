@@ -527,13 +527,15 @@ jobs:
         run: |
           # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
-          dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz
+          if [ "${{ matrix.canister == 'split' }}" = "true" ]; then
+            dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz
+          fi
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server
         id: dev-server-start
         run: |
-          SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
+          SEPARATE_FRONTEND_CANISTER=${{ matrix.canister == 'split' && 1 || 0 }} TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
 
