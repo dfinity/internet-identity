@@ -1,3 +1,11 @@
+<script lang="ts" module>
+  declare global {
+    interface Window {
+      __configPromise: Promise<unknown>;
+    }
+  }
+</script>
+
 <script lang="ts">
   import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
   import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
@@ -76,6 +84,14 @@
       }
     </script>
   {/if}
+  <script>
+    // Test of loading backend config from another origin before svelte has even loaded
+    window.__configPromise = fetch(
+      "https://beta.identity.ic0.app/social-image.png",
+    );
+  </script>
 </svelte:head>
 
-{@render children()}
+{#await window.__configPromise then}
+  {@render children()}
+{/await}
