@@ -448,14 +448,29 @@ jobs:
     needs: [cached-build, test-app-build]
     strategy:
       matrix:
+        canister: ["single", "split"] # single = the regular setup with one canister, split = the setup with a separate frontend canister
         device: ["desktop", "mobile"]
-        shard: ["1_3", "2_3", "3_3"]
+        shard:
+          [
+            "1_12",
+            "2_12",
+            "3_12",
+            "4_12",
+            "5_12",
+            "6_12",
+            "7_12",
+            "8_12",
+            "9_12",
+            "10_12",
+            "11_12",
+            "12_12",
+          ]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
     env:
       # Suffix used for tagging artifacts
-      artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
+      artifact_suffix: next-${{ matrix.canister }}-${{ matrix.device }}-${{ matrix.shard }}
       # OpenID provider instance ports (see /src/test_openid_provider)
       openid_providers: "11105 11106"
     steps:
@@ -490,10 +505,16 @@ jobs:
       - name: "Run dfx"
         run: dfx start --background --artificial-delay 0
 
-      - name: "Download II wasm"
+      - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
         with:
           name: internet_identity_test_cached.wasm.gz
+          path: .
+
+      - name: "Download II frontend wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: internet_identity_frontend_test_cached.wasm.gz
           path: .
 
       - name: "Download test app wasm"
@@ -520,17 +541,20 @@ jobs:
         run: |
           # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server
         id: dev-server-start
         run: |
-          TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
+          SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
 
-      - run: |
+      - name: Run Playwright tests
+        run: |
           npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+        continue-on-error: ${{ matrix.canister == 'split' }} # The split canister setup is currently work in progress, so we don't fail the job if these tests fail
 
       - name: Stop dfx
         if: ${{ always() }}
@@ -918,6 +942,14 @@ jobs:
           II_DEV_CSP: 0
         run: ./scripts/build
 
+      - name: Build test flavor (frontend)
+        env:
+          II_FETCH_ROOT_KEY: 1
+          II_DUMMY_CAPTCHA: 1
+          II_DUMMY_AUTH: 0
+          II_DEV_CSP: 0
+        run: ./scripts/build --frontend
+
       - run: mv internet_identity.wasm.gz internet_identity_test.wasm.gz
       - name: "Upload test build"
         uses: actions/upload-artifact@v4
@@ -927,6 +959,16 @@ jobs:
           # path is the name used as the file to upload and the name of the
           # file when downloaded
           path: internet_identity_test.wasm.gz
+
+      - run: mv internet_identity_frontend.wasm.gz internet_identity_frontend_test.wasm.gz
+      - name: "Upload test build"
+        uses: actions/upload-artifact@v4
+        with:
+          # name is the name used to display and retrieve the artifact
+          name: internet_identity_frontend_test_cached.wasm.gz
+          # path is the name used as the file to upload and the name of the
+          # file when downloaded
+          path: internet_identity_frontend_test.wasm.gz
 
   # Make sure that the asset we're testing is the same as that produced by the (slower) docker builds
   cached-build-check:
