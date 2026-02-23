@@ -1,7 +1,7 @@
 use asset_util::{collect_assets, Asset as AssetUtilAsset, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use candid::{CandidType, Deserialize, Encode, Principal};
+use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
 use ic_cdk::{init, post_upgrade};
@@ -11,7 +11,7 @@ use ic_http_certification::{
 };
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, DummyAuthConfig, OpenIdConfig,
+    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit, OpenIdConfig,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -28,20 +28,13 @@ static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
 
-#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
-pub struct InternetIdentityFrontendInit {
-    pub backend_canister_id: Option<Principal>,
-    pub related_origins: Option<Vec<String>>,
-    pub fetch_root_key: Option<bool>,
-    pub analytics_config: Option<Option<AnalyticsConfig>>,
-    pub dummy_auth: Option<Option<DummyAuthConfig>>,
-    pub openid_configs: Option<Vec<OpenIdConfig>>,
-}
-
 // Default configuration for the frontend canister
 lazy_static! {
+    // TODO: Change this to the mainnet value `rdmx6-jaaaa-aaaaa-aaadq-cai` before deploying to mainnet.
+    static ref DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID: Principal =
+        Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
     static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
-        backend_canister_id: Some(Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap()),
+        backend_canister_id: Some(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
@@ -386,14 +379,20 @@ fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsse
 
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
-    // TODO: Make this a deployment arg
-    let canister_id = Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
-    // Encode config to base64-encoded Candid to avoid JSON escaping issues
-    let encoded_config = BASE64.encode(Encode!(config).unwrap());
+    // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
+    let backend_canister_id = config
+        .backend_canister_id
+        .unwrap_or(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID);
+
+    // Encode config to base64-encoded Candid to avoid JSON escaping issues.
+    // For backward compatibility, we use the same struct as before the II canister split.
+    let config = InternetIdentityInit::from(config.clone());
+    let encoded_config = BASE64.encode(Encode!(&config).unwrap());
+
     html.replace(
         r#"<body "#,
         &format!(
-            r#"<body data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#
+            r#"<body data-canister-id="{backend_canister_id}" data-canister-config="{encoded_config}" "#
         ),
     )
 }
