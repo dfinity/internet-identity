@@ -1,7 +1,7 @@
 use asset_util::{collect_assets, Asset as AssetUtilAsset, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use candid::{Encode, Principal};
+use candid::{CandidType, Deserialize, Encode, Principal};
 use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
 use ic_cdk::{init, post_upgrade};
@@ -11,13 +11,12 @@ use ic_http_certification::{
 };
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityInit,
+    AnalyticsConfig, DummyAuthConfig, OpenIdConfig,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
 use sha2::Digest;
 use std::io::Read;
-
 use std::{cell::RefCell, rc::Rc};
 
 thread_local! {
@@ -29,49 +28,50 @@ static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
 
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct InternetIdentityFrontendInit {
+    pub backend_canister_id: Option<Principal>,
+    pub related_origins: Option<Vec<String>>,
+    pub fetch_root_key: Option<bool>,
+    pub analytics_config: Option<Option<AnalyticsConfig>>,
+    pub dummy_auth: Option<Option<DummyAuthConfig>>,
+    pub openid_configs: Option<Vec<OpenIdConfig>>,
+}
+
 // Default configuration for the frontend canister
 lazy_static! {
-    static ref DEFAULT_CONFIG: InternetIdentityInit = InternetIdentityInit {
-        assigned_user_number_range: None,
-        archive_config: None,
-        canister_creation_cycles_cost: None,
-        register_rate_limit: None,
-        captcha_config: Some(internet_identity_interface::internet_identity::types::CaptchaConfig {
-            max_unsolved_captchas: 50,
-            captcha_trigger: internet_identity_interface::internet_identity::types::CaptchaTrigger::Static(
-                internet_identity_interface::internet_identity::types::StaticCaptchaTrigger::CaptchaDisabled
-            ),
-        }),
+    static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
+        backend_canister_id: Some(Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap()),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        new_flow_origins: Some(vec!["https://id.ai".to_string()]),
-        openid_configs: Some(vec![
-            internet_identity_interface::internet_identity::types::OpenIdConfig {
-                name: "Google".to_string(),
-                logo: "".to_string(),
-                issuer: "https://accounts.google.com".to_string(),
-                client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com".to_string(),
-                jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
-                auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
-                fedcm_uri: None,
-            },
-        ]),
-        analytics_config: None,
+        openid_configs: Some(vec![OpenIdConfig {
+            name: "Google".to_string(),
+            logo: "".to_string(),
+            issuer: "https://accounts.google.com".to_string(),
+            client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com"
+                .to_string(),
+            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
+            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+            auth_scope: vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "profile".to_string()
+            ],
+            fedcm_uri: None,
+        }]),
+        dummy_auth: Some(Some(DummyAuthConfig {
+            prompt_for_index: true
+        })),
         fetch_root_key: None,
-        enable_dapps_explorer: None,
-        is_production: None,
-        dummy_auth: Some(Some(
-            DummyAuthConfig { prompt_for_index: true }
-        )),
+        analytics_config: None,
     };
 }
 
 #[init]
-fn init(init_arg: Option<InternetIdentityInit>) {
+fn init(init_arg: Option<InternetIdentityFrontendInit>) {
     let config = init_arg.unwrap_or_else(|| DEFAULT_CONFIG.clone());
     certify_all_assets(config);
 }
@@ -81,7 +81,7 @@ fn post_upgrade() {
     init(None);
 }
 
-fn certify_all_assets(init: InternetIdentityInit) {
+fn certify_all_assets(init: InternetIdentityFrontendInit) {
     let static_assets = get_static_assets(&init);
 
     // 2. Extract integrity hashes for inline scripts from HTML files
@@ -343,7 +343,7 @@ fn get_content_security_policy(integrity_hashes: Vec<String>) -> String {
 }
 
 /// Gets the static assets with HTML fixup and well-known endpoints
-fn get_static_assets(config: &InternetIdentityInit) -> Vec<AssetUtilAsset> {
+fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsset> {
     // Collect assets and fix up HTML files
     let mut assets: Vec<AssetUtilAsset> = collect_assets(&ASSETS_DIR, None)
         .into_iter()
@@ -385,7 +385,7 @@ fn get_static_assets(config: &InternetIdentityInit) -> Vec<AssetUtilAsset> {
 }
 
 /// Fix up HTML pages by injecting canister ID and canister config
-fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
+fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
     // TODO: Make this a deployment arg
     let canister_id = Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
     // Encode config to base64-encoded Candid to avoid JSON escaping issues
