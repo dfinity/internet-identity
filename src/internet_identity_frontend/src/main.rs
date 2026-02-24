@@ -3,12 +3,10 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
-use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{
-    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, StatusCode,
-};
+use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
     DummyAuthConfig, InternetIdentityInit,
@@ -133,7 +131,6 @@ fn certify_all_assets(init: InternetIdentityInit) {
                  content: _,
              }| {
                 if content_type == ContentType::HTML {
-                    ic_cdk::println!("Certifying HTML asset: {}", path);
                     AssetConfig::File {
                         path,
                         content_type: Some("text/html".to_string()),
