@@ -9,7 +9,7 @@ use ic_cdk_macros::query;
 use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit, OpenIdConfig,
+    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
