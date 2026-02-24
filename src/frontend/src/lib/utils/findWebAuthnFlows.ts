@@ -1,7 +1,7 @@
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { CredentialData } from "./credential-devices";
-import { canisterConfig } from "$lib/globals";
+import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 import { isSameOrigin } from "./urlUtils";
 
 export type WebAuthnFlow = {
@@ -46,7 +46,8 @@ export const findWebAuthnFlows = ({
   // We need the helpers inside so that when `canisterConfig` is accessed, it already exists.
   // The devices are expected to be ordered by recently used already
   // Move devices registered on the new flow origins to the end using toSorted (preserving relative order within groups)
-  const newFlowOrigins = canisterConfig.new_flow_origins[0] ?? [];
+  const primaryOrigin = getPrimaryOrigin();
+  const newFlowOrigins = primaryOrigin !== undefined ? [primaryOrigin] : [];
   const isInNewFlow = (credentialData: CredentialData): boolean => {
     const origin = credentialData.origin ?? II_LEGACY_ORIGIN;
     return newFlowOrigins.some((o) => isSameOrigin(o, origin));

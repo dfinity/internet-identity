@@ -2,14 +2,7 @@ import type { ClientInit } from "@sveltejs/kit";
 import featureFlags from "$lib/state/featureFlags";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { sessionStore } from "$lib/stores/session.store";
-import {
-  initGlobals,
-  canisterId,
-  agentOptions,
-  canisterConfig,
-} from "$lib/globals";
-import { isNullish } from "@dfinity/utils";
-import { isSameOrigin } from "$lib/utils/urlUtils";
+import { initGlobals, canisterId, agentOptions } from "$lib/globals";
 import { localeStore } from "$lib/stores/locale.store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
@@ -48,27 +41,11 @@ const overrideFeatureFlags = () => {
   window.history.replaceState(undefined, "", url);
 };
 
-// Set the discoverable passkey flag based on the new flow origins config.
-// This will be used for id.ai and Utopia to enable the new authentication flow.
-// Once the feature is enabled for all users, this can be removed.
-const maybeSetDiscoverablePasskeyFlowFlag = () => {
-  const newFlowOrigins = canisterConfig.new_flow_origins[0];
-  if (isNullish(newFlowOrigins)) {
-    return;
-  }
-  const origin = window.location.origin;
-  if (newFlowOrigins.filter((o) => isSameOrigin(o, origin)).length === 0) {
-    return;
-  }
-  featureFlags.DISCOVERABLE_PASSKEY_FLOW.set(true);
-};
-
 export const init: ClientInit = async () => {
   initGlobals();
   // Initialize them after globals so canister config can be used for defaults
   Object.values(featureFlags).forEach((flag) => flag.initialize());
   overrideFeatureFlags();
-  maybeSetDiscoverablePasskeyFlowFlag();
   await Promise.all([
     localeStore.init(),
     sessionStore.init({ canisterId, agentOptions }),
