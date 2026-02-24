@@ -1,7 +1,7 @@
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import { CredentialData } from "./credential-devices";
-import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
+import { getPrimaryOrigin } from "$lib/globals";
 import { isSameOrigin } from "./urlUtils";
 
 export type WebAuthnFlow = {
