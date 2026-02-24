@@ -133,6 +133,7 @@ fn certify_all_assets(init: InternetIdentityInit) {
                  content: _,
              }| {
                 if content_type == ContentType::HTML {
+                    ic_cdk::println!("Certifying HTML asset: {}", path);
                     AssetConfig::File {
                         path,
                         content_type: Some("text/html".to_string()),
@@ -143,12 +144,10 @@ fn certify_all_assets(init: InternetIdentityInit) {
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
                             )],
                         ),
-                        fallback_for: vec![AssetFallbackConfig {
-                            scope: "/".to_string(),
-                            status_code: Some(StatusCode::OK),
-                        }],
-                        aliased_by: vec!["/".to_string()],
                         encodings: vec![AssetEncoding::Identity.default_config()],
+                        // Fallbacks and aliases are already handled in `get_static_assets()`
+                        fallback_for: vec![],
+                        aliased_by: vec![],
                     }
                 } else {
                     let encodings = if encoding == ContentEncoding::GZip {
