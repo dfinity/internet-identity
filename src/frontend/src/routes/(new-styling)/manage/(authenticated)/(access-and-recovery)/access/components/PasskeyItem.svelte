@@ -71,7 +71,7 @@
     const primaryOrigin = getPrimaryOrigin();
     const origin = getMetadataString(passkey.metadata, "origin");
     if (primaryOrigin === undefined || origin === undefined) {
-      return;
+      return false;
     }
     return origin !== primaryOrigin;
   });
