@@ -11,6 +11,8 @@
   import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
   import { onMount } from "svelte";
   import type { Provider } from "$lib/assets/aaguid";
+  import { getMetadataString } from "$lib/utils/openID";
+  import { getPrimaryOrigin } from "$lib/globals";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -66,7 +68,14 @@
         ]
       : []),
   ]);
-  const isLegacy = $derived(isLegacyAuthnMethod(passkey));
+  const isLegacy = $derived.by(() => {
+    const primaryOrigin = getPrimaryOrigin();
+    const origin = getMetadataString(passkey.metadata, "origin");
+    if (primaryOrigin === undefined || origin === undefined) {
+      return;
+    }
+    return origin !== primaryOrigin;
+  });
 
   onMount(() => {
     // Lazy load known providers data
