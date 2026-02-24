@@ -27,6 +27,8 @@ lazy_static.workspace = true
 flate2 = "1.1.5"
 ic-cdk-timers.workspace = true
 
+[dev-dependencies]
+candid_parser.workspace = true
 
 [features]
 # The dev_csp feature weakens the CSP in order to facilitate development with a locally deployed II instance.
