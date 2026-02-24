@@ -201,6 +201,47 @@ pub struct AnchorCredentials {
     pub recovery_phrases: Vec<PublicKey>,
 }
 
+/// Init arguments of II frontend canister which can be supplied on install and upgrade.
+///
+/// Each field is wrapped in `Option<>` to indicate whether the field should be updated or not.
+///
+/// Some fields, like `analytics_config`, have an additional nested `Option<>`, this indicates
+/// enable/disable status (e.g. `Some(None)` disables a feature while `None` leaves it untouched).
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct InternetIdentityFrontendInit {
+    pub backend_canister_id: Option<Principal>,
+    pub related_origins: Option<Vec<String>>,
+    pub fetch_root_key: Option<bool>,
+    pub analytics_config: Option<Option<AnalyticsConfig>>,
+    pub dummy_auth: Option<Option<DummyAuthConfig>>,
+    pub openid_configs: Option<Vec<OpenIdConfig>>,
+}
+
+impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
+    fn from(value: InternetIdentityFrontendInit) -> Self {
+        Self {
+            backend_canister_id: value.backend_canister_id,
+            related_origins: value.related_origins,
+            fetch_root_key: value.fetch_root_key,
+            analytics_config: value.analytics_config,
+            dummy_auth: value.dummy_auth,
+            openid_configs: value.openid_configs,
+
+            // Config fields not used by the frontend
+            canister_creation_cycles_cost: None,
+            assigned_user_number_range: None,
+            archive_config: None,
+            register_rate_limit: None,
+
+            // Deprecated config fields
+            enable_dapps_explorer: None,
+            captcha_config: None,
+            is_production: None,
+            new_flow_origins: None,
+        }
+    }
+}
+
 /// Init arguments of II which can be supplied on install and upgrade.
 ///
 /// Each field is wrapped in `Option<>` to indicate whether the field should
@@ -223,6 +264,7 @@ pub struct InternetIdentityInit {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
+    pub backend_canister_id: Option<Principal>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
