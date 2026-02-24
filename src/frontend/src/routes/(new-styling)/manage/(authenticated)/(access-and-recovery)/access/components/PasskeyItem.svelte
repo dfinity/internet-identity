@@ -70,10 +70,7 @@
   const isLegacy = $derived.by(() => {
     const primaryOrigin = getPrimaryOrigin();
     const origin = getMetadataString(passkey.metadata, "origin");
-    if (primaryOrigin === undefined) {
-      return false;
-    }
-    return origin !== primaryOrigin;
+    return primaryOrigin !== undefined && origin !== primaryOrigin;
   });
 
   onMount(() => {
