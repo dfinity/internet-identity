@@ -542,7 +542,6 @@ jobs:
       - name: Run Playwright tests
         run: |
           npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
-        continue-on-error: ${{ matrix.canister == 'split' }} # The split canister setup is currently work in progress, so we don't fail the job if these tests fail
 
       - name: Stop dfx
         if: ${{ always() }}
