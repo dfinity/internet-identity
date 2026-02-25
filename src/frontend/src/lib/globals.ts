@@ -16,7 +16,6 @@ import { idlFactory as internet_identity_idl } from "$lib/generated/internet_ide
 import { features } from "$lib/legacy/features";
 import { IDL } from "@icp-sdk/core/candid";
 
-
 export let canisterId: Principal;
 export let canisterConfig: InternetIdentityInit;
 export let agentOptions: HttpAgentOptions;
@@ -38,9 +37,7 @@ export const initGlobals = async () => {
     const response = await fetch(`${backendOrigin}/.config.did.bin`);
     const openidConfigCandid = await response.arrayBuffer();
 
-    const [{
-      openid_configs,
-    }] = IDL.decode(
+    const [{ openid_configs }] = IDL.decode(
       [init({ IDL })[0]._type],
       new Uint8Array(openidConfigCandid),
     ) as unknown as [InternetIdentityInit];
