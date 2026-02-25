@@ -11,7 +11,7 @@ use ic_http_certification::{
 };
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit, OpenIdConfig,
+    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -40,21 +40,6 @@ lazy_static! {
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        openid_configs: Some(vec![OpenIdConfig {
-            name: "Google".to_string(),
-            logo: "".to_string(),
-            issuer: "https://accounts.google.com".to_string(),
-            client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com"
-                .to_string(),
-            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
-            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-            auth_scope: vec![
-                "openid".to_string(),
-                "email".to_string(),
-                "profile".to_string()
-            ],
-            fedcm_uri: None,
-        }]),
         dummy_auth: Some(Some(DummyAuthConfig {
             prompt_for_index: true
         })),

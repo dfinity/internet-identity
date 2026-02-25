@@ -214,7 +214,6 @@ pub struct InternetIdentityFrontendInit {
     pub fetch_root_key: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
-    pub openid_configs: Option<Vec<OpenIdConfig>>,
 }
 
 impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
@@ -225,7 +224,9 @@ impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
             analytics_config: value.analytics_config,
             dummy_auth: value.dummy_auth,
             related_origins: value.related_origins,
-            openid_configs: value.openid_configs,
+
+            // Config fields pulled from the backend
+            openid_configs: None,
 
             // Config fields not used by the frontend
             canister_creation_cycles_cost: None,
@@ -251,14 +252,12 @@ impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
 /// since non-optional fields cannot be deprecated in Candid.
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
-    pub related_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
 }
 
 impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
     fn from(value: &InternetIdentityInit) -> Self {
         Self {
-            related_origins: value.related_origins.clone(),
             openid_configs: value.openid_configs.clone(),
         }
     }

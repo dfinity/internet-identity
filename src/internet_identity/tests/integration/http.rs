@@ -1459,10 +1459,6 @@ fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
 #[test]
 fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectResponse> {
     let env = env();
-    let related_origins = vec![
-        "https://identity.internetcomputer.org".to_string(),
-        "https://identity.ic0.app".to_string(),
-    ];
     let openid_configs = vec![OpenIdConfig {
         name: "Test Provider".to_string(),
         logo: "https://example.com/logo.png".to_string(),
@@ -1474,7 +1470,6 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         fedcm_uri: None,
     }];
     let config = InternetIdentityInit {
-        related_origins: Some(related_origins.clone()),
         openid_configs: Some(openid_configs.clone()),
         ..Default::default()
     };
@@ -1498,7 +1493,6 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
     assert_eq!(
         decoded_config,
         InternetIdentitySynchronizedConfig {
-            related_origins: Some(related_origins),
             openid_configs: Some(openid_configs),
         }
     );
