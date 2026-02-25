@@ -76,12 +76,6 @@
       }
     </script>
   {/if}
-  <script>
-    // Load backend config from another origin before svelte has even loaded
-    window.__configPromise = fetch(
-      "https://beta.identity.ic0.app/social-image.png",
-    );
-  </script>
 </svelte:head>
 
 {@render children()}
