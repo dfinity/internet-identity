@@ -5,6 +5,7 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_methods,
     sample_webauthn_authn_method, test_authn_method,
 };
+use candid::Decode;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
@@ -17,7 +18,8 @@ use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt,
-    FrontendHostname, InternetIdentityInit, MetadataEntryV2,
+    FrontendHostname, InternetIdentityInit, InternetIdentitySynchronizedConfig, MetadataEntryV2,
+    OpenIdConfig,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -1450,6 +1452,56 @@ fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
         2f64,
     );
     assert_metric(&metrics, "internet_identity_total_application_count", 1f64);
+    Ok(())
+}
+
+/// Verifies that the `/.config.did.bin` asset can be decoded as `InternetIdentitySynchronizedConfig`.
+#[test]
+fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectResponse> {
+    let env = env();
+    let related_origins = vec![
+        "https://identity.internetcomputer.org".to_string(),
+        "https://identity.ic0.app".to_string(),
+    ];
+    let openid_configs = vec![OpenIdConfig {
+        name: "Test Provider".to_string(),
+        logo: "https://example.com/logo.png".to_string(),
+        issuer: "https://accounts.example.com".to_string(),
+        client_id: "test-client-id".to_string(),
+        jwks_uri: "https://example.com/.well-known/jwks.json".to_string(),
+        auth_uri: "https://accounts.example.com/o/oauth2/auth".to_string(),
+        auth_scope: vec!["openid".to_string(), "email".to_string()],
+        fedcm_uri: None,
+    }];
+    let config = InternetIdentityInit {
+        related_origins: Some(related_origins.clone()),
+        openid_configs: Some(openid_configs.clone()),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.config.did.bin".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(2),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+    assert_eq!(http_response.status_code, 200);
+
+    let decoded_config = candid::Decode!(&http_response.body, InternetIdentitySynchronizedConfig)
+        .expect(
+            "Failed to decode /.config.did.bin response body as InternetIdentitySynchronizedConfig",
+        );
+
+    assert_eq!(
+        decoded_config,
+        InternetIdentitySynchronizedConfig {
+            related_origins: Some(related_origins),
+            openid_configs: Some(openid_configs),
+        }
+    );
     Ok(())
 }
 
