@@ -25,41 +25,35 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
+const MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR: &str =
+    "<!doctype html>\
+    <html>\
+    <head><title>Internet Identity Frontend Initialization Error</title></head>\
+    <body><h1>Internet Identity Frontend Initialization Error</h1>\
+    <p>
+    Please initialize this canister with the following required install args:
+    <ul>
+    <li>backend_canister_id</li>
+    <li>backend_origin</li>
+    </ul>
+    </p>\
+    </body></html>";
 
 // Default configuration for the frontend canister
 lazy_static! {
     // TODO: Change this to the mainnet value `rdmx6-jaaaa-aaaaa-aaadq-cai` before deploying to mainnet.
     static ref DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID: Principal =
         Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
+
     static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
         backend_canister_id: Some(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID),
+        backend_origin: Some("https://backend.id.ai".to_string()),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        openid_configs: Some(vec![
-            internet_identity_interface::internet_identity::types::OpenIdConfig {
-                name: "Test OpenID 11105".to_string(),
-                logo: "<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>".to_string(),
-                issuer: "http://localhost:11105".to_string(),
-                client_id: "internet_identity".to_string(),
-                jwks_uri: "http://localhost:11105/jwks".to_string(),
-                auth_uri: "http://localhost:11105/auth".to_string(),
-                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
-                fedcm_uri: Some("".to_string()),
-            },
-           internet_identity_interface::internet_identity::types::OpenIdConfig {
-                name: "Test OpenID 11106".to_string(),
-                logo: "<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>".to_string(),
-                issuer: "http://localhost:11106".to_string(),
-                client_id: "internet_identity".to_string(),
-                jwks_uri: "http://localhost:11106/jwks".to_string(),
-                auth_uri: "http://localhost:11106/auth".to_string(),
-                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
-                fedcm_uri: Some("".to_string()),
-            },
-        ]),
+        openid_configs: None,
         dummy_auth: Some(Some(DummyAuthConfig {
             prompt_for_index: true
         })),
@@ -383,21 +377,32 @@ fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsse
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
     // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
-    let backend_canister_id = config
-        .backend_canister_id
-        .unwrap_or(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID);
+    let (Some(backend_canister_id), Some(backend_origin)) =
+        (&config.backend_canister_id, &config.backend_origin)
+    else {
+        return MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR.to_string();
+    };
+
+    let html = html.replace(
+        "</head>",
+        &format!(
+            r#"<link rel="preload" href="{backend_origin}/.config.did.bin" as="fetch"></head>"#,
+        ),
+    );
 
     // Encode config to base64-encoded Candid to avoid JSON escaping issues.
     // For backward compatibility, we use the same struct as before the II canister split.
     let config = InternetIdentityInit::from(config.clone());
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
 
-    html.replace(
+    let html = html.replace(
         r#"<body "#,
         &format!(
             r#"<body data-canister-id="{backend_canister_id}" data-canister-config="{encoded_config}" "#
         ),
-    )
+    );
+
+    html
 }
 
 /// Extract all inline scripts from HTML for CSP hash generation

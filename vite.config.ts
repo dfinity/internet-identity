@@ -86,6 +86,14 @@ export default defineConfig(({ command, mode }): UserConfig => {
                         ? "internet_identity_frontend"
                         : "internet_identity",
                   },
+                  ...(process.env.SEPARATE_FRONTEND_CANISTER === "1"
+                    ? [
+                        {
+                          hosts: ["backend.id.ai"],
+                          canisterName: "internet_identity",
+                        },
+                      ]
+                    : []),
                 ]
               : []),
           ],

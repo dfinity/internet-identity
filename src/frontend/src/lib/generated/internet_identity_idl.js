@@ -47,6 +47,7 @@ export const idlFactory = ({ IDL }) => {
   const InternetIdentityInit = IDL.Record({
     'fetch_root_key' : IDL.Opt(IDL.Bool),
     'is_production' : IDL.Opt(IDL.Bool),
+    'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
@@ -55,6 +56,7 @@ export const idlFactory = ({ IDL }) => {
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
+    'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),
@@ -370,26 +372,10 @@ export const idlFactory = ({ IDL }) => {
     'headers' : IDL.Vec(HeaderField),
     'certificate_version' : IDL.Opt(IDL.Nat16),
   });
-  const Token = IDL.Record({});
-  const StreamingCallbackHttpResponse = IDL.Record({
-    'token' : IDL.Opt(Token),
-    'body' : IDL.Vec(IDL.Nat8),
-  });
-  const StreamingStrategy = IDL.Variant({
-    'Callback' : IDL.Record({
-      'token' : Token,
-      'callback' : IDL.Func(
-          [Token],
-          [StreamingCallbackHttpResponse],
-          ['query'],
-        ),
-    }),
-  });
   const HttpResponse = IDL.Record({
     'body' : IDL.Vec(IDL.Nat8),
     'headers' : IDL.Vec(HeaderField),
     'upgrade' : IDL.Opt(IDL.Bool),
-    'streaming_strategy' : IDL.Opt(StreamingStrategy),
     'status_code' : IDL.Nat16,
   });
   const IdentityAuthnInfo = IDL.Record({
@@ -945,6 +931,7 @@ export const init = ({ IDL }) => {
   const InternetIdentityInit = IDL.Record({
     'fetch_root_key' : IDL.Opt(IDL.Bool),
     'is_production' : IDL.Opt(IDL.Bool),
+    'backend_canister_id' : IDL.Opt(IDL.Principal),
     'enable_dapps_explorer' : IDL.Opt(IDL.Bool),
     'assigned_user_number_range' : IDL.Opt(IDL.Tuple(IDL.Nat64, IDL.Nat64)),
     'new_flow_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
@@ -953,6 +940,7 @@ export const init = ({ IDL }) => {
     'analytics_config' : IDL.Opt(IDL.Opt(AnalyticsConfig)),
     'related_origins' : IDL.Opt(IDL.Vec(IDL.Text)),
     'openid_configs' : IDL.Opt(IDL.Vec(OpenIdConfig)),
+    'backend_origin' : IDL.Opt(IDL.Text),
     'captcha_config' : IDL.Opt(CaptchaConfig),
     'dummy_auth' : IDL.Opt(IDL.Opt(DummyAuthConfig)),
     'register_rate_limit' : IDL.Opt(RateLimitConfig),

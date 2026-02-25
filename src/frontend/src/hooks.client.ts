@@ -42,7 +42,7 @@ const overrideFeatureFlags = () => {
 };
 
 export const init: ClientInit = async () => {
-  initGlobals();
+  await initGlobals();
   // Initialize them after globals so canister config can be used for defaults
   Object.values(featureFlags).forEach((flag) => flag.initialize());
   overrideFeatureFlags();

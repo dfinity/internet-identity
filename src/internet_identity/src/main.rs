@@ -556,6 +556,7 @@ fn config() -> InternetIdentityInit {
         is_production: persistent_state.is_production,
         dummy_auth: Some(persistent_state.dummy_auth.clone()),
         backend_canister_id: Some(ic_cdk::api::id()),
+        backend_origin: None,
     })
 }
 
