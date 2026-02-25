@@ -3,12 +3,10 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
-use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{
-    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, StatusCode,
-};
+use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
     DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit,
@@ -111,12 +109,10 @@ fn certify_all_assets(init: InternetIdentityFrontendInit) {
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
                             )],
                         ),
-                        fallback_for: vec![AssetFallbackConfig {
-                            scope: "/".to_string(),
-                            status_code: Some(StatusCode::OK),
-                        }],
-                        aliased_by: vec!["/".to_string()],
                         encodings: vec![AssetEncoding::Identity.default_config()],
+                        // Fallbacks and aliases are already handled in `get_static_assets()`
+                        fallback_for: vec![],
+                        aliased_by: vec![],
                     }
                 } else {
                     let encodings = if encoding == ContentEncoding::GZip {

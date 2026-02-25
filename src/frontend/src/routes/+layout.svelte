@@ -39,7 +39,7 @@
     }
 
     // 2. Show page once it has fully loaded (see app.html)
-    document.documentElement.removeAttribute("data-hide-ssg");
+    document.documentElement.removeAttribute("data-temp-hide-ssg");
 
     // Fix z position of password managers
     new MutationObserver(() => {

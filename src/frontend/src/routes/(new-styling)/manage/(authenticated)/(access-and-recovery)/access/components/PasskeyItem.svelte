@@ -8,9 +8,10 @@
   import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { aaguidToString, getAuthnMethodAlias } from "$lib/utils/webAuthn";
-  import { isLegacyAuthnMethod } from "$lib/utils/accessMethods";
   import { onMount } from "svelte";
   import type { Provider } from "$lib/assets/aaguid";
+  import { getMetadataString } from "$lib/utils/openID";
+  import { getPrimaryOrigin } from "$lib/globals";
 
   interface Props {
     passkey: AuthnMethodData;
@@ -66,7 +67,11 @@
         ]
       : []),
   ]);
-  const isLegacy = $derived(isLegacyAuthnMethod(passkey));
+  const isLegacy = $derived.by(() => {
+    const primaryOrigin = getPrimaryOrigin();
+    const origin = getMetadataString(passkey.metadata, "origin");
+    return primaryOrigin !== undefined && origin !== primaryOrigin;
+  });
 
   onMount(() => {
     // Lazy load known providers data
