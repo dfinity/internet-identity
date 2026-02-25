@@ -60,6 +60,7 @@ type OpenIdConfig = record {
 
 type InternetIdentityFrontendInit = record {
     backend_canister_id : opt principal;
+    backend_origin : opt text;
     related_origins : opt vec text;
     fetch_root_key : opt bool;
     analytics_config : opt opt AnalyticsConfig;
