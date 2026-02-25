@@ -53,28 +53,7 @@ lazy_static! {
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        openid_configs: Some(vec![
-            internet_identity_interface::internet_identity::types::OpenIdConfig {
-                name: "Test OpenID 11105".to_string(),
-                logo: "<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>".to_string(),
-                issuer: "http://localhost:11105".to_string(),
-                client_id: "internet_identity".to_string(),
-                jwks_uri: "http://localhost:11105/jwks".to_string(),
-                auth_uri: "http://localhost:11105/auth".to_string(),
-                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
-                fedcm_uri: Some("".to_string()),
-            },
-           internet_identity_interface::internet_identity::types::OpenIdConfig {
-                name: "Test OpenID 11106".to_string(),
-                logo: "<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>".to_string(),
-                issuer: "http://localhost:11106".to_string(),
-                client_id: "internet_identity".to_string(),
-                jwks_uri: "http://localhost:11106/jwks".to_string(),
-                auth_uri: "http://localhost:11106/auth".to_string(),
-                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
-                fedcm_uri: Some("".to_string()),
-            },
-        ]),
+        openid_configs: None,
         dummy_auth: Some(Some(DummyAuthConfig {
             prompt_for_index: true
         })),
