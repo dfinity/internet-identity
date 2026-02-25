@@ -5,7 +5,6 @@ use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_methods,
     sample_webauthn_authn_method, test_authn_method,
 };
-use candid::Decode;
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::api::{http_request, internet_identity as api};
 use canister_tests::flows;
@@ -1485,8 +1484,8 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
     let http_response = http_request(&env, canister_id, &request)?;
     assert_eq!(http_response.status_code, 200);
 
-    let decoded_config = candid::Decode!(&http_response.body, InternetIdentitySynchronizedConfig)
-        .expect(
+    let decoded_config: InternetIdentitySynchronizedConfig =
+        candid::decode_one(&http_response.body).expect(
             "Failed to decode /.config.did.bin response body as InternetIdentitySynchronizedConfig",
         );
 
@@ -1496,6 +1495,12 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
             openid_configs: Some(openid_configs),
         }
     );
+
+    let result = verify_response_certification(&env, canister_id, request, http_response, 2);
+    assert_eq!(result.verification_version, 2);
+
+    verify_security_headers(&http_response.headers, &None);
+
     Ok(())
 }
 
