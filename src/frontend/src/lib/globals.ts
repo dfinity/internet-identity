@@ -4,7 +4,6 @@ import {
   type InternetIdentityInit,
 } from "$lib/generated/internet_identity_types";
 import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
-import { init } from "$lib/generated/internet_identity_idl";
 import {
   Actor,
   ActorSubclass,
@@ -12,7 +11,10 @@ import {
   HttpAgentOptions,
 } from "@icp-sdk/core/agent";
 import { inferHost } from "$lib/utils/iiConnection";
-import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import {
+  idlFactory as internet_identity_idl,
+  init as internet_identity_init,
+} from "$lib/generated/internet_identity_idl";
 import { features } from "$lib/legacy/features";
 import { IDL } from "@icp-sdk/core/candid";
 
@@ -38,7 +40,7 @@ export const initGlobals = async () => {
     const openidConfigCandid = await response.arrayBuffer();
 
     const [{ openid_configs }] = IDL.decode(
-      [init({ IDL })[0]._type],
+      [internet_identity_init({ IDL })[0]._type],
       new Uint8Array(openidConfigCandid),
     ) as unknown as [InternetIdentityInit];
 
