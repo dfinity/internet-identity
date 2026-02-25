@@ -47,7 +47,7 @@ lazy_static! {
 
     static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
         backend_canister_id: Some(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID),
-        backend_origin: Some(format!("http://{}.localhost:4943", *DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID)),
+        backend_origin: Some("https://backend.id.ai".to_string()),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
