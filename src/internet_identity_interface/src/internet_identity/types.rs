@@ -211,6 +211,7 @@ pub struct AnchorCredentials {
 pub struct InternetIdentityFrontendInit {
     pub backend_canister_id: Option<Principal>,
     pub related_origins: Option<Vec<String>>,
+    pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub fetch_root_key: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
@@ -225,8 +226,8 @@ impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
             dummy_auth: value.dummy_auth,
             related_origins: value.related_origins,
 
-            // Config fields pulled from the backend
-            openid_configs: None,
+            // TODO: pull this config field from the backend and set it to None here.
+            openid_configs: value.openid_configs,
 
             // Config fields not used by the frontend
             canister_creation_cycles_cost: None,
