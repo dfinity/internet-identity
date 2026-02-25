@@ -9,7 +9,9 @@ use base64::Engine;
 use candid::Encode;
 use ic_cdk::api;
 use include_dir::{include_dir, Dir};
-use internet_identity_interface::internet_identity::types::InternetIdentityInit;
+use internet_identity_interface::internet_identity::types::{
+    InternetIdentityInit, InternetIdentitySynchronizedConfig,
+};
 use serde_json::json;
 use sha2::Digest;
 
@@ -77,6 +79,15 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
             asset
         })
         .collect();
+
+    // Required to make the synchronized config available to the II frontend canister.
+    // The synchronized config is the part of `InternetIdentityInit` that is needed for both the II backend and frontend.
+    assets.push(Asset {
+        url_path: "/.config.did.bin".to_string(),
+        content: Encode!(&InternetIdentitySynchronizedConfig::from(config)).unwrap(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
 
     // Required to make II available on the identity.internetcomputer.org domain.
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
