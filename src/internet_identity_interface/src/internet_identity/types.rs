@@ -221,10 +221,10 @@ impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
     fn from(value: InternetIdentityFrontendInit) -> Self {
         Self {
             backend_canister_id: value.backend_canister_id,
-            related_origins: value.related_origins,
             fetch_root_key: value.fetch_root_key,
             analytics_config: value.analytics_config,
             dummy_auth: value.dummy_auth,
+            related_origins: value.related_origins,
             openid_configs: value.openid_configs,
 
             // Config fields not used by the frontend
@@ -238,6 +238,28 @@ impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
             captcha_config: None,
             is_production: None,
             new_flow_origins: None,
+        }
+    }
+}
+
+/// Config fields that are synchronized between the frontend and backend.
+///
+/// Since the II frontend is stateless, this config is pulled from the backend
+/// on page load via HTTPS. It is served as an encoded Candid value.
+///
+/// The fields are wrapped in `Option<>` to help evolve this API in the future,
+/// since non-optional fields cannot be deprecated in Candid.
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct InternetIdentitySynchronizedConfig {
+    pub related_origins: Option<Vec<String>>,
+    pub openid_configs: Option<Vec<OpenIdConfig>>,
+}
+
+impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
+    fn from(value: &InternetIdentityInit) -> Self {
+        Self {
+            related_origins: value.related_origins.clone(),
+            openid_configs: value.openid_configs.clone(),
         }
     }
 }
