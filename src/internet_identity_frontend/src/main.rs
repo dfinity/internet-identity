@@ -3,15 +3,13 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
-use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{
-    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, StatusCode,
-};
+use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit, OpenIdConfig,
+    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -40,21 +38,28 @@ lazy_static! {
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        openid_configs: Some(vec![OpenIdConfig {
-            name: "Google".to_string(),
-            logo: "".to_string(),
-            issuer: "https://accounts.google.com".to_string(),
-            client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com"
-                .to_string(),
-            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
-            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-            auth_scope: vec![
-                "openid".to_string(),
-                "email".to_string(),
-                "profile".to_string()
-            ],
-            fedcm_uri: None,
-        }]),
+        openid_configs: Some(vec![
+            internet_identity_interface::internet_identity::types::OpenIdConfig {
+                name: "Test OpenID 11105".to_string(),
+                logo: "<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>".to_string(),
+                issuer: "http://localhost:11105".to_string(),
+                client_id: "internet_identity".to_string(),
+                jwks_uri: "http://localhost:11105/jwks".to_string(),
+                auth_uri: "http://localhost:11105/auth".to_string(),
+                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+                fedcm_uri: Some("".to_string()),
+            },
+           internet_identity_interface::internet_identity::types::OpenIdConfig {
+                name: "Test OpenID 11106".to_string(),
+                logo: "<svg viewBox=\"0 0 24 24\"><path d=\"m14 2.8-2.6 1.8v16.6l2.6-1.4zm-3.3 5.4C1.9 9 2 14.7 2 14.7c0 5.6 8.7 6.5 8.7 6.5v-1.9c-6.3-1-5.5-4.5-5.5-4.5.3-4 5.5-4.3 5.5-4.3Zm4 0v2.1s1.6 0 3 1.2l-1.5.6 5.8 1.4V9l-2 1.1s-1.7-1.7-5.3-1.9z\" style=\"fill: currentColor;\"></path></svg>".to_string(),
+                issuer: "http://localhost:11106".to_string(),
+                client_id: "internet_identity".to_string(),
+                jwks_uri: "http://localhost:11106/jwks".to_string(),
+                auth_uri: "http://localhost:11106/auth".to_string(),
+                auth_scope: vec!["openid".to_string(), "email".to_string(), "profile".to_string()],
+                fedcm_uri: Some("".to_string()),
+            },
+        ]),
         dummy_auth: Some(Some(DummyAuthConfig {
             prompt_for_index: true
         })),
@@ -126,12 +131,10 @@ fn certify_all_assets(init: InternetIdentityFrontendInit) {
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
                             )],
                         ),
-                        fallback_for: vec![AssetFallbackConfig {
-                            scope: "/".to_string(),
-                            status_code: Some(StatusCode::OK),
-                        }],
-                        aliased_by: vec!["/".to_string()],
                         encodings: vec![AssetEncoding::Identity.default_config()],
+                        // Fallbacks and aliases are already handled in `get_static_assets()`
+                        fallback_for: vec![],
+                        aliased_by: vec![],
                     }
                 } else {
                     let encodings = if encoding == ContentEncoding::GZip {
