@@ -25,14 +25,29 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
+const MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR: &str =
+    "<!doctype html>\
+    <html>\
+    <head><title>Internet Identity Frontend Initialization Error</title></head>\
+    <body><h1>Internet Identity Frontend Initialization Error</h1>\
+    <p>
+    Please initialize this canister with the following required install args:
+    <ul>
+    <li>backend_canister_id</li>
+    <li>backend_origin</li>
+    </ul>
+    </p>\
+    </body></html>";
 
 // Default configuration for the frontend canister
 lazy_static! {
     // TODO: Change this to the mainnet value `rdmx6-jaaaa-aaaaa-aaadq-cai` before deploying to mainnet.
     static ref DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID: Principal =
         Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
+
     static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
         backend_canister_id: Some(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID),
+        backend_origin: Some(format!("http://{}.localhost:4943", *DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID)),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
@@ -383,21 +398,32 @@ fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsse
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
     // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
-    let backend_canister_id = config
-        .backend_canister_id
-        .unwrap_or(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID);
+    let (Some(backend_canister_id), Some(backend_origin)) =
+        (&config.backend_canister_id, &config.backend_origin)
+    else {
+        return MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR.to_string();
+    };
+
+    let html = html.replace(
+        "</head>",
+        &format!(
+            r#"<link rel="preload" href="{backend_origin}/.config.did.bin" as="fetch"></head>"#,
+        ),
+    );
 
     // Encode config to base64-encoded Candid to avoid JSON escaping issues.
     // For backward compatibility, we use the same struct as before the II canister split.
     let config = InternetIdentityInit::from(config.clone());
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
 
-    html.replace(
+    let html = html.replace(
         r#"<body "#,
         &format!(
             r#"<body data-canister-id="{backend_canister_id}" data-canister-config="{encoded_config}" "#
         ),
-    )
+    );
+
+    html
 }
 
 /// Extract all inline scripts from HTML for CSP hash generation
