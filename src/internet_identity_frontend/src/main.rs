@@ -1,7 +1,7 @@
 use asset_util::{collect_assets, Asset as AssetUtilAsset, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use candid::{Encode, Principal};
+use candid::{Encode, IDLValue, Principal};
 use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
@@ -9,7 +9,7 @@ use ic_cdk_macros::query;
 use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit,
+    DummyAuthConfig, InternetIdentityFrontendArgs, InternetIdentityInit,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -25,19 +25,6 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
-const MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR: &str =
-    "<!doctype html>\
-    <html>\
-    <head><title>Internet Identity Frontend Initialization Error</title></head>\
-    <body><h1>Internet Identity Frontend Initialization Error</h1>\
-    <p>
-    Please initialize this canister with the following required install args:
-    <ul>
-    <li>backend_canister_id</li>
-    <li>backend_origin</li>
-    </ul>
-    </p>\
-    </body></html>";
 
 // Default configuration for the frontend canister
 lazy_static! {
@@ -45,9 +32,9 @@ lazy_static! {
     static ref DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID: Principal =
         Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
 
-    static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
-        backend_canister_id: Some(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID),
-        backend_origin: Some("https://backend.id.ai".to_string()),
+    static ref DEFAULT_CONFIG: InternetIdentityFrontendArgs = InternetIdentityFrontendArgs {
+        backend_canister_id: *DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID,
+        backend_origin: "https://backend.id.ai".to_string(),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
@@ -63,18 +50,17 @@ lazy_static! {
 }
 
 #[init]
-fn init(init_arg: Option<InternetIdentityFrontendInit>) {
-    let config = init_arg.unwrap_or_else(|| DEFAULT_CONFIG.clone());
-    certify_all_assets(config);
+fn init(args: InternetIdentityFrontendArgs) {
+    certify_all_assets(args);
 }
 
 #[post_upgrade]
-fn post_upgrade() {
-    init(None);
+fn post_upgrade(args: InternetIdentityFrontendArgs) {
+    certify_all_assets(args);
 }
 
-fn certify_all_assets(init: InternetIdentityFrontendInit) {
-    let static_assets = get_static_assets(&init);
+fn certify_all_assets(args: InternetIdentityFrontendArgs) {
+    let static_assets = get_static_assets(&args);
 
     // 2. Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -333,7 +319,7 @@ fn get_content_security_policy(integrity_hashes: Vec<String>) -> String {
 }
 
 /// Gets the static assets with HTML fixup and well-known endpoints
-fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsset> {
+fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsset> {
     // Collect assets and fix up HTML files
     let mut assets: Vec<AssetUtilAsset> = collect_assets(&ASSETS_DIR, None)
         .into_iter()
@@ -346,6 +332,18 @@ fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsse
             asset
         })
         .collect();
+
+    // Serve the initialization argument of this canister as a Candid file
+    assets.push(AssetUtilAsset {
+        url_path: "/.config.txt".to_string(),
+        content: IDLValue::try_from_candid_type(config)
+            .unwrap()
+            .to_string()
+            .as_bytes()
+            .to_vec(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::TXT,
+    });
 
     // Add .well-known/ic-domains for custom domain support
     let ic_domains_content = b"identity.internetcomputer.org\nbeta.identity.ic0.app\nbeta.identity.internetcomputer.org\nid.ai\nbeta.id.ai\nwww.id.ai".to_vec();
@@ -375,13 +373,9 @@ fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsse
 }
 
 /// Fix up HTML pages by injecting canister ID and canister config
-fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
-    // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
-    let (Some(backend_canister_id), Some(backend_origin)) =
-        (&config.backend_canister_id, &config.backend_origin)
-    else {
-        return MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR.to_string();
-    };
+fn fixup_html(html: &str, config: &InternetIdentityFrontendArgs) -> String {
+    let backend_canister_id = config.backend_canister_id;
+    let backend_origin = config.backend_origin.clone();
 
     let html = html.replace(
         "</head>",
@@ -395,10 +389,11 @@ fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
     let config = InternetIdentityInit::from(config.clone());
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
 
+    // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
     let html = html.replace(
         r#"<body "#,
         &format!(
-            r#"<body data-canister-id="{backend_canister_id}" data-canister-config="{encoded_config}" "#
+            r#"<body data-canister-id="{backend_canister_id}" data-canister-config="{encoded_config}" "#,
         ),
     );
 

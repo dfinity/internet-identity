@@ -59,8 +59,8 @@ type OpenIdConfig = record {
 };
 
 type InternetIdentityFrontendInit = record {
-    backend_canister_id : opt principal;
-    backend_origin : opt text;
+    backend_canister_id : principal;
+    backend_origin : text;
     related_origins : opt vec text;
     fetch_root_key : opt bool;
     analytics_config : opt opt AnalyticsConfig;
@@ -68,6 +68,6 @@ type InternetIdentityFrontendInit = record {
     openid_configs : opt vec OpenIdConfig;
 };
 
-service : (opt InternetIdentityFrontendInit) -> {
+service : (InternetIdentityFrontendInit) -> {
     http_request : (request : HttpRequest) -> (HttpResponse) query;
 };
