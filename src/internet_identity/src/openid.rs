@@ -12,8 +12,8 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig, PublicKey,
-    SessionKey, SignedDelegation, Timestamp, UserKey,
+    AnchorNumber, Delegation, EmailVerification, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
+    PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -140,8 +140,11 @@ impl OpenIdCredential {
         })
     }
 
-    /// Find current config for stored credential
-    pub fn config_issuer(&self) -> Option<String> {
+    /// Helper method to find the matching provider for this credential and execute a callback with it
+    fn with_provider<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(&dyn OpenIdProvider) -> Option<R>,
+    {
         PROVIDERS.with_borrow(|providers| {
             providers
                 .iter()
@@ -159,13 +162,29 @@ impl OpenIdCredential {
                         replace_issuer_placeholders(&provider.issuer(), &issuer_claims);
                     effective_issuer == self.iss
                 })
-                .map(|provider| provider.issuer())
+                .and_then(|provider| f(provider.as_ref()))
+        })
+    }
+
+    /// Find current config for stored credential
+    pub fn config_issuer(&self) -> Option<String> {
+        self.with_provider(|provider| Some(provider.issuer()))
+    }
+
+    /// Return the verified email for this credential, if available
+    pub fn verified_email(&self) -> Option<String> {
+        self.with_provider(|provider| {
+            provider
+                .email_verification()
+                .and_then(|verification| get_verified_email(&verification, &self.metadata))
         })
     }
 }
 
 pub trait OpenIdProvider {
     fn issuer(&self) -> String;
+
+    fn email_verification(&self) -> Option<EmailVerification>;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -268,6 +287,54 @@ pub fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, St
     result
 }
 
+/// Get the verified email from metadata if it passes the provider's verification requirements.
+pub fn get_verified_email(
+    verification: &EmailVerification,
+    metadata: &HashMap<String, MetadataEntryV2>,
+) -> Option<String> {
+    match verification {
+        EmailVerification::Google => get_google_verified_email(metadata),
+        EmailVerification::Microsoft => get_microsoft_verified_email(metadata),
+    }
+}
+
+fn get_google_verified_email(metadata: &HashMap<String, MetadataEntryV2>) -> Option<String> {
+    let email = metadata.get("email").and_then(|entry| match entry {
+        MetadataEntryV2::String(s) => Some(s.clone()),
+        _ => None,
+    })?;
+
+    let is_verified = metadata
+        .get("email_verified")
+        .and_then(|entry| match entry {
+            MetadataEntryV2::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .is_some_and(|s| s == "true");
+
+    is_verified.then_some(email)
+}
+
+fn get_microsoft_verified_email(metadata: &HashMap<String, MetadataEntryV2>) -> Option<String> {
+    let email = metadata.get("email").and_then(|entry| match entry {
+        MetadataEntryV2::String(s) => Some(s.clone()),
+        _ => None,
+    })?;
+
+    // For Microsoft, check if tid matches the personal account tenant ID
+    // (services like Xbox, Teams for Life, or Outlook.com)
+    const MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
+    let is_verified = metadata
+        .get("tid")
+        .and_then(|entry| match entry {
+            MetadataEntryV2::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .is_some_and(|tid| tid == MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID);
+
+    is_verified.then_some(email)
+}
+
 /// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
 /// the Microsoft issuer uri is dynamic based on the `tid` claim, this method makes sure to
 /// replace the placeholders like e.g. `tid` in the issuer uri with the corresponding claims.
@@ -332,6 +399,10 @@ struct ExampleProvider;
 impl OpenIdProvider for ExampleProvider {
     fn issuer(&self) -> String {
         "https://example.com".into()
+    }
+
+    fn email_verification(&self) -> Option<EmailVerification> {
+        None
     }
 
     fn verify(
@@ -530,6 +601,10 @@ struct ExamplePlaceholderProvider;
 impl OpenIdProvider for ExamplePlaceholderProvider {
     fn issuer(&self) -> String {
         "https://login.microsoftonline.com/{tid}/v2.0".into()
+    }
+
+    fn email_verification(&self) -> Option<EmailVerification> {
+        None
     }
 
     fn verify(

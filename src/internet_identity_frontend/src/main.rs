@@ -54,6 +54,7 @@ lazy_static! {
                 "profile".to_string()
             ],
             fedcm_uri: None,
+            email_verification: None,
         }]),
         dummy_auth: Some(Some(DummyAuthConfig {
             prompt_for_index: true

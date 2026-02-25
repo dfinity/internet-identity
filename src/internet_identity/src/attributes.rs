@@ -134,51 +134,39 @@ impl Anchor {
             .filter_map(|openid_credential| {
                 // E.g., `openid:google.com`
                 let scope = Some(AttributeScope::OpenId {
-                    issuer: openid_credential.iss.clone(),
+                    issuer: openid_credential.config_issuer()?,
                 });
-                // E.g., {`email`, `name`}
-                //
-                // Why we do not include `sub` / `aud` into the keys of this map:
+
+                // Why we do not include `sub` / `aud` in the map lookup key:
                 // --------------------------------------------------------------
                 // Currently, an anchor can only have a single iss linked once. The storage layer
                 // allows for duplicate iss, but the implementation has been restricted to enforce
                 // the one-to-one relationship.
-                let attribute_names = requested_attributes.remove(&scope)?;
-
-                let mut attribute_keys: BTreeMap<AttributeName, AttributeKey> = attribute_names
-                    .into_iter()
-                    .map(|attribute_name| {
-                        (
-                            attribute_name,
-                            AttributeKey {
-                                scope: scope.clone(),
-                                attribute_name,
-                            },
-                        )
-                    })
-                    .collect();
-
-                let attributes = openid_credential
-                    .metadata
+                let attributes = requested_attributes
+                    .remove(&scope)?
                     .iter()
-                    .filter_map(|(attribute_name_str, attribute_value)| {
-                        // If the attribute exists in the OpenID JWT metadata, but isn't listed as
-                        // an explicit case in `AttributeName`, it cannot be certified; we skip it.
-                        let attribute_name =
-                            AttributeName::try_from(attribute_name_str.as_str()).ok()?;
-
-                        let key = attribute_keys.remove(&attribute_name)?;
-
-                        let MetadataEntryV2::String(value) = attribute_value else {
-                            return None;
+                    .filter_map(|key| {
+                        let value = if key == &AttributeName::VerifiedEmail {
+                            openid_credential.verified_email()?.into_bytes()
+                        } else {
+                            openid_credential
+                                .metadata
+                                .get(&key.to_string())
+                                .and_then(|entry| match entry {
+                                    MetadataEntryV2::String(value) => {
+                                        Some(value.as_bytes().to_vec())
+                                    }
+                                    _ => None,
+                                })?
                         };
 
-                        let attribute = Attribute {
-                            key,
-                            value: value.as_bytes().to_vec(),
-                        };
-
-                        Some(attribute)
+                        Some(Attribute {
+                            key: AttributeKey {
+                                scope: scope.clone(),
+                                attribute_name: *key,
+                            },
+                            value,
+                        })
                     })
                     .collect::<Vec<Attribute>>();
 
