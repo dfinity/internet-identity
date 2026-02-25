@@ -1496,10 +1496,10 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         }
     );
 
+    verify_security_headers(&http_response.headers, &None);
+
     let result = verify_response_certification(&env, canister_id, request, http_response, 2);
     assert_eq!(result.verification_version, 2);
-
-    verify_security_headers(&http_response.headers, &None);
 
     Ok(())
 }
