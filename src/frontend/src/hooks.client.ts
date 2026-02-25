@@ -7,6 +7,12 @@ import { localeStore } from "$lib/stores/locale.store";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
+declare global {
+  interface Window {
+    __configPromise: Promise<unknown>;
+  }
+}
+
 const overrideFeatureFlags = () => {
   // Override feature flags based on search params before any other code
   // including other hooks runs that might depend on these feature flags.
@@ -42,6 +48,7 @@ const overrideFeatureFlags = () => {
 };
 
 export const init: ClientInit = async () => {
+  await window.__configPromise; // Wait for the config to be loaded before initializing globals
   initGlobals();
   // Initialize them after globals so canister config can be used for defaults
   Object.values(featureFlags).forEach((flag) => flag.initialize());
