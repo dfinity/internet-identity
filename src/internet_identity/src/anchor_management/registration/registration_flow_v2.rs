@@ -322,7 +322,7 @@ fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber,
     }) = &arg
     {
         anchor_management::check_passkey_pubkey_is_not_used(&webauthn.pubkey)
-            .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err))?;
+            .map_err(IdRegFinishError::InvalidAuthnMethod)?;
     }
 
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
