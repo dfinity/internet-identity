@@ -88,7 +88,7 @@ ARG II_SPLIT_FRONTEND=
 RUN touch src/*/src/lib.rs
 RUN npm ci
 
-RUN if [ -n "$II_SPLIT_FRONTEND" ]; then \
+RUN if [ "$II_SPLIT_FRONTEND" = "1" ]; then \
     ./scripts/build --frontend && \
     mv /internet_identity_frontend.wasm.gz /internet_identity.wasm.gz; \
     else \
