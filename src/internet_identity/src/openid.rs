@@ -12,8 +12,8 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, EmailVerification, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
-    PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
+    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
+    OpenIdEmailVerification, PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -184,7 +184,7 @@ impl OpenIdCredential {
 pub trait OpenIdProvider {
     fn issuer(&self) -> String;
 
-    fn email_verification(&self) -> Option<EmailVerification>;
+    fn email_verification(&self) -> Option<OpenIdEmailVerification>;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -289,12 +289,12 @@ pub fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, St
 
 /// Get the verified email from metadata if it passes the provider's verification requirements.
 pub fn get_verified_email(
-    verification: &EmailVerification,
+    verification: &OpenIdEmailVerification,
     metadata: &HashMap<String, MetadataEntryV2>,
 ) -> Option<String> {
     match verification {
-        EmailVerification::Google => get_google_verified_email(metadata),
-        EmailVerification::Microsoft => get_microsoft_verified_email(metadata),
+        OpenIdEmailVerification::Google => get_google_verified_email(metadata),
+        OpenIdEmailVerification::Microsoft => get_microsoft_verified_email(metadata),
     }
 }
 
@@ -401,7 +401,7 @@ impl OpenIdProvider for ExampleProvider {
         "https://example.com".into()
     }
 
-    fn email_verification(&self) -> Option<EmailVerification> {
+    fn email_verification(&self) -> Option<OpenIdEmailVerification> {
         None
     }
 
@@ -603,7 +603,7 @@ impl OpenIdProvider for ExamplePlaceholderProvider {
         "https://login.microsoftonline.com/{tid}/v2.0".into()
     }
 
-    fn email_verification(&self) -> Option<EmailVerification> {
+    fn email_verification(&self) -> Option<OpenIdEmailVerification> {
         None
     }
 

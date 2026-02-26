@@ -356,10 +356,8 @@ pub enum DeployArchiveResult {
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub enum EmailVerification {
-    #[serde(rename = "google")]
+pub enum OpenIdEmailVerification {
     Google,
-    #[serde(rename = "microsoft")]
     Microsoft,
 }
 
@@ -373,7 +371,7 @@ pub struct OpenIdConfig {
     pub auth_uri: String,
     pub auth_scope: Vec<String>,
     pub fedcm_uri: Option<String>,
-    pub email_verification: Option<EmailVerification>,
+    pub email_verification: Option<OpenIdEmailVerification>,
 }
 
 pub enum AuthorizationKey {

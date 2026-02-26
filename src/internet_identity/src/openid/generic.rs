@@ -19,7 +19,7 @@ use identity_jose::jws::{
     VerificationInput,
 };
 use internet_identity_interface::internet_identity::types::{
-    EmailVerification, MetadataEntryV2, OpenIdConfig,
+    MetadataEntryV2, OpenIdConfig, OpenIdEmailVerification,
 };
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
@@ -103,7 +103,7 @@ pub struct Provider {
     client_id: String,
     issuer: String,
     certs: Rc<RefCell<Vec<Jwk>>>,
-    email_verification: Option<EmailVerification>,
+    email_verification: Option<OpenIdEmailVerification>,
 }
 
 impl OpenIdProvider for Provider {
@@ -111,7 +111,7 @@ impl OpenIdProvider for Provider {
         self.issuer.clone()
     }
 
-    fn email_verification(&self) -> Option<EmailVerification> {
+    fn email_verification(&self) -> Option<OpenIdEmailVerification> {
         self.email_verification.clone()
     }
 
