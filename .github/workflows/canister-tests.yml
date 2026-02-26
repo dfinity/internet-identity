@@ -44,12 +44,21 @@ jobs:
       # NOTE: if you modify the flavors, update the #flavors table in README.md
       matrix:
         include:
-          # The production build
+          # The production backend build
           - name: internet_identity_production.wasm.gz
             II_FETCH_ROOT_KEY: 0
             II_DUMMY_CAPTCHA: 0
             II_DUMMY_AUTH: 0
             II_DEV_CSP: 0
+            II_SPLIT_FRONTEND: 0
+
+          # The production frontend build
+          - name: internet_identity_frontend_production.wasm.gz
+            II_FETCH_ROOT_KEY: 0
+            II_DUMMY_CAPTCHA: 0
+            II_DUMMY_AUTH: 0
+            II_DEV_CSP: 0
+            II_SPLIT_FRONTEND: 1
 
           # No captcha and fetching the root key, used in (our) tests, backend and
           # e2e.
@@ -58,6 +67,7 @@ jobs:
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 0
             II_DEV_CSP: 0
+            II_SPLIT_FRONTEND: 0
 
           # Everything disabled, used by third party developers who only care
           # about the login flow
@@ -66,6 +76,7 @@ jobs:
             II_DUMMY_CAPTCHA: 1
             II_DUMMY_AUTH: 1
             II_DEV_CSP: 1
+            II_SPLIT_FRONTEND: 0
 
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +101,7 @@ jobs:
             II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
             II_DUMMY_CAPTCHA=${{ matrix.II_DUMMY_CAPTCHA }}
             II_DEV_CSP=${{ matrix.II_DEV_CSP }}
+            II_SPLIT_FRONTEND=${{ matrix.II_SPLIT_FRONTEND }}
             II_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
