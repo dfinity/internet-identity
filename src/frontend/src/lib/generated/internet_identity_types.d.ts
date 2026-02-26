@@ -254,7 +254,6 @@ export interface HttpResponse {
   'body' : Uint8Array | number[],
   'headers' : Array<HeaderField>,
   'upgrade' : [] | [boolean],
-  'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }
 export interface IdAliasCredentials {
@@ -321,6 +320,13 @@ export type IdentityPropertiesReplaceError = {
 export interface InternetIdentityInit {
   'fetch_root_key' : [] | [boolean],
   'is_production' : [] | [boolean],
+  /**
+   * Backend canister ID, needed for backward compatibility.
+   */
+  'backend_canister_id' : [] | [Principal],
+  /**
+   * Configuration to show dapps explorer or not
+   */
   'enable_dapps_explorer' : [] | [boolean],
   'assigned_user_number_range' : [] | [[bigint, bigint]],
   'new_flow_origins' : [] | [Array<string>],
@@ -329,6 +335,13 @@ export interface InternetIdentityInit {
   'analytics_config' : [] | [[] | [AnalyticsConfig]],
   'related_origins' : [] | [Array<string>],
   'openid_configs' : [] | [Array<OpenIdConfig>],
+  /**
+   * Backend origin, needed to sync configuration with frontend.
+   */
+  'backend_origin' : [] | [string],
+  /**
+   * Configuration of the captcha in the registration flow.
+   */
   'captcha_config' : [] | [CaptchaConfig],
   'dummy_auth' : [] | [[] | [DummyAuthConfig]],
   'register_rate_limit' : [] | [RateLimitConfig],

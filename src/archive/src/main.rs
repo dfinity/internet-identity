@@ -552,7 +552,6 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                         headers,
                         body: ByteBuf::from(body),
                         upgrade: None,
-                        streaming_strategy: None,
                     }
                 }
                 Err(err) => HttpResponse {
@@ -560,7 +559,6 @@ fn http_request(req: HttpRequest) -> HttpResponse {
                     headers: vec![],
                     body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                     upgrade: None,
-                    streaming_strategy: None,
                 },
             }
         }
@@ -569,7 +567,6 @@ fn http_request(req: HttpRequest) -> HttpResponse {
             headers: vec![],
             body: ByteBuf::from(format!("Asset {path} not found.")),
             upgrade: None,
-            streaming_strategy: None,
         },
     }
 }

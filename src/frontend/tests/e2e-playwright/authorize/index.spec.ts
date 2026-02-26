@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import {
   authorize,
   authorizeWithUrl,
@@ -10,6 +10,7 @@ import {
   II_URL,
   cancelDummyAuth,
 } from "../utils";
+import { test } from "../fixtures";
 
 const DEFAULT_USER_NAME = "John Doe";
 
@@ -153,7 +154,11 @@ test("Authorize by signing in from another device", async ({
   expect(principal).toBe(expectedPrincipal);
 });
 
-test("Authorize by signing up with OpenID", async ({ page }) => {
+test("Authorize by signing up with OpenID", async ({
+  page,
+  openIdUsers,
+  signInWithOpenId,
+}) => {
   const userId = crypto.randomUUID();
 
   // Set name claim
@@ -169,28 +174,16 @@ test("Authorize by signing up with OpenID", async ({ page }) => {
     // Pick OpenID to continue
     const pagePromise = authPage.context().waitForEvent("page");
     await authPage
-      .getByRole("button", { name: "Continue with Test OpenID" })
+      .getByRole("button", {
+        name: openIdUsers[0].issuer.name,
+      })
       .click();
 
     // Authenticate and authorize with OpenID
     const openIdPage = await pagePromise;
-    await expect(
-      openIdPage.getByRole("heading", {
-        name: "Sign-in",
-      }),
-    ).toBeVisible();
-    await openIdPage.getByPlaceholder("Enter any login").fill(userId);
-    await openIdPage
-      .getByPlaceholder("and password")
-      .fill("any-password-works");
-    await openIdPage.getByRole("button", { name: "Sign-in" }).click();
-    await expect(
-      openIdPage.getByRole("heading", {
-        name: "Authorize",
-      }),
-    ).toBeVisible();
-    await openIdPage.getByRole("button", { name: "Continue" }).click();
-    await openIdPage.waitForEvent("close", { timeout: 15_000 });
+    const closePromise = openIdPage.waitForEvent("close", { timeout: 15_000 });
+    await signInWithOpenId(openIdPage, openIdUsers[0].id);
+    await closePromise;
 
     // Continue to dapp
     await authPage

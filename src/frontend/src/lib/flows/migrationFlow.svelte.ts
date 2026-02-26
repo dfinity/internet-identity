@@ -19,7 +19,7 @@ import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store"
 import { throwCanisterError } from "$lib/utils/utils";
 import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
 import { supportsWebauthRoR } from "$lib/utils/userAgent";
-import { canisterConfig } from "$lib/globals";
+import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 import {
   upgradeIdentityFunnel,
@@ -27,7 +27,6 @@ import {
 } from "$lib/utils/analytics/upgradeIdentityFunnel";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
-import { isNewOriginDevice } from "$lib/utils/accessMethods";
 
 export class WrongDomainError extends Error {
   constructor() {
@@ -55,8 +54,11 @@ export class MigrationFlow {
   ): Promise<void> => {
     this.identityNumber = identityNumber;
     this.#devices = await this.#lookupAuthenticators(identityNumber);
-    const alreadyMigrated = this.#devices.some(isNewOriginDevice);
-    if (alreadyMigrated) {
+    const primaryOrigin = getPrimaryOrigin();
+    if (
+      primaryOrigin !== undefined &&
+      this.#devices.some((device) => device.origin[0] === primaryOrigin)
+    ) {
       this.view = "alreadyMigrated";
       return;
     }

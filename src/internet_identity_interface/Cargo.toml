@@ -10,6 +10,7 @@ serde_bytes.workspace = true
 candid.workspace = true
 serde.workspace = true
 ic-cdk.workspace = true
+ic-http-certification.workspace = true
 
 [dev-dependencies]
 pretty_assertions.workspace = true

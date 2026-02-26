@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import {
   cancelDummyAuth,
   clearStorage,
@@ -6,10 +6,9 @@ import {
   dummyAuth,
   II_URL,
 } from "./utils";
+import { test } from "./fixtures";
 
-// This is chosen on purpose to exhibit a JWT token that is encoded in base64url but cannot
-// be decoded as simply base64. Works as a regression test.
-const DEFAULT_USER_NAME = "įìęèéêêëėįì";
+const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";
 
 test.describe("First visit", () => {
@@ -147,93 +146,93 @@ test.describe("First visit", () => {
     ).toBeVisible();
   });
 
-  test("Sign up with OpenID", async ({ page }) => {
-    const userId = crypto.randomUUID();
+  test.describe("OpenID user with name claim", () => {
+    // This is chosen on purpose to exhibit a JWT token that is encoded in base64url
+    // but cannot be decoded as simply base64. Works as a regression test.
+    const name = "įìęèéêêëėįì";
 
-    // Set name claim
-    await fetch(`http://localhost:11105/account/${userId}/claims`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    test.use({
+      openIdConfig: {
+        createUsers: [
+          {
+            claims: { name },
+          },
+        ],
       },
-      body: JSON.stringify({ name: DEFAULT_USER_NAME }),
     });
 
-    // Pick OpenID to continue
-    const pagePromise = page.context().waitForEvent("page");
-    await page.goto(II_URL);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page
-      .getByRole("button", { name: "Continue with Test OpenID" })
-      .click();
+    test("Sign up with OpenID", async ({
+      page,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // Pick OpenID to continue
+      await page.goto(II_URL);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      const popupPromise = page.context().waitForEvent("page");
+      await page
+        .getByRole("button", { name: openIdUsers[0].issuer.name })
+        .click();
 
-    // Authenticate and authorize with OpenID
-    const authPage = await pagePromise;
-    await expect(
-      authPage.getByRole("heading", {
-        name: "Sign-in",
-      }),
-    ).toBeVisible();
-    await authPage.getByPlaceholder("Enter any login").fill(userId);
-    await authPage.getByPlaceholder("and password").fill("any-password-works");
-    await authPage.getByRole("button", { name: "Sign-in" }).click();
-    await expect(
-      authPage.getByRole("heading", {
-        name: "Authorize",
-      }),
-    ).toBeVisible();
-    await authPage.getByRole("button", { name: "Continue" }).click();
-    await authPage.waitForEvent("close", { timeout: 15_000 });
+      // Sign in on OpenID page
+      const popup = await popupPromise;
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
 
-    // Assert that dashboard is shown
-    await page.waitForURL(II_URL + "/manage");
-    await expect(
-      page.getByRole("heading", {
-        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      }),
-    ).toBeVisible();
+      // Assert that dashboard is shown
+      await page.waitForURL(II_URL + "/manage");
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${name}!`),
+        }),
+      ).toBeVisible();
+    });
   });
 
-  test("Sign up with OpenID (no name available)", async ({ page }) => {
-    const userId = crypto.randomUUID();
+  test.describe("OpenID user without name claim", () => {
+    test.use({
+      openIdConfig: {
+        createUsers: [
+          {
+            claims: {},
+          },
+        ],
+      },
+    });
 
-    // Pick OpenID to continue
-    const pagePromise = page.context().waitForEvent("page");
-    await page.goto(II_URL);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page
-      .getByRole("button", { name: "Continue with Test OpenID" })
-      .click();
+    test("Sign up with OpenID", async ({
+      page,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      // Pick OpenID to continue
+      await page.goto(II_URL);
+      await page.getByRole("button", { name: "Sign in" }).click();
+      const popupPromise = page.context().waitForEvent("page");
+      await page
+        .getByRole("button", { name: openIdUsers[0].issuer.name })
+        .click();
 
-    // Authenticate and authorize with OpenID
-    const authPage = await pagePromise;
-    await expect(
-      authPage.getByRole("heading", {
-        name: "Sign-in",
-      }),
-    ).toBeVisible();
-    await authPage.getByPlaceholder("Enter any login").fill(userId);
-    await authPage.getByPlaceholder("and password").fill("any-password-works");
-    await authPage.getByRole("button", { name: "Sign-in" }).click();
-    await expect(
-      authPage.getByRole("heading", {
-        name: "Authorize",
-      }),
-    ).toBeVisible();
-    await authPage.getByRole("button", { name: "Continue" }).click();
-    await authPage.waitForEvent("close", { timeout: 15_000 });
+      // Sign in on OpenID page
+      const popup = await popupPromise;
+      const closePromise = popup.waitForEvent("close", { timeout: 15_000 });
+      await signInWithOpenId(popup, openIdUsers[0].id);
+      await closePromise;
 
-    // Enter identity name
-    await page.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
-    await page.getByRole("button", { name: "Create identity" }).click();
+      // Enter identity name
+      const name = "John Doe";
+      await page.getByLabel("Identity name").fill(name);
+      await page.getByRole("button", { name: "Create identity" }).click();
 
-    // Assert that dashboard is shown
-    await page.waitForURL(II_URL + "/manage");
-    await expect(
-      page.getByRole("heading", {
-        name: new RegExp(`Welcome, ${DEFAULT_USER_NAME}!`),
-      }),
-    ).toBeVisible();
+      // Assert that dashboard is shown
+      await page.waitForURL(II_URL + "/manage");
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${name}!`),
+        }),
+      ).toBeVisible();
+    });
   });
 });
 

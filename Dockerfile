@@ -50,6 +50,7 @@ COPY src/internet_identity_interface/Cargo.toml src/internet_identity_interface/
 COPY src/archive/Cargo.toml src/archive/Cargo.toml
 COPY src/canister_tests/Cargo.toml src/canister_tests/Cargo.toml
 COPY src/sig-verifier-js/Cargo.toml src/sig-verifier-js/Cargo.toml
+COPY src/internet_identity_frontend/Cargo.toml src/internet_identity_frontend/Cargo.toml
 COPY src/asset_util/Cargo.toml src/asset_util/Cargo.toml
 ENV CARGO_TARGET_DIR=/cargo_target
 COPY ./scripts/build ./scripts/build
@@ -65,6 +66,8 @@ RUN mkdir -p src/internet_identity/src \
     && touch src/sig-verifier-js/src/lib.rs \
     && mkdir -p src/asset_util/src \
     && touch src/asset_util/src/lib.rs \
+    && mkdir -p src/internet_identity_frontend/src \
+    && touch src/internet_identity_frontend/src/main.rs \
     && ./scripts/build --only-dependencies --internet-identity --archive \
     && rm -rf src
 

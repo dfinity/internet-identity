@@ -203,6 +203,83 @@ pub struct AnchorCredentials {
     pub recovery_phrases: Vec<PublicKey>,
 }
 
+/// Init arguments of II frontend canister which can be supplied on install and upgrade.
+///
+/// Each field is wrapped in `Option<>` to indicate whether the field should be updated or not.
+///
+/// Some fields, like `analytics_config`, have an additional nested `Option<>`, this indicates
+/// enable/disable status (e.g. `Some(None)` disables a feature while `None` leaves it untouched).
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct InternetIdentityFrontendInit {
+    pub backend_canister_id: Option<Principal>,
+    /// For example, "https://backend.id.ai" (no trailing slash)
+    pub backend_origin: Option<String>,
+    pub related_origins: Option<Vec<String>>,
+    pub openid_configs: Option<Vec<OpenIdConfig>>,
+    pub fetch_root_key: Option<bool>,
+    pub analytics_config: Option<Option<AnalyticsConfig>>,
+    pub dummy_auth: Option<Option<DummyAuthConfig>>,
+}
+
+impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
+    fn from(value: InternetIdentityFrontendInit) -> Self {
+        let InternetIdentityFrontendInit {
+            backend_canister_id,
+            backend_origin,
+            fetch_root_key,
+            analytics_config,
+            dummy_auth,
+            related_origins,
+            openid_configs,
+        } = value;
+
+        Self {
+            backend_canister_id,
+            backend_origin,
+
+            fetch_root_key,
+            analytics_config,
+            dummy_auth,
+            related_origins,
+
+            // TODO: pull this config field from the backend and set it to None here.
+            openid_configs,
+
+            // Config fields not used by the frontend
+            canister_creation_cycles_cost: None,
+            assigned_user_number_range: None,
+            archive_config: None,
+            register_rate_limit: None,
+
+            // Deprecated config fields
+            enable_dapps_explorer: None,
+            captcha_config: None,
+            is_production: None,
+            new_flow_origins: None,
+        }
+    }
+}
+
+/// Config fields that are synchronized between the frontend and backend.
+///
+/// Since the II frontend is stateless, this config is pulled from the backend
+/// on page load via HTTPS. It is served as an encoded Candid value.
+///
+/// The fields are wrapped in `Option<>` to help evolve this API in the future,
+/// since non-optional fields cannot be deprecated in Candid.
+#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+pub struct InternetIdentitySynchronizedConfig {
+    pub openid_configs: Option<Vec<OpenIdConfig>>,
+}
+
+impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
+    fn from(value: &InternetIdentityInit) -> Self {
+        Self {
+            openid_configs: value.openid_configs.clone(),
+        }
+    }
+}
+
 /// Init arguments of II which can be supplied on install and upgrade.
 ///
 /// Each field is wrapped in `Option<>` to indicate whether the field should
@@ -225,6 +302,8 @@ pub struct InternetIdentityInit {
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
+    pub backend_canister_id: Option<Principal>,
+    pub backend_origin: Option<String>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]

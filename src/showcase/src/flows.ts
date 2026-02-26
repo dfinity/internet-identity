@@ -29,6 +29,8 @@ const DEFAULT_INIT: InternetIdentityInit = {
   is_production: [],
   new_flow_origins: [],
   dummy_auth: [],
+  backend_canister_id: [],
+  backend_origin: [],
 };
 
 const registerSuccessToastTemplate = (result: unknown) => html`

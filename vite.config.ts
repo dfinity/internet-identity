@@ -81,8 +81,19 @@ export default defineConfig(({ command, mode }): UserConfig => {
                       "identity.ic0.app",
                       "identity.internetcomputer.org",
                     ],
-                    canisterName: "internet_identity",
+                    canisterName:
+                      process.env.SEPARATE_FRONTEND_CANISTER === "1"
+                        ? "internet_identity_frontend"
+                        : "internet_identity",
                   },
+                  ...(process.env.SEPARATE_FRONTEND_CANISTER === "1"
+                    ? [
+                        {
+                          hosts: ["backend.id.ai"],
+                          canisterName: "internet_identity",
+                        },
+                      ]
+                    : []),
                 ]
               : []),
           ],

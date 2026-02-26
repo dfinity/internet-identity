@@ -17,7 +17,8 @@ use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
     AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt,
-    FrontendHostname, InternetIdentityInit, MetadataEntryV2,
+    FrontendHostname, InternetIdentityInit, InternetIdentitySynchronizedConfig, MetadataEntryV2,
+    OpenIdConfig,
 };
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
@@ -97,6 +98,8 @@ fn ii_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        backend_canister_id: None,
+        backend_origin: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
 
@@ -165,6 +168,8 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), RejectRespon
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        backend_canister_id: None,
+        backend_origin: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
@@ -209,6 +214,8 @@ fn ii_canister_serves_webauthn_assets_after_upgrade() -> Result<(), RejectRespon
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        backend_canister_id: None,
+        backend_origin: None,
     };
 
     let _ = upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), Some(config_2));
@@ -613,6 +620,8 @@ fn must_not_cache_well_known_webauthn() -> Result<(), RejectResponse> {
         enable_dapps_explorer: None,
         is_production: None,
         dummy_auth: None,
+        backend_canister_id: None,
+        backend_origin: None,
     };
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
@@ -1449,6 +1458,56 @@ fn should_report_total_account_metrics() -> Result<(), RejectResponse> {
     Ok(())
 }
 
+/// Verifies that the `/.config.did.bin` asset can be decoded as `InternetIdentitySynchronizedConfig`.
+#[test]
+fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectResponse> {
+    let env = env();
+    let openid_configs = vec![OpenIdConfig {
+        name: "Test Provider".to_string(),
+        logo: "https://example.com/logo.png".to_string(),
+        issuer: "https://accounts.example.com".to_string(),
+        client_id: "test-client-id".to_string(),
+        jwks_uri: "https://example.com/.well-known/jwks.json".to_string(),
+        auth_uri: "https://accounts.example.com/o/oauth2/auth".to_string(),
+        auth_scope: vec!["openid".to_string(), "email".to_string()],
+        fedcm_uri: None,
+    }];
+    let config = InternetIdentityInit {
+        openid_configs: Some(openid_configs.clone()),
+        ..Default::default()
+    };
+    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
+
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.config.did.bin".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(2),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+    assert_eq!(http_response.status_code, 200);
+
+    let decoded_config: InternetIdentitySynchronizedConfig =
+        candid::decode_one(&http_response.body).expect(
+            "Failed to decode /.config.did.bin response body as InternetIdentitySynchronizedConfig",
+        );
+
+    assert_eq!(
+        decoded_config,
+        InternetIdentitySynchronizedConfig {
+            openid_configs: Some(openid_configs),
+        }
+    );
+
+    verify_security_headers(&http_response.headers, &None);
+
+    let result = verify_response_certification(&env, canister_id, request, http_response, 2);
+    assert_eq!(result.verification_version, 2);
+
+    Ok(())
+}
+
 fn verify_response_certification(
     env: &PocketIc,
     canister_id: CanisterId,
@@ -1457,18 +1516,10 @@ fn verify_response_certification(
     min_certification_version: u16,
 ) -> VerificationInfo {
     verify_request_response_pair(
-        ic_http_certification::HttpRequest {
-            method: request.method,
-            url: request.url,
-            headers: request.headers,
-            body: request.body.into_vec(),
-        },
-        ic_http_certification::HttpResponse {
-            status_code: http_response.status_code,
-            headers: http_response.headers,
-            body: http_response.body.into_vec(),
-            upgrade: None,
-        },
+        request.try_into().expect("Cannot represent HttpRequest"),
+        http_response
+            .try_into()
+            .expect("Cannot represent HttpResponse"),
         canister_id.as_slice(),
         time(env) as u128,
         Duration::from_secs(300).as_nanos(),
