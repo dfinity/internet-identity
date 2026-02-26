@@ -443,14 +443,12 @@ fn verify_claims(
             "Name too long".into(),
         ));
     }
-    if let Some(ref email_verified) = claims.email_verified {
-        if let EmailVerifiedClaim::String(ref s) = email_verified {
-            if s != "true" && s != "false" {
-                return Err(OpenIDJWTVerificationError::GenericError(format!(
-                    "email_verified must be 'true' or 'false', got: {}",
-                    s
-                )));
-            }
+    if let Some(EmailVerifiedClaim::String(ref s)) = claims.email_verified {
+        if s != "true" && s != "false" {
+            return Err(OpenIDJWTVerificationError::GenericError(format!(
+                "email_verified must be 'true' or 'false', got: {}",
+                s
+            )));
         }
     }
 
