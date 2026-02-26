@@ -520,7 +520,6 @@ export interface HttpResponse {
   'body' : Uint8Array | number[],
   'headers' : Array<HeaderField>,
   'upgrade' : [] | [boolean],
-  'streaming_strategy' : [] | [StreamingStrategy],
   'status_code' : number,
 }
 /**
@@ -696,6 +695,10 @@ export interface InternetIdentityInit {
    */
   'is_production' : [] | [boolean],
   /**
+   * Backend canister ID, needed for backward compatibility.
+   */
+  'backend_canister_id' : [] | [Principal],
+  /**
    * Configuration to show dapps explorer or not
    */
   'enable_dapps_explorer' : [] | [boolean],
@@ -734,6 +737,10 @@ export interface InternetIdentityInit {
    * Configurations for OpenID clients
    */
   'openid_configs' : [] | [Array<OpenIdConfig>],
+  /**
+   * Backend origin, needed to sync configuration with frontend.
+   */
+  'backend_origin' : [] | [string],
   /**
    * Configuration of the captcha in the registration flow.
    */

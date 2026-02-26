@@ -3,15 +3,13 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::{Encode, Principal};
 use flate2::read::GzDecoder;
-use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter};
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
-use ic_http_certification::{
-    HeaderField, HttpCertificationTree, HttpRequest, HttpResponse, StatusCode,
-};
+use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit, OpenIdConfig,
+    DummyAuthConfig, InternetIdentityFrontendInit, InternetIdentityInit,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -27,35 +25,35 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
+const MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR: &str =
+    "<!doctype html>\
+    <html>\
+    <head><title>Internet Identity Frontend Initialization Error</title></head>\
+    <body><h1>Internet Identity Frontend Initialization Error</h1>\
+    <p>
+    Please initialize this canister with the following required install args:
+    <ul>
+    <li>backend_canister_id</li>
+    <li>backend_origin</li>
+    </ul>
+    </p>\
+    </body></html>";
 
 // Default configuration for the frontend canister
 lazy_static! {
     // TODO: Change this to the mainnet value `rdmx6-jaaaa-aaaaa-aaadq-cai` before deploying to mainnet.
     static ref DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID: Principal =
         Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
+
     static ref DEFAULT_CONFIG: InternetIdentityFrontendInit = InternetIdentityFrontendInit {
         backend_canister_id: Some(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID),
+        backend_origin: Some("https://backend.id.ai".to_string()),
         related_origins: Some(vec![
             "https://id.ai".to_string(),
             "https://identity.internetcomputer.org".to_string(),
             "https://identity.ic0.app".to_string(),
         ]),
-        openid_configs: Some(vec![OpenIdConfig {
-            name: "Google".to_string(),
-            logo: "".to_string(),
-            issuer: "https://accounts.google.com".to_string(),
-            client_id: "775077467414-q1ajffledt8bjj82p2rl5a09co8cf4rf.apps.googleusercontent.com"
-                .to_string(),
-            jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
-            auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-            auth_scope: vec![
-                "openid".to_string(),
-                "email".to_string(),
-                "profile".to_string()
-            ],
-            fedcm_uri: None,
-            email_verification: None,
-        }]),
+        openid_configs: None,
         dummy_auth: Some(Some(DummyAuthConfig {
             prompt_for_index: true
         })),
@@ -127,12 +125,10 @@ fn certify_all_assets(init: InternetIdentityFrontendInit) {
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
                             )],
                         ),
-                        fallback_for: vec![AssetFallbackConfig {
-                            scope: "/".to_string(),
-                            status_code: Some(StatusCode::OK),
-                        }],
-                        aliased_by: vec!["/".to_string()],
                         encodings: vec![AssetEncoding::Identity.default_config()],
+                        // Fallbacks and aliases are already handled in `get_static_assets()`
+                        fallback_for: vec![],
+                        aliased_by: vec![],
                     }
                 } else {
                     let encodings = if encoding == ContentEncoding::GZip {
@@ -381,21 +377,32 @@ fn get_static_assets(config: &InternetIdentityFrontendInit) -> Vec<AssetUtilAsse
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityFrontendInit) -> String {
     // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
-    let backend_canister_id = config
-        .backend_canister_id
-        .unwrap_or(*DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID);
+    let (Some(backend_canister_id), Some(backend_origin)) =
+        (&config.backend_canister_id, &config.backend_origin)
+    else {
+        return MISSING_MANDATORY_INTERNET_IDENTITY_FRONTEND_INSTALL_ARGS_HTML_ERROR.to_string();
+    };
+
+    let html = html.replace(
+        "</head>",
+        &format!(
+            r#"<link rel="preload" href="{backend_origin}/.config.did.bin" as="fetch"></head>"#,
+        ),
+    );
 
     // Encode config to base64-encoded Candid to avoid JSON escaping issues.
     // For backward compatibility, we use the same struct as before the II canister split.
     let config = InternetIdentityInit::from(config.clone());
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
 
-    html.replace(
+    let html = html.replace(
         r#"<body "#,
         &format!(
             r#"<body data-canister-id="{backend_canister_id}" data-canister-config="{encoded_config}" "#
         ),
-    )
+    );
+
+    html
 }
 
 /// Extract all inline scripts from HTML for CSP hash generation

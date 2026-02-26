@@ -19,6 +19,8 @@ const mockInternetIdentityInit = (
   captcha_config: [],
   dummy_auth: [],
   register_rate_limit: [],
+  backend_canister_id: [],
+  backend_origin: [],
   ...overrides,
 });
 

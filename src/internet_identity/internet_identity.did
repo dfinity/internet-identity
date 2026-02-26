@@ -291,6 +291,8 @@ type InternetIdentityInit = record {
     dummy_auth : opt opt DummyAuthConfig;
     // Backend canister ID, needed for backward compatibility.
     backend_canister_id : opt principal;
+    // Backend origin, needed to sync configuration with frontend.
+    backend_origin : opt text;
 };
 
 type ChallengeKey = text;
