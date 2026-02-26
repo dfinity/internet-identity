@@ -9,9 +9,9 @@ use canister_tests::api::internet_identity::api_v2::authn_method_replace;
 use canister_tests::api::internet_identity::api_v2::authn_method_session_register;
 use canister_tests::api::internet_identity::api_v2::identity_info;
 use canister_tests::framework::*;
-use pretty_assertions::assert_eq;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::RejectResponse;
+use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
