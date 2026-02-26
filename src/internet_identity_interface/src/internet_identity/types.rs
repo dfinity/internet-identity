@@ -391,7 +391,7 @@ pub enum DeployArchiveResult {
     Failed(String),
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Eq, PartialEq)]
 pub enum OpenIdEmailVerification {
     Google,
     Microsoft,
