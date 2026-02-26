@@ -147,7 +147,7 @@ pub enum GetDelegationResponse {
     NoSuchDelegation,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, PartialEq)]
 pub enum AddTentativeDeviceResponse {
     #[serde(rename = "added_tentatively")]
     AddedTentatively {
