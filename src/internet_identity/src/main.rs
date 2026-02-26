@@ -144,10 +144,6 @@ async fn add_tentative_device(
     anchor_number: AnchorNumber,
     device_data: DeviceData,
 ) -> AddTentativeDeviceResponse {
-    if anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey).is_err() {
-        return AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed;
-    };
-
     let result =
         tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
     match result {
@@ -238,11 +234,9 @@ fn register(
 
 #[update]
 fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    if let Err(err) = anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey) {
-        trap(&err);
-    };
-
     anchor_operation_with_authz_check(anchor_number, |anchor| {
+        anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+
         Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -1107,9 +1101,6 @@ mod v2_api {
     ) -> Result<AuthnMethodConfirmationCode, AuthnMethodRegisterError> {
         let device = DeviceWithUsage::try_from(authn_method)
             .map_err(|err| AuthnMethodRegisterError::InvalidMetadata(err.to_string()))?;
-
-        anchor_management::check_passkey_pubkey_is_not_used(&device.pubkey)
-            .map_err(|_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)?;
 
         tentative_device_registration::add_tentative_device(
             identity_number,

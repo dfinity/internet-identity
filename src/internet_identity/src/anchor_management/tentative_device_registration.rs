@@ -4,7 +4,7 @@ use crate::state::RegistrationState::{
     SessionTentativelyConfirmed,
 };
 use crate::state::TentativeDeviceRegistration;
-use crate::{secs_to_nanos, state};
+use crate::{anchor_management, secs_to_nanos, state};
 use candid::{CandidType, Principal};
 use ic_cdk::api::time;
 use ic_cdk::{call, trap};
@@ -101,6 +101,9 @@ pub async fn add_tentative_device(
                     state: DeviceRegistrationModeActive,
                     ..
                 } => {
+                    anchor_management::check_passkey_pubkey_is_not_used(&tentative_device.pubkey)
+                        .map_err(|_| AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)?;
+
                     registration.state = DeviceTentativelyAdded {
                         tentative_device,
                         failed_attempts: 0,
