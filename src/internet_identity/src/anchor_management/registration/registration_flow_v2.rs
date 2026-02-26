@@ -17,9 +17,9 @@ use ic_cdk::caller;
 use ic_stable_structures::Memory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::{
-    AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData,
-    DeviceData, DeviceWithUsage, IdRegFinishArg, IdRegFinishError, IdRegFinishResult,
-    IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
+    AuthnMethod, AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError,
+    CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishArg, IdRegFinishError,
+    IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
     RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 
@@ -236,6 +236,18 @@ fn validate_identity_data<M: Memory + Clone>(
 ) -> Result<ValidatedCreateIdentityData, IdRegFinishError> {
     match &arg {
         CreateIdentityData::PubkeyAuthn(arg) => {
+            // Enforce global uniqueness of passkey pubkeys across all anchors.
+            if let AuthnMethod::WebAuthn(webauthn) = &arg.authn_method.authn_method {
+                if storage
+                    .lookup_anchor_with_passkey_pubkey(&webauthn.pubkey)
+                    .is_some()
+                {
+                    return Err(IdRegFinishError::InvalidAuthnMethod(
+                        "passkey with this public key is already used".to_string(),
+                    ));
+                }
+            }
+
             Ok(ValidatedCreateIdentityData::PubkeyAuthn(arg.clone()))
         }
         CreateIdentityData::OpenID(openid_registration_data) => {
@@ -275,7 +287,6 @@ fn apply_identity_data(
             let device = DeviceWithUsage::try_from(authn_method)
                 .map(|device| Device::from(DeviceData::from(device)))
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-
             identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;

@@ -4,11 +4,12 @@ use canister_tests::api::internet_identity::api_v2::authn_method_add;
 use canister_tests::api::internet_identity::api_v2::authn_method_confirm;
 use canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_enter;
 use canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_exit;
-use canister_tests::api::internet_identity::api_v2::authn_method_replace;
 use canister_tests::api::internet_identity::api_v2::authn_method_remove;
+use canister_tests::api::internet_identity::api_v2::authn_method_replace;
 use canister_tests::api::internet_identity::api_v2::authn_method_session_register;
 use canister_tests::api::internet_identity::api_v2::identity_info;
 use canister_tests::framework::*;
+use pretty_assertions::assert_eq;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::RejectResponse;
 use serde_bytes::ByteBuf;
@@ -448,9 +449,9 @@ fn should_enforce_unique_passkey_pubkeys_and_free_them_on_change_and_remove(
             &a1_same_p0,
             None,
         );
-    assert!(
-        result_a1.is_err(),
-        "second identity registration with same passkey pubkey should fail"
+    assert_eq!(
+        result_a1,
+        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
     );
 
     // 3. This anchor's passkey can be updated to have a different pubkey (P1).
@@ -467,8 +468,7 @@ fn should_enforce_unique_passkey_pubkeys_and_free_them_on_change_and_remove(
     .expect("authn_method_replace failed");
 
     // 4a. Changing a passkey frees up its pubkey for other devices in the same anchor.
-    let a0_reuse_p0_same_anchor =
-        webauthn_authn_method(p0.clone(), test_credential_id(4).unwrap());
+    let a0_reuse_p0_same_anchor = webauthn_authn_method(p0.clone(), test_credential_id(4).unwrap());
     authn_method_add(
         &env,
         canister_id,
@@ -524,9 +524,9 @@ fn should_enforce_unique_passkey_pubkeys_and_free_them_on_change_and_remove(
             &c0_same_q0,
             None,
         );
-    assert!(
-        result_c0.is_err(),
-        "identity registration with an in-use passkey pubkey should fail"
+    assert_eq!(
+        result_c0,
+        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
     );
 
     // Remove Q0 from B0 using the secondary device Q1 for authorization.

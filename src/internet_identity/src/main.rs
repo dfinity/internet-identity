@@ -1217,6 +1217,7 @@ mod openid_api {
         arg: OpenIDRegFinishArg,
     ) -> Result<IdRegFinishResult, IdRegFinishError> {
         openid::with_provider(&arg.jwt, |provider| provider.verify(&arg.jwt, &arg.salt))?;
+
         registration::registration_flow_v2::identity_registration_finish(
             CreateIdentityData::OpenID(arg),
         )
