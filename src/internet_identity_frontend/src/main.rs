@@ -123,7 +123,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         vec![AssetEncoding::Identity.default_config()]
                     };
 
-                    let headers = if path.starts_with("_app/immutable") {
+                    let headers = if path.starts_with("/_app/immutable") {
                         (
                             "cache-control".to_string(),
                             IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
@@ -335,7 +335,7 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
 
     // Serve the initialization argument of this canister as a Candid file
     assets.push(AssetUtilAsset {
-        url_path: "/.config.txt".to_string(),
+        url_path: "/.config".to_string(),
         content: IDLValue::try_from_candid_type(config)
             .unwrap()
             .to_string()
@@ -380,7 +380,7 @@ fn fixup_html(html: &str, config: &InternetIdentityFrontendArgs) -> String {
     let html = html.replace(
         "</head>",
         &format!(
-            r#"<link rel="preload" href="{backend_origin}/.config.did.bin" as="fetch"></head>"#,
+            r#"<link rel="preload" href="{backend_origin}/.config.did.bin" crossorigin="anonymous" fetchpriority="high" as="fetch"></head>"#,
         ),
     );
 

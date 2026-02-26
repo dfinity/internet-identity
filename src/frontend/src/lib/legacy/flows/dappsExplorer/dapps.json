@@ -631,7 +631,13 @@
     "name": "Demo App",
     "oneLiner": "Experience next-gen decentralized authentication.",
     "website": "https://try.id.ai",
-    "logo": "try-id-ai.svg"
+    "authOrigins": [
+      "https://try.id.ai",
+      "https://vt36r-2qaaa-aaaad-aad5a-cai.icp0.io",
+      "https://4mteh-mqaaa-aaaad-adnaa-cai.icp0.io"
+    ],
+    "logo": "try-id-ai.svg",
+    "certified_attributes": true
   },
   {
     "name": "Caffeine",
@@ -644,13 +650,6 @@
     ],
     "logo": "caffeine_logo.svg",
     "logoDark": "caffeine_logo_dark.svg",
-    "certified_attributes": true
-  },
-  {
-    "name": "Direct OpenID Sign-In",
-    "oneLiner": "Direct OpenID sign-in test app",
-    "website": "https://4mteh-mqaaa-aaaad-adnaa-cai.icp0.io",
-    "logo": "try-id-ai.svg",
     "certified_attributes": true
   }
 ]
