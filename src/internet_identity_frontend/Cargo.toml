@@ -9,7 +9,7 @@ internet_identity_interface.workspace = true
 serde_bytes.workspace = true
 
 # IC canister dependencies
-candid.workspace = true
+candid = { workspace = true, features = ["value"] }
 ic-cdk.workspace = true
 ic-cdk-macros.workspace = true
 

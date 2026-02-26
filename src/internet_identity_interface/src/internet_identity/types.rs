@@ -207,41 +207,40 @@ pub struct AnchorCredentials {
 ///
 /// Some fields, like `analytics_config`, have an additional nested `Option<>`, this indicates
 /// enable/disable status (e.g. `Some(None)` disables a feature while `None` leaves it untouched).
-#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
-pub struct InternetIdentityFrontendInit {
-    pub backend_canister_id: Option<Principal>,
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Eq, PartialEq)]
+pub struct InternetIdentityFrontendArgs {
+    pub backend_canister_id: Principal,
     /// For example, "https://backend.id.ai" (no trailing slash)
-    pub backend_origin: Option<String>,
+    pub backend_origin: String,
+
     pub related_origins: Option<Vec<String>>,
-    pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub fetch_root_key: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
 }
 
-impl From<InternetIdentityFrontendInit> for InternetIdentityInit {
-    fn from(value: InternetIdentityFrontendInit) -> Self {
-        let InternetIdentityFrontendInit {
+impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
+    fn from(value: InternetIdentityFrontendArgs) -> Self {
+        let InternetIdentityFrontendArgs {
             backend_canister_id,
             backend_origin,
             fetch_root_key,
             analytics_config,
             dummy_auth,
             related_origins,
-            openid_configs,
         } = value;
 
         Self {
-            backend_canister_id,
-            backend_origin,
+            backend_canister_id: Some(backend_canister_id),
+            backend_origin: Some(backend_origin),
 
             fetch_root_key,
             analytics_config,
             dummy_auth,
             related_origins,
 
-            // TODO: pull this config field from the backend and set it to None here.
-            openid_configs,
+            // This config field is pulled in the frontend from the backend
+            openid_configs: None,
 
             // Config fields not used by the frontend
             canister_creation_cycles_cost: None,
@@ -340,7 +339,7 @@ pub struct CaptchaConfig {
     pub captcha_trigger: CaptchaTrigger,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Eq, PartialEq)]
 pub enum AnalyticsConfig {
     Plausible {
         // Config params from Plausible NPM package
@@ -398,7 +397,7 @@ pub enum OpenIdEmailVerification {
     Microsoft,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
     pub name: String,
     pub logo: String,
@@ -512,7 +511,7 @@ pub enum AccountNameValidationError {
     NameTooLong,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct DummyAuthConfig {
     pub prompt_for_index: bool,
 }
