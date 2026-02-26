@@ -47,17 +47,6 @@ type DummyAuthConfig = record {
     prompt_for_index : bool;
 };
 
-type OpenIdConfig = record {
-    name : text;
-    logo : text;
-    issuer : text;
-    client_id : text;
-    jwks_uri : text;
-    auth_uri : text;
-    auth_scope : vec text;
-    fedcm_uri : opt text;
-};
-
 type InternetIdentityFrontendInit = record {
     backend_canister_id : principal;
     backend_origin : text;
@@ -65,7 +54,6 @@ type InternetIdentityFrontendInit = record {
     fetch_root_key : opt bool;
     analytics_config : opt opt AnalyticsConfig;
     dummy_auth : opt opt DummyAuthConfig;
-    openid_configs : opt vec OpenIdConfig;
 };
 
 service : (InternetIdentityFrontendInit) -> {
