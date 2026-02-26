@@ -5,7 +5,7 @@
       "candid": "src/internet_identity_frontend/internet_identity_frontend.did",
       "wasm": "internet_identity_frontend.wasm.gz",
       "build": "bash -c 'II_DEV_CSP=1 II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=${II_DUMMY_CAPTCHA:-1} scripts/build --frontend'",
-      "init_arg_file": "src/internet_identity_frontend/test_arg.did",
+      "init_arg_file": "src/internet_identity_frontend/local_test_arg.did",
       "shrink": false
     },
     "internet_identity": {
@@ -28,9 +28,7 @@
       "wasm": "demos/vc_issuer/vc_demo_issuer.wasm.gz",
       "build": "demos/vc_issuer/build.sh",
       "post_install": "bash -c 'demos/vc_issuer/provision'",
-      "dependencies": [
-        "internet_identity"
-      ]
+      "dependencies": ["internet_identity"]
     }
   },
   "defaults": {

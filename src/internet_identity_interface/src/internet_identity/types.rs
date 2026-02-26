@@ -214,7 +214,6 @@ pub struct InternetIdentityFrontendArgs {
     pub backend_origin: String,
 
     pub related_origins: Option<Vec<String>>,
-    pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub fetch_root_key: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
@@ -229,7 +228,6 @@ impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
             analytics_config,
             dummy_auth,
             related_origins,
-            openid_configs,
         } = value;
 
         Self {
@@ -241,8 +239,8 @@ impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
             dummy_auth,
             related_origins,
 
-            // TODO: pull this config field from the backend and set it to None here.
-            openid_configs,
+            // This config field is pulled in the frontend from the backend
+            openid_configs: None,
 
             // Config fields not used by the frontend
             canister_creation_cycles_cost: None,

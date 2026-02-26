@@ -528,7 +528,8 @@ jobs:
           # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           if [ "${{ matrix.canister == 'split' }}" = "true" ]; then
-            dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz
+            II_CANISTER_ID=$(dfx canister id internet_identity)
+            dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; dummy_auth = opt opt record { prompt_for_index = true } })"
           fi
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
 

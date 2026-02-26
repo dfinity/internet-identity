@@ -1,7 +1,7 @@
 use asset_util::{collect_assets, Asset as AssetUtilAsset, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use candid::{Encode, IDLValue, Principal};
+use candid::{Encode, IDLValue};
 use flate2::read::GzDecoder;
 use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::{init, post_upgrade};
@@ -9,9 +9,8 @@ use ic_cdk_macros::query;
 use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    DummyAuthConfig, InternetIdentityFrontendArgs, InternetIdentityInit,
+    InternetIdentityFrontendArgs, InternetIdentityInit,
 };
-use lazy_static::lazy_static;
 use serde_json::json;
 use sha2::Digest;
 use std::io::Read;
@@ -25,29 +24,6 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
-
-// Default configuration for the frontend canister
-lazy_static! {
-    // TODO: Change this to the mainnet value `rdmx6-jaaaa-aaaaa-aaadq-cai` before deploying to mainnet.
-    static ref DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID: Principal =
-        Principal::from_text("uxrrr-q7777-77774-qaaaq-cai").unwrap();
-
-    static ref DEFAULT_CONFIG: InternetIdentityFrontendArgs = InternetIdentityFrontendArgs {
-        backend_canister_id: *DEFAULT_INTERNET_IDENTITY_BACKEND_CANISTER_ID,
-        backend_origin: "https://backend.id.ai".to_string(),
-        related_origins: Some(vec![
-            "https://id.ai".to_string(),
-            "https://identity.internetcomputer.org".to_string(),
-            "https://identity.ic0.app".to_string(),
-        ]),
-        openid_configs: None,
-        dummy_auth: Some(Some(DummyAuthConfig {
-            prompt_for_index: true
-        })),
-        fetch_root_key: None,
-        analytics_config: None,
-    };
-}
 
 #[init]
 fn init(args: InternetIdentityFrontendArgs) {
