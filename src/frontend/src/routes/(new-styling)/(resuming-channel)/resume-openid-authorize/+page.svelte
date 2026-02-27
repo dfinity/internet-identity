@@ -112,7 +112,6 @@
 
   onMount(async () => {
     const searchParams = new URLSearchParams(window.location.hash.slice(1));
-    console.log("Search params:", window.location.hash);
     window.history.replaceState(
       undefined,
       "",
