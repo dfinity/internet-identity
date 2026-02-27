@@ -200,12 +200,6 @@
                   delay: 500,
                 }}
                 d="M 46 1 H 71 A 20 20 0 0 1 91 21 V 71 A 20 20 0 0 1 71 91 H 21 A 20 20 0 0 1 1 71 V 21 A 20 20 0 0 1 21 1 H 46"
-                x="1"
-                y="1"
-                width="90"
-                height="90"
-                rx="20"
-                ry="20"
                 stroke-linecap="round"
                 class="stroke-fg-primary fill-none stroke-2"
               />
