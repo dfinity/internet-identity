@@ -111,7 +111,7 @@ impl OpenIdProvider for Provider {
         self.issuer.clone()
     }
 
-    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme> {
+    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
         self.email_verification
     }
 
@@ -542,6 +542,10 @@ fn should_return_credential() {
             (
                 "email".into(),
                 MetadataEntryV2::String(claims.email.unwrap()),
+            ),
+            (
+                "email_verified".into(),
+                MetadataEntryV2::String(claims.email_verified.unwrap().into_string()),
             ),
             ("name".into(), MetadataEntryV2::String(claims.name.unwrap())),
         ]),

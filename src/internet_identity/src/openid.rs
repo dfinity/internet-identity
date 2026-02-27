@@ -200,6 +200,9 @@ impl OpenIdCredential {
     fn get_microsoft_verified_email(&self) -> Option<String> {
         // For Microsoft, check if tid matches the personal account tenant ID
         // (services like Xbox, Teams for Life, or Outlook.com)
+        //
+        // See Microsoft identity platform documentation:
+        // See https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference#payload-claims
         const MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
         let tid = self.read_attribute_as_string("tid")?;
@@ -216,7 +219,7 @@ impl OpenIdCredential {
         self.with_provider(|provider| {
             use OpenIdEmailVerificationScheme::*;
 
-            let verification_scheme = provider.email_verification_schema()?;
+            let verification_scheme = provider.email_verification_scheme()?;
 
             match verification_scheme {
                 Google => self.get_google_verified_email(),
@@ -229,7 +232,7 @@ impl OpenIdCredential {
 pub trait OpenIdProvider {
     fn issuer(&self) -> String;
 
-    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme>;
+    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme>;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -398,7 +401,7 @@ impl OpenIdProvider for ExampleProvider {
         "https://example.com".into()
     }
 
-    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme> {
+    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
         None
     }
 
@@ -600,7 +603,7 @@ impl OpenIdProvider for ExamplePlaceholderProvider {
         "https://login.microsoftonline.com/{tid}/v2.0".into()
     }
 
-    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme> {
+    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
         None
     }
 
