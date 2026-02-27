@@ -143,4 +143,42 @@ test.describe("Authorize with direct OpenID", () => {
       await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
     });
   });
+
+  test.describe("with verified_email attribute", () => {
+    const email = "john.doe@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { email, email_verified: "true" },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        attributes: [
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`,
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedAttributes).toEqual({
+        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`]:
+          email,
+      });
+    });
+
+    test("should return verified email", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
 });

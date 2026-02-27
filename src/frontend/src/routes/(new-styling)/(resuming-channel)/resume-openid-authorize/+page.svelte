@@ -53,7 +53,8 @@
       const implicitConsentAttributeKeys = paramsResult.data.attributes.filter(
         (attribute) =>
           attribute === `openid:${issuer}:name` ||
-          attribute === `openid:${issuer}:email`,
+          attribute === `openid:${issuer}:email` ||
+          attribute === `openid:${issuer}:verified_email`,
       );
       try {
         const { attributes, issued_at_timestamp_ns } =
