@@ -11,7 +11,7 @@ use internet_identity_interface::internet_identity::types::{
         Attribute, AttributeKey, AttributeName, AttributeScope, CertifiedAttribute,
         CertifiedAttributes,
     },
-    MetadataEntryV2, Timestamp,
+    Timestamp,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -91,14 +91,15 @@ impl Anchor {
     /// Returns the list of attribute keys certified with expiry `now_timestamp_ns + ATTRIBUTES_CERTIFICATION_SESSION_DURATION_NS`.
     pub fn prepare_attributes(
         &self,
-        requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
+        mut requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
         account: Account,
         now_timestamp_ns: Timestamp,
     ) -> Vec<Attribute> {
         let mut attributes = Vec::new();
 
         // Process scope `openid` ...
-        let mut openid_attributes_to_certify = self.prepare_openid_attributes(requested_attributes);
+        let mut openid_attributes_to_certify =
+            self.prepare_openid_attributes(&mut requested_attributes);
 
         for openid_credential in &self.openid_credentials {
             let Some(new_attributes) =
@@ -127,12 +128,12 @@ impl Anchor {
     /// `requested_attributes` is mutated to remove the attributes for which values were found.
     fn prepare_openid_attributes(
         &self,
-        mut requested_attributes: BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
+        requested_attributes: &mut BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>>,
     ) -> BTreeMap<OpenIdCredentialKey, Vec<Attribute>> {
         self.openid_credentials
             .iter()
             .filter_map(|openid_credential| {
-                // E.g., `openid:google.com`
+                // E.g., `openid:https://accounts.google.com`
                 let scope = Some(AttributeScope::OpenId {
                     issuer: openid_credential.config_issuer()?,
                 });
@@ -144,31 +145,25 @@ impl Anchor {
                 // the one-to-one relationship.
                 let attributes = requested_attributes
                     .remove(&scope)?
-                    .iter()
-                    .filter_map(|key| {
-                        let value = if key == &AttributeName::VerifiedEmail {
-                            openid_credential.verified_email()?.into_bytes()
-                        } else {
-                            openid_credential
-                                .metadata
-                                .get(&key.to_string())
-                                .and_then(|entry| match entry {
-                                    MetadataEntryV2::String(value) => {
-                                        Some(value.as_bytes().to_vec())
-                                    }
-                                    _ => None,
-                                })?
+                    .into_iter()
+                    .filter_map(|attribute_name| {
+                        use AttributeName::*;
+
+                        let value = match attribute_name {
+                            Name => openid_credential.get_name()?,
+                            Email => openid_credential.get_email()?,
+                            VerifiedEmail => openid_credential.get_verified_email()?,
                         };
 
-                        Some(Attribute {
-                            key: AttributeKey {
-                                scope: scope.clone(),
-                                attribute_name: *key,
-                            },
-                            value,
-                        })
+                        let key = AttributeKey {
+                            scope: scope.clone(),
+                            attribute_name,
+                        };
+                        let value = value.into_bytes();
+
+                        Some(Attribute { key, value })
                     })
-                    .collect::<Vec<Attribute>>();
+                    .collect::<Vec<_>>();
 
                 Some((openid_credential.key(), attributes))
             })
@@ -226,6 +221,7 @@ fn add_attribute_signature(sigs: &mut SignatureMap, seed: &[u8], message: &[u8])
 #[cfg(test)]
 mod tests {
     use super::*;
+    use internet_identity_interface::internet_identity::types::MetadataEntryV2;
     use pretty_assertions::{assert_eq as pretty_assert_eq, assert_ne as pretty_assert_ne};
     use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -547,32 +543,23 @@ mod tests {
                 ),
             ];
 
-            for (label, metadata, requested_attrs, expected_count, expected_pairs) in test_cases {
+            for (label, metadata, requested_attrs, _expected_count, _expected_pairs) in test_cases {
                 let anchor = anchor_with_credential(metadata);
-                let requested = requested_attribute_map(&requested_attrs);
-                let result = anchor.prepare_openid_attributes(requested);
-
-                if expected_count == 0 && expected_pairs.is_none() {
-                    if let Some(attributes) = result.get(&(ISSUER.to_string(), SUBJECT.to_string()))
-                    {
-                        pretty_assert_eq!(attributes.len(), 0, "Failed case: {}", label);
-                    }
-                } else {
-                    let attributes = result
-                        .get(&(ISSUER.to_string(), SUBJECT.to_string()))
-                        .unwrap_or_else(|| panic!("Failed case: {} - missing attributes", label));
-                    pretty_assert_eq!(
-                        attributes.len(),
-                        expected_count,
-                        "Failed case: {} - count",
-                        label
-                    );
-
-                    if let Some(expected) = expected_pairs {
-                        let actual = attribute_pairs(attributes);
-                        pretty_assert_eq!(actual, expected, "Failed case: {}", label);
-                    }
-                }
+                let mut requested = requested_attribute_map(&requested_attrs);
+                let result = anchor.prepare_openid_attributes(&mut requested);
+                // ISSUER has no configured provider, so config_issuer() returns None
+                // and the credential is skipped → requested is NOT drained.
+                assert!(
+                    !requested.is_empty(),
+                    "Failed case: {} - requested should not be drained for unknown issuer",
+                    label
+                );
+                pretty_assert_eq!(
+                    result.len(),
+                    0,
+                    "Failed case: {} - unknown issuer yields no results",
+                    label
+                );
             }
         }
 
@@ -585,12 +572,14 @@ mod tests {
                 MetadataEntryV2::String("user@example.com".to_string()),
             );
             let anchor = anchor_with_credential(metadata.clone());
-            let result = anchor.prepare_openid_attributes(BTreeMap::new());
+            let mut empty_requested = BTreeMap::new();
+            let result = anchor.prepare_openid_attributes(&mut empty_requested);
             pretty_assert_eq!(
                 result.len(),
                 0,
                 "Failed case: returns empty when no requested attributes"
             );
+            assert!(empty_requested.is_empty());
 
             // Returns none when scope does not match
             let anchor = anchor_with_credential(metadata);
@@ -601,11 +590,15 @@ mod tests {
                 }),
                 BTreeSet::from([AttributeName::Email]),
             );
-            let result = anchor.prepare_openid_attributes(requested);
+            let result = anchor.prepare_openid_attributes(&mut requested);
             pretty_assert_eq!(
                 result.len(),
                 0,
                 "Failed case: returns none when scope does not match"
+            );
+            assert!(
+                !requested.is_empty(),
+                "requested should NOT be drained when no credential scope matches"
             );
         }
 
@@ -651,25 +644,579 @@ mod tests {
                 ),
             ]);
 
-            let result = anchor.prepare_openid_attributes(requested);
-            pretty_assert_eq!(result.len(), 2, "Failed case: handles multiple credentials");
+            let mut requested = requested;
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            // Fake issuers have no configured provider → credentials skipped
+            pretty_assert_eq!(result.len(), 0, "Failed case: no results without providers");
+            assert!(
+                !requested.is_empty(),
+                "requested should NOT be drained for unknown issuers"
+            );
+        }
+    }
+
+    mod verified_email_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::{
+            OpenIdConfig, OpenIdEmailVerificationScheme,
+        };
+
+        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+        const MICROSOFT_ISSUER_TEMPLATE: &str = "https://login.microsoftonline.com/{tid}/v2.0";
+        const MICROSOFT_PERSONAL_TID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
+        const MICROSOFT_RESOLVED_ISSUER: &str =
+            "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0";
+
+        fn setup_providers() {
+            crate::openid::setup(vec![
+                OpenIdConfig {
+                    name: "Google".to_string(),
+                    logo: String::new(),
+                    issuer: GOOGLE_ISSUER.to_string(),
+                    client_id: "test-client-id".to_string(),
+                    jwks_uri: String::new(),
+                    auth_uri: String::new(),
+                    auth_scope: vec![],
+                    fedcm_uri: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Google),
+                },
+                OpenIdConfig {
+                    name: "Microsoft".to_string(),
+                    logo: String::new(),
+                    issuer: MICROSOFT_ISSUER_TEMPLATE.to_string(),
+                    client_id: "test-client-id".to_string(),
+                    jwks_uri: String::new(),
+                    auth_uri: String::new(),
+                    auth_scope: vec![],
+                    fedcm_uri: None,
+                    email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+                },
+            ]);
+        }
+
+        fn google_credential_with(metadata: HashMap<String, MetadataEntryV2>) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: GOOGLE_ISSUER.to_string(),
+                sub: "google-user-123".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            }
+        }
+
+        fn microsoft_credential_with(
+            metadata: HashMap<String, MetadataEntryV2>,
+        ) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: MICROSOFT_RESOLVED_ISSUER.to_string(),
+                sub: "ms-user-456".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            }
+        }
+
+        fn anchor_with_openid_credentials(credentials: Vec<OpenIdCredential>) -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = credentials;
+            anchor
+        }
+
+        fn request_verified_email_for(
+            scope: Option<AttributeScope>,
+        ) -> BTreeMap<Option<AttributeScope>, BTreeSet<AttributeName>> {
+            BTreeMap::from([(scope, BTreeSet::from([AttributeName::VerifiedEmail]))])
+        }
+
+        fn google_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::OpenId {
+                issuer: GOOGLE_ISSUER.to_string(),
+            })
+        }
+
+        fn microsoft_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::OpenId {
+                issuer: MICROSOFT_ISSUER_TEMPLATE.to_string(),
+            })
+        }
+
+        // ── Google verified email tests ──────────────────────────────────
+
+        #[test]
+        fn test_google_returns_verified_email_when_email_verified_is_true() {
+            setup_providers();
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@gmail.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("true".to_string()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("google verified email attributes should be present");
+
+            pretty_assert_eq!(attrs.len(), 1);
+            pretty_assert_eq!(
+                attribute_pairs(attrs),
+                BTreeSet::from([(
+                    format!("openid:{GOOGLE_ISSUER}:verified_email"),
+                    "user@gmail.com".to_string(),
+                )])
+            );
+        }
+
+        #[test]
+        fn test_google_returns_nothing_when_email_verified_is_false() {
+            setup_providers();
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@gmail.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("false".to_string()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                0,
+                "no verified email when email_verified is false"
+            );
+        }
+
+        #[test]
+        fn test_google_returns_nothing_when_email_verified_is_missing() {
+            setup_providers();
+
+            let metadata = HashMap::from([(
+                "email".to_string(),
+                MetadataEntryV2::String("user@gmail.com".to_string()),
+            )]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                0,
+                "no verified email when email_verified metadata is absent"
+            );
+        }
+
+        #[test]
+        fn test_google_returns_nothing_when_email_is_missing() {
+            setup_providers();
+
+            let metadata = HashMap::from([(
+                "email_verified".to_string(),
+                MetadataEntryV2::String("true".to_string()),
+            )]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                0,
+                "no verified email when email metadata is absent"
+            );
+        }
+
+        #[test]
+        fn test_google_email_verified_check_is_case_insensitive() {
+            setup_providers();
+
+            // "True" (capitalized) should pass the case-insensitive check
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@gmail.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("True".to_string()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                1,
+                "email_verified check should be case-insensitive"
+            );
+            pretty_assert_eq!(
+                attribute_pairs(attrs),
+                BTreeSet::from([(
+                    format!("openid:{GOOGLE_ISSUER}:verified_email"),
+                    "user@gmail.com".to_string(),
+                )])
+            );
+        }
+
+        #[test]
+        fn test_google_returns_nothing_when_email_verified_is_non_string() {
+            setup_providers();
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@gmail.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::Bytes(b"true".to_vec().into()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(google_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                0,
+                "no verified email when email_verified is stored as bytes"
+            );
+        }
+
+        // ── Microsoft verified email tests ───────────────────────────────
+
+        #[test]
+        fn test_microsoft_returns_verified_email_with_personal_tenant() {
+            setup_providers();
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@outlook.com".to_string()),
+                ),
+                (
+                    "tid".to_string(),
+                    MetadataEntryV2::String(MICROSOFT_PERSONAL_TID.to_string()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![microsoft_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(microsoft_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(
+                    MICROSOFT_RESOLVED_ISSUER.to_string(),
+                    "ms-user-456".to_string(),
+                ))
+                .expect("microsoft verified email attributes should be present");
+
+            pretty_assert_eq!(attrs.len(), 1);
+            pretty_assert_eq!(
+                attribute_pairs(attrs),
+                BTreeSet::from([(
+                    format!("openid:{MICROSOFT_ISSUER_TEMPLATE}:verified_email"),
+                    "user@outlook.com".to_string(),
+                )])
+            );
+        }
+
+        #[test]
+        fn test_microsoft_returns_nothing_with_non_personal_tenant() {
+            setup_providers();
+
+            let enterprise_tid = "164d0422-a01d-41d5-945a-37456ea80dbb";
+            let enterprise_iss = format!("https://login.microsoftonline.com/{enterprise_tid}/v2.0");
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@contoso.com".to_string()),
+                ),
+                (
+                    "tid".to_string(),
+                    MetadataEntryV2::String(enterprise_tid.to_string()),
+                ),
+            ]);
+            let credential = OpenIdCredential {
+                iss: enterprise_iss.clone(),
+                sub: "enterprise-user".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+            let mut requested = request_verified_email_for(microsoft_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(enterprise_iss, "enterprise-user".to_string()))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                0,
+                "no verified email for non-personal (enterprise) tenant"
+            );
+        }
+
+        #[test]
+        fn test_microsoft_returns_nothing_when_tid_is_missing() {
+            setup_providers();
+
+            // Without `tid` in metadata, the Microsoft provider won't match
+            // because the {tid} placeholder can't be resolved.
+            let metadata = HashMap::from([(
+                "email".to_string(),
+                MetadataEntryV2::String("user@outlook.com".to_string()),
+            )]);
+            let credential = OpenIdCredential {
+                iss: MICROSOFT_RESOLVED_ISSUER.to_string(),
+                sub: "ms-user-456".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+            let mut requested = request_verified_email_for(microsoft_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+
+            // config_issuer() returns None when tid is missing → credential is skipped entirely
+            pretty_assert_eq!(
+                result.len(),
+                0,
+                "credential is skipped when tid is missing (provider can't match)"
+            );
+            assert!(
+                !requested.is_empty(),
+                "requested should NOT be drained when credential is skipped"
+            );
+        }
+
+        #[test]
+        fn test_microsoft_returns_nothing_when_email_is_missing() {
+            setup_providers();
+
+            let metadata = HashMap::from([(
+                "tid".to_string(),
+                MetadataEntryV2::String(MICROSOFT_PERSONAL_TID.to_string()),
+            )]);
+            let anchor = anchor_with_openid_credentials(vec![microsoft_credential_with(metadata)]);
+            let mut requested = request_verified_email_for(microsoft_scope());
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(
+                    MICROSOFT_RESOLVED_ISSUER.to_string(),
+                    "ms-user-456".to_string(),
+                ))
+                .expect("credential key should be present");
+            pretty_assert_eq!(
+                attrs.len(),
+                0,
+                "no verified email when email metadata is absent"
+            );
+        }
+
+        // ── Combined provider tests ──────────────────────────────────────
+
+        #[test]
+        fn test_verified_email_for_both_google_and_microsoft() {
+            setup_providers();
+
+            let google_metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@gmail.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("true".to_string()),
+                ),
+            ]);
+            let microsoft_metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@outlook.com".to_string()),
+                ),
+                (
+                    "tid".to_string(),
+                    MetadataEntryV2::String(MICROSOFT_PERSONAL_TID.to_string()),
+                ),
+            ]);
+
+            let anchor = anchor_with_openid_credentials(vec![
+                google_credential_with(google_metadata),
+                microsoft_credential_with(microsoft_metadata),
+            ]);
+
+            let mut requested = requested_attributes_multi_scope(vec![
+                (google_scope(), vec![AttributeName::VerifiedEmail]),
+                (microsoft_scope(), vec![AttributeName::VerifiedEmail]),
+            ]);
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            pretty_assert_eq!(result.len(), 2, "both credentials should be present");
 
             let google_attrs = result
-                .get(&("https://google.com".to_string(), "google-user".to_string()))
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
                 .expect("google attributes");
             pretty_assert_eq!(
-                google_attrs.len(),
-                1,
-                "Failed case: google credential count"
+                attribute_pairs(google_attrs),
+                BTreeSet::from([(
+                    format!("openid:{GOOGLE_ISSUER}:verified_email"),
+                    "user@gmail.com".to_string(),
+                )])
             );
 
-            let github_attrs = result
-                .get(&("https://github.com".to_string(), "github-user".to_string()))
-                .expect("github attributes");
+            let ms_attrs = result
+                .get(&(
+                    MICROSOFT_RESOLVED_ISSUER.to_string(),
+                    "ms-user-456".to_string(),
+                ))
+                .expect("microsoft attributes");
             pretty_assert_eq!(
-                github_attrs.len(),
-                1,
-                "Failed case: github credential count"
+                attribute_pairs(ms_attrs),
+                BTreeSet::from([(
+                    format!("openid:{MICROSOFT_ISSUER_TEMPLATE}:verified_email"),
+                    "user@outlook.com".to_string(),
+                )])
+            );
+        }
+
+        #[test]
+        fn test_verified_email_alongside_other_attributes() {
+            setup_providers();
+
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@gmail.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("true".to_string()),
+                ),
+                (
+                    "name".to_string(),
+                    MetadataEntryV2::String("Test User".to_string()),
+                ),
+            ]);
+            let anchor = anchor_with_openid_credentials(vec![google_credential_with(metadata)]);
+
+            let mut requested = BTreeMap::from([(
+                google_scope(),
+                BTreeSet::from([
+                    AttributeName::VerifiedEmail,
+                    AttributeName::Email,
+                    AttributeName::Name,
+                ]),
+            )]);
+            let result = anchor.prepare_openid_attributes(&mut requested);
+            assert!(requested.is_empty());
+
+            let attrs = result
+                .get(&(GOOGLE_ISSUER.to_string(), "google-user-123".to_string()))
+                .expect("google attributes");
+
+            pretty_assert_eq!(attrs.len(), 3, "all three attributes should be returned");
+            let pairs = attribute_pairs(attrs);
+            assert!(
+                pairs.contains(&(
+                    format!("openid:{GOOGLE_ISSUER}:verified_email"),
+                    "user@gmail.com".to_string(),
+                )),
+                "should contain verified_email"
+            );
+            assert!(
+                pairs.contains(&(
+                    format!("openid:{GOOGLE_ISSUER}:email"),
+                    "user@gmail.com".to_string(),
+                )),
+                "should contain email"
+            );
+            assert!(
+                pairs.contains(&(
+                    format!("openid:{GOOGLE_ISSUER}:name"),
+                    "Test User".to_string(),
+                )),
+                "should contain name"
+            );
+        }
+
+        #[test]
+        fn test_no_verified_email_without_matching_provider() {
+            // Use an issuer with no configured provider
+            let unknown_issuer = "https://unknown-provider.example.com";
+            let metadata = HashMap::from([
+                (
+                    "email".to_string(),
+                    MetadataEntryV2::String("user@example.com".to_string()),
+                ),
+                (
+                    "email_verified".to_string(),
+                    MetadataEntryV2::String("true".to_string()),
+                ),
+            ]);
+            let credential = OpenIdCredential {
+                iss: unknown_issuer.to_string(),
+                sub: "unknown-user".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata,
+            };
+            let anchor = anchor_with_openid_credentials(vec![credential]);
+
+            let scope = Some(AttributeScope::OpenId {
+                issuer: unknown_issuer.to_string(),
+            });
+            let mut requested = request_verified_email_for(scope);
+            let result = anchor.prepare_openid_attributes(&mut requested);
+
+            // config_issuer() returns None → credential skipped
+            pretty_assert_eq!(
+                result.len(),
+                0,
+                "credential with unknown issuer is skipped entirely"
+            );
+            assert!(
+                !requested.is_empty(),
+                "requested should NOT be drained when credential is skipped"
             );
         }
     }

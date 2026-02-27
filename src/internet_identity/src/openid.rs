@@ -13,7 +13,7 @@ use internet_identity_interface::internet_identity::types::openid::{
 };
 use internet_identity_interface::internet_identity::types::{
     AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
-    OpenIdEmailVerification, PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
+    OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -171,12 +171,57 @@ impl OpenIdCredential {
         self.with_provider(|provider| Some(provider.issuer()))
     }
 
+    fn read_attribute_as_string(&self, attribute_name: &str) -> Option<String> {
+        let MetadataEntryV2::String(value) = self.metadata.get(attribute_name)? else {
+            return None;
+        };
+
+        Some(value.clone())
+    }
+
+    pub fn get_name(&self) -> Option<String> {
+        self.read_attribute_as_string("name")
+    }
+
+    pub fn get_email(&self) -> Option<String> {
+        self.read_attribute_as_string("email")
+    }
+
+    fn get_google_verified_email(&self) -> Option<String> {
+        let email_verified = self.read_attribute_as_string("email_verified")?;
+
+        if !email_verified.eq_ignore_ascii_case("true") {
+            return None;
+        }
+
+        self.get_email()
+    }
+
+    fn get_microsoft_verified_email(&self) -> Option<String> {
+        // For Microsoft, check if tid matches the personal account tenant ID
+        // (services like Xbox, Teams for Life, or Outlook.com)
+        const MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
+
+        let tid = self.read_attribute_as_string("tid")?;
+
+        if tid != MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID {
+            return None;
+        }
+
+        self.get_email()
+    }
+
     /// Return the verified email for this credential, if available
-    pub fn verified_email(&self) -> Option<String> {
+    pub fn get_verified_email(&self) -> Option<String> {
         self.with_provider(|provider| {
-            provider
-                .email_verification()
-                .and_then(|verification| get_verified_email(&verification, &self.metadata))
+            use OpenIdEmailVerificationScheme::*;
+
+            let verification_scheme = provider.email_verification_schema()?;
+
+            match verification_scheme {
+                Google => self.get_google_verified_email(),
+                Microsoft => self.get_microsoft_verified_email(),
+            }
         })
     }
 }
@@ -184,7 +229,7 @@ impl OpenIdCredential {
 pub trait OpenIdProvider {
     fn issuer(&self) -> String;
 
-    fn email_verification(&self) -> Option<OpenIdEmailVerification>;
+    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme>;
 
     /// Verify JWT and bound nonce with salt, return `OpenIdCredential` if successful
     ///
@@ -287,54 +332,6 @@ pub fn get_all_claims(claims_bytes: &[u8], keys: Vec<String>) -> Vec<(String, St
     result
 }
 
-/// Get the verified email from metadata if it passes the provider's verification requirements.
-pub fn get_verified_email(
-    verification: &OpenIdEmailVerification,
-    metadata: &HashMap<String, MetadataEntryV2>,
-) -> Option<String> {
-    match verification {
-        OpenIdEmailVerification::Google => get_google_verified_email(metadata),
-        OpenIdEmailVerification::Microsoft => get_microsoft_verified_email(metadata),
-    }
-}
-
-fn get_google_verified_email(metadata: &HashMap<String, MetadataEntryV2>) -> Option<String> {
-    let email = metadata.get("email").and_then(|entry| match entry {
-        MetadataEntryV2::String(s) => Some(s.clone()),
-        _ => None,
-    })?;
-
-    let is_verified = metadata
-        .get("email_verified")
-        .and_then(|entry| match entry {
-            MetadataEntryV2::String(s) => Some(s.as_str()),
-            _ => None,
-        })
-        .is_some_and(|s| s == "true");
-
-    is_verified.then_some(email)
-}
-
-fn get_microsoft_verified_email(metadata: &HashMap<String, MetadataEntryV2>) -> Option<String> {
-    let email = metadata.get("email").and_then(|entry| match entry {
-        MetadataEntryV2::String(s) => Some(s.clone()),
-        _ => None,
-    })?;
-
-    // For Microsoft, check if tid matches the personal account tenant ID
-    // (services like Xbox, Teams for Life, or Outlook.com)
-    const MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
-    let is_verified = metadata
-        .get("tid")
-        .and_then(|entry| match entry {
-            MetadataEntryV2::String(s) => Some(s.as_str()),
-            _ => None,
-        })
-        .is_some_and(|tid| tid == MICROSOFT_PERSONAL_ACCOUNT_TENANT_ID);
-
-    is_verified.then_some(email)
-}
-
 /// As seen in <https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration>,
 /// the Microsoft issuer uri is dynamic based on the `tid` claim, this method makes sure to
 /// replace the placeholders like e.g. `tid` in the issuer uri with the corresponding claims.
@@ -401,7 +398,7 @@ impl OpenIdProvider for ExampleProvider {
         "https://example.com".into()
     }
 
-    fn email_verification(&self) -> Option<OpenIdEmailVerification> {
+    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme> {
         None
     }
 
@@ -603,7 +600,7 @@ impl OpenIdProvider for ExamplePlaceholderProvider {
         "https://login.microsoftonline.com/{tid}/v2.0".into()
     }
 
-    fn email_verification(&self) -> Option<OpenIdEmailVerification> {
+    fn email_verification_schema(&self) -> Option<OpenIdEmailVerificationScheme> {
         None
     }
 
