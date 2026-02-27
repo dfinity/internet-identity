@@ -393,6 +393,7 @@ pub enum DeployArchiveResult {
 
 #[derive(Clone, Copy, Debug, CandidType, Serialize, Deserialize, Eq, PartialEq)]
 pub enum OpenIdEmailVerificationScheme {
+    Unknown,
     Google,
     Microsoft,
 }

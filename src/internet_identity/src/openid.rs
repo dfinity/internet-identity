@@ -222,6 +222,7 @@ impl OpenIdCredential {
             let verification_scheme = provider.email_verification_scheme()?;
 
             match verification_scheme {
+                Unknown => None,
                 Google => self.get_google_verified_email(),
                 Microsoft => self.get_microsoft_verified_email(),
             }
