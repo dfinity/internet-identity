@@ -18,7 +18,7 @@ const provider = new oidc.Provider(`http://localhost:${port}`, {
     },
   ],
   claims: {
-    openid: ["sub", "name", "email", "preferred_username"],
+    openid: ["sub", "name", "email", "preferred_username", "email_verified"],
   },
   async findAccount(_, id) {
     return {
