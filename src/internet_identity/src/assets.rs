@@ -93,7 +93,15 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
     assets.push(Asset {
         url_path: "/.well-known/ic-domains".to_string(),
-        content: b"identity.internetcomputer.org\nbeta.identity.ic0.app\nbeta.identity.internetcomputer.org\nid.ai\nbeta.id.ai\nwww.id.ai".to_vec(),
+        content: config
+            .related_origins
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|origin| origin.replace("https://", ""))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });

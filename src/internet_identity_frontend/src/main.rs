@@ -322,10 +322,17 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
     });
 
     // Add .well-known/ic-domains for custom domain support
-    let ic_domains_content = b"identity.internetcomputer.org\nbeta.identity.ic0.app\nbeta.identity.internetcomputer.org\nid.ai\nbeta.id.ai\nwww.id.ai".to_vec();
     assets.push(AssetUtilAsset {
         url_path: "/.well-known/ic-domains".to_string(),
-        content: ic_domains_content,
+        content: config
+            .related_origins
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|origin| origin.replace("https://", ""))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });
