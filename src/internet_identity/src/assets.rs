@@ -103,8 +103,7 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
         })
         .collect::<Vec<String>>()
         .join("\n")
-        .into_bytes()
-        .to_vec();
+        .into_bytes();
 
     assets.push(Asset {
         url_path: "/.well-known/ic-domains".to_string(),
