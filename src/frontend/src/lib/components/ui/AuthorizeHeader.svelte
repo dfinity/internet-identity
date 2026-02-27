@@ -34,21 +34,10 @@
       <img
         src={dapp.logoSrc}
         alt={`${dapp.name} logo`}
-        class={[
-          "h-16 max-w-50 object-contain",
-          dapp.logoDarkSrc !== undefined && "dark:hidden",
-        ]}
+        class={["h-20 max-w-50 object-contain"]}
       />
-      {#if dapp.logoDarkSrc !== undefined}
-        <img
-          src={dapp.logoDarkSrc}
-          alt={`${dapp.name} logo`}
-          class="hidden h-16 max-w-50 object-contain dark:block"
-          aria-hidden="true"
-        />
-      {/if}
     {:else}
-      <div class="flex size-16 items-center justify-center" aria-hidden="true">
+      <div class="flex size-20 items-center justify-center" aria-hidden="true">
         <GlobeIcon class="size-6" />
       </div>
     {/if}
