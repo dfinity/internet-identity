@@ -112,6 +112,7 @@
 
   onMount(async () => {
     const searchParams = new URLSearchParams(window.location.hash.slice(1));
+    console.log("Search params:", window.location.hash);
     window.history.replaceState(
       undefined,
       "",
@@ -144,8 +145,12 @@
       });
       directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
       const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+      const { name, email } = decodeJWT(jwt);
       if (authFlowResult.type === "signUp") {
-        await authFlow.completeOpenIdRegistration(authFlowResult.name!);
+        await authFlow.completeOpenIdRegistration(
+          // Prefer name, then email prefix, then fallback to a generic name
+          name ?? email?.split("@")[0] ?? $t`${config.name} user`,
+        );
       }
       if (
         dapp?.certifiedAttributes === true ||
