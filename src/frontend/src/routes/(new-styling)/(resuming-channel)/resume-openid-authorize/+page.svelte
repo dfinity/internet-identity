@@ -184,7 +184,7 @@
           <svg viewBox="0 0 92 92" width="92" height="92" class="mb-4">
             <path
               d="M 46 1 H 71 A 20 20 0 0 1 91 21 V 71 A 20 20 0 0 1 71 91 H 21 A 20 20 0 0 1 1 71 V 21 A 20 20 0 0 1 21 1 H 46"
-              class="stroke-border-tertiary fill-none stroke-2"
+              class="stroke-fg-primary/10 fill-none stroke-2"
             />
             <g
               transition:fade|global={{
@@ -218,7 +218,7 @@
             cy="46"
             r="45"
             stroke-width="2"
-            class="stroke-border-tertiary fill-none stroke-2"
+            class="stroke-fg-primary/10 fill-none stroke-2"
           />
           <g
             transition:fade|global={{
