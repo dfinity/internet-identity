@@ -97,6 +97,9 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
             .related_origins
             .clone()
             .unwrap_or_default()
+            .into_iter()
+            .map(|origin| origin.replace("https://", ""))
+            .collect::<Vec<_>>()
             .join("\n")
             .into_bytes(),
         encoding: ContentEncoding::Identity,
