@@ -91,9 +91,24 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
 
     // Required to make II available on the identity.internetcomputer.org domain.
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
+    let well_known_origins = config
+        .related_origins
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|origin| {
+            let origin = origin.replace("https://", "");
+            let beta_origin = format!("beta.{origin}");
+            [origin, beta_origin]
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
+        .into_bytes()
+        .to_vec();
+
     assets.push(Asset {
         url_path: "/.well-known/ic-domains".to_string(),
-        content: b"identity.internetcomputer.org\nbeta.identity.ic0.app\nbeta.identity.internetcomputer.org\nid.ai\nbeta.id.ai\nwww.id.ai".to_vec(),
+        content: well_known_origins,
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });
