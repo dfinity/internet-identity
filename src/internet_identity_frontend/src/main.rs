@@ -322,24 +322,14 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
     });
 
     // Add .well-known/ic-domains for custom domain support
-    let well_known_origins = config
-        .related_origins
-        .clone()
-        .unwrap_or_default()
-        .into_iter()
-        .flat_map(|origin| {
-            let origin = origin.replace("https://", "");
-            let beta_origin = format!("beta.{origin}");
-            [origin, beta_origin]
-        })
-        .collect::<Vec<String>>()
-        .join("\n")
-        .into_bytes()
-        .to_vec();
-
     assets.push(AssetUtilAsset {
         url_path: "/.well-known/ic-domains".to_string(),
-        content: well_known_origins,
+        content: config
+            .related_origins
+            .clone()
+            .unwrap_or_default()
+            .join("\n")
+            .into_bytes(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
     });
