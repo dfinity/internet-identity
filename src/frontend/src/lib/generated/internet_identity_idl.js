@@ -15,12 +15,18 @@ export const idlFactory = ({ IDL }) => {
       'api_host' : IDL.Opt(IDL.Text),
     }),
   });
+  const OpenIdEmailVerification = IDL.Variant({
+    'Google' : IDL.Null,
+    'Unknown' : IDL.Null,
+    'Microsoft' : IDL.Null,
+  });
   const OpenIdConfig = IDL.Record({
     'auth_uri' : IDL.Text,
     'jwks_uri' : IDL.Text,
     'logo' : IDL.Text,
     'name' : IDL.Text,
     'fedcm_uri' : IDL.Opt(IDL.Text),
+    'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
     'client_id' : IDL.Text,
@@ -899,12 +905,18 @@ export const init = ({ IDL }) => {
       'api_host' : IDL.Opt(IDL.Text),
     }),
   });
+  const OpenIdEmailVerification = IDL.Variant({
+    'Google' : IDL.Null,
+    'Unknown' : IDL.Null,
+    'Microsoft' : IDL.Null,
+  });
   const OpenIdConfig = IDL.Record({
     'auth_uri' : IDL.Text,
     'jwks_uri' : IDL.Text,
     'logo' : IDL.Text,
     'name' : IDL.Text,
     'fedcm_uri' : IDL.Opt(IDL.Text),
+    'email_verification' : IDL.Opt(OpenIdEmailVerification),
     'issuer' : IDL.Text,
     'auth_scope' : IDL.Vec(IDL.Text),
     'client_id' : IDL.Text,
