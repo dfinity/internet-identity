@@ -367,6 +367,7 @@ type JWT = text;
 type Salt = blob;
 
 type OpenIdEmailVerification = variant {
+    Unknown;
     Google;
     Microsoft;
 };

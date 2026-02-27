@@ -53,7 +53,8 @@
       const implicitConsentAttributeKeys = paramsResult.data.attributes.filter(
         (attribute) =>
           attribute === `openid:${issuer}:name` ||
-          attribute === `openid:${issuer}:email`,
+          attribute === `openid:${issuer}:email` ||
+          attribute === `openid:${issuer}:verified_email`,
       );
       try {
         const { attributes, issued_at_timestamp_ns } =
@@ -143,8 +144,12 @@
       });
       directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
       const authFlowResult = await authFlow.continueWithOpenId(config, jwt);
+      const { name, email } = decodeJWT(jwt);
       if (authFlowResult.type === "signUp") {
-        await authFlow.completeOpenIdRegistration(authFlowResult.name!);
+        await authFlow.completeOpenIdRegistration(
+          // Prefer name, then email prefix, then fallback to a generic name
+          name ?? email?.split("@")[0] ?? $t`${config.name} user`,
+        );
       }
       if (
         dapp?.certifiedAttributes === true ||

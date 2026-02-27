@@ -812,6 +812,7 @@ export interface OpenIdConfig {
   'logo' : string,
   'name' : string,
   'fedcm_uri' : [] | [string],
+  'email_verification' : [] | [OpenIdEmailVerification],
   'issuer' : string,
   'auth_scope' : Array<string>,
   'client_id' : string,
@@ -838,6 +839,9 @@ export type OpenIdDelegationError = { 'NoSuchDelegation' : null } |
   { 'NoSuchAnchor' : null } |
   { 'JwtExpired' : null } |
   { 'JwtVerificationFailed' : null };
+export type OpenIdEmailVerification = { 'Google' : null } |
+  { 'Unknown' : null } |
+  { 'Microsoft' : null };
 export interface OpenIdPrepareDelegationResponse {
   'user_key' : UserKey,
   'expiration' : Timestamp,
