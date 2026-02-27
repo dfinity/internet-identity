@@ -391,6 +391,12 @@ pub enum DeployArchiveResult {
     Failed(String),
 }
 
+#[derive(Clone, Copy, Debug, CandidType, Serialize, Deserialize, Eq, PartialEq)]
+pub enum OpenIdEmailVerificationScheme {
+    Google,
+    Microsoft,
+}
+
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct OpenIdConfig {
     pub name: String,
@@ -401,6 +407,7 @@ pub struct OpenIdConfig {
     pub auth_uri: String,
     pub auth_scope: Vec<String>,
     pub fedcm_uri: Option<String>,
+    pub email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
 pub enum AuthorizationKey {

@@ -366,6 +366,11 @@ type Aud = text;
 type JWT = text;
 type Salt = blob;
 
+type OpenIdEmailVerification = variant {
+    Google;
+    Microsoft;
+};
+
 type OpenIdConfig = record {
     name : text;
     logo : text;
@@ -375,6 +380,7 @@ type OpenIdConfig = record {
     auth_uri : text;
     auth_scope : vec text;
     fedcm_uri : opt text;
+    email_verification : opt OpenIdEmailVerification;
 };
 
 type OpenIdCredentialKey = record { Iss; Sub };

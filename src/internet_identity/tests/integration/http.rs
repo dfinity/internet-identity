@@ -1471,6 +1471,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         auth_uri: "https://accounts.example.com/o/oauth2/auth".to_string(),
         auth_scope: vec!["openid".to_string(), "email".to_string()],
         fedcm_uri: None,
+        email_verification: None,
     }];
     let config = InternetIdentityInit {
         openid_configs: Some(openid_configs.clone()),
