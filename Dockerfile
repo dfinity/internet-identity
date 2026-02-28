@@ -12,7 +12,7 @@ ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
     apt -yq update && \
     apt -yqq install --no-install-recommends curl ca-certificates \
-        build-essential pkg-config libssl-dev llvm-dev liblmdb-dev clang cmake jq
+    build-essential pkg-config libssl-dev llvm-dev liblmdb-dev clang cmake jq
 
 # Install node
 RUN curl --fail -sSf https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
@@ -83,11 +83,17 @@ ARG II_FETCH_ROOT_KEY=
 ARG II_DUMMY_CAPTCHA=
 ARG II_DUMMY_AUTH=
 ARG II_DEV_CSP=
+ARG II_SPLIT_FRONTEND=
 
 RUN touch src/*/src/lib.rs
 RUN npm ci
 
-RUN ./scripts/build
+RUN if [ "$II_SPLIT_FRONTEND" = "1" ]; then \
+    ./scripts/build --frontend && \
+    mv /internet_identity_frontend.wasm.gz /internet_identity.wasm.gz; \
+    else \
+    ./scripts/build; \
+    fi
 RUN sha256sum /internet_identity.wasm.gz
 
 FROM deps as build_archive
