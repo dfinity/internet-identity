@@ -290,7 +290,14 @@ request_verification_command() {
 
 deploy_release_candidate() {
   echo "Deploying II release candidate with same arguments as prod"
-  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install fgte5-ciaaa-aaaad-aaatq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
+  dfx canister \
+    --network ic \
+    --wallet cvthj-wyaaa-aaaad-aaaaq-cai \
+    install fgte5-ciaaa-aaaad-aaatq-cai \
+      --mode upgrade \
+      --wasm ./internet_identity.wasm.gz \
+      --argument-type raw \
+      --argument-file "$(cat ./dfx_arg.bin)"
 }
 
 test_release_candidate() {
@@ -328,7 +335,8 @@ confirm_proposal_arguments() {
 prepare_proposal_argument() {
   echo "You need at least the didc from 2024-07-29 https://github.com/dfinity/candid/releases/tag/2024-07-29"
   didc assist -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' | awk '/\(/ {flag=1} flag {print} /\)/ {flag=0}' > args.txt
-  didc encode "$(cat args.txt)" | xxd -r -p > arg.bin
+  didc encode -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' "$(cat args.txt)" > dfx_arg.bin
+  cat dfx_arg.bin | xxd -r -p > arg.bin
 }
 
 append_proposal_argument() {
