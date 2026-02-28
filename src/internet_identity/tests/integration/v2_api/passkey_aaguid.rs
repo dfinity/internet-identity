@@ -4,12 +4,14 @@ use canister_tests::api::internet_identity::api_v2::authn_method_add;
 use canister_tests::api::internet_identity::api_v2::authn_method_confirm;
 use canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_enter;
 use canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_exit;
+use canister_tests::api::internet_identity::api_v2::authn_method_remove;
 use canister_tests::api::internet_identity::api_v2::authn_method_replace;
 use canister_tests::api::internet_identity::api_v2::authn_method_session_register;
 use canister_tests::api::internet_identity::api_v2::identity_info;
 use canister_tests::framework::*;
 use internet_identity_interface::internet_identity::types::*;
 use pocket_ic::RejectResponse;
+use pretty_assertions::assert_eq;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 
@@ -411,4 +413,263 @@ fn should_handle_missing_aaguid_gracefully() {
     } else {
         panic!("Expected WebAuthn authentication method");
     }
+}
+
+#[test]
+fn should_enforce_unique_passkey_pubkeys_and_free_them_on_change_and_remove(
+) -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+
+    let webauthn_authn_method = |pubkey: ByteBuf, credential_id: ByteBuf| AuthnMethodData {
+        authn_method: AuthnMethod::WebAuthn(WebAuthn {
+            pubkey,
+            credential_id,
+            aaguid: Some(test_aaguid().to_vec()),
+        }),
+        metadata: HashMap::new(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    // 1. Register an anchor with a passkey (anchor A0 with pubkey P0).
+    let p0 = test_pubkey(1);
+    let a0_initial = webauthn_authn_method(p0.clone(), test_credential_id(1).unwrap());
+    let identity_a0 = create_identity_with_authn_method(&env, canister_id, &a0_initial);
+
+    // 2. Another anchor cannot be registered with a passkey with the same pubkey.
+    let a1_same_p0 = webauthn_authn_method(p0.clone(), test_credential_id(2).unwrap());
+    let result_a1 =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name(
+            &env,
+            canister_id,
+            &a1_same_p0,
+            None,
+        );
+    assert_eq!(
+        result_a1,
+        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
+    );
+
+    // 3. This anchor's passkey can be updated to have a different pubkey (P1).
+    let p1 = test_pubkey(2);
+    let a0_replacement = webauthn_authn_method(p1.clone(), test_credential_id(3).unwrap());
+    authn_method_replace(
+        &env,
+        canister_id,
+        a0_initial.principal(),
+        identity_a0,
+        &p0,
+        &a0_replacement,
+    )?
+    .expect("authn_method_replace failed");
+
+    // 4a. Changing a passkey frees up its pubkey for other devices in the same anchor.
+    let a0_reuse_p0_same_anchor = webauthn_authn_method(p0.clone(), test_credential_id(4).unwrap());
+    authn_method_add(
+        &env,
+        canister_id,
+        a0_replacement.principal(),
+        identity_a0,
+        &a0_reuse_p0_same_anchor,
+    )?
+    .expect("authn_method_add with freed pubkey on same anchor failed");
+
+    // Remove the re-used device again so that P0 becomes globally free for the next step.
+    authn_method_remove(
+        &env,
+        canister_id,
+        a0_replacement.principal(),
+        identity_a0,
+        &p0,
+    )?
+    .expect("authn_method_remove failed");
+
+    // 4b. Changing a passkey frees up its pubkey for other devices in distinct anchors.
+    let result_a1_after_change =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name(
+            &env,
+            canister_id,
+            &a1_same_p0,
+            None,
+        );
+    assert!(
+        result_a1_after_change.is_ok(),
+        "identity registration with freed passkey pubkey on another anchor should succeed"
+    );
+
+    // 5. Removing a passkey frees up its pubkey for other devices (same and distinct anchors).
+
+    // Create an anchor B0 with two devices: the passkey we care about (Q0) and another passkey (Q1)
+    // which will be used for authorization after Q0 is removed.
+    let q0 = test_pubkey(3);
+    let q1 = test_pubkey(4);
+    let b0_primary_q0 = webauthn_authn_method(q0.clone(), test_credential_id(5).unwrap());
+    let b0_secondary_q1 = webauthn_authn_method(q1.clone(), test_credential_id(6).unwrap());
+    let identity_b0 = crate::v2_api::authn_method_test_helpers::create_identity_with_authn_methods(
+        &env,
+        canister_id,
+        &[b0_primary_q0.clone(), b0_secondary_q1.clone()],
+    );
+
+    // Show that Q0 cannot be used for a different anchor while it is still present on B0.
+    let c0_same_q0 = webauthn_authn_method(q0.clone(), test_credential_id(7).unwrap());
+    let result_c0 =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name(
+            &env,
+            canister_id,
+            &c0_same_q0,
+            None,
+        );
+    assert_eq!(
+        result_c0,
+        Err("InvalidAuthnMethod(\"passkey with this public key is already used\")".to_string())
+    );
+
+    // Remove Q0 from B0 using the secondary device Q1 for authorization.
+    authn_method_remove(
+        &env,
+        canister_id,
+        b0_secondary_q1.principal(),
+        identity_b0,
+        &q0,
+    )?
+    .expect("authn_method_remove for Q0 on B0 failed");
+
+    // 5a. After removal, Q0 can be added again as a new device on the same anchor B0.
+    let b0_readd_q0 = webauthn_authn_method(q0.clone(), test_credential_id(8).unwrap());
+    authn_method_add(
+        &env,
+        canister_id,
+        b0_secondary_q1.principal(),
+        identity_b0,
+        &b0_readd_q0,
+    )?
+    .expect("authn_method_add with freed pubkey on same anchor after removal failed");
+
+    // Remove Q0 again from B0 so that Q0 is no longer used by any anchor.
+    authn_method_remove(
+        &env,
+        canister_id,
+        b0_secondary_q1.principal(),
+        identity_b0,
+        &q0,
+    )?
+    .expect("second authn_method_remove for Q0 on B0 failed");
+
+    // 5b. After removal from all anchors, Q0 can be used to register a new anchor.
+    let result_c0_after_removal =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method_and_name(
+            &env,
+            canister_id,
+            &c0_same_q0,
+            None,
+        );
+    assert!(
+        result_c0_after_removal.is_ok(),
+        "identity registration with a passkey pubkey that was removed from all anchors should succeed"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn should_enforce_unique_passkey_pubkeys_in_registration_mode_flows() -> Result<(), RejectResponse>
+{
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+
+    let webauthn_authn_method = |pubkey: ByteBuf, credential_id: ByteBuf| AuthnMethodData {
+        authn_method: AuthnMethod::WebAuthn(WebAuthn {
+            pubkey,
+            credential_id,
+            aaguid: Some(test_aaguid().to_vec()),
+        }),
+        metadata: HashMap::new(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    // Create first identity A0 with passkey P0.
+    let p0 = test_pubkey(10);
+    let a0_initial = webauthn_authn_method(p0.clone(), test_credential_id(10).unwrap());
+    let _identity_a0 = create_identity_with_authn_method(&env, canister_id, &a0_initial);
+
+    // Create second identity B0 with a different passkey P1.
+    let p1 = test_pubkey(11);
+    let b0_initial = webauthn_authn_method(p1.clone(), test_credential_id(11).unwrap());
+    let identity_b0 = create_identity_with_authn_method(&env, canister_id, &b0_initial);
+
+    // 1. authn_method_register must reject registering a passkey whose pubkey is already used.
+    let a1_same_p0 = webauthn_authn_method(p0.clone(), test_credential_id(12).unwrap());
+    let result_register_conflict =
+        canister_tests::api::internet_identity::api_v2::authn_method_register(
+            &env,
+            canister_id,
+            identity_b0,
+            &a1_same_p0,
+        )?;
+    assert_eq!(
+        result_register_conflict,
+        Err(AuthnMethodRegisterError::PasskeyWithThisPublicKeyIsAlreadyUsed)
+    );
+
+    // 2. authn_method_registration_mode_exit must reject adding a passkey whose pubkey is already used.
+    let registration_mode_id = "0eZr5".to_string();
+    let intermediate_sender = Principal::self_authenticating([42; 32]);
+
+    // Enter registration mode for identity B0.
+    canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        b0_initial.principal(),
+        identity_b0,
+        Some(registration_mode_id.clone()),
+    )?
+    .unwrap();
+
+    // Create a session for B0 (this stores a confirmed session principal).
+    let AuthnMethodConfirmationCode {
+        confirmation_code,
+        expiration: _,
+    } = canister_tests::api::internet_identity::api_v2::authn_method_session_register(
+        &env,
+        canister_id,
+        intermediate_sender,
+        identity_b0,
+    )?
+    .unwrap();
+
+    // Confirm the session.
+    canister_tests::api::internet_identity::api_v2::authn_method_confirm(
+        &env,
+        canister_id,
+        b0_initial.principal(),
+        identity_b0,
+        &confirmation_code,
+    )?
+    .unwrap();
+
+    // Try to exit registration mode by adding a device with the already-used pubkey P0.
+    let b0_conflicting_p0 = webauthn_authn_method(p0.clone(), test_credential_id(13).unwrap());
+    let result_exit_conflict =
+        canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_exit(
+            &env,
+            canister_id,
+            intermediate_sender,
+            identity_b0,
+            Some(b0_conflicting_p0),
+        )?;
+    assert_eq!(
+        result_exit_conflict,
+        Err(AuthnMethodRegistrationModeExitError::PasskeyWithThisPublicKeyIsAlreadyUsed)
+    );
+
+    Ok(())
 }

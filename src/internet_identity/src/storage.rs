@@ -121,6 +121,7 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
+use crate::utils::sha256sum;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -177,6 +178,7 @@ const STABLE_ACCOUNT_COUNTER_DISCREPANCY_COUNTER_MEMORY_INDEX: u8 = 18u8;
 const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_INDEX: u8 = 19u8;
 const STABLE_ANCHOR_APPLICATION_CONFIG_MEMORY_INDEX: u8 = 20u8;
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX: u8 = 21u8;
+const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX: u8 = 22u8;
 
 const ANCHOR_MEMORY_ID: MemoryId = MemoryId::new(ANCHOR_MEMORY_INDEX);
 const ARCHIVE_BUFFER_MEMORY_ID: MemoryId = MemoryId::new(ARCHIVE_BUFFER_MEMORY_INDEX);
@@ -210,6 +212,9 @@ const LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID: MemoryId =
 
 const LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID: MemoryId =
     MemoryId::new(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_INDEX);
+
+const LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID: MemoryId =
+    MemoryId::new(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_INDEX);
 
 // The bucket size 128 is relatively low, to avoid wasting memory when using
 // multiple virtual memories for smaller amounts of data.
@@ -319,6 +324,10 @@ pub struct Storage<M: Memory> {
     lookup_anchor_with_recovery_phrase_principal_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) lookup_anchor_with_recovery_phrase_principal_memory:
         StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
+
+    lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
+    pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
+        StableBTreeMap<[u8; 32], StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -400,6 +409,8 @@ impl<M: Memory + Clone> Storage<M> {
             memory_manager.get(LOOKUP_APPLICATION_WITH_ORIGIN_MEMORY_ID);
         let lookup_anchor_with_recovery_phrase_principal_memory =
             memory_manager.get(LOOKUP_ANCHOR_WITH_RECOVERY_PHRASE_PRINCIPAL_MEMORY_ID);
+        let lookup_anchor_with_passkey_pubkey_hash_memory =
+            memory_manager.get(LOOKUP_ANCHOR_WITH_PASSKEY_PUBKEY_HASH_MEMORY_ID);
 
         let registration_rates = RegistrationRates::new(
             MinHeap::init(registration_ref_rate_memory.clone())
@@ -493,6 +504,12 @@ impl<M: Memory + Clone> Storage<M> {
             ),
             lookup_anchor_with_recovery_phrase_principal_memory: StableBTreeMap::init(
                 lookup_anchor_with_recovery_phrase_principal_memory,
+            ),
+            lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper::new(
+                lookup_anchor_with_passkey_pubkey_hash_memory.clone(),
+            ),
+            lookup_anchor_with_passkey_pubkey_hash_memory: StableBTreeMap::init(
+                lookup_anchor_with_passkey_pubkey_hash_memory,
             ),
         }
     }
@@ -675,10 +692,18 @@ impl<M: Memory + Clone> Storage<M> {
             &previous_recovery_keys,
             &storable_anchor.recovery_keys.unwrap_or_default(),
         );
-        self.sync_anchors_with_passkey_credential_index(
+
+        let current_passkey_credentials = storable_anchor.passkey_credentials.unwrap_or_default();
+
+        self.sync_anchor_with_passkey_credential_index(
             anchor_number,
             &previous_passkey_credentials,
-            &storable_anchor.passkey_credentials.unwrap_or_default(),
+            &current_passkey_credentials,
+        );
+        self.sync_anchor_with_passkey_pubkey_index(
+            anchor_number,
+            &previous_passkey_credentials,
+            &current_passkey_credentials,
         );
 
         Ok(())
@@ -758,6 +783,61 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&key)
     }
 
+    pub fn lookup_anchor_with_passkey_pubkey(&self, pubkey: &PublicKey) -> Option<AnchorNumber> {
+        let hash = sha256sum(pubkey);
+        self.lookup_anchor_with_passkey_pubkey_hash_memory
+            .get(&hash)
+    }
+
+    fn sync_anchor_with_passkey_pubkey_index(
+        &mut self,
+        anchor_number: AnchorNumber,
+        previous_passkeys: &[StorablePasskeyCredential],
+        current_passkeys: &[StorablePasskeyCredential],
+    ) {
+        let previous_pubkey_hashes = previous_passkeys
+            .iter()
+            .map(|passkey| sha256sum(&passkey.pubkey))
+            .collect::<BTreeSet<_>>();
+
+        let current_pubkey_hashes = current_passkeys
+            .iter()
+            .map(|passkey| sha256sum(&passkey.pubkey))
+            .collect::<BTreeSet<_>>();
+
+        let pubkey_hashes_to_be_removed = previous_pubkey_hashes.difference(&current_pubkey_hashes);
+        let pubkey_hashes_to_be_added = current_pubkey_hashes.difference(&previous_pubkey_hashes);
+
+        for pubkey_hash in pubkey_hashes_to_be_removed {
+            let Some(existing_anchor_number) = self
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(pubkey_hash)
+            else {
+                // This pubkey hash is not indexed, nothing to do.
+                continue;
+            };
+            if existing_anchor_number != anchor_number {
+                // Ensure that a user can remove only their own passkey pubkey from the index.
+                continue;
+            }
+            self.lookup_anchor_with_passkey_pubkey_hash_memory
+                .remove(pubkey_hash);
+        }
+
+        for pubkey_hash in pubkey_hashes_to_be_added {
+            if self
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .contains_key(pubkey_hash)
+            {
+                // This pubkey hash is already occupied; do not overwrite it.
+                continue;
+            };
+
+            self.lookup_anchor_with_passkey_pubkey_hash_memory
+                .insert(*pubkey_hash, anchor_number);
+        }
+    }
+
     fn sync_anchor_with_recovery_phrase_principal_index(
         &mut self,
         anchor_number: AnchorNumber,
@@ -806,7 +886,7 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     /// Update `CredentialId` to `AnchorNumber` lookup map
-    fn sync_anchors_with_passkey_credential_index(
+    fn sync_anchor_with_passkey_credential_index(
         &mut self,
         anchor_number: AnchorNumber,
         previous_passkey_credentials: &[StorablePasskeyCredential],
@@ -1813,6 +1893,11 @@ impl<M: Memory + Clone> Storage<M> {
             (
                 "lookup_anchor_with_recovery_phrase_principal_memory".to_string(),
                 self.lookup_anchor_with_recovery_phrase_principal_memory_wrapper
+                    .size(),
+            ),
+            (
+                "lookup_anchor_with_passkey_pubkey_hash_memory".to_string(),
+                self.lookup_anchor_with_passkey_pubkey_hash_memory_wrapper
                     .size(),
             ),
         ])

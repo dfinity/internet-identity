@@ -1,6 +1,7 @@
 use crate::openid;
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, create_identity_with_openid_credential, test_authn_method,
+    create_identity_with_authn_method, create_identity_with_openid_credential,
+    sample_webauthn_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity as api;
@@ -225,7 +226,7 @@ fn should_report_active_openid_authn_methods() {
 
     // Check daily stats, some activity is required first to update the stats
     env.advance_time(Duration::from_secs(DAY_SECONDS));
-    create_identity_with_authn_method(&env, canister_id, &test_authn_method());
+    create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(0));
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_daily_active_authn_methods{type=\"openid\",issuer=\"https://accounts.google.com\"}",
@@ -234,7 +235,7 @@ fn should_report_active_openid_authn_methods() {
 
     // Check monthly stats, some activity is required first to update the stats
     env.advance_time(Duration::from_secs(MONTH_SECONDS - DAY_SECONDS));
-    create_identity_with_authn_method(&env, canister_id, &test_authn_method());
+    create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(1));
     assert_metric(
         &get_metrics(&env, canister_id),
         "internet_identity_monthly_active_authn_methods{type=\"openid\",issuer=\"https://accounts.google.com\"}",

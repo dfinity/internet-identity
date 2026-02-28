@@ -205,6 +205,16 @@ export const addTentativeDevice = async ({
       return result;
     }
 
+    if ("passkey_with_this_public_key_is_already_used" in result) {
+      await displayError({
+        title: "Passkey Already Used",
+        message:
+          "This passkey is already in use on another device or identity. Please use a different passkey or device.",
+        primaryButton: "Ok",
+      });
+      return { tag: "canceled" };
+    }
+
     // We should never get here, but just in case we show an error
     unreachable(result);
     break;

@@ -1,11 +1,12 @@
 use ic_stable_structures::{storable::Bound, Storable};
 use internet_identity_interface::internet_identity::types::FrontendHostname;
 use minicbor::{Decode, Encode};
-use sha2::{Digest, Sha256};
 use std::{
     borrow::Cow,
     fmt::{self, Display},
 };
+
+use crate::utils::{sha256sum, slice_to_bounded_32};
 
 #[derive(Encode, Decode, Clone, Debug, PartialEq)]
 #[cbor(map)]
@@ -43,21 +44,9 @@ impl Display for StorableOriginSha256 {
     }
 }
 
-/// Safely converts unbounded slice to a fixed-size slice.
-fn slice_to_bounded_32(slice: &[u8]) -> [u8; 32] {
-    let mut bounded = [0u8; 32];
-    // Don't copy more than 32 bytes
-    let copy_len = slice.len().min(32);
-    bounded[..copy_len].copy_from_slice(&slice[..copy_len]);
-    bounded
-}
-
 impl StorableOriginSha256 {
     pub fn from_origin(origin: &FrontendHostname) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update(origin.as_bytes());
-        let sha256sum = hasher.finalize();
-        let hash = slice_to_bounded_32(&sha256sum);
+        let hash = sha256sum(origin.as_bytes());
         Self { hash }
     }
 }
