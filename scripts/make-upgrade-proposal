@@ -290,7 +290,14 @@ request_verification_command() {
 
 deploy_release_candidate() {
   echo "Deploying II release candidate with same arguments as prod"
-  dfx canister --network ic --wallet cvthj-wyaaa-aaaad-aaaaq-cai install fgte5-ciaaa-aaaad-aaatq-cai --mode=upgrade --wasm ./internet_identity.wasm.gz --argument-file ./args.txt
+  dfx canister \
+    --network ic \
+    --wallet cvthj-wyaaa-aaaad-aaaaq-cai \
+    install fgte5-ciaaa-aaaad-aaatq-cai \
+      --mode upgrade \
+      --wasm ./internet_identity.wasm.gz \
+      --argument-type raw \
+      --argument "$(cat ./dfx_arg.bin)"
 }
 
 test_release_candidate() {
@@ -320,20 +327,45 @@ share_proposal() {
 }
 
 confirm_proposal_arguments() {
-  echo "Confirm that the sha256 of the arg.bin file matches the one in the Proposal.md file"
+  echo "Confirm that the sha256 of the mainnet_arg.bin file matches the one in the Proposal.md file"
   echo ""
-  echo "You need to execute 'shasum -a 256 ./arg.bin' and compare the output with the command in the proposal.md file"
+  echo "You need to execute 'shasum -a 256 ./mainnet_arg.bin' and compare the output with the command in the proposal.md file"
+}
+
+run_didc_command_for_ii_init() {
+  local SUBCOMMAND="$1"
+  shift
+  local ARGS=("$@")
+  local OPTS="-d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)'"
+  didc "$SUBCOMMAND" $OPTS "${ARGS[@]}"
+}
+
+didc_encode_ii_init() {
+  local ARG_FILE="$1"
+  local ARG="$(cat "$ARG_FILE")"
+  run_didc_command_for_ii_init encode "$ARG"
+}
+
+didc_assist_ii_init() {
+  run_didc_command_for_ii_init assist | awk '/\(/ {flag=1} flag {print} /\)/ {flag=0}'
+}
+
+compute_sha256sum_for_args() {
+  local ARG_FILE="$1"
+  didc_encode_ii_init "$ARG_FILE" | xxd -r -p | sha256sum | cut -f1 -d' '
 }
 
 prepare_proposal_argument() {
   echo "You need at least the didc from 2024-07-29 https://github.com/dfinity/candid/releases/tag/2024-07-29"
-  didc assist -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' | awk '/\(/ {flag=1} flag {print} /\)/ {flag=0}' > args.txt
-  didc encode "$(cat args.txt)" | xxd -r -p > arg.bin
+  didc_assist_ii_init > args.txt
+  didc_encode_ii_init args.txt > dfx_arg.bin
+  # DFX raw arguments are are encoded differently that ic-admin's --arg values (mainnet_arg.bin).
+  xxd -r -p dfx_arg.bin > mainnet_arg.bin
 }
 
 append_proposal_argument() {
   # Get the arguments from the file
-  ARGUMENTS=$(cat "args.txt")
+  ARGUMENTS="$(cat args.txt)"
   
   cat >> proposal.md << EOF
 
@@ -342,7 +374,7 @@ append_proposal_argument() {
 Run the following command to verify the upgrade argument hash:
 
 \`\`\`
-didc encode '${ARGUMENTS}' | xxd -r -p | sha256sum
+didc encode -d ./src/internet_identity/internet_identity.did -t '(opt InternetIdentityInit)' '${ARGUMENTS}' | xxd -r -p | sha256sum
 \`\`\`
 
 The output should match the argument hash.
@@ -356,8 +388,7 @@ download_proposal_text() {
 dry_run_proposal() {
   # Download again the release tag wasm to check the hash along the latest downloaded before.
   curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
-  # Read again the arguments to check the hash along the arg.bin file sent in the proposal.
-  ARGUMENTS=$(cat "args.txt")
+  # Read again the arguments to check the hash along the mainnet_arg.bin file sent in the proposal.
   ic-admin \
     --use-hsm \
     --key-id "01" \
@@ -370,8 +401,8 @@ dry_run_proposal() {
     --mode upgrade \
     --wasm-module-path ./internet_identity.wasm.gz \
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
-    --arg arg.bin \
-    --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum | cut -f1 -d' ')" \
+    --arg mainnet_arg.bin \
+    --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
     --dry-run \
     --summary-file ./proposal.md \
     --proposal-title "Upgrade Internet Identity Canister to $(git rev-parse --short HEAD)"
@@ -380,8 +411,7 @@ dry_run_proposal() {
 make_proposal() {
   # Download again the release tag wasm to check the hash along the latest downloaded before.
   curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
-  # Read again the arguments to check the hash along the arg.bin file sent in the proposal.
-  ARGUMENTS=$(cat "args.txt")
+  # Read again the arguments to check the hash along the mainnet_arg.bin file sent in the proposal.
   ic-admin \
     --use-hsm \
     --key-id "01" \
@@ -394,8 +424,8 @@ make_proposal() {
     --mode upgrade \
     --wasm-module-path ./internet_identity.wasm.gz \
     --wasm-module-sha256 "$(sha256 internet_identity-$TAG_NAME.wasm.gz)" \
-    --arg arg.bin \
-    --arg-sha256 "$(didc encode "$ARGUMENTS" | xxd -r -p | sha256sum | cut -f1 -d' ')" \
+    --arg mainnet_arg.bin \
+    --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
     --summary-file ./proposal.md \
     --proposal-title "Upgrade Internet Identity Canister to $(git rev-parse --short HEAD)"
 }
