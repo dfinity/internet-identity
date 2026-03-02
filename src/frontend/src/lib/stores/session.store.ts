@@ -22,19 +22,21 @@ export interface Session {
   salt: Uint8Array;
 }
 
+type SessionData = Pick<Session, "identity" | "nonce" | "salt">;
+
 type SessionStore = Readable<Session> & {
   init: (params: {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
   }) => Promise<void>;
-  reset: () => Promise<void>;
+  reset: () => void;
 };
 
 const STORAGE_KEY = "ii-session";
 
 const internalStore = writable<Session | undefined>();
 
-const create = async () => {
+const createSession = async (): Promise<SessionData> => {
   const identity = await ECDSAKeyIdentity.generate({
     extractable: true,
   });
@@ -59,7 +61,7 @@ const create = async () => {
   };
 };
 
-const read = async () => {
+const readSession = async (): Promise<SessionData | undefined> => {
   const item = sessionStorage.getItem(STORAGE_KEY);
   if (isNullish(item)) {
     return undefined;
@@ -91,9 +93,24 @@ const read = async () => {
   };
 };
 
+let preCreatedSession: SessionData;
+const nextSession = (): SessionData => {
+  const session = preCreatedSession!;
+  void (async () => {
+    // Pre-create the next session in the background to make reset synchronous
+    preCreatedSession = await createSession();
+  })();
+  return session;
+};
+
 export const sessionStore: SessionStore = {
   init: async ({ canisterId, agentOptions }) => {
-    const { identity, nonce, salt } = (await read()) ?? (await create());
+    // Try to read an existing session from sessionStorage,
+    // if it doesn't exist or is expired create a new one.
+    const { identity, nonce, salt } =
+      (await readSession()) ?? (await createSession());
+    // Pre-create the next session for synchronous reset later on.
+    void nextSession();
     const agent = HttpAgent.createSync({ ...agentOptions, identity });
     // Fetch subnet keys to speed up queries during authentication,
     // this avoids having to fetch them later on user interaction.
@@ -110,8 +127,8 @@ export const sessionStore: SessionStore = {
     }
     return session;
   }).subscribe,
-  reset: async () => {
-    const { identity, nonce, salt } = await create();
+  reset: () => {
+    const { identity, nonce, salt } = nextSession();
     internalStore.update((session) => {
       if (isNullish(session)) {
         throw new Error("Not initialized");
