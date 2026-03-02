@@ -97,9 +97,16 @@ const readSession = async (): Promise<SessionData | undefined> => {
   };
 };
 
-let preCreatedSession: CreatedSession;
+let preCreatedSession: CreatedSession | undefined = undefined;
 const nextSession = (): CreatedSession => {
-  const session = preCreatedSession!;
+  // Consume the pre-created session by assigning it to a local variable
+  // and clearing it afterwards. This ensures that if nextSession is called
+  // again before the background creation completes, it will throw an error.
+  const session = preCreatedSession;
+  preCreatedSession = undefined;
+  if (session === undefined) {
+    throw new Error("No pre-created session available");
+  }
   void (async () => {
     // Pre-create the next session in the background to make reset synchronous
     preCreatedSession = await createSession();
@@ -118,7 +125,7 @@ export const sessionStore: SessionStore = {
       session.persist();
     }
     // Pre-create the next session for synchronous reset later on.
-    void nextSession();
+    preCreatedSession = await createSession();
     // Read session data and initialize agent
     const { identity, nonce, salt } = data;
     const agent = HttpAgent.createSync({ ...agentOptions, identity });
