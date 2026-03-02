@@ -11,17 +11,26 @@ export const redirectInPopup = (url: string): Promise<string> => {
   const redirectWindow = window.open(
     url,
     "_blank",
-    `width=${width},height=${height},left=${left},top=${top}`,
+    `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`,
   );
+  if (redirectWindow === null) {
+    throw new CallbackPopupClosedError();
+  }
 
   return new Promise<string>((resolve, reject) => {
+    const cleanup = () => {
+      clearInterval(closeInterval);
+      channel.close();
+      redirectWindow.close();
+      window.focus();
+    };
     // Monitor popup closure since cross-origin windows prevent close event
     // listening. We periodically check the closed attribute to detect when
     // the user closes the popup, allowing us to reject the promise instead
     // of waiting indefinitely for a result that will never arrive.
     const closeInterval = setInterval(() => {
       if (redirectWindow?.closed === true) {
-        clearInterval(closeInterval);
+        cleanup();
         reject(new CallbackPopupClosedError());
       }
     }, 500);
@@ -32,9 +41,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
       if (typeof event.data !== "string") {
         return;
       }
-      channel.close();
-      redirectWindow?.close();
-      window.focus();
+      cleanup();
       resolve(event.data);
     });
   });
