@@ -21,7 +21,7 @@
 
     // User was returned here after redirect from a OpenID flow callback,
     // these flows are always handled in a popup and the callback url is
-    // returned to the opener window through the PostMessage API.
+    // returned to the opener window through a shared BroadcastChannel.
     sendUrlToOpener();
   });
 </script>
