@@ -172,56 +172,11 @@ fn verify_tentative_device(
     }
 }
 
-#[update]
-async fn create_challenge() -> Challenge {
-    registration::create_challenge().await
-}
-
-#[update]
-fn register(
-    device_data: DeviceData,
-    challenge_result: ChallengeAttempt,
-    temp_key: Option<Principal>,
-) -> RegisterResponse {
-    anchor_management::registration::register(device_data, challenge_result, temp_key)
-}
-
-#[update]
-fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
-    anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
-    })
-    .unwrap_or_else(|err| trap(err.as_str()))
-}
-
-#[update]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
         Ok::<_, String>((
             (),
             anchor_management::update_device(anchor, device_key, device_data),
-        ))
-    })
-    .unwrap_or_else(|err| trap(err.as_str()))
-}
-
-#[update]
-fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
-    anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>((
-            (),
-            anchor_management::replace_device(anchor_number, anchor, device_key, device_data),
-        ))
-    })
-    .unwrap_or_else(|err| trap(err.as_str()))
-}
-
-#[update]
-fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
-    anchor_operation_with_authz_check(anchor_number, |anchor| {
-        Ok::<_, String>((
-            (),
-            anchor_management::remove_device(anchor_number, anchor, device_key),
         ))
     })
     .unwrap_or_else(|err| trap(err.as_str()))
@@ -834,6 +789,13 @@ mod v2_api {
         identity_number: IdentityNumber,
         authn_method: AuthnMethodData,
     ) -> Result<(), AuthnMethodAddError> {
+        fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
+            anchor_operation_with_authz_check(anchor_number, |anchor| {
+                Ok::<_, String>(((), anchor_management::add_device(anchor, device_data)))
+            })
+            .unwrap_or_else(|err| trap(err.as_str()))
+        }
+
         DeviceWithUsage::try_from(authn_method)
             .map(|device| add(identity_number, DeviceData::from(device)))
             .map_err(|err| AuthnMethodAddError::InvalidMetadata(err.to_string()))
@@ -844,6 +806,15 @@ mod v2_api {
         identity_number: IdentityNumber,
         public_key: PublicKey,
     ) -> Result<(), ()> {
+        fn remove(anchor_number: AnchorNumber, device_key: DeviceKey) {
+            anchor_operation_with_authz_check(anchor_number, |anchor| {
+                Ok::<_, String>((
+                    (),
+                    anchor_management::remove_device(anchor_number, anchor, device_key),
+                ))
+            })
+            .unwrap_or_else(|err| trap(err.as_str()))
+        }
         remove(identity_number, public_key);
         Ok(())
     }
@@ -854,9 +825,25 @@ mod v2_api {
         authn_method_pk: PublicKey,
         new_authn_method: AuthnMethodData,
     ) -> Result<(), AuthnMethodReplaceError> {
+        fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
+            anchor_operation_with_authz_check(anchor_number, |anchor| {
+                Ok::<_, String>((
+                    (),
+                    anchor_management::replace_device(
+                        anchor_number,
+                        anchor,
+                        device_key,
+                        device_data,
+                    ),
+                ))
+            })
+            .unwrap_or_else(|err| trap(err.as_str()))
+        }
+
         let new_device = DeviceWithUsage::try_from(new_authn_method)
             .map(DeviceData::from)
             .map_err(|err| AuthnMethodReplaceError::InvalidMetadata(err.to_string()))?;
+
         replace(identity_number, authn_method_pk, new_device);
         Ok(())
     }
