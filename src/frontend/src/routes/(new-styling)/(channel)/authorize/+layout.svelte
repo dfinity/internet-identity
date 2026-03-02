@@ -45,7 +45,7 @@
     isAuthenticating = true;
     if ($authenticationStore?.identityNumber !== identityNumber) {
       // Sign in if not authenticated with this identity yet
-      await sessionStore.reset();
+      sessionStore.reset();
       await authLastUsedFlow.authenticate(
         $lastUsedIdentitiesStore.identities[`${identityNumber}`],
       );

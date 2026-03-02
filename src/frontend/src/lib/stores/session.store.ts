@@ -24,6 +24,11 @@ export interface Session {
 
 type SessionData = Pick<Session, "identity" | "nonce" | "salt">;
 
+type CreatedSession = {
+  data: SessionData;
+  persist: () => void;
+};
+
 type SessionStore = Readable<Session> & {
   init: (params: {
     canisterId: Principal;
@@ -36,7 +41,7 @@ const STORAGE_KEY = "ii-session";
 
 const internalStore = writable<Session | undefined>();
 
-const createSession = async (): Promise<SessionData> => {
+const createSession = async (): Promise<CreatedSession> => {
   const identity = await ECDSAKeyIdentity.generate({
     extractable: true,
   });
@@ -44,21 +49,20 @@ const createSession = async (): Promise<SessionData> => {
   const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
   const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
   const { nonce, salt } = await createAnonymousNonce(identity.getPrincipal());
-  sessionStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      privateJwk,
-      publicJwk,
-      nonce,
-      salt: toBase64(salt),
-      createdAt: new Date().getTime(),
-    }),
-  );
-  return {
-    identity,
-    nonce,
-    salt,
+  const data = { identity, nonce, salt };
+  const persist = () => {
+    sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        privateJwk,
+        publicJwk,
+        nonce,
+        salt: toBase64(salt),
+        createdAt: new Date().getTime(),
+      }),
+    );
   };
+  return { data, persist };
 };
 
 const readSession = async (): Promise<SessionData | undefined> => {
@@ -93,8 +97,8 @@ const readSession = async (): Promise<SessionData | undefined> => {
   };
 };
 
-let preCreatedSession: SessionData;
-const nextSession = (): SessionData => {
+let preCreatedSession: CreatedSession;
+const nextSession = (): CreatedSession => {
   const session = preCreatedSession!;
   void (async () => {
     // Pre-create the next session in the background to make reset synchronous
@@ -107,10 +111,16 @@ export const sessionStore: SessionStore = {
   init: async ({ canisterId, agentOptions }) => {
     // Try to read an existing session from sessionStorage,
     // if it doesn't exist or is expired create a new one.
-    const { identity, nonce, salt } =
-      (await readSession()) ?? (await createSession());
+    let data = await readSession();
+    if (data === undefined) {
+      const session = await createSession();
+      data = session.data;
+      session.persist();
+    }
     // Pre-create the next session for synchronous reset later on.
     void nextSession();
+    // Read session data and initialize agent
+    const { identity, nonce, salt } = data;
     const agent = HttpAgent.createSync({ ...agentOptions, identity });
     // Fetch subnet keys to speed up queries during authentication,
     // this avoids having to fetch them later on user interaction.
@@ -128,7 +138,9 @@ export const sessionStore: SessionStore = {
     return session;
   }).subscribe,
   reset: () => {
-    const { identity, nonce, salt } = nextSession();
+    const session = nextSession();
+    session.persist();
+    const { identity, nonce, salt } = session.data;
     internalStore.update((session) => {
       if (isNullish(session)) {
         throw new Error("Not initialized");
