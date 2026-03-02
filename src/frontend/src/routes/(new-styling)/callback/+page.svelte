@@ -2,6 +2,7 @@
   import { analytics } from "$lib/utils/analytics/analytics";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { sendUrlToOpener } from "./utils";
 
   analytics.event("page-redirect-callback");
 
@@ -21,6 +22,6 @@
     // User was returned here after redirect from a OpenID flow callback,
     // these flows are always handled in a popup and the callback url is
     // returned to the opener window through the PostMessage API.
-    window.opener.postMessage(window.location.href, window.location.origin);
+    sendUrlToOpener();
   });
 </script>

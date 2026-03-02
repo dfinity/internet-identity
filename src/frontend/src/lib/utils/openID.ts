@@ -3,14 +3,14 @@ import type {
   OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
 import { canisterConfig } from "$lib/globals";
+import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
+import { Principal } from "@icp-sdk/core/principal";
+import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   PopupClosedError,
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
-} from "$lib/legacy/flows/redirect";
-import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
-import { Principal } from "@icp-sdk/core/principal";
-import { isNullish, nonNullish } from "@dfinity/utils";
+} from "../../routes/(new-styling)/callback/utils";
 
 export interface RequestConfig {
   // OAuth client ID
