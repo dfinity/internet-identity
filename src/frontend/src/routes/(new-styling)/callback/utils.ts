@@ -11,7 +11,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
   const redirectWindow = window.open(
     url,
     "_blank",
-    `width=${width},height=${height},left=${left},top=${top},noopener,noreferrer`,
+    `width=${width},height=${height},left=${left},top=${top}`,
   );
   if (redirectWindow === null) {
     throw new CallbackPopupClosedError();
@@ -21,7 +21,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
     const cleanup = () => {
       clearInterval(closeInterval);
       channel.close();
-      redirectWindow.close();
+      redirectWindow?.close();
       window.focus();
     };
     // Monitor popup closure since cross-origin windows prevent close event
