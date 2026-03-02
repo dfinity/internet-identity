@@ -15,11 +15,10 @@ export const redirectInPopup = (url: string): Promise<string> => {
   );
 
   return new Promise<string>((resolve, reject) => {
-    // We need to throw an error when the window is closed, else the page and
-    // thus the user will wait indefinitely for a result that never comes.
-    //
-    // We can't listen to close events since the window is likely cross-origin,
-    // so instead we periodically check the closed attribute with an interval.
+    // Monitor popup closure since cross-origin windows prevent close event
+    // listening. We periodically check the closed attribute to detect when
+    // the user closes the popup, allowing us to reject the promise instead
+    // of waiting indefinitely for a result that will never arrive.
     const closeInterval = setInterval(() => {
       if (redirectWindow?.closed === true) {
         clearInterval(closeInterval);
