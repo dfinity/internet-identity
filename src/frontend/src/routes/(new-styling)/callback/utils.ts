@@ -29,7 +29,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
     // the user closes the popup, allowing us to reject the promise instead
     // of waiting indefinitely for a result that will never arrive.
     const closeInterval = setInterval(() => {
-      if (redirectWindow?.closed === true) {
+      if (redirectWindow.closed === true) {
         cleanup();
         reject(new CallbackPopupClosedError());
       }
