@@ -1,7 +1,7 @@
 const BROADCAST_CHANNEL = "redirect_callback";
 export const REDIRECT_CALLBACK_PATH = "/callback";
 
-export class PopupClosedError extends Error {}
+export class CallbackPopupClosedError extends Error {}
 
 export const redirectInPopup = (url: string): Promise<string> => {
   const width = 500;
@@ -22,7 +22,7 @@ export const redirectInPopup = (url: string): Promise<string> => {
     const closeInterval = setInterval(() => {
       if (redirectWindow?.closed === true) {
         clearInterval(closeInterval);
-        reject(new PopupClosedError());
+        reject(new CallbackPopupClosedError());
       }
     }, 500);
     // Listen to the popup, we expect a message with the url of the callback,

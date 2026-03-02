@@ -7,7 +7,7 @@ import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import { isNullish, nonNullish } from "@dfinity/utils";
 import {
-  PopupClosedError,
+  CallbackPopupClosedError,
   REDIRECT_CALLBACK_PATH,
   redirectInPopup,
 } from "../../routes/(new-styling)/callback/utils";
@@ -90,7 +90,7 @@ export const isNotSupportedError = (error: unknown) =>
 export const isOpenIdCancelError = (error: unknown) => {
   return (
     (error instanceof Error && error.name === "NetworkError") ||
-    error instanceof PopupClosedError
+    error instanceof CallbackPopupClosedError
   );
 };
 
