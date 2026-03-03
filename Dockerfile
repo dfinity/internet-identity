@@ -99,8 +99,27 @@ RUN touch src/*/src/lib.rs
 RUN ./scripts/build --archive
 RUN sha256sum /archive.wasm.gz
 
+FROM deps as build_internet_identity_frontend
+
+COPY . .
+
+# The version baked in
+ARG II_VERSION=
+
+# The features, see README
+ARG II_DEV_CSP=
+
+RUN touch src/*/src/lib.rs
+RUN npm ci
+
+RUN ./scripts/build --frontend
+RUN sha256sum /internet_identity_frontend.wasm.gz
+
 FROM scratch AS scratch_internet_identity
 COPY --from=build_internet_identity /internet_identity.wasm.gz /
 
 FROM scratch AS scratch_archive
 COPY --from=build_archive /archive.wasm.gz /
+
+FROM scratch AS scratch_internet_identity_frontend
+COPY --from=build_internet_identity_frontend /internet_identity_frontend.wasm.gz /
