@@ -46,7 +46,6 @@ mod state;
 mod stats;
 mod storage;
 
-
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
     secs * 1_000_000_000
@@ -67,8 +66,6 @@ const ID_AI_ORIGIN: &str = "https://id.ai";
 async fn init_salt() {
     state::init_salt().await;
 }
-
-
 
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
@@ -148,8 +145,6 @@ fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
     anchor_management::get_anchor_info(anchor_number)
 }
-
-
 
 #[query]
 fn get_accounts(
@@ -1139,8 +1134,6 @@ mod attribute_sharing {
         Ok(certified_attributes)
     }
 }
-
-
 
 fn main() {}
 

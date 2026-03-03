@@ -84,5 +84,3 @@ impl From<AnchorError> for IdentityPropertiesReplaceError {
         }
     }
 }
-
-
