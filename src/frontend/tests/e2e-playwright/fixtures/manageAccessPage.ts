@@ -25,10 +25,10 @@ class RenamePasskeyDialog {
   }
 
   async submit(): Promise<void> {
-    await this.locator.getByRole("button", { name: "Save changes" }).click();
     const value = await this.locator
       .getByRole("textbox", { name: "Passkey name" })
       .inputValue();
+    await this.locator.getByRole("button", { name: "Save changes" }).click();
     this.#onChange(value);
   }
 
