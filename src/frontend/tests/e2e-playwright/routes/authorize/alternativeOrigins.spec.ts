@@ -5,7 +5,7 @@ import {
   NOT_TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   TEST_APP_URL,
-} from "../utils";
+} from "../../utils";
 
 test("Should not issue delegation when alternative origins are empty", async ({
   page,

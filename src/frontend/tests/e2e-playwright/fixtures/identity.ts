@@ -130,6 +130,10 @@ export const test = base.extend<{
   actorForIdentity: (
     identityNumber: bigint,
   ) => Promise<ActorSubclass<_SERVICE>>;
+  replaceAuthForIdentity: (
+    identityNumber: bigint,
+    newDummyAuthIndex: bigint,
+  ) => void;
 }>({
   identityConfig: {
     createIdentities: [
@@ -199,5 +203,15 @@ export const test = base.extend<{
         identity.canisterId,
         identity.dummyAuthIndex,
       );
+    }),
+  replaceAuthForIdentity: ({ identities }, use) =>
+    use((identityNumber: bigint, newDummyAuthIndex: bigint) => {
+      const identity = identities.find(
+        (identity) => identity.identityNumber === identityNumber,
+      );
+      if (identity === undefined) {
+        throw new Error("Identity not found");
+      }
+      identity.dummyAuthIndex = newDummyAuthIndex;
     }),
 });

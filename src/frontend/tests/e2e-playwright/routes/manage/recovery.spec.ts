@@ -1,11 +1,11 @@
-import { test as base } from "../fixtures";
+import { test as base } from "../../fixtures";
 import { expect } from "@playwright/test";
 import {
   fromMnemonicWithoutValidation,
   generateMnemonic,
   IC_DERIVATION_PATH,
 } from "$lib/utils/recoveryPhrase";
-import { II_URL } from "../utils";
+import { II_URL } from "../../utils";
 
 /**
  * Swap the first word around with the next different word found,
