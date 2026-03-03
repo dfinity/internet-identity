@@ -109,9 +109,15 @@ test.describe("Authorize with direct OpenID", () => {
     // Link both OpenID provider users with identity first to ensure attributes from
     // both providers are available, but only one is returned through implicit consent.
     test.beforeEach(
-      async ({ page, identity, signInWithOpenId, openIdUsers }) => {
+      async ({
+        page,
+        identities,
+        signInWithIdentity,
+        signInWithOpenId,
+        openIdUsers,
+      }) => {
         await page.goto(II_URL + "/manage/access");
-        await identity.signIn();
+        await signInWithIdentity(page, identities[0].identityNumber);
 
         for (const user of openIdUsers) {
           // Click "Add new" and pick OpenID provider
