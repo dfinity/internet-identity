@@ -180,8 +180,7 @@ class ManageAccessPage {
     const item = this.#page
       .getByRole("main")
       .getByRole("listitem")
-      .filter({ hasText: "Passkey" })
-      .first();
+      .filter({ hasText: "Passkey" });
     return new PasskeyItem(item, name);
   }
 

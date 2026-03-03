@@ -134,12 +134,12 @@ test.describe("Access methods", () => {
       .assertUnremovable();
   });
 
-  test("cannot have more than 8 passkeys", async ({ manageAccessPage }) => {
+  test("cannot have more than 16 passkeys", async ({ manageAccessPage }) => {
     await manageAccessPage.assertPasskeyCount(1);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 15; i++) {
       await manageAccessPage.add((dialog) => dialog.passkey(dummyAuth()));
     }
-    await manageAccessPage.assertPasskeyCount(8);
+    await manageAccessPage.assertPasskeyCount(16);
     await manageAccessPage.add(async (dialog) => {
       await dialog.assertPasskeyUnavailable();
       await dialog.close();
