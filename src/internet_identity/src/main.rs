@@ -23,10 +23,6 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
     OpenIdPrepareDelegationResponse,
 };
-use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasError, GetIdAliasRequest, IdAliasCredentials, PrepareIdAliasError,
-    PrepareIdAliasRequest, PreparedIdAlias,
-};
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -49,7 +45,7 @@ mod openid;
 mod state;
 mod stats;
 mod storage;
-mod vc_mvp;
+
 
 // Some time helpers
 const fn secs_to_nanos(secs: u64) -> u64 {
@@ -72,105 +68,7 @@ async fn init_salt() {
     state::init_salt().await;
 }
 
-#[update]
-fn enter_device_registration_mode(anchor_number: AnchorNumber) -> Timestamp {
-    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    tentative_device_registration::enter_device_registration_mode(anchor_number, None)
-        // Legacy API traps instead of returning an error.
-        .unwrap_or_else(|err| match err {
-            AuthnMethodRegistrationModeEnterError::AlreadyInProgress => trap("Already in progress"),
-            AuthnMethodRegistrationModeEnterError::InternalCanisterError(message) => trap(&message),
-            AuthnMethodRegistrationModeEnterError::Unauthorized(_)
-            | AuthnMethodRegistrationModeEnterError::InvalidRegistrationId(_) => {
-                trap("Unreachable error")
-            }
-        })
-}
 
-#[update]
-fn exit_device_registration_mode(anchor_number: AnchorNumber) {
-    check_authz_and_record_activity(anchor_number).unwrap_or_else(|err| trap(&format!("{err}")));
-    tentative_device_registration::exit_device_registration_mode(anchor_number);
-}
-
-#[update]
-async fn add_tentative_device(
-    anchor_number: AnchorNumber,
-    device_data: DeviceData,
-) -> AddTentativeDeviceResponse {
-    let result =
-        tentative_device_registration::add_tentative_device(anchor_number, device_data).await;
-    match result {
-        Ok(AuthnMethodConfirmationCode {
-            confirmation_code,
-            expiration,
-        }) => AddTentativeDeviceResponse::AddedTentatively {
-            verification_code: confirmation_code,
-            device_registration_timeout: expiration,
-        },
-        Err(err) => match err {
-            AuthnMethodRegisterError::RegistrationModeOff => {
-                AddTentativeDeviceResponse::DeviceRegistrationModeOff
-            }
-            AuthnMethodRegisterError::RegistrationAlreadyInProgress => {
-                AddTentativeDeviceResponse::AnotherDeviceTentativelyAdded
-            }
-            AuthnMethodRegisterError::InvalidMetadata(_) => {
-                // Unreachable since we don't convert from `AuthnMethodData` to `DeviceWithUsage`
-                // in this legacy method in comparison to the newer `authn_method_register` method.
-                trap("Unreachable error");
-            }
-            AuthnMethodRegisterError::NotSelfAuthenticating(_) => {
-                // Unreachable in this legacy method since it doesn't check for self-authenticating principals
-                trap("Unreachable error");
-            }
-        },
-    }
-}
-
-#[update]
-fn verify_tentative_device(
-    anchor_number: AnchorNumber,
-    user_confirmation_code: DeviceConfirmationCode,
-) -> VerifyTentativeDeviceResponse {
-    let (mut anchor, authorization_key) = check_authorization(anchor_number)
-        .unwrap_or_else(|err| trap(&format!("{} could not be authenticated.", err.principal)));
-    match tentative_device_registration::confirm_tentative_device_or_session(
-        anchor_number,
-        user_confirmation_code,
-    ) {
-        Ok(maybe_confirmed_device) => {
-            if let Some(confirmed_device) = maybe_confirmed_device {
-                // Add device to anchor with bookkeeping if it has been confirmed
-                anchor_management::activity_bookkeeping(&mut anchor, &authorization_key);
-                let operation = anchor_management::add_device(&mut anchor, confirmed_device);
-                if let Err(err) = state::storage_borrow_mut(|storage| storage.write(anchor)) {
-                    trap(&format!("{err}"));
-                }
-                anchor_management::post_operation_bookkeeping(anchor_number, operation);
-            }
-            VerifyTentativeDeviceResponse::Verified
-        }
-        Err(err) => match err {
-            AuthnMethodConfirmationError::RegistrationModeOff => {
-                VerifyTentativeDeviceResponse::DeviceRegistrationModeOff
-            }
-            AuthnMethodConfirmationError::NoAuthnMethodToConfirm => {
-                VerifyTentativeDeviceResponse::NoDeviceToVerify
-            }
-            AuthnMethodConfirmationError::WrongCode { retries_left } => {
-                VerifyTentativeDeviceResponse::WrongCode { retries_left }
-            }
-            // Unreachable since these two errors already result in a trap in this legacy method.
-            AuthnMethodConfirmationError::Unauthorized(principal) => {
-                trap(&format!("{principal} could not be authenticated."))
-            }
-            AuthnMethodConfirmationError::InternalCanisterError(err) => {
-                trap(&err.to_string());
-            }
-        },
-    }
-}
 
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
@@ -251,62 +149,7 @@ fn get_anchor_info(anchor_number: AnchorNumber) -> IdentityAnchorInfo {
     anchor_management::get_anchor_info(anchor_number)
 }
 
-#[query]
-fn get_principal(anchor_number: AnchorNumber, frontend: FrontendHostname) -> Principal {
-    let Ok(_) = check_authorization(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-    delegation::get_principal(anchor_number, frontend)
-}
 
-#[update]
-async fn prepare_delegation(
-    anchor_number: AnchorNumber,
-    frontend: FrontendHostname,
-    session_key: SessionKey,
-    max_time_to_live: Option<u64>,
-) -> (UserKey, Timestamp) {
-    let ii_domain = check_authz_and_record_activity(anchor_number)
-        .unwrap_or_else(|err| trap(&format!("{err}")));
-
-    account_management::prepare_account_delegation(
-        anchor_number,
-        frontend,
-        None,
-        session_key,
-        max_time_to_live,
-        &ii_domain,
-    )
-    .await
-    .map(
-        |PrepareAccountDelegation {
-             user_key,
-             expiration,
-         }| (user_key, expiration),
-    )
-    .unwrap_or_else(|err| trap(&format!("{err:?}")))
-}
-
-#[query]
-fn get_delegation(
-    anchor_number: AnchorNumber,
-    frontend: FrontendHostname,
-    session_key: SessionKey,
-    expiration: Timestamp,
-) -> GetDelegationResponse {
-    let Ok(_) = check_authorization(anchor_number) else {
-        trap(&format!("{} could not be authenticated.", caller()));
-    };
-    account_management::get_account_delegation(
-        anchor_number,
-        &frontend,
-        None,
-        session_key,
-        expiration,
-    )
-    .map(GetDelegationResponse::SignedDelegation)
-    .unwrap_or(GetDelegationResponse::NoSuchDelegation)
-}
 
 #[query]
 fn get_accounts(
@@ -1297,41 +1140,7 @@ mod attribute_sharing {
     }
 }
 
-/// Legacy API for the original attribute sharing MVP (VC-based).
-/// The current attribute sharing protocol endpoints live in `mod attribute_sharing`.
-mod attribute_sharing_old_vc {
-    use super::*;
 
-    #[update]
-    async fn prepare_id_alias(
-        req: PrepareIdAliasRequest,
-    ) -> Result<PreparedIdAlias, PrepareIdAliasError> {
-        check_authz_and_record_activity(req.identity_number).map_err(PrepareIdAliasError::from)?;
-        let prepared_id_alias = vc_mvp::prepare_id_alias(
-            req.identity_number,
-            vc_mvp::InvolvedDapps {
-                relying_party: req.relying_party.clone(),
-                issuer: req.issuer.clone(),
-            },
-        )
-        .await;
-        Ok(prepared_id_alias)
-    }
-
-    #[query]
-    fn get_id_alias(req: GetIdAliasRequest) -> Result<IdAliasCredentials, GetIdAliasError> {
-        check_authorization(req.identity_number).map_err(GetIdAliasError::from)?;
-        vc_mvp::get_id_alias(
-            req.identity_number,
-            vc_mvp::InvolvedDapps {
-                relying_party: req.relying_party,
-                issuer: req.issuer,
-            },
-            &req.rp_id_alias_jwt,
-            &req.issuer_id_alias_jwt,
-        )
-    }
-}
 
 fn main() {}
 

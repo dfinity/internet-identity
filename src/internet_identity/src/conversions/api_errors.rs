@@ -1,9 +1,6 @@
 use crate::authz_utils::{AuthorizationError, IdentityUpdateError};
 use crate::storage::anchor::AnchorError;
 use crate::storage::StorageError;
-use internet_identity_interface::internet_identity::types::vc_mvp::{
-    GetIdAliasError, PrepareIdAliasError,
-};
 use internet_identity_interface::internet_identity::types::{
     IdentityInfoError, IdentityMetadataReplaceError, IdentityPropertiesReplaceError,
 };
@@ -40,17 +37,6 @@ impl From<AnchorError> for IdentityMetadataReplaceError {
                 }
             }
             err => IdentityMetadataReplaceError::InternalCanisterError(err.to_string()),
-        }
-    }
-}
-
-impl From<IdentityUpdateError> for PrepareIdAliasError {
-    fn from(value: IdentityUpdateError) -> Self {
-        match value {
-            IdentityUpdateError::Unauthorized(principal) => {
-                PrepareIdAliasError::Unauthorized(principal)
-            }
-            err => PrepareIdAliasError::InternalCanisterError(err.to_string()),
         }
     }
 }
@@ -99,8 +85,4 @@ impl From<AnchorError> for IdentityPropertiesReplaceError {
     }
 }
 
-impl From<AuthorizationError> for GetIdAliasError {
-    fn from(value: AuthorizationError) -> Self {
-        Self::Unauthorized(value.principal)
-    }
-}
+
