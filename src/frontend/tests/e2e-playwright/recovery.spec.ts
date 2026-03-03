@@ -35,9 +35,16 @@ const test = base.extend<{
 test.describe("Recovery flow", () => {
   // Activate recovery phrase and goto recovery
   test.beforeEach(
-    async ({ manageRecoveryPage, recoveryPage, identity, words }) => {
+    async ({
+      page,
+      manageRecoveryPage,
+      recoveryPage,
+      identities,
+      signInWithIdentity,
+      words,
+    }) => {
       await manageRecoveryPage.goto();
-      await identity.signIn();
+      await signInWithIdentity(page, identities[0].identityNumber);
       await manageRecoveryPage.assertNotActivated();
       words.current = await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
@@ -60,47 +67,50 @@ test.describe("Recovery flow", () => {
       ).toBeVisible();
     });
 
-    test("on first attempt", async ({ recoveryPage, words, identity }) => {
+    test("on first attempt", async ({ recoveryPage, words, identities }) => {
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(words.current!);
-        await wizard.confirmFoundIdentity(identity.name);
+        await wizard.confirmFoundIdentity(identities[0].name);
       });
     });
 
     test("on retry after identity not found", async ({
       recoveryPage,
       words,
-      identity,
+      identities,
     }) => {
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(generateMnemonic());
         await wizard.retryIdentityNotFound();
         await wizard.enterRecoveryPhrase(words.current!);
-        await wizard.confirmFoundIdentity(identity.name);
+        await wizard.confirmFoundIdentity(identities[0].name);
       });
     });
 
     test("on retry after invalid phrase", async ({
       recoveryPage,
       words,
-      identity,
+      identities,
     }) => {
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(changeLastWord(words.current!));
         await wizard.retryInvalid();
         await wizard.enterRecoveryPhrase(words.current!);
-        await wizard.confirmFoundIdentity(identity.name);
+        await wizard.confirmFoundIdentity(identities[0].name);
       });
     });
 
     test("with a legacy identity", async ({
       recoveryPage,
       words,
-      identity,
+      identities,
+      actorForIdentity,
     }) => {
       // Remove name from identity
-      const { actor, identityNumber } = await identity.createActor();
-      await actor.identity_properties_replace(identityNumber, { name: [] });
+      const actor = await actorForIdentity(identities[0].identityNumber);
+      await actor.identity_properties_replace(identities[0].identityNumber, {
+        name: [],
+      });
       // Enter name during recovery
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(words.current!);
@@ -113,7 +123,7 @@ test.describe("Recovery flow", () => {
     page,
     recoveryPage,
     words,
-    identity,
+    identities,
   }) => {
     // Recover with the same phrase twice to verify that
     // the phrase remains usable after it has been used.
@@ -121,7 +131,7 @@ test.describe("Recovery flow", () => {
       await recoveryPage.goto();
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(words.current!);
-        await wizard.confirmFoundIdentity(identity.name);
+        await wizard.confirmFoundIdentity(identities[0].name);
       });
       // Verify we've reached the dashboard and the page has loaded,
       // this indicates that the user has successfully authenticated.
@@ -134,12 +144,12 @@ test.describe("Recovery flow", () => {
 
   test.describe("can be cancelled", () => {
     // Assert we're back on the landing page and the recovery phrase is still valid
-    test.afterEach(async ({ page, recoveryPage, words, identity }) => {
+    test.afterEach(async ({ page, recoveryPage, words, identities }) => {
       await page.waitForURL(II_URL);
       await recoveryPage.goto();
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(words.current!);
-        await wizard.confirmFoundIdentity(identity.name);
+        await wizard.confirmFoundIdentity(identities[0].name);
       });
       await page.waitForURL(II_URL + "/manage/access");
       await expect(
@@ -185,11 +195,14 @@ test.describe("Recovery flow", () => {
     test("before upgrading legacy identity", async ({
       recoveryPage,
       words,
-      identity,
+      identities,
+      actorForIdentity,
     }) => {
       // Remove name from identity
-      const { actor, identityNumber } = await identity.createActor();
-      await actor.identity_properties_replace(identityNumber, { name: [] });
+      const actor = await actorForIdentity(identities[0].identityNumber);
+      await actor.identity_properties_replace(identities[0].identityNumber, {
+        name: [],
+      });
       // Cancel instead of entering an identity name
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(words.current!);
@@ -197,8 +210,8 @@ test.describe("Recovery flow", () => {
       });
       await recoveryPage.cancel();
       // Revert name removal from identity
-      await actor.identity_properties_replace(identityNumber, {
-        name: [identity.name],
+      await actor.identity_properties_replace(identities[0].identityNumber, {
+        name: [identities[0].name],
       });
     });
   });
