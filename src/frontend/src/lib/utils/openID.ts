@@ -103,9 +103,7 @@ export const createRedirectURL = (
   config: Omit<RequestConfig, "configURL">,
   options: RequestOptions,
 ): URL => {
-  const state = toBase64URL(
-    window.crypto.getRandomValues(new Uint8Array(12)).buffer,
-  );
+  const state = toBase64URL(window.crypto.getRandomValues(new Uint8Array(12)));
   const redirectURL = new URL(REDIRECT_CALLBACK_PATH, window.location.origin);
   const authURL = new URL(config.authURL);
   // Even though we only need an id token, we're still asking for a code
@@ -170,7 +168,7 @@ export const createAnonymousNonce = async (
   bytes.set(salt);
   bytes.set(principal.toUint8Array(), 32);
   const nonce = toBase64URL(
-    await window.crypto.subtle.digest("SHA-256", bytes),
+    new Uint8Array(await window.crypto.subtle.digest("SHA-256", bytes)),
   );
   return { nonce, salt };
 };
