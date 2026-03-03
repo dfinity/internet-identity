@@ -38,7 +38,7 @@ To build the wasm modules yourself and verify their hashes, run the following co
 \`\`\`
 git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
-./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1)
+./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1) --iife-hash $(shasum -a 256 internet_identity_frontend.wasm.gz | cut -d ' ' -f1)
 \`\`\`
 
 Make sure to compare the hashes also with the proposal payload when verifying canister upgrade proposals.

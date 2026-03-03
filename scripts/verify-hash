@@ -8,6 +8,7 @@ cd "$SCRIPTS_DIR/.."
 
 
 declare expected_ii_hash=
+declare expected_iife_hash=
 declare expected_archive_hash=
 
 GREEN=
@@ -43,10 +44,11 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 --ii-hash II_HASH [--archive-hash ARCHIVE_HASH]
+  $0 --ii-hash II_HASH [--iife-hash IIFE_HASH] [--archive-hash ARCHIVE_HASH]
 
 Options:
   --ii-hash HASH                  Expected II SHA256 hash of the II wasm.
+  --iife-hash HASH                Optional II frontend hash, if the frontend needs to be verified as well.
   --archive-hash ARCHIVE_HASH     Optional archive hash, if the archive needs to be verified as well.
 EOF
 }
@@ -54,7 +56,7 @@ EOF
 function help() {
     cat << EOF
 
-Builds the II canister (and optionally also the archive) and compares the hash of the built wasm with the expected hash.
+Builds the II canister (and optionally also the frontend and archive) and compares the hash of the built wasm with the expected hash.
 EOF
 }
 
@@ -72,6 +74,11 @@ do
         --ii-hash)
             expected_ii_hash="${2:?missing value for '--ii-hash'}"
             shift; # shift past --ii-hash and value
+            shift;
+            ;;
+        --iife-hash)
+            expected_iife_hash="${2:?missing value for '--iife-hash'}"
+            shift; # shift past --iife-hash and value
             shift;
             ;;
         --archive-hash)
@@ -101,6 +108,7 @@ fi
 prod_build_sha256="$(shasum -a 256 ./internet_identity.wasm.gz | cut -d ' ' -f1)"
 
 ii_match=false
+iife_match=false
 archive_match=false
 
 if [ "$prod_build_sha256" == "$expected_ii_hash" ]
@@ -109,6 +117,22 @@ then
 else
   print_red "sha mismatch: $prod_build_sha256 /= $expected_ii_hash"
   exit 1
+fi
+
+if [ -n "$expected_iife_hash" ]
+then
+  ./scripts/docker-build --frontend
+  iife_sha256="$(shasum -a 256 ./internet_identity_frontend.wasm.gz | cut -d ' ' -f1)"
+  if [ "$iife_sha256" == "$expected_iife_hash" ]
+  then
+    iife_match=true
+  else
+    print_red "sha mismatch: $iife_sha256 /= $expected_iife_hash"
+    if $ii_match; then
+      print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+    fi
+    exit 1
+  fi
 fi
 
 if [ -n "$expected_archive_hash" ]
@@ -129,6 +153,10 @@ fi
 
 if $ii_match; then
   print_green "internet_identity.wasm.gz sha256 matches expected hash $expected_ii_hash"
+fi
+
+if $iife_match; then
+  print_green "internet_identity_frontend.wasm.gz sha256 matches expected hash $expected_iife_hash"
 fi
 
 if $archive_match; then
