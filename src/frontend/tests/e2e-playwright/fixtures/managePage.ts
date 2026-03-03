@@ -10,10 +10,7 @@ class ManagePage {
 
   async signOut() {
     await this.#openMenuOnMobile();
-    await this.#page
-      .getByRole("banner")
-      .getByRole("button", { name: "Switch identity" })
-      .click();
+    await this.#page.getByRole("button", { name: "Switch identity" }).click();
     await this.#page
       .getByRole("group")
       .getByRole("button", { name: "Sign Out" })

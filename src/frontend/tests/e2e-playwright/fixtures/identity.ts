@@ -142,37 +142,37 @@ export const test = base.extend<{
   identities: async ({ browser, identityConfig }, use) =>
     use(
       await Promise.all(
-        identityConfig.createIdentities.map(async (createIdentity) => {
-          const name = createIdentity.name ?? DEFAULT_NAME;
-          const dummyAuthIndex =
-            createIdentity.generateDummyAuthIndex?.() ?? getRandomIndex();
-          const context = await browser.newContext();
-          const page = await context.newPage();
-          await page.goto(II_URL);
-          const element = (await page.$("[data-canister-id]"))!;
-          const canisterId = Principal.fromText(
-            (await element.getAttribute("data-canister-id"))!,
-          );
-          const wizard = new IdentityWizard(page);
-          await wizard.signUp(dummyAuth(dummyAuthIndex), name);
-          await page.close();
-          await context.close();
-          const actor = await createActor(
-            identityConfig.host ?? DEFAULT_HOST,
-            canisterId,
-            dummyAuthIndex,
-          );
-          const [deviceKeyWithAnchor] = await actor.lookup_device_key(
-            toSeed(dummyAuthIndex),
-          );
-          const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
-          return {
-            canisterId,
-            name,
-            dummyAuthIndex,
-            identityNumber,
-          };
-        }),
+        identityConfig.createIdentities.map(
+          async ({ name, generateDummyAuthIndex = getRandomIndex }) => {
+            const dummyAuthIndex = generateDummyAuthIndex();
+            const context = await browser.newContext();
+            const page = await context.newPage();
+            await page.goto(II_URL);
+            const element = (await page.$("[data-canister-id]"))!;
+            const canisterId = Principal.fromText(
+              (await element.getAttribute("data-canister-id"))!,
+            );
+            const wizard = new IdentityWizard(page);
+            await wizard.signUp(dummyAuth(dummyAuthIndex), name);
+            await page.close();
+            await context.close();
+            const actor = await createActor(
+              identityConfig.host ?? DEFAULT_HOST,
+              canisterId,
+              dummyAuthIndex,
+            );
+            const [deviceKeyWithAnchor] = await actor.lookup_device_key(
+              toSeed(dummyAuthIndex),
+            );
+            const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
+            return {
+              canisterId,
+              name,
+              dummyAuthIndex,
+              identityNumber,
+            };
+          },
+        ),
       ),
     ),
   signInWithIdentity: ({ identities }, use) =>
