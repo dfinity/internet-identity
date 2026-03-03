@@ -751,6 +751,12 @@ jobs:
           name: archive.wasm.gz
           path: .
 
+      - name: "Download frontend"
+        uses: actions/download-artifact@v4
+        with:
+          name: internet_identity_frontend.wasm.gz
+          path: .
+
       - name: "Download issuer"
         uses: actions/download-artifact@v4
         with:
@@ -816,6 +822,7 @@ jobs:
             internet_identity_production.wasm.gz
             internet_identity_dev.wasm.gz
             internet_identity_test.wasm.gz
+            internet_identity_frontend.wasm.gz
             archive.wasm.gz
             vc_demo_issuer.wasm.gz
           production_asset: internet_identity_production.wasm.gz
@@ -843,6 +850,7 @@ jobs:
             internet_identity_production.wasm.gz.sha256 \
             internet_identity_dev.wasm.gz \
             internet_identity_test.wasm.gz \
+            internet_identity_frontend.wasm.gz \
             src/internet_identity/internet_identity.did \
             archive.wasm.gz \
             vc_demo_issuer.wasm.gz
