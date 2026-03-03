@@ -37,26 +37,36 @@ const test = base.extend<{
 });
 
 test.describe("Recovery phrase", () => {
-  test.beforeEach(async ({ manageRecoveryPage, identity }) => {
-    await manageRecoveryPage.goto();
-    await identity.signIn();
-    await manageRecoveryPage.assertNotActivated();
-  });
+  test.beforeEach(
+    async ({ page, manageRecoveryPage, identities, signInWithIdentity }) => {
+      await manageRecoveryPage.goto();
+      await signInWithIdentity(page, identities[0].identityNumber);
+      await manageRecoveryPage.assertNotActivated();
+    },
+  );
 
   test.describe("can be activated", () => {
     test.afterEach(
-      async ({ page, manageRecoveryPage, identity, words, recoveryPage }) => {
+      async ({
+        page,
+        managePage,
+        manageRecoveryPage,
+        identities,
+        signInWithIdentity,
+        words,
+        recoveryPage,
+      }) => {
         await manageRecoveryPage.assertActivated();
         // Assert it's still activated after signing back in
-        await identity.signOut();
+        await managePage.signOut();
         await manageRecoveryPage.goto();
-        await identity.signIn();
+        await signInWithIdentity(page, identities[0].identityNumber);
         await manageRecoveryPage.assertActivated();
         // Verify we can recover using `words.current`
         await recoveryPage.goto();
         await recoveryPage.start(async (wizard) => {
           await wizard.enterRecoveryPhrase(words.current!);
-          await wizard.confirmFoundIdentity(identity.name);
+          await wizard.confirmFoundIdentity(identities[0].name);
         });
         await page.waitForURL(II_URL + "/manage/access");
         await expect(
@@ -98,18 +108,26 @@ test.describe("Recovery phrase", () => {
     });
 
     test.afterEach(
-      async ({ page, manageRecoveryPage, identity, recoveryPage, words }) => {
+      async ({
+        page,
+        managePage,
+        manageRecoveryPage,
+        identities,
+        signInWithIdentity,
+        recoveryPage,
+        words,
+      }) => {
         await manageRecoveryPage.assertActivated();
         // Assert it's still activated after signing back in
-        await identity.signOut();
+        await managePage.signOut();
         await manageRecoveryPage.goto();
-        await identity.signIn();
+        await signInWithIdentity(page, identities[0].identityNumber);
         await manageRecoveryPage.assertActivated();
         // Verify we can still recover using `words.current`
         await recoveryPage.goto();
         await recoveryPage.start(async (wizard) => {
           await wizard.enterRecoveryPhrase(words.current!);
-          await wizard.confirmFoundIdentity(identity.name);
+          await wizard.confirmFoundIdentity(identities[0].name);
         });
         await page.waitForURL(II_URL + "/manage/access");
         await expect(
@@ -137,11 +155,19 @@ test.describe("Recovery phrase", () => {
     });
 
     test.describe("when coming back after sign out", () => {
-      test.beforeEach(async ({ manageRecoveryPage, identity }) => {
-        await identity.signOut();
-        await manageRecoveryPage.goto();
-        await identity.signIn();
-      });
+      test.beforeEach(
+        async ({
+          page,
+          managePage,
+          manageRecoveryPage,
+          identities,
+          signInWithIdentity,
+        }) => {
+          await managePage.signOut();
+          await manageRecoveryPage.goto();
+          await signInWithIdentity(page, identities[0].identityNumber);
+        },
+      );
 
       test("on first attempt", async ({ manageRecoveryPage, words }) => {
         await manageRecoveryPage.verify(async (wizard) => {
@@ -159,17 +185,20 @@ test.describe("Recovery phrase", () => {
     });
 
     test("when signed in (incorrectly) and then when coming back (correctly)", async ({
+      page,
+      managePage,
       manageRecoveryPage,
-      identity,
+      identities,
+      signInWithIdentity,
       words,
     }) => {
       await manageRecoveryPage.verify(async (wizard) => {
         await wizard.verifySelecting(swapWordsAround(words.current!));
         await wizard.close();
       });
-      await identity.signOut();
+      await managePage.signOut();
       await manageRecoveryPage.goto();
-      await identity.signIn();
+      await signInWithIdentity(page, identities[0].identityNumber);
       await manageRecoveryPage.verify(async (wizard) => {
         await wizard.verifyTyping(words.current!);
       });
@@ -178,18 +207,26 @@ test.describe("Recovery phrase", () => {
 
   test.describe("can be reset", () => {
     test.afterEach(
-      async ({ page, manageRecoveryPage, identity, recoveryPage, words }) => {
+      async ({
+        page,
+        managePage,
+        manageRecoveryPage,
+        identities,
+        signInWithIdentity,
+        recoveryPage,
+        words,
+      }) => {
         await manageRecoveryPage.assertActivated();
         // Assert it's still activated after signing back in
-        await identity.signOut();
+        await managePage.signOut();
         await manageRecoveryPage.goto();
-        await identity.signIn();
+        await signInWithIdentity(page, identities[0].identityNumber);
         await manageRecoveryPage.assertActivated();
         // Verify we can recover using the new recovery phrase (`words.current`)
         await recoveryPage.goto();
         await recoveryPage.start(async (wizard) => {
           await wizard.enterRecoveryPhrase(words.current!);
-          await wizard.confirmFoundIdentity(identity.name);
+          await wizard.confirmFoundIdentity(identities[0].name);
         });
         await page.waitForURL(II_URL + "/manage/access");
         await expect(
@@ -262,37 +299,47 @@ test.describe("Recovery phrase", () => {
     }
 
     test.describe("when it is locked (legacy)", () => {
-      test.beforeEach(async ({ identity, manageRecoveryPage, words }) => {
-        // Use an actor to create a locked recovery phrase
-        // since this functionality is no longer available.
-        const { actor, identityNumber } = await identity.createActor();
-        words.current = generateMnemonic();
-        const recoveryIdentity = await fromMnemonicWithoutValidation(
-          words.current.join(" "),
-          IC_DERIVATION_PATH,
-        );
-        await actor.authn_method_add(identityNumber, {
-          metadata: [
-            ["alias", { String: "Recovery phrase" }],
-            ["usage", { String: "recovery_phrase" }],
-          ],
-          authn_method: {
-            PubKey: {
-              pubkey: new Uint8Array(recoveryIdentity.getPublicKey().derKey),
+      test.beforeEach(
+        async ({
+          page,
+          identities,
+          signInWithIdentity,
+          actorForIdentity,
+          managePage,
+          manageRecoveryPage,
+          words,
+        }) => {
+          // Use an actor to create a locked recovery phrase
+          // since this functionality is no longer available.
+          const actor = await actorForIdentity(identities[0].identityNumber);
+          words.current = generateMnemonic();
+          const recoveryIdentity = await fromMnemonicWithoutValidation(
+            words.current.join(" "),
+            IC_DERIVATION_PATH,
+          );
+          await actor.authn_method_add(identities[0].identityNumber, {
+            metadata: [
+              ["alias", { String: "Recovery phrase" }],
+              ["usage", { String: "recovery_phrase" }],
+            ],
+            authn_method: {
+              PubKey: {
+                pubkey: new Uint8Array(recoveryIdentity.getPublicKey().derKey),
+              },
             },
-          },
-          security_settings: {
-            protection: { Protected: null },
-            purpose: { Recovery: null },
-          },
-          last_authentication: [],
-        });
-        // Revisit the page to see the changes
-        await identity.signOut();
-        await manageRecoveryPage.goto();
-        await identity.signIn();
-        await manageRecoveryPage.assertLocked();
-      });
+            security_settings: {
+              protection: { Protected: null },
+              purpose: { Recovery: null },
+            },
+            last_authentication: [],
+          });
+          // Revisit the page to see the changes
+          await managePage.signOut();
+          await manageRecoveryPage.goto();
+          await signInWithIdentity(page, identities[0].identityNumber);
+          await manageRecoveryPage.assertLocked();
+        },
+      );
 
       test("on first attempt", async ({ manageRecoveryPage, words }) => {
         words.current = await manageRecoveryPage.unlockAndReset(
@@ -334,9 +381,9 @@ test.describe("Recovery phrase", () => {
 
     test("when resetting", async ({
       page,
+      identities,
       manageRecoveryPage,
       recoveryPage,
-      identity,
     }) => {
       const oldWords = await manageRecoveryPage.activate(async (wizard) => {
         await wizard.acknowledge();
@@ -353,7 +400,7 @@ test.describe("Recovery phrase", () => {
       await recoveryPage.goto();
       await recoveryPage.start(async (wizard) => {
         await wizard.enterRecoveryPhrase(oldWords);
-        await wizard.confirmFoundIdentity(identity.name);
+        await wizard.confirmFoundIdentity(identities[0].name);
       });
       await page.waitForURL(II_URL + "/manage/access");
       await expect(
@@ -363,14 +410,22 @@ test.describe("Recovery phrase", () => {
   });
 
   test.describe("is not verified", () => {
-    test.afterEach(async ({ manageRecoveryPage, identity }) => {
-      await manageRecoveryPage.assertNotVerified();
-      // Assert it's still not verified after signing back in
-      await identity.signOut();
-      await manageRecoveryPage.goto();
-      await identity.signIn();
-      await manageRecoveryPage.assertNotVerified();
-    });
+    test.afterEach(
+      async ({
+        page,
+        identities,
+        signInWithIdentity,
+        managePage,
+        manageRecoveryPage,
+      }) => {
+        await manageRecoveryPage.assertNotVerified();
+        // Assert it's still not verified after signing back in
+        await managePage.signOut();
+        await manageRecoveryPage.goto();
+        await signInWithIdentity(page, identities[0].identityNumber);
+        await manageRecoveryPage.assertNotVerified();
+      },
+    );
 
     test.describe("when closed during activation", () => {
       test("before written down", async ({ manageRecoveryPage }) => {
