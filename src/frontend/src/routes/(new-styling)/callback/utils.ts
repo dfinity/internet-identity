@@ -24,10 +24,10 @@ export const redirectInPopup = (url: string): Promise<string> => {
       redirectWindow?.close();
       window.focus();
     };
-    // Monitor popup closure since cross-origin windows prevent close event
-    // listening. We periodically check the closed attribute to detect when
-    // the user closes the popup, allowing us to reject the promise instead
-    // of waiting indefinitely for a result that will never arrive.
+    // Periodically check if popup was closed by the user.
+    // We can't listen for close events due to cross-origin restrictions,
+    // so we poll every 500ms to detect closure. The interval balances
+    // responsiveness with resource consumption.
     const closeInterval = setInterval(() => {
       if (redirectWindow.closed === true) {
         cleanup();
