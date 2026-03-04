@@ -5,7 +5,6 @@ import {
   generateMnemonic,
   IC_DERIVATION_PATH,
 } from "$lib/utils/recoveryPhrase";
-import { II_URL } from "../../utils";
 
 /**
  * Swap the first word around with the next different word found,
@@ -51,6 +50,7 @@ test.describe("Recovery phrase", () => {
         page,
         managePage,
         manageRecoveryPage,
+        manageAccessPage,
         identities,
         signInWithIdentity,
         words,
@@ -68,10 +68,7 @@ test.describe("Recovery phrase", () => {
           await wizard.enterRecoveryPhrase(words.current!);
           await wizard.confirmFoundIdentity(identities[0].name);
         });
-        await page.waitForURL(II_URL + "/manage/access");
-        await expect(
-          page.getByRole("heading", { name: "Access methods" }),
-        ).toBeVisible();
+        await manageAccessPage.assertVisible();
       },
     );
 
@@ -112,6 +109,7 @@ test.describe("Recovery phrase", () => {
         page,
         managePage,
         manageRecoveryPage,
+        manageAccessPage,
         identities,
         signInWithIdentity,
         recoveryPage,
@@ -129,10 +127,7 @@ test.describe("Recovery phrase", () => {
           await wizard.enterRecoveryPhrase(words.current!);
           await wizard.confirmFoundIdentity(identities[0].name);
         });
-        await page.waitForURL(II_URL + "/manage/access");
-        await expect(
-          page.getByRole("heading", { name: "Access methods" }),
-        ).toBeVisible();
+        await manageAccessPage.assertVisible();
       },
     );
 
@@ -211,6 +206,7 @@ test.describe("Recovery phrase", () => {
         page,
         managePage,
         manageRecoveryPage,
+        manageAccessPage,
         identities,
         signInWithIdentity,
         recoveryPage,
@@ -228,10 +224,7 @@ test.describe("Recovery phrase", () => {
           await wizard.enterRecoveryPhrase(words.current!);
           await wizard.confirmFoundIdentity(identities[0].name);
         });
-        await page.waitForURL(II_URL + "/manage/access");
-        await expect(
-          page.getByRole("heading", { name: "Access methods" }),
-        ).toBeVisible();
+        await manageAccessPage.assertVisible();
       },
     );
 
@@ -380,9 +373,9 @@ test.describe("Recovery phrase", () => {
     });
 
     test("when resetting", async ({
-      page,
       identities,
       manageRecoveryPage,
+      manageAccessPage,
       recoveryPage,
     }) => {
       const oldWords = await manageRecoveryPage.activate(async (wizard) => {
@@ -402,10 +395,7 @@ test.describe("Recovery phrase", () => {
         await wizard.enterRecoveryPhrase(oldWords);
         await wizard.confirmFoundIdentity(identities[0].name);
       });
-      await page.waitForURL(II_URL + "/manage/access");
-      await expect(
-        page.getByRole("heading", { name: "Access methods" }),
-      ).toBeVisible();
+      await manageAccessPage.assertVisible();
     });
   });
 

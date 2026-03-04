@@ -202,6 +202,20 @@ class ManageAccessPage {
         .filter({ hasText: "Passkey" }),
     ).toHaveCount(count);
   }
+
+  async assertVisible() {
+    await this.#page.waitForURL(
+      (url) => url.origin === II_URL && url.pathname === "/manage/access",
+    );
+    await expect(
+      this.#page.getByRole("heading", { name: "Access methods" }),
+    ).toBeVisible();
+    await expect(
+      this.#page.getByRole("paragraph", {
+        name: "Add or remove the ways you can sign in with your identity.",
+      }),
+    ).toBeVisible();
+  }
 }
 
 export const test = base.extend<{
