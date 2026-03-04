@@ -250,7 +250,7 @@ test.describe("Access methods", () => {
       await manageAccessPage.assertPasskeyCount(2);
       await manageAccessPage
         .findPasskey(LEGACY_PASSKEY_NAME)
-        .assertUnremovable();
+        .assertRemoveDisabled();
     });
   });
 
