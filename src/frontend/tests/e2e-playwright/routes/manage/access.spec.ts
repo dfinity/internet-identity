@@ -135,6 +135,7 @@ test.describe("Access methods", () => {
     await manageAccessPage
       .findPasskey(DEFAULT_PASSKEY_NAME)
       .assertUnremovable();
+    await manageAccessPage.assertPasskeyCount(1);
   });
 
   test("cannot have more than 16 passkeys", async ({ manageAccessPage }) => {
@@ -147,6 +148,7 @@ test.describe("Access methods", () => {
       await dialog.assertPasskeyUnavailable();
       await dialog.close();
     });
+    await manageAccessPage.assertPasskeyCount(16);
   });
 
   test.describe("can be cancelled", () => {
