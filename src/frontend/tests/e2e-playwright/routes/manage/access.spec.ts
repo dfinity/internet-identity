@@ -135,6 +135,27 @@ test.describe("Access methods", () => {
     });
   });
 
+  test("cannot remove a single passkey", async ({ manageAccessPage }) => {
+    await manageAccessPage.assertPasskeyCount(1);
+    await manageAccessPage
+      .findPasskey(DEFAULT_PASSKEY_NAME)
+      .assertUnremovable();
+    await manageAccessPage.assertPasskeyCount(1);
+  });
+
+  test("cannot have more than 16 passkeys", async ({ manageAccessPage }) => {
+    await manageAccessPage.assertPasskeyCount(1);
+    for (let i = 0; i < 15; i++) {
+      await manageAccessPage.add((dialog) => dialog.passkey(dummyAuth()));
+    }
+    await manageAccessPage.assertPasskeyCount(16);
+    await manageAccessPage.add(async (dialog) => {
+      await dialog.assertPasskeyUnavailable();
+      await dialog.close();
+    });
+    await manageAccessPage.assertPasskeyCount(16);
+  });
+
   test.describe("can remove a legacy passkey", () => {
     const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
 
@@ -192,7 +213,7 @@ test.describe("Access methods", () => {
       },
     );
 
-    test("can be removed if recovery is verified", async ({
+    test("when recovery phrase is verified", async ({
       page,
       manageAccessPage,
       manageRecoveryPage,
@@ -221,7 +242,7 @@ test.describe("Access methods", () => {
       await manageAccessPage.assertPasskeyExists("post-upgrade-passkey");
     });
 
-    test("cannot be removed if recovery is missing or unverified", async ({
+    test("unless recovery phrase is missing or unverified", async ({
       manageAccessPage,
     }) => {
       // Assert remove button is disabled
@@ -230,27 +251,6 @@ test.describe("Access methods", () => {
         .findPasskey(LEGACY_PASSKEY_NAME)
         .assertUnremovable();
     });
-  });
-
-  test("cannot remove a single passkey", async ({ manageAccessPage }) => {
-    await manageAccessPage.assertPasskeyCount(1);
-    await manageAccessPage
-      .findPasskey(DEFAULT_PASSKEY_NAME)
-      .assertUnremovable();
-    await manageAccessPage.assertPasskeyCount(1);
-  });
-
-  test("cannot have more than 16 passkeys", async ({ manageAccessPage }) => {
-    await manageAccessPage.assertPasskeyCount(1);
-    for (let i = 0; i < 15; i++) {
-      await manageAccessPage.add((dialog) => dialog.passkey(dummyAuth()));
-    }
-    await manageAccessPage.assertPasskeyCount(16);
-    await manageAccessPage.add(async (dialog) => {
-      await dialog.assertPasskeyUnavailable();
-      await dialog.close();
-    });
-    await manageAccessPage.assertPasskeyCount(16);
   });
 
   test.describe("can be cancelled", () => {
