@@ -88,7 +88,7 @@ test.describe("Access methods", () => {
         });
     });
 
-    test("which has been added previously", async ({ manageAccessPage }) => {
+    test("which is currently not in use", async ({ manageAccessPage }) => {
       // Remove additional passkey
       await manageAccessPage.assertPasskeyCount(2);
       await manageAccessPage
@@ -108,6 +108,7 @@ test.describe("Access methods", () => {
       replaceAuthForIdentity,
     }) => {
       // Remove currently in use passkey
+      await manageAccessPage.assertPasskeyCount(2);
       await manageAccessPage
         .findPasskey("in-use-passkey")
         .remove(async (dialog) => {
