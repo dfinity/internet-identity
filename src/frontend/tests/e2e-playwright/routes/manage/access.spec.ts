@@ -167,7 +167,7 @@ test.describe("Access methods", () => {
         await managePage.signOut();
         await manageAccessPage.goto();
         await signInWithIdentity(page, identities[0].identityNumber);
-        await managePage.assertVisible();
+        await manageAccessPage.assertVisible();
       },
     );
 
