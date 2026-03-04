@@ -211,9 +211,9 @@ class ManageAccessPage {
       this.#page.getByRole("heading", { name: "Access methods" }),
     ).toBeVisible();
     await expect(
-      this.#page.getByRole("paragraph", {
-        name: "Add or remove the ways you can sign in with your identity.",
-      }),
+      this.#page.getByText(
+        "Add or remove the ways you can sign in with your identity.",
+      ),
     ).toBeVisible();
   }
 }
