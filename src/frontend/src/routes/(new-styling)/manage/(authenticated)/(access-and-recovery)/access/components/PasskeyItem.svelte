@@ -104,15 +104,17 @@
         ></div>
       {/if}
     </div>
-    <div
-      class={[
-        "ms-2 rounded-full border px-2 py-0.5 text-xs font-medium",
-        "border-[#d3d8e6] bg-[#e8e9f2] text-[#4e566c]",
-        "dark:border-[#34384b] dark:bg-[#1f212d] dark:text-[#9ba2c6]",
-      ]}
-    >
-      {$t`Legacy`}
-    </div>
+    {#if isLegacy}
+      <div
+        class={[
+          "ms-2 rounded-full border px-2 py-0.5 text-xs font-medium",
+          "border-[#d3d8e6] bg-[#e8e9f2] text-[#4e566c]",
+          "dark:border-[#34384b] dark:bg-[#1f212d] dark:text-[#9ba2c6]",
+        ]}
+      >
+        {$t`Legacy`}
+      </div>
+    {/if}
     {#if options.length > 0}
       <Select {options} align="end">
         <Button
