@@ -28,14 +28,14 @@ test.describe("Access methods", () => {
     await managePage.signOut();
     await manageAccessPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
-    await managePage.assertVisible();
+    await manageAccessPage.assertVisible();
 
     // Verify we can now also sign in with the new passkey
     await managePage.signOut();
     replaceAuthForIdentity(identities[0].identityNumber, authIndex);
     await manageAccessPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
-    await managePage.assertVisible();
+    await manageAccessPage.assertVisible();
   });
 
   test.describe("can rename a passkey", () => {
