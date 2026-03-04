@@ -3,7 +3,7 @@
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
   import { PlusIcon } from "@lucide/svelte";
-  import { openIdName } from "$lib/utils/openID";
+  import { getMetadataString, openIdName } from "$lib/utils/openID";
   import type {
     AuthnMethodData,
     OpenIdCredential,
@@ -14,10 +14,7 @@
   import { handleError } from "$lib/components/utils/error";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { throwCanisterError } from "$lib/utils/utils";
-  import {
-    authnMethodToPublicKey,
-    getAuthnMethodAlias,
-  } from "$lib/utils/webAuthn";
+  import { authnMethodToPublicKey } from "$lib/utils/webAuthn";
   import { nanosToMillis } from "$lib/utils/time";
   import { goto, invalidateAll } from "$app/navigation";
   import { AddAccessMethodWizard } from "$lib/components/wizards/addAccessMethod";
@@ -63,6 +60,20 @@
   );
   const openIdCredentials = $derived(
     accessMethods.filter((m) => "openid" in m).map(({ openid }) => openid),
+  );
+  let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
+    () => {
+      const value = data.identityInfo.authn_methods.find(
+        (m) =>
+          "Recovery" in m.security_settings.purpose &&
+          getMetadataString(m.metadata, "usage") === "recovery_phrase",
+      );
+      return value === undefined
+        ? "missing"
+        : value.last_authentication[0] === undefined
+          ? "unverified"
+          : "verified";
+    },
   );
 
   // Handlers
@@ -244,6 +255,7 @@
                 $authenticatedStore,
                 accessMethod,
               )}
+              {recoveryPhraseStatus}
             />
           {:else if "openid" in accessMethod}
             <OpenIdItem

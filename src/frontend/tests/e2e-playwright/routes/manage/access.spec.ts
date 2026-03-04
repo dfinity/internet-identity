@@ -1,6 +1,11 @@
+import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
 import { dummyAuth, getRandomIndex, II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
+import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
+import { toSeed } from "../../fixtures/identity";
+import { LEGACY_II_URL } from "$lib/config";
+import { sign } from "crypto";
 
 test.describe("Access methods", () => {
   test.beforeEach(
@@ -127,6 +132,103 @@ test.describe("Access methods", () => {
       await signInWithIdentity(page, identities[0].identityNumber);
       await manageAccessPage.assertPasskeyCount(1);
       await manageAccessPage.assertPasskeyExists("additional-passkey");
+    });
+  });
+
+  test.describe("can remove a legacy passkey", () => {
+    const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
+
+    test.beforeEach(
+      async ({
+        page,
+        managePage,
+        manageAccessPage,
+        identities,
+        signInWithIdentity,
+        actorForIdentity,
+      }) => {
+        // Rename current passkey so we can differentiate it from the legacy passkey
+        await manageAccessPage.assertPasskeyCount(1);
+        await manageAccessPage
+          .findPasskey(DEFAULT_PASSKEY_NAME)
+          .rename(async (dialog) => {
+            await dialog.fill("post-upgrade-passkey");
+            await dialog.submit();
+          });
+
+        // Use an actor to create a legacy passkey (not id.ai)
+        // since this functionality is no longer available.
+        const actor = await actorForIdentity(identities[0].identityNumber);
+        const authIndex = getRandomIndex();
+        const seed = toSeed(authIndex);
+        const identity = await Ed25519KeyIdentity.generate(seed);
+        await actor.authn_method_add(identities[0].identityNumber, {
+          metadata: [
+            ["alias", { String: LEGACY_PASSKEY_NAME }],
+            ["origin", { String: LEGACY_II_URL }],
+          ],
+          authn_method: {
+            WebAuthn: {
+              pubkey: new Uint8Array(identity.getPublicKey().derKey),
+              credential_id: seed,
+              aaguid: [],
+            },
+          },
+          security_settings: {
+            protection: { Unprotected: null },
+            purpose: { Authentication: null },
+          },
+          last_authentication: [],
+        });
+
+        // Sign back in and assert the legacy passkey is present and labeled as legacy
+        await managePage.signOut();
+        await manageAccessPage.goto();
+        await signInWithIdentity(page, identities[0].identityNumber);
+        await manageAccessPage.assertPasskeyCount(2);
+        await manageAccessPage.assertPasskeyExists(LEGACY_PASSKEY_NAME);
+        const passkeyItem = manageAccessPage.findPasskey(LEGACY_PASSKEY_NAME);
+        await expect(passkeyItem.locator.getByText("Legacy")).toBeVisible();
+      },
+    );
+
+    test("can be removed if recovery is verified", async ({
+      page,
+      manageAccessPage,
+      manageRecoveryPage,
+      identities,
+      signInWithIdentity,
+    }) => {
+      // Set-up recovery phrase and verify it to enable removal of legacy passkey
+      await manageRecoveryPage.goto();
+      await signInWithIdentity(page, identities[0].identityNumber);
+      await manageRecoveryPage.activate(async (wizard) => {
+        await wizard.acknowledge();
+        const words = await wizard.writeDown();
+        await wizard.verifySelecting(words);
+      });
+
+      // Go back to access methods page and assert we can now remove the legacy passkey
+      await manageAccessPage.goto();
+      await signInWithIdentity(page, identities[0].identityNumber);
+      await manageAccessPage.assertPasskeyCount(2);
+      await manageAccessPage
+        .findPasskey(LEGACY_PASSKEY_NAME)
+        .remove((dialog) => dialog.confirm());
+
+      // Assert other passkeys are still present
+      await manageAccessPage.assertPasskeyCount(1);
+      await manageAccessPage.assertPasskeyExists("post-upgrade-passkey");
+    });
+
+    test("cannot be removed if recovery is missing or unverified", async ({
+      manageAccessPage,
+    }) => {
+      // Assert remove button is disabled
+      await manageAccessPage.assertPasskeyCount(2);
+      await manageAccessPage
+        .findPasskey(LEGACY_PASSKEY_NAME)
+        .assertUnremovable();
     });
   });
 

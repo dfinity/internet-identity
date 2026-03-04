@@ -15,13 +15,19 @@
 
   interface Props {
     passkey: AuthnMethodData;
+    recoveryPhraseStatus: "missing" | "unverified" | "verified";
     onRename?: () => void;
     onRemove?: () => void;
     isCurrentAccessMethod?: boolean;
   }
 
-  const { passkey, onRename, onRemove, isCurrentAccessMethod }: Props =
-    $props();
+  const {
+    passkey,
+    recoveryPhraseStatus,
+    onRename,
+    onRemove,
+    isCurrentAccessMethod,
+  }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
 
@@ -47,6 +53,12 @@
       ? knownProviders[aaguid]
       : undefined,
   );
+  const isLegacy = $derived.by(() => {
+    const primaryOrigin = getPrimaryOrigin();
+    const origin = getMetadataString(passkey.metadata, "origin");
+    return primaryOrigin !== undefined && origin !== primaryOrigin;
+  });
+
   const options = $derived([
     ...(onRename !== undefined
       ? [
@@ -62,17 +74,18 @@
           {
             label: $t`Remove`,
             icon: Trash2Icon,
+            disabled: isLegacy && recoveryPhraseStatus !== "verified",
+            tooltip:
+              isLegacy && recoveryPhraseStatus !== "verified"
+                ? recoveryPhraseStatus === "unverified"
+                  ? $t`Verify recovery to remove`
+                  : $t`Activate recovery to remove`
+                : undefined,
             onClick: onRemove,
           },
         ]
       : []),
   ]);
-  const isLegacy = $derived.by(() => {
-    const primaryOrigin = getPrimaryOrigin();
-    const origin = getMetadataString(passkey.metadata, "origin");
-    return primaryOrigin !== undefined && origin !== primaryOrigin;
-  });
-
   onMount(() => {
     // Lazy load known providers data
     import("$lib/assets/aaguid").then(
@@ -81,7 +94,7 @@
   });
 </script>
 
-<div class={[isLegacy && "opacity-50"]}>
+<div>
   <div class="mb-3 flex h-9 flex-row items-center">
     <div class="relative">
       <PasskeyIcon class="text-fg-primary size-6" />
@@ -91,7 +104,16 @@
         ></div>
       {/if}
     </div>
-    {#if options.length > 0 && !isLegacy}
+    <div
+      class={[
+        "ms-2 rounded-full border px-2 py-0.5 text-xs font-medium",
+        "border-[#d3d8e6] bg-[#e8e9f2] text-[#4e566c]",
+        "dark:border-[#34384b] dark:bg-[#1f212d] dark:text-[#9ba2c6]",
+      ]}
+    >
+      {$t`Legacy`}
+    </div>
+    {#if options.length > 0}
       <Select {options} align="end">
         <Button
           variant="tertiary"
@@ -165,7 +187,9 @@
     </div>
   </div>
   <div class="text-text-primary text-xs">
-    {#if provider?.type === "cloud"}
+    {#if isLegacy}
+      {$t`This legacy passkey is no longer usable and should be removed.`}
+    {:else if provider?.type === "cloud"}
       {provider.platform === undefined
         ? $t`Stored in your ${provider.account} account and synced across your devices.`
         : $t`Stored in your ${provider.account} account and synced across your ${provider.platform} devices.`}
