@@ -5,7 +5,6 @@ import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { toSeed } from "../../fixtures/identity";
 import { LEGACY_II_URL } from "$lib/config";
-import { sign } from "crypto";
 
 test.describe("Access methods", () => {
   test.beforeEach(
