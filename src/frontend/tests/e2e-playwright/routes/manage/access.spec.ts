@@ -208,7 +208,9 @@ test.describe("Access methods", () => {
         await manageAccessPage.assertPasskeyCount(2);
         await manageAccessPage.assertPasskeyExists(LEGACY_PASSKEY_NAME);
         const passkeyItem = manageAccessPage.findPasskey(LEGACY_PASSKEY_NAME);
-        await expect(passkeyItem.locator.getByText("Legacy")).toBeVisible();
+        await expect(
+          passkeyItem.locator.getByText("Legacy", { exact: true }),
+        ).toBeVisible();
       },
     );
 
