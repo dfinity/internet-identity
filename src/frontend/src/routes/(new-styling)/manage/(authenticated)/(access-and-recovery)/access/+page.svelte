@@ -70,7 +70,8 @@
       );
       return value === undefined
         ? "missing"
-        : value.last_authentication[0] === undefined
+        : value.last_authentication[0] === undefined ||
+            "Protected" in value.security_settings.protection
           ? "unverified"
           : "verified";
     },
