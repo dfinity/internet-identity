@@ -9,8 +9,8 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   cancelDummyAuth,
-} from "../utils";
-import { test } from "../fixtures";
+} from "../../utils";
+import { test } from "../../fixtures";
 
 const DEFAULT_USER_NAME = "John Doe";
 

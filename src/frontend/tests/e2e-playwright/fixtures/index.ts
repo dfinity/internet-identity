@@ -4,6 +4,7 @@ import { test as openIdTest } from "./openid";
 import { test as authorizeTest } from "./authorize";
 import { test as recoveryPageTest } from "./recoveryPage";
 import { test as managePageTest } from "./managePage";
+import { test as manageAccessPageTest } from "./manageAccessPage";
 import { test as manageRecoveryPageTest } from "./manageRecoveryPage";
 
 export const test = mergeTests(
@@ -12,5 +13,6 @@ export const test = mergeTests(
   authorizeTest,
   recoveryPageTest,
   managePageTest,
+  manageAccessPageTest,
   manageRecoveryPageTest,
 );
