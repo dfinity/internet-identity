@@ -1,25 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./deploy-pr-to-beta [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] <PR_NUMBER>
+# Usage: ./deploy-pr-to-beta [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] --end <front|back> <PR_NUMBER>
 
 print_usage() {
     cat <<EOF
-Usage: $0 [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] <PR_NUMBER>
+Usage: $0 [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANISTER_ID>] --end <front|back> <PR_NUMBER>
 
-Select which staging canister to upgrade.
+Select which staging canister to upgrade and which end(s) to deploy.
 
 Options:
   --staging-a, -sa        Use Staging A (fgte5-ciaaa-aaaad-aaatq-cai)
   --staging-b, -sb        Use Staging B (jqajs-xiaaa-aaaad-aab5q-cai)
   --staging-c, -sc        Use Staging C (y2aaj-miaaa-aaaad-aacxq-cai)
   --staging <CANISTER_ID> Use the provided canister id
+  --end <front|back>      Which end(s) to deploy (can be specified multiple times)
+  -fe                     Shortcut for --end front
+  -be                     Shortcut for --end back
   -h, --help              Show this help
 EOF
 }
 
 PR_NUMBER=""
 STAGING_CANISTER_ID=""
+STAGING_NAME=""
+DEPLOY_FRONT=false
+DEPLOY_BACK=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -29,14 +35,17 @@ while [[ $# -gt 0 ]]; do
             ;;
         -sa|--staging-a)
             STAGING_CANISTER_ID="fgte5-ciaaa-aaaad-aaatq-cai"
+            STAGING_NAME="a"
             shift
             ;;
         -sb|--staging-b)
             STAGING_CANISTER_ID="jqajs-xiaaa-aaaad-aab5q-cai"
+            STAGING_NAME="b"
             shift
             ;;
         -sc|--staging-c)
             STAGING_CANISTER_ID="y2aaj-miaaa-aaaad-aacxq-cai"
+            STAGING_NAME="c"
             shift
             ;;
         --staging)
@@ -47,6 +56,33 @@ while [[ $# -gt 0 ]]; do
                 exit 1
             fi
             STAGING_CANISTER_ID="$1"
+            STAGING_NAME="custom"
+            shift
+            ;;
+        --end)
+            shift
+            if [ $# -eq 0 ]; then
+                echo "Error: --end requires an argument (front or back)" >&2
+                print_usage
+                exit 1
+            fi
+            case "$1" in
+                front) DEPLOY_FRONT=true ;;
+                back)  DEPLOY_BACK=true ;;
+                *)
+                    echo "Error: --end value must be 'front' or 'back', got '$1'" >&2
+                    print_usage
+                    exit 1
+                    ;;
+            esac
+            shift
+            ;;
+        -fe)
+            DEPLOY_FRONT=true
+            shift
+            ;;
+        -be)
+            DEPLOY_BACK=true
             shift
             ;;
         --)
@@ -83,25 +119,153 @@ if [ -z "$STAGING_CANISTER_ID" ]; then
     exit 1
 fi
 
+if [ "$DEPLOY_FRONT" = false ] && [ "$DEPLOY_BACK" = false ]; then
+    echo "Error: --end must be specified (use --end front, --end back, -fe, or -be)" >&2
+    print_usage
+    exit 1
+fi
+
+if [ "$DEPLOY_FRONT" = true ] && [ "$STAGING_NAME" != "a" ]; then
+    echo "Error: Frontend deployment is not yet supported for Staging B, C, or custom canister IDs. Use --staging-a/-sa for frontend deployment." >&2
+    exit 1
+fi
+
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$SCRIPTS_DIR/.."
 cd "$ROOT_DIR"
 
 REPO="dfinity/internet-identity"
 WORKFLOW_FILE="canister-tests.yml"
-ARTIFACT_NAME="internet_identity_production.wasm.gz"
-ZIP_FILE="$ARTIFACT_NAME.zip"
-EXTRACTED_FILE="$ARTIFACT_NAME"
 WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
-BETA_CANISTER_ID="$STAGING_CANISTER_ID"
+FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai"
+
+# -------------------------
+# Prompt for a single Candid field value.
+# Usage: prompt_field <field_label> <current_value>
+# Prints the (possibly updated) value to stdout.
+# -------------------------
+prompt_field() {
+    local label="$1"
+    local current="$2"
+    echo "" >&2
+    echo "  $label = $current" >&2
+    read -r -p "  Keep current value? [Y/n]: " answer </dev/tty >&2
+    if [[ "$answer" =~ ^[Nn] ]]; then
+        read -r -p "  Enter new value for $label: " new_value </dev/tty >&2
+        echo "$new_value"
+    else
+        echo "$current"
+    fi
+}
+
+# -------------------------
+# Build InternetIdentityFrontendInit Candid argument interactively.
+# Fetches current config from the canister, then prompts field-by-field.
+# Sets FRONTEND_INSTALL_ARG with the resulting Candid record.
+# -------------------------
+build_frontend_install_arg() {
+    local canister_id="$1"
+    local config_url="https://${canister_id}.icp0.io/.config"
+
+    echo ""
+    echo "Fetching current frontend config from $config_url ..."
+    local raw_config
+    raw_config=$(curl -sfL "$config_url")
+    if [ -z "$raw_config" ]; then
+        echo "Error: Could not fetch current config from $config_url" >&2
+        exit 1
+    fi
+
+    echo ""
+    echo "Current frontend config:"
+    echo "$raw_config"
+    echo ""
+    echo "Configure install arguments (press Enter to keep each current value):"
+
+    # Parse individual fields from the Candid text output.
+    # We use grep + sed to extract the value portion after "field_name = ".
+    local current_backend_canister_id
+    current_backend_canister_id=$(echo "$raw_config" | grep 'backend_canister_id' | sed 's/.*= *//;s/ *;$//')
+    local current_backend_origin
+    current_backend_origin=$(echo "$raw_config" | grep 'backend_origin' | sed 's/.*= *//;s/ *;$//')
+    local current_related_origins
+    current_related_origins=$(echo "$raw_config" | sed -n '/related_origins/,/}/p' | tr '\n' ' ' | sed 's/.*= *//;s/ *;[[:space:]]*$//')
+    local current_fetch_root_key
+    current_fetch_root_key=$(echo "$raw_config" | grep 'fetch_root_key' | sed 's/.*= *//;s/ *;$//')
+    local current_analytics_config
+    current_analytics_config=$(echo "$raw_config" | grep 'analytics_config' | sed 's/.*= *//;s/ *;$//')
+    local current_dummy_auth
+    current_dummy_auth=$(echo "$raw_config" | grep 'dummy_auth' | sed 's/.*= *//;s/ *;$//')
+
+    local val_backend_canister_id
+    val_backend_canister_id=$(prompt_field "backend_canister_id" "$current_backend_canister_id")
+    local val_backend_origin
+    val_backend_origin=$(prompt_field "backend_origin" "$current_backend_origin")
+    local val_related_origins
+    val_related_origins=$(prompt_field "related_origins" "$current_related_origins")
+    local val_fetch_root_key
+    val_fetch_root_key=$(prompt_field "fetch_root_key" "$current_fetch_root_key")
+    local val_analytics_config
+    val_analytics_config=$(prompt_field "analytics_config" "$current_analytics_config")
+    local val_dummy_auth
+    val_dummy_auth=$(prompt_field "dummy_auth" "$current_dummy_auth")
+
+    local candid_arg="(record { backend_canister_id = ${val_backend_canister_id}; backend_origin = ${val_backend_origin}; related_origins = ${val_related_origins}; fetch_root_key = ${val_fetch_root_key}; analytics_config = ${val_analytics_config}; dummy_auth = ${val_dummy_auth} })"
+
+    echo ""
+    echo "Install argument (Candid):"
+    echo "  $candid_arg"
+    echo ""
+
+    echo "Encoding argument with didc..."
+    local encoded
+    encoded=$(didc encode \
+        -d ./src/internet_identity_frontend/internet_identity_frontend.did \
+        -t '(InternetIdentityFrontendInit)' \
+        "$candid_arg")
+    if [ -z "$encoded" ]; then
+        echo "Error: didc encode failed" >&2
+        exit 1
+    fi
+
+    FRONTEND_INSTALL_ARG="$encoded"
+
+    echo "Encoded argument: $FRONTEND_INSTALL_ARG"
+    echo ""
+    read -r -p "Proceed with this argument? [Y/n]: " confirm </dev/tty
+    if [[ "$confirm" =~ ^[Nn] ]]; then
+        echo "Aborted by user." >&2
+        exit 1
+    fi
+}
+
+# -------------------------
+# Prompt for frontend install args if deploying frontend
+# -------------------------
+FRONTEND_INSTALL_ARG=""
+if [ "$DEPLOY_FRONT" = true ]; then
+    build_frontend_install_arg "$FRONTEND_CANISTER_ID"
+fi
+
+# Build the list of (artifact, canister) pairs to deploy
+DEPLOYMENTS=()
+if [ "$DEPLOY_BACK" = true ]; then
+    DEPLOYMENTS+=("internet_identity_production.wasm.gz:$STAGING_CANISTER_ID")
+fi
+if [ "$DEPLOY_FRONT" = true ]; then
+    DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID")
+fi
 
 # -------------------------
 # Cleanup handler
 # -------------------------
 cleanup() {
     echo "Cleaning up temporary files..."
-    rm -f "$ROOT_DIR/$ZIP_FILE"
-    rm -f "$ROOT_DIR/$EXTRACTED_FILE"
+    for pair in "${DEPLOYMENTS[@]}"; do
+        artifact="${pair%%:*}"
+        rm -f "$ROOT_DIR/$artifact.zip"
+        rm -f "$ROOT_DIR/$artifact"
+    done
 }
 trap cleanup EXIT
 # -------------------------
@@ -129,6 +293,7 @@ RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
         [.workflow_runs[]
             | select(.pull_requests[]?.number == ($PR|tonumber))
             | select(.path == (".github/workflows/" + $WF))
+            | select(.status == "completed" and .conclusion == "success")
         ]
         | sort_by(.run_number)
         | reverse
@@ -142,38 +307,56 @@ fi
 
 echo "Found workflow run ID: $RUN_ID"
 
-echo "Fetching artifact list..."
-ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
-    "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts" \
-    | jq -r --arg ART "$ARTIFACT_NAME" '
-        .artifacts[] | select(.name == $ART) | .archive_download_url
-    ')
+for pair in "${DEPLOYMENTS[@]}"; do
+    ARTIFACT_NAME="${pair%%:*}"
+    CANISTER_ID="${pair##*:}"
+    ZIP_FILE="$ARTIFACT_NAME.zip"
 
-if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
-    echo "Error: Artifact not found: $ARTIFACT_NAME"
-    exit 1
-fi
+    echo ""
+    echo "=== Deploying $ARTIFACT_NAME to canister $CANISTER_ID ==="
 
-echo "Downloading artifact $ARTIFACT_NAME..."
-curl -sfL -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
+    echo "Fetching artifact list..."
+    ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
+        "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
+        | jq -r --arg ART "$ARTIFACT_NAME" '
+            .artifacts[] | select(.name == $ART) | .archive_download_url
+        ')
 
-echo "Extracting ZIP..."
-unzip -o "$ZIP_FILE" -d "$ROOT_DIR" >/dev/null
+    if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "null" ]; then
+        echo "Error: Artifact not found: $ARTIFACT_NAME"
+        exit 1
+    fi
 
-if [ ! -f "$ROOT_DIR/$EXTRACTED_FILE" ]; then
-    echo "Error: Extracted file not found: $EXTRACTED_FILE"
-    exit 1
-fi
+    echo "Downloading artifact $ARTIFACT_NAME..."
+    curl -sfL -H "$AUTH_HEADER" -o "$ZIP_FILE" "$ARTIFACT_URL"
 
-echo "Artifact extracted: $EXTRACTED_FILE"
+    echo "Extracting ZIP..."
+    unzip -o "$ZIP_FILE" -d "$ROOT_DIR" >/dev/null
 
-# Upgrade the beta II canister with the .wasm.gz file
-echo "Upgrading canister $BETA_CANISTER_ID..."
-dfx canister \
-    --network ic \
-    --wallet "$WALLET_CANISTER_ID" \
-    install "$BETA_CANISTER_ID" \
-    --mode upgrade \
-    --wasm "$ROOT_DIR/$EXTRACTED_FILE"
+    if [ ! -f "$ROOT_DIR/$ARTIFACT_NAME" ]; then
+        echo "Error: Extracted file not found: $ARTIFACT_NAME"
+        exit 1
+    fi
 
-echo "Upgrade complete."
+    echo "Artifact extracted: $ARTIFACT_NAME"
+
+    # Build the install command with optional --argument for frontend
+    INSTALL_ARGS=()
+    if [ "$ARTIFACT_NAME" = "internet_identity_frontend.wasm.gz" ] && [ -n "$FRONTEND_INSTALL_ARG" ]; then
+        INSTALL_ARGS+=(--argument-type raw --argument "$FRONTEND_INSTALL_ARG")
+    fi
+
+    echo "Upgrading canister $CANISTER_ID..."
+    dfx canister \
+        --network ic \
+        --wallet "$WALLET_CANISTER_ID" \
+        install "$CANISTER_ID" \
+        --mode upgrade \
+        --wasm "$ROOT_DIR/$ARTIFACT_NAME" \
+        ${INSTALL_ARGS[@]+"${INSTALL_ARGS[@]}"}
+
+    echo "Upgrade of $CANISTER_ID complete."
+done
+
+echo ""
+echo "All deployments complete."
