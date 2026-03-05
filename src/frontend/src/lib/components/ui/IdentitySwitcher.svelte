@@ -9,7 +9,7 @@
   } from "@lucide/svelte";
   import type { HTMLAttributes } from "svelte/elements";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import { formatDate, formatRelative, t } from "$lib/stores/locale.store";
+  import { formatRelative, t } from "$lib/stores/locale.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { getMetadataString, openIdLogo } from "$lib/utils/openID";
   import PasskeyIcon from "../icons/PasskeyIcon.svelte";
