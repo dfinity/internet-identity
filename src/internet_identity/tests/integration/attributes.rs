@@ -243,3 +243,187 @@ fn should_get_certified_attributes() {
         get_response.expires_at_timestamp_ns,
     );
 }
+
+/// Regression test: Microsoft credentials use a template issuer with `{tid}` placeholder.
+/// `get_attributes` must use the template issuer (from the OpenID config) as the scope key,
+/// NOT the resolved issuer (from the JWT `iss` claim with the actual tenant ID).
+/// Without the fix, `get_attributes` would look up signatures under the resolved issuer scope
+/// but `prepare_attributes` stores them under the template issuer scope, resulting in
+/// no certified attributes being returned.
+#[test]
+fn should_get_certified_attributes_microsoft() {
+    let env = env();
+    #[allow(unused_variables)]
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        crate::openid::one_openid_microsoft_test_data();
+
+    let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+    init_args.openid_configs = Some(vec![OpenIdConfig {
+        name: "Microsoft".into(),
+        logo: "logo".into(),
+        issuer: "https://login.microsoftonline.com/{tid}/v2.0".into(),
+        client_id: "d948c073-eebd-4ab8-861d-055f7ab49e17".into(),
+        jwks_uri: "https://login.microsoftonline.com/common/discovery/v2.0/keys".into(),
+        auth_uri: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize".into(),
+        auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+        fedcm_uri: Some("".into()),
+        email_verification: None,
+    }]);
+
+    let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(init_args),
+        1_000_000_000_000_000, // 1P cycles for HTTP outcalls
+    );
+    // Mock certs response so openid_credential_add can verify the JWT
+    crate::openid::mock_microsoft_certs_response(&env);
+
+    deploy_archive_via_ii(&env, ii_backend_canister_id);
+
+    // Create an identity with the required authn method
+    let identity_number =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method(
+            &env,
+            ii_backend_canister_id,
+            &test_authn_method,
+        );
+
+    // Sync time to the JWT iat
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    // Add OpenID credential
+    api::openid_credential_add(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )
+    .expect("failed to add openid credential")
+    .expect("openid_credential_add error");
+
+    let origin = "https://some-dapp.com";
+
+    // The attribute key MUST use the template issuer with {tid}, not the resolved tenant ID.
+    let microsoft_template_issuer = "https://login.microsoftonline.com/{tid}/v2.0";
+
+    // 1. Prepare attributes
+
+    env.advance_time(Duration::from_secs(15));
+
+    let prepare_request = PrepareAttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attribute_keys: vec![
+            format!("openid:{microsoft_template_issuer}:name"),
+        ],
+    };
+
+    let prepare_response = api::prepare_attributes(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        prepare_request,
+    )
+    .expect("failed to call prepare_attributes")
+    .expect("prepare_attributes error");
+
+    assert_eq!(prepare_response.attributes.len(), 1);
+
+    // 2. Get attributes
+    env.advance_time(Duration::from_secs(5));
+
+    let get_request = GetAttributesRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        issued_at_timestamp_ns: prepare_response.issued_at_timestamp_ns,
+        attributes: prepare_response.attributes.clone(),
+    };
+
+    let get_response =
+        api::get_attributes(&env, ii_backend_canister_id, test_principal, get_request)
+            .expect("failed to call get_attributes")
+            .expect("get_attributes error");
+
+    // Check that we actually got a certified attribute back (the regression would return 0)
+    assert_eq!(
+        get_response.certified_attributes.len(),
+        1,
+        "get_attributes should return 1 certified attribute for Microsoft name; \
+         if 0, get_attributes is likely using the resolved issuer instead of the template issuer"
+    );
+
+    // Verify the CBOR signature prefix (smoke test)
+    assert!(get_response.certified_attributes[0]
+        .signature
+        .starts_with(&[217, 217, 247, 162, 107, 99, 101, 114]));
+
+    // Redact signatures for comparison
+    let mut redacted_response = get_response.clone();
+    redacted_response
+        .certified_attributes
+        .iter_mut()
+        .for_each(|attr| attr.signature = vec![]);
+
+    assert_eq!(
+        redacted_response,
+        CertifiedAttributes {
+            certified_attributes: vec![CertifiedAttribute {
+                key: format!("openid:{microsoft_template_issuer}:name"),
+                value: "Llorenç Muntaner Perello".as_bytes().to_vec(),
+                signature: vec![], // redacted
+            }],
+            expires_at_timestamp_ns: prepare_response.issued_at_timestamp_ns
+                + Duration::from_secs(30 * 60).as_nanos() as u64,
+        }
+    );
+
+    // Verify the signatures; this relies on delegation verification for the same (origin, user).
+
+    let session_public_key = ByteBuf::from("session public key");
+
+    env.advance_time(Duration::from_secs(35));
+
+    let (canister_sig_key, expiration) = api::prepare_delegation(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        origin,
+        &session_public_key,
+        None,
+    )
+    .unwrap();
+
+    env.advance_time(Duration::from_secs(5));
+
+    let signed_delegation = match api::get_delegation(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        origin,
+        &session_public_key,
+        expiration,
+    )
+    .unwrap()
+    {
+        GetDelegationResponse::SignedDelegation(delegation) => delegation,
+        GetDelegationResponse::NoSuchDelegation => panic!("failed to get delegation"),
+    };
+
+    verify_delegation_and_attribute_signatures(
+        &env,
+        session_public_key,
+        canister_sig_key,
+        ii_backend_canister_id,
+        signed_delegation,
+        get_response.certified_attributes,
+        get_response.expires_at_timestamp_ns,
+    );
+}

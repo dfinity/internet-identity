@@ -619,7 +619,7 @@ pub fn mock_google_certs_response(env: &PocketIc) {
     mock_certs_response(env, url, mock_certs);
 }
 
-fn mock_microsoft_certs_response(env: &PocketIc) {
+pub fn mock_microsoft_certs_response(env: &PocketIc) {
     // This is the URL that the canister will fetch the Microsoft certificates
     let url = "https://login.microsoftonline.com/common/discovery/v2.0/keys";
     // These are the certificates at the time of the related Microsoft JWT mocked data was created.
@@ -785,7 +785,7 @@ fn second_openid_google_test_data() -> (String, [u8; 32], Claims, u64, Principal
     )
 }
 
-fn one_openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
+pub fn one_openid_microsoft_test_data() -> (String, [u8; 32], Claims, u64, Principal, AuthnMethodData) {
     let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IkpZaEFjVFBNWl9MWDZEQmxPV1E3SG4wTmVYRSJ9.eyJhdWQiOiJkOTQ4YzA3My1lZWJkLTRhYjgtODYxZC0wNTVmN2FiNDllMTciLCJpc3MiOiJodHRwczovL2xvZ2luLm1pY3Jvc29mdG9ubGluZS5jb20vNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmL3YyLjAiLCJpYXQiOjE3NTY4MDgzMjQsIm5iZiI6MTc1NjgwODMyNCwiZXhwIjoxNzU2ODEyMjI0LCJhaW8iOiJBVlFBcS84WkFBQUExQjhrYVdEVWp6V0xnSUxVT2hIQ1pWVndhbk1wNGVnVzdURzZwTytnVSsyYzdKRVRJckV5VHlySkxQQ0h1VkZINkUrbzRlMzhCQjZ6dmlWSU9kTzkxNVRHVDhEaUR3bkhCazYxTSt2bTdJaz0iLCJjX2hhc2giOiJGUzJsWllUYTIwcWozZVl1enczUXBnIiwibmFtZSI6Ikxsb3JlbsOnIE11bnRhbmVyIFBlcmVsbG8iLCJub25jZSI6ImN1UmM4VlNEN1ZkQU9ISmpsX1UxbkNWdlpvamQtMGJoUE81X0lGbTc0N2MiLCJvaWQiOiIxYjI2NDVmNy04YjdmLTQyMTAtYjQxYy01MDM1MmQ1OWYyZTgiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJsbG9yZW5jLm11bnRhbmVyQGRmaW5pdHkub3JnIiwicmgiOiIxLkFTNEFYbHhEU2xGa0dreW9INnVXWnJiZWozUEFTTm05N3JoS2hoMEZYM3EwbmhlNUFPd3VBQS4iLCJzaWQiOiIwMDdkZWE3OS0yNjY5LWZjNTItMzQwOS01Y2NjZDkxOTAzMjEiLCJzdWIiOiJydkF0eGluNk1TblRsN1RnUlg4RlhYQ0tQbEVlTklmUHI0bHdQT1lfd293IiwidGlkIjoiNGE0MzVjNWUtNjQ1MS00YzFhLWE4MWYtYWI5NjY2YjZkZThmIiwidXRpIjoiU3pLR0k3cG44MC1ZdnRmMmxuZ0RBUSIsInZlciI6IjIuMCJ9.kS8C8IlRoMaYoFyru-D06WzdeS8mHA3LupXyrOqXwwb4AIMMUDETlJEznAQ6iZxK4iAhAPAqAnC9TS_j0sacRCTBA3Rks-tkuwV2sA3XdwDsoFOnJdBs-N5GEXJNv45TzQ0jQANnXBJwwgH9hS-ledFZiutvzaTfDGpAymxx58qj7VDG5fTMxpiPMNCr42sNidw7B8ifUJgcfcxt_8wsTN_mui4Q6wtWRQvPnbesyTvRaOg2S6LMG3m8RBNYtHvXlICwD1kaKS5wUiYcrN3gg6wqOXCI3w57S5yfnGNo1tF4sWCfR0ZkfyHfVzdXK_6BwCty7rt4udp-NFsCAVXNRQ";
     let salt: [u8; 32] = [
         196, 116, 153, 227, 8, 104, 231, 67, 202, 28, 156, 132, 101, 84, 170, 111, 86, 233, 29, 54,
