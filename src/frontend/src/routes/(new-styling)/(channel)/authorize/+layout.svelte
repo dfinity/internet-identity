@@ -1,12 +1,15 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import { authorizationContextStore } from "$lib/stores/authorization.store";
+  import {
+    authorizationContextStore,
+    authorizationStore,
+  } from "$lib/stores/authorization.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Button from "$lib/components/ui/Button.svelte";
-  import { ChevronDownIcon } from "@lucide/svelte";
+  import { ChevronDownIcon, UserIcon } from "@lucide/svelte";
   import Header from "$lib/components/layout/Header.svelte";
   import Footer from "$lib/components/layout/Footer.svelte";
   import { authenticationStore } from "$lib/stores/authentication.store";
@@ -19,20 +22,24 @@
   import { sessionStore } from "$lib/stores/session.store";
   import { t } from "$lib/stores/locale.store";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import { waitFor } from "$lib/utils/utils";
+  import { throwCanisterError, waitFor } from "$lib/utils/utils";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
+  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
+  import { DelegationResultSchema } from "$lib/utils/transport/utils";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
 
-  const { children, data }: LayoutProps = $props();
+  const { children }: LayoutProps = $props();
 
   const authLastUsedFlow = new AuthLastUsedFlow();
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities)
       .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3),
+      .slice(0, 11), // Only show 1 + 10 last used since entries can't be removed yet
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
@@ -66,6 +73,27 @@
     await handleSignIn(identityNumber);
     await goto("/authorize/upgrade-success");
   };
+  const authorizeDefault = async () => {
+    try {
+      const { identityNumber, actor } = $authenticationStore!;
+      const { effectiveOrigin } = $authorizationContextStore;
+      const accountNumber = actor
+        .get_default_account(identityNumber, effectiveOrigin)
+        .then(throwCanisterError)
+        .then((account) => account.account_number[0]);
+      void triggerDropWaveAnimation();
+      const { requestId, delegationChain } =
+        await authorizationStore.authorize(accountNumber);
+      const result = DelegationResultSchema.encode(delegationChain);
+      await $establishedChannelStore.send({
+        jsonrpc: "2.0",
+        id: requestId,
+        result,
+      });
+    } catch (error) {
+      handleError(error);
+    }
+  };
 
   // Pre-fetch passkey credential ids
   $effect(() =>
@@ -91,6 +119,9 @@
         class="ml-auto gap-2.5 pr-3 md:-mr-3"
         aria-label="Switch identity"
       >
+        <Avatar size="xs">
+          <UserIcon class="size-4" />
+        </Avatar>
         <span>{selectedIdentity.name ?? selectedIdentity.identityNumber}</span>
         <ChevronDownIcon class="size-4" />
       </Button>
@@ -106,14 +137,22 @@
           direction="down"
           align="end"
           distance="0.75rem"
+          class="!bg-bg-primary"
         >
           <IdentitySwitcher
             selected={selectedIdentity.identityNumber}
             identities={lastUsedIdentities}
-            onSwitchIdentity={handleSignIn}
+            onSwitchIdentity={async (identityNumber) => {
+              await handleSignIn(identityNumber);
+              await authorizeDefault();
+            }}
             onUseAnotherIdentity={() => {
               isIdentityPopoverOpen = false;
               isAuthDialogOpen = true;
+            }}
+            onManageIdentity={async () => {
+              isIdentityPopoverOpen = false;
+              window.open("/manage", "_blank");
             }}
             onError={(error) => {
               isIdentityPopoverOpen = false;
@@ -146,7 +185,7 @@
               {$t`Sign in`}
             </h1>
             <p class="text-text-secondary mb-6 self-start text-sm">
-              {$t`choose method to continue`}
+              {$t`Choose method to continue`}
             </p>
           </AuthWizard>
         </Dialog>

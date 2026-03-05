@@ -73,7 +73,7 @@ class IdentityWizard {
     const buttons = [
       "Sign in",
       "Switch identity",
-      "Use another identity",
+      "Add another identity",
       "Continue with passkey",
     ];
     await this.#page

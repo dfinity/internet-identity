@@ -69,7 +69,7 @@
     {distance}
     responsive={false}
     onClose={() => (isOpen = false)}
-    class={["!w-max !p-1.5 !shadow-lg", className]}
+    class={["!w-max p-1.5 !shadow-lg", className]}
   >
     <div class="flex flex-col" role="menu">
       {#each options as option, index}

@@ -257,7 +257,7 @@ test.describe("Last used identities listed", () => {
     await createIdentity(page, DEFAULT_USER_NAME, auth);
     await page.goto(II_URL);
     await page.getByRole("button", { name: "Switch identity" }).click();
-    await page.getByRole("button", { name: "Use another identity" }).click();
+    await page.getByRole("button", { name: "Add another identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     auth(page);
     await page.getByRole("button", { name: "Use existing identity" }).click();
@@ -274,7 +274,7 @@ test.describe("Last used identities listed", () => {
     await createIdentity(page, DEFAULT_USER_NAME, auth);
     await page.goto(II_URL);
     await page.getByRole("button", { name: "Switch identity" }).click();
-    await page.getByRole("button", { name: "Use another identity" }).click();
+    await page.getByRole("button", { name: "Add another identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     await page.getByRole("button", { name: "Create new identity" }).click();
     await page.getByLabel("Identity name").fill(SECONDARY_USER_NAME);
