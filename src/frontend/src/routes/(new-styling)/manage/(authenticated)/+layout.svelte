@@ -34,11 +34,10 @@
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { Trans } from "$lib/components/locale";
-  import { getMetadataString, openIdLogo } from "$lib/utils/openID";
+  import { getMetadataString } from "$lib/utils/openID";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { onMount } from "svelte";
-  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
 
   const { children, data }: LayoutProps = $props();
 
