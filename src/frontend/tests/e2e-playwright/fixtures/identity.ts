@@ -73,7 +73,7 @@ class IdentityWizard {
     const buttons = [
       "Sign in",
       "Switch identity",
-      "Use another identity",
+      "Add another identity",
       "Continue with passkey",
     ];
     await this.#page
@@ -99,7 +99,7 @@ class IdentityWizard {
   }
 }
 
-const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
+export const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
   // Same implementation as found in `DiscoverableDummyIdentity`
   const buffer = new ArrayBuffer(32);
   const view = new DataView(buffer);

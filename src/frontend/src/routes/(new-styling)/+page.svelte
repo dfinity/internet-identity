@@ -6,11 +6,7 @@
   import EasyAccessIllustration from "$lib/components/illustrations/landing/EasyAccessIllustration.svelte";
   import PasswordFreeIllustration from "$lib/components/illustrations/landing/PasswordFreeIllustration.svelte";
   import LandingCard from "$lib/components/ui/LandingCard.svelte";
-  import {
-    INTERNET_COMPUTER_URL,
-    FAQ_PASSKEY_URL,
-    II_DEVELOPER_DOCS_URL,
-  } from "$lib/config";
+  import { INTERNET_COMPUTER_URL, FAQ_PASSKEY_URL } from "$lib/config";
   import { manuallyReroute } from "$lib/utils/reroute";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -18,6 +14,7 @@
     ChevronDownIcon,
     CircleMinusIcon,
     CirclePlusIcon,
+    UserIcon,
   } from "@lucide/svelte";
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
@@ -46,6 +43,7 @@
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
 
   const authLastUsedFlow = new AuthLastUsedFlow();
 
@@ -56,9 +54,9 @@
   let identityButtonRef = $state<HTMLButtonElement>();
 
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore.identities)
-      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3), // Only show 3 last used since entries can't be removed yet
+    Object.values($lastUsedIdentitiesStore.identities).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    ),
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
@@ -204,6 +202,9 @@
           class="btn btn-tertiary ms-auto gap-2.5 pr-3"
           aria-label={$t`Switch identity`}
         >
+          <Avatar size="xs">
+            <UserIcon class="size-4" />
+          </Avatar>
           <span>
             {selectedIdentity.name ?? selectedIdentity.identityNumber}
           </span>
@@ -246,14 +247,6 @@
           creating passwords, sharing personal data, or giving up control.
         </Trans>
       </p>
-      <a
-        href={II_DEVELOPER_DOCS_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="btn btn-secondary btn-sm"
-      >
-        {$t`For developers`}
-      </a>
     </div>
   </div>
   <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
@@ -598,7 +591,7 @@
         {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`choose method to continue`}
+        {$t`Choose method to continue`}
       </p>
     </AuthWizard>
   </Dialog>
@@ -616,6 +609,7 @@
     direction="down"
     align="end"
     distance="0.75rem"
+    class="!bg-bg-primary"
   >
     <IdentitySwitcher
       selected={selectedIdentity.identityNumber}

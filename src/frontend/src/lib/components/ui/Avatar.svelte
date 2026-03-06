@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
 
-  type Size = "sm" | "md" | "lg" | "xl";
+  type Size = "xs" | "sm" | "md" | "lg" | "xl";
 
   type Props = HTMLAttributes<HTMLDivElement> & { size?: Size };
 
@@ -13,6 +13,7 @@
   class={[
     "bg-bg-secondary border-border-secondary text-fg-disabled flex shrink-0 items-center justify-center rounded-full border font-semibold",
     {
+      xs: "size-6 text-xs",
       sm: "size-8 text-sm",
       md: "size-10 text-sm",
       lg: "size-12 text-base",

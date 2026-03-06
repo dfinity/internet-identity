@@ -73,7 +73,8 @@
     "name": "OISY Wallet",
     "oneLiner": "Browser-based multi-chain wallet",
     "website": "https://oisy.com",
-    "logo": "oisy_logo.svg"
+    "logo": "oisy_logo.svg",
+    "certified_attributes": true
   },
   {
     "name": "Kinic",

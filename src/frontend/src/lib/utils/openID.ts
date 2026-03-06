@@ -339,7 +339,67 @@ export const getMetadataString = (metadata: MetadataMapV2, key: string) => {
 export const openIdLogo = (
   issuer: string,
   metadata: MetadataMapV2,
-): string | undefined => findConfig(issuer, metadata)?.logo;
+): string | undefined => {
+  const logo = findConfig(issuer, metadata)?.logo;
+
+  // To prevent rendering an element with the same id multiple times in the DOM,
+  // we namespace all ids in the svg string using an unique suffix on each call.
+  //
+  // This is necessary because the logo is rendered in a list of identities and
+  // multiple identities with the same provider can be present at the same time.
+  return logo !== undefined ? namespaceIds(logo) : undefined;
+};
+
+/**
+ * Safely namespaces all IDs inside an SVG string and updates all references,
+ * to prevent collisions when rendering multiple SVGs with the same IDs in the DOM.
+ *
+ * @param input - Raw SVG string
+ * @param suffix - Optional suffix to append to IDs (default: random UUID)
+ * @returns Namespaced SVG string
+ */
+const namespaceIds = (
+  input: string,
+  suffix = globalThis.crypto.randomUUID(),
+): string => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(input, "text/html");
+
+  const idMap: Record<string, string> = {};
+
+  const elementsWithId = doc.querySelectorAll<HTMLElement | SVGElement>("[id]");
+  elementsWithId.forEach((el) => {
+    const oldId = el.id;
+    const newId = `${oldId}-${suffix}`;
+    el.id = newId;
+    idMap[oldId] = newId;
+  });
+
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
+
+  while (walker.nextNode()) {
+    const el = walker.currentNode as Element;
+
+    for (const attr of el.getAttributeNames()) {
+      let value = el.getAttribute(attr);
+      if (value === null) {
+        continue;
+      }
+
+      for (const oldId in idMap) {
+        const newId = idMap[oldId];
+
+        value = value
+          .replace(new RegExp(`url\\(#${oldId}\\)`, "g"), `url(#${newId})`)
+          .replace(new RegExp(`^#${oldId}$`), `#${newId}`);
+      }
+
+      el.setAttribute(attr, value);
+    }
+  }
+
+  return doc.body.innerHTML;
+};
 
 /**
  * Return the name of the OpenID provider from the config.

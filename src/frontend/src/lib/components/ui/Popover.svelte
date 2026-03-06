@@ -175,7 +175,7 @@
   >
     <div
       class={[
-        "border-border-secondary bg-bg-primary_alt relative flex w-90 flex-col rounded-xl border p-4 shadow-xl",
+        "border-border-secondary bg-bg-primary_alt relative flex w-90 flex-col overflow-clip rounded-xl border shadow-xl",
         {
           up: {
             start: "origin-bottom-left",
@@ -205,7 +205,12 @@
     </div>
   </div>
 {:else}
-  <Dialog {onClose} showCloseButton={false}>
+  <Dialog
+    {onClose}
+    showCloseButton={false}
+    class={className}
+    contentClass="!p-0"
+  >
     {@render children?.()}
   </Dialog>
 {/if}
