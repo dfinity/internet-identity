@@ -42,9 +42,18 @@ impl Anchor {
             self.openid_credentials
                 .iter()
                 .flat_map(|openid_credential| {
-                    let scope = Some(AttributeScope::OpenId {
-                        issuer: openid_credential.iss.clone(),
-                    });
+                    // It is important here to rely on the issuer ID as opposed to `openid_credential.iss`
+                    // becasue, e.g., for Microsoft accounts, the issuer has a tenant ID parameter
+                    // which should *not* be instantiated for a general Microsoft attribute scope.
+                    let Some(issuer) = openid_credential.config_issuer() else {
+                        ic_cdk::println!(
+                            "No matching OpenID provider for issuer: {}, skipping credential",
+                            openid_credential.iss
+                        );
+                        return BTreeSet::new();
+                    };
+
+                    let scope = Some(AttributeScope::OpenId { issuer });
 
                     let Some(attributes_to_fetch) = attributes.remove(&scope) else {
                         return BTreeSet::new();
@@ -1218,6 +1227,116 @@ mod tests {
                 !requested.is_empty(),
                 "requested should NOT be drained when credential is skipped"
             );
+        }
+    }
+
+    /// Regression test for the `get_attributes` fix.
+    ///
+    /// The bug: `get_attributes` built its scope key from `openid_credential.iss`
+    /// (the *resolved* issuer, e.g. `…/9188040d-…/v2.0` for Microsoft),
+    /// while callers pass the *template* issuer (`…/{tid}/v2.0`) as the scope
+    /// key. This caused `attributes.remove(&scope)` to always miss for
+    /// Microsoft credentials.
+    ///
+    /// We test via `prepare_openid_attributes` because:
+    ///  1. It uses the identical `config_issuer()` lookup that the fix applied
+    ///     to `get_attributes`.
+    ///  2. `get_attributes` calls into canister runtime (`state::assets_and_signatures`,
+    ///     `ic_cdk::println!`) and cannot be exercised in a unit test.
+    ///  3. A test that passes for `prepare_openid_attributes` with the
+    ///     template-scope key proves that the same key will work in
+    ///     `get_attributes` after the fix.
+    mod get_attributes_issuer_regression_test {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::{
+            OpenIdConfig, OpenIdEmailVerificationScheme,
+        };
+
+        const MICROSOFT_ISSUER_TEMPLATE: &str = "https://login.microsoftonline.com/{tid}/v2.0";
+        const MICROSOFT_PERSONAL_TID: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
+        const MICROSOFT_RESOLVED_ISSUER: &str =
+            "https://login.microsoftonline.com/9188040d-6c67-4c5b-b112-36a304b66dad/v2.0";
+        const ANCHOR_NUMBER: u64 = 4242;
+
+        fn setup_microsoft_provider() {
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Microsoft".to_string(),
+                logo: String::new(),
+                issuer: MICROSOFT_ISSUER_TEMPLATE.to_string(),
+                client_id: "test-client-id".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: Some(OpenIdEmailVerificationScheme::Microsoft),
+            }]);
+        }
+
+        /// Callers of `get_attributes` / `prepare_attributes` always use the
+        /// *template* issuer (`{tid}` placeholder) as the scope key.
+        fn microsoft_template_scope() -> Option<AttributeScope> {
+            Some(AttributeScope::OpenId {
+                issuer: MICROSOFT_ISSUER_TEMPLATE.to_string(),
+            })
+        }
+
+        /// A Microsoft credential whose `.iss` is the *resolved* issuer
+        /// (real tenant ID), as it would be after JWT verification.
+        fn microsoft_credential_with_email(email: &str) -> OpenIdCredential {
+            OpenIdCredential {
+                iss: MICROSOFT_RESOLVED_ISSUER.to_string(),
+                sub: "ms-user-456".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::from([
+                    (
+                        "email".to_string(),
+                        MetadataEntryV2::String(email.to_string()),
+                    ),
+                    (
+                        "tid".to_string(),
+                        MetadataEntryV2::String(MICROSOFT_PERSONAL_TID.to_string()),
+                    ),
+                ]),
+            }
+        }
+
+        /// The scope key uses the *template* issuer while the credential's
+        /// `.iss` contains the *resolved* issuer. Before the fix,
+        /// `get_attributes` used `.iss` directly and the lookup would miss.
+        /// `prepare_openid_attributes` (and now `get_attributes`) uses
+        /// `config_issuer()` which returns the template, so the key matches.
+        #[test]
+        fn test_template_scope_resolves_microsoft_credential() {
+            setup_microsoft_provider();
+
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = vec![microsoft_credential_with_email("user@outlook.com")];
+
+            // Key the request by the *template* scope — exactly as callers do.
+            let mut requested = BTreeMap::from([(
+                microsoft_template_scope(),
+                BTreeSet::from([AttributeName::Email]),
+            )]);
+
+            let result = anchor.prepare_openid_attributes(&mut requested);
+
+            // The scope must have been consumed (matched).
+            assert!(
+                requested.is_empty(),
+                "template scope should match the credential via config_issuer()"
+            );
+
+            // Exactly one credential key should be present with one attribute.
+            pretty_assert_eq!(result.len(), 1, "one credential should match");
+            let attrs = result
+                .get(&(
+                    MICROSOFT_RESOLVED_ISSUER.to_string(),
+                    "ms-user-456".to_string(),
+                ))
+                .expect("credential key should be present");
+            pretty_assert_eq!(attrs.len(), 1, "email attribute should be returned");
+            pretty_assert_eq!(String::from_utf8_lossy(&attrs[0].value), "user@outlook.com",);
         }
     }
 }
