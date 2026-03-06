@@ -191,12 +191,22 @@
 
 <!-- Layout -->
 <div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
-  <!-- Sidebar -->
+  <!-- Sidebar and backdrop on mobile -->
+  <div
+    onclick={() => (isMobileSidebarOpen = false)}
+    class={[
+      "bg-bg-overlay absolute inset-0 z-1 transition-opacity duration-200 ease-out sm:hidden",
+      isMobileSidebarOpen ? "opacity-80" : "pointer-events-none opacity-0 ",
+    ]}
+    aria-hidden="true"
+  ></div>
   <aside
     class={[
       "bg-bg-primary border-border-secondary flex w-74 flex-col sm:border-r sm:max-md:w-19",
-      "max-sm:invisible max-sm:absolute max-sm:inset-0 max-sm:z-1 max-sm:w-full max-sm:overflow-y-auto",
-      isMobileSidebarOpen && "max-sm:visible",
+      "max-sm:absolute max-sm:start-0 max-sm:end-20 max-sm:top-0 max-sm:bottom-0 max-sm:z-1 max-sm:w-auto max-sm:overflow-y-auto max-sm:transition-transform max-sm:duration-200 max-sm:ease-out",
+      isMobileSidebarOpen
+        ? "max-sm:translate-x-0"
+        : "max-sm:pointer-events-none max-sm:translate-x-[-100%]",
     ]}
   >
     <div class="h-[env(safe-area-inset-top)]"></div>
@@ -210,7 +220,7 @@
       </div>
       <button
         onclick={() => (isMobileSidebarOpen = false)}
-        class="btn btn-tertiary btn-icon ms-auto sm:hidden"
+        class="btn btn-tertiary btn-icon ms-auto -me-1.5 sm:hidden"
         aria-label={$t`Close menu`}
       >
         <XIcon class="size-5" />
@@ -228,66 +238,6 @@
         Internet Identity
       </div>
     </div>
-    <!-- Mobile identity button-->
-    {#if $lastUsedIdentitiesStore.selected !== undefined}
-      {@const logo =
-        "openid" in $lastUsedIdentitiesStore.selected.authMethod &&
-        $lastUsedIdentitiesStore.selected.authMethod.openid.metadata !==
-          undefined
-          ? openIdLogo(
-              $lastUsedIdentitiesStore.selected.authMethod.openid.iss,
-              $lastUsedIdentitiesStore.selected.authMethod.openid.metadata,
-            )
-          : undefined}
-      <button
-        onclick={() => (isIdentityPopoverOpen = true)}
-        class={[
-          "mx-4 mb-6 flex flex-row items-center gap-3 p-3 text-start sm:hidden",
-          "border-border-secondary hover:bg-bg-primary_hover rounded-md border",
-        ]}
-        aria-label={$t`Switch identity`}
-      >
-        <div class="relative">
-          <Avatar size="sm">
-            <UserIcon class="size-5" />
-          </Avatar>
-          <div
-            class="bg-bg-primary_alt border-border-secondary absolute -right-1.25 -bottom-1.25 flex size-5 items-center justify-center rounded-full border"
-          >
-            {#if logo !== undefined}
-              <div class="text-fg-tertiary size-3.25">
-                {@html logo}
-              </div>
-            {:else}
-              <PasskeyIcon class="text-fg-tertiary !size-3" />
-            {/if}
-          </div>
-        </div>
-        <div class="flex flex-col overflow-hidden">
-          <div class="text-text-primary text-sm font-semibold">
-            {$lastUsedIdentitiesStore.selected.name ??
-              $lastUsedIdentitiesStore.selected.identityNumber}
-          </div>
-          <div
-            class="text-text-tertiary overflow-hidden text-sm overflow-ellipsis whitespace-nowrap"
-          >
-            {#if "openid" in $lastUsedIdentitiesStore.selected.authMethod && $lastUsedIdentitiesStore.selected.authMethod.openid.metadata !== undefined}
-              <span
-                >{getMetadataString(
-                  $lastUsedIdentitiesStore.selected.authMethod.openid.metadata,
-                  "email",
-                ) ?? $t`Hidden email`}</span
-              >
-            {:else}
-              <span>
-                {$t`Passkey`}
-              </span>
-            {/if}
-          </div>
-        </div>
-        <ChevronDownIcon class="text-text-primary ms-auto size-5 shrink-0" />
-      </button>
-    {/if}
     <!-- Navigation -->
     <nav class="flex flex-col gap-0.5 px-4">
       <ul class="contents">
@@ -355,27 +305,8 @@
     <div class="h-[env(safe-area-inset-top)]"></div>
     <!-- Header -->
     <header class="flex h-16 flex-row items-center px-4 sm:px-8 md:px-12">
-      <!-- Mobile logo -->
-      <Logo class="text-fg-primary h-4 sm:hidden" />
-      <!-- Empty space between left and right content -->
-      <div class="flex-1"></div>
-      <!-- Identity button-->
-      <button
-        bind:this={identityButtonRef}
-        onclick={() => (isIdentityPopoverOpen = true)}
-        class="btn btn-tertiary gap-2.5 pr-3 max-sm:hidden sm:-mr-3"
-        aria-label={$t`Switch identity`}
-      >
-        <Avatar size="xs">
-          <UserIcon class="size-4" />
-        </Avatar>
-        <span>
-          {data.identityInfo.name[0] ?? data.identityNumber.toString()}
-        </span>
-        <ChevronDownIcon size="1rem" />
-      </button>
       <!-- Mobile menu button -->
-      <div class="relative ms-2 sm:hidden">
+      <div class="relative -ms-1.5 sm:hidden">
         <button
           onclick={() => (isMobileSidebarOpen = true)}
           class="btn btn-tertiary btn-icon"
@@ -394,6 +325,23 @@
           ]}
         ></div>
       </div>
+      <!-- Empty space between left and right content -->
+      <div class="flex-1"></div>
+      <!-- Identity button-->
+      <button
+        bind:this={identityButtonRef}
+        onclick={() => (isIdentityPopoverOpen = true)}
+        class="btn btn-tertiary gap-2.5 pr-3 max-sm:-mr-2 sm:-mr-3"
+        aria-label={$t`Switch identity`}
+      >
+        <Avatar size="xs">
+          <UserIcon class="size-4" />
+        </Avatar>
+        <span>
+          {data.identityInfo.name[0] ?? data.identityNumber.toString()}
+        </span>
+        <ChevronDownIcon size="1rem" />
+      </button>
     </header>
     <!-- Page content -->
     <main class="flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12">
