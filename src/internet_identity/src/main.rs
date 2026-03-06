@@ -245,7 +245,9 @@ fn add(anchor_number: AnchorNumber, device_data: DeviceData) {
 #[update]
 fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+        if device_key != device_data.pubkey {
+            anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+        }
 
         Ok::<_, String>((
             (),
@@ -258,7 +260,9 @@ fn update(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: Devic
 #[update]
 fn replace(anchor_number: AnchorNumber, device_key: DeviceKey, device_data: DeviceData) {
     anchor_operation_with_authz_check(anchor_number, |anchor| {
-        anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+        if device_key != device_data.pubkey {
+            anchor_management::check_passkey_pubkey_is_not_used(&device_data.pubkey)?;
+        }
 
         Ok::<_, String>((
             (),
