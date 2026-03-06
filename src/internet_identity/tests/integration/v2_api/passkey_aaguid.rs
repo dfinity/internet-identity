@@ -606,6 +606,19 @@ fn should_enforce_unique_passkey_pubkeys_in_registration_mode_flows() -> Result<
     let b0_initial = webauthn_authn_method(p1.clone(), test_credential_id(11).unwrap());
     let identity_b0 = create_identity_with_authn_method(&env, canister_id, &b0_initial);
 
+    // Enter registration mode for identity B0 (needed for both checks below).
+    let registration_mode_id = "0eZr5".to_string();
+    let intermediate_sender = Principal::self_authenticating([42; 32]);
+
+    canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_enter(
+        &env,
+        canister_id,
+        b0_initial.principal(),
+        identity_b0,
+        Some(registration_mode_id.clone()),
+    )?
+    .unwrap();
+
     // 1. authn_method_register must reject registering a passkey whose pubkey is already used.
     let a1_same_p0 = webauthn_authn_method(p0.clone(), test_credential_id(12).unwrap());
     let result_register_conflict =
@@ -621,18 +634,6 @@ fn should_enforce_unique_passkey_pubkeys_in_registration_mode_flows() -> Result<
     );
 
     // 2. authn_method_registration_mode_exit must reject adding a passkey whose pubkey is already used.
-    let registration_mode_id = "0eZr5".to_string();
-    let intermediate_sender = Principal::self_authenticating([42; 32]);
-
-    // Enter registration mode for identity B0.
-    canister_tests::api::internet_identity::api_v2::authn_method_registration_mode_enter(
-        &env,
-        canister_id,
-        b0_initial.principal(),
-        identity_b0,
-        Some(registration_mode_id.clone()),
-    )?
-    .unwrap();
 
     // Create a session for B0 (this stores a confirmed session principal).
     let AuthnMethodConfirmationCode {

@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::api::internet_identity::api_v2;
 use canister_tests::framework::{
@@ -38,11 +38,14 @@ fn should_require_captcha_above_threshold_rate() {
     let env = env();
     let canister_id =
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_dynamic_captcha());
-    let authn_method = test_authn_method();
 
     // initialize a base rate of one registration every 4 seconds for 100 seconds (reference rate)
-    for _ in 0..25 {
-        create_identity_with_authn_method(&env, canister_id, &authn_method);
+    for i in 0..25 {
+        create_identity_with_authn_method(
+            &env,
+            canister_id,
+            &sample_webauthn_authn_method(i as u8),
+        );
         env.advance_time(Duration::from_secs(4))
     }
 
@@ -60,7 +63,7 @@ fn should_require_captcha_above_threshold_rate() {
             &env,
             canister_id,
             flow_principal,
-            &authn_method,
+            &sample_webauthn_authn_method((25 + i) as u8),
             None,
         )
         .expect("API call failed")
