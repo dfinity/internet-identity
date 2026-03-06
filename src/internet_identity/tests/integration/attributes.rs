@@ -318,9 +318,7 @@ fn should_get_certified_attributes_microsoft() {
         identity_number,
         origin: origin.to_string(),
         account_number: None,
-        attribute_keys: vec![
-            format!("openid:{microsoft_template_issuer}:name"),
-        ],
+        attribute_keys: vec![format!("openid:{microsoft_template_issuer}:name")],
     };
 
     let prepare_response = api::prepare_attributes(
