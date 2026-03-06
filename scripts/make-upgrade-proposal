@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -xeuo pipefail
+set -euo pipefail
 
 # THIS SCRIPT IS A WORK IN PROGRESS
 # 
@@ -288,6 +288,11 @@ wait_for_release_text_change() {
   echo "Go to the release page"
   echo "Change title to release-YYYY-MM-DD: (Friendly and explanatory title)"
   echo "Add a paragraph after the first one summarizing the upgrade changes"
+  if [ -f release_notes.md ]; then
+    echo ""
+    echo "A combined What's Changed summary has been generated in release_notes.md."
+    echo "You can paste its contents into the release page."
+  fi
   echo "Release page: https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME"
 }
 
@@ -302,13 +307,13 @@ wait_for_archive_canister_hash() {
 download_wasms() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
   if should_upgrade_backend "$upgrade_type"; then
-    curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity.wasm.gz
-    curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive.wasm.gz
+    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity.wasm.gz
+    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/archive.wasm.gz -o archive.wasm.gz
   fi
   if should_upgrade_frontend "$upgrade_type"; then
     # NOTE: The CI workflow must publish internet_identity_frontend.wasm.gz to GitHub releases
     # If this download fails, ensure the release workflow includes the frontend WASM artifact
-    curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_frontend.wasm.gz -o internet_identity_frontend.wasm.gz
+    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend.wasm.gz
   fi
 }
 
@@ -516,17 +521,46 @@ EOF
 
 download_proposal_text() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
-  local release_body=$(curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/dfinity/internet-identity/releases/latest | jq -cMr '.body')
-  
+  local release_body=$(curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/dfinity/internet-identity/releases/tags/$TAG_NAME | jq -cMr '.body')
+
+  # Source paths for filtering commits by canister
+  local -a backend_paths=(
+    src/internet_identity/
+    src/internet_identity_interface/
+    src/archive/
+    src/asset_util/
+    src/canister_tests/
+  )
+  local -a frontend_paths=(
+    src/internet_identity_frontend/
+    src/frontend/
+    src/lingui-svelte/
+    src/showcase/
+    src/vite-plugins/
+  )
+
+  local backend_commits=""
+  local frontend_commits=""
+
   if should_upgrade_backend "$upgrade_type"; then
     # Find last backend proposal tag
     local last_backend_tag=$(git tag -l "proposal-backend-*" | sort -V | tail -1)
     
-    if [ -n "$last_backend_tag" ]; then
-      local commit_range="${last_backend_tag}..${TAG_NAME}"
-      local backend_commits=$(git log --oneline --no-merges "$commit_range")
-      
-      cat > backend_proposal.md << EOF
+    if [ -z "$last_backend_tag" ]; then
+      echo "No previous proposal-backend-* tag found."
+      echo "Available release tags:"
+      git tag -l "release-*" | sort -V | tail -5
+      read -p "Enter the tag or commit of the last backend deployment: " last_backend_tag
+      if ! git rev-parse "$last_backend_tag" >/dev/null 2>&1; then
+        echo "Error: '$last_backend_tag' is not a valid tag or commit" >&2
+        exit 1
+      fi
+    fi
+
+    local commit_range="${last_backend_tag}..${TAG_NAME}"
+    backend_commits=$(git log --oneline --no-merges "$commit_range" -- "${backend_paths[@]}")
+    
+    cat > backend_proposal.md << EOF
 # Backend Canister Upgrade
 
 ## Commits since last backend upgrade
@@ -539,26 +573,27 @@ ${backend_commits}
 ## Release Notes
 ${release_body}
 EOF
-    else
-      # No previous backend proposal found
-      cat > backend_proposal.md << EOF
-# Backend Canister Upgrade
-
-## Release Notes
-${release_body}
-EOF
-    fi
   fi
   
   if should_upgrade_frontend "$upgrade_type"; then
     # Find last frontend proposal tag
     local last_frontend_tag=$(git tag -l "proposal-frontend-*" | sort -V | tail -1)
     
-    if [ -n "$last_frontend_tag" ]; then
-      local commit_range="${last_frontend_tag}..${TAG_NAME}"
-      local frontend_commits=$(git log --oneline --no-merges "$commit_range")
-      
-      cat > frontend_proposal.md << EOF
+    if [ -z "$last_frontend_tag" ]; then
+      echo "No previous proposal-frontend-* tag found."
+      echo "Available release tags:"
+      git tag -l "release-*" | sort -V | tail -5
+      read -p "Enter the tag or commit of the last frontend deployment: " last_frontend_tag
+      if ! git rev-parse "$last_frontend_tag" >/dev/null 2>&1; then
+        echo "Error: '$last_frontend_tag' is not a valid tag or commit" >&2
+        exit 1
+      fi
+    fi
+
+    local commit_range="${last_frontend_tag}..${TAG_NAME}"
+    frontend_commits=$(git log --oneline --no-merges "$commit_range" -- "${frontend_paths[@]}")
+    
+    cat > frontend_proposal.md << EOF
 # Frontend Canister Upgrade
 
 ## Commits since last frontend upgrade
@@ -571,15 +606,33 @@ ${frontend_commits}
 ## Release Notes
 ${release_body}
 EOF
-    else
-      # No previous frontend proposal found
-      cat > frontend_proposal.md << EOF
-# Frontend Canister Upgrade
+  fi
 
-## Release Notes
-${release_body}
+  # Generate combined two-column summary when upgrading both canisters
+  if should_upgrade_backend "$upgrade_type" && should_upgrade_frontend "$upgrade_type"; then
+    local backend_list=$(echo "$backend_commits" | sed 's/^/- /')
+    local frontend_list=$(echo "$frontend_commits" | sed 's/^/- /')
+
+    cat > release_notes.md << EOF
+## What's Changed
+
+<table>
+<tr><th>Backend</th><th>Frontend</th></tr>
+<tr>
+<td>
+
+${backend_list}
+
+</td>
+<td>
+
+${frontend_list}
+
+</td>
+</tr>
+</table>
 EOF
-    fi
+    echo "Combined release notes written to release_notes.md" >&2
   fi
 }
 
