@@ -2,7 +2,7 @@ mod dynamic_captcha;
 
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_method_and_name,
-    test_authn_method,
+    sample_webauthn_authn_method, test_authn_method,
 };
 use candid::Principal;
 use canister_tests::api::internet_identity::{api_v2, get_anchor_info};
@@ -36,9 +36,10 @@ fn should_register_new_identity() {
 fn should_register_multiple_identities() {
     let env = env();
     let canister_id = install_ii_with_archive(&env, None, None);
-    let authn_method = test_authn_method();
-    let identity_number_1 = create_identity_with_authn_method(&env, canister_id, &authn_method);
-    let identity_number_2 = create_identity_with_authn_method(&env, canister_id, &authn_method);
+    let identity_number_1 =
+        create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(0));
+    let identity_number_2 =
+        create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(1));
 
     assert_ne!(identity_number_1, identity_number_2);
 }
@@ -88,9 +89,8 @@ fn should_not_exceed_configured_identity_range() {
     let canister_id =
         install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_anchor_range((42, 44)));
 
-    let authn_method = test_authn_method();
-    create_identity_with_authn_method(&env, canister_id, &authn_method);
-    create_identity_with_authn_method(&env, canister_id, &authn_method);
+    create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(0));
+    create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(1));
 
     let flow_principal = test_principal(0);
     api_v2::identity_registration_start(&env, canister_id, flow_principal)
@@ -105,7 +105,7 @@ fn should_not_exceed_configured_identity_range() {
         &env,
         canister_id,
         flow_principal,
-        &authn_method,
+        &sample_webauthn_authn_method(2),
         None,
     )
     .expect("API call failed");

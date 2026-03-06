@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method,
 };
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
@@ -23,11 +23,26 @@ const PD_SESS_SEC: &str = "prepare_delegation_session_seconds";
 fn should_report_expected_aggregations() -> Result<(), RejectResponse> {
     let env = env();
     let canister_id = install_ii_canister(&env, II_WASM.clone());
-    for ii_origin in ["internetcomputer.org", "ic0.app", "other"] {
-        let identity_nr = create_identity(&env, canister_id, ii_origin);
+    for (i, ii_origin) in ["internetcomputer.org", "ic0.app", "other"]
+        .into_iter()
+        .enumerate()
+    {
+        let identity_nr = create_identity_with_index(&env, canister_id, ii_origin, i as u8);
 
-        delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
-        delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+        delegation_for_origin_with_sender_index(
+            &env,
+            canister_id,
+            identity_nr,
+            "https://some-dapp.com",
+            i as u8,
+        )?;
+        delegation_for_origin_with_sender_index(
+            &env,
+            canister_id,
+            identity_nr,
+            "https://some-dapp.com",
+            i as u8,
+        )?;
 
         let aggregations = api::stats(&env, canister_id)?.event_aggregations;
         assert_expected_aggregation(
@@ -60,9 +75,15 @@ fn should_not_report_empty_aggregations() -> Result<(), RejectResponse> {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
     let ii_origin2 = "internetcomputer.org";
-    let identity_nr = create_identity(&env, canister_id, ii_origin);
+    let identity_nr = create_identity_with_index(&env, canister_id, ii_origin, 0);
 
-    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+    delegation_for_origin_with_sender_index(
+        &env,
+        canister_id,
+        identity_nr,
+        "https://some-dapp.com",
+        0,
+    )?;
 
     let aggregations = api::stats(&env, canister_id)?.event_aggregations;
     let mut expected_keys = vec![
@@ -79,8 +100,14 @@ fn should_not_report_empty_aggregations() -> Result<(), RejectResponse> {
 
     env.advance_time(Duration::from_secs(60 * 60 * 24 * 30)); // 30 days
 
-    let identity_nr2 = create_identity(&env, canister_id, ii_origin2);
-    delegation_for_origin(&env, canister_id, identity_nr2, "https://some-dapp.com")?;
+    let identity_nr2 = create_identity_with_index(&env, canister_id, ii_origin2, 1);
+    delegation_for_origin_with_sender_index(
+        &env,
+        canister_id,
+        identity_nr2,
+        "https://some-dapp.com",
+        1,
+    )?;
 
     let aggregations = api::stats(&env, canister_id)?.event_aggregations;
 
@@ -301,12 +328,21 @@ fn assert_expected_aggregation(
 /// Note that this key corresponds to the legacy `BrowserStorageKey` key type that was used
 /// in the legacy pin-flow that is now deprecated.
 fn create_identity(env: &PocketIc, canister_id: CanisterId, ii_origin: &str) -> IdentityNumber {
+    create_identity_with_index(env, canister_id, ii_origin, 0)
+}
+
+fn create_identity_with_index(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    ii_origin: &str,
+    i: u8,
+) -> IdentityNumber {
     let authn_method = AuthnMethodData {
         metadata: HashMap::from([(
             "origin".to_string(),
             MetadataEntryV2::String(format!("https://identity.{ii_origin}")),
         )]),
-        ..test_authn_method()
+        ..sample_webauthn_authn_method(i)
     };
     create_identity_with_authn_method(env, canister_id, &authn_method)
 }
@@ -321,10 +357,20 @@ fn delegation_for_origin(
     identity_nr: IdentityNumber,
     frontend_hostname: &str,
 ) -> Result<(), RejectResponse> {
+    delegation_for_origin_with_sender_index(env, canister_id, identity_nr, frontend_hostname, 0)
+}
+
+fn delegation_for_origin_with_sender_index(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    identity_nr: IdentityNumber,
+    frontend_hostname: &str,
+    index: u8,
+) -> Result<(), RejectResponse> {
     api::prepare_delegation(
         env,
         canister_id,
-        test_authn_method().principal(),
+        sample_webauthn_authn_method(index).principal(),
         identity_nr,
         frontend_hostname,
         &ByteBuf::from("session public key"),

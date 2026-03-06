@@ -34,6 +34,12 @@ export type AddTentativeDeviceResponse = {
   } |
   {
     /**
+     * Passkey with this public key is already used
+     */
+    'passkey_with_this_public_key_is_already_used' : null
+  } |
+  {
+    /**
      * The device was tentatively added.
      */
     'added_tentatively' : {
@@ -161,6 +167,12 @@ export type AuthnMethodPurpose = { 'Recovery' : null } |
   { 'Authentication' : null };
 export type AuthnMethodRegisterError = {
     /**
+     * Passkey with this public key is already used
+     */
+    'PasskeyWithThisPublicKeyIsAlreadyUsed' : null
+  } |
+  {
+    /**
      * Authentication method registration mode is off, either due to timeout or because it was never enabled.
      */
     'RegistrationModeOff' : null
@@ -210,12 +222,19 @@ export type AuthnMethodRegistrationModeEnterError = {
   { 'AlreadyInProgress' : null } |
   { 'Unauthorized' : Principal };
 export type AuthnMethodRegistrationModeExitError = {
-    'InternalCanisterError' : string
+    'PasskeyWithThisPublicKeyIsAlreadyUsed' : null
   } |
+  { 'InternalCanisterError' : string } |
   { 'RegistrationModeOff' : null } |
   { 'Unauthorized' : Principal } |
   { 'InvalidMetadata' : string };
 export type AuthnMethodReplaceError = {
+    /**
+     * Passkey with this public key is already used
+     */
+    'PasskeyWithThisPublicKeyIsAlreadyUsed' : null
+  } |
+  {
     /**
      * No authentication method found with the given public key.
      */

@@ -25,9 +25,6 @@ msgstr ""
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
-msgid "{name} | Created {date}"
-msgstr "{name} | Dibuat {date}"
-
 msgid "{name} account"
 msgstr "Akun {name}"
 
@@ -70,6 +67,9 @@ msgstr "Aktifkan"
 msgid "Activate it so that you can recover your identity at any time."
 msgstr "Aktifkan agar Anda dapat memulihkan identitas Anda kapan saja."
 
+msgid "Activate recovery to remove"
+msgstr ""
+
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
 msgstr ""
 
@@ -81,6 +81,9 @@ msgstr "Tambahkan metode akses"
 
 msgid "Add another account"
 msgstr "Tambah akun lain"
+
+msgid "Add another identity"
+msgstr ""
 
 msgid "Add another passkey"
 msgstr "Tambahkan passkey lain"
@@ -154,7 +157,7 @@ msgstr ""
 msgid "Choose method"
 msgstr "Pilih metode"
 
-msgid "choose method to continue"
+msgid "Choose method to continue"
 msgstr ""
 
 msgid "Clear all"
@@ -222,6 +225,9 @@ msgstr "Buat identitas baru"
 
 msgid "Create passkey"
 msgstr "Buat passkey"
+
+msgid "Created {0}"
+msgstr ""
 
 msgid "Created {date}"
 msgstr ""
@@ -298,9 +304,6 @@ msgstr ""
 
 msgid "FAQs"
 msgstr "Pertanyaan yang Sering Diajukan"
-
-msgid "For developers"
-msgstr "Untuk pengembang"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Misalnya, pengguna A masuk ke Internet Identity dengan akun Google mereka “A@gmail.com” dan kemudian menggunakan Internet Identity untuk autentikasi di aplikasi Z. Google tidak akan pernah tahu bahwa pengguna tersebut terautentikasi di aplikasi Z, hanya Internet Identity yang mengetahuinya. Selain itu, aplikasi Z juga tidak akan pernah tahu bahwa pengguna A menggunakan Google untuk mengautentikasi pengguna Internet Identity mereka."
@@ -506,6 +509,9 @@ msgstr "Pelajari cara membuka tautan di peramban Anda"
 msgid "Ledger has been confirmed to be incompatible."
 msgstr ""
 
+msgid "Legacy"
+msgstr ""
+
 msgid "Let's get started"
 msgstr "Mari mulai"
 
@@ -539,11 +545,11 @@ msgstr ""
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Pastikan untuk menambahkan metode akses baru agar Anda dapat masuk lain kali atau mengatur ulang frasa pemulihan Anda."
 
-msgid "Manage Identity"
-msgstr "Kelola identitas"
-
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Kelola identitas Anda dan tetap kendalikan aplikasi serta situs web Anda melalui dashboard. Jelajahi Fitur Pro untuk menyesuaikan dan mengamankan pengalaman Anda lebih lanjut."
+
+msgid "Manage your Internet Identity"
+msgstr ""
 
 msgid "Maximum length is 32 characters."
 msgstr "Panjang maksimum 32 karakter."
@@ -788,11 +794,14 @@ msgstr "Masuk di sana."
 msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
 
+msgid "Sign in with another identity"
+msgstr ""
+
 msgid "Sign in with your {name} account from any device."
 msgstr "Masuk dengan akun {name} Anda dari perangkat mana pun."
 
-msgid "Sign Out"
-msgstr "Keluar"
+msgid "Sign out"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
@@ -889,6 +898,9 @@ msgstr ""
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Identitas ini sudah ditingkatkan ke pengalaman baru."
+
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr ""
 
 msgid "This may take a few seconds"
 msgstr ""
@@ -1004,14 +1016,14 @@ msgstr "Meningkatkan identitas..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Gunakan perangkat yang sudah memiliki identitas Anda untuk memindai atau membuka URL. Ini akan menautkan identitas Anda ke perangkat ini."
 
-msgid "Use another identity"
-msgstr "Gunakan identitas lain"
-
 msgid "Use existing identity"
 msgstr "Gunakan identitas yang ada"
 
 msgid "Verify"
 msgstr "Verifikasi"
+
+msgid "Verify recovery to remove"
+msgstr ""
 
 msgid "Verify you are human"
 msgstr "Verifikasi bahwa Anda manusia"

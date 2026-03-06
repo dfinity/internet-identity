@@ -4,8 +4,8 @@ use crate::anchor_management::registration::captcha::{
 use crate::anchor_management::registration::rate_limit::process_rate_limit;
 use crate::anchor_management::registration::Base64;
 use crate::anchor_management::{
-    activity_bookkeeping, add_openid_credential_skip_checks, check_openid_credential_is_unique,
-    post_operation_bookkeeping, set_name,
+    self, activity_bookkeeping, add_openid_credential_skip_checks,
+    check_openid_credential_is_unique, post_operation_bookkeeping, set_name,
 };
 use crate::state::flow_states::RegistrationFlowState;
 use crate::storage::anchor::{Anchor, Device};
@@ -17,10 +17,10 @@ use ic_cdk::caller;
 use ic_stable_structures::Memory;
 use internet_identity_interface::archive::types::{DeviceDataWithoutAlias, Operation};
 use internet_identity_interface::internet_identity::types::{
-    AuthorizationKey, CaptchaTrigger, CheckCaptchaArg, CheckCaptchaError, CreateIdentityData,
-    DeviceData, DeviceWithUsage, IdRegFinishArg, IdRegFinishError, IdRegFinishResult,
-    IdRegNextStepResult, IdRegStartError, IdentityNumber, OpenIDRegFinishArg,
-    RegistrationFlowNextStep, StaticCaptchaTrigger,
+    AuthnMethod, AuthnMethodData, AuthorizationKey, CaptchaTrigger, CheckCaptchaArg,
+    CheckCaptchaError, CreateIdentityData, DeviceData, DeviceWithUsage, IdRegFinishArg,
+    IdRegFinishError, IdRegFinishResult, IdRegNextStepResult, IdRegStartError, IdentityNumber,
+    OpenIDRegFinishArg, RegistrationFlowNextStep, StaticCaptchaTrigger,
 };
 
 impl RegistrationFlowState {
@@ -275,7 +275,6 @@ fn apply_identity_data(
             let device = DeviceWithUsage::try_from(authn_method)
                 .map(|device| Device::from(DeviceData::from(device)))
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
-
             identity
                 .add_device(device.clone())
                 .map_err(|err| IdRegFinishError::InvalidAuthnMethod(err.to_string()))?;
@@ -312,6 +311,20 @@ fn apply_identity_data(
 }
 
 fn create_identity(arg: &CreateIdentityData, now: u64) -> Result<IdentityNumber, IdRegFinishError> {
+    // Enforce global uniqueness of passkey pubkeys across all anchors.
+    if let CreateIdentityData::PubkeyAuthn(IdRegFinishArg {
+        authn_method:
+            AuthnMethodData {
+                authn_method: AuthnMethod::WebAuthn(webauthn),
+                ..
+            },
+        ..
+    }) = &arg
+    {
+        anchor_management::check_passkey_pubkey_is_not_used(&webauthn.pubkey)
+            .map_err(IdRegFinishError::InvalidAuthnMethod)?;
+    }
+
     let (identity_number, operation) = state::storage_borrow_mut(|storage| {
         let arg = validate_identity_data(storage, arg)?;
 

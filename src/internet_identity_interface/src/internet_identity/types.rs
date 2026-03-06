@@ -147,7 +147,7 @@ pub enum GetDelegationResponse {
     NoSuchDelegation,
 }
 
-#[derive(Clone, Debug, CandidType, Deserialize)]
+#[derive(Clone, Debug, CandidType, Deserialize, PartialEq)]
 pub enum AddTentativeDeviceResponse {
     #[serde(rename = "added_tentatively")]
     AddedTentatively {
@@ -158,6 +158,8 @@ pub enum AddTentativeDeviceResponse {
     DeviceRegistrationModeOff,
     #[serde(rename = "another_device_tentatively_added")]
     AnotherDeviceTentativelyAdded,
+    #[serde(rename = "passkey_with_this_public_key_is_already_used")]
+    PasskeyWithThisPublicKeyIsAlreadyUsed,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]

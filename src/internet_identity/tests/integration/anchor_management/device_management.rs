@@ -88,29 +88,6 @@ fn should_add_additional_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that the same device cannot be added twice.
-#[test]
-fn should_not_add_existing_device() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let user_number = flows::register_anchor(&env, canister_id);
-
-    let result = api::add(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        &device_data_1(), // this device was already added during registration
-    );
-
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("Device with key \\w+ already exists on this anchor\\.").unwrap(),
-    );
-    Ok(())
-}
-
 /// Verifies that a second recovery phrase cannot be added.
 #[test]
 fn should_not_add_second_recovery_phrase() -> Result<(), RejectResponse> {
@@ -310,6 +287,56 @@ fn should_not_update_device_of_different_user() {
         CanisterCalledTrap,
         Regex::new("[a-z\\d-]+ could not be authenticated.").unwrap(),
     );
+}
+
+/// Verifies that legacy v1 flows enforce global uniqueness of passkey pubkeys
+/// when adding devices directly or via the tentative-device flow.
+#[test]
+fn should_enforce_unique_passkey_pubkeys_in_legacy_flows() -> Result<(), RejectResponse> {
+    let env = env();
+    let canister_id = install_ii_with_archive(&env, None, None);
+
+    // Register first anchor A0 with its default device (device_data_1, pubkey P0).
+    let _user_number_a =
+        flows::register_anchor_with(&env, canister_id, principal_1(), &device_data_1());
+
+    // Register second anchor B0 with a different default device (device_data_2, pubkey P1).
+    let user_number_b =
+        flows::register_anchor_with(&env, canister_id, principal_2(), &device_data_2());
+
+    // 1. Direct add: adding a device with pubkey P0 to B0 must fail because P0 is
+    // already used by A0.
+    let result_add_conflict = api::add(
+        &env,
+        canister_id,
+        principal_2(),
+        user_number_b,
+        &device_data_1(),
+    );
+    expect_user_error_with_message(
+        result_add_conflict,
+        CanisterCalledTrap,
+        Regex::new("passkey with this public key is already used").unwrap(),
+    );
+
+    // 2. Tentative device flow: adding a tentative device with pubkey P0 to B0
+    // must also fail with the same error.
+    api::enter_device_registration_mode(&env, canister_id, principal_2(), user_number_b)?;
+
+    let mut conflicting_device = device_data_1();
+    conflicting_device.alias = "conflicting device".to_string();
+    // pubkey is the same as device_data_1().pubkey (P0), already used on A0
+
+    let tentative_response =
+        api::add_tentative_device(&env, canister_id, user_number_b, &conflicting_device)?;
+
+    // Because the canister traps on this condition, we expect the specific variant.
+    assert_eq!(
+        tentative_response,
+        AddTentativeDeviceResponse::PasskeyWithThisPublicKeyIsAlreadyUsed
+    );
+
+    Ok(())
 }
 
 /// Verifies that unprotected devices can only be updated from themselves
