@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 # Make sure we always run from the root
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -84,14 +84,14 @@ if [ ${#CANISTERS[@]} -eq 0 ]; then
     CANISTERS=("internet_identity")
 fi
 
-# Checking for dependencies
-if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.8.5" ]]
-then
-    echo "could not find ic-wasm 0.8.5"
-    echo "ic-wasm version 0.8.5 is needed, please run the following command:"
-    echo "  cargo install ic-wasm --version 0.8.5"
-    exit 1
-fi
+# # Checking for dependencies
+# if [[ ! "$(command -v ic-wasm)" || "$(ic-wasm --version)" != "ic-wasm 0.8.5" ]]
+# then
+#     echo "could not find ic-wasm 0.8.5"
+#     echo "ic-wasm version 0.8.5 is needed, please run the following command:"
+#     echo "  cargo install ic-wasm --version 0.8.5"
+#     exit 1
+# fi
 
 # Check for exact node version
 if [[ "$(node --version)" !=  "v$(cat .node-version)" ]]

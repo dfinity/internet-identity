@@ -1,0 +1,12 @@
+(
+  record {
+    backend_canister_id = principal "uxrrr-q7777-77774-qaaaq-cai";
+    backend_origin = "http://uxrrr-q7777-77774-qaaaq-cai.localhost:4943";
+    related_origins = opt vec {
+      "http://u6s2n-gx777-77774-qaaba-cai.localhost:4943";
+    };
+    fetch_root_key = null;
+    analytics_config = null;
+    dummy_auth = null;
+  },
+)

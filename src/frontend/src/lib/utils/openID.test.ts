@@ -177,6 +177,7 @@ const createOpenIDConfig = (issuer: string): OpenIdConfig => ({
   issuer,
   auth_scope: ["test"],
   client_id: "test",
+  email_verification: [],
 });
 
 describe("findConfig", () => {

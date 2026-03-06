@@ -183,7 +183,7 @@
         lastUsedIdentitiesStore.removeIdentity(
           $authenticatedStore.identityNumber,
         );
-        await sessionStore.reset();
+        sessionStore.reset();
         location.replace("/login");
         return;
       }

@@ -18,6 +18,7 @@ pub const OPENID_ISSUER_MAX_BYTES: usize = 1024;
 pub enum AttributeName {
     Email,
     Name,
+    VerifiedEmail,
 }
 
 impl TryFrom<&str> for AttributeName {
@@ -27,6 +28,7 @@ impl TryFrom<&str> for AttributeName {
         match value {
             "email" => Ok(AttributeName::Email),
             "name" => Ok(AttributeName::Name),
+            "verified_email" => Ok(AttributeName::VerifiedEmail),
             _ => Err(format!("Unknown attribute: {}", value)),
         }
     }
@@ -37,6 +39,7 @@ impl std::fmt::Display for AttributeName {
         match self {
             AttributeName::Email => write!(f, "email"),
             AttributeName::Name => write!(f, "name"),
+            AttributeName::VerifiedEmail => write!(f, "verified_email"),
         }
     }
 }

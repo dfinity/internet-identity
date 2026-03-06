@@ -1,10 +1,11 @@
-import { Page, test as base } from "@playwright/test";
+import { Page, test as base, expect } from "@playwright/test";
 import { dummyAuth, DummyAuthFn, getRandomIndex, II_URL } from "../utils";
 import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { Agent } from "undici";
+import { Principal } from "@icp-sdk/core/principal";
 
 // Fetch that's compatible with Vite server's self-signed certs
 const insecureAgent = new Agent({
@@ -18,20 +19,23 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
     ...options,
   } as RequestInit);
 
-interface Identity {
-  name: string;
+export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
+export const DEFAULT_NAME = "Test User";
 
-  signIn(): Promise<void>;
-
-  signOut(): Promise<void>;
-
-  createActor(): Promise<{
-    actor: ActorSubclass<_SERVICE>;
-    identityNumber: bigint;
+export type IdentityConfig = {
+  host?: string;
+  createIdentities: Array<{
+    name: string;
+    generateDummyAuthIndex?: () => bigint;
   }>;
-}
+};
 
-const DEFAULT_NAME = "Test User";
+interface Identity {
+  canisterId: Principal;
+  identityNumber: bigint;
+  name: string;
+  dummyAuthIndex: bigint;
+}
 
 class IdentityWizard {
   #page: Page;
@@ -43,21 +47,21 @@ class IdentityWizard {
   async signIn(auth: DummyAuthFn): Promise<void> {
     await this.#goto();
     auth(this.#page);
-    await this.#page
-      .getByRole("button", { name: "Use existing identity" })
-      .click();
-    await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
+    const dialog = this.#page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Use existing identity" }).click();
+    await expect(dialog).toBeHidden();
   }
 
   async signUp(auth: DummyAuthFn, name: string): Promise<void> {
     await this.#goto();
-    await this.#page
-      .getByRole("button", { name: "Create new identity" })
-      .click();
+    const dialog = this.#page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Create new identity" }).click();
     await this.#page.getByLabel("Identity name").fill(name);
     auth(this.#page);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
-    await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
+    await expect(dialog).toBeHidden();
   }
 
   /**
@@ -95,52 +99,119 @@ class IdentityWizard {
   }
 }
 
+const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
+  // Same implementation as found in `DiscoverableDummyIdentity`
+  const buffer = new ArrayBuffer(32);
+  const view = new DataView(buffer);
+  view.setBigUint64(0, dummyAuthIndex);
+  return new Uint8Array(buffer);
+};
+
+const createActor = async (
+  host: string,
+  canisterId: Principal,
+  dummyAuthIndex: bigint,
+): Promise<ActorSubclass<_SERVICE>> =>
+  Actor.createActor<_SERVICE>(internet_identity_idl, {
+    agent: await HttpAgent.create({
+      host,
+      shouldFetchRootKey: true,
+      verifyQuerySignatures: false,
+      fetch: insecureFetch,
+      identity: Ed25519KeyIdentity.generate(toSeed(dummyAuthIndex)),
+    }),
+    canisterId,
+  });
+
 export const test = base.extend<{
-  identity: Identity;
+  identityConfig: IdentityConfig;
+  identities: Identity[];
+  signInWithIdentity: (page: Page, identityNumber: bigint) => Promise<void>;
+  actorForIdentity: (
+    identityNumber: bigint,
+  ) => Promise<ActorSubclass<_SERVICE>>;
+  replaceAuthForIdentity: (
+    identityNumber: bigint,
+    newDummyAuthIndex: bigint,
+  ) => void;
 }>({
-  identity: async ({ page, browser }, use) => {
-    const authIndex = getRandomIndex();
-    const auth = dummyAuth(authIndex);
-    const tempContext = await browser.newContext();
-    const tempPage = await tempContext.newPage();
-    await tempPage.goto(II_URL);
-    const script = (await tempPage.$("[data-canister-id]"))!;
-    const canisterId = (await script.getAttribute("data-canister-id"))!;
-    const tempWizard = new IdentityWizard(tempPage);
-    await tempWizard.signUp(auth, DEFAULT_NAME);
-    await tempPage.waitForURL(II_URL + "/manage");
-    await tempPage.close();
-    await use({
-      name: DEFAULT_NAME,
-      signIn: async () => {
-        const wizard = new IdentityWizard(page);
-        await wizard.signIn(auth);
+  identityConfig: {
+    createIdentities: [
+      {
+        name: DEFAULT_NAME,
+        generateDummyAuthIndex: getRandomIndex,
       },
-      signOut: async () => {
-        // Navigating to landing page (reloading) is sufficient for now to sign out
-        await page.goto(II_URL);
-      },
-      createActor: async () => {
-        // Same implementation as found in `DiscoverableDummyIdentity`
-        const buffer = new ArrayBuffer(32);
-        const view = new DataView(buffer);
-        view.setBigUint64(0, authIndex);
-        const seed = new Uint8Array(buffer);
-        const agent = await HttpAgent.create({
-          host: "https://localhost:5173", // Vite dev server
-          shouldFetchRootKey: true,
-          verifyQuerySignatures: false,
-          fetch: insecureFetch,
-        });
-        const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-          agent,
-          canisterId,
-        });
-        const [deviceKeyWithAnchor] = await actor.lookup_device_key(seed);
-        const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
-        agent.replaceIdentity(Ed25519KeyIdentity.generate(seed));
-        return { actor, identityNumber };
-      },
-    });
+    ],
   },
+  identities: async ({ browser, identityConfig }, use) =>
+    use(
+      await Promise.all(
+        identityConfig.createIdentities.map(
+          async ({ name, generateDummyAuthIndex = getRandomIndex }) => {
+            const dummyAuthIndex = generateDummyAuthIndex();
+            const context = await browser.newContext();
+            const page = await context.newPage();
+            await page.goto(II_URL);
+            const element = (await page.$("[data-canister-id]"))!;
+            const canisterId = Principal.fromText(
+              (await element.getAttribute("data-canister-id"))!,
+            );
+            const wizard = new IdentityWizard(page);
+            await wizard.signUp(dummyAuth(dummyAuthIndex), name);
+            await page.close();
+            await context.close();
+            const actor = await createActor(
+              identityConfig.host ?? DEFAULT_HOST,
+              canisterId,
+              dummyAuthIndex,
+            );
+            const [deviceKeyWithAnchor] = await actor.lookup_device_key(
+              toSeed(dummyAuthIndex),
+            );
+            const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
+            return {
+              canisterId,
+              name,
+              dummyAuthIndex,
+              identityNumber,
+            };
+          },
+        ),
+      ),
+    ),
+  signInWithIdentity: ({ identities }, use) =>
+    use(async (page: Page, identityNumber: bigint) => {
+      const identity = identities.find(
+        (identity) => identity.identityNumber === identityNumber,
+      );
+      if (identity === undefined) {
+        throw new Error("Identity not found");
+      }
+      const wizard = new IdentityWizard(page);
+      await wizard.signIn(dummyAuth(identity.dummyAuthIndex));
+    }),
+  actorForIdentity: ({ identityConfig, identities }, use) =>
+    use((identityNumber: bigint) => {
+      const identity = identities.find(
+        (identity) => identity.identityNumber === identityNumber,
+      );
+      if (identity === undefined) {
+        throw new Error("Identity not found");
+      }
+      return createActor(
+        identityConfig.host ?? DEFAULT_HOST,
+        identity.canisterId,
+        identity.dummyAuthIndex,
+      );
+    }),
+  replaceAuthForIdentity: ({ identities }, use) =>
+    use((identityNumber: bigint, newDummyAuthIndex: bigint) => {
+      const identity = identities.find(
+        (identity) => identity.identityNumber === identityNumber,
+      );
+      if (identity === undefined) {
+        throw new Error("Identity not found");
+      }
+      identity.dummyAuthIndex = newDummyAuthIndex;
+    }),
 });

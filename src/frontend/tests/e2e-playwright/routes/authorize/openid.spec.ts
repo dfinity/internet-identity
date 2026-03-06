@@ -1,7 +1,10 @@
 import { expect } from "@playwright/test";
-import { test } from "../fixtures";
-import { ALTERNATE_OPENID_PORT, DEFAULT_OPENID_PORT } from "../fixtures/openid";
-import { II_URL } from "../utils";
+import { test } from "../../fixtures";
+import {
+  ALTERNATE_OPENID_PORT,
+  DEFAULT_OPENID_PORT,
+} from "../../fixtures/openid";
+import { II_URL } from "../../utils";
 
 test.describe("Authorize with direct OpenID", () => {
   test.describe("without any attributes", () => {
@@ -109,9 +112,15 @@ test.describe("Authorize with direct OpenID", () => {
     // Link both OpenID provider users with identity first to ensure attributes from
     // both providers are available, but only one is returned through implicit consent.
     test.beforeEach(
-      async ({ page, identity, signInWithOpenId, openIdUsers }) => {
+      async ({
+        page,
+        identities,
+        signInWithIdentity,
+        signInWithOpenId,
+        openIdUsers,
+      }) => {
         await page.goto(II_URL + "/manage/access");
-        await identity.signIn();
+        await signInWithIdentity(page, identities[0].identityNumber);
 
         for (const user of openIdUsers) {
           // Click "Add new" and pick OpenID provider
@@ -136,6 +145,44 @@ test.describe("Authorize with direct OpenID", () => {
     });
 
     test("should omit attributes", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  test.describe("with verified_email attribute", () => {
+    const email = "john.doe@example.com";
+
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { email, email_verified: "true" },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        attributes: [
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`,
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedAttributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedAttributes).toEqual({
+        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:verified_email`]:
+          email,
+      });
+    });
+
+    test("should return verified email", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,

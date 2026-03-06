@@ -562,6 +562,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
             auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
             auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
             fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+            email_verification: None,
         }, OpenIdConfig {
             name: "Microsoft".into(),
             logo: "<svg viewBox=\"0 0 24 24\"><path d=\"M2.5 2.5h9v9h-9zm10 0h9v9h-9zm-10 10h9v9h-9zm10 0h9v9h-9z\" style=\"fill: currentColor;\"></path></svg>".into(),
@@ -572,6 +573,7 @@ pub fn setup_canister(env: &PocketIc) -> Principal {
             auth_uri: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize".into(),
             auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
             fedcm_uri: Some("".into()),
+            email_verification: None,
         }]),
         archive_config: Some(ArchiveConfig {
             module_hash: wasm_module_hash(&ARCHIVE_WASM),

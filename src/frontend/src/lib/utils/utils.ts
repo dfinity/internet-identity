@@ -431,10 +431,10 @@ export const bufFromBufLike = (
   );
 };
 
-export const toBase64 = (bytes: ArrayBuffer): string =>
-  btoa(String.fromCharCode(...new Uint8Array(bytes)));
+export const toBase64 = (bytes: Uint8Array): string =>
+  btoa(String.fromCharCode(...bytes));
 
-export const toBase64URL = (bytes: ArrayBuffer): string =>
+export const toBase64URL = (bytes: Uint8Array): string =>
   toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 export const fromBase64 = (base64: string): Uint8Array =>

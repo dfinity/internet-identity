@@ -5,8 +5,8 @@ import {
   createIdentity,
   dummyAuth,
   II_URL,
-} from "./utils";
-import { test } from "./fixtures";
+} from "../utils";
+import { test } from "../fixtures";
 
 const DEFAULT_USER_NAME = "John Doe";
 const SECONDARY_USER_NAME = "Jane Doe";

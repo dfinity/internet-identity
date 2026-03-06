@@ -81,6 +81,7 @@ fn should_get_certified_attributes() {
         auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+        email_verification: None,
     }]);
 
     let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(

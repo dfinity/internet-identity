@@ -34,6 +34,7 @@ fn should_init_config() {
                 auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                 auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
                 fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
+                email_verification: None,
             }]),
             ..Default::default()
         },
@@ -48,6 +49,7 @@ fn should_init_config() {
                     auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                     auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
                     fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
+                    email_verification: None,
                 },
                 OpenIdConfig {
                     name: "Example2".into(),
@@ -58,6 +60,7 @@ fn should_init_config() {
                     auth_scope: vec!["openid".into()],
                     auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
                     fedcm_uri: None,
+                    email_verification: None,
                 },
             ]),
             ..Default::default()
@@ -89,6 +92,7 @@ fn should_enable_config() {
         auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://example.com/fedcm.json".into()),
+        email_verification: None,
     }]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -113,6 +117,7 @@ fn should_disable_config() {
             auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
             auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
             fedcm_uri: Some("https://example.com/fedcm.json".into()),
+            email_verification: None,
         }]),
         ..Default::default()
     };
@@ -140,6 +145,7 @@ fn should_update_config() {
             auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
             auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
             fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
+            email_verification: None,
         }]),
         ..Default::default()
     };
@@ -152,6 +158,7 @@ fn should_update_config() {
         auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
         auth_scope: vec!["openid".into()],
         fedcm_uri: None,
+        email_verification: None,
     }]);
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config.clone()));
@@ -185,6 +192,7 @@ fn should_retain_config() {
                 auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                 auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
                 fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
+                email_verification: None,
             }]),
             ..Default::default()
         },
@@ -199,6 +207,7 @@ fn should_retain_config() {
                     auth_uri: "https://example.com/o/oauth2/v2/auth".into(),
                     auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
                     fedcm_uri: Some("https://example.com/gsi/fedcm.json".into()),
+                    email_verification: None,
                 },
                 OpenIdConfig {
                     name: "Example2".into(),
@@ -209,6 +218,7 @@ fn should_retain_config() {
                     auth_uri: "https://example2.com/o/oauth2/v2/auth".into(),
                     auth_scope: vec!["openid".into()],
                     fedcm_uri: None,
+                    email_verification: None,
                 },
             ]),
             ..Default::default()

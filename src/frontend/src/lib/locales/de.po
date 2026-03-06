@@ -16,6 +16,9 @@ msgstr ""
 msgid "{0} logo"
 msgstr ""
 
+msgid "{0} user"
+msgstr ""
+
 msgid "{application} has moved to the new Internet Identity"
 msgstr ""
 
@@ -359,9 +362,6 @@ msgstr "Wie funktionieren Passkeys?"
 msgid "How does Internet Identity compare to other Web3 authentication tools?"
 msgstr "Wie vergleicht sich Internet Identity mit anderen Web3-Authentifizierungstools?"
 
-msgid "How it works"
-msgstr "So funktioniert's"
-
 msgid "How to stay secure"
 msgstr "So bleiben Sie sicher"
 
@@ -662,8 +662,8 @@ msgstr ""
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Gehen Sie zu Ihrem <0>bestehenden Gerät</0> zurück und wählen Sie <1>Neu starten</1>, um es erneut zu versuchen."
 
-msgid "Powered by Internet Identity"
-msgstr "Unterstützt von Internet Identity"
+msgid "Powered by"
+msgstr ""
 
 msgid "Real Privacy"
 msgstr "Echte Privatsphäre"
@@ -895,9 +895,6 @@ msgstr ""
 
 msgid "This passkey is no longer associated with any identity."
 msgstr ""
-
-msgid "This takes a few seconds."
-msgstr "Dies dauert einige Sekunden."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr ""

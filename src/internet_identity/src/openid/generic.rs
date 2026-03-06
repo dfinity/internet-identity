@@ -18,7 +18,9 @@ use identity_jose::jws::{
     Decoder, JwsVerifierFn, SignatureVerificationError, SignatureVerificationErrorKind,
     VerificationInput,
 };
-use internet_identity_interface::internet_identity::types::{MetadataEntryV2, OpenIdConfig};
+use internet_identity_interface::internet_identity::types::{
+    MetadataEntryV2, OpenIdConfig, OpenIdEmailVerificationScheme,
+};
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -59,6 +61,31 @@ struct Certs {
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+enum EmailVerifiedClaim {
+    Bool(bool),
+    String(String),
+}
+
+// Depending on the OpenID provider, this claim can either be a boolean or string,
+// so we need to support both formats when parsing the claims, but we will convert
+// both to a string for storing it in the OpenIdCredential metadata.
+impl EmailVerifiedClaim {
+    fn into_string(self) -> String {
+        match self {
+            EmailVerifiedClaim::Bool(value) => {
+                if value {
+                    "true".into()
+                } else {
+                    "false".into()
+                }
+            }
+            EmailVerifiedClaim::String(value) => value,
+        }
+    }
+}
+
+#[derive(Deserialize)]
 struct Claims {
     iss: String,
     sub: String,
@@ -69,17 +96,23 @@ struct Claims {
     // Optional metadata claims
     email: Option<String>,
     name: Option<String>,
+    email_verified: Option<EmailVerifiedClaim>,
 }
 
 pub struct Provider {
     client_id: String,
     issuer: String,
     certs: Rc<RefCell<Vec<Jwk>>>,
+    email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
 impl OpenIdProvider for Provider {
     fn issuer(&self) -> String {
         self.issuer.clone()
+    }
+
+    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
+        self.email_verification
     }
 
     fn verify(
@@ -129,6 +162,12 @@ impl OpenIdProvider for Provider {
         if let Some(email) = claims.email {
             metadata.insert("email".into(), MetadataEntryV2::String(email));
         }
+        if let Some(email_verified) = claims.email_verified {
+            metadata.insert(
+                "email_verified".into(),
+                MetadataEntryV2::String(email_verified.into_string()),
+            );
+        }
         if let Some(name) = claims.name {
             metadata.insert("name".into(), MetadataEntryV2::String(name));
         }
@@ -171,6 +210,7 @@ impl Provider {
             client_id: config.client_id,
             issuer: config.issuer,
             certs,
+            email_verification: config.email_verification,
         }
     }
 }
@@ -403,6 +443,14 @@ fn verify_claims(
             "Name too long".into(),
         ));
     }
+    if let Some(EmailVerifiedClaim::String(ref s)) = claims.email_verified {
+        if s != "true" && s != "false" {
+            return Err(OpenIDJWTVerificationError::GenericError(format!(
+                "email_verified must be 'true' or 'false', got: {}",
+                s
+            )));
+        }
+    }
 
     Ok(())
 }
@@ -475,6 +523,7 @@ fn test_data() -> (String, [u8; 32], OpenIdConfig, Claims) {
         auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
         fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+        email_verification: None,
     };
 
     (jwt.into(), salt, config, claims)
@@ -493,6 +542,10 @@ fn should_return_credential() {
             (
                 "email".into(),
                 MetadataEntryV2::String(claims.email.unwrap()),
+            ),
+            (
+                "email_verified".into(),
+                MetadataEntryV2::String(claims.email_verified.unwrap().into_string()),
             ),
             ("name".into(), MetadataEntryV2::String(claims.name.unwrap())),
         ]),
