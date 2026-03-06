@@ -331,7 +331,7 @@
       <button
         bind:this={identityButtonRef}
         onclick={() => (isIdentityPopoverOpen = true)}
-        class="btn btn-tertiary gap-2.5 pr-3 sm:-mr-3"
+        class="btn btn-tertiary gap-2.5 pe-3 max-sm:-me-2 sm:-me-3"
         aria-label={$t`Switch identity`}
       >
         <Avatar size="xs">
