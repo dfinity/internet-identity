@@ -243,7 +243,9 @@ test.describe("Last used identities listed", () => {
     await page.goto(II_URL);
     await page.getByRole("button", { name: "Switch identity" }).click();
     auth(page);
-    await page.getByRole("button", { name: DEFAULT_USER_NAME }).click();
+    await page
+      .getByRole("button", { name: "Manage your Internet Identity" })
+      .click();
     await page.waitForURL(II_URL + "/manage");
     await expect(
       page.getByRole("heading", {
