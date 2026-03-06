@@ -26,20 +26,12 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import { sessionStore } from "$lib/stores/session.store";
-  import {
-    formatDate,
-    locales,
-    localeStore,
-    t,
-  } from "$lib/stores/locale.store";
+  import { locales, localeStore, t } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
-  import { nanosToMillis } from "$lib/utils/time";
-  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { Trans } from "$lib/components/locale";
   import { getMetadataString, openIdLogo } from "$lib/utils/openID";
@@ -279,12 +271,12 @@
           <div
             class="text-text-tertiary overflow-hidden text-sm overflow-ellipsis whitespace-nowrap"
           >
-            {#if "openid" in $lastUsedIdentitiesStore.selected.authMethod}
+            {#if "openid" in $lastUsedIdentitiesStore.selected.authMethod && $lastUsedIdentitiesStore.selected.authMethod.openid.metadata !== undefined}
               <span
                 >{getMetadataString(
-                  $lastUsedIdentitiesStore.selected.authMethod.openid.metadata!,
+                  $lastUsedIdentitiesStore.selected.authMethod.openid.metadata,
                   "email",
-                ) ?? $t`Hidden email`}dhjbsdhfsvjfvshgfvshvfhsgvdfgh</span
+                ) ?? $t`Hidden email`}</span
               >
             {:else}
               <span>

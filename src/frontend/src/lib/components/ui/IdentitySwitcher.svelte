@@ -49,7 +49,7 @@
   const selectedIdentity = $derived(
     initialIdentities.find(
       (identity) => identity.identityNumber === initialSelected,
-    ),
+    )!,
   );
   const selectedLogo = $derived(
     selectedIdentity !== undefined &&
@@ -66,6 +66,19 @@
       (identity) => identity.identityNumber !== initialSelected,
     ),
   );
+  const passkeyNameCounts = $derived.by(() => {
+    const counts = new Map<string | undefined, number>();
+
+    for (const identity of otherIdentities) {
+      if (!("passkey" in identity.authMethod)) {
+        continue;
+      }
+
+      counts.set(identity.name, (counts.get(identity.name) ?? 0) + 1);
+    }
+
+    return counts;
+  });
 
   const handleSwitchIdentity = async (identityNumber: bigint) => {
     try {
@@ -137,15 +150,15 @@
     <p
       class="text-text-primary max-w-full overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap"
     >
-      {selectedIdentity!.name ?? selectedIdentity!.identityNumber}
+      {selectedIdentity.name ?? selectedIdentity.identityNumber}
     </p>
     <p
       class="text-text-tertiary mb-6 max-w-full overflow-hidden text-sm text-ellipsis whitespace-nowrap"
     >
-      {#if "openid" in selectedIdentity!.authMethod}
+      {#if "openid" in selectedIdentity.authMethod && selectedIdentity.authMethod.openid.metadata !== undefined}
         <span
           >{getMetadataString(
-            selectedIdentity!.authMethod.openid.metadata!,
+            selectedIdentity.authMethod.openid.metadata,
             "email",
           ) ?? $t`Hidden email`}</span
         >
@@ -188,12 +201,8 @@
         )
       : undefined}
   {@const notUnique =
-    otherIdentities.filter(
-      (otherIdentity) =>
-        "passkey" in identity.authMethod &&
-        "passkey" in otherIdentity.authMethod &&
-        identity.name === otherIdentity.name,
-    ).length > 1}
+    "passkey" in identity.authMethod &&
+    (passkeyNameCounts.get(identity.name) ?? 0) > 1}
   <li class="mx-4">
     <button
       onclick={() => handleSwitchIdentity(identity.identityNumber)}
@@ -217,10 +226,10 @@
         <span
           class="text-text-tertiary overflow-hidden text-sm text-ellipsis whitespace-nowrap"
         >
-          {#if "openid" in identity.authMethod}
+          {#if "openid" in identity.authMethod && identity.authMethod.openid.metadata !== undefined}
             <span
               >{getMetadataString(
-                identity.authMethod.openid.metadata!,
+                identity.authMethod.openid.metadata,
                 "email",
               ) ?? $t`Hidden email`}</span
             >
