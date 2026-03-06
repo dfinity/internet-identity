@@ -272,15 +272,16 @@ test.describe("Last used identities listed", () => {
   });
 
   test("Sign up with a new passkey", async ({ page }) => {
-    const auth = dummyAuth();
-    await createIdentity(page, DEFAULT_USER_NAME, auth);
+    const auth1 = dummyAuth();
+    const auth2 = dummyAuth();
+    await createIdentity(page, DEFAULT_USER_NAME, auth1);
     await page.goto(II_URL);
     await page.getByRole("button", { name: "Switch identity" }).click();
     await page.getByRole("button", { name: "Add another identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     await page.getByRole("button", { name: "Create new identity" }).click();
     await page.getByLabel("Identity name").fill(SECONDARY_USER_NAME);
-    auth(page);
+    auth2(page);
     await page.getByRole("button", { name: "Create identity" }).click();
     await page.waitForURL(II_URL + "/manage");
     await expect(
