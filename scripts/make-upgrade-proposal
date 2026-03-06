@@ -304,13 +304,16 @@ wait_for_archive_canister_hash() {
 download_wasms() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
   if should_upgrade_backend "$upgrade_type"; then
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity.wasm.gz
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/archive.wasm.gz -o archive.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/archive.wasm.gz -o archive.wasm.gz
+    gzip -t internet_identity.wasm.gz || { echo "ERROR: internet_identity.wasm.gz is not a valid gzip file"; exit 1; }
+    gzip -t archive.wasm.gz || { echo "ERROR: archive.wasm.gz is not a valid gzip file"; exit 1; }
   fi
   if should_upgrade_frontend "$upgrade_type"; then
     # NOTE: The CI workflow must publish internet_identity_frontend.wasm.gz to GitHub releases
     # If this download fails, ensure the release workflow includes the frontend WASM artifact
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend.wasm.gz
+    gzip -t internet_identity_frontend.wasm.gz || { echo "ERROR: internet_identity_frontend.wasm.gz is not a valid gzip file"; exit 1; }
   fi
 }
 
@@ -326,7 +329,7 @@ request_verification_command() {
   
   if should_upgrade_frontend "$upgrade_type"; then
     FRONTEND_WASM_SHA=$(sha256sum "internet_identity_frontend.wasm.gz" | awk '{print $1}')
-    cmd_parts+=("--frontend-hash $FRONTEND_WASM_SHA")
+    cmd_parts+=("--iife-hash $FRONTEND_WASM_SHA")
   fi
 
   echo "Run the following command in another terminal to verify the hashes"
@@ -605,7 +608,7 @@ dry_run_proposal() {
   if should_upgrade_backend "$upgrade_type"; then
     echo "=== Dry run for Backend Proposal ==="
     # Download again the release tag wasm to check the hash along the latest downloaded before.
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
     # Read again the arguments to check the hash along the mainnet_arg.bin file sent in the proposal.
     ic-admin \
       --use-hsm \
@@ -628,7 +631,7 @@ dry_run_proposal() {
   
   if should_upgrade_frontend "$upgrade_type"; then
     echo "=== Dry run for Frontend Proposal ==="
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
     ic-admin \
       --use-hsm \
       --key-id "01" \
@@ -655,7 +658,7 @@ make_proposal() {
   if should_upgrade_backend "$upgrade_type"; then
     echo "=== Creating Backend Proposal ==="
     # Download again the release tag wasm to check the hash along the latest downloaded before.
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_production.wasm.gz -o internet_identity-$TAG_NAME.wasm.gz
     # Read again the arguments to check the hash along the mainnet_arg.bin file sent in the proposal.
     ic-admin \
       --use-hsm \
@@ -677,7 +680,7 @@ make_proposal() {
   
   if should_upgrade_frontend "$upgrade_type"; then
     echo "=== Creating Frontend Proposal ==="
-    curl -sSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
+    curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
     ic-admin \
       --use-hsm \
       --key-id "01" \
