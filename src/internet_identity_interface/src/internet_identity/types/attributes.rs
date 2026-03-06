@@ -212,7 +212,7 @@ impl std::fmt::Display for AttributeKey {
     }
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(CandidType, Debug, Deserialize)]
 pub struct PrepareAttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
@@ -302,7 +302,7 @@ pub enum PrepareAttributeError {
     GetAccountError(GetAccountError),
 }
 
-#[derive(CandidType, Deserialize)]
+#[derive(CandidType, Debug, Deserialize)]
 pub struct GetAttributesRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
