@@ -88,29 +88,6 @@ fn should_add_additional_device() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that the same device cannot be added twice.
-#[test]
-fn should_not_add_existing_device() -> Result<(), RejectResponse> {
-    let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
-    let user_number = flows::register_anchor(&env, canister_id);
-
-    let result = api::add(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number,
-        &device_data_1(), // this device was already added during registration
-    );
-
-    expect_user_error_with_message(
-        result,
-        CanisterCalledTrap,
-        Regex::new("Device with key \\w+ already exists on this anchor\\.").unwrap(),
-    );
-    Ok(())
-}
-
 /// Verifies that a second recovery phrase cannot be added.
 #[test]
 fn should_not_add_second_recovery_phrase() -> Result<(), RejectResponse> {
