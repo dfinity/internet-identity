@@ -26,26 +26,19 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import { sessionStore } from "$lib/stores/session.store";
-  import {
-    formatDate,
-    locales,
-    localeStore,
-    t,
-  } from "$lib/stores/locale.store";
+  import { locales, localeStore, t } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
-  import { nanosToMillis } from "$lib/utils/time";
-  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { Trans } from "$lib/components/locale";
-  import { getMetadataString } from "$lib/utils/openID";
+  import { getMetadataString, openIdLogo } from "$lib/utils/openID";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { onMount } from "svelte";
+  import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
 
   const { children, data }: LayoutProps = $props();
 
@@ -60,9 +53,9 @@
   let isRecoveryPhraseSetUpDismissed = $state(false);
 
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore.identities)
-      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3),
+    Object.values($lastUsedIdentitiesStore.identities).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    ),
   );
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
@@ -237,37 +230,63 @@
     </div>
     <!-- Mobile identity button-->
     {#if $lastUsedIdentitiesStore.selected !== undefined}
-      {@const name = lastUsedIdentityTypeName(
-        $lastUsedIdentitiesStore.selected,
-      )}
-      <ButtonCard
+      {@const logo =
+        "openid" in $lastUsedIdentitiesStore.selected.authMethod &&
+        $lastUsedIdentitiesStore.selected.authMethod.openid.metadata !==
+          undefined
+          ? openIdLogo(
+              $lastUsedIdentitiesStore.selected.authMethod.openid.iss,
+              $lastUsedIdentitiesStore.selected.authMethod.openid.metadata,
+            )
+          : undefined}
+      <button
         onclick={() => (isIdentityPopoverOpen = true)}
-        class="mx-4 mb-6 sm:hidden"
+        class={[
+          "mx-4 mb-6 flex flex-row items-center gap-3 p-3 text-start sm:hidden",
+          "border-border-secondary hover:bg-bg-primary_hover rounded-md border",
+        ]}
         aria-label={$t`Switch identity`}
       >
-        <Avatar size="sm">
-          <UserIcon class="size-5" />
-        </Avatar>
-        <div class="flex flex-col text-left text-sm">
-          <div class="text-text-primary font-semibold">
-            {data.identityInfo.name[0] ?? data.identityNumber.toString()}
-          </div>
-          <div class="text-text-tertiary font-normal" aria-hidden="true">
-            {#if data.identityInfo.created_at[0] !== undefined}
-              {@const date = $formatDate(
-                new Date(nanosToMillis(data.identityInfo.created_at[0])),
-                {
-                  dateStyle: "short",
-                },
-              )}
-              <span>{$t`${name} | Created ${date}`}</span>
+        <div class="relative">
+          <Avatar size="sm">
+            <UserIcon class="size-5" />
+          </Avatar>
+          <div
+            class="bg-bg-primary_alt border-border-secondary absolute -right-1.25 -bottom-1.25 flex size-5 items-center justify-center rounded-full border"
+          >
+            {#if logo !== undefined}
+              <div class="text-fg-tertiary size-3.25">
+                {@html logo}
+              </div>
             {:else}
-              <span>{name}</span>
+              <PasskeyIcon class="text-fg-tertiary !size-3" />
             {/if}
           </div>
         </div>
-        <ChevronDownIcon class="ms-auto me-1 size-5" />
-      </ButtonCard>
+        <div class="flex flex-col overflow-hidden">
+          <div class="text-text-primary text-sm font-semibold">
+            {$lastUsedIdentitiesStore.selected.name ??
+              $lastUsedIdentitiesStore.selected.identityNumber}
+          </div>
+          <div
+            class="text-text-tertiary overflow-hidden text-sm overflow-ellipsis whitespace-nowrap"
+          >
+            {#if "openid" in $lastUsedIdentitiesStore.selected.authMethod && $lastUsedIdentitiesStore.selected.authMethod.openid.metadata !== undefined}
+              <span
+                >{getMetadataString(
+                  $lastUsedIdentitiesStore.selected.authMethod.openid.metadata,
+                  "email",
+                ) ?? $t`Hidden email`}</span
+              >
+            {:else}
+              <span>
+                {$t`Passkey`}
+              </span>
+            {/if}
+          </div>
+        </div>
+        <ChevronDownIcon class="text-text-primary ms-auto size-5 shrink-0" />
+      </button>
     {/if}
     <!-- Navigation -->
     <nav class="flex flex-col gap-0.5 px-4">
@@ -347,6 +366,9 @@
         class="btn btn-tertiary gap-2.5 pr-3 max-sm:hidden sm:-mr-3"
         aria-label={$t`Switch identity`}
       >
+        <Avatar size="xs">
+          <UserIcon class="size-4" />
+        </Avatar>
         <span>
           {data.identityInfo.name[0] ?? data.identityNumber.toString()}
         </span>
@@ -393,6 +415,7 @@
     direction="down"
     align="end"
     distance="0.75rem"
+    class="!bg-bg-primary"
   >
     <IdentitySwitcher
       selected={$authenticatedStore.identityNumber}
@@ -437,7 +460,7 @@
         {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`choose method to continue`}
+        {$t`Choose method to continue`}
       </p>
     </AuthWizard>
   </Dialog>
