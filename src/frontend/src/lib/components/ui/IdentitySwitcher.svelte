@@ -101,6 +101,176 @@
   };
 </script>
 
+{#snippet authMethodBadge(logo: string | undefined, size: "sm" | "lg")}
+  <span
+    class={[
+      "bg-bg-primary_alt border-border-secondary absolute flex items-center justify-center rounded-full border",
+      size === "lg"
+        ? "-right-1 -bottom-1 size-6.5"
+        : "-right-1.25 -bottom-1.25 size-5",
+    ]}
+  >
+    {#if logo !== undefined}
+      <span
+        class={["text-fg-tertiary", size === "lg" ? "size-4.25" : "size-3.25"]}
+      >
+        {@html logo}
+      </span>
+    {:else}
+      <PasskeyIcon
+        class={["text-fg-tertiary", size === "lg" ? "!size-4.25" : "!size-3"]}
+      />
+    {/if}
+  </span>
+{/snippet}
+
+{#snippet selectedIdentityCard()}
+  <div
+    class="bg-bg-secondary border-border-secondary relative mx-[-1px] my-[-1px] flex flex-col items-center rounded-b-2xl border-x border-b p-8"
+  >
+    <div class="relative mb-2">
+      <Avatar size="lg">
+        <UserIcon class="size-6" />
+      </Avatar>
+      {@render authMethodBadge(selectedLogo, "lg")}
+    </div>
+    <p
+      class="text-text-primary max-w-full overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap"
+    >
+      {selectedIdentity!.name ?? selectedIdentity!.identityNumber}
+    </p>
+    <p
+      class="text-text-tertiary mb-6 max-w-full overflow-hidden text-sm text-ellipsis whitespace-nowrap"
+    >
+      {#if "openid" in selectedIdentity!.authMethod}
+        <span
+          >{getMetadataString(
+            selectedIdentity!.authMethod.openid.metadata!,
+            "email",
+          ) ?? $t`Hidden email`}</span
+        >
+      {/if}
+    </p>
+    {#if onSignOut !== undefined}
+      <button onclick={handleSignOut} class="btn btn-secondary w-full">
+        <LogOutIcon class="size-4" />
+        {$t`Sign out`}
+      </button>
+    {/if}
+    {#if onManageIdentity !== undefined}
+      <button
+        onclick={handleManageIdentity}
+        class="btn btn-secondary group w-full gap-2.5"
+      >
+        {#if isNavigatingToManage}
+          <ProgressRing class="size-4" />
+        {/if}
+        {$t`Manage your Internet Identity`}
+      </button>
+    {/if}
+    <button
+      onclick={onClose}
+      class="btn btn-tertiary btn-sm btn-icon absolute end-2 top-2 !rounded-full"
+      aria-label={$t`Close`}
+    >
+      <XIcon class="size-5" />
+    </button>
+  </div>
+{/snippet}
+
+{#snippet identityListItem(identity: LastUsedIdentity)}
+  {@const logo =
+    "openid" in identity.authMethod &&
+    identity.authMethod.openid.metadata !== undefined
+      ? openIdLogo(
+          identity.authMethod.openid.iss,
+          identity.authMethod.openid.metadata,
+        )
+      : undefined}
+  {@const notUnique =
+    otherIdentities.filter(
+      (otherIdentity) =>
+        "passkey" in identity.authMethod &&
+        "passkey" in otherIdentity.authMethod &&
+        identity.name === otherIdentity.name,
+    ).length > 1}
+  <li class="mx-4">
+    <button
+      onclick={() => handleSwitchIdentity(identity.identityNumber)}
+      class={[
+        "group flex w-full flex-row items-center gap-3 p-3 text-start",
+        "border-border-secondary rounded-md border outline-none",
+        "enabled:hover:bg-bg-primary_hover enabled:focus-visible:bg-bg-primary_hover",
+        "disabled:border-border-disabled",
+      ]}
+    >
+      <span class="relative">
+        <Avatar size="sm">
+          <UserIcon class="size-5" />
+        </Avatar>
+        {@render authMethodBadge(logo, "sm")}
+      </span>
+      <span class="flex flex-col overflow-hidden group-disabled:opacity-50">
+        <span class="text-text-primary text-sm font-semibold">
+          {identity.name ?? identity.identityNumber}
+        </span>
+        <span
+          class="text-text-tertiary overflow-hidden text-sm text-ellipsis whitespace-nowrap"
+        >
+          {#if "openid" in identity.authMethod}
+            <span
+              >{getMetadataString(
+                identity.authMethod.openid.metadata!,
+                "email",
+              ) ?? $t`Hidden email`}</span
+            >
+          {:else}
+            <span>
+              {$t`Passkey`}
+              {#if notUnique && identity.createdAtMillis !== undefined}
+                {" | "}
+                {$t`Created ${$formatRelative(
+                  new Date(identity.createdAtMillis),
+                  {
+                    style: "long",
+                  },
+                )}`}
+              {/if}
+            </span>
+          {/if}
+        </span>
+      </span>
+      {#if switchingToIdentity === identity.identityNumber}
+        <ProgressRing class="text-fg-disabled ms-auto size-5" />
+      {:else}
+        <ArrowRightIcon
+          class={[
+            "text-fg-tertiary ms-auto mr-1 size-5 opacity-0 transition-all duration-200",
+            "group-enabled:group-hover:mr-0 group-enabled:group-hover:opacity-100",
+            "group-enabled:group-focus-visible:mr-0 group-enabled:group-focus-visible:opacity-100",
+          ]}
+        />
+      {/if}
+    </button>
+  </li>
+{/snippet}
+
+{#snippet otherIdentitiesList()}
+  <div>
+    <h2 class="text-text-primary mx-4 mt-6 mb-4 text-sm font-semibold">
+      {$t`Sign in with another identity`}
+    </h2>
+    <ul
+      class="flex flex-col gap-2 overflow-y-auto"
+      style={`max-height: ${Math.max(2, Math.floor((windowHeight - 380) / 74)) * 74 - 41}px`}
+    >
+      {#each otherIdentities as identity}
+        {@render identityListItem(identity)}
+      {/each}
+    </ul>
+  </div>
+{/snippet}
+
 <svelte:window bind:innerHeight={windowHeight} />
 
 <fieldset
@@ -111,162 +281,10 @@
 >
   <div class="flex flex-col overflow-x-hidden">
     {#if selectedIdentity !== undefined}
-      <div
-        class="bg-bg-secondary border-border-secondary relative mx-[-1px] my-[-1px] flex flex-col items-center rounded-b-2xl border-x border-b p-8"
-      >
-        <div class="relative mb-2">
-          <Avatar size="lg">
-            <UserIcon class="size-6" />
-          </Avatar>
-          <div
-            class="bg-bg-primary_alt border-border-secondary absolute -right-1 -bottom-1 flex size-6.5 items-center justify-center rounded-full border"
-          >
-            {#if selectedLogo !== undefined}
-              <div class="text-fg-tertiary size-4.25">
-                {@html selectedLogo}
-              </div>
-            {:else}
-              <PasskeyIcon class="text-fg-tertiary !size-4.25" />
-            {/if}
-          </div>
-        </div>
-        <div
-          class="text-text-primary max-w-full overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap"
-        >
-          {selectedIdentity.name ?? selectedIdentity.identityNumber}
-        </div>
-        <div
-          class="text-text-tertiary mb-6 max-w-full overflow-hidden text-sm text-ellipsis whitespace-nowrap"
-        >
-          {#if "openid" in selectedIdentity.authMethod}
-            <span
-              >{getMetadataString(
-                selectedIdentity.authMethod.openid.metadata!,
-                "email",
-              ) ?? $t`Hidden email`}</span
-            >
-          {/if}
-        </div>
-        {#if onSignOut !== undefined}
-          <button onclick={handleSignOut} class="btn btn-secondary w-full">
-            <LogOutIcon class="size-4" />
-            {$t`Sign out`}
-          </button>
-        {/if}
-        {#if onManageIdentity !== undefined}
-          <button
-            onclick={handleManageIdentity}
-            class="btn btn-secondary group w-full gap-2.5"
-          >
-            {#if isNavigatingToManage}
-              <ProgressRing class="size-4" />
-            {/if}
-            {$t`Manage your Internet Identity`}
-          </button>
-        {/if}
-        <button
-          onclick={onClose}
-          class="btn btn-tertiary btn-sm btn-icon absolute end-2 top-2 !rounded-full"
-          aria-label={$t`Close`}
-        >
-          <XIcon class="size-5" />
-        </button>
-      </div>
+      {@render selectedIdentityCard()}
     {/if}
     {#if otherIdentities.length > 0}
-      <div class="text-text-primary mx-4 mt-6 mb-4 text-sm font-semibold">
-        {$t`Sign in with another identity`}
-      </div>
-      <div
-        class="flex flex-col gap-2 overflow-y-auto"
-        style={`max-height: ${Math.max(2, Math.floor((windowHeight - 380) / 74)) * 74 - 41}px`}
-      >
-        {#each otherIdentities as identity}
-          {@const logo =
-            "openid" in identity.authMethod &&
-            identity.authMethod.openid.metadata !== undefined
-              ? openIdLogo(
-                  identity.authMethod.openid.iss,
-                  identity.authMethod.openid.metadata,
-                )
-              : undefined}
-          {@const notUnique =
-            otherIdentities.filter(
-              (otherIdentity) =>
-                "passkey" in identity.authMethod &&
-                "passkey" in otherIdentity.authMethod &&
-                identity.name === otherIdentity.name,
-            ).length > 1}
-          <button
-            onclick={() => handleSwitchIdentity(identity.identityNumber)}
-            class={[
-              "group mx-4 flex flex-row items-center gap-3 p-3 text-start",
-              "border-border-secondary rounded-md border",
-              "enabled:hover:bg-bg-primary_hover",
-              "disabled:border-border-disabled",
-            ]}
-          >
-            <div class="relative">
-              <Avatar size="sm">
-                <UserIcon class="size-5" />
-              </Avatar>
-              <div
-                class="bg-bg-primary_alt border-border-secondary absolute -right-1.25 -bottom-1.25 flex size-5 items-center justify-center rounded-full border"
-              >
-                {#if logo !== undefined}
-                  <div class="text-fg-tertiary size-3.25">
-                    {@html logo}
-                  </div>
-                {:else}
-                  <PasskeyIcon class="text-fg-tertiary !size-3" />
-                {/if}
-              </div>
-            </div>
-            <div
-              class="flex flex-col overflow-hidden group-disabled:opacity-50"
-            >
-              <div class="text-text-primary text-sm font-semibold">
-                {identity.name ?? identity.identityNumber}
-              </div>
-              <div
-                class="text-text-tertiary overflow-hidden text-sm text-ellipsis whitespace-nowrap"
-              >
-                {#if "openid" in identity.authMethod}
-                  <span
-                    >{getMetadataString(
-                      identity.authMethod.openid.metadata!,
-                      "email",
-                    ) ?? $t`Hidden email`}</span
-                  >
-                {:else}
-                  <span>
-                    {$t`Passkey`}
-                    {#if notUnique && identity.createdAtMillis !== undefined}
-                      {" | "}
-                      {$t`Created ${$formatRelative(
-                        new Date(identity.createdAtMillis),
-                        {
-                          style: "long",
-                        },
-                      )}`}
-                    {/if}
-                  </span>
-                {/if}
-              </div>
-            </div>
-            {#if switchingToIdentity === identity.identityNumber}
-              <ProgressRing class="text-fg-disabled ms-auto size-5" />
-            {:else}
-              <ArrowRightIcon
-                class={[
-                  "text-fg-tertiary ms-auto mr-1 size-5 opacity-0 transition-all duration-200",
-                  "group-enabled:group-hover:mr-0 group-enabled:group-hover:opacity-100",
-                ]}
-              />
-            {/if}
-          </button>
-        {/each}
-      </div>
+      {@render otherIdentitiesList()}
     {/if}
     <button onclick={onUseAnotherIdentity} class="btn btn-tertiary m-4">
       <PlusIcon class="size-4" />
