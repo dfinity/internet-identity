@@ -11,7 +11,6 @@
     closeOnOutsideClick?: boolean;
     showCloseButton?: boolean;
     backdrop?: boolean;
-    unStyled?: boolean;
     contentClass?: ClassValue | null;
   };
 
@@ -22,7 +21,6 @@
     closeOnOutsideClick = nonNullish(onClose),
     showCloseButton = nonNullish(onClose),
     backdrop = true,
-    unStyled = false,
     contentClass,
     ...props
   }: Props = $props();

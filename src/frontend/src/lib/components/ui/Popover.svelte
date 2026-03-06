@@ -15,7 +15,6 @@
     distance?: string;
     responsive?: boolean;
     flip?: boolean;
-    unStyled?: boolean;
   };
 
   let {
@@ -28,7 +27,6 @@
     class: className,
     responsive = true,
     flip = true,
-    unStyled = false,
     ...props
   }: Props = $props();
 
