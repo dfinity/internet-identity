@@ -83,7 +83,7 @@ class PasskeyItem {
   }
 
   async rename<T>(fn: (dialog: RenamePasskeyDialog) => Promise<T>): Promise<T> {
-    await this.locator.getByRole("button", { name: "More options" }).click();
+    await this.#openMoreOptions();
     await this.locator
       .getByRole("menu")
       .getByRole("menuitem", { name: "Rename" })
@@ -99,7 +99,7 @@ class PasskeyItem {
   }
 
   async remove<T>(fn: (dialog: RemovePasskeyDialog) => Promise<T>): Promise<T> {
-    await this.locator.getByRole("button", { name: "More options" }).click();
+    await this.#openMoreOptions();
     await this.locator
       .getByRole("menu")
       .getByRole("menuitem", { name: "Remove" })
@@ -114,10 +114,21 @@ class PasskeyItem {
   }
 
   async assertUnremovable(): Promise<void> {
-    await this.locator.getByRole("button", { name: "More options" }).click();
+    await this.#openMoreOptions();
     await expect(
       this.locator.getByRole("menu").getByRole("menuitem", { name: "Remove" }),
     ).toBeHidden();
+  }
+
+  async assertRemoveDisabled(): Promise<void> {
+    await this.#openMoreOptions();
+    await expect(
+      this.locator.getByRole("menu").getByRole("menuitem", { name: "Remove" }),
+    ).toBeDisabled();
+  }
+
+  async #openMoreOptions() {
+    await this.locator.getByRole("button", { name: "More options" }).click();
   }
 }
 

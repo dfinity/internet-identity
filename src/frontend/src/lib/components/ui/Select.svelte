@@ -4,12 +4,15 @@
   import Popover from "$lib/components/ui/Popover.svelte";
   import { isNullish, nonNullish } from "@dfinity/utils";
   import Button from "$lib/components/ui/Button.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   type Option<T> = {
     value?: T;
     label: string;
     icon?: Component;
     selected?: boolean;
+    disabled?: boolean;
+    tooltip?: string;
     onClick?: () => void;
   };
   type Direction = "up" | "right" | "down" | "left";
@@ -73,26 +76,34 @@
   >
     <div class="flex flex-col" role="menu">
       {#each options as option, index}
-        <Button
-          onclick={() => handleClick(option, index)}
-          variant="tertiary"
-          class={[
-            "justify-start gap-2.5 !px-3 text-start",
-            option.selected && "[ul:not(:hover)_&]:bg-bg-primary_hover",
-          ]}
-          role="menuitem"
-          aria-label={option.label}
+        <Tooltip
+          label={option.tooltip ?? ""}
+          hidden={option.tooltip === undefined ? true : undefined}
+          direction="left"
+          distance="0.9rem"
         >
-          {#if nonNullish(option.icon)}
-            {@const Icon = option.icon}
-            <div
-              class="text-fg-quaternary dark:text-fg-tertiary [&_svg]:size-4"
-            >
-              <Icon />
-            </div>
-          {/if}
-          <span>{option.label}</span>
-        </Button>
+          <Button
+            onclick={() => handleClick(option, index)}
+            variant="tertiary"
+            class={[
+              "justify-start gap-2.5 !px-3 text-start",
+              option.selected && "[ul:not(:hover)_&]:bg-bg-primary_hover",
+            ]}
+            role="menuitem"
+            aria-label={option.label}
+            disabled={option.disabled}
+          >
+            {#if nonNullish(option.icon)}
+              {@const Icon = option.icon}
+              <div
+                class="text-fg-quaternary dark:text-fg-tertiary [&_svg]:size-4"
+              >
+                <Icon />
+              </div>
+            {/if}
+            <span>{option.label}</span>
+          </Button>
+        </Tooltip>
       {/each}
     </div>
   </Popover>

@@ -104,10 +104,16 @@ export const GUIDED_UPGRADE = createFeatureFlagStore(
   },
 );
 
+export const MIN_GUIDED_UPGRADE = createFeatureFlagStore(
+  "MIN_GUIDED_UPGRADE",
+  false,
+);
+
 export default {
   DOMAIN_COMPATIBILITY,
   HARDWARE_KEY_TEST,
   DISCOVERABLE_PASSKEY_FLOW,
   ENABLE_ALL_LOCALES,
   GUIDED_UPGRADE,
+  MIN_GUIDED_UPGRADE,
 } as Record<string, FeatureFlagStore>;
