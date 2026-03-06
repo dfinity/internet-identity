@@ -9,7 +9,6 @@ class ManagePage {
   }
 
   async signOut() {
-    await this.#openMenuOnMobile();
     await this.#page.getByRole("button", { name: "Switch identity" }).click();
     await this.#page
       .getByRole("group")
@@ -30,15 +29,6 @@ class ManagePage {
     await expect(
       this.#page.getByText("Your identity and sign-in methods at a glance."),
     ).toBeVisible();
-  }
-
-  async #openMenuOnMobile() {
-    const menuButton = this.#page
-      .getByRole("banner")
-      .getByRole("button", { name: "Open menu" });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
-    }
   }
 }
 
