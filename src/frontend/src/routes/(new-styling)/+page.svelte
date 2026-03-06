@@ -6,11 +6,7 @@
   import EasyAccessIllustration from "$lib/components/illustrations/landing/EasyAccessIllustration.svelte";
   import PasswordFreeIllustration from "$lib/components/illustrations/landing/PasswordFreeIllustration.svelte";
   import LandingCard from "$lib/components/ui/LandingCard.svelte";
-  import {
-    INTERNET_COMPUTER_URL,
-    FAQ_PASSKEY_URL,
-    II_DEVELOPER_DOCS_URL,
-  } from "$lib/config";
+  import { INTERNET_COMPUTER_URL, FAQ_PASSKEY_URL } from "$lib/config";
   import { manuallyReroute } from "$lib/utils/reroute";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
@@ -246,14 +242,6 @@
           creating passwords, sharing personal data, or giving up control.
         </Trans>
       </p>
-      <a
-        href={II_DEVELOPER_DOCS_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="btn btn-secondary btn-sm"
-      >
-        {$t`For developers`}
-      </a>
     </div>
   </div>
   <div class="overflow-x-auto px-4 pt-4 pb-8 sm:px-8">
