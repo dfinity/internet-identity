@@ -38,7 +38,7 @@ To build the wasm modules yourself and verify their hashes, run the following co
 \`\`\`
 git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
-./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1)
+./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1) --iife-hash $(shasum -a 256 internet_identity_frontend.wasm.gz | cut -d ' ' -f1)
 \`\`\`
 
 Make sure to compare the hashes also with the proposal payload when verifying canister upgrade proposals.
@@ -105,10 +105,67 @@ done <<< "$INPUT_ASSETS"
 
 >&2 echo "Creating release notes"
 
+# Source paths for filtering commits by canister
+BACKEND_PATHS=(
+  src/internet_identity/
+  src/internet_identity_interface/
+  src/archive/
+  src/asset_util/
+  src/canister_tests/
+)
+FRONTEND_PATHS=(
+  src/internet_identity_frontend/
+  src/frontend/
+  src/lingui-svelte/
+  src/showcase/
+  src/vite-plugins/
+)
+
+# Generate per-canister "What's Changed" section using proposal tags as baselines.
+# Falls back to the GitHub-generated changelog if no proposal tags exist.
+section_changelog=$(mktemp)
+LAST_BACKEND_TAG=$(git tag -l "proposal-backend-*" | sort -V | tail -1 || true)
+LAST_FRONTEND_TAG=$(git tag -l "proposal-frontend-*" | sort -V | tail -1 || true)
+
+if [ -n "$LAST_BACKEND_TAG" ] || [ -n "$LAST_FRONTEND_TAG" ]; then
+  >&2 echo "Generating per-canister changelog (backend baseline: ${LAST_BACKEND_TAG:-none}, frontend baseline: ${LAST_FRONTEND_TAG:-none})"
+  echo "## What's Changed" >> "$section_changelog"
+  echo "" >> "$section_changelog"
+
+  if [ -n "$LAST_BACKEND_TAG" ]; then
+    backend_log=$(git log --format='* %s' --no-merges "${LAST_BACKEND_TAG}..${RELEASE_TAG}" -- "${BACKEND_PATHS[@]}" || true)
+    if [ -n "$backend_log" ]; then
+      {
+        echo "### Backend Changes"
+        echo "_Since [\`${LAST_BACKEND_TAG}\`](https://github.com/dfinity/internet-identity/releases/tag/${LAST_BACKEND_TAG})_"
+        echo ""
+        echo "$backend_log"
+        echo ""
+      } >> "$section_changelog"
+    fi
+  fi
+
+  if [ -n "$LAST_FRONTEND_TAG" ]; then
+    frontend_log=$(git log --format='* %s' --no-merges "${LAST_FRONTEND_TAG}..${RELEASE_TAG}" -- "${FRONTEND_PATHS[@]}" || true)
+    if [ -n "$frontend_log" ]; then
+      {
+        echo "### Frontend Changes"
+        echo "_Since [\`${LAST_FRONTEND_TAG}\`](https://github.com/dfinity/internet-identity/releases/tag/${LAST_FRONTEND_TAG})_"
+        echo ""
+        echo "$frontend_log"
+        echo ""
+      } >> "$section_changelog"
+    fi
+  fi
+else
+  >&2 echo "No proposal tags found, using GitHub-generated changelog"
+  echo "$INPUT_CHANGELOG" > "$section_changelog"
+fi
+
 body=$(mktemp)
 >&2 echo "Using '$body' for body"
 cat "$section_intro" >> "$body" && echo >> "$body" && rm "$section_intro"
-echo "$INPUT_CHANGELOG" >> "$body"
+cat "$section_changelog" >> "$body" && echo >> "$body" && rm "$section_changelog"
 cat "$section_build_flavors" >> "$body" && echo >> "$body" && rm "$section_build_flavors"
 cat "$section_wasm_verification" >> "$body" && echo >> "$body" && rm "$section_wasm_verification"
 

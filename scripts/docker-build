@@ -17,10 +17,11 @@ function usage() {
     cat << EOF
 
 Usage:
-  $0 [--internet-identity] [--archive]
+  $0 [--internet-identity] [--frontend] [--archive]
 
 Options:
   --internet-identity          build the internet_identity canister (alongside other specifically mentioned canisters), defaults to --internet-identity
+  --frontend                   build the internet_identity_frontend canister (alongside other specifically mentioned canisters)
   --archive                    build the archive canister (alongside other specifically mentioned canisters), defaults to --internet-identity
 
 Environment:
@@ -34,7 +35,7 @@ EOF
 function help() {
     cat << EOF
 
-This will create (and override) "./internet_identity.wasm.gz" or "./archive.wasm.gz". For more information on build features, see:
+This will create (and override) "./internet_identity.wasm.gz", "./internet_identity_frontend.wasm.gz", or "./archive.wasm.gz". For more information on build features, see:
     https://github.com/dfinity/internet-identity#build-features-and-flavors
 EOF
 }
@@ -109,6 +110,10 @@ do
             ;;
         --internet-identity)
             CANISTERS+=("internet_identity")
+            shift
+            ;;
+        --frontend)
+            CANISTERS+=("internet_identity_frontend")
             shift
             ;;
         --archive)
