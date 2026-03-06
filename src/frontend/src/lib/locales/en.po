@@ -25,9 +25,6 @@ msgstr "{application} has moved to the new Internet Identity"
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 
-msgid "{name} | Created {date}"
-msgstr "{name} | Created {date}"
-
 msgid "{name} account"
 msgstr "{name} account"
 
@@ -70,6 +67,9 @@ msgstr "Activate"
 msgid "Activate it so that you can recover your identity at any time."
 msgstr "Activate it so that you can recover your identity at any time."
 
+msgid "Activate recovery to remove"
+msgstr "Activate recovery to remove"
+
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
 msgstr "Activate your recovery phrase so that you can recover your identity at any point."
 
@@ -81,6 +81,9 @@ msgstr "Add access method"
 
 msgid "Add another account"
 msgstr "Add another account"
+
+msgid "Add another identity"
+msgstr "Add another identity"
 
 msgid "Add another passkey"
 msgstr "Add another passkey"
@@ -154,8 +157,8 @@ msgstr "choose language to continue"
 msgid "Choose method"
 msgstr "Choose method"
 
-msgid "choose method to continue"
-msgstr "choose method to continue"
+msgid "Choose method to continue"
+msgstr "Choose method to continue"
 
 msgid "Clear all"
 msgstr "Clear all"
@@ -222,6 +225,9 @@ msgstr "Create new identity"
 
 msgid "Create passkey"
 msgstr "Create passkey"
+
+msgid "Created {0}"
+msgstr "Created {0}"
 
 msgid "Created {date}"
 msgstr "Created {date}"
@@ -298,9 +304,6 @@ msgstr "FAQ & Support"
 
 msgid "FAQs"
 msgstr "FAQs"
-
-msgid "For developers"
-msgstr "For developers"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
@@ -506,6 +509,9 @@ msgstr "Learn how to open links in your browser"
 msgid "Ledger has been confirmed to be incompatible."
 msgstr "Ledger has been confirmed to be incompatible."
 
+msgid "Legacy"
+msgstr "Legacy"
+
 msgid "Let's get started"
 msgstr "Let's get started"
 
@@ -539,11 +545,11 @@ msgstr "Make sure no one can see what's on your screen or what you are writing."
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 
-msgid "Manage Identity"
-msgstr "Manage Identity"
-
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
+
+msgid "Manage your Internet Identity"
+msgstr "Manage your Internet Identity"
 
 msgid "Maximum length is 32 characters."
 msgstr "Maximum length is 32 characters."
@@ -788,11 +794,14 @@ msgstr "Sign in there."
 msgid "Sign in using familiar methods"
 msgstr "Sign in using familiar methods"
 
+msgid "Sign in with another identity"
+msgstr "Sign in with another identity"
+
 msgid "Sign in with your {name} account from any device."
 msgstr "Sign in with your {name} account from any device."
 
-msgid "Sign Out"
-msgstr "Sign Out"
+msgid "Sign out"
+msgstr "Sign out"
 
 msgid "Signing in securely"
 msgstr "Signing in securely"
@@ -889,6 +898,9 @@ msgstr "This app has moved to the new Internet Identity"
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "This identity has already been upgraded to the new experience."
+
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr "This legacy passkey is no longer usable and should be removed."
 
 msgid "This may take a few seconds"
 msgstr "This may take a few seconds"
@@ -1004,14 +1016,14 @@ msgstr "Upgrading identity..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 
-msgid "Use another identity"
-msgstr "Use another identity"
-
 msgid "Use existing identity"
 msgstr "Use existing identity"
 
 msgid "Verify"
 msgstr "Verify"
+
+msgid "Verify recovery to remove"
+msgstr "Verify recovery to remove"
 
 msgid "Verify you are human"
 msgstr "Verify you are human"

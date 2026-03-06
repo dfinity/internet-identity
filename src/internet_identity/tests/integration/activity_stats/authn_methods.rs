@@ -112,13 +112,35 @@ fn should_report_monthly_active_authn_methods() -> Result<(), RejectResponse> {
         !get_metrics(&env, canister_id).contains("internet_identity_daily_active_authn_methods")
     );
 
-    for (authn_type, authn_method) in authn_methods_all_types() {
+    for (i, (authn_type, mut authn_method)) in authn_methods_all_types().into_iter().enumerate() {
         // advance time to ensure a new collection period
         env.advance_time(Duration::from_secs(MONTH_SECONDS));
 
         // Create two identities with the same authn_method to bump the counter to a value of 2
         // so that it's more than an off-by-one error away from 0.
         create_identity_with_authn_method(&env, canister_id, &authn_method);
+
+        // Patch the `authn_method` since one cannot reuse the same passkey pubkey used before.
+        authn_method.authn_method = match authn_method.authn_method {
+            AuthnMethod::WebAuthn(WebAuthn {
+                pubkey,
+                credential_id,
+                aaguid,
+            }) => AuthnMethod::WebAuthn(WebAuthn {
+                pubkey: pubkey
+                    .into_vec()
+                    .into_iter()
+                    .chain(vec![i as u8; 32])
+                    .collect::<Vec<u8>>()
+                    .into(),
+                credential_id,
+                aaguid,
+            }),
+            AuthnMethod::PubKey(_) => AuthnMethod::PubKey(PublicKeyAuthn {
+                pubkey: ByteBuf::from(vec![1; 32]),
+            }),
+        };
+
         let identity_nr = create_identity_with_authn_method(&env, canister_id, &authn_method);
 
         // repeated activity with the same authn_method on the same identity within the 30-day
