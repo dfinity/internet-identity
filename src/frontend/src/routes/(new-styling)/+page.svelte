@@ -58,9 +58,9 @@
   let identityButtonRef = $state<HTMLButtonElement>();
 
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore.identities)
-      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 11), // Only show 1 + 10 last used since entries can't be removed yet
+    Object.values($lastUsedIdentitiesStore.identities).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    ),
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 

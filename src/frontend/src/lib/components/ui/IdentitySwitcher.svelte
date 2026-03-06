@@ -145,10 +145,6 @@
                 "email",
               ) ?? $t`Hidden email`}</span
             >
-          {:else}
-            <span>
-              {$t`Passkey`}
-            </span>
           {/if}
         </div>
         {#if onSignOut !== undefined}
