@@ -253,6 +253,7 @@
           "mx-4 mb-6 flex flex-row items-center gap-3 p-3 text-start sm:hidden",
           "border-border-secondary hover:bg-bg-primary_hover rounded-md border",
         ]}
+        aria-label={$t`Switch identity`}
       >
         <div class="relative">
           <Avatar size="sm">
