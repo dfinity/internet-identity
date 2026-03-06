@@ -1,7 +1,7 @@
-import { test as base } from "./fixtures";
+import { test as base } from "../fixtures";
 import { expect } from "@playwright/test";
 import { generateMnemonic } from "$lib/utils/recoveryPhrase";
-import { II_URL } from "./utils";
+import { II_URL } from "../utils";
 
 /**
  * Replace the last word with the first different word found,

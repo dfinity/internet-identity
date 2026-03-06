@@ -8,7 +8,7 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   createNewIdentityInII,
-} from "../utils";
+} from "../../utils";
 
 test("Authorize with last used identity", async ({ page }) => {
   const auth = dummyAuth();

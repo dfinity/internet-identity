@@ -7,7 +7,7 @@ import {
   openIiTab,
   openTestAppWithII,
   waitForNthMessage,
-} from "../utils";
+} from "../../utils";
 
 test("Authorize ready message should be sent immediately", async ({ page }) => {
   await openTestAppWithII(page);

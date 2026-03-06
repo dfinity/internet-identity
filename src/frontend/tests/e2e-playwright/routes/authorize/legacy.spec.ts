@@ -6,7 +6,7 @@ import {
   TEST_APP_URL,
   dummyAuth,
   authorizeWithUrl,
-} from "../utils";
+} from "../../utils";
 [LEGACY_II_URL, ALT_LEGACY_II_URL].forEach((legacyURL) => {
   test.describe(`Legacy domain ${legacyURL}`, () => {
     test(`sees upgrade banner during authentication`, async ({ page }) => {
