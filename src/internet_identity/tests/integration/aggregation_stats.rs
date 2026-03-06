@@ -75,9 +75,15 @@ fn should_not_report_empty_aggregations() -> Result<(), RejectResponse> {
     let canister_id = install_ii_canister(&env, II_WASM.clone());
     let ii_origin = "ic0.app";
     let ii_origin2 = "internetcomputer.org";
-    let identity_nr = create_identity(&env, canister_id, ii_origin);
+    let identity_nr = create_identity_with_index(&env, canister_id, ii_origin, 0);
 
-    delegation_for_origin(&env, canister_id, identity_nr, "https://some-dapp.com")?;
+    delegation_for_origin_with_sender_index(
+        &env,
+        canister_id,
+        identity_nr,
+        "https://some-dapp.com",
+        0,
+    )?;
 
     let aggregations = api::stats(&env, canister_id)?.event_aggregations;
     let mut expected_keys = vec![
@@ -94,8 +100,14 @@ fn should_not_report_empty_aggregations() -> Result<(), RejectResponse> {
 
     env.advance_time(Duration::from_secs(60 * 60 * 24 * 30)); // 30 days
 
-    let identity_nr2 = create_identity(&env, canister_id, ii_origin2);
-    delegation_for_origin(&env, canister_id, identity_nr2, "https://some-dapp.com")?;
+    let identity_nr2 = create_identity_with_index(&env, canister_id, ii_origin2, 1);
+    delegation_for_origin_with_sender_index(
+        &env,
+        canister_id,
+        identity_nr2,
+        "https://some-dapp.com",
+        1,
+    )?;
 
     let aggregations = api::stats(&env, canister_id)?.event_aggregations;
 
