@@ -227,10 +227,10 @@ checklist_must_get() {
 }
 
 select_canisters_to_upgrade() {
-  echo "Which canister(s) do you want to propose for upgrade?"
-  echo "1) Backend (internet_identity)"
-  echo "2) Frontend (internet_identity_frontend)"
-  echo "3) Both"
+  echo "Which canister(s) do you want to propose for upgrade?" >&2
+  echo "1) Backend (internet_identity)" >&2
+  echo "2) Frontend (internet_identity_frontend)" >&2
+  echo "3) Both" >&2
   read -p "Enter your choice (1-3): " choice
   case $choice in
     1) echo "backend" ;;
@@ -288,11 +288,8 @@ wait_for_release_text_change() {
   echo "Go to the release page"
   echo "Change title to release-YYYY-MM-DD: (Friendly and explanatory title)"
   echo "Add a paragraph after the first one summarizing the upgrade changes"
-  if [ -f release_notes.md ]; then
-    echo ""
-    echo "A combined What's Changed summary has been generated in release_notes.md."
-    echo "You can paste its contents into the release page."
-  fi
+  echo ""
+  echo "The What's Changed section is now auto-split into Backend/Frontend sections by CI."
   echo "Release page: https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME"
 }
 
@@ -521,7 +518,6 @@ EOF
 
 download_proposal_text() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
-  local release_body=$(curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/dfinity/internet-identity/releases/tags/$TAG_NAME | jq -cMr '.body')
 
   # Source paths for filtering commits by canister
   local -a backend_paths=(
@@ -558,20 +554,17 @@ download_proposal_text() {
     fi
 
     local commit_range="${last_backend_tag}..${TAG_NAME}"
-    backend_commits=$(git log --oneline --no-merges "$commit_range" -- "${backend_paths[@]}")
+    backend_commits=$(git log --format='* %s' --no-merges "$commit_range" -- "${backend_paths[@]}")
     
     cat > backend_proposal.md << EOF
 # Backend Canister Upgrade
 
-## Commits since last backend upgrade
-Last backend proposal: \`${last_backend_tag}\`
+## What's Changed
+_Since \`${last_backend_tag}\`_
 
-\`\`\`
 ${backend_commits}
-\`\`\`
 
-## Release Notes
-${release_body}
+[Full release notes](https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME)
 EOF
   fi
   
@@ -591,48 +584,18 @@ EOF
     fi
 
     local commit_range="${last_frontend_tag}..${TAG_NAME}"
-    frontend_commits=$(git log --oneline --no-merges "$commit_range" -- "${frontend_paths[@]}")
+    frontend_commits=$(git log --format='* %s' --no-merges "$commit_range" -- "${frontend_paths[@]}")
     
     cat > frontend_proposal.md << EOF
 # Frontend Canister Upgrade
 
-## Commits since last frontend upgrade
-Last frontend proposal: \`${last_frontend_tag}\`
-
-\`\`\`
-${frontend_commits}
-\`\`\`
-
-## Release Notes
-${release_body}
-EOF
-  fi
-
-  # Generate combined two-column summary when upgrading both canisters
-  if should_upgrade_backend "$upgrade_type" && should_upgrade_frontend "$upgrade_type"; then
-    local backend_list=$(echo "$backend_commits" | sed 's/^/- /')
-    local frontend_list=$(echo "$frontend_commits" | sed 's/^/- /')
-
-    cat > release_notes.md << EOF
 ## What's Changed
+_Since \`${last_frontend_tag}\`_
 
-<table>
-<tr><th>Backend</th><th>Frontend</th></tr>
-<tr>
-<td>
+${frontend_commits}
 
-${backend_list}
-
-</td>
-<td>
-
-${frontend_list}
-
-</td>
-</tr>
-</table>
+[Full release notes](https://github.com/dfinity/internet-identity/releases/tag/$TAG_NAME)
 EOF
-    echo "Combined release notes written to release_notes.md" >&2
   fi
 }
 
