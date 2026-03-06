@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { scale, fly } from "svelte/transition";
-  import type { HTMLAttributes } from "svelte/elements";
+  import type { ClassValue, HTMLAttributes } from "svelte/elements";
   import { nonNullish } from "@dfinity/utils";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
@@ -11,6 +11,7 @@
     closeOnOutsideClick?: boolean;
     showCloseButton?: boolean;
     backdrop?: boolean;
+    contentClass?: ClassValue | null;
   };
 
   const {
@@ -20,6 +21,7 @@
     closeOnOutsideClick = nonNullish(onClose),
     showCloseButton = nonNullish(onClose),
     backdrop = true,
+    contentClass,
     ...props
   }: Props = $props();
 
@@ -67,16 +69,30 @@
     const preventScroll = (event: TouchEvent) => {
       event.preventDefault();
     };
+    const findScrollableParent = (target: HTMLElement): HTMLElement => {
+      let scrollableParent = target;
+      while (scrollableParent && scrollableParent !== contentRef) {
+        if (scrollableParent === contentRef) {
+          break;
+        }
+        if (scrollableParent.scrollHeight > scrollableParent.clientHeight) {
+          return scrollableParent;
+        }
+        scrollableParent = scrollableParent.parentElement as HTMLElement;
+      }
+      return contentRef;
+    };
     let lastY = 0;
     const touchScrollStart = (event: TouchEvent) => {
       lastY = event.touches[0].clientY;
     };
     const touchScrollMove = (event: TouchEvent) => {
+      const scrollTarget = findScrollableParent(event.target as HTMLElement);
       const y = event.touches[0].clientY;
       const dy = y - lastY;
       lastY = y;
-      contentRef.scrollTo({
-        top: contentRef.scrollTop - dy,
+      scrollTarget.scrollTo({
+        top: scrollTarget.scrollTop - dy,
         behavior: "instant",
       });
     };
@@ -151,17 +167,22 @@
   >
     <!-- Non-interactive element to render dark-mode bottom sheet border gradient -->
     <div
-      class="from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-0 hidden rounded-t-2xl bg-gradient-to-b to-transparent p-[1px] max-sm:dark:block"
-    >
-      <div class="bg-bg-primary_alt h-24 rounded-t-2xl"></div>
-    </div>
+      class={[
+        "from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-1 hidden h-24 rounded-t-2xl bg-gradient-to-b to-transparent p-[1px] max-sm:dark:block",
+        // Use a mask to only show the gradient on the border area, and prevent it from overlapping with the dialog content.
+        "![mask-composite:exclude] [mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)]",
+      ]}
+    ></div>
     <div class="flex flex-1 flex-col">
       <div
         bind:this={contentRef}
         class="relative max-h-[var(--max-content-height)] overflow-y-auto"
       >
         <div
-          class="flex flex-1 shrink-0 flex-col px-4 pt-4 pb-4 sm:px-6 sm:pt-6 sm:pb-8"
+          class={[
+            "flex flex-1 shrink-0 flex-col px-4 pt-4 pb-4 sm:px-6 sm:pt-6 sm:pb-8",
+            contentClass,
+          ]}
         >
           {@render children?.()}
           {#if showCloseButton && nonNullish(onClose)}

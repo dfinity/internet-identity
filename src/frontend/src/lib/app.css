@@ -13,6 +13,7 @@ body {
 html {
   background-color: var(--color-bg-primary);
   -webkit-font-smoothing: antialiased;
+  color-scheme: light dark;
 }
 
 button:not(:disabled),

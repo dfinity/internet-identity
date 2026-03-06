@@ -18,6 +18,7 @@
     ChevronDownIcon,
     CircleMinusIcon,
     CirclePlusIcon,
+    UserIcon,
   } from "@lucide/svelte";
   import FlairCanvas from "$lib/components/backgrounds/FlairCanvas.svelte";
   import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
@@ -46,6 +47,7 @@
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
+  import Avatar from "$lib/components/ui/Avatar.svelte";
 
   const authLastUsedFlow = new AuthLastUsedFlow();
 
@@ -56,9 +58,9 @@
   let identityButtonRef = $state<HTMLButtonElement>();
 
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore.identities)
-      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3), // Only show 3 last used since entries can't be removed yet
+    Object.values($lastUsedIdentitiesStore.identities).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    ),
   );
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
@@ -204,6 +206,9 @@
           class="btn btn-tertiary ms-auto gap-2.5 pr-3"
           aria-label={$t`Switch identity`}
         >
+          <Avatar size="xs">
+            <UserIcon class="size-4" />
+          </Avatar>
           <span>
             {selectedIdentity.name ?? selectedIdentity.identityNumber}
           </span>
@@ -598,7 +603,7 @@
         {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`choose method to continue`}
+        {$t`Choose method to continue`}
       </p>
     </AuthWizard>
   </Dialog>
@@ -616,6 +621,7 @@
     direction="down"
     align="end"
     distance="0.75rem"
+    class="!bg-bg-primary"
   >
     <IdentitySwitcher
       selected={selectedIdentity.identityNumber}
