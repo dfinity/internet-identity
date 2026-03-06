@@ -1,4 +1,4 @@
-import { Page, test as base } from "@playwright/test";
+import { Page, test as base, expect } from "@playwright/test";
 import { dummyAuth, DummyAuthFn, getRandomIndex, II_URL } from "../utils";
 import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -47,21 +47,21 @@ class IdentityWizard {
   async signIn(auth: DummyAuthFn): Promise<void> {
     await this.#goto();
     auth(this.#page);
-    await this.#page
-      .getByRole("button", { name: "Use existing identity" })
-      .click();
-    await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
+    const dialog = this.#page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Use existing identity" }).click();
+    await expect(dialog).toBeHidden();
   }
 
   async signUp(auth: DummyAuthFn, name: string): Promise<void> {
     await this.#goto();
-    await this.#page
-      .getByRole("button", { name: "Create new identity" })
-      .click();
+    const dialog = this.#page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Create new identity" }).click();
     await this.#page.getByLabel("Identity name").fill(name);
     auth(this.#page);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
-    await this.#page.waitForURL((url) => url.pathname.startsWith("/manage"));
+    await expect(dialog).toBeHidden();
   }
 
   /**
@@ -73,7 +73,7 @@ class IdentityWizard {
     const buttons = [
       "Sign in",
       "Switch identity",
-      "Use another identity",
+      "Add another identity",
       "Continue with passkey",
     ];
     await this.#page
@@ -99,7 +99,7 @@ class IdentityWizard {
   }
 }
 
-const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
+export const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
   // Same implementation as found in `DiscoverableDummyIdentity`
   const buffer = new ArrayBuffer(32);
   const view = new DataView(buffer);
@@ -130,6 +130,10 @@ export const test = base.extend<{
   actorForIdentity: (
     identityNumber: bigint,
   ) => Promise<ActorSubclass<_SERVICE>>;
+  replaceAuthForIdentity: (
+    identityNumber: bigint,
+    newDummyAuthIndex: bigint,
+  ) => void;
 }>({
   identityConfig: {
     createIdentities: [
@@ -199,5 +203,15 @@ export const test = base.extend<{
         identity.canisterId,
         identity.dummyAuthIndex,
       );
+    }),
+  replaceAuthForIdentity: ({ identities }, use) =>
+    use((identityNumber: bigint, newDummyAuthIndex: bigint) => {
+      const identity = identities.find(
+        (identity) => identity.identityNumber === identityNumber,
+      );
+      if (identity === undefined) {
+        throw new Error("Identity not found");
+      }
+      identity.dummyAuthIndex = newDummyAuthIndex;
     }),
 });

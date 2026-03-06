@@ -16,14 +16,14 @@ msgstr ""
 msgid "{0} logo"
 msgstr ""
 
+msgid "{0} user"
+msgstr ""
+
 msgid "{application} has moved to the new Internet Identity"
 msgstr ""
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Alcanzaste el máximo de # cuenta para una app.} other {Alcanzaste el máximo de # cuentas para una app.}}"
-
-msgid "{name} | Created {date}"
-msgstr "{name} | Creado {date}"
 
 msgid "{name} account"
 msgstr "Cuenta de {name}"
@@ -67,6 +67,9 @@ msgstr "Activar"
 msgid "Activate it so that you can recover your identity at any time."
 msgstr "Actívala para que puedas recuperar tu identidad en cualquier momento."
 
+msgid "Activate recovery to remove"
+msgstr ""
+
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
 msgstr ""
 
@@ -78,6 +81,9 @@ msgstr "Añade un método de acceso"
 
 msgid "Add another account"
 msgstr "Añadir otra cuenta"
+
+msgid "Add another identity"
+msgstr ""
 
 msgid "Add another passkey"
 msgstr "Añade otra passkey"
@@ -151,7 +157,7 @@ msgstr ""
 msgid "Choose method"
 msgstr "Elige un método"
 
-msgid "choose method to continue"
+msgid "Choose method to continue"
 msgstr ""
 
 msgid "Clear all"
@@ -219,6 +225,9 @@ msgstr "Crear nueva identidad"
 
 msgid "Create passkey"
 msgstr "Crear passkey"
+
+msgid "Created {0}"
+msgstr ""
 
 msgid "Created {date}"
 msgstr ""
@@ -296,9 +305,6 @@ msgstr ""
 msgid "FAQs"
 msgstr "Preguntas frecuentes"
 
-msgid "For developers"
-msgstr "Para desarrolladores"
-
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
 msgstr "Por ejemplo, el usuario A inicia sesión en Internet Identity con su cuenta de Google “A@gmail.com” y luego usa Internet Identity para autenticarse en la aplicación Z. Google nunca sabrá que el usuario está autenticado en la aplicación Z, solo Internet Identity lo sabe. Además, la aplicación Z tampoco sabrá que el usuario A utilizó Google para autenticar su usuario de Internet Identity."
 
@@ -358,9 +364,6 @@ msgstr "¿Cómo funcionan las passkeys?"
 
 msgid "How does Internet Identity compare to other Web3 authentication tools?"
 msgstr "¿Cómo se compara Internet Identity con otras herramientas de autenticación Web3?"
-
-msgid "How it works"
-msgstr "Cómo funciona"
 
 msgid "How to stay secure"
 msgstr "Cómo mantenerse seguro"
@@ -506,6 +509,9 @@ msgstr "Cómo abrir enlaces en tu navegador"
 msgid "Ledger has been confirmed to be incompatible."
 msgstr ""
 
+msgid "Legacy"
+msgstr ""
+
 msgid "Let's get started"
 msgstr "Empecemos"
 
@@ -539,11 +545,11 @@ msgstr ""
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Asegúrate de añadir un nuevo método de acceso para poder iniciar sesión la próxima vez o restablecer tu frase de recuperación."
 
-msgid "Manage Identity"
-msgstr "Administrar identidad"
-
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Administra tus identidades y mantén el control de tus aplicaciones y sitios web desde tu panel. Explora las funciones Pro para personalizar y controlar aún más tu experiencia."
+
+msgid "Manage your Internet Identity"
+msgstr ""
 
 msgid "Maximum length is 32 characters."
 msgstr "Longitud máxima de 32 caracteres."
@@ -662,8 +668,8 @@ msgstr "Elija algo que puedas reconocer fácilmente, como tu nombre"
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Vuelve a tu <0>dispositivo existente</0> y elige <1>Empezar de nuevo</1> para volver a intentarlo."
 
-msgid "Powered by Internet Identity"
-msgstr "Con la tecnología de Internet Identity"
+msgid "Powered by"
+msgstr ""
 
 msgid "Real Privacy"
 msgstr "Privacidad Verdadera"
@@ -788,11 +794,14 @@ msgstr "Inicia sesión ahí."
 msgid "Sign in using familiar methods"
 msgstr "Inicia la sesión usando métodos conocidos"
 
+msgid "Sign in with another identity"
+msgstr ""
+
 msgid "Sign in with your {name} account from any device."
 msgstr "Inicia sesión con tu cuenta de {name} desde cualquier dispositivo."
 
-msgid "Sign Out"
-msgstr "Cerrar sesión"
+msgid "Sign out"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Iniciando sesión de forma segura"
@@ -890,14 +899,14 @@ msgstr ""
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Esta identidad ya ha sido actualizada a la nueva experiencia."
 
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr ""
+
 msgid "This may take a few seconds"
 msgstr ""
 
 msgid "This passkey is no longer associated with any identity."
 msgstr ""
-
-msgid "This takes a few seconds."
-msgstr "Esto tarda unos segundos."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr ""
@@ -1007,14 +1016,14 @@ msgstr "Actualizando identidad..."
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
 msgstr "Usa un dispositivo que ya tenga tu identidad para escanear o abrir la URL. Esto vinculará tu identidad a este dispositivo."
 
-msgid "Use another identity"
-msgstr "Usar otra identidad"
-
 msgid "Use existing identity"
 msgstr "Usar identidad existente"
 
 msgid "Verify"
 msgstr "Verificar"
+
+msgid "Verify recovery to remove"
+msgstr ""
 
 msgid "Verify you are human"
 msgstr "Verifica que eres humano"

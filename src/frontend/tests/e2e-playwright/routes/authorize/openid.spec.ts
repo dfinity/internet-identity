@@ -1,7 +1,10 @@
 import { expect } from "@playwright/test";
-import { test } from "../fixtures";
-import { ALTERNATE_OPENID_PORT, DEFAULT_OPENID_PORT } from "../fixtures/openid";
-import { II_URL } from "../utils";
+import { test } from "../../fixtures";
+import {
+  ALTERNATE_OPENID_PORT,
+  DEFAULT_OPENID_PORT,
+} from "../../fixtures/openid";
+import { II_URL } from "../../utils";
 
 test.describe("Authorize with direct OpenID", () => {
   test.describe("without any attributes", () => {

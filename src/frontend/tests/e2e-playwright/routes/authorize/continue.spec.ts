@@ -8,7 +8,7 @@ import {
   TEST_APP_CANONICAL_URL,
   II_URL,
   createNewIdentityInII,
-} from "../utils";
+} from "../../utils";
 
 test("Authorize with last used identity", async ({ page }) => {
   const auth = dummyAuth();
@@ -29,11 +29,8 @@ test("Authorize by switching to another identity", async ({ page }) => {
   const otherPrincipal = await createIdentity(page, "Jane Doe", auth2);
   const principal = await authorize(page, async (authPage) => {
     await authPage.getByRole("button", { name: "Switch identity" }).click();
-    await authPage.getByRole("button", { name: "John Doe" }).click();
     auth1(authPage);
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
+    await authPage.getByRole("button", { name: "John Doe" }).click();
   });
   expect(principal).toBe(expectedPrincipal);
   expect(principal).not.toBe(otherPrincipal);
@@ -60,7 +57,7 @@ test("Authorize by signing in with a different passkey", async ({ page }) => {
   const principal = await authorize(page, async (authPage) => {
     await authPage.getByRole("button", { name: "Switch identity" }).click();
     await authPage
-      .getByRole("button", { name: "Use another identity" })
+      .getByRole("button", { name: "Add another identity" })
       .click();
     await authPage
       .getByRole("button", { name: "Continue with passkey" })

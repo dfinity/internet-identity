@@ -13,14 +13,15 @@
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { handleError } from "$lib/components/utils/error";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { GUIDED_UPGRADE } from "$lib/state/featureFlags";
+  import { GUIDED_UPGRADE, MIN_GUIDED_UPGRADE } from "$lib/state/featureFlags";
   import { goto } from "$app/navigation";
 
   const { children }: LayoutProps = $props();
 
   let animationWrapperRef = $state<HTMLElement>();
   let isUpgradeCollapsed = $state(
-    localStorage.getItem("ii-guided-upgrade-collapsed") === "true",
+    localStorage.getItem("ii-guided-upgrade-collapsed") === "true" ||
+      $MIN_GUIDED_UPGRADE,
   );
   let upgradePanelHeight = $state<number>(224);
   let isUpgrading = $state(false);
@@ -147,7 +148,7 @@
         onoutrostart={() =>
           animationWrapperRef?.setAttribute("aria-hidden", "true")}
       >
-        {#if $GUIDED_UPGRADE}
+        {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
           {@render upgradePanel()}
         {/if}
         <AuthPanel
@@ -162,13 +163,15 @@
     {/key}
   {:else}
     <div class="relative col-start-1 row-start-1 flex flex-col gap-5">
-      {#if $GUIDED_UPGRADE}
+      {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
         {@render upgradePanel()}
       {/if}
       <AuthPanel
         class={[
           "z-1",
-          $GUIDED_UPGRADE && isUpgradeCollapsed && "rounded-t-none",
+          ($GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE) &&
+            isUpgradeCollapsed &&
+            "rounded-t-none",
         ]}
       >
         {@render children()}

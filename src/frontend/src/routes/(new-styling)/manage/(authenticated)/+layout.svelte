@@ -26,20 +26,12 @@
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import { sessionStore } from "$lib/stores/session.store";
-  import {
-    formatDate,
-    locales,
-    localeStore,
-    t,
-  } from "$lib/stores/locale.store";
+  import { locales, localeStore, t } from "$lib/stores/locale.store";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
   import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
   import type { LayoutProps } from "./$types";
   import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
-  import { nanosToMillis } from "$lib/utils/time";
-  import { lastUsedIdentityTypeName } from "$lib/utils/lastUsedIdentity";
-  import ButtonCard from "$lib/components/ui/ButtonCard.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { Trans } from "$lib/components/locale";
   import { getMetadataString } from "$lib/utils/openID";
@@ -60,9 +52,9 @@
   let isRecoveryPhraseSetUpDismissed = $state(false);
 
   const lastUsedIdentities = $derived(
-    Object.values($lastUsedIdentitiesStore.identities)
-      .sort((a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis)
-      .slice(0, 3),
+    Object.values($lastUsedIdentitiesStore.identities).sort(
+      (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
+    ),
   );
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
@@ -198,12 +190,22 @@
 
 <!-- Layout -->
 <div class="bg-bg-primary_alt flex min-h-[100dvh] flex-row">
-  <!-- Sidebar -->
+  <!-- Sidebar and backdrop on mobile -->
+  <div
+    onclick={() => (isMobileSidebarOpen = false)}
+    class={[
+      "bg-bg-overlay absolute inset-0 z-1 transition-opacity duration-200 ease-out sm:hidden",
+      isMobileSidebarOpen ? "opacity-80" : "pointer-events-none opacity-0 ",
+    ]}
+    aria-hidden="true"
+  ></div>
   <aside
     class={[
       "bg-bg-primary border-border-secondary flex w-74 flex-col sm:border-r sm:max-md:w-19",
-      "max-sm:invisible max-sm:absolute max-sm:inset-0 max-sm:z-1 max-sm:w-full max-sm:overflow-y-auto",
-      isMobileSidebarOpen && "max-sm:visible",
+      "max-sm:absolute max-sm:start-0 max-sm:end-20 max-sm:top-0 max-sm:bottom-0 max-sm:z-1 max-sm:w-auto max-sm:overflow-y-auto max-sm:transition-transform max-sm:duration-200 max-sm:ease-out",
+      isMobileSidebarOpen
+        ? "max-sm:translate-x-0"
+        : "max-sm:pointer-events-none max-sm:translate-x-[-100%]",
     ]}
   >
     <div class="h-[env(safe-area-inset-top)]"></div>
@@ -217,7 +219,7 @@
       </div>
       <button
         onclick={() => (isMobileSidebarOpen = false)}
-        class="btn btn-tertiary btn-icon ms-auto sm:hidden"
+        class="btn btn-tertiary btn-icon ms-auto -me-1.5 sm:hidden"
         aria-label={$t`Close menu`}
       >
         <XIcon class="size-5" />
@@ -235,40 +237,6 @@
         Internet Identity
       </div>
     </div>
-    <!-- Mobile identity button-->
-    {#if $lastUsedIdentitiesStore.selected !== undefined}
-      {@const name = lastUsedIdentityTypeName(
-        $lastUsedIdentitiesStore.selected,
-      )}
-      <ButtonCard
-        onclick={() => (isIdentityPopoverOpen = true)}
-        class="mx-4 mb-6 sm:hidden"
-        aria-label={$t`Switch identity`}
-      >
-        <Avatar size="sm">
-          <UserIcon class="size-5" />
-        </Avatar>
-        <div class="flex flex-col text-left text-sm">
-          <div class="text-text-primary font-semibold">
-            {data.identityInfo.name[0] ?? data.identityNumber.toString()}
-          </div>
-          <div class="text-text-tertiary font-normal" aria-hidden="true">
-            {#if data.identityInfo.created_at[0] !== undefined}
-              {@const date = $formatDate(
-                new Date(nanosToMillis(data.identityInfo.created_at[0])),
-                {
-                  dateStyle: "short",
-                },
-              )}
-              <span>{$t`${name} | Created ${date}`}</span>
-            {:else}
-              <span>{name}</span>
-            {/if}
-          </div>
-        </div>
-        <ChevronDownIcon class="ms-auto me-1 size-5" />
-      </ButtonCard>
-    {/if}
     <!-- Navigation -->
     <nav class="flex flex-col gap-0.5 px-4">
       <ul class="contents">
@@ -336,24 +304,8 @@
     <div class="h-[env(safe-area-inset-top)]"></div>
     <!-- Header -->
     <header class="flex h-16 flex-row items-center px-4 sm:px-8 md:px-12">
-      <!-- Mobile logo -->
-      <Logo class="text-fg-primary h-4 sm:hidden" />
-      <!-- Empty space between left and right content -->
-      <div class="flex-1"></div>
-      <!-- Identity button-->
-      <button
-        bind:this={identityButtonRef}
-        onclick={() => (isIdentityPopoverOpen = true)}
-        class="btn btn-tertiary gap-2.5 pr-3 max-sm:hidden sm:-mr-3"
-        aria-label={$t`Switch identity`}
-      >
-        <span>
-          {data.identityInfo.name[0] ?? data.identityNumber.toString()}
-        </span>
-        <ChevronDownIcon size="1rem" />
-      </button>
       <!-- Mobile menu button -->
-      <div class="relative ms-2 sm:hidden">
+      <div class="relative -ms-1.5 sm:hidden">
         <button
           onclick={() => (isMobileSidebarOpen = true)}
           class="btn btn-tertiary btn-icon"
@@ -372,6 +324,23 @@
           ]}
         ></div>
       </div>
+      <!-- Empty space between left and right content -->
+      <div class="flex-1"></div>
+      <!-- Identity button-->
+      <button
+        bind:this={identityButtonRef}
+        onclick={() => (isIdentityPopoverOpen = true)}
+        class="btn btn-tertiary gap-2.5 pe-3 max-sm:-me-2 sm:-me-3"
+        aria-label={$t`Switch identity`}
+      >
+        <Avatar size="xs">
+          <UserIcon class="size-4" />
+        </Avatar>
+        <span>
+          {data.identityInfo.name[0] ?? data.identityNumber.toString()}
+        </span>
+        <ChevronDownIcon size="1rem" />
+      </button>
     </header>
     <!-- Page content -->
     <main class="flex flex-col px-4 py-5 sm:px-8 sm:py-3 md:px-12">
@@ -393,6 +362,7 @@
     direction="down"
     align="end"
     distance="0.75rem"
+    class="!bg-bg-primary"
   >
     <IdentitySwitcher
       selected={$authenticatedStore.identityNumber}
@@ -437,7 +407,7 @@
         {$t`Sign in`}
       </h1>
       <p class="text-text-secondary mb-6 self-start text-sm">
-        {$t`choose method to continue`}
+        {$t`Choose method to continue`}
       </p>
     </AuthWizard>
   </Dialog>

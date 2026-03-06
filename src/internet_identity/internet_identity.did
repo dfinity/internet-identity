@@ -136,6 +136,8 @@ type AddTentativeDeviceResponse = variant {
     device_registration_mode_off;
     // There is another device already added tentatively
     another_device_tentatively_added;
+    // Passkey with this public key is already used
+    passkey_with_this_public_key_is_already_used;
 };
 
 type VerifyTentativeDeviceResponse = variant {
@@ -540,6 +542,8 @@ type AuthnMethodRegisterError = variant {
     InvalidMetadata : text;
     // The caller's principal is not self-authenticating.
     NotSelfAuthenticating : principal;
+    // Passkey with this public key is already used
+    PasskeyWithThisPublicKeyIsAlreadyUsed;
 };
 
 type AuthnMethodConfirmationError = variant {
@@ -567,6 +571,7 @@ type AuthnMethodRegistrationModeExitError = variant {
     InternalCanisterError : text;
     RegistrationModeOff;
     InvalidMetadata : text;
+    PasskeyWithThisPublicKeyIsAlreadyUsed;
 };
 
 type LookupByRegistrationIdError = variant {
@@ -604,6 +609,8 @@ type AuthnMethodReplaceError = variant {
     InvalidMetadata : text;
     // No authentication method found with the given public key.
     AuthnMethodNotFound;
+    // Passkey with this public key is already used
+    PasskeyWithThisPublicKeyIsAlreadyUsed;
 };
 
 type AuthnMethodMetadataReplaceError = variant {

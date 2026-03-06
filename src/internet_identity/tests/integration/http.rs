@@ -16,7 +16,7 @@ use ic_response_verification::verify_request_response_pair;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::vc_mvp::PrepareIdAliasRequest;
 use internet_identity_interface::internet_identity::types::{
-    AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt,
+    AuthnMethod, AuthnMethodData, CaptchaConfig, CaptchaTrigger, ChallengeAttempt, DeviceData,
     FrontendHostname, InternetIdentityInit, InternetIdentitySynchronizedConfig, MetadataEntryV2,
     OpenIdConfig,
 };
@@ -1376,10 +1376,17 @@ fn should_report_registration_rates() -> Result<(), RejectResponse> {
         0.0,
     );
 
-    for _ in 0..20 {
+    for i in 0..20u8 {
         // make sure both registration flows are counted
-        flows::register_anchor(&env, canister_id); // legacy API
-        create_identity_with_authn_method(&env, canister_id, &test_authn_method()); // v2 API
+        // Use unique devices to satisfy passkey pubkey uniqueness
+        let legacy_device = DeviceData {
+            pubkey: ByteBuf::from(vec![100 + i; 32]),
+            alias: "test device".to_string(),
+            credential_id: Some(ByteBuf::from(vec![100 + i; 16])),
+            ..DeviceData::auth_test_device()
+        };
+        flows::register_anchor_with_device(&env, canister_id, &legacy_device); // legacy API
+        create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(i)); // v2 API
         env.advance_time(Duration::from_secs(1));
     }
 

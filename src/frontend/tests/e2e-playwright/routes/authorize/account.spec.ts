@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { authorize, createIdentity, dummyAuth } from "../utils";
+import { authorize, createIdentity, dummyAuth } from "../../utils";
 
 test("Create another account and authorize with primary", async ({ page }) => {
   const auth = dummyAuth();

@@ -1,5 +1,5 @@
 use crate::v2_api::authn_method_test_helpers::{
-    create_identity_with_authn_method, test_authn_method,
+    create_identity_with_authn_method, sample_webauthn_authn_method, test_authn_method,
 };
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::{
@@ -148,13 +148,13 @@ fn should_retain_anchor_on_user_range_end_decrease() {
     };
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
-    let authn_method = test_authn_method();
+
     assert_eq!(
-        create_identity_with_authn_method(&env, canister_id, &authn_method),
+        create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(0)),
         1000
     );
     assert_eq!(
-        create_identity_with_authn_method(&env, canister_id, &authn_method),
+        create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(1)),
         1001
     );
     assert!(upgrade_ii_canister_with_arg(

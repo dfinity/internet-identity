@@ -7,7 +7,7 @@ import {
   II_URL,
   LEGACY_II_URL,
   signOut,
-} from "../utils";
+} from "../../utils";
 
 const TEST_USER_NAME = "Test User";
 const TEST_USER_NAME_2 = "Test User 2";
@@ -154,7 +154,7 @@ test.skip("Migration", () => {
     const auth2 = dummyAuth();
 
     await page.getByRole("button", { name: "Switch identity" }).click();
-    await page.getByRole("button", { name: "Use another identity" }).click();
+    await page.getByRole("button", { name: "Add another identity" }).click();
     await page.getByRole("button", { name: "Continue with passkey" }).click();
     await page.getByRole("button", { name: "Upgrade" }).click();
     await page
