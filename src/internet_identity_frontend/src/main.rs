@@ -146,6 +146,20 @@ fn get_asset_headers(
     related_origins: Option<&Vec<String>>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
+    let credentials_allowlist = if let Some(related_origins) = related_origins {
+        if related_origins.is_empty() {
+            "self".to_string()
+        } else {
+            let quoted: Vec<String> = related_origins
+                .iter()
+                .map(|origin| format!("\"{origin}\""))
+                .collect();
+            format!("self {}", quoted.join(" "))
+        }
+    } else {
+        "self".to_string()
+    };
+
     // List of recommended security headers as per https://owasp.org/www-project-secure-headers/
     // These headers enable browser security features (like limit access to platform apis and set
     // iFrame policies, etc.)
@@ -185,7 +199,8 @@ fn get_asset_headers(
         // - sync-xhr=(self): Allow synchronous XMLHttpRequest from same origin
         (
             "Permissions-Policy".to_string(),
-            "accelerometer=(),\
+            format!(
+                "accelerometer=(),\
              autoplay=(),\
              camera=(),\
              clipboard-read=(),\
@@ -204,14 +219,14 @@ fn get_asset_headers(
              midi=(),\
              payment=(),\
              picture-in-picture=(),\
-             publickey-credentials-get=(self),\
+             publickey-credentials-get=({credentials_allowlist}),\
              screen-wake-lock=(),\
              serial=(),\
              sync-xhr=(self),\
              usb=(),\
              web-share=(),\
              xr-spatial-tracking=()"
-                .to_string(),
+            ),
         ),
     ];
     headers.extend(additional_headers);
