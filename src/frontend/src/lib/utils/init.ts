@@ -1,4 +1,4 @@
-import { isNullish, nonNullish } from "@dfinity/utils";
+import { isNullish } from "@dfinity/utils";
 import { displayError } from "$lib/templates/displayError";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { IDL } from "@icp-sdk/core/candid";

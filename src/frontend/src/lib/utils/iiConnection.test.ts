@@ -42,9 +42,6 @@ const mockDelegationIdentity = {
   },
 } as unknown as DelegationIdentity;
 
-// Used to await that the getter has resolved.
-let infoResponse: MetadataMapV2 | null | undefined = null;
-
 const DEFAULT_INIT: InternetIdentityInit = {
   analytics_config: [],
   archive_config: [],
