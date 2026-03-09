@@ -1,7 +1,6 @@
 import type {
   DeviceData,
   InternetIdentityInit,
-  MetadataMapV2,
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
@@ -89,7 +88,6 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await idbClear();
-  infoResponse = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("location", {
     origin: currentOrigin,
