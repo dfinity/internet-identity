@@ -146,7 +146,7 @@ fn get_asset_headers(
     related_origins: Option<&Vec<String>>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
-    let cross_origin_credentials_allowlist = if let Some(related_origins) = related_origins {
+    let credentials_allowlist = if let Some(related_origins) = related_origins {
         if related_origins.is_empty() {
             "self".to_string()
         } else {
@@ -219,7 +219,7 @@ fn get_asset_headers(
              midi=(),\
              payment=(),\
              picture-in-picture=(),\
-             publickey-credentials-get=({cross_origin_credentials_allowlist}),\
+             publickey-credentials-get=({credentials_allowlist}),\
              screen-wake-lock=(),\
              serial=(),\
              sync-xhr=(self),\
