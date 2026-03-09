@@ -33,7 +33,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should return default flow if no devices are provided", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [],
       currentOrigin: currentOrigin,
       relatedOrigins,
@@ -43,7 +42,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should use iframe if the RP ID does not match the current origin", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [createMockCredential(nonCurrentOrigin1)],
       currentOrigin: currentOrigin,
       relatedOrigins,
@@ -54,7 +52,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should not use iframe if the RP ID matches the current origin", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
         createMockCredential(currentOrigin),
@@ -68,7 +65,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should use ic0.app when origin is undefined", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [
         createMockCredential(undefined),
         createMockCredential(LEGACY_II_URL),
@@ -82,7 +78,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should handle multiple RP IDs and filter credentials accordingly", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
         createMockCredential(currentOrigin),
@@ -103,7 +98,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should return undefined flow if no related origins", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
         createMockCredential(currentOrigin),
@@ -120,7 +114,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should return default flow for wrong related origins", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [
         createMockCredential(currentOrigin),
         createMockCredential(currentOrigin),
@@ -140,7 +133,6 @@ describe("findWebAuthnFlows", () => {
 
   it("should return flows in order of devices (recently used)", () => {
     const result = findWebAuthnFlows({
-      supportsRor: true,
       devices: [
         createMockCredential(nonCurrentOrigin2),
         createMockCredential(currentOrigin),
@@ -222,7 +214,6 @@ describe("findWebAuthnFlows", () => {
 
     for (const { label, devices, expectedOrder } of test_cases) {
       const result = findWebAuthnFlows({
-        supportsRor: true, // irrelevant for this test
         devices,
         currentOrigin,
         relatedOrigins: [currentOrigin, nonCurrentOrigin1, newOrigin],
