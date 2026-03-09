@@ -12,7 +12,6 @@ import {
   DelegationParamsCodec,
   AuthResponseCodec,
 } from "$lib/utils/transport/utils";
-import { AuthReady } from "$lib/legacy/flows/authorize/postMessageInterface";
 import {
   Delegation,
   DelegationChain,
@@ -436,7 +435,12 @@ export class LegacyTransport implements Transport {
       };
 
       window.addEventListener("message", listener);
-      window.opener?.postMessage(AuthReady, "*");
+      window.opener?.postMessage(
+        {
+          kind: "authorize-ready",
+        },
+        "*",
+      );
     });
   }
 

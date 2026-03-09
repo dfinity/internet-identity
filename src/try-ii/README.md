@@ -18,7 +18,7 @@ To run the demo application locally:
 npm install
 
 # Start the development server
-npm run dev
+npm run devJ
 ```
 
 The application will be available at `http://localhost:8080`.

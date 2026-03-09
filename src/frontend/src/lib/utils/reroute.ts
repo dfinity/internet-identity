@@ -1,16 +1,11 @@
 import type { Reroute } from "@sveltejs/kit";
 import { WEBAUTHN_IFRAME_PATH } from "../../routes/iframe/webauthn/utils";
-import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
-import { nonNullish } from "@dfinity/utils";
 import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";
 import { get } from "svelte/store";
 import { building } from "$app/environment";
 import { goto, replaceState } from "$app/navigation";
 
 export const reroute: Reroute = ({ url }) => {
-  if (nonNullish(getAddDeviceAnchor(url))) {
-    return "/register/device";
-  }
   if (url.hash === WEBAUTHN_IFRAME_PATH) {
     return "/iframe/webauthn";
   }

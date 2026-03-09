@@ -56,7 +56,6 @@ import {
 } from "./credential-devices";
 import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { isRecoveryDevice, RecoveryDevice } from "./recoveryDevice";
 import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancelError } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
@@ -614,16 +613,6 @@ export class Connection {
     });
   };
 
-  lookupRecovery = async (
-    userNumber: UserNumber,
-  ): Promise<RecoveryDevice[]> => {
-    const actor = await this.createActor();
-    // lookup blanks out the alias for privacy reasons -> omit alias from DeviceData
-    const allDevices: Omit<DeviceData, "alias">[] =
-      await actor.lookup(userNumber);
-    return allDevices.filter(isRecoveryDevice);
-  };
-
   // Create an actor representing the backend
   createActor = async (
     identity?: SignIdentity,
@@ -1014,9 +1003,6 @@ export const remapToLegacyDomain = (origin: string): string => {
     return origin;
   }
 };
-
-const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
-  new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
 
 export const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
   if (buf1.byteLength != buf2.byteLength) return false;
