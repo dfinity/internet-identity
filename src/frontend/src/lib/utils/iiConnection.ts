@@ -56,7 +56,6 @@ import {
 } from "./credential-devices";
 import { findWebAuthnFlows, WebAuthnFlow } from "./findWebAuthnFlows";
 import { MultiWebAuthnIdentity } from "./multiWebAuthnIdentity";
-import { supportsWebauthRoR } from "./userAgent";
 import { isWebAuthnCancelError } from "./webAuthnErrorUtils";
 import { LoginEvents, loginFunnel } from "./analytics/loginFunnel";
 import {
@@ -431,7 +430,6 @@ export class Connection {
   > => {
     if (isNullish(this.webAuthFlows) && get(DOMAIN_COMPATIBILITY)) {
       const flows = findWebAuthnFlows({
-        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: credentials,
         currentOrigin: window.location.origin,
         // Empty array is the same as no related origins.
