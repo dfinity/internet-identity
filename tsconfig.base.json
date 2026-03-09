@@ -1,5 +1,5 @@
 {
-  "include": ["src/showcase", "src/frontend"],
+  "include": ["src/frontend"],
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,

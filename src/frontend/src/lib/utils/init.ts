@@ -3,7 +3,6 @@ import { displayError } from "$lib/templates/displayError";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { IDL } from "@icp-sdk/core/candid";
 import { init } from "$lib/generated/internet_identity_idl";
-import { version } from "$lib/legacy/version";
 import { anyFeatures, features } from "$lib/legacy/features";
 import { fromBase64 } from "$lib/utils/utils";
 
@@ -73,15 +72,6 @@ export const printDevMessage = () => {
   console.log(
     "The code can be found here: https://github.com/dfinity/internet-identity",
   );
-  console.log(
-    `https://github.com/dfinity/internet-identity/commit/${version.commit}`,
-  );
-  if (nonNullish(version.release)) {
-    console.log(`This is version ${version.release}`);
-  }
-  if (version.dirty) {
-    console.warn("This version is dirty");
-  }
 
   if (anyFeatures()) {
     const message = `

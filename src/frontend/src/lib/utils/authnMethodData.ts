@@ -12,31 +12,6 @@ import {
 } from "$lib/utils/recoveryPhrase";
 
 /**
- * Helper to create a new PinIdentity authn method to be used in a registration flow.
- */
-export const pinAuthnMethodData = ({
-  alias,
-  pubKey,
-}: {
-  alias: string;
-  pubKey: DerEncodedPublicKey;
-}): AuthnMethodData => {
-  const metadata: MetadataMapV2 = [
-    ["alias", { String: alias }],
-    ["usage", { String: "browser_storage_key" }],
-    ["origin", { String: window.origin }],
-  ];
-  return {
-    metadata,
-    authn_method: {
-      PubKey: { pubkey: new Uint8Array(pubKey) },
-    },
-    security_settings: defaultSecuritySettings(),
-    last_authentication: [],
-  };
-};
-
-/**
  * Helper to create a new passkey authn method to be used in a registration flow.
  */
 export const passkeyAuthnMethodData = ({

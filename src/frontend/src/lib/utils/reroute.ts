@@ -1,5 +1,5 @@
 import type { Reroute } from "@sveltejs/kit";
-import { WEBAUTHN_IFRAME_PATH } from "$lib/legacy/flows/iframeWebAuthn";
+import { WEBAUTHN_IFRAME_PATH } from "../../routes/iframe/webauthn/utils";
 import { getAddDeviceAnchor } from "$lib/utils/addDeviceLink";
 import { nonNullish } from "@dfinity/utils";
 import { DISCOVERABLE_PASSKEY_FLOW } from "$lib/state/featureFlags";

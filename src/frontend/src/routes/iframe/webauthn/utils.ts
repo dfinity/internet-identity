@@ -1,3 +1,4 @@
+import { canisterConfig } from "$lib/globals";
 import { Connection } from "$lib/utils/iiConnection";
 import {
   waitForWindowReadyRequest,
@@ -82,7 +83,7 @@ const requestCredential = (
     targetWindow.postMessage(request, targetOrigin);
   });
 
-const handleCredentialRequest = (
+export const handleCredentialRequest = (
   targetWindow: Window,
   targetOrigin: string,
 ): void =>
@@ -151,7 +152,7 @@ export const webAuthnInIframeFlow = async (
     //
     // Additionally, the CSP configuration will block any attempt to render II
     // inside an iframe from domains that are not related origins.
-    connection.canisterConfig.related_origins[0] ?? [],
+    canisterConfig.related_origins[0] ?? [],
   );
 
   // Get credential and send to parent window

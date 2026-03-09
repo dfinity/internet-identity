@@ -1,4 +1,4 @@
-import { extractAAGUID, lookupAAGUID } from "$lib/utils/webAuthn";
+import { extractAAGUID } from "$lib/utils/webAuthn";
 import { beforeAll } from "vitest";
 
 describe("webauthn", () => {
@@ -38,27 +38,6 @@ describe("webauthn", () => {
 
     it("should return undefined", () => {
       expect(extractAAGUID(anonymousAuthData)).toBeUndefined();
-    });
-  });
-
-  describe("lookupAAGUID", () => {
-    beforeAll(() => {
-      vi.mock("$lib/assets/aaguid", () => ({
-        default: {
-          "fbfc3007-154e-4ecc-8c0b-6e020557d7bd": {
-            name: "iCloud Keychain",
-            type: "account",
-            account: "Apple",
-            platform: "Apple",
-          },
-        },
-      }));
-    });
-
-    it("should return expected value", async () => {
-      expect(await lookupAAGUID("fbfc3007-154e-4ecc-8c0b-6e020557d7bd")).toBe(
-        "iCloud Keychain",
-      );
     });
   });
 });

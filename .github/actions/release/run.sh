@@ -117,7 +117,6 @@ FRONTEND_PATHS=(
   src/internet_identity_frontend/
   src/frontend/
   src/lingui-svelte/
-  src/showcase/
   src/vite-plugins/
 )
 

@@ -23,7 +23,6 @@ const createFeatureFlagStore = (
 ): FeatureFlagStore => {
   const { subscribe, set, update } = writable(defaultValue);
 
-  // We cannot use browser because this is also imported in our showcase
   if (isNullish(globalThis.window)) {
     return {
       subscribe,

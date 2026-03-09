@@ -31,14 +31,9 @@ import type {
   UserNumber,
   VerifyTentativeDeviceResponse,
 } from "$lib/generated/internet_identity_types";
-import { fromMnemonicWithoutValidation } from "$lib/legacy/crypto/ed25519";
 import { get } from "svelte/store";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
 import { features } from "$lib/legacy/features";
-import {
-  IdentityMetadata,
-  IdentityMetadataRepository,
-} from "$lib/legacy/repositories/identityMetadata";
 import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
 import {
   Actor,
@@ -390,7 +385,6 @@ export class Connection {
     | AuthFail
     | WebAuthnFailed
     | PossiblyWrongWebAuthnFlow
-    | PinUserOtherDomain
     | UnknownUser
     | ApiError
   > => {
@@ -412,12 +406,6 @@ export class Connection {
     let webAuthnAuthenticators = devices.filter(
       ({ key_type }) => !("browser_storage_key" in key_type),
     );
-
-    // If we reach this point, it's because no PIN identity was found.
-    // Therefore, it's because it was created in another domain.
-    if (webAuthnAuthenticators.length === 0) {
-      return { kind: "pinUserOtherDomain" };
-    }
 
     if (get(HARDWARE_KEY_TEST)) {
       webAuthnAuthenticators = webAuthnAuthenticators.filter(
@@ -585,48 +573,6 @@ export class Connection {
     };
   };
 
-  fromSeedPhrase = async (
-    userNumber: bigint,
-    seedPhrase: string,
-  ): Promise<LoginSuccess | NoSeedPhrase | SeedPhraseFail> => {
-    const pubkeys = (await this.lookupCredentials(userNumber)).recovery_phrases;
-    if (pubkeys.length === 0) {
-      return {
-        kind: "noSeedPhrase",
-      };
-    }
-
-    const identity = await fromMnemonicWithoutValidation(
-      seedPhrase,
-      IC_DERIVATION_PATH,
-    );
-    if (
-      !pubkeys.some((pubkey) =>
-        bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
-      )
-    ) {
-      return {
-        kind: "seedPhraseFail",
-      };
-    }
-    const delegationIdentity = await this.requestFEDelegation(identity);
-    const actor = await this.createActor(delegationIdentity);
-
-    return {
-      kind: "loginSuccess",
-      userNumber,
-      connection: new AuthenticatedConnection(
-        this.canisterId,
-        this.canisterConfig,
-        identity,
-        delegationIdentity,
-        userNumber,
-        actor,
-      ),
-      showAddCurrentDevice: false,
-    };
-  };
-
   lookupCredentials = async (
     userNumber: UserNumber,
   ): Promise<AnchorCredentials> => {
@@ -720,8 +666,6 @@ export class Connection {
 }
 
 export class AuthenticatedConnection extends Connection {
-  private metadataRepository: IdentityMetadataRepository;
-
   public constructor(
     public canisterId: string,
     public canisterConfig: InternetIdentityInit,
@@ -731,24 +675,6 @@ export class AuthenticatedConnection extends Connection {
     public actor?: ActorSubclass<_SERVICE>,
   ) {
     super(canisterId, canisterConfig);
-    const metadataGetter = async () => {
-      const response = await this.getIdentityInfo();
-      if ("Ok" in response) {
-        return response.Ok.metadata;
-      }
-      throw new Error("Error fetching metadata");
-    };
-    const metadataSetter = async (metadata: MetadataMapV2) => {
-      const response = await this.setIdentityMetadata(metadata);
-      if ("Ok" in response) {
-        return;
-      }
-      throw new Error("Error updating metadata");
-    };
-    this.metadataRepository = IdentityMetadataRepository.init({
-      getter: metadataGetter,
-      setter: metadataSetter,
-    });
   }
 
   async getActor(): Promise<ActorSubclass<_SERVICE>> {
@@ -859,18 +785,6 @@ export class AuthenticatedConnection extends Connection {
   ): Promise<{ Ok: null } | { Err: IdentityMetadataReplaceError }> => {
     const actor = await this.getActor();
     return await actor.identity_metadata_replace(this.userNumber, metadata);
-  };
-
-  getIdentityMetadata = (): Promise<IdentityMetadata | undefined> => {
-    return this.metadataRepository.getMetadata();
-  };
-
-  updateIdentityMetadata = (partialMetadata: Partial<IdentityMetadata>) => {
-    return this.metadataRepository.updateMetadata(partialMetadata);
-  };
-
-  commitMetadata = async (): Promise<boolean> => {
-    return await this.metadataRepository.commitMetadata();
   };
 
   prepareDelegation = async (
