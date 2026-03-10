@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+sed -E \
+  -e "s/from '@dfinity\/([^']*)'/from '@icp-sdk\/core\/\1'/g" \
+  -e 's/from "@dfinity\/([^"]*)"/from "@icp-sdk\/core\/\1"/g'

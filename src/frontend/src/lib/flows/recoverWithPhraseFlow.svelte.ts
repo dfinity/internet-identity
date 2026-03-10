@@ -9,7 +9,11 @@ import {
   isValidMnemonic,
 } from "$lib/utils/recoveryPhrase";
 import { throwCanisterError } from "$lib/utils/utils";
-import { DerEncodedPublicKey, HttpAgent, SignIdentity } from "@dfinity/agent";
+import {
+  DerEncodedPublicKey,
+  HttpAgent,
+  SignIdentity,
+} from "@icp-sdk/core/agent";
 import {
   DelegationChain,
   DelegationIdentity,

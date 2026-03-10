@@ -53,10 +53,10 @@ export const injectCanisterIdAndConfigPlugin = ({
 /**
  * GZip generated resources e.g. index.js => index.js.gz
  */
-export const compression = (): Plugin =>
+export const compression = () =>
   viteCompression({
     // II canister only supports one content type per resource. That is why we remove the original file.
-    algorithm: "gzip",
+    algorithms: ["gzip"],
     deleteOriginalAssets: true,
     include: /\.(js|woff2)$/,
   });
