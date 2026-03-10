@@ -1,6 +1,5 @@
 import { ERROR_SUPPORT_URL } from "$lib/config";
 import { TemplateElement } from "$lib/utils/lit-html";
-import { nonNullish } from "@dfinity/utils";
 import { html, render } from "lit-html";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { mainWindow } from "./mainWindow";
@@ -23,14 +22,15 @@ const pageContent = (options: ErrorOptions) =>
         title: options.title,
         message: options.message,
         htmlElement: "div",
-        slot: nonNullish(options.detail)
-          ? html`<div class="l-stack">
-              <h4>Error details:</h4>
-              <pre data-role="error-detail" class="t-paragraph">
+        slot:
+          options.detail !== undefined
+            ? html`<div class="l-stack">
+                <h4>Error details:</h4>
+                <pre data-role="error-detail" class="t-paragraph">
 ${options.detail}</pre
-              >
-            </div>`
-          : undefined,
+                >
+              </div>`
+            : undefined,
       })}
 
       <div class="l-stack">

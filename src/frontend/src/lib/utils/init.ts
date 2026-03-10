@@ -1,4 +1,3 @@
-import { isNullish } from "@dfinity/utils";
 import { displayError } from "$lib/templates/displayError";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { IDL } from "@icp-sdk/core/candid";
@@ -15,7 +14,7 @@ export const readCanisterId = (): string => {
   const setupJs = document.querySelector(
     "[data-canister-id]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
+  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
     void displayError({
       title: "Canister ID not set",
       message:
@@ -35,7 +34,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
   const setupJs = document.querySelector(
     "[data-canister-config]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
+  if (setupJs === null || setupJs.dataset.canisterConfig === undefined) {
     void displayError({
       title: "Canister config not set",
       message:

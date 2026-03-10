@@ -1,7 +1,6 @@
 import { storeLocalStorageKey } from "$lib/constants/store.constants";
 import { derived, get, Readable, writable } from "svelte/store";
 import { writableStored } from "./writable.store";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   AccountInfo,
   MetadataMapV2,
@@ -86,11 +85,12 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
     [lastUsedStore, selectedStore],
     ([identities, selected]) => ({
       identities,
-      selected: nonNullish(selected)
-        ? Object.values(identities).find(
-            (identity) => identity.identityNumber === selected,
-          )
-        : undefined,
+      selected:
+        selected !== undefined
+          ? Object.values(identities).find(
+              (identity) => identity.identityNumber === selected,
+            )
+          : undefined,
     }),
   );
 
@@ -110,7 +110,7 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
     addLastUsedIdentityIfMissing: (params) => {
       lastUsedStore.update((lastUsedIdentities) => {
         const identity = lastUsedIdentities[params.identityNumber.toString()];
-        if (nonNullish(identity)) {
+        if (identity !== undefined) {
           return lastUsedIdentities;
         }
         lastUsedIdentities[params.identityNumber.toString()] = {
@@ -124,17 +124,17 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
     addLastUsedAccount: (params) => {
       lastUsedStore.update((lastUsedIdentities) => {
         const identity = lastUsedIdentities[params.identityNumber.toString()];
-        if (isNullish(identity)) {
+        if (identity === undefined) {
           return lastUsedIdentities;
         }
-        if (isNullish(identity.accounts)) {
+        if (identity.accounts === undefined) {
           identity.accounts = {};
         }
-        if (isNullish(identity.accounts[params.origin])) {
+        if (identity.accounts[params.origin] === undefined) {
           identity.accounts[params.origin] = {};
         }
         identity.accounts[params.origin][
-          isNullish(params.accountNumber)
+          params.accountNumber === undefined
             ? PRIMARY_ACCOUNT_KEY
             : params.accountNumber.toString()
         ] = {
@@ -153,18 +153,18 @@ export const initLastUsedIdentitiesStore = (): LastUsedIdentitiesStore => {
     syncLastUsedAccounts: (identityNumber, origin, accounts) => {
       lastUsedStore.update((lastUsedIdentities) => {
         const identity = lastUsedIdentities[identityNumber.toString()];
-        if (isNullish(identity)) {
+        if (identity === undefined) {
           return lastUsedIdentities;
         }
-        if (isNullish(identity.accounts)) {
+        if (identity.accounts === undefined) {
           identity.accounts = {};
         }
-        if (isNullish(identity.accounts[origin])) {
+        if (identity.accounts[origin] === undefined) {
           identity.accounts[origin] = {};
         }
         identity.accounts[origin] = Object.fromEntries(
           accounts.map((account) => [
-            isNullish(account.account_number[0])
+            account.account_number[0] === undefined
               ? PRIMARY_ACCOUNT_KEY
               : account.account_number[0].toString(),
             {

@@ -16,7 +16,6 @@ import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store"
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
 import { features } from "$lib/legacy/features";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
@@ -129,11 +128,11 @@ export class AuthFlow {
     authenticationV2Funnel.trigger(
       AuthenticationV2Events.StartWebauthnCreation,
     );
-    if (isNullish(this.#name)) {
+    if (this.#name === undefined) {
       throw new Error("Name is not set");
     }
     const passkeyIdentity =
-      features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(this.#name)
         : await DiscoverablePasskeyIdentity.createNew(this.#name);
     await this.#startRegistration();
@@ -159,12 +158,11 @@ export class AuthFlow {
       clientId: config.client_id,
       authURL: config.auth_uri,
       authScope: config.auth_scope.join(" "),
-      configURL: config.fedcm_uri?.[0],
     };
     authenticationV2Funnel.addProperties({
       provider: config.name,
     });
-    if (isNullish(jwt)) {
+    if (jwt === undefined) {
       // Create two try-catch blocks to avoid double-triggering the analytics.
       try {
         this.#systemOverlay = true;
@@ -220,7 +218,7 @@ export class AuthFlow {
       if (
         isCanisterError<OpenIdDelegationError>(error) &&
         error.type === "NoSuchAnchor" &&
-        nonNullish(jwt)
+        jwt !== undefined
       ) {
         this.#jwt = jwt;
         this.#configIssuer = config.issuer;
@@ -228,7 +226,7 @@ export class AuthFlow {
         authenticationV2Funnel.trigger(
           AuthenticationV2Events.RegisterWithOpenID,
         );
-        if (isNullish(name)) {
+        if (name === undefined) {
           // Show enter name screen to complete registration,
           this.#view = "setupNewIdentity";
         }
@@ -239,7 +237,7 @@ export class AuthFlow {
   };
 
   completeOpenIdRegistration = async (name: string): Promise<bigint> => {
-    if (isNullish(this.#jwt) || isNullish(this.#configIssuer)) {
+    if (this.#jwt === undefined || this.#configIssuer === undefined) {
       throw new Error("JWT or config issuer is missing");
     }
     authenticationV2Funnel.trigger(AuthenticationV2Events.RegisterWithOpenID);
@@ -291,7 +289,7 @@ export class AuthFlow {
     try {
       const { identity_number: identityNumber } = await get(sessionStore)
         .actor.identity_registration_finish({
-          name: nonNullish(name) ? [name] : [],
+          name: name !== undefined ? [name] : [],
           authn_method: authnMethod,
         })
         .then(throwCanisterError);
@@ -405,16 +403,16 @@ export class AuthFlow {
         authMethod: { openid: { iss, sub } },
       });
       const metadata: MetadataMapV2 = [];
-      if (nonNullish(jwtName)) {
+      if (jwtName !== undefined) {
         metadata.push(["name", { String: jwtName }]);
       }
-      if (nonNullish(email)) {
+      if (email !== undefined) {
         metadata.push(["email", { String: email }]);
       }
       const claimKeys = extractIssuerTemplateClaims(configIssuer);
-      if (nonNullish(claimKeys)) {
+      if (claimKeys !== undefined) {
         claimKeys.forEach((key) => {
-          if (nonNullish(restJWTClaims[key])) {
+          if (restJWTClaims[key] !== undefined) {
             metadata.push([
               key,
               {

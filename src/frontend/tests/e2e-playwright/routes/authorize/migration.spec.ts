@@ -51,7 +51,7 @@ test.skip("Migration from an app", () => {
       TEST_APP_URL,
       II_URL,
       async (authPage) => {
-        if (isNullish(credential) || isNullish(identityNumber)) {
+        if (credential === undefined || identityNumber === undefined) {
           throw new Error("Credential or identity number not found");
         }
         // Step 3: Perform the migration
@@ -84,7 +84,7 @@ test.skip("Migration from an app", () => {
       TEST_APP_URL,
       II_URL,
       async (authPage) => {
-        if (isNullish(credential) || isNullish(identityNumber)) {
+        if (credential === undefined || identityNumber === undefined) {
           throw new Error("Credential or identity number not found");
         }
         auth(authPage);

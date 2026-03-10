@@ -7,7 +7,6 @@
   import { t } from "$lib/stores/locale.store";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { isNullish } from "@dfinity/utils";
 
   interface Account {
     name: string;
@@ -29,10 +28,10 @@
   let nameExists = $state(false);
 
   const showSetDefault = $derived(
-    isNullish(account) || !account.isDefaultSignIn,
+    account === undefined || !account.isDefaultSignIn,
   );
   const hasChanges = $derived(
-    isNullish(account) ||
+    account === undefined ||
       account.name !== name.trim() ||
       account.isDefaultSignIn !== isDefaultSignIn,
   );
@@ -61,10 +60,10 @@
       <PencilIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {isNullish(account) ? $t`Name account` : $t`Edit account`}
+      {account === undefined ? $t`Name account` : $t`Edit account`}
     </h1>
     <p class="text-text-tertiary mb-6 text-base font-medium">
-      {isNullish(account)
+      {account === undefined
         ? $t`Label it by use (e.g. 'Work' or 'Demo').`
         : showSetDefault
           ? $t`Rename or make this your default sign-in`
@@ -112,11 +111,13 @@
       {#if isSubmitting}
         <ProgressRing />
         <span>
-          {isNullish(account) ? $t`Creating account...` : $t`Saving changes...`}
+          {account === undefined
+            ? $t`Creating account...`
+            : $t`Saving changes...`}
         </span>
       {:else}
         <span>
-          {isNullish(account) ? $t`Create account` : $t`Save changes`}
+          {account === undefined ? $t`Create account` : $t`Save changes`}
         </span>
       {/if}
     </Button>

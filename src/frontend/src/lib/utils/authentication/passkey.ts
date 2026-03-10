@@ -6,7 +6,6 @@ import {
   CosePublicKey,
   DiscoverablePasskeyIdentity,
 } from "$lib/utils/discoverablePasskeyIdentity";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 import { features } from "$lib/legacy/features";
@@ -44,7 +43,7 @@ export const authenticateWithPasskey = async ({
     canisterId,
   });
   const dummyAuth =
-    features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0]);
+    features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined;
   let identityNumber: bigint;
   const passkeyIdentity = dummyAuth
     ? DiscoverableDummyIdentity.useExisting()
@@ -55,7 +54,7 @@ export const authenticateWithPasskey = async ({
             const lookupResult = (
               await actor.lookup_device_key(new Uint8Array(result.rawId))
             )[0];
-            if (isNullish(lookupResult)) {
+            if (lookupResult === undefined) {
               throw new CredentialNotFound();
             }
             identityNumber = lookupResult.anchor_number;
@@ -82,7 +81,7 @@ export const authenticateWithPasskey = async ({
     session.identity.getPublicKey(),
     new Date(Date.now() + expiration),
   );
-  if (isNullish(identityNumber!)) {
+  if (identityNumber! === undefined) {
     throw new Error("Unreachable, identity number should have been set");
   }
   const identity = DelegationIdentity.fromDelegation(

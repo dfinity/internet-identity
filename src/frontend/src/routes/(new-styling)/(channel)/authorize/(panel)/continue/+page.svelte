@@ -12,7 +12,6 @@
     AuthenticationV2Events,
     authenticationV2Funnel,
   } from "$lib/utils/analytics/authenticationV2Funnel";
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { plural, t } from "$lib/stores/locale.store";
@@ -65,7 +64,7 @@
     ),
   );
   const isAccountLimitReached = $derived(
-    nonNullish(accounts) && accounts.length >= 5,
+    accounts !== undefined && accounts.length >= 5,
   );
   const dapps = getDapps();
   const application = $derived(
@@ -74,7 +73,7 @@
     )?.name,
   );
   const primaryAccountName = $derived(
-    nonNullish(application) ? $t`My ${application} account` : $t`My account`,
+    application !== undefined ? $t`My ${application} account` : $t`My account`,
   );
   const existingNames = $derived(
     accounts?.map((account) => account.name[0] ?? primaryAccountName) ?? [],
@@ -195,7 +194,7 @@
     name: string;
     isDefaultSignIn: boolean;
   }) => {
-    if (isNullish(accounts)) {
+    if (accounts === undefined) {
       return;
     }
     try {
@@ -246,7 +245,7 @@
 
   // Keep local last used accounts in sync (we might need them later)
   $effect(() => {
-    if (isNullish($authenticationStore) || isNullish(accounts)) {
+    if ($authenticationStore === undefined || accounts === undefined) {
       return;
     }
     const { identityNumber } = $authenticationStore;
@@ -381,7 +380,7 @@
   </p>
   <div class="grid">
     <!-- Nested if/else conditions breaks transitions, so they've been flattened here-->
-    {#if isMultipleAccountsEnabled && $isAuthenticatedStore && nonNullish(accounts)}
+    {#if isMultipleAccountsEnabled && $isAuthenticatedStore && accounts !== undefined}
       {@render accountList(accounts)}
     {:else if isMultipleAccountsEnabled && $isAuthenticatedStore}
       <!-- Display the progress ring if loading accounts takes longer than usual.
@@ -442,7 +441,7 @@
   </Dialog>
 {/if}
 
-{#if nonNullish(isEditAccountDialogVisibleFor)}
+{#if isEditAccountDialogVisibleFor !== undefined}
   {@const account = {
     name: isEditAccountDialogVisibleFor.name[0] ?? primaryAccountName,
     isDefaultSignIn:

@@ -1,5 +1,4 @@
 import { anonymousActor } from "$lib/globals";
-import { nonNullish } from "@dfinity/utils";
 import { convertToValidCredentialData } from "./credential-devices";
 
 /**
@@ -16,7 +15,10 @@ export const fetchIdentityCredentials = async (
       .filter((device) => "authentication" in device.purpose)
       .filter(({ key_type }) => !("browser_storage_key" in key_type))
       .map(convertToValidCredentialData)
-      .filter(nonNullish);
+      .filter(
+        (credential): credential is NonNullable<typeof credential> =>
+          credential !== undefined,
+      );
 
     if (validCredentials.length > 0) {
       return validCredentials.map(

@@ -2,7 +2,6 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { fade } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { nonNullish } from "@dfinity/utils";
 
   type Direction = "up" | "right" | "down" | "left";
   type Align = "start" | "center" | "end";
@@ -39,7 +38,7 @@
     let tracking = true;
 
     const track = () => {
-      if (nonNullish(anchorRef) && nonNullish(popoverRef)) {
+      if (anchorRef !== undefined && popoverRef !== undefined) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
 

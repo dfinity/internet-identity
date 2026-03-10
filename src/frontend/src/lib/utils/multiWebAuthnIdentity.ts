@@ -10,7 +10,6 @@
 import { webAuthnInIframe } from "../../routes/iframe/webauthn/utils";
 import { PublicKey, Signature, SignIdentity } from "@icp-sdk/core/agent";
 import { DER_COSE_OID, unwrapDER } from "@icp-sdk/core/identity";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
 import { bufferEqual } from "./iiConnection";
@@ -63,7 +62,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * `getPublicKey()` is never called before `sign()`.
    */
   public getPublicKey(): PublicKey {
-    if (isNullish(this._actualIdentity)) {
+    if (this._actualIdentity === undefined) {
       throw new Error("cannot use getPublicKey() before a successful sign()");
     } else {
       return this._actualIdentity.getPublicKey();
@@ -81,7 +80,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * first signing.
    */
   public async sign(blob: ArrayBuffer): Promise<Signature> {
-    if (this._actualIdentity) {
+    if (this._actualIdentity !== undefined) {
       return this._actualIdentity.sign(blob);
     }
     const options: CredentialRequestOptions = {
@@ -96,7 +95,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       },
     };
     const result = (
-      this.iframe === true && nonNullish(this.rpId)
+      this.iframe === true && this.rpId !== undefined
         ? await webAuthnInIframe(options, this.attachElement)
         : await navigator.credentials.get(options)
     ) as PublicKeyCredential;
@@ -114,7 +113,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       }
     }
 
-    if (isNullish(this._actualIdentity)) {
+    if (this._actualIdentity === undefined) {
       // Odd, user logged in with a credential we didn't provide?
       throw new Error("internal error");
     }

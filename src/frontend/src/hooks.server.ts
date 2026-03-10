@@ -1,5 +1,4 @@
 import { injectCanisterIdAndConfigPlugin } from "@dfinity/internet-identity-vite-plugins";
-import { nonNullish } from "@dfinity/utils";
 import type { Handle, ServerInit } from "@sveltejs/kit";
 import { localeStore } from "$lib/stores/locale.store";
 
@@ -12,7 +11,7 @@ const transformHtml =
 export const handle: Handle = async ({ event, resolve }) => {
   const response = await resolve(event);
   if (
-    nonNullish(transformHtml) &&
+    transformHtml !== undefined &&
     response.headers.get("Content-Type") === "text/html" &&
     response.ok
   ) {

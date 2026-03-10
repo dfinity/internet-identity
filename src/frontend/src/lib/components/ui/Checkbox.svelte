@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from "svelte/elements";
   import { CheckIcon, MinusIcon } from "@lucide/svelte";
-  import { nonNullish } from "@dfinity/utils";
 
   type Size = "sm" | "md";
 
@@ -48,7 +47,7 @@
         sm: "size-4",
         md: "size-5",
       }[size],
-      (nonNullish(label) || nonNullish(hint)) && "mt-0.5",
+      (label !== undefined || hint !== undefined) && "mt-0.5",
     ]}
   >
     {#if checked}
@@ -67,9 +66,9 @@
       {/if}
     {/if}
   </div>
-  {#if nonNullish(label) || nonNullish(hint)}
+  {#if label !== undefined || hint !== undefined}
     <div class="flex flex-col">
-      {#if nonNullish(label)}
+      {#if label !== undefined}
         <p
           class={[
             "text-text-secondary font-medium select-none",
@@ -79,7 +78,7 @@
           {label}
         </p>
       {/if}
-      {#if nonNullish(hint)}
+      {#if hint !== undefined}
         <p
           class={[
             "text-text-tertiary select-none",

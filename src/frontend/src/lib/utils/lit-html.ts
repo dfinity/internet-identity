@@ -1,7 +1,6 @@
 /* A couple of lit-html helpers */
 
 import { toast } from "$lib/templates/toast";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, render } from "lit-html";
 import { DirectiveResult } from "lit-html/directive.js";
 import { Ref, ref } from "lit-html/directives/ref.js";
@@ -14,7 +13,7 @@ export type TemplateElement = string | TemplateResult | DirectiveResult;
 export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
   const value = ref.value;
 
-  if (isNullish(value)) {
+  if (value === undefined) {
     toast.error(
       "Internet Identity: Tried to access a DOM element that doesn't exist, this is a bug",
     );
@@ -33,7 +32,7 @@ export function withRef<A, B>(ref: Ref<A>, f: (val: A) => B): B | undefined {
  */
 export const mount = (callback: (elem: Element) => void): DirectiveResult =>
   ref((e: Element | undefined) => {
-    if (nonNullish(e)) {
+    if (e !== undefined) {
       // This works by observing the entire document for mutations, under
       // the assumption that the first DOM mutation to happen after the element
       // was created is inserting the element (or its parent) in the DOM. This
