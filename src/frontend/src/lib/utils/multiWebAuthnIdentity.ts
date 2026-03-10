@@ -79,7 +79,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * WebAuthnIdentity created with the pubkey that we picked up during the
    * first signing.
    */
-  public async sign(blob: ArrayBuffer): Promise<Signature> {
+  public async sign(blob: Uint8Array): Promise<Signature> {
     if (this._actualIdentity !== undefined) {
       return this._actualIdentity.sign(blob);
     }
@@ -130,7 +130,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     if (!cbor) {
       throw new Error("failed to encode cbor");
     }
-    return new Uint8Array(cbor).buffer as Signature;
+    return new Uint8Array(cbor) as Signature;
   }
 }
 

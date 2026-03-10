@@ -23,6 +23,7 @@
   import type { Provider } from "$lib/assets/aaguid";
   import { onMount } from "svelte";
   import { aaguidToString } from "$lib/utils/webAuthn";
+  import { toHex } from "$lib/utils/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { anonymousActor, anonymousAgent, canisterConfig } from "$lib/globals";
   import type { DeviceData } from "$lib/generated/internet_identity_types";
@@ -36,7 +37,6 @@
   } from "@icp-sdk/core/identity";
   import { toaster } from "$lib/components/utils/toaster";
   import { waitFor } from "$lib/utils/utils";
-  import { bytesToHex } from "@noble/hashes/utils";
   import { handleError } from "$lib/components/utils/error";
 
   interface IdentityResult {
@@ -119,14 +119,16 @@
     !devices.some(
       (device) =>
         device.credential_id[0] !== undefined &&
-        device.origin[0]?.endsWith("id.ai"),
+        (device.origin[0]?.endsWith("id.ai") ?? false),
     );
   const lookupByPasskey = async () => {
     const identityResult = await new Promise<IdentityResult>(
+      // eslint-disable-next-line no-async-promise-executor
       async (resolve) => {
         let identityNumber = BigInt(-1);
         const passkeyIdentity = await DiscoverablePasskeyIdentity.useExisting({
           getPublicKey: (result) =>
+            // eslint-disable-next-line no-async-promise-executor
             new Promise(async (resolve) => {
               const lookupResult = (
                 await anonymousActor.lookup_device_key(
@@ -199,7 +201,7 @@
       handleError(error);
     }
   };
-  const exportJSON = async () => {
+  const exportJSON = () => {
     const date = Date.now();
     const json = JSON.stringify(
       {
@@ -210,7 +212,7 @@
       },
       (_, value) =>
         value instanceof Uint8Array
-          ? bytesToHex(value as Uint8Array)
+          ? toHex(value as Uint8Array)
           : typeof value === "bigint"
             ? value.toString()
             : value,
@@ -236,12 +238,12 @@
 
   onMount(() => {
     // Lazy load known providers data
-    import("$lib/assets/aaguid").then(
+    void import("$lib/assets/aaguid").then(
       (data) => (knownProviders = data.default),
     );
     // Load identity numbers from storage (old and new),
     // and fetch all devices for each anchor in parallel.
-    readStorage()
+    void readStorage()
       .then((storage) => [
         ...Object.entries(storage.anchors ?? {})
           // Filter out old entries that are in new storage
@@ -307,7 +309,7 @@
       <hr class="bt-1 border-border-secondary my-4" />
       {#if identityResults.length > 0}
         <div class="mb-4 flex flex-col gap-4">
-          {#each [...identityResults].sort((a, b) => b.lastUsed - a.lastUsed) as identityResult}
+          {#each [...identityResults].sort((a, b) => b.lastUsed - a.lastUsed) as identityResult (identityResult.identityNumber)}
             {@const isRecoveryPhraseSetUp = identityResult.devices.some(
               (device) =>
                 "recovery" in device.purpose &&
@@ -396,7 +398,7 @@
         <div class="text-text-tertiary text-sm text-balance">
           <Trans>Check out the other domains:</Trans>
           <ul class="mt-1 flex flex-col gap-0.5">
-            {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
+            {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin (relatedOrigin)}
               <li>
                 <a
                   href={relatedOrigin + "/self-service"}
@@ -430,7 +432,7 @@
       <hr class="bt-1 border-border-secondary my-4" />
       {#if testResults.length > 0}
         <div class="flex flex-col gap-4">
-          {#each [...testResults].reverse() as testResult}
+          {#each [...testResults].reverse() as testResult, index (index)}
             {@const provider =
               knownProviders !== undefined && testResult.aaguid !== undefined
                 ? knownProviders[testResult.aaguid]

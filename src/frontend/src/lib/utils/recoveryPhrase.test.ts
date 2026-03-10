@@ -1,4 +1,3 @@
-import { hexToBytes } from "@noble/hashes/utils";
 import { Ed25519PublicKey } from "@icp-sdk/core/identity";
 import * as ed25519 from "./recoveryPhrase";
 

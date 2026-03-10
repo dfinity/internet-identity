@@ -7,7 +7,7 @@ import {
   Signature,
   wrapDER,
 } from "@icp-sdk/core/agent";
-import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils";
+import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes";
 import borc from "borc";
 import { bufFromBufLike } from "$lib/utils/utils";
 
@@ -21,7 +21,7 @@ import { bufFromBufLike } from "$lib/utils/utils";
  */
 
 function _coseToDerEncodedBlob(cose: Uint8Array): DerEncodedPublicKey {
-  return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
+  return wrapDER(cose, DER_COSE_OID) as DerEncodedPublicKey;
 }
 
 type PublicKeyCredentialWithAttachment = Omit<PublicKeyCredential, "toJSON"> & {
@@ -42,7 +42,7 @@ type PublicKeyCredentialWithAttachment = Omit<PublicKeyCredential, "toJSON"> & {
  * @param authData The authData field of the attestation response.
  * @returns The COSE key of the authData.
  */
-function _authDataToCose(authData: ArrayBuffer): ArrayBuffer {
+function _authDataToCose(authData: Uint8Array): Uint8Array {
   const dataView = new DataView(new ArrayBuffer(2));
   const idLenBytes = authData.slice(53, 55);
   [...new Uint8Array(idLenBytes)].forEach((v, i) => dataView.setUint8(i, v));
@@ -189,12 +189,10 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     // Parse the attestationObject as CBOR.
-    const attObject = borc.decodeFirst(
-      new Uint8Array(response.attestationObject),
-    );
+    const attObject = borc.decodeFirst(response.attestationObject);
 
     return new this(
-      creds.rawId,
+      new Uint8Array(creds.rawId),
       _authDataToCose(attObject.authData),
       creds.authenticatorAttachment ?? undefined,
       credentialCreationOptions?.publicKey?.rp.id,
@@ -205,14 +203,14 @@ export class WebAuthnIdentity extends SignIdentity {
   protected _publicKey: CosePublicKey;
 
   public constructor(
-    public readonly rawId: ArrayBuffer,
-    cose: ArrayBuffer,
+    public readonly rawId: Uint8Array,
+    cose: Uint8Array,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
     protected rpId: string | undefined,
     public readonly aaguid: Uint8Array | undefined,
   ) {
     super();
-    this._publicKey = new CosePublicKey(new Uint8Array(cose));
+    this._publicKey = new CosePublicKey(cose);
   }
 
   public getPublicKey(): PublicKey {
