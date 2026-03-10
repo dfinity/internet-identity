@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import {
     MigrationFlow,
     WrongDomainError,
@@ -48,8 +47,8 @@
   };
 
   const handleUpgrade = async (name: string): Promise<void | "cancelled"> => {
-    if (isNullish(migrationFlow.identityNumber)) {
-      // Button is disabled if identityNumber is null or undefined so no need to manage that case.
+    if (migrationFlow.identityNumber === undefined) {
+      // Button is disabled if identityNumber is undefined so no need to manage that case.
       throw new Error("Identity number is undefined");
     }
     try {
@@ -71,8 +70,8 @@
   <AlreadyMigrated onUpgradeAgain={migrationFlow.upgradeAgain} />
 {:else if migrationFlow.view === "enterNumber"}
   <EnterIdentityNumber onSubmit={handleSubmit} />
-  <!-- User can't move to this step if identityNumber is null or undefined so no need to manage that case. -->
-{:else if migrationFlow.view === "enterName" && nonNullish(migrationFlow.identityNumber)}
+  <!-- User can't move to this step if identityNumber is undefined so no need to manage that case. -->
+{:else if migrationFlow.view === "enterName" && migrationFlow.identityNumber !== undefined}
   <UpgradePasskey
     upgrade={handleUpgrade}
     identityNumber={migrationFlow.identityNumber}

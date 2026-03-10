@@ -32,7 +32,6 @@
   } from "./utils";
   import { sessionStore } from "$lib/stores/session.store";
   import { page } from "$app/state";
-  import { nonNullish } from "@dfinity/utils";
   import { ConfirmAccessMethodWizard } from "$lib/components/wizards/confirmAccessMethod";
   import { toaster } from "$lib/components/utils/toaster";
 
@@ -86,9 +85,10 @@
     lastUsedIdentitiesStore.addLastUsedIdentityIfMissing({
       identityNumber: data.identityNumber,
       name: data.identityInfo.name[0],
-      createdAtMillis: nonNullish(data.identityInfo.created_at[0])
-        ? nanosToMillis(data.identityInfo.created_at[0])
-        : undefined,
+      createdAtMillis:
+        data.identityInfo.created_at[0] !== undefined
+          ? nanosToMillis(data.identityInfo.created_at[0])
+          : undefined,
       authMethod: {
         openid: {
           iss: openid.iss,
@@ -111,7 +111,7 @@
         name: data.identityInfo.name[0],
         createdAtMillis:
           data.identityInfo.created_at.length > 0 &&
-          nonNullish(data.identityInfo.created_at[0])
+          data.identityInfo.created_at[0] !== undefined
             ? nanosToMillis(data.identityInfo.created_at[0])
             : undefined,
         authMethod: {
@@ -333,7 +333,7 @@
   </Dialog>
 {/if}
 
-{#if nonNullish(pendingRegistrationId)}
+{#if pendingRegistrationId !== null}
   <Dialog onClose={() => (pendingRegistrationId = null)}>
     <ConfirmAccessMethodWizard
       registrationId={pendingRegistrationId}

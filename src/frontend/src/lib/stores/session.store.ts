@@ -12,7 +12,6 @@ import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { Principal } from "@icp-sdk/core/principal";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 import { fromBase64, toBase64 } from "$lib/utils/utils";
-import { isNullish } from "@dfinity/utils";
 
 export interface Session {
   identity: SignIdentity;
@@ -67,7 +66,7 @@ const createSession = async (): Promise<CreatedSession> => {
 
 const readSession = async (): Promise<SessionData | undefined> => {
   const item = sessionStorage.getItem(STORAGE_KEY);
-  if (isNullish(item)) {
+  if (item === null) {
     return undefined;
   }
   const { privateJwk, publicJwk, nonce, salt, createdAt } = JSON.parse(item);
@@ -139,7 +138,7 @@ export const sessionStore: SessionStore = {
     internalStore.set({ identity, agent, actor, nonce, salt });
   },
   subscribe: derived(internalStore, (session) => {
-    if (isNullish(session)) {
+    if (session === undefined) {
       throw new Error("Not initialized");
     }
     return session;
@@ -149,7 +148,7 @@ export const sessionStore: SessionStore = {
     session.persist();
     const { identity, nonce, salt } = session.data;
     internalStore.update((session) => {
-      if (isNullish(session)) {
+      if (session === undefined) {
         throw new Error("Not initialized");
       }
       const { agent, actor } = session;

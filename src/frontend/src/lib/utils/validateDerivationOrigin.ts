@@ -1,7 +1,6 @@
 import { resolveCanisterId as resolveCanisterIdFn } from "$lib/utils/canisterIdResolution";
 import { wrapError } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
-import { isNullish } from "@dfinity/utils";
 
 const MAX_ALTERNATIVE_ORIGINS = 10;
 type ValidationResult =
@@ -26,7 +25,7 @@ export const validateDerivationOrigin = async ({
   derivationOrigin?: string;
   resolveCanisterId?: typeof resolveCanisterIdFn;
 }): Promise<ValidationResult> => {
-  if (isNullish(derivationOrigin) || derivationOrigin === requestOrigin) {
+  if (derivationOrigin === undefined || derivationOrigin === requestOrigin) {
     // this is the default behaviour -> no further validation necessary
     return { result: "valid" };
   }
@@ -131,7 +130,7 @@ const inferAlternativeOriginsUrl = ({
   const ALTERNATIVE_ORIGINS_PATH = "/.well-known/ii-alternative-origins";
 
   const location = window?.location;
-  if (isNullish(location)) {
+  if (location === undefined) {
     // If there is no location, then most likely this is a non-browser environment. All bets
     // are off, but we return something valid just in case.
     return `https://${canisterId.toText()}.${IC_HTTP_GATEWAY_DOMAIN}${ALTERNATIVE_ORIGINS_PATH}`;

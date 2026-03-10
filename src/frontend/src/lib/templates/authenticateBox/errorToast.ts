@@ -1,5 +1,4 @@
 import { FlowError } from "$lib/templates/authenticateBox";
-import { nonNullish } from "@dfinity/utils";
 import { html, TemplateResult } from "lit-html";
 
 // Maps all errors kinds to their error types (without kind field):
@@ -77,12 +76,15 @@ export const flowErrorToastTemplate = <K extends FlowError["kind"]>(
   flowError: KindToError<K> & { kind: K },
 ): TemplateResult => {
   const props = clarifyError[flowError.kind](flowError);
-  const detailSlot = nonNullish(props.detail)
-    ? html`<div class="l-stack">
-        <h4>Error details:</h4>
-        <pre data-role="error-detail" class="t-paragraph">${props.detail}</pre>
-      </div>`
-    : undefined;
+  const detailSlot =
+    props.detail !== undefined
+      ? html`<div class="l-stack">
+          <h4>Error details:</h4>
+          <pre data-role="error-detail" class="t-paragraph">
+${props.detail}</pre
+          >
+        </div>`
+      : undefined;
   return html`
     <h3 data-error-code=${flowError.kind} class="t-title c-card__title">
       ${props.title}

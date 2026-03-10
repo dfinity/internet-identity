@@ -1,5 +1,4 @@
 import { II_LEGACY_ORIGIN } from "$lib/legacy/constants";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { CredentialData } from "./credential-devices";
 import { getPrimaryOrigin } from "$lib/globals";
 import { isSameOrigin } from "./urlUtils";
@@ -72,14 +71,14 @@ export const findWebAuthnFlows = ({
     // Device origin to RP ID (hostname)
     .map((device: CredentialData) =>
       device.origin === currentOrigin ||
-      (currentOrigin === II_LEGACY_ORIGIN && isNullish(device.origin))
+      (currentOrigin === II_LEGACY_ORIGIN && device.origin === undefined)
         ? undefined
         : new URL(device.origin ?? II_LEGACY_ORIGIN).hostname,
     )
     // Filter out RP IDs that are not within `relatedRpIds`
     .filter(
       (rpId: string | undefined) =>
-        isNullish(rpId) || relatedRpIds.includes(rpId),
+        rpId === undefined || relatedRpIds.includes(rpId),
     )
     // Remove duplicates
     .reduce((rpIds: Array<string | undefined>, rpId: string | undefined) => {
@@ -90,7 +89,7 @@ export const findWebAuthnFlows = ({
     }, [])
     .map((rpId) => ({
       rpId,
-      useIframe: nonNullish(rpId) && rpId !== currentRpId,
+      useIframe: rpId !== undefined && rpId !== currentRpId,
     }));
 
   // If there are no steps, add a default step.

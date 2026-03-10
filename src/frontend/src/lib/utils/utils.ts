@@ -6,7 +6,6 @@ import {
   Delegation,
   SignedDelegation as FrontendSignedDelegation,
 } from "@icp-sdk/core/identity";
-import { isNullish, nonNullish } from "@dfinity/utils";
 
 export function unknownToString(obj: unknown, def: string): string {
   // Only booleans, numbers and strings _may_ not be objects, so first we try
@@ -48,7 +47,7 @@ export function asNonEmptyArray<T>(
 
   const first = arr.shift();
 
-  if (isNullish(first)) {
+  if (first === undefined) {
     return undefined;
   }
 
@@ -103,7 +102,7 @@ export class Chan<A> implements AsyncIterable<A> {
   }
 
   send(a: A): void {
-    if (nonNullish(this.snd)) {
+    if (this.snd !== undefined) {
       this.snd(a);
       // After the promise was resolved, set as undefined so that
       // future `send`s go to the buffer.
@@ -267,7 +266,7 @@ export const throwCanisterError = <
   response: T,
 ): Promise<S> => {
   if ("Err" in response) {
-    if (isNullish(response.Err)) {
+    if (response.Err === null) {
       throw new Error("Unexpected error occurred");
     }
     throw new CanisterError(response.Err);

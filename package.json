@@ -79,7 +79,6 @@
   },
   "dependencies": {
     "@dfinity/internet-identity-vc-api": "*",
-    "@dfinity/utils": "^4.2.0",
     "@icp-sdk/auth": "^5.0.0",
     "@icp-sdk/core": "^5.0.0",
     "@lingui/core": "^5.9.2",

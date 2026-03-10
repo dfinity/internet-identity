@@ -1,6 +1,5 @@
 import type { AnalyticsConfig } from "$lib/generated/internet_identity_types";
 import { authorizationStore } from "$lib/stores/authorization.store";
-import { isNullish } from "@dfinity/utils";
 import Plausible from "plausible-tracker";
 import { PlausibleInitOptions } from "plausible-tracker/build/main/lib/tracker";
 import { get } from "svelte/store";
@@ -10,7 +9,7 @@ let tracker: undefined | ReturnType<typeof Plausible>;
 const convertToPlausibleConfig = (
   config: AnalyticsConfig | undefined,
 ): PlausibleInitOptions | undefined => {
-  if (isNullish(config)) {
+  if (config === undefined) {
     return;
   }
   if ("Plausible" in config) {
@@ -32,11 +31,11 @@ const removeUndefinedFields = (obj: Record<string, unknown | undefined>) => {
 };
 
 export const initAnalytics = (config: AnalyticsConfig | undefined) => {
-  if (isNullish(config)) {
+  if (config === undefined) {
     return;
   }
   const plausibleConfig = convertToPlausibleConfig(config);
-  if (isNullish(plausibleConfig)) {
+  if (plausibleConfig === undefined) {
     return;
   }
   tracker = Plausible(plausibleConfig);

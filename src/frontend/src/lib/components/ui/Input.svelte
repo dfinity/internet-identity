@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { ClassValue, HTMLInputAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
   import type { Snippet } from "svelte";
 
   type Size = "sm" | "md";
@@ -25,13 +24,13 @@
     value = $bindable(),
     size = "md",
     error,
-    errorBorder = nonNullish(error),
+    errorBorder = error !== undefined,
     ...restProps
   }: Props = $props();
 </script>
 
 <div class={["flex flex-col gap-1.5", className]}>
-  {#if nonNullish(label)}
+  {#if label !== undefined}
     <label for={id} class="text-text-secondary text-sm font-medium">
       {label}
     </label>
@@ -56,20 +55,20 @@
       ]}
     />
   </div>
-  {#if nonNullish(error) || nonNullish(hint)}
+  {#if error !== undefined || hint !== undefined}
     <div
       class={[
         "text-sm",
-        nonNullish(error) ? "text-text-error-primary" : "text-text-tertiary",
+        error !== undefined ? "text-text-error-primary" : "text-text-tertiary",
       ]}
     >
-      {#if nonNullish(error)}
+      {#if error !== undefined}
         {#if typeof error === "string"}
           {error}
         {:else}
           {@render error()}
         {/if}
-      {:else if nonNullish(hint)}
+      {:else if hint !== undefined}
         {#if typeof hint === "string"}
           {hint}
         {:else}

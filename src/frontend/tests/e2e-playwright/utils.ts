@@ -2,7 +2,6 @@ import { CDPSession, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
-import { isNullish } from "@dfinity/utils";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
@@ -298,7 +297,7 @@ export const getMessageText = async (
 const webauthnClientCache = new WeakMap<Page, Promise<CDPSession>>();
 const getWebAuthnClient = (page: Page) => {
   let clientPromise = webauthnClientCache.get(page);
-  if (isNullish(clientPromise)) {
+  if (clientPromise === undefined) {
     clientPromise = (async () => {
       const client = await page.context().newCDPSession(page);
       await client.send("WebAuthn.enable");

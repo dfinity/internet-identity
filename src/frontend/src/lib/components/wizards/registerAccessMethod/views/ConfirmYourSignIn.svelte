@@ -2,7 +2,6 @@
   import PasskeyIllustration from "$lib/components/illustrations/PasskeyIllustration.svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { nonNullish } from "@dfinity/utils";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
 
@@ -30,7 +29,7 @@
   {$t`Confirm your sign-in`}
 </h1>
 <p class="text-text-tertiary mb-4 text-base font-medium text-balance">
-  {#if nonNullish(name)}
+  {#if name !== undefined}
     <Trans>
       You're signing in as <b class="text-text-primary">{name}</b>.
     </Trans>

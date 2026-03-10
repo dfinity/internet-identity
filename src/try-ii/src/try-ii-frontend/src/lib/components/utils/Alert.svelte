@@ -7,7 +7,6 @@
     XIcon,
   } from "@lucide/svelte";
   import Button from "$lib/components/Button.svelte";
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import ProgressRing from "$lib/components/ProgressRing.svelte";
 
   type Props = HTMLAttributes<HTMLDivElement> & {
@@ -50,7 +49,7 @@
       <ProgressRing class="text-fg-brand-primary" />
     {/if}
   </div>
-  {#if nonNullish(onClose)}
+  {#if onClose !== undefined}
     <Button
       onclick={onClose}
       variant="tertiary"
@@ -70,20 +69,20 @@
       direction === "horizontal"
         ? "col-start-2 row-span-2 row-start-1"
         : "col-span-3",
-      direction === "horizontal" && isNullish(onClose) && "col-span-2",
+      direction === "horizontal" && onClose === undefined && "col-span-2",
     ]}
   >
     <div class="text-text-primary text-sm font-semibold">
       {title}
     </div>
-    {#if nonNullish(description) || nonNullish(children)}
+    {#if description !== undefined || children !== undefined}
       <div class="flex flex-col gap-3">
-        {#if nonNullish(description)}
+        {#if description !== undefined}
           <div class="text-text-tertiary text-sm font-medium">
             {description}
           </div>
         {/if}
-        {#if nonNullish(children)}
+        {#if children !== undefined}
           <div class="flex gap-3">
             {@render children()}
           </div>

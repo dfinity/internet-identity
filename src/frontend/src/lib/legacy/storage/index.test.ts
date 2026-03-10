@@ -1,5 +1,4 @@
 import { Principal } from "@icp-sdk/core/principal";
-import { nonNullish } from "@dfinity/utils";
 import { IDBFactory } from "fake-indexeddb";
 import {
   clear as idbClear,
@@ -436,13 +435,13 @@ function withStorage(
   return async () => {
     localStorage.clear();
     const lsBefore = opts?.localStorage?.before;
-    if (nonNullish(lsBefore)) {
+    if (lsBefore !== undefined) {
       setLocalStorage(lsBefore);
     }
 
     await idbClear();
     const idbBefore = opts?.indexeddb?.before;
-    if (nonNullish(idbBefore)) {
+    if (idbBefore !== undefined) {
       await setIndexedDB(idbBefore);
     }
 
@@ -451,7 +450,7 @@ function withStorage(
     // Check the IndexedDB "after"
 
     const idbAfter = opts?.indexeddb?.after;
-    if (nonNullish(idbAfter)) {
+    if (idbAfter !== undefined) {
       const actual: IndexedDB = await readIndexedDB();
 
       if (typeof idbAfter === "function") {
@@ -469,7 +468,7 @@ function withStorage(
     // Check the localStorage "after"
 
     const lsAfter = opts?.localStorage?.after;
-    if (nonNullish(lsAfter)) {
+    if (lsAfter !== undefined) {
       const actual: LocalStorage = readLocalStorage();
 
       if (typeof lsAfter === "function") {

@@ -8,7 +8,6 @@ import {
   NodeMotion,
   type FlairAnimationOptions,
 } from "$lib/components/backgrounds/FlairCanvas";
-import { nonNullish } from "@dfinity/utils";
 import { tick } from "svelte";
 
 ////// ANIMATION //////
@@ -779,7 +778,7 @@ export function drawNodes(
   const body = document.querySelector("body");
   if (!body) return;
   const color =
-    nonNullish(customHexColor) &&
+    customHexColor !== undefined &&
     customHexColor.length > 0 &&
     customColorMode === "all"
       ? customHexColor

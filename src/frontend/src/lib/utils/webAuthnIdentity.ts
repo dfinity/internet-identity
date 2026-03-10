@@ -7,7 +7,6 @@ import {
   Signature,
   wrapDER,
 } from "@icp-sdk/core/agent";
-import { isNullish } from "@dfinity/utils";
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils";
 import borc from "borc";
 import { bufFromBufLike } from "$lib/utils/utils";
@@ -260,7 +259,7 @@ export class WebAuthnIdentity extends SignIdentity {
         signature: new Uint8Array(response.signature),
       }),
     );
-    if (isNullish(cbor)) {
+    if (cbor === undefined || cbor === null) {
       throw new Error("failed to encode cbor");
     }
     return cbor.buffer as Signature;

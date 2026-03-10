@@ -3,7 +3,6 @@
     HTMLButtonAttributes,
     HTMLAnchorAttributes,
   } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
 
   type Props = HTMLButtonAttributes &
     HTMLAnchorAttributes & {
@@ -18,11 +17,11 @@
     "href" in props ? props : undefined;
 </script>
 
-{#if nonNullish(buttonProps)}
+{#if buttonProps !== undefined}
   <button bind:this={element} {...buttonProps}>
     {@render buttonProps.children?.()}
   </button>
-{:else if nonNullish(anchorProps)}
+{:else if anchorProps !== undefined}
   <a bind:this={element} {...anchorProps}>
     {@render anchorProps.children?.()}
   </a>

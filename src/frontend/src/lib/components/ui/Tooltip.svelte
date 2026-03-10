@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
 
   type Direction = "up" | "right" | "down" | "left";
   type Align = "start" | "center" | "end";
@@ -48,7 +47,7 @@
     }
     let tracking = true;
     const track = () => {
-      if (nonNullish(anchorRef) && nonNullish(tooltipRef)) {
+      if (anchorRef !== undefined && tooltipRef !== undefined) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const tooltipRect = tooltipRef.getBoundingClientRect();
         tooltipRef.style.top = {
@@ -167,7 +166,7 @@
       <span class="text-text-primary text-start text-xs font-semibold">
         {label}
       </span>
-      {#if nonNullish(description)}
+      {#if description !== undefined}
         <span class="text-text-tertiary mt-1 text-start text-xs font-medium">
           {description}
         </span>

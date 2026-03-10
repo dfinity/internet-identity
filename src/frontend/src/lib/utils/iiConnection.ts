@@ -49,7 +49,6 @@ import {
   Ed25519KeyIdentity,
 } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   convertToValidCredentialData,
   CredentialData,
@@ -306,7 +305,7 @@ export class Connection {
     try {
       finishResponse = await actor.identity_registration_finish({
         authn_method: authnMethod,
-        name: nonNullish(name) ? [name] : [],
+        name: name !== undefined ? [name] : [],
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -418,7 +417,10 @@ export class Connection {
       userNumber,
       webAuthnAuthenticators
         .map(convertToValidCredentialData)
-        .filter(nonNullish),
+        .filter(
+          (credential): credential is NonNullable<typeof credential> =>
+            credential !== undefined,
+        ),
     );
   };
 
@@ -428,7 +430,7 @@ export class Connection {
   ): Promise<
     LoginSuccess | WebAuthnFailed | PossiblyWrongWebAuthnFlow | AuthFail
   > => {
-    if (isNullish(this.webAuthFlows) && get(DOMAIN_COMPATIBILITY)) {
+    if (this.webAuthFlows === undefined && get(DOMAIN_COMPATIBILITY)) {
       const flows = findWebAuthnFlows({
         devices: credentials,
         currentOrigin: window.location.origin,
@@ -450,9 +452,10 @@ export class Connection {
     if (this.webAuthFlows?.currentIndex === flowsLength) {
       this.webAuthFlows.currentIndex = 0;
     }
-    const currentFlow = nonNullish(this.webAuthFlows)
-      ? this.webAuthFlows.flows[this.webAuthFlows.currentIndex]
-      : undefined;
+    const currentFlow =
+      this.webAuthFlows !== undefined
+        ? this.webAuthFlows.flows[this.webAuthFlows.currentIndex]
+        : undefined;
 
     /* Recover the Identity (i.e. key pair) used when creating the anchor.
      * If the "DUMMY_AUTH" feature is set, we use a dummy identity, the same identity
@@ -481,7 +484,7 @@ export class Connection {
           WebauthnAuthenticationEvents.Cancelled,
         );
         // We only want to show a special error if the user might have to choose different web auth flow.
-        if (nonNullish(this.webAuthFlows) && flowsLength > 1) {
+        if (this.webAuthFlows !== undefined && flowsLength > 1) {
           // Increase the index to try the next flow.
           this.webAuthFlows = {
             flows: this.webAuthFlows.flows,
@@ -607,7 +610,7 @@ export class Connection {
     const actor = await this.createActor();
     return await actor.add_tentative_device(userNumber, {
       ...device,
-      origin: isNullish(window?.origin) ? [] : [window.origin],
+      origin: window?.origin === undefined ? [] : [window.origin],
     });
   };
 
@@ -674,7 +677,7 @@ export class AuthenticatedConnection extends Connection {
       }
     }
 
-    if (isNullish(this.actor)) {
+    if (this.actor === undefined) {
       // Create our actor with a DelegationIdentity to avoid re-prompting auth
       this.delegationIdentity = await this.requestFEDelegation(this.identity);
       this.actor = await this.createActor(this.delegationIdentity);
@@ -729,7 +732,7 @@ export class AuthenticatedConnection extends Connection {
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
     const sanitizedOrigin =
-      nonNullish(origin) && origin.length <= 50 ? origin : undefined;
+      origin !== undefined && origin.length <= 50 ? origin : undefined;
     return await actor.add(this.userNumber, {
       alias,
       pubkey: Array.from(new Uint8Array(newPublicKey)),
@@ -789,7 +792,7 @@ export class AuthenticatedConnection extends Connection {
         this.userNumber,
         origin,
         sessionKey,
-        nonNullish(maxTimeToLive) ? [maxTimeToLive] : [],
+        maxTimeToLive !== undefined ? [maxTimeToLive] : [],
       );
     } catch (e: unknown) {
       console.error(e);
@@ -841,7 +844,7 @@ export class AuthenticatedConnection extends Connection {
       identity_number: userNumber,
     });
 
-    if (isNullish(result)) {
+    if (result === undefined) {
       console.error("Canister did not send a response");
       return { error: "internal_error" };
     }
@@ -892,7 +895,7 @@ export class AuthenticatedConnection extends Connection {
       ...preparedIdAlias,
     });
 
-    if (isNullish(result)) {
+    if (result === undefined) {
       console.error("Canister did not send a response");
       return { error: "internal_error" };
     }
@@ -995,7 +998,7 @@ export const remapToLegacyDomain = (origin: string): string => {
     /^https:\/\/(?<subdomain>[\w-]+(?:\.raw)?)\.icp0\.io$/;
   const match = origin.match(ORIGIN_MAPPING_REGEX);
   const subdomain = match?.groups?.subdomain;
-  if (nonNullish(subdomain)) {
+  if (subdomain !== undefined) {
     return `https://${subdomain}.ic0.app`;
   } else {
     return origin;
@@ -1020,7 +1023,7 @@ export const inferHost = (): string => {
   const IC_API_DOMAIN = "icp-api.io";
 
   const location = window?.location;
-  if (isNullish(location)) {
+  if (location === undefined) {
     // If there is no location, then most likely this is a non-browser environment. All bets
     // are off but we return something valid just in case.
     return "https://" + IC_API_DOMAIN;

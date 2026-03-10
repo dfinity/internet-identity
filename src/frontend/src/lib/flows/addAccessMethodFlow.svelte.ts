@@ -1,6 +1,5 @@
 import { canisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { decodeJWT, requestJWT } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { throwCanisterError } from "$lib/utils/utils";
@@ -53,10 +52,10 @@ export class AddAccessMethodFlow {
         .then(throwCanisterError);
 
       const metadata: MetadataMapV2 = [];
-      if (nonNullish(name)) {
+      if (name !== undefined) {
         metadata.push(["name", { String: name }]);
       }
-      if (nonNullish(email)) {
+      if (email !== undefined) {
         metadata.push(["email", { String: email }]);
       }
       return {
@@ -74,16 +73,16 @@ export class AddAccessMethodFlow {
   createPasskey = async (name?: string): Promise<AuthnMethodData> => {
     const { actor, identityNumber } = get(authenticatedStore);
     // TODO: Do not fail if name is not provided, maybe use the identity number as a fallback?
-    if (isNullish(name)) {
+    if (name === undefined) {
       throw new Error("Identity is missing a name");
     }
 
     const passkeyIdentity =
-      features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const credentialId = passkeyIdentity.getCredentialId();
-    if (isNullish(credentialId)) {
+    if (credentialId === undefined) {
       throw new Error("Credential ID is missing");
     }
     const authnMethodData = passkeyAuthnMethodData({

@@ -2,7 +2,6 @@
 // https://github.com/dfinity/nns-dapp/blob/4619857a316be5b47a950c6b8461ffcaa1a3dde3/frontend/src/lib/utils/html.utils.ts#L94
 //
 
-import { isNullish } from "@dfinity/utils";
 import type { marked as markedTypes, Renderer } from "marked";
 import { marked } from "marked";
 
@@ -61,7 +60,8 @@ const transformImg = (img: string): string => {
   // eslint-disable-next-line
   const alt = img.match(/alt="([^"]+)"/)?.[1] || "img";
   const title = img.match(/title="([^"]+)"/)?.[1];
-  const shouldEscape = isNullish(src) || src.startsWith("data:image");
+  const shouldEscape =
+    src === undefined || src === null || src.startsWith("data:image");
   const imageHtml = shouldEscape
     ? escapeHtml(img)
     : imageToLinkRenderer(src, title, alt);
