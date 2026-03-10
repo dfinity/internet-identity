@@ -30,7 +30,6 @@
           delay: 80,
         }}
         out:fly={{ x: -160 * (navigating.delta ?? 1), duration: 160 }}
-        onoutrostart={() => divRef?.setAttribute("aria-hidden", "true")}
       >
         {@render children?.()}
       </div>

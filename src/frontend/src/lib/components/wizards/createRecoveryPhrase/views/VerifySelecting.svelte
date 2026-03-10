@@ -67,7 +67,7 @@
   {/if}
 </p>
 <ul class={["mb-8 grid grid-cols-3 gap-3"]}>
-  {#each shuffledIndexes as index}
+  {#each shuffledIndexes as index (index)}
     {@const word = recoveryPhrase[index]}
     {@const selectedPosition = selectedIndexes.indexOf(index)}
     {@const isSelected = selectedPosition !== -1 && !isCheckingOrder}

@@ -144,8 +144,6 @@
         class="relative col-start-1 row-start-1 flex flex-col gap-5"
         in:fly={{ duration: 300, y: 60, delay: 200 }}
         out:scale={{ duration: 500, start: 0.9 }}
-        onoutrostart={() =>
-          animationWrapperRef?.setAttribute("aria-hidden", "true")}
       >
         {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
           {@render upgradePanel()}

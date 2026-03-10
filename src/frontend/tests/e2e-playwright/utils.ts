@@ -114,10 +114,10 @@ export const createNewIdentityInII = async (
   dummyAuth: DummyAuthFn,
 ): Promise<void> => {
   // Wait for page to load
-  await Promise.any([
-    page.getByRole("button", { name: "Continue with passkey" }).waitFor(),
-    page.getByRole("button", { name: "Switch identity" }).waitFor(),
-  ]);
+  await page
+    .getByRole("button", { name: "Continue with passkey" })
+    .or(page.getByRole("button", { name: "Switch identity" }))
+    .waitFor();
 
   // Check if we're on the continue screen or not
   const onContinueScreen = await page
