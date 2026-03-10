@@ -3,6 +3,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
 import { isNullish } from "@dfinity/utils";
+import { createPrivateKey, createPublicKey } from "node:crypto";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
@@ -364,6 +365,38 @@ export const addCredentialToVirtualAuthenticator = async (
     authenticatorId,
     credential,
   });
+};
+
+/**
+ * Converts the WebAuthn CDP private key (base64 PKCS#8 DER) to a public key
+ * in SPKI DER encoding.
+ */
+export const cdpPrivateKeyToPublicKeyDer = (
+  privateKey: string,
+): Uint8Array => {
+  const privateKeyDer = Buffer.from(privateKey, "base64");
+  const privateKeyObject = createPrivateKey({
+    key: privateKeyDer,
+    format: "der",
+    type: "pkcs8",
+  });
+  const publicKeyDer = createPublicKey(privateKeyObject).export({
+    format: "der",
+    type: "spki",
+  });
+  return new Uint8Array(publicKeyDer);
+};
+
+/**
+ * Decodes credential IDs returned by CDP (base64 over JSON) to raw bytes.
+ */
+export const decodeCdpCredentialId = (credentialId: string): Uint8Array => {
+  const normalized = credentialId.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
+  return new Uint8Array(Buffer.from(padded, "base64"));
 };
 
 /**
