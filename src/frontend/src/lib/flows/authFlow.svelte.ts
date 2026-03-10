@@ -158,6 +158,7 @@ export class AuthFlow {
       clientId: config.client_id,
       authURL: config.auth_uri,
       authScope: config.auth_scope.join(" "),
+      configURL: config.fedcm_uri?.[0],
     };
     authenticationV2Funnel.addProperties({
       provider: config.name,
