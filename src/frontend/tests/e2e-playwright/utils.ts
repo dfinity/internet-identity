@@ -422,7 +422,7 @@ export const virtualAuthenticatorPrivKeyToPubKey = async (
     ]),
   );
 
-  return new Uint8Array(wrapDER(new Uint8Array(coseKey), DER_COSE_OID));
+  return wrapDER(coseKey, DER_COSE_OID);
 };
 
 /**
