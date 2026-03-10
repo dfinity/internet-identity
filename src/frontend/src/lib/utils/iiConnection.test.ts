@@ -1,14 +1,9 @@
 import type {
   DeviceData,
   InternetIdentityInit,
-  MetadataMapV2,
   _SERVICE,
 } from "$lib/generated/internet_identity_types";
 import { DOMAIN_COMPATIBILITY } from "$lib/state/featureFlags";
-import {
-  IdentityMetadata,
-  RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-} from "$lib/legacy/repositories/identityMetadata";
 import {
   ActorSubclass,
   DerEncodedPublicKey,
@@ -46,20 +41,6 @@ const mockDelegationIdentity = {
   },
 } as unknown as DelegationIdentity;
 
-const recoveryPageShownTimestampMillis = 1234567890;
-const mockRawMetadata: MetadataMapV2 = [
-  [
-    RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-    { String: String(recoveryPageShownTimestampMillis) },
-  ],
-];
-const mockIdentityMetadata: IdentityMetadata = {
-  recoveryPageShownTimestampMillis,
-};
-
-// Used to await that the getter has resolved.
-let infoResponse: MetadataMapV2 | null | undefined = null;
-
 const DEFAULT_INIT: InternetIdentityInit = {
   analytics_config: [],
   archive_config: [],
@@ -91,11 +72,9 @@ vi.mock("$lib/globals", () => ({
 }));
 
 const mockActor = {
-  identity_info: vi.fn().mockImplementation(async () => {
-    // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-    infoResponse = await mockRawMetadata;
-    return { Ok: { metadata: mockRawMetadata } };
-  }),
+  identity_info: vi
+    .fn()
+    .mockImplementation(() => Promise.resolve({ Ok: { metadata: [] } })),
   identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
   lookup: vi.fn().mockResolvedValue([mockDevice]),
 } as unknown as ActorSubclass<_SERVICE>;
@@ -109,60 +88,11 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await idbClear();
-  infoResponse = undefined;
   vi.clearAllMocks();
   vi.stubGlobal("location", {
     origin: currentOrigin,
   });
   DOMAIN_COMPATIBILITY.getFeatureFlag()?.reset();
-});
-
-test("initializes identity metadata repository", async () => {
-  const connection = new AuthenticatedConnection(
-    "12345",
-    DEFAULT_INIT,
-    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
-    mockDelegationIdentity,
-    BigInt(1234),
-    mockActor,
-  );
-
-  await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
-
-  expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
-});
-
-test("commits changes on identity metadata", async () => {
-  const userNumber = BigInt(1234);
-  const connection = new AuthenticatedConnection(
-    "12345",
-    DEFAULT_INIT,
-    MultiWebAuthnIdentity.fromCredentials([], undefined, undefined),
-    mockDelegationIdentity,
-    userNumber,
-    mockActor,
-  );
-
-  expect(infoResponse).toBeUndefined();
-  await vi.waitFor(() => expect(infoResponse).toEqual(mockRawMetadata));
-
-  expect(await connection.getIdentityMetadata()).toEqual(mockIdentityMetadata);
-
-  const newRecoveryPageShownTimestampMillis = 9876543210;
-  connection.updateIdentityMetadata({
-    recoveryPageShownTimestampMillis: newRecoveryPageShownTimestampMillis,
-  });
-
-  expect(mockActor.identity_metadata_replace).not.toHaveBeenCalled();
-  await connection.commitMetadata();
-
-  expect(mockActor.identity_metadata_replace).toHaveBeenCalledTimes(1);
-  expect(mockActor.identity_metadata_replace).toHaveBeenCalledWith(userNumber, [
-    [
-      RECOVERY_PAGE_SHOW_TIMESTAMP_MILLIS,
-      { String: String(newRecoveryPageShownTimestampMillis) },
-    ],
-  ]);
 });
 
 describe("Connection.login", () => {
@@ -240,11 +170,9 @@ describe("Connection.login", () => {
     it("login returns authenticated connection with expected rpID if new flow origins are enabled", async () => {
       const newOriginDevice = createMockDevice("https://id.ai");
       const mockActor = {
-        identity_info: vi.fn().mockImplementation(async () => {
-          // The `await` is necessary to make sure that the `getterResponse` is set before the test continues.
-          infoResponse = await mockRawMetadata;
-          return { Ok: { metadata: mockRawMetadata } };
-        }),
+        identity_info: vi
+          .fn()
+          .mockImplementation(() => Promise.resolve({ Ok: { metadata: [] } })),
         identity_metadata_replace: vi.fn().mockResolvedValue({ Ok: null }),
         // The order here matters, the first device is the one that would be used normally.
         // But we changed to push the new_flow_origins to the end.

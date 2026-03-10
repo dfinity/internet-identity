@@ -40,16 +40,10 @@ const clarifyError: {
       "We failed to call the Internet Identity service, please try again.",
     detail: err.error.message,
   }),
-  badPin: () => ({ title: "Could not authenticate", message: "Invalid PIN" }),
   registerNoSpace: () => ({
     title: "Failed to register",
     message:
       "Failed to register with Internet Identity, because there is no space left at the moment. We're working on increasing the capacity.",
-  }),
-  pinNotAllowed: () => ({
-    title: "PIN method not allowed",
-    message:
-      "The Dapp you are authenticating to does not allow PIN identities and you only have a PIN identity. Please retry using a Passkey: open a new Internet Identity page, add a passkey and retry.",
   }),
   alreadyInProgress: () => ({
     title: "Registration is already in progress",

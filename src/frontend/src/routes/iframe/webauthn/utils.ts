@@ -1,8 +1,4 @@
-import { Connection } from "$lib/utils/iiConnection";
-import {
-  waitForWindowReadyRequest,
-  waitForWindowReadyResponse,
-} from "$lib/utils/internalPostMessage";
+import { waitForWindowReadyResponse } from "$lib/utils/internalPostMessage";
 import { isNullish } from "@dfinity/utils";
 
 export const WEBAUTHN_IFRAME_PATH = "/iframe/webauthn";
@@ -82,7 +78,7 @@ const requestCredential = (
     targetWindow.postMessage(request, targetOrigin);
   });
 
-const handleCredentialRequest = (
+export const handleCredentialRequest = (
   targetWindow: Window,
   targetOrigin: string,
 ): void =>
@@ -139,28 +135,6 @@ const handleCredentialRequest = (
       }
     }
   });
-
-export const webAuthnInIframeFlow = async (
-  connection: Connection,
-): Promise<never> => {
-  // Establish cross-origin connection with parent window
-  const targetOrigin = await waitForWindowReadyRequest(
-    window.parent,
-    // We only establish a connection for the related origins in the II config,
-    // incoming requests from other origins are not listed here and ignored.
-    //
-    // Additionally, the CSP configuration will block any attempt to render II
-    // inside an iframe from domains that are not related origins.
-    connection.canisterConfig.related_origins[0] ?? [],
-  );
-
-  // Get credential and send to parent window
-  handleCredentialRequest(window.parent, targetOrigin);
-
-  return new Promise<never>((_) => {
-    /* halt */
-  });
-};
 
 export const webAuthnInIframe = async (
   options: CredentialRequestOptions,
