@@ -79,11 +79,12 @@ impl<M: Memory + Clone> Storage<M> {
         // anchors within this entire batch failed to migrate.
         let mut batch_did_not_fail_completely = false;
 
-        // This is where the index migration happens. For each anchor in the batch, read it
-        // from storage and write it back, which updates the indices.
+        // This is where the index migration happens. For each anchor in the batch,
+        // force-sync its indices with empty previous data so that all current entries
+        // get added to the indices (even if the StorableAnchor already existed).
         for anchor_number in begin..=end {
-            let anchor = match self.read(anchor_number) {
-                Ok(anchor) => anchor,
+            match self.force_sync_all_indices(anchor_number) {
+                Ok(_) => {}
                 Err(StorageError::AnchorNotFound { .. }) => {
                     ic_cdk::println!("Marking {} as <DUMMY ANCHOR>", anchor_number);
 
@@ -97,19 +98,18 @@ impl<M: Memory + Clone> Storage<M> {
                     // data in the future. Safe to unwrap while the name is shorter than
                     // `MAX_NAME_LENGTH` bytes.
                     anchor.set_name(Some("<DUMMY ANCHOR>".to_string())).unwrap();
-                    anchor
-                }
-                Err(err) => {
-                    let err = format!("r#{}:{:?}", anchor_number, err);
-                    errors.push(err);
-                    continue;
-                }
-            };
 
-            match self.write(anchor) {
-                Ok(_) => (),
+                    match self.write(anchor) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            let err = format!("w#{}:{:?}", anchor_number, err);
+                            errors.push(err);
+                            continue;
+                        }
+                    }
+                }
                 Err(err) => {
-                    let err = format!("w#{}:{:?}", anchor_number, err);
+                    let err = format!("idx#{}:{:?}", anchor_number, err);
                     errors.push(err);
                     continue;
                 }
@@ -225,6 +225,15 @@ mod sync_anchor_indices_tests {
         storage.write(a2.clone()).unwrap();
         storage.write(a3.clone()).unwrap();
 
+        // Clear indices to simulate the state before the migration
+        // (i.e., StorableAnchors exist but the indices are empty).
+        storage
+            .lookup_anchor_with_recovery_phrase_principal_memory
+            .clear_new();
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .clear_new();
+
         const BATCH_SIZE: u64 = 3;
 
         reset_migration_state();
@@ -257,6 +266,31 @@ mod sync_anchor_indices_tests {
             None
         );
 
+        // Check that passkey pubkey hashes are indexed for anchors 2 and 3
+        let pubkey_hash_2 = crate::utils::sha256sum(&pubkey(2));
+        let pubkey_hash_4 = crate::utils::sha256sum(&pubkey(4));
+        let pubkey_hash_1 = crate::utils::sha256sum(&pubkey(1));
+
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_2),
+            Some(2)
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_4),
+            Some(3)
+        );
+        // Anchor 1 only has a recovery phrase, no passkey
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_1),
+            None
+        );
+
         assert_migration_completed(vec![]);
     }
 
@@ -278,8 +312,13 @@ mod sync_anchor_indices_tests {
         storage.write(a2.clone()).unwrap();
         storage.write(a3.clone()).unwrap();
 
+        // Clear indices to simulate the state before the migration
+        // (i.e., StorableAnchors exist but the indices are empty).
         storage
             .lookup_anchor_with_recovery_phrase_principal_memory
+            .clear_new();
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
             .clear_new();
 
         // Not all anchors will fit into the first batch
@@ -316,6 +355,24 @@ mod sync_anchor_indices_tests {
             None
         );
 
+        // Check passkey pubkey hash index: anchors 1 and 2 are in the first batch
+        let pubkey_hash_2 = crate::utils::sha256sum(&pubkey(2));
+        let pubkey_hash_4 = crate::utils::sha256sum(&pubkey(4));
+
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_2),
+            Some(2)
+        );
+        // Anchor 3's passkey not migrated yet
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_4),
+            None
+        );
+
         // Run migration (2)
         storage.sync_anchor_indices(0, BATCH_SIZE);
 
@@ -324,6 +381,12 @@ mod sync_anchor_indices_tests {
             storage
                 .lookup_anchor_with_recovery_phrase_principal_memory
                 .get(&principal_3),
+            Some(3)
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_4),
             Some(3)
         );
 

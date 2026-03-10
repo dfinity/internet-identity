@@ -709,6 +709,47 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
+    /// Force-sync all indices for an anchor by reading its current `StorableAnchor`
+    /// and syncing indices with empty previous data. This is intended for data migrations
+    /// where the `StorableAnchor` already exists in `stable_anchor_memory` but the indices
+    /// were not yet populated.
+    pub(crate) fn force_sync_all_indices(
+        &mut self,
+        anchor_number: AnchorNumber,
+    ) -> Result<(), StorageError> {
+        let storable_anchor = self
+            .stable_anchor_memory
+            .get(&anchor_number)
+            .ok_or(StorageError::AnchorNotFound { anchor_number })?;
+
+        self.sync_anchor_with_openid_credential_index(
+            anchor_number,
+            vec![],
+            storable_anchor.openid_credentials,
+        );
+        self.sync_anchor_with_recovery_phrase_principal_index(
+            anchor_number,
+            &[],
+            &storable_anchor.recovery_keys.unwrap_or_default(),
+        );
+
+        let current_passkey_credentials =
+            storable_anchor.passkey_credentials.unwrap_or_default();
+
+        self.sync_anchor_with_passkey_credential_index(
+            anchor_number,
+            &[],
+            &current_passkey_credentials,
+        );
+        self.sync_anchor_with_passkey_pubkey_index(
+            anchor_number,
+            &[],
+            &current_passkey_credentials,
+        );
+
+        Ok(())
+    }
+
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         // These values are no longer used for reading, but we keep the check for consistency.
