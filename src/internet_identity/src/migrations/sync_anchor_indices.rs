@@ -410,4 +410,97 @@ mod sync_anchor_indices_tests {
 
         assert_migration_completed(vec![]);
     }
+
+    /// Regression test: the previous migration used `read()` + `write()`, which relies on
+    /// diff-based index syncing. When a `StorableAnchor` already existed in `stable_anchor_memory`
+    /// (written by a prior `write()` call), re-writing the same data produced an empty diff,
+    /// so no entries were added to `lookup_anchor_with_passkey_pubkey_hash_memory`.
+    /// This was the root cause of the index being nearly empty after a seemingly successful migration.
+    #[test]
+    fn regression_populates_passkey_index_when_storable_anchor_already_exists() {
+        let mut storage = Storage::new((1, 9), DefaultMemoryImpl::default());
+
+        // Create anchors with passkey devices and write them to storage.
+        // This populates `stable_anchor_memory` (the StorableAnchor entries).
+        let mut a1 = storage.allocate_anchor(111).unwrap();
+        let mut a2 = storage.allocate_anchor(222).unwrap();
+
+        a1.add_device(other_device(pubkey(10))).unwrap();
+        a2.add_device(other_device(pubkey(20))).unwrap();
+        a2.add_device(recovery_phrase(pubkey(30))).unwrap();
+
+        storage.write(a1).unwrap();
+        storage.write(a2).unwrap();
+
+        // At this point, `stable_anchor_memory` has StorableAnchor entries for both anchors
+        // AND the indices are populated (because `write()` synced them).
+        // Verify the indices are populated as a sanity check.
+        let pubkey_hash_10 = crate::utils::sha256sum(&pubkey(10));
+        let pubkey_hash_20 = crate::utils::sha256sum(&pubkey(20));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_10),
+            Some(1)
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_20),
+            Some(2)
+        );
+
+        // Now clear ONLY the indices (not stable_anchor_memory) to simulate the real
+        // production scenario: StorableAnchors already exist, but the passkey pubkey hash
+        // index was introduced later and is empty.
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .clear_new();
+        storage
+            .lookup_anchor_with_recovery_phrase_principal_memory
+            .clear_new();
+
+        // Confirm indices are now empty.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_10),
+            None
+        );
+        assert_eq!(storage.lookup_anchor_with_passkey_pubkey_hash_memory.len(), 0);
+
+        // Run the migration. The bug was that with the old read+write approach, the migration
+        // would see previous == current (both from stable_anchor_memory) and produce an empty
+        // diff, leaving the index unpopulated.
+        const BATCH_SIZE: u64 = 10;
+        reset_migration_state();
+        storage.sync_anchor_indices(0, BATCH_SIZE);
+
+        // After the fix (force_sync_all_indices), the indices must be fully populated.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_10),
+            Some(1),
+            "passkey pubkey hash index should be populated for anchor 1 even though StorableAnchor already existed"
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&pubkey_hash_20),
+            Some(2),
+            "passkey pubkey hash index should be populated for anchor 2 even though StorableAnchor already existed"
+        );
+
+        let principal_30 = Principal::self_authenticating(pubkey(30));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_recovery_phrase_principal_memory
+                .get(&principal_30),
+            Some(2),
+            "recovery phrase principal index should be populated for anchor 2 even though StorableAnchor already existed"
+        );
+
+        assert_migration_completed(vec![]);
+    }
 }
