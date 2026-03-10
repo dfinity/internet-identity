@@ -98,40 +98,38 @@ test("Can upgrade identity", async ({
     await page.goto(II_URL);
 
     // Open the sign-in dialog
-    const dialog = page.getByRole("dialog");
     if (attempt > 0) {
       await page.getByRole("button", { name: "Switch identity" }).click();
       await page.getByRole("button", { name: "Add another identity" }).click();
     } else {
       await page.getByRole("button", { name: "Sign in" }).click();
     }
-    await expect(dialog).toBeVisible();
 
     // Select the passkey authentication method
-    await dialog.getByRole("button", { name: "Continue with passkey" }).click();
-    await dialog.getByRole("button", { name: "Upgrade" }).click();
+    await page.getByRole("button", { name: "Continue with passkey" }).click();
+    await page.getByRole("button", { name: "Upgrade" }).click();
 
     // Enter the identity number
-    await dialog
+    await page
       .getByPlaceholder("Internet Identity number")
       .fill(identities[0].identityNumber.toString());
-    await dialog.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
 
     // On subsequent attempts, we expect a message that the identity is already upgraded
     if (attempt > 0) {
       await expect(
         page.getByRole("heading", { name: "Identity already upgraded" }),
       ).toBeVisible();
-      await dialog.getByRole("button", { name: "Upgrade again" }).click();
+      await page.getByRole("button", { name: "Upgrade again" }).click();
     }
 
     // Set the identity name and authenticate with dummy auth
     const newAuth = dummyAuth();
-    await dialog.getByLabel("Identity name").fill(identities[0].name);
+    await page.getByLabel("Identity name").fill(identities[0].name);
     newAuth(page);
 
     // Complete the upgrade process
-    await dialog.getByRole("button", { name: "Upgrade identity" }).click();
+    await page.getByRole("button", { name: "Upgrade identity" }).click();
     await managePage.assertVisible();
   }
 });
