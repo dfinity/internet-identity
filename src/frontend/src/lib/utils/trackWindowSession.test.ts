@@ -15,8 +15,8 @@ const mockVisibilityState = (state: "hidden" | "visible") => {
 };
 
 describe("trackWindowSession", () => {
-  let onLeaveSession: ReturnType<typeof vi.fn>;
-  let onEnterSession: ReturnType<typeof vi.fn>;
+  let onLeaveSession: () => void;
+  let onEnterSession: () => void;
 
   beforeEach(() => {
     onLeaveSession = vi.fn();

@@ -290,6 +290,15 @@ export const bufFromBufLike = (
   ) as ArrayBuffer;
 };
 
+// Utility to compare two Uint8Array instances for equality
+export const uint8ArrayEqual = (a: Uint8Array, b: Uint8Array): boolean => {
+  if (a.byteLength !== b.byteLength) return false;
+  for (let i = 0; i < a.byteLength; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
 const BASE64_ENCODE_CHUNK_SIZE = 100000;
 
 export const fromBase64 = (base64: string): Uint8Array => {
@@ -307,6 +316,14 @@ export const fromBase64 = (base64: string): Uint8Array => {
   }
   throw Error("Could not decode base64 string");
 };
+
+export const fromBase64URL = (base64Url: string): Uint8Array =>
+  fromBase64(
+    base64Url
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
+  );
 
 export const toBase64 = (bytes: Uint8Array): string => {
   if ("toBase64" in bytes && typeof bytes.toBase64 === "function") {
@@ -335,6 +352,9 @@ export const toBase64 = (bytes: Uint8Array): string => {
   }
   throw Error("Could not encode base64 string");
 };
+
+export const toBase64URL = (bytes: Uint8Array): string =>
+  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 export const fromHex = (hex: string): Uint8Array => {
   if ("fromHex" in Uint8Array && typeof Uint8Array.fromHex === "function") {

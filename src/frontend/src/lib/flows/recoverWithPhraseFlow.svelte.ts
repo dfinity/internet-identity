@@ -8,7 +8,7 @@ import {
   IC_DERIVATION_PATH,
   isValidMnemonic,
 } from "$lib/utils/recoveryPhrase";
-import { throwCanisterError } from "$lib/utils/utils";
+import { throwCanisterError, uint8ArrayEqual } from "$lib/utils/utils";
 import {
   DerEncodedPublicKey,
   HttpAgent,
@@ -44,7 +44,7 @@ const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
 };
 
 const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
-  new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
+  new Uint8Array(pubkey) as DerEncodedPublicKey;
 
 export class InvalidMnemonicError extends Error {
   constructor() {
@@ -78,7 +78,7 @@ export const recoverWithPhrase = async (
   const userNumber = BigInt(window.prompt("Identity number")!);
   const devices = await anonymousActor.get_anchor_credentials(userNumber);
   const isCorrectPhrase = devices.recovery_phrases.some((pubkey) =>
-    bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
+    uint8ArrayEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
   );
   if (!isCorrectPhrase) {
     throw new IdentityNotFoundError();

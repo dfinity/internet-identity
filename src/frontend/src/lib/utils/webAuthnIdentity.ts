@@ -7,9 +7,8 @@ import {
   Signature,
   wrapDER,
 } from "@icp-sdk/core/agent";
-import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes";
 import borc from "borc";
-import { bufFromBufLike } from "$lib/utils/utils";
+import { bufFromBufLike, fromHex, toHex } from "$lib/utils/utils";
 
 /**
  * This whole file was copied agent-js:
@@ -77,13 +76,9 @@ export class CosePublicKey implements PublicKey {
  *        coded string.
  */
 function _createChallengeBuffer(
-  challenge: string | Uint8Array = "<ic0.app>",
-): Uint8Array {
-  if (typeof challenge === "string") {
-    return Uint8Array.from(challenge, (c) => c.charCodeAt(0));
-  } else {
-    return challenge;
-  }
+  challenge: string = "<ic0.app>",
+): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(challenge, (c) => c.charCodeAt(0));
 }
 
 /**
@@ -111,7 +106,7 @@ async function _createCredential(
           name: "Internet Identity Service",
         },
         user: {
-          id: randomBytes(16),
+          id: globalThis.crypto.getRandomValues(new Uint8Array(16)),
           name: "Internet Identity",
           displayName: "Internet Identity",
         },
@@ -162,8 +157,8 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     return new this(
-      hexToBytes(rawId),
-      hexToBytes(publicKey),
+      fromHex(rawId),
+      fromHex(publicKey),
       undefined,
       rpId,
       undefined,
@@ -229,16 +224,16 @@ export class WebAuthnIdentity extends SignIdentity {
     return this.authenticatorAttachment;
   }
 
-  public async sign(blob: ArrayBuffer): Promise<Signature> {
+  public async sign(blob: Uint8Array): Promise<Signature> {
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: [
           {
             type: "public-key",
-            id: this.rawId,
+            id: new Uint8Array(this.rawId),
           },
         ],
-        challenge: blob,
+        challenge: new Uint8Array(blob),
         userVerification: "preferred",
         rpId: this.rpId,
       },
@@ -260,7 +255,7 @@ export class WebAuthnIdentity extends SignIdentity {
     if (cbor === undefined || cbor === null) {
       throw new Error("failed to encode cbor");
     }
-    return cbor.buffer as Signature;
+    return cbor as Signature;
   }
 
   /**
@@ -268,8 +263,8 @@ export class WebAuthnIdentity extends SignIdentity {
    */
   public toJSON(): JsonnableWebAuthnIdentity {
     return {
-      publicKey: bytesToHex(this._publicKey.getCose()),
-      rawId: bytesToHex(new Uint8Array(this.rawId)),
+      publicKey: toHex(this._publicKey.getCose()),
+      rawId: toHex(new Uint8Array(this.rawId)),
       rpId: this.rpId,
     };
   }

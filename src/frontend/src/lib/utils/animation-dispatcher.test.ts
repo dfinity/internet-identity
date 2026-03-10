@@ -3,6 +3,7 @@ import {
   triggerDropWaveAnimation,
   registerAnimationTrigger,
   unregisterAnimationTrigger,
+  TriggerFunction,
 } from "./animation-dispatcher";
 import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
 import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
@@ -35,7 +36,7 @@ describe("AnimationDispatcher", () => {
 
   describe("Basic Functionality", () => {
     it("should register and call trigger function", async () => {
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
 
       await triggerDropWaveAnimation();
 
@@ -49,7 +50,7 @@ describe("AnimationDispatcher", () => {
     });
 
     it("should unregister trigger function", async () => {
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
       unregisterAnimationTrigger();
 
       await triggerDropWaveAnimation();
@@ -60,7 +61,7 @@ describe("AnimationDispatcher", () => {
 
   describe("Queue Behavior", () => {
     beforeEach(() => {
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
     });
 
     it("should execute single animation immediately", async () => {
@@ -153,7 +154,7 @@ describe("AnimationDispatcher", () => {
 
   describe("Promise Resolution", () => {
     beforeEach(() => {
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
     });
 
     it("should resolve promises in correct order", async () => {
@@ -224,7 +225,7 @@ describe("AnimationDispatcher", () => {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       });
 
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
 
       // Queue some animations
       const promise1 = triggerDropWaveAnimation();
@@ -301,14 +302,14 @@ describe("AnimationDispatcher", () => {
     });
 
     it("should handle rapid registration and unregistration", async () => {
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
       const promise1 = triggerDropWaveAnimation();
 
       // Wait a bit to let the first animation potentially start
       await new Promise<void>((resolve) => setTimeout(resolve, 10));
 
       unregisterAnimationTrigger();
-      registerAnimationTrigger(mockTriggerFunction);
+      registerAnimationTrigger(mockTriggerFunction as TriggerFunction);
 
       const promise2 = triggerDropWaveAnimation();
 

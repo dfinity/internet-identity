@@ -5,7 +5,7 @@
     "checkJs": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2021", "DOM"],
+    "lib": ["ES2022", "DOM"],
     "module": "esnext",
     "strict": true,
     "target": "es2018",

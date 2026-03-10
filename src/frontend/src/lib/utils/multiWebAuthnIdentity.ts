@@ -14,6 +14,7 @@ import borc from "borc";
 import { CredentialData } from "./credential-devices";
 import { bufferEqual } from "./iiConnection";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
+import { uint8ArrayEqual } from "./utils";
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
@@ -87,9 +88,9 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",
-          id: cd.credentialId,
+          id: new Uint8Array(cd.credentialId),
         })),
-        challenge: blob,
+        challenge: new Uint8Array(blob),
         userVerification: this.userVerification,
         rpId: this.rpId,
       },
@@ -101,7 +102,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     ) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
-      if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {
+      if (uint8ArrayEqual(cd.credentialId, new Uint8Array(result.rawId))) {
         this._actualIdentity = new WebAuthnIdentity(
           cd.credentialId,
           unwrapDER(cd.pubkey, DER_COSE_OID),

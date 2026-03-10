@@ -62,7 +62,7 @@ export const toKey = (accessMethod: AccessMethod): string => {
     "passkey" in accessMethod &&
     "WebAuthn" in accessMethod.passkey.authn_method
   ) {
-    return bytesToHex(
+    return toHex(
       new Uint8Array(accessMethod.passkey.authn_method.WebAuthn.credential_id),
     );
   }

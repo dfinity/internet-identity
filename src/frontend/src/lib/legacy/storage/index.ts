@@ -1,6 +1,7 @@
 /* Everything related to storage of user flow data, like anchor numbers, last used anchor, etc. */
 
 import { parseUserNumber } from "$lib/utils/userNumber";
+import { bufFromBufLike } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { ZodType, z } from "zod";
@@ -358,7 +359,11 @@ const computePrincipalDigest = async ({
   const buff = concatUint8Arrays([principal, principalLen]);
 
   // Create the digest
-  const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
+  const digestBytes = await crypto.subtle.sign(
+    "HMAC",
+    hasher,
+    new Uint8Array(buff),
+  );
   return arrayBufferToBase64(digestBytes);
 };
 
@@ -398,7 +403,11 @@ const computeOriginDigest = async ({
   const buff = concatUint8Arrays([origin, originLen]);
 
   // Create the digest
-  const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
+  const digestBytes = await crypto.subtle.sign(
+    "HMAC",
+    hasher,
+    new Uint8Array(buff),
+  );
   return arrayBufferToBase64(digestBytes);
 };
 
