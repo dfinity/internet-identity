@@ -299,8 +299,6 @@ export const uint8ArrayEqual = (a: Uint8Array, b: Uint8Array): boolean => {
   return true;
 };
 
-const BASE64_ENCODE_CHUNK_SIZE = 100000;
-
 export const fromBase64 = (base64: string): Uint8Array => {
   if (
     "fromBase64" in Uint8Array &&
@@ -333,22 +331,11 @@ export const toBase64 = (bytes: Uint8Array): string => {
     return globalThis.Buffer.from(bytes).toString("base64");
   }
   if (typeof globalThis.btoa !== "undefined") {
-    return btoa(
-      Array.from({
-        length: Math.ceil(bytes.byteLength / BASE64_ENCODE_CHUNK_SIZE),
-      })
-        .map((_, index) =>
-          String.fromCharCode(
-            ...new Uint8Array(
-              bytes.slice(
-                index * BASE64_ENCODE_CHUNK_SIZE,
-                (index + 1) * BASE64_ENCODE_CHUNK_SIZE,
-              ),
-            ),
-          ),
-        )
-        .join(""),
-    );
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
   throw Error("Could not encode base64 string");
 };

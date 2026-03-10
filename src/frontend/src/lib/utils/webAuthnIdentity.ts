@@ -68,7 +68,7 @@ export class CosePublicKey implements PublicKey {
 }
 
 /**
- * Create a challenge from a string or array. The default challenge is always the same
+ * Create a challenge from a string. The default challenge is always the same
  * because we don't need to verify the authenticity of the key on the server (we don't
  * register our keys with the IC). Any challenge would do, even one per key, randomly
  * generated.
