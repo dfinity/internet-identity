@@ -467,7 +467,10 @@ mod sync_anchor_indices_tests {
                 .get(&pubkey_hash_10),
             None
         );
-        assert_eq!(storage.lookup_anchor_with_passkey_pubkey_hash_memory.len(), 0);
+        assert_eq!(
+            storage.lookup_anchor_with_passkey_pubkey_hash_memory.len(),
+            0
+        );
 
         // Run the migration. The bug was that with the old read+write approach, the migration
         // would see previous == current (both from stable_anchor_memory) and produce an empty
