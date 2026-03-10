@@ -1,7 +1,6 @@
 /* Everything related to storage of user flow data, like anchor numbers, last used anchor, etc. */
 
 import { parseUserNumber } from "$lib/utils/userNumber";
-import { bufFromBufLike } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { ZodType, z } from "zod";

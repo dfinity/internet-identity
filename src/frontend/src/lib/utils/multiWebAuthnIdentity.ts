@@ -12,7 +12,6 @@ import { PublicKey, Signature, SignIdentity } from "@icp-sdk/core/agent";
 import { DER_COSE_OID, unwrapDER } from "@icp-sdk/core/identity";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
-import { bufferEqual } from "./iiConnection";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
 import { uint8ArrayEqual } from "./utils";
 

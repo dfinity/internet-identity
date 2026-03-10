@@ -1,6 +1,7 @@
 import { get } from "svelte/store";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
+import { SvelteURL } from "svelte/reactivity";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
 
@@ -24,7 +25,7 @@ export class ConfirmAccessMethodFlow {
     const registrationId = existingRegistrationId ?? secureRandomId(5);
 
     if (existingRegistrationId === undefined) {
-      this.#newDeviceLink = new URL(
+      this.#newDeviceLink = new SvelteURL(
         `/pair#${registrationId}`,
         window.location.origin,
       );

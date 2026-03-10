@@ -16,12 +16,13 @@ import {
   AuthenticationV2Events,
   authenticationV2Funnel,
 } from "$lib/utils/analytics/authenticationV2Funnel";
+import { SvelteMap } from "svelte/reactivity";
 
 export class AuthLastUsedFlow {
   systemOverlay = $state(false);
   authenticatingIdentity = $state<bigint | null>(null);
   #identityCredentials: Map<bigint, Promise<Uint8Array[] | undefined>> =
-    new Map();
+    new SvelteMap();
 
   init(identities: bigint[]) {
     identities.forEach((identityNumber) => {
