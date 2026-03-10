@@ -23,10 +23,8 @@ test("Can upgrade identity", async ({
   // Navigate to legacy page that doesn't redirect
   await page.goto(LEGACY_II_URL + "/self-service");
 
-  // Add virtual authenticator to be able to create a legacy passkey using navigator.credentials.create in the page context
+  // Add virtual authenticator and create a passkey in page context
   const authenticatorId = await addVirtualAuthenticator(page);
-
-  // Create a passkey in the page context
   await page.evaluate(
     async (rpId) => {
       await navigator.credentials.create({
