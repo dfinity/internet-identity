@@ -31,7 +31,7 @@ test("Can upgrade identity", async ({
         publicKey: {
           challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
           attestation: "direct",
-          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
           rp: {
             name: "Internet Identity Service",
             id: rpId,
