@@ -18,7 +18,6 @@ import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdent
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
-import { supportsWebauthRoR } from "$lib/utils/userAgent";
 import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
 import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 import {
@@ -188,7 +187,6 @@ export class MigrationFlow {
 
     if (isNullish(this.#webAuthFlows)) {
       const flows = findWebAuthnFlows({
-        supportsRor: supportsWebauthRoR(window.navigator.userAgent),
         devices: webAuthnAuthenticators,
         currentOrigin: window.location.origin,
         // Empty array is the same as no related origins.
