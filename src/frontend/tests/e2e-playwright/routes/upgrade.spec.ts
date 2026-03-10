@@ -2,9 +2,9 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import {
   addVirtualAuthenticator,
-  cdpPrivateKeyToPublicKeyDer,
-  decodeCdpCredentialId,
+  virtualAuthenticatorPrivKeyToPubKey,
   dummyAuth,
+  fromBase64URL,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
   LEGACY_II_URL,
@@ -31,11 +31,7 @@ test("Can upgrade identity", async ({
         publicKey: {
           challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
           attestation: "direct",
-          pubKeyCredParams: [
-            { type: "public-key", alg: -7 },
-            { type: "public-key", alg: -8 },
-            { type: "public-key", alg: -257 },
-          ],
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
           rp: {
             name: "Internet Identity Service",
             id: rpId,
@@ -56,8 +52,10 @@ test("Can upgrade identity", async ({
     page,
     authenticatorId,
   );
-  const publicKey = cdpPrivateKeyToPublicKeyDer(credential!.privateKey);
-  const credentialId = decodeCdpCredentialId(credential!.credentialId);
+  const publicKey = await virtualAuthenticatorPrivKeyToPubKey(
+    credential!.privateKey,
+  );
+  const credentialId = fromBase64URL(credential!.credentialId);
 
   // Use an actor to create a legacy passkey (not id.ai)
   // since this functionality is no longer available.
@@ -101,7 +99,12 @@ test("Can upgrade identity", async ({
 
     // Open the sign-in dialog
     const dialog = page.getByRole("dialog");
-    await page.getByRole("button", { name: "Sign in" }).click();
+    if (attempt > 0) {
+      await page.getByRole("button", { name: "Switch identity" }).click();
+      await page.getByRole("button", { name: "Add another identity" }).click();
+    } else {
+      await page.getByRole("button", { name: "Sign in" }).click();
+    }
     await expect(dialog).toBeVisible();
 
     // Select the passkey authentication method
