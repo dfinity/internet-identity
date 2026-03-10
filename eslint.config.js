@@ -57,7 +57,7 @@ export default ts.config(
       "require-await": ["error"],
       "@typescript-eslint/no-floating-promises": ["error"],
       // @see https://github.com/sveltejs/eslint-plugin-svelte/issues/1353
-      'svelte/no-navigation-without-resolve': 'off',
+      "svelte/no-navigation-without-resolve": "off",
     },
   },
   {

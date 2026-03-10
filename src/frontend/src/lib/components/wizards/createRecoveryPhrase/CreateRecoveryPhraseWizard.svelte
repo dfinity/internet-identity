@@ -37,8 +37,9 @@
   let incorrectRecoveryPhrase = $state<string[]>();
   let sourceAction = $state<Props["action"] | undefined>(undefined);
   let sourceUnverifiedRecoveryPhrase = $state<string[] | undefined>(undefined);
-  let sourceExistingRecoveryPhraseType =
-    $state<Props["existingRecoveryPhraseType"] | undefined>(undefined);
+  let sourceExistingRecoveryPhraseType = $state<
+    Props["existingRecoveryPhraseType"] | undefined
+  >(undefined);
 
   $effect.pre(() => {
     if (
