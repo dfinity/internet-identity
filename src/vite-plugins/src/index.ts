@@ -87,29 +87,39 @@ export const replicaForwardPlugin = ({
   forwardRules: Array<{ canisterName: string; hosts: string[] }>;
 }) => ({
   name: "replica-forward",
+  enforce: "pre",
   configureServer(server: ViteDevServer) {
     const replicaOrigin = `127.0.0.1:${readReplicaPort()}`;
     server.middlewares.use((req, res, next) => {
+      const authority = req.headers[":authority"];
+      const hostHeader = req.headers["host"];
+      const hostWithPort =
+        typeof hostHeader === "string"
+          ? hostHeader
+          : typeof authority === "string"
+            ? authority
+            : undefined;
+
       if (
         /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
          * to verify the alternative origins. */
-        req.headers["host"]?.includes(".raw.")
+        hostWithPort?.includes(".raw.") ??
+        false
       ) {
         console.log(
-          `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`,
+          `Denying access to raw URL ${req.method} https://${hostWithPort}${req.url}`,
         );
         res.statusCode = 400;
         res.end("Raw IC URLs are not supported");
         return;
       }
 
-      const host_ = req.headers["host"];
-      if (isNullish(host_)) {
+      if (isNullish(hostWithPort)) {
         // default handling
         return next();
       }
 
-      const [host, _port] = host_.split(":");
+      const [host, _port] = hostWithPort.split(":");
 
       const matchingRule = forwardRules.find((rule) =>
         rule.hosts.includes(host),

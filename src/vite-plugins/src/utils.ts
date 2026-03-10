@@ -76,14 +76,23 @@ export const forwardToReplica = async ({
   req: IncomingMessage;
   replicaOrigin: string;
 }) => {
+  const authority = req.headers[":authority"];
+  const hostHeader = req.headers.host;
+  const requestHost =
+    typeof hostHeader === "string"
+      ? hostHeader
+      : typeof authority === "string"
+        ? authority
+        : undefined;
+
   console.log(
-    `forwarding ${req.method} https://${req.headers.host}${req.url} to canister ${canisterId} ${replicaOrigin}`,
+    `forwarding ${req.method} https://${requestHost}${req.url} to canister ${canisterId} ${replicaOrigin}`,
   );
 
   // Start by crafting the new request with the original request's headers
   const reqHeaders: string[] = [];
   for (const k in req.headers) {
-    if (k.match(/host/i)) {
+    if (k.match(/host/i) || k.startsWith(":")) {
       // Skip the host header, we add it manually later
       continue;
     }
