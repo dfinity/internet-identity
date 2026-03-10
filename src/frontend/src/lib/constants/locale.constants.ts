@@ -7,4 +7,4 @@ export const enabledLocales = ["en", "es", "ur"];
 const rtlLocales = ["ur"];
 
 export const getLocaleDirection = (locale: string): "ltr" | "rtl" =>
-	rtlLocales.includes(locale) ? "rtl" : "ltr";
+  rtlLocales.includes(locale) ? "rtl" : "ltr";
