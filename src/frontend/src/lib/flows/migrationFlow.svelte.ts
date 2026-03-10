@@ -4,7 +4,6 @@ import {
 } from "$lib/stores/authentication.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import type {
   AuthnMethodSecuritySettings,
   DeviceData,
@@ -70,7 +69,7 @@ export class MigrationFlow {
   };
 
   upgradeAgain = (attachElement?: HTMLElement) => {
-    if (isNullish(this.identityNumber)) {
+    if (this.identityNumber === undefined) {
       // This shouldn't happen because `authenticateWithIdentityNumber` is called, before.
       // The identityNumber is set in authenticateWithIdentityNumber from "enterNumber" view.
       this.view = "enterNumber";
@@ -84,25 +83,25 @@ export class MigrationFlow {
   };
 
   createPasskey = async (name: string): Promise<void> => {
-    if (isNullish(this.identityNumber)) {
+    if (this.identityNumber === undefined) {
       // Cannot call createPasskey before authenticateWithIdentityNumber.
       throw new Error("Identity number is null");
     }
     // TODO: Create the passkey in id.ai
     const passkeyIdentity =
-      features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const origin = window.location.origin;
     // The canister only allow for 50 characters, so for long domains we don't attach an origin
     // (those long domains are most likely a testnet with URL like <canister id>.large03.testnet.dfinity.network, and we basically only care about identity.ic0.app & identity.internetcomputer.org).
     const sanitizedOrigin =
-      nonNullish(origin) && origin.length <= 50 ? origin : undefined;
+      origin !== undefined && origin.length <= 50 ? origin : undefined;
     const authenticatorAttachement =
       passkeyIdentity.getAuthenticatorAttachment();
     const aaguid = passkeyIdentity.getAaguid();
     const credentialId = passkeyIdentity.getCredentialId();
-    if (isNullish(credentialId)) {
+    if (credentialId === undefined) {
       throw new Error("Credential ID is null");
     }
     const securitySettings: AuthnMethodSecuritySettings = {
@@ -110,7 +109,7 @@ export class MigrationFlow {
       purpose: { Authentication: null },
     };
     const metadata: MetadataMapV2 = [];
-    if (nonNullish(authenticatorAttachement)) {
+    if (authenticatorAttachement !== undefined) {
       metadata.push([
         "authenticator_attachment",
         {
@@ -118,7 +117,7 @@ export class MigrationFlow {
         },
       ]);
     }
-    if (nonNullish(sanitizedOrigin)) {
+    if (sanitizedOrigin !== undefined) {
       metadata.push([
         "origin",
         {
@@ -183,9 +182,9 @@ export class MigrationFlow {
     const webAuthnAuthenticators = devices
       .filter(({ key_type }) => !("browser_storage_key" in key_type))
       .map(convertToValidCredentialData)
-      .filter(nonNullish);
+      .filter((data): data is NonNullable<typeof data> => data !== undefined);
 
-    if (isNullish(this.#webAuthFlows)) {
+    if (this.#webAuthFlows === undefined) {
       const flows = findWebAuthnFlows({
         devices: webAuthnAuthenticators,
         currentOrigin: window.location.origin,
@@ -204,9 +203,10 @@ export class MigrationFlow {
     if (this.#webAuthFlows?.currentIndex === flowsLength) {
       this.#webAuthFlows.currentIndex = 0;
     }
-    const currentFlow = nonNullish(this.#webAuthFlows)
-      ? this.#webAuthFlows.flows[this.#webAuthFlows.currentIndex]
-      : undefined;
+    const currentFlow =
+      this.#webAuthFlows !== undefined
+        ? this.#webAuthFlows.flows[this.#webAuthFlows.currentIndex]
+        : undefined;
 
     const passkeyIdentity = MultiWebAuthnIdentity.fromCredentials(
       webAuthnAuthenticators,
@@ -252,7 +252,7 @@ export class MigrationFlow {
       // We only want to show a special error if the user might have to choose different web auth flow.
       if (
         isWebAuthnCancelError(error) &&
-        nonNullish(this.#webAuthFlows) &&
+        this.#webAuthFlows !== undefined &&
         flowsLength > 1
       ) {
         // Increase the index to try the next flow.

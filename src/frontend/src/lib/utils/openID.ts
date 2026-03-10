@@ -5,7 +5,6 @@ import type {
 import { canisterConfig } from "$lib/globals";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   CallbackPopupClosedError,
   REDIRECT_CALLBACK_PATH,
@@ -115,13 +114,13 @@ export const createRedirectURL = (
   authURL.searchParams.set("scope", config.authScope);
   authURL.searchParams.set("state", state);
   authURL.searchParams.set("nonce", options.nonce);
-  if (options.mediation === "required" && isNullish(options.loginHint)) {
+  if (options.mediation === "required" && options.loginHint === undefined) {
     authURL.searchParams.set("prompt", "select_account");
   }
   if (options.mediation === "silent") {
     authURL.searchParams.set("prompt", "silent");
   }
-  if (nonNullish(options.loginHint)) {
+  if (options.loginHint !== undefined) {
     authURL.searchParams.set("login_hint", options.loginHint);
   }
 
@@ -145,7 +144,7 @@ const requestWithPopup = async (
   if (searchParams.get("state") !== redirectURL.searchParams.get("state")) {
     throw new Error("Invalid state");
   }
-  if (isNullish(id_token)) {
+  if (id_token === null) {
     throw new Error("No token received");
   }
 
@@ -189,7 +188,7 @@ export const isFedCMSupported = (
     return false;
   }
   return (
-    nonNullish(config.configURL) &&
+    config.configURL !== undefined &&
     config.configURL.length > 0 &&
     "IdentityCredential" in window
   );

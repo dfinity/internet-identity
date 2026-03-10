@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
 
   type Props = HTMLAttributes<HTMLDivElement> & {
     header: string;
@@ -16,7 +15,7 @@
 >
   <p class="text-text-tertiary text-sm uppercase">{header}</p>
   <div class="grid h-[280px] place-items-center">
-    {#if nonNullish(children)}
+    {#if children !== undefined}
       {@render children()}
     {/if}
   </div>

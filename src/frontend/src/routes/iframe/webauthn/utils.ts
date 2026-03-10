@@ -1,5 +1,4 @@
 import { waitForWindowReadyResponse } from "$lib/utils/internalPostMessage";
-import { isNullish } from "@dfinity/utils";
 
 export const WEBAUTHN_IFRAME_PATH = "/iframe/webauthn";
 
@@ -141,7 +140,7 @@ export const webAuthnInIframe = async (
   // This is necessary for Safari to have the iframe on focus, for example, when a dialog is open.
   attachElement?: HTMLElement,
 ): Promise<Credential> => {
-  if (isNullish(options.publicKey?.rpId)) {
+  if (options.publicKey?.rpId === undefined) {
     throw new Error("RP id is missing");
   }
   const targetOrigin = `https://${options.publicKey?.rpId}`;
@@ -167,7 +166,7 @@ export const webAuthnInIframe = async (
 
   try {
     // Wait for iframe to be loaded and ready
-    if (isNullish(iframe.contentWindow)) {
+    if (iframe.contentWindow === null) {
       throw new Error("Hidden iframe could not be instantiated");
     }
     await new Promise<void>((resolve, reject) => {

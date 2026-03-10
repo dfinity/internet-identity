@@ -1,11 +1,10 @@
 <script lang="ts" module>
   import type QrCreator from "qr-creator";
-  import { isNullish } from "@dfinity/utils";
 
   // Lazy load qr creator only once
   let qrCreatorPromise: Promise<typeof QrCreator> | undefined;
   let getQrCreator = (): Promise<typeof QrCreator> => {
-    if (isNullish(qrCreatorPromise)) {
+    if (qrCreatorPromise === undefined) {
       qrCreatorPromise = import("qr-creator").then((value) => value.default);
     }
     return qrCreatorPromise;
@@ -28,7 +27,7 @@
   let qrCreator = $state<typeof QrCreator>();
 
   $effect(() => {
-    if (isNullish(qrCreator) || isNullish(containerRef)) {
+    if (qrCreator === undefined || containerRef === undefined) {
       return;
     }
     const size = clientWidth > clientHeight ? clientWidth : clientHeight;

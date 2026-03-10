@@ -6,7 +6,6 @@ import {
 } from "@icp-sdk/core/agent";
 import { DER_COSE_OID, unwrapDER, wrapDER } from "@icp-sdk/core/identity";
 import borc from "borc";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { extractAAGUID } from "$lib/utils/webAuthn";
 import { bufFromBufLike } from "$lib/utils/utils";
 import { getPrimaryOrigin } from "$lib/globals";
@@ -220,7 +219,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   }
 
   async sign(blob: Uint8Array): Promise<Signature> {
-    const credential = await (nonNullish(this.#credentialCreationOptions)
+    const credential = await (this.#credentialCreationOptions !== undefined
       ? navigator.credentials.create({
           ...this.#credentialCreationOptions,
           publicKey: {
@@ -228,7 +227,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
             challenge: blob,
           },
         })
-      : nonNullish(this.#credentialRequestOptions)
+      : this.#credentialRequestOptions !== undefined
         ? navigator.credentials.get({
             ...this.#credentialRequestOptions,
             publicKey: {
@@ -260,10 +259,10 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
         signature: new Uint8Array(result.response.signature),
       }),
     );
-    if (isNullish(cbor)) {
+    if (cbor === undefined || cbor === null) {
       throw new Error("Failed to encode cbor");
     }
-    if (nonNullish(result.response.attestationObject)) {
+    if (result.response.attestationObject !== undefined) {
       // Parse the attestationObject as CBOR.
       const attObject = borc.decodeFirst(
         new Uint8Array(result.response.attestationObject),
@@ -334,7 +333,7 @@ export const requestOptions = (
     rpId,
     // Either use the specified credential ids or let the user pick a passkey
     allowCredentials:
-      nonNullish(credentialIds) && credentialIds.length > 0
+      credentialIds !== undefined && credentialIds.length > 0
         ? credentialIds.map((id) => ({ id, type: "public-key" as const }))
         : undefined,
     // Require passkeys to verify the user e.g. TouchID

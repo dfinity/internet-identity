@@ -8,7 +8,6 @@ import { init } from "$lib/generated/internet_identity_idl";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { fromBase64 } from "$lib/utils/utils";
 import { IDL } from "@icp-sdk/core/candid";
-import { isNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
 import { Buffer } from "buffer";
@@ -24,7 +23,7 @@ export const readCanisterId = (): string => {
   const setupJs = document.querySelector(
     "[data-canister-id]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
+  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
     void displayError({
       title: "Canister ID not set",
       message:
@@ -44,7 +43,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
   const setupJs = document.querySelector(
     "[data-canister-config]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
+  if (setupJs === null || setupJs.dataset.canisterConfig === undefined) {
     void displayError({
       title: "Canister config not set",
       message:

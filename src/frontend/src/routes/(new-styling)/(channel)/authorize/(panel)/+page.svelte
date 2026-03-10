@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { goto } from "$app/navigation";
   import { authorizationContextStore } from "$lib/stores/authorization.store";
@@ -46,7 +45,7 @@
     {$t`Choose method`}
   </h1>
   <p class="text-text-secondary mb-6 self-start text-sm">
-    {#if nonNullish(dapp?.name)}
+    {#if dapp?.name !== undefined}
       {@const application = dapp.name}
       <Trans>
         to continue with <b>{application}</b>

@@ -1,7 +1,6 @@
 import { mount, withRef } from "$lib/utils/lit-html";
 import { parseUserNumber } from "$lib/utils/userNumber";
 import { Chan } from "$lib/utils/utils";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { TemplateResult, html } from "lit-html";
 import { asyncReplace } from "lit-html/directives/async-replace.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
@@ -57,7 +56,7 @@ export const mkAnchorInput = ({
     if (result === "invalid") {
       return showHint("Invalid Internet Identity");
     }
-    if (isNullish(result)) {
+    if (result === undefined) {
       return showHint("Please enter an Internet Identity");
     }
     onSubmit(result);
@@ -110,9 +109,10 @@ export const mkAnchorInput = ({
   // All classes (user specified + default) on the wrapping element,
   // set dynamically
   const defaultClass = "c-input--anchor__wrap";
-  const classes = isNullish(classes_)
-    ? new Chan(defaultClass)
-    : classes_.map((clzs) => [defaultClass, ...clzs].join(" "));
+  const classes =
+    classes_ === undefined
+      ? new Chan(defaultClass)
+      : classes_.map((clzs) => [defaultClass, ...clzs].join(" "));
 
   const template = html`<div class="c-input--anchor">
     <label class=${asyncReplace(classes)} aria-label="Identity Anchor">
@@ -126,7 +126,7 @@ export const mkAnchorInput = ({
         value="${ifDefined(userNumber?.toString())}"
         data-expected=${ifDefined(dataExpected)}
         @input=${inputFilter(isDigits, onBadInput, onInput)}
-        @change=${nonNullish(onChange)
+        @change=${onChange !== undefined
           ? () => withRef(userNumberInput, (input) => onChange(input.value))
           : undefined}
         @keydown=${inputFilter(isDigits, onBadInput)}

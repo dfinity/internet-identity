@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import type { Snippet } from "svelte";
   import SolveCaptcha from "$lib/components/wizards/auth/views/SolveCaptcha.svelte";
@@ -81,7 +80,7 @@
       const result = await authFlow.continueWithOpenId(config);
       if (result.type === "signIn") {
         await onSignIn(result.identityNumber);
-      } else if (nonNullish(result.name)) {
+      } else if (result.name !== undefined) {
         await onSignUp(await authFlow.completeOpenIdRegistration(result.name));
       }
     } catch (error) {
@@ -142,7 +141,7 @@
   {:else}
     <MigrationWizard onSuccess={onUpgrade} {onError} />
   {/if}
-{:else if nonNullish(authFlow.captcha)}
+{:else if authFlow.captcha !== undefined}
   <SolveCaptcha {...authFlow.captcha} />
 {:else}
   {#if authFlow.view === "chooseMethod" || !withinDialog}

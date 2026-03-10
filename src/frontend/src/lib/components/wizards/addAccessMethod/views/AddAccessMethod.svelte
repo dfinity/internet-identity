@@ -6,7 +6,6 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { issuerMatches } from "$lib/utils/openID";
-  import { nonNullish } from "@dfinity/utils";
   import { canisterConfig } from "$lib/globals";
   import type {
     OpenIdConfig,
@@ -30,20 +29,20 @@
     maxPasskeysReached,
   }: Props = $props();
 
-  let authenticatingProviderId = $state<string | null>();
-  let cancelledProviderId = $state<string | null>(null);
+  let authenticatingProviderId = $state<string>();
+  let cancelledProviderId = $state<string>();
 
-  const isPasskeySupported = nonNullish(window.PublicKeyCredential);
+  const isPasskeySupported = window.PublicKeyCredential !== undefined;
 
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
     authenticatingProviderId = config.client_id;
     const result = await linkOpenIdAccount(config);
-    authenticatingProviderId = null;
+    authenticatingProviderId = undefined;
 
     if (result === "cancelled") {
       cancelledProviderId = config.client_id;
       await waitFor(4000);
-      cancelledProviderId = null;
+      cancelledProviderId = undefined;
     }
   };
 
@@ -95,7 +94,7 @@
             <Button
               onclick={() => handleContinueWithOpenId(provider)}
               variant="secondary"
-              disabled={nonNullish(authenticatingProviderId) ||
+              disabled={authenticatingProviderId !== undefined ||
                 hasCredential(provider.issuer)}
               size="xl"
               class="flex-1"
@@ -121,7 +120,7 @@
         onclick={continueWithPasskey}
         variant="secondary"
         disabled={!isPasskeySupported ||
-          nonNullish(authenticatingProviderId) ||
+          authenticatingProviderId !== undefined ||
           maxPasskeysReached}
         size="xl"
       >

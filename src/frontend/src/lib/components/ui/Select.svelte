@@ -2,7 +2,6 @@
   import type { Component } from "svelte";
   import type { HTMLAttributes } from "svelte/elements";
   import Popover from "$lib/components/ui/Popover.svelte";
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "./Tooltip.svelte";
 
@@ -50,7 +49,7 @@
   };
 
   $effect(() => {
-    if (isNullish(childrenRef)) {
+    if (childrenRef === undefined) {
       return;
     }
     const listener = () => (isOpen = true);
@@ -63,7 +62,7 @@
   {@render children?.()}
 </div>
 
-{#if isOpen && nonNullish(childrenRef)}
+{#if isOpen && childrenRef !== undefined}
   <Popover
     {...props}
     anchor={childrenRef}
@@ -93,7 +92,7 @@
             aria-label={option.label}
             disabled={option.disabled}
           >
-            {#if nonNullish(option.icon)}
+            {#if option.icon !== undefined}
               {@const Icon = option.icon}
               <div
                 class="text-fg-quaternary dark:text-fg-tertiary [&_svg]:size-4"

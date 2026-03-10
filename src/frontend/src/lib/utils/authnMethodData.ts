@@ -5,7 +5,6 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { CredentialId } from "$lib/utils/credential-devices";
 import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
-import { nonNullish } from "@dfinity/utils";
 import {
   fromMnemonicWithoutValidation,
   IC_DERIVATION_PATH,
@@ -33,10 +32,10 @@ export const passkeyAuthnMethodData = ({
     // The origin in the metadata might not match the origin in the auth method if the origin is longer than 50 characters.
     ["origin", { String: origin }],
   ];
-  if (nonNullish(alias)) {
+  if (alias !== undefined) {
     metadata.push(["alias", { String: alias }]);
   }
-  if (nonNullish(authenticatorAttachment)) {
+  if (authenticatorAttachment !== undefined) {
     metadata.push([
       "authenticator_attachment",
       { String: authenticatorAttachment },

@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { SVGAttributes } from "svelte/elements";
-  import { isNullish } from "@dfinity/utils";
 
   type Props = SVGAttributes<SVGSVGElement> & {
     value?: number;
@@ -26,7 +25,7 @@
   class={[
     "size-5 -rotate-90 rounded-full",
     className,
-    isNullish(value) && "progress_rotate",
+    value === undefined && "progress_rotate",
   ]}
   style="--circumference: {circumference}px"
 >
@@ -38,7 +37,10 @@
     cy={clientWidth / 2}
   />
   <circle
-    class={["fill-none stroke-current", isNullish(value) && "progress_pulsate"]}
+    class={[
+      "fill-none stroke-current",
+      value === undefined && "progress_pulsate",
+    ]}
     stroke-linecap="round"
     stroke-width={strokeWidth}
     r={(Math.max(clientWidth, strokeWidth) - strokeWidth) / 2}

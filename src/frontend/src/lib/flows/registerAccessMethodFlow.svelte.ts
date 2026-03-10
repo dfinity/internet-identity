@@ -6,7 +6,6 @@ import { sessionStore } from "$lib/stores/session.store";
 import { get } from "svelte/store";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import { features } from "$lib/legacy/features";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -42,7 +41,7 @@ export class RegisterAccessMethodFlow {
 
   waitForExistingDevice = async (existingRegistrationId?: string) => {
     const registrationId = existingRegistrationId ?? secureRandomId(5);
-    if (isNullish(existingRegistrationId)) {
+    if (existingRegistrationId === undefined) {
       this.#existingDeviceLink = new URL(
         `/activate#${registrationId}`,
         window.location.origin,
@@ -55,7 +54,7 @@ export class RegisterAccessMethodFlow {
       const identityNumber = (
         await anonymousActor.lookup_by_registration_mode_id(registrationId)
       )[0];
-      if (nonNullish(identityNumber)) {
+      if (identityNumber !== undefined) {
         this.#identityNumber = identityNumber;
         return this.#registerSession(identityNumber);
       }
@@ -80,7 +79,7 @@ export class RegisterAccessMethodFlow {
       const [info] =
         await session.actor.authn_method_session_info(identityNumber);
       // Show confirm sign-in view if session has been confirmed
-      if (nonNullish(info)) {
+      if (info !== undefined) {
         this.#identityName = info.name[0] ?? identityNumber.toString(10);
         this.#createdAtMillis = info.created_at.map(nanosToMillis)[0];
         this.#view = "confirmSignIn";
@@ -94,16 +93,16 @@ export class RegisterAccessMethodFlow {
 
   createPasskey = async (): Promise<bigint> => {
     const session = get(sessionStore);
-    if (isNullish(this.#identityNumber)) {
+    if (this.#identityNumber === undefined) {
       throw new Error("Identity number is missing");
     }
     const name = this.#identityName ?? this.#identityNumber.toString(10);
     const passkeyIdentity =
-      features.DUMMY_AUTH || nonNullish(canisterConfig.dummy_auth[0]?.[0])
+      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const credentialId = passkeyIdentity.getCredentialId();
-    if (isNullish(credentialId)) {
+    if (credentialId === undefined) {
       throw new Error("Credential ID is missing");
     }
     const authnMethodData = passkeyAuthnMethodData({
