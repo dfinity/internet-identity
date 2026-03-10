@@ -34,6 +34,7 @@
 
   let wrapperRef = $state<HTMLElement>();
   let tooltipRef = $state<HTMLElement>();
+  // svelte-ignore state_referenced_locally
   let isTooltipVisible = $state(manual ? !hidden : false);
 
   const anchorRef = $derived(
@@ -129,7 +130,7 @@
     {id}
     {...restProps}
     bind:this={tooltipRef}
-    popover={"manual"}
+    popover="manual"
     class="tooltip pointer-events-none fixed overflow-visible bg-transparent"
     role="tooltip"
   >

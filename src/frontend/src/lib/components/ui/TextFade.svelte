@@ -13,6 +13,7 @@
   } = $props();
 
   let index = $state(0);
+  // svelte-ignore state_referenced_locally
   let currentText = $state(texts[0]);
 
   const next = async () => {
@@ -23,14 +24,14 @@
     }
   };
 
-  let interval: NodeJS.Timeout;
+  let interval: ReturnType<typeof setInterval>;
 
   onMount(() => {
     if (texts.length <= 1) return;
 
     const start = setTimeout(() => {
       interval = setInterval(next, delayBetween + duration);
-      next();
+      void next();
     }, startDelay);
 
     return () => {

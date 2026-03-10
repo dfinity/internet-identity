@@ -19,7 +19,7 @@
     existingRecoveryPhraseType?: "unprotected" | "protected";
   }
 
-  const {
+  let {
     action = "create",
     onCreate,
     onVerify,
@@ -30,13 +30,38 @@
     existingRecoveryPhraseType,
   }: Props = $props();
 
-  let recoveryPhrase = $state<string[] | undefined>(
-    action === "verify" ? unverifiedRecoveryPhrase : undefined,
-  );
-  let isWritten = $state(action === "verify");
+  let recoveryPhrase = $state<string[] | undefined>(undefined);
+  let isWritten = $state(false);
   let isIncorrect = $state(false);
-  let isLocked = $state(existingRecoveryPhraseType === "protected");
+  let isLocked = $state(false);
   let incorrectRecoveryPhrase = $state<string[]>();
+  let sourceAction = $state<Props["action"] | undefined>(undefined);
+  let sourceUnverifiedRecoveryPhrase = $state<string[] | undefined>(undefined);
+  let sourceExistingRecoveryPhraseType =
+    $state<Props["existingRecoveryPhraseType"] | undefined>(undefined);
+
+  $effect.pre(() => {
+    if (
+      action !== sourceAction ||
+      unverifiedRecoveryPhrase !== sourceUnverifiedRecoveryPhrase ||
+      existingRecoveryPhraseType !== sourceExistingRecoveryPhraseType
+    ) {
+      sourceAction = action;
+      sourceUnverifiedRecoveryPhrase = unverifiedRecoveryPhrase;
+      sourceExistingRecoveryPhraseType = existingRecoveryPhraseType;
+
+      recoveryPhrase =
+        action === "verify"
+          ? unverifiedRecoveryPhrase === undefined
+            ? undefined
+            : [...unverifiedRecoveryPhrase]
+          : undefined;
+      isWritten = action === "verify";
+      isIncorrect = false;
+      isLocked = existingRecoveryPhraseType === "protected";
+      incorrectRecoveryPhrase = undefined;
+    }
+  });
 
   const handleCreate = async () => {
     try {

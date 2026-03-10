@@ -12,7 +12,7 @@
     strokeWidth: overrideStrokeWidth,
   }: Props = $props();
 
-  const strokeWidth = overrideStrokeWidth ?? 2;
+  const strokeWidth = $derived(overrideStrokeWidth ?? 2);
   let clientWidth = $state(0);
   const circumference = $derived(
     2 * Math.PI * ((Math.max(clientWidth, strokeWidth) - strokeWidth) * 0.5),

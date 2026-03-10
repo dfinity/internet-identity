@@ -14,17 +14,25 @@
   } & SvelteHTMLElements["div"];
 
   let {
-    value: initialValue,
+    value: propValue,
     onSubmit,
     class: className,
     ...props
   }: Props = $props();
 
-  let value = $state(initialValue ?? EMPTY_PHRASE);
+  let value = $state<string[]>([]);
+  let sourceValue = $state<string[] | undefined>(undefined);
   let wrapperRef = $state<HTMLFieldSetElement>();
   let dictionary = $state<string[]>();
   let isSubmitting = $state(false);
   let showValues = $state(false);
+
+  $effect.pre(() => {
+    if (propValue !== sourceValue) {
+      sourceValue = propValue;
+      value = [...(propValue ?? EMPTY_PHRASE)];
+    }
+  });
 
   const isEmpty = $derived(value.every((word) => word.length === 0));
   const isValid = $derived(
@@ -103,7 +111,9 @@
 
   onMount(() => {
     // Lazy load dictionary so this component doesn't include it in the bundle eagerly
-    import("bip39").then((bip39) => (dictionary = bip39.wordlists.english));
+    void import("bip39").then(
+      (bip39) => (dictionary = bip39.wordlists.english),
+    );
     // Focus on first empty input field, else fallback to first input
     focusInput(
       Math.max(
@@ -129,7 +139,7 @@
       className,
     ]}
   >
-    {#each value as word, index}
+    {#each value as word, index (index)}
       {@const position = index + 1}
       <label class="relative">
         <input

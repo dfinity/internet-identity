@@ -41,7 +41,7 @@
     children: Snippet;
   };
 
-  const { options, children }: Props = $props();
+  let { options, children }: Props = $props();
 
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
@@ -91,13 +91,13 @@
       });
     });
 
-  let authorizePromise = $state(
+  const createAuthorizePromise = (channelOptions?: ChannelOptions) =>
     channelStore
-      .establish(options)
+      .establish(channelOptions)
       .catch((error) => {
         console.error(error); // Log error to console
         if (error instanceof PostMessageUnsupportedError) {
-          goto("/unsupported");
+          void goto("/unsupported");
           return new Promise<Channel>(() => {}); // Never resolve since we render the unsupported page
         }
         return Promise.reject(
@@ -108,7 +108,7 @@
         );
       })
       .then((channel) => {
-        if (options?.pending === true) {
+        if (channelOptions?.pending === true) {
           // Don't authorize if we're only doing an initial handshake
           return;
         }
@@ -122,8 +122,9 @@
           );
         });
         return authorizeChannel(channel);
-      }),
-  );
+      });
+
+  let authorizePromise = $derived(createAuthorizePromise(options));
 </script>
 
 {#await authorizePromise then _}

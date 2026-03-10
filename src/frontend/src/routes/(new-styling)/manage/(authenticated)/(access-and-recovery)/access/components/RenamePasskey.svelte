@@ -7,7 +7,7 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
   import { aaguidToString, getAuthnMethodAlias } from "$lib/utils/webAuthn";
-  import { onMount, untrack } from "svelte";
+  import { onMount } from "svelte";
   import type { Provider } from "$lib/assets/aaguid";
 
   interface Props {
@@ -16,13 +16,13 @@
     onCancel: () => void;
   }
 
-  const { passkey, onRename, onCancel }: Props = $props();
+  let { passkey, onRename, onCancel }: Props = $props();
 
   let knownProviders = $state<Record<string, Provider>>({});
   let isSubmitting = $state(false);
   let inputRef = $state<HTMLInputElement>();
 
-  const initialName = getAuthnMethodAlias(passkey);
+  const initialName = $derived(getAuthnMethodAlias(passkey));
   const aaguid = $derived.by(() => {
     if (!("WebAuthn" in passkey.authn_method)) {
       return;
@@ -37,7 +37,15 @@
     aaguid !== undefined ? knownProviders?.[aaguid]?.name : undefined,
   );
 
-  let name = $state(untrack(() => initialName));
+  let name = $state("");
+  let sourcePasskey = $state<AuthnMethodData | undefined>(undefined);
+
+  $effect.pre(() => {
+    if (passkey !== sourcePasskey) {
+      sourcePasskey = passkey;
+      name = initialName;
+    }
+  });
 
   const hasChanges = $derived(initialName !== name.trim());
 
@@ -54,7 +62,7 @@
     inputRef?.focus();
 
     // Lazy load known providers data
-    import("$lib/assets/aaguid").then(
+    void import("$lib/assets/aaguid").then(
       (data) => (knownProviders = data.default),
     );
   });

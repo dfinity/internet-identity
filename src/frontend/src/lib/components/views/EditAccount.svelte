@@ -19,13 +19,22 @@
     save: (account: Account) => void;
   }
 
-  const { account, existingNames, save }: Props = $props();
+  let { account, existingNames, save }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let name = $state(account?.name ?? "");
-  let isDefaultSignIn = $state(account?.isDefaultSignIn ?? false);
+  let sourceAccount = $state<Account | undefined>(undefined);
+  let name = $state("");
+  let isDefaultSignIn = $state(false);
   let isSubmitting = $state(false);
   let nameExists = $state(false);
+
+  $effect.pre(() => {
+    if (account !== sourceAccount) {
+      sourceAccount = account;
+      name = account?.name ?? "";
+      isDefaultSignIn = account?.isDefaultSignIn ?? false;
+    }
+  });
 
   const showSetDefault = $derived(
     account === undefined || !account.isDefaultSignIn,

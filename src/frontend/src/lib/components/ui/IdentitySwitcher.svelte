@@ -38,7 +38,9 @@
 
   // Snapshot identities on render to prevent UI changes while popover is open.
   // Popover shows up-to-date info when opened, but stays stable during interaction.
+  // svelte-ignore state_referenced_locally
   let initialIdentities = $state(identities);
+  // svelte-ignore state_referenced_locally
   let initialSelected = $state(selected);
 
   let switchingToIdentity = $state<bigint>();

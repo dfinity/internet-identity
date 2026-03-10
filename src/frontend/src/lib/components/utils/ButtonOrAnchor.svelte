@@ -10,11 +10,8 @@
     };
 
   let { element = $bindable(), ...props }: Props = $props();
-  const buttonProps: HTMLButtonAttributes | undefined = !("href" in props)
-    ? props
-    : undefined;
-  const anchorProps: HTMLAnchorAttributes | undefined =
-    "href" in props ? props : undefined;
+  const buttonProps = $derived(!("href" in props) ? props : undefined);
+  const anchorProps = $derived("href" in props ? props : undefined);
 </script>
 
 {#if buttonProps !== undefined}
