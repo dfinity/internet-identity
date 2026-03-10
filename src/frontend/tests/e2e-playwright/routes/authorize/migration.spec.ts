@@ -10,7 +10,6 @@ import {
   LEGACY_II_URL,
   TEST_APP_URL,
 } from "../../utils";
-import { isNullish } from "@dfinity/utils";
 
 const TEST_USER_NAME = "Test User";
 
