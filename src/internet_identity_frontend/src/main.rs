@@ -37,6 +37,7 @@ fn post_upgrade(args: InternetIdentityFrontendArgs) {
 
 fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
+    let related_origins = args.related_origins.as_ref();
 
     // 2. Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -82,6 +83,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         content_type: Some("text/html".to_string()),
                         headers: get_asset_headers(
                             integrity_hashes.clone(),
+                            related_origins,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -115,7 +117,11 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         path,
                         content_type: Some(content_type.to_mime_type_string()),
                         encodings,
-                        headers: get_asset_headers(integrity_hashes.clone(), vec![headers]),
+                        headers: get_asset_headers(
+                            integrity_hashes.clone(),
+                            related_origins,
+                            vec![headers],
+                        ),
                         fallback_for: vec![],
                         aliased_by: vec![],
                     }
@@ -137,8 +143,23 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
 
 fn get_asset_headers(
     integrity_hashes: Vec<String>,
+    related_origins: Option<&Vec<String>>,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
+    let credentials_allowlist = if let Some(related_origins) = related_origins {
+        if related_origins.is_empty() {
+            "self".to_string()
+        } else {
+            let quoted: Vec<String> = related_origins
+                .iter()
+                .map(|origin| format!("\"{origin}\""))
+                .collect();
+            format!("self {}", quoted.join(" "))
+        }
+    } else {
+        "self".to_string()
+    };
+
     // List of recommended security headers as per https://owasp.org/www-project-secure-headers/
     // These headers enable browser security features (like limit access to platform apis and set
     // iFrame policies, etc.)
@@ -155,7 +176,7 @@ fn get_asset_headers(
         // Comprehensive policy to prevent XSS attacks and data injection
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes),
+            get_content_security_policy(integrity_hashes, related_origins),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -178,7 +199,8 @@ fn get_asset_headers(
         // - sync-xhr=(self): Allow synchronous XMLHttpRequest from same origin
         (
             "Permissions-Policy".to_string(),
-            "accelerometer=(),\
+            format!(
+                "accelerometer=(),\
              autoplay=(),\
              camera=(),\
              clipboard-read=(),\
@@ -197,14 +219,14 @@ fn get_asset_headers(
              midi=(),\
              payment=(),\
              picture-in-picture=(),\
-             publickey-credentials-get=(self),\
+             publickey-credentials-get=({credentials_allowlist}),\
              screen-wake-lock=(),\
              serial=(),\
              sync-xhr=(self),\
              usb=(),\
              web-share=(),\
              xr-spatial-tracking=()"
-                .to_string(),
+            ),
         ),
     ];
     headers.extend(additional_headers);
@@ -246,12 +268,18 @@ fn get_asset_headers(
 /// font-src 'self':
 ///   Allow fonts only from same origin
 ///
-/// frame-ancestors 'self':
-///   Control embedding - only allow same origin
+/// frame-ancestors 'self' <related_origins...>:
+///   Control embedding - allow same origin and configured related origins
+///
+/// frame-src 'self' <related_origins...>:
+///   Allow framing only from same origin and configured related origins
 ///
 /// upgrade-insecure-requests (production only):
 ///   Automatically upgrade HTTP requests to HTTPS (omitted in dev for localhost)
-fn get_content_security_policy(integrity_hashes: Vec<String>) -> String {
+fn get_content_security_policy(
+    integrity_hashes: Vec<String>,
+    related_origins: Option<&Vec<String>>,
+) -> String {
     let connect_src = "'self' https:";
 
     // Allow connecting via http for development purposes
@@ -272,6 +300,16 @@ fn get_content_security_policy(integrity_hashes: Vec<String>) -> String {
         )
     };
 
+    let embedding_allowlist = if let Some(related_origins) = related_origins {
+        if related_origins.is_empty() {
+            "'self'".to_string()
+        } else {
+            format!("'self' {}", related_origins.join(" "))
+        }
+    } else {
+        "'self'".to_string()
+    };
+
     let csp = format!(
         "default-src 'none';\
          connect-src {connect_src};\
@@ -282,8 +320,8 @@ fn get_content_security_policy(integrity_hashes: Vec<String>) -> String {
          style-src 'self' 'unsafe-inline';\
          style-src-elem 'self' 'unsafe-inline';\
          font-src 'self';\
-         frame-ancestors 'self';\
-         frame-src 'self';"
+         frame-ancestors {embedding_allowlist};\
+         frame-src {embedding_allowlist};"
     );
 
     // For production builds, upgrade all HTTP connections to HTTPS
