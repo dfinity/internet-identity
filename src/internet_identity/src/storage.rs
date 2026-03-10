@@ -733,8 +733,7 @@ impl<M: Memory + Clone> Storage<M> {
             &storable_anchor.recovery_keys.unwrap_or_default(),
         );
 
-        let current_passkey_credentials =
-            storable_anchor.passkey_credentials.unwrap_or_default();
+        let current_passkey_credentials = storable_anchor.passkey_credentials.unwrap_or_default();
 
         self.sync_anchor_with_passkey_credential_index(
             anchor_number,
