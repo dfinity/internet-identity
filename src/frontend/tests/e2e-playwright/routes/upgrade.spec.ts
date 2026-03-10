@@ -123,7 +123,7 @@ test("Can upgrade identity", async ({
       await page.getByRole("button", { name: "Upgrade again" }).click();
     }
 
-    // Set the identity name and authenticate with dummy auth
+    // Set the identity name and register new dummy auth
     const newAuth = dummyAuth();
     await page.getByLabel("Identity name").fill(identities[0].name);
     newAuth(page);
