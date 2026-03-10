@@ -211,11 +211,13 @@
     <div class="h-[env(safe-area-inset-top)]"></div>
     <!-- Mobile logo and close button -->
     <div
-      class="mb-3 flex flex-row items-center justify-end px-4 py-3 sm:hidden"
+      class="mb-3 flex flex-row items-center justify-start px-4 py-3 sm:hidden"
     >
-      <Logo class="text-fg-primary h-4" />
-      <div class="text-text-primary ms-4 text-base font-semibold">
-        Internet Identity
+      <div dir="ltr" class="flex items-center gap-4">
+        <Logo class="text-fg-primary h-4" />
+        <div class="text-text-primary text-base font-semibold">
+          Internet Identity
+        </div>
       </div>
       <button
         onclick={() => (isMobileSidebarOpen = false)}
@@ -232,9 +234,11 @@
         "max-sm:hidden",
       ]}
     >
-      <Logo class="text-fg-primary h-4" />
-      <div class="text-text-primary text-base font-semibold max-md:hidden">
-        Internet Identity
+      <div dir="ltr" class="flex items-center gap-4">
+        <Logo class="text-fg-primary h-4" />
+        <div class="text-text-primary text-base font-semibold max-md:hidden">
+          Internet Identity
+        </div>
       </div>
     </div>
     <!-- Navigation -->

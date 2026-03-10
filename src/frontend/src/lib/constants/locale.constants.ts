@@ -2,4 +2,9 @@
 export const availableLocales = ["en", "de", "es", "id", "ur"];
 
 // List of languages that are actually enabled
-export const enabledLocales = ["en", "es"];
+export const enabledLocales = ["en", "es", "ur"];
+
+const rtlLocales = ["ur"];
+
+export const getLocaleDirection = (locale: string): "ltr" | "rtl" =>
+	rtlLocales.includes(locale) ? "rtl" : "ltr";

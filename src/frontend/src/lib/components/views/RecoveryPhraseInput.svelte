@@ -122,6 +122,7 @@
   <!-- Input grid -->
   <div
     {...props}
+    dir="ltr"
     class={[
       "grid grid-cols-3 overflow-hidden",
       "border-border-secondary rounded-md border-1",

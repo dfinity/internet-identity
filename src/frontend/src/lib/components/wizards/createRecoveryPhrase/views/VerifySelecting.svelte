@@ -66,7 +66,7 @@
     <Trans>Select each word in the correct order:</Trans>
   {/if}
 </p>
-<ul class={["mb-8 grid grid-cols-3 gap-3"]}>
+<ul dir="ltr" class={["mb-8 grid grid-cols-3 gap-3"]}>
   {#each shuffledIndexes as index}
     {@const word = recoveryPhrase[index]}
     {@const selectedPosition = selectedIndexes.indexOf(index)}
