@@ -371,9 +371,7 @@ export const addCredentialToVirtualAuthenticator = async (
  * Converts the WebAuthn CDP private key (base64 PKCS#8 DER) to a public key
  * in SPKI DER encoding.
  */
-export const cdpPrivateKeyToPublicKeyDer = (
-  privateKey: string,
-): Uint8Array => {
+export const cdpPrivateKeyToPublicKeyDer = (privateKey: string): Uint8Array => {
   const privateKeyDer = Buffer.from(privateKey, "base64");
   const privateKeyObject = createPrivateKey({
     key: privateKeyDer,
