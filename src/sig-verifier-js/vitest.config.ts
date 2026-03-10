@@ -10,6 +10,11 @@ export default defineConfig(
       include: "./tests.ts",
       globals: true /* globals like 'test' and 'describe' */,
       watch: false,
+      server: {
+        deps: {
+          inline: [/\.wasm$/],
+        },
+      },
     },
   }),
 );
