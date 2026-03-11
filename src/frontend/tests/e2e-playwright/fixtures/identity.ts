@@ -19,23 +19,7 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
     ...options,
   } as RequestInit);
 
-const FORWARDED_HOST = new URL(II_URL).host;
-
-const actorFetchForHost =
-  (host: string): typeof fetch =>
-  (url, options = {}) => {
-    if (new URL(host).host !== "localhost:5173") {
-      return insecureFetch(url, options);
-    }
-
-    const headers = new Headers(options.headers);
-    headers.set("host", FORWARDED_HOST);
-
-    return insecureFetch(url, {
-      ...options,
-      headers,
-    });
-  };
+const REPLICA_HOST = "http://127.0.0.1:4943";
 
 export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
 export const DEFAULT_NAME = "Test User";
@@ -130,12 +114,15 @@ const createActor = async (
   canisterId: Principal,
   dummyAuthIndex: bigint,
 ): Promise<ActorSubclass<_SERVICE>> =>
+  // Browser traffic still goes through id.ai + resolver overrides.
+  // Node-side fixture actors can safely target the local replica directly.
+  // This avoids host-header/proxy edge cases in CI.
   Actor.createActor<_SERVICE>(internet_identity_idl, {
     agent: await HttpAgent.create({
-      host,
+      host: new URL(host).host === "localhost:5173" ? REPLICA_HOST : host,
       shouldFetchRootKey: true,
       verifyQuerySignatures: false,
-      fetch: actorFetchForHost(host),
+      fetch: insecureFetch,
       identity: Ed25519KeyIdentity.generate(toSeed(dummyAuthIndex)),
     }),
     canisterId,
