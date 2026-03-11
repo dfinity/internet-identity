@@ -774,7 +774,7 @@ msgid "See how many access methods are within your identity and manage your reco
 msgstr "Consulta cuántos métodos de acceso hay en tu identidad y gestiona tu frase de recuperación."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
-msgstr "Selectiona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
+msgstr "Selecciona <0>Abrir en Safari</0> o <1>Abrir en Chrome</1>."
 
 msgid "Select each word in the correct order:"
 msgstr "Selecciona cada palabra en el orden correcto:"
