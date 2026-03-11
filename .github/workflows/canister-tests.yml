@@ -582,7 +582,7 @@ jobs:
 
       - name: Run Playwright tests
         run: |
-          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /) --reporter=line,html
 
       - name: Stop dfx
         if: ${{ always() }}
