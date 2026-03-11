@@ -50,7 +50,6 @@
     "@types/node": "*",
     "@vitejs/plugin-basic-ssl": "^2.1.4",
     "@vitest/browser": "^4.0.18",
-    "@wdio/globals": "^8.43.0",
     "@zag-js/svelte": "^1.12.0",
     "@zag-js/toast": "^1.12.0",
     "devtools-protocol": "^0.0.1502260",
