@@ -92,7 +92,7 @@ const verifyCredentials = async ({
   validRpDerivationOrigin.result satisfies "valid";
   const rpOrigin = rpDerivationOrigin ?? rpOrigin_;
 
-  const vcIssuer = new VcIssuer(issuerCanisterId);
+  const vcIssuer = new VcIssuer(issuerCanisterId as unknown as Principal);
 
   const issuerDerivationOriginResult = await getValidatedIssuerDerivationOrigin(
     {
@@ -115,7 +115,9 @@ const verifyCredentials = async ({
     return abortedCredentials({ reason: "auth_failed_issuer" });
   }
 
-  const userNumber_ = await getAnchorByPrincipal({ principal: givenP_RP });
+  const userNumber_ = await getAnchorByPrincipal({
+    principal: givenP_RP as unknown as Principal,
+  });
 
   // Ask user to confirm the verification of credentials
   const allowed = await allowCredentials({
@@ -187,7 +189,7 @@ const verifyCredentials = async ({
       origin: rpOrigin,
     }),
   );
-  if (computedP_RP.compareTo(givenP_RP) !== "eq") {
+  if (computedP_RP.compareTo(givenP_RP as unknown as Principal) !== "eq") {
     console.error("Principal did not match that expected by RP");
     return abortedCredentials({ reason: "bad_principal_rp" });
   }
@@ -232,7 +234,7 @@ const verifyCredentials = async ({
 
   // Create the presentation and return it to the RP
   return createPresentation({
-    issuerCanisterId,
+    issuerCanisterId: issuerCanisterId as unknown as Principal,
     rpAliasCredential: pAlias.rpAliasCredential,
     issuedCredential,
   });
