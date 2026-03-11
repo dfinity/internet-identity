@@ -4,6 +4,7 @@ import { authenticationStore } from "$lib/stores/authentication.store";
 import { sessionStore } from "$lib/stores/session.store";
 import { initGlobals, canisterId, agentOptions } from "$lib/globals";
 import { localeStore } from "$lib/stores/locale.store";
+import { getLocaleDirection } from "$lib/constants/locale.constants";
 
 const FEATURE_FLAG_PREFIX = "feature_flag_";
 
@@ -50,5 +51,11 @@ export const init: ClientInit = async () => {
     localeStore.init(),
     sessionStore.init({ canisterId, agentOptions }),
   ]);
+
+  localeStore.subscribe((locale) => {
+    document.documentElement.lang = locale;
+    document.documentElement.dir = getLocaleDirection(locale);
+  });
+
   authenticationStore.init({ canisterId, agentOptions });
 };

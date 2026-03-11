@@ -28,6 +28,7 @@
 </p>
 <div class="relative">
   <ol
+    dir="ltr"
     class={["my-8 grid grid-cols-3 gap-3", !isRevealed && "blur-md"]}
     aria-hidden={isRevealed ? "false" : "true"}
   >

@@ -186,10 +186,12 @@
   <header
     class="from-bg-primary flex h-16 flex-row items-center bg-gradient-to-b to-transparent px-4 md:px-6 lg:px-8"
   >
-    <Logo class="text-fg-primary me-4 h-5.5" />
-    <h1 class="text-text-primary hidden text-base font-semibold sm:block">
-      Internet Identity
-    </h1>
+    <div dir="ltr" class="flex items-center">
+      <Logo class="text-fg-primary me-4 h-5.5" />
+      <h1 class="text-text-primary hidden text-base font-semibold sm:block">
+        Internet Identity
+      </h1>
+    </div>
     {#if !building}
       {#if selectedIdentity === undefined}
         <button onclick={() => (isAuthDialogOpen = true)} class="btn ms-auto">

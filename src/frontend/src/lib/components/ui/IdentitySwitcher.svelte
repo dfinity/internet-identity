@@ -119,8 +119,8 @@
     class={[
       "bg-bg-primary_alt border-border-secondary absolute flex items-center justify-center rounded-full border",
       size === "lg"
-        ? "-right-1 -bottom-1 size-6.5"
-        : "-right-1.25 -bottom-1.25 size-5",
+        ? "-end-1 -bottom-1 size-6.5"
+        : "-end-1.25 -bottom-1.25 size-5",
     ]}
   >
     {#if logo !== undefined}
@@ -254,9 +254,9 @@
       {:else}
         <ArrowRightIcon
           class={[
-            "text-fg-tertiary ms-auto mr-1 size-5 opacity-0 transition-all duration-200",
-            "group-enabled:group-hover:mr-0 group-enabled:group-hover:opacity-100",
-            "group-enabled:group-focus-visible:mr-0 group-enabled:group-focus-visible:opacity-100",
+            "text-fg-tertiary ms-auto me-1 size-5 transform opacity-0 transition-all duration-200 rtl:-scale-x-100",
+            "group-enabled:group-hover:me-0 group-enabled:group-hover:opacity-100",
+            "group-enabled:group-focus-visible:me-0 group-enabled:group-focus-visible:opacity-100",
           ]}
         />
       {/if}

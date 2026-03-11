@@ -14,13 +14,13 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 
 msgid "{0} logo"
-msgstr ""
+msgstr "Logo {0}"
 
 msgid "{0} user"
-msgstr ""
+msgstr "Pengguna {0}"
 
 msgid "{application} has moved to the new Internet Identity"
-msgstr ""
+msgstr "{application} telah pindah ke Internet Identity baru"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
@@ -29,7 +29,7 @@ msgid "{name} account"
 msgstr "Akun {name}"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
-msgstr ""
+msgstr "{num, plural, other {# Passkey}}"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Internet Identity tampilan baru yang modern. Desain baru ini intuitif dan lebih mudah dinavigasi, sehingga pengalaman pengguna menjadi lebih lancar."
@@ -53,7 +53,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Cara untuk mendapatkan kembali akses ke identitas Anda jika Anda kehilangannya."
 
 msgid "Access and recovery"
-msgstr ""
+msgstr "Akses dan pemulihan"
 
 msgid "Access methods"
 msgstr "Metode akses"
@@ -68,10 +68,10 @@ msgid "Activate it so that you can recover your identity at any time."
 msgstr "Aktifkan agar Anda dapat memulihkan identitas Anda kapan saja."
 
 msgid "Activate recovery to remove"
-msgstr ""
+msgstr "Aktifkan pemulihan untuk menghapus"
 
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
-msgstr ""
+msgstr "Aktifkan frasa pemulihan Anda agar Anda dapat memulihkan identitas Anda kapan saja."
 
 msgid "Add a passkey"
 msgstr "Tambahkan passkey"
@@ -83,7 +83,7 @@ msgid "Add another account"
 msgstr "Tambah akun lain"
 
 msgid "Add another identity"
-msgstr ""
+msgstr "Tambahkan identitas lain"
 
 msgid "Add another passkey"
 msgstr "Tambahkan passkey lain"
@@ -119,10 +119,10 @@ msgid "Authorize new device"
 msgstr "Otorisasi perangkat baru"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
-msgstr ""
+msgstr "Sebelum memulai, cari tempat yang privat dan siapkan frasa pemulihan Anda. Jaga kerahasiaannya untuk melindungi identitas Anda."
 
 msgid "Before you continue"
-msgstr ""
+msgstr "Sebelum Anda melanjutkan"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Dengan mengaktifkan fitur ini, Anda dapat membuat lebih dari satu akun untuk satu aplikasi. Beralih antar akun dengan mudah (misalnya, kantor, pribadi, atau demo)."
@@ -140,31 +140,31 @@ msgid "Characters are case-sensitive"
 msgstr "Karakter membedakan huruf besar/kecil"
 
 msgid "Check out the other domains:"
-msgstr ""
+msgstr "Lihat domain lainnya:"
 
 msgid "Checking recovery phrase"
-msgstr ""
+msgstr "Memeriksa frasa pemulihan"
 
 msgid "Checking your order"
-msgstr ""
+msgstr "Memeriksa pesanan Anda"
 
 msgid "Choose an account"
 msgstr "Pilih akun"
 
 msgid "choose language to continue"
-msgstr ""
+msgstr "pilih bahasa untuk melanjutkan"
 
 msgid "Choose method"
 msgstr "Pilih metode"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Pilih metode untuk melanjutkan"
 
 msgid "Clear all"
 msgstr "Hapus semua"
 
 msgid "Click to reveal"
-msgstr ""
+msgstr "Klik untuk menampilkan"
 
 msgid "Close"
 msgstr "Tutup"
@@ -176,7 +176,7 @@ msgid "Code copied to clipboard"
 msgstr "Kode disalin ke papan klip"
 
 msgid "Complete set-up"
-msgstr ""
+msgstr "Selesaikan penyiapan"
 
 msgid "Confirm sign-in"
 msgstr "Konfirmasi masuk"
@@ -227,10 +227,10 @@ msgid "Create passkey"
 msgstr "Buat passkey"
 
 msgid "Created {0}"
-msgstr ""
+msgstr "Dibuat {0}"
 
 msgid "Created {date}"
-msgstr ""
+msgstr "Dibuat {date}"
 
 msgid "Creating account..."
 msgstr "Membuat akun..."
@@ -248,7 +248,7 @@ msgid "Currently signed in with this passkey"
 msgstr "Saat ini masuk dengan passkey ini"
 
 msgid "Dashlane has been confirmed to be incompatible."
-msgstr ""
+msgstr "Dashlane telah dikonfirmasi tidak kompatibel."
 
 msgid "Default"
 msgstr "Default"
@@ -257,10 +257,10 @@ msgid "Discoverable passkeys"
 msgstr "Passkey yang dapat ditemukan"
 
 msgid "Dismiss"
-msgstr ""
+msgstr "Tutup"
 
 msgid "Do you want to continue?"
-msgstr ""
+msgstr "Apakah Anda ingin melanjutkan?"
 
 msgid "Easy access"
 msgstr "Akses mudah"
@@ -275,19 +275,19 @@ msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
 
 msgid "Encountered an internal error while processing the request."
-msgstr ""
+msgstr "Terjadi kesalahan internal saat memproses permintaan."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
-msgstr ""
+msgstr "Masukkan nama untuk identitas Anda untuk menyelesaikan peningkatan. Setelah diatur, nama tidak dapat diubah nanti."
 
 msgid "Enter characters"
 msgstr "Masukkan karakter"
 
 msgid "Enter each word in the correct order:"
-msgstr ""
+msgstr "Masukkan setiap kata dalam urutan yang benar:"
 
 msgid "Enter recovery phrase"
-msgstr ""
+msgstr "Masukkan frasa pemulihan"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Semua yang perlu Anda ketahui tentang Internet Identity, cara yang pribadi, aman, dan mudah untuk masuk ke aplikasi di Internet Computer."
@@ -297,10 +297,10 @@ msgid "Experience"
 msgstr "Rasakan"
 
 msgid "Export JSON"
-msgstr ""
+msgstr "Ekspor JSON"
 
 msgid "FAQ & Support"
-msgstr ""
+msgstr "FAQ & Dukungan"
 
 msgid "FAQs"
 msgstr "Pertanyaan yang Sering Diajukan"
@@ -321,10 +321,10 @@ msgid "Generating code..."
 msgstr "Membuat kode..."
 
 msgid "Generating phrase..."
-msgstr ""
+msgstr "Membuat frasa..."
 
 msgid "Get started"
-msgstr ""
+msgstr "Mulai"
 
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
 msgstr "Beri identitas Anda nama yang jelas, sederhana, dan mudah diingat agar mudah Anda kenali."
@@ -369,28 +369,28 @@ msgid "How to stay secure"
 msgstr "Cara tetap aman"
 
 msgid "I Acknowledge"
-msgstr ""
+msgstr "Saya Mengerti"
 
 msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
-msgstr ""
+msgstr "Saya bertanggung jawab atas frasa pemulihan saya dan frasa tersebut tidak dapat diambil dari Internet Identity jika hilang."
 
 msgid "I have written it down"
-msgstr ""
+msgstr "Saya sudah mencatatnya"
 
 msgid "Identity already upgraded"
 msgstr "Identitas sudah ditingkatkan"
 
 msgid "Identity found"
-msgstr ""
+msgstr "Identitas ditemukan"
 
 msgid "Identity list"
-msgstr ""
+msgstr "Daftar identitas"
 
 msgid "Identity name"
 msgstr "Nama identitas"
 
 msgid "Identity not found"
-msgstr ""
+msgstr "Identitas tidak ditemukan"
 
 msgid "Identity number"
 msgstr "Nomor identitas"
@@ -405,13 +405,13 @@ msgid "In use on another account."
 msgstr "Digunakan di akun lain."
 
 msgid "Incorrect recovery phrase. Please try again."
-msgstr ""
+msgstr "Frasa pemulihan salah. Silakan coba lagi."
 
 msgid "Incorrect spelling"
 msgstr "Ejaan salah"
 
 msgid "Incorrect word order. Review and try again."
-msgstr ""
+msgstr "Urutan kata salah. Tinjau dan coba lagi."
 
 msgid "Incorrect. Try again with the new code."
 msgstr "Salah. Coba lagi dengan kode baru."
@@ -453,7 +453,7 @@ msgid "Invalid code. Please check and try again."
 msgstr "Kode tidak valid. Silakan periksa dan coba lagi."
 
 msgid "Invalid recovery phrase"
-msgstr ""
+msgstr "Frasa pemulihan tidak valid"
 
 msgid "Invalid request"
 msgstr "Permintaan tidak valid"
@@ -465,7 +465,7 @@ msgid "It can be used at any time to recover your identity."
 msgstr "Ini dapat digunakan kapan saja untuk memulihkan identitas Anda."
 
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
-msgstr ""
+msgstr "Tampaknya Anda mencoba masuk dari aplikasi sosial. Ikuti langkah-langkah ini untuk melanjutkan:"
 
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Peramban bawaan aplikasi ini tidak didukung."
@@ -477,10 +477,10 @@ msgid "It seems like the connection with the service could not be established. T
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
 
 msgid "It seems like the connection with the service could not be re-established."
-msgstr ""
+msgstr "Tampaknya koneksi dengan layanan tidak dapat disambungkan kembali."
 
 msgid "It seems like the request could not be processed."
-msgstr ""
+msgstr "Tampaknya permintaan tidak dapat diproses."
 
 msgid "It won't be removed from your device or password manager."
 msgstr "Ini tidak akan dihapus dari perangkat atau pengelola kata sandi Anda."
@@ -492,13 +492,13 @@ msgid "Keep linked"
 msgstr "Tetap tertaut"
 
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
-msgstr ""
+msgstr "Disimpan di kunci fisik. Autentikasi pada perangkat yang didukung melalui ketuk/masukkan."
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "Beri label sesuai penggunaan (misalnya, 'Kantor' atau 'Demo')."
 
 msgid "Language"
-msgstr ""
+msgstr "Bahasa"
 
 msgid "Last used"
 msgstr "Terakhir digunakan"
@@ -507,10 +507,10 @@ msgid "Learn how to open links in your browser"
 msgstr "Pelajari cara membuka tautan di peramban Anda"
 
 msgid "Ledger has been confirmed to be incompatible."
-msgstr ""
+msgstr "Ledger telah dikonfirmasi tidak kompatibel."
 
 msgid "Legacy"
-msgstr ""
+msgstr "Legacy"
 
 msgid "Let's get started"
 msgstr "Mari mulai"
@@ -522,25 +522,25 @@ msgid "Link copied to clipboard"
 msgstr "Tautan disalin ke papan klip"
 
 msgid "Locked legacy recovery phrase"
-msgstr ""
+msgstr "Frasa pemulihan lama terkunci"
 
 msgid "Long-press the link that opened this page."
 msgstr "Tekan lama tautan yang membuka halaman ini."
 
 msgid "Lookup by passkey"
-msgstr ""
+msgstr "Cari berdasarkan passkey"
 
 msgid "Lookup identity"
-msgstr ""
+msgstr "Cari identitas"
 
 msgid "Lost access to your identity?"
-msgstr ""
+msgstr "Kehilangan akses ke identitas Anda?"
 
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Permudah pendaftaran dan masuk dengan Google, Apple, atau Microsoft. Login yang Anda kenal, kini dengan privasi yang lebih baik."
 
 msgid "Make sure no one can see what's on your screen or what you are writing."
-msgstr ""
+msgstr "Pastikan tidak ada yang bisa melihat apa yang ada di layar Anda atau apa yang Anda tulis."
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Pastikan untuk menambahkan metode akses baru agar Anda dapat masuk lain kali atau mengatur ulang frasa pemulihan Anda."
@@ -549,7 +549,7 @@ msgid "Manage your identities and stay in control of your apps and websites with
 msgstr "Kelola identitas Anda dan tetap kendalikan aplikasi serta situs web Anda melalui dashboard. Jelajahi Fitur Pro untuk menyesuaikan dan mengamankan pengalaman Anda lebih lanjut."
 
 msgid "Manage your Internet Identity"
-msgstr ""
+msgstr "Kelola Internet Identity Anda"
 
 msgid "Maximum length is 32 characters."
 msgstr "Panjang maksimum 32 karakter."
@@ -591,34 +591,34 @@ msgid "No identity found"
 msgstr "Tidak ada identitas yang ditemukan"
 
 msgid "No passkey tests yet"
-msgstr ""
+msgstr "Belum ada pengujian passkey"
 
 msgid "No recovery phrase"
-msgstr ""
+msgstr "Tidak ada frasa pemulihan"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Tidak. Face ID atau sidik jari Anda hanya digunakan untuk membuat atau membuka passkey Anda. Data biometrik Anda tidak pernah dibagikan dengan Internet Identity atau situs web dan aplikasi lain yang Anda gunakan."
 
 msgid "NordPass has been confirmed to be incompatible."
-msgstr ""
+msgstr "NordPass telah dikonfirmasi tidak kompatibel."
 
 msgid "Not upgraded"
-msgstr ""
+msgstr "Belum ditingkatkan"
 
 msgid "Number of access methods"
 msgstr "Jumlah metode akses"
 
 msgid "One or more words are wrong or out of order."
-msgstr ""
+msgstr "Satu atau lebih kata salah atau urutannya tidak tepat."
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
 
 msgid "Open in browser"
-msgstr ""
+msgstr "Buka di peramban"
 
 msgid "Open in browser to continue"
-msgstr ""
+msgstr "Buka di peramban untuk melanjutkan"
 
 msgid "Open menu"
 msgstr "Buka menu"
@@ -630,7 +630,7 @@ msgid "Passkey"
 msgstr "Passkey"
 
 msgid "Passkey ({0})"
-msgstr ""
+msgstr "Passkey ({0})"
 
 msgid "Passkey has been registered from another device."
 msgstr "Passkey telah didaftarkan dari perangkat lain."
@@ -639,7 +639,7 @@ msgid "Passkey name"
 msgstr "Nama passkey"
 
 msgid "Passkey testing"
-msgstr ""
+msgstr "Pengujian passkey"
 
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 msgstr "Passkey adalah cara yang aman dan mudah untuk masuk tanpa menggunakan kata sandi. Passkey disimpan di pengelola kata sandi Anda (Google Password Manager, iCloud Keychain, 1Password, dll.) dan dapat dilindungi dengan sidik jari, wajah, atau kode perangkat."
@@ -663,22 +663,22 @@ msgid "Password-free"
 msgstr "Tanpa kata sandi"
 
 msgid "Pick something recognizable, like your name"
-msgstr ""
+msgstr "Pilih sesuatu yang mudah dikenali, seperti nama Anda"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Silakan kembali ke <0>perangkat Anda yang ada</0> dan pilih <1>Mulai ulang</1> untuk mencoba lagi."
 
 msgid "Powered by"
-msgstr ""
+msgstr "Didukung oleh"
 
 msgid "Real Privacy"
 msgstr "Privasi nyata"
 
 msgid "Recover"
-msgstr ""
+msgstr "Pulihkan"
 
 msgid "Recover your identity"
-msgstr ""
+msgstr "Pulihkan identitas Anda"
 
 msgid "Recovery phrase"
 msgstr "Frasa pemulihan"
@@ -690,10 +690,10 @@ msgid "Recovery phrase not activated"
 msgstr "Frasa pemulihan tidak diaktifkan"
 
 msgid "Recovery phrase not verified"
-msgstr ""
+msgstr "Frasa pemulihan tidak terverifikasi"
 
 msgid "Recovery phrase set"
-msgstr ""
+msgstr "Frasa pemulihan diatur"
 
 msgid "Redirecting to the app"
 msgstr "Mengalihkan ke aplikasi..."
@@ -726,19 +726,19 @@ msgid "Replace it anytime"
 msgstr "Ganti kapan saja"
 
 msgid "Requires unlocking before it can be reset."
-msgstr ""
+msgstr "Memerlukan pembukaan kunci sebelum dapat disetel ulang."
 
 msgid "Reset"
 msgstr "Setel ulang"
 
 msgid "Reset your recovery phrase?"
-msgstr ""
+msgstr "Setel ulang frasa pemulihan Anda?"
 
 msgid "Resetting recovery phrase..."
-msgstr ""
+msgstr "Menyetel ulang frasa pemulihan..."
 
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
-msgstr ""
+msgstr "Penyetelan ulang akan membatalkan frasa pemulihan Anda saat ini, sehingga hanya frasa baru yang dapat digunakan."
 
 msgid "Retry"
 msgstr "Coba lagi"
@@ -747,19 +747,19 @@ msgid "Return to app"
 msgstr "Kembali ke aplikasi"
 
 msgid "Return to application"
-msgstr ""
+msgstr "Kembali ke aplikasi"
 
 msgid "Right now"
 msgstr "Saat ini"
 
 msgid "Run a passkey test to see results"
-msgstr ""
+msgstr "Jalankan pengujian passkey untuk melihat hasil"
 
 msgid "Save changes"
 msgstr "Simpan perubahan"
 
 msgid "Save your recovery phrase"
-msgstr ""
+msgstr "Simpan frasa pemulihan Anda"
 
 msgid "Saving changes..."
 msgstr "Menyimpan perubahan..."
@@ -777,7 +777,7 @@ msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
 
 msgid "Select each word in the correct order:"
-msgstr ""
+msgstr "Pilih setiap kata dalam urutan yang benar:"
 
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
@@ -795,13 +795,13 @@ msgid "Sign in using familiar methods"
 msgstr "Masuk menggunakan metode yang dikenal"
 
 msgid "Sign in with another identity"
-msgstr ""
+msgstr "Masuk dengan identitas lain"
 
 msgid "Sign in with your {name} account from any device."
 msgstr "Masuk dengan akun {name} Anda dari perangkat mana pun."
 
 msgid "Sign out"
-msgstr ""
+msgstr "Keluar"
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
@@ -825,25 +825,25 @@ msgid "Still have an identity number?"
 msgstr "Masih punya nomor identitas?"
 
 msgid "Still using an identity number?"
-msgstr ""
+msgstr "Masih menggunakan nomor identitas?"
 
 msgid "Store it safely"
 msgstr "Simpan dengan aman"
 
 msgid "Stored and usable only in {0} on the {1} device it was created on."
-msgstr ""
+msgstr "Disimpan dan hanya dapat digunakan di {0} pada perangkat {1} tempat ia dibuat."
 
 msgid "Stored and usable only in {0} on the device it was created on."
-msgstr ""
+msgstr "Disimpan dan hanya dapat digunakan di {0} pada perangkat tempat ia dibuat."
 
 msgid "Stored and usable only on the {0} device it was created on."
-msgstr ""
+msgstr "Disimpan dan hanya dapat digunakan pada perangkat {0} tempat ia dibuat."
 
 msgid "Stored in your {0} account and synced across your {1} devices."
-msgstr ""
+msgstr "Disimpan di akun {0} Anda dan disinkronkan di perangkat {1} Anda."
 
 msgid "Stored in your {0} account and synced across your devices."
-msgstr ""
+msgstr "Disimpan di akun {0} Anda dan disinkronkan di seluruh perangkat Anda."
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Disimpan dengan aman di perangkat Anda, di pengelola kata sandi Anda, atau di kunci keamanan."
@@ -858,22 +858,22 @@ msgid "Support"
 msgstr "Dukungan"
 
 msgid "Supported"
-msgstr ""
+msgstr "Didukung"
 
 msgid "Switch identity"
 msgstr "Ganti identitas"
 
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
-msgstr ""
+msgstr "Ketuk pada <0>bilah alamat</0> dan <1>buka di peramban</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
-msgstr ""
+msgstr "Ketuk pada tombol <0>kembali</0> yang disorot."
 
 msgid "Test passkey support"
-msgstr ""
+msgstr "Uji dukungan passkey"
 
 msgid "Test passkey support and view authenticator details"
-msgstr ""
+msgstr "Uji dukungan passkey dan lihat detail autentikator"
 
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "<0>Perangkat yang ada</0> sedang bersiap untuk melanjutkan."
@@ -885,46 +885,46 @@ msgid "The integration with Google, Microsoft and Apple uses a standard authenti
 msgstr "Integrasi dengan Google, Microsoft, dan Apple menggunakan protokol autentikasi standar yang disebut OpenID. Ini adalah protokol yang sama yang digunakan aplikasi lain untuk masuk dengan Google."
 
 msgid "The passkey could not be identified, support unknown."
-msgstr ""
+msgstr "Passkey tidak dapat diidentifikasi, dukungan tidak diketahui."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
-msgstr ""
+msgstr "Frasa dimasukkan dengan benar tetapi milik produk selain Internet Identity."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika masalah berlanjut, hubungi pengembang."
 
 msgid "This app has moved to the new Internet Identity"
-msgstr ""
+msgstr "Aplikasi ini telah pindah ke Internet Identity baru"
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Identitas ini sudah ditingkatkan ke pengalaman baru."
 
 msgid "This legacy passkey is no longer usable and should be removed."
-msgstr ""
+msgstr "Passkey lama ini tidak lagi dapat digunakan dan harus dihapus."
 
 msgid "This may take a few seconds"
-msgstr ""
+msgstr "Ini mungkin memakan waktu beberapa detik"
 
 msgid "This passkey is no longer associated with any identity."
-msgstr ""
+msgstr "Passkey ini tidak lagi dikaitkan dengan identitas apa pun."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
-msgstr ""
+msgstr "YubiKey ini memiliki firmware lama (5.1) yang tidak kompatibel."
 
 msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
-msgstr ""
+msgstr "YubiKey ini memiliki firmware lama (5.2 - 5.4) yang mungkin tidak kompatibel."
 
 msgid "This YubiKey has older firmware (5.2) that might be incompatible."
-msgstr ""
+msgstr "YubiKey ini memiliki firmware lama (5.2) yang mungkin tidak kompatibel."
 
 msgid "This YubiKey has older firmware (5.4) that might be incompatible."
-msgstr ""
+msgstr "YubiKey ini memiliki firmware lama (5.4) yang mungkin tidak kompatibel."
 
 msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
-msgstr ""
+msgstr "YubiKey ini memiliki firmware lama (5.5 - 5.6) yang mungkin tidak kompatibel."
 
 msgid "This YubiKey has older firmware (5.6) that might be incompatible."
-msgstr ""
+msgstr "YubiKey ini memiliki firmware lama (5.6) yang mungkin tidak kompatibel."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Untuk mengonfirmasi ini Anda, masukkan kode di bawah ini di <0>perangkat Anda yang ada</0>."
@@ -945,7 +945,7 @@ msgid "To finish setting up your passkey, follow the instructions shown on your 
 msgstr "Untuk menyelesaikan pengaturan passkey Anda, ikuti instruksi yang ditampilkan di <0>perangkat baru</0> Anda."
 
 msgid "Type each word in the correct order:"
-msgstr ""
+msgstr "Ketik setiap kata dalam urutan yang benar:"
 
 msgid "Type the characters exactly as shown below"
 msgstr "Ketik karakter persis seperti yang ditunjukkan di bawah"
@@ -954,13 +954,13 @@ msgid "Unable to complete setup"
 msgstr "Tidak dapat menyelesaikan pengaturan"
 
 msgid "Unable to connect"
-msgstr ""
+msgstr "Tidak dapat terhubung"
 
 msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
 
 msgid "Unexpected error"
-msgstr ""
+msgstr "Kesalahan tidak terduga"
 
 msgid "Unknown"
 msgstr "Tidak diketahui"
@@ -978,13 +978,13 @@ msgid "Unlinking {name} account..."
 msgstr "Memutuskan tautan akun {name}..."
 
 msgid "Unlock and reset"
-msgstr ""
+msgstr "Buka kunci dan setel ulang"
 
 msgid "Unlock to continue"
-msgstr ""
+msgstr "Buka kunci untuk melanjutkan"
 
 msgid "Unsupported"
-msgstr ""
+msgstr "Tidak didukung"
 
 msgid "Unsupported Browser"
 msgstr "Peramban Tidak Didukung"
@@ -999,16 +999,16 @@ msgid "Upgrade again"
 msgstr "Tingkatkan lagi"
 
 msgid "Upgrade completed successfully"
-msgstr ""
+msgstr "Peningkatan berhasil diselesaikan"
 
 msgid "Upgrade identity"
 msgstr "Tingkatkan identitas"
 
 msgid "Upgrade your existing identity to the new experience in a two steps."
-msgstr ""
+msgstr "Tingkatkan identitas Anda yang ada ke pengalaman baru dalam dua langkah."
 
 msgid "Upgrade your identity"
-msgstr ""
+msgstr "Tingkatkan identitas Anda"
 
 msgid "Upgrading identity..."
 msgstr "Meningkatkan identitas..."
@@ -1023,19 +1023,19 @@ msgid "Verify"
 msgstr "Verifikasi"
 
 msgid "Verify recovery to remove"
-msgstr ""
+msgstr "Verifikasi pemulihan untuk menghapus"
 
 msgid "Verify you are human"
 msgstr "Verifikasi bahwa Anda manusia"
 
 msgid "Verify your recovery phrase"
-msgstr ""
+msgstr "Verifikasi frasa pemulihan Anda"
 
 msgid "Verifying..."
 msgstr "Memverifikasi..."
 
 msgid "View your last used identities"
-msgstr ""
+msgstr "Lihat identitas terakhir yang Anda gunakan"
 
 msgid "Waiting for your existing device"
 msgstr "Menunggu perangkat Anda yang ada"
@@ -1044,7 +1044,7 @@ msgid "Waiting for your new device"
 msgstr "Menunggu perangkat baru Anda"
 
 msgid "Warning"
-msgstr ""
+msgstr "Peringatan"
 
 msgid "We didn't recognize that activation code."
 msgstr "Kami tidak mengenali kode aktivasi tersebut."
@@ -1080,13 +1080,13 @@ msgid "with your Internet Identity"
 msgstr "dengan Internet Identity Anda"
 
 msgid "Word {position}"
-msgstr ""
+msgstr "Kata {position}"
 
 msgid "Write down all 24 words correctly and keep them offline. Do not store them in the cloud or on devices."
-msgstr ""
+msgstr "Catat ke-24 kata dengan benar dan simpan secara offline. Jangan menyimpannya di cloud atau di perangkat."
 
 msgid "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
-msgstr ""
+msgstr "Catat frasa pemulihan Anda sesuai urutan dan verifikasi setelahnya. Simpan dengan aman dan jangan bagikan. Jika hilang, Anda akan kehilangan akses."
 
 msgid "Wrong domain was set. Please try again."
 msgstr "Domain yang salah diatur. Silakan coba lagi."
@@ -1104,10 +1104,10 @@ msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
 
 msgid "You can recover your identity now, verify you saved it correctly."
-msgstr ""
+msgstr "Anda dapat memulihkan identitas Anda sekarang, verifikasi bahwa Anda menyimpannya dengan benar."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
-msgstr ""
+msgstr "Anda dapat menyetel ulang frasa pemulihan Anda kapan saja. Ini menjaga identitas Anda tetap aman jika pernah terekspos."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Anda telah mencapai jumlah maksimum passkey"
@@ -1119,7 +1119,7 @@ msgid "You no longer need to remember your identity number and can use your fing
 msgstr "Anda tidak perlu lagi mengingat nomor identitas Anda dan dapat menggunakan sidik jari, wajah, atau kunci layar sebagai gantinya."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
-msgstr ""
+msgstr "Anda akan melihat frasa pemulihan Anda, yang tidak disimpan oleh Internet Identity sehingga tidak dapat diambil jika hilang, jadi jagalah keamanannya secara offline."
 
 msgid "You're about to sign in on a <0>new device</0>."
 msgstr "Anda akan masuk di <0>perangkat baru</0>."
@@ -1146,10 +1146,10 @@ msgid "Your identity name is currently not editable. It is only ever visible to 
 msgstr "Nama identitas Anda saat ini tidak dapat diedit. Ini hanya terlihat oleh Anda."
 
 msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
-msgstr ""
+msgstr "Frasa pemulihan Anda memberikan kontrol penuh atas identitas Anda. Jangan pernah membagikannya dan hanya gunakan di situs web resmi."
 
 msgid "Your recovery phrase is active, verify you saved it correctly."
-msgstr ""
+msgstr "Frasa pemulihan Anda aktif, verifikasi bahwa Anda menyimpannya dengan benar."
 
 msgid "Your recovery phrase is now active and can be reset anytime."
-msgstr ""
+msgstr "Frasa pemulihan Anda sekarang aktif dan dapat disetel ulang kapan saja."

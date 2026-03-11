@@ -14,13 +14,13 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "{0} logo"
-msgstr ""
+msgstr "{0}-Logo"
 
 msgid "{0} user"
-msgstr ""
+msgstr "{0}-Benutzer"
 
 msgid "{application} has moved to the new Internet Identity"
-msgstr ""
+msgstr "{application} ist zur neuen Internet Identity umgezogen"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Sie haben das Maximum von # Konto für eine einzelne App erreicht.} other {Sie haben das Maximum von # Konten für eine einzelne App erreicht.}}"
@@ -29,7 +29,7 @@ msgid "{name} account"
 msgstr "{name}-Konto"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
-msgstr ""
+msgstr "{num, plural, one {# Passkey} other {# Passkeys}}"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
 msgstr "<0>Völlig überarbeitetes Interface:</0> Wir haben Internet Identity ein frisches, modernes Erscheinungsbild verliehen. Das neue Design ist intuitiv und einfacher zu bedienen, wodurch die Nutzerführung reibungsloser wird."
@@ -53,7 +53,7 @@ msgid "A way to regain access to your identity if you ever lose it."
 msgstr "Eine Möglichkeit, den Zugang zu Ihrer Identität wiederzuerlangen, falls Sie sie verlieren sollten."
 
 msgid "Access and recovery"
-msgstr ""
+msgstr "Zugriff und Wiederherstellung"
 
 msgid "Access methods"
 msgstr "Zugriffsmethoden"
@@ -68,10 +68,10 @@ msgid "Activate it so that you can recover your identity at any time."
 msgstr "Aktivieren Sie sie, damit Sie Ihre Identität jederzeit wiederherstellen können."
 
 msgid "Activate recovery to remove"
-msgstr ""
+msgstr "Wiederherstellung aktivieren zum Entfernen"
 
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
-msgstr ""
+msgstr "Aktivieren Sie Ihre Wiederherstellungsphrase, damit Sie Ihre Identität jederzeit wiederherstellen können."
 
 msgid "Add a passkey"
 msgstr "Einen Passkey hinzufügen"
@@ -83,7 +83,7 @@ msgid "Add another account"
 msgstr "Weiteres Konto hinzufügen"
 
 msgid "Add another identity"
-msgstr ""
+msgstr "Weitere Identität hinzufügen"
 
 msgid "Add another passkey"
 msgstr "Weiteren Passkey hinzufügen"
@@ -119,10 +119,10 @@ msgid "Authorize new device"
 msgstr "Neues Gerät autorisieren"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
-msgstr ""
+msgstr "Bevor Sie beginnen, suchen Sie sich einen privaten Ort und halten Sie Ihre Wiederherstellungsphrase bereit. Behandeln Sie diese vertraulich, um Ihre Identität zu schützen."
 
 msgid "Before you continue"
-msgstr ""
+msgstr "Bevor Sie fortfahren"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "Wenn Sie diese Funktion aktivieren, können Sie mehr als ein Konto für eine einzelne App erstellen. Wechseln Sie einfach zwischen den Konten (z. B. Arbeit, Privat oder Demo)."
@@ -140,31 +140,31 @@ msgid "Characters are case-sensitive"
 msgstr "Groß- und Kleinschreibung beachten"
 
 msgid "Check out the other domains:"
-msgstr ""
+msgstr "Schauen Sie sich die anderen Domains an:"
 
 msgid "Checking recovery phrase"
-msgstr ""
+msgstr "Wiederherstellungsphrase wird überprüft"
 
 msgid "Checking your order"
-msgstr ""
+msgstr "Ihre Bestellung wird überprüft"
 
 msgid "Choose an account"
 msgstr "Wählen Sie ein Konto aus"
 
 msgid "choose language to continue"
-msgstr ""
+msgstr "Sprache wählen, um fortzufahren"
 
 msgid "Choose method"
 msgstr "Methode auswählen"
 
 msgid "Choose method to continue"
-msgstr ""
+msgstr "Methode wählen, um fortzufahren"
 
 msgid "Clear all"
 msgstr "Alle löschen"
 
 msgid "Click to reveal"
-msgstr ""
+msgstr "Zum Aufdecken klicken"
 
 msgid "Close"
 msgstr "Schließen"
@@ -176,7 +176,7 @@ msgid "Code copied to clipboard"
 msgstr "Code in die Zwischenablage kopiert"
 
 msgid "Complete set-up"
-msgstr ""
+msgstr "Einrichtung abschließen"
 
 msgid "Confirm sign-in"
 msgstr "Anmeldung bestätigen"
@@ -227,10 +227,10 @@ msgid "Create passkey"
 msgstr "Passkey erstellen"
 
 msgid "Created {0}"
-msgstr ""
+msgstr "{0} erstellt"
 
 msgid "Created {date}"
-msgstr ""
+msgstr "Am {date} erstellt"
 
 msgid "Creating account..."
 msgstr "Konto wird erstellt..."
@@ -248,7 +248,7 @@ msgid "Currently signed in with this passkey"
 msgstr "Derzeit mit diesem Passkey angemeldet"
 
 msgid "Dashlane has been confirmed to be incompatible."
-msgstr ""
+msgstr "Es wurde bestätigt, dass Dashlane inkompatibel ist."
 
 msgid "Default"
 msgstr "Standard"
@@ -257,10 +257,10 @@ msgid "Discoverable passkeys"
 msgstr "Entdeckbare Passkeys"
 
 msgid "Dismiss"
-msgstr ""
+msgstr "Verwerfen"
 
 msgid "Do you want to continue?"
-msgstr ""
+msgstr "Möchten Sie fortfahren?"
 
 msgid "Easy access"
 msgstr "Einfacher Zugang"
@@ -275,19 +275,19 @@ msgid "Enable multiple accounts"
 msgstr "Mehrere Konten aktivieren"
 
 msgid "Encountered an internal error while processing the request."
-msgstr ""
+msgstr "Beim Verarbeiten der Anfrage ist ein interner Fehler aufgetreten."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
-msgstr ""
+msgstr "Geben Sie einen Namen für Ihre Identität ein, um die Aktualisierung abzuschließen. Einmal festgelegt, kann dieser später nicht mehr geändert werden."
 
 msgid "Enter characters"
 msgstr "Zeichen eingeben"
 
 msgid "Enter each word in the correct order:"
-msgstr ""
+msgstr "Geben Sie jedes Wort in der richtigen Reihenfolge ein:"
 
 msgid "Enter recovery phrase"
-msgstr ""
+msgstr "Wiederherstellungsphrase eingeben"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, sichere und einfache Möglichkeit, sich bei Apps auf dem Internet Computer anzumelden."
@@ -297,10 +297,10 @@ msgid "Experience"
 msgstr "Erleben"
 
 msgid "Export JSON"
-msgstr ""
+msgstr "JSON exportieren"
 
 msgid "FAQ & Support"
-msgstr ""
+msgstr "FAQ & Support"
 
 msgid "FAQs"
 msgstr "Häufig gestellte Fragen"
@@ -321,10 +321,10 @@ msgid "Generating code..."
 msgstr "Code wird generiert..."
 
 msgid "Generating phrase..."
-msgstr ""
+msgstr "Phrase wird generiert..."
 
 msgid "Get started"
-msgstr ""
+msgstr "Loslegen"
 
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
 msgstr "Geben Sie Ihrer Identität einen klaren, einfachen und einprägsamen Namen, den Sie leicht erkennen."
@@ -369,28 +369,28 @@ msgid "How to stay secure"
 msgstr "So bleiben Sie sicher"
 
 msgid "I Acknowledge"
-msgstr ""
+msgstr "Ich bestätige"
 
 msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
-msgstr ""
+msgstr "Ich bin für meine Wiederherstellungsphrase verantwortlich; bei Verlust kann sie von Internet Identity nicht wiederhergestellt werden."
 
 msgid "I have written it down"
-msgstr ""
+msgstr "Ich habe sie aufgeschrieben"
 
 msgid "Identity already upgraded"
 msgstr "Identität bereits aktualisiert"
 
 msgid "Identity found"
-msgstr ""
+msgstr "Identität gefunden"
 
 msgid "Identity list"
-msgstr ""
+msgstr "Identitätsliste"
 
 msgid "Identity name"
 msgstr "Identitätsname"
 
 msgid "Identity not found"
-msgstr ""
+msgstr "Identität nicht gefunden"
 
 msgid "Identity number"
 msgstr "Identitätsnummer"
@@ -405,13 +405,13 @@ msgid "In use on another account."
 msgstr "Wird auf einem anderen Konto verwendet."
 
 msgid "Incorrect recovery phrase. Please try again."
-msgstr ""
+msgstr "Falsche Wiederherstellungsphrase. Bitte versuchen Sie es erneut."
 
 msgid "Incorrect spelling"
 msgstr "Falsche Schreibweise"
 
 msgid "Incorrect word order. Review and try again."
-msgstr ""
+msgstr "Falsche Wortreihenfolge. Überprüfen und erneut versuchen."
 
 msgid "Incorrect. Try again with the new code."
 msgstr "Falsch. Versuchen Sie es erneut mit dem neuen Code."
@@ -453,7 +453,7 @@ msgid "Invalid code. Please check and try again."
 msgstr "Ungültiger Code. Bitte überprüfen und erneut versuchen."
 
 msgid "Invalid recovery phrase"
-msgstr ""
+msgstr "Ungültige Wiederherstellungsphrase"
 
 msgid "Invalid request"
 msgstr "Ungültige Anfrage"
@@ -465,7 +465,7 @@ msgid "It can be used at any time to recover your identity."
 msgstr "Es kann jederzeit verwendet werden, um Ihre Identität wiederherzustellen."
 
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
-msgstr ""
+msgstr "Es sieht so aus, als ob Sie versuchen, sich über eine Social-App anzumelden. Folgen Sie diesen Schritten, um fortzufahren:"
 
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
 msgstr "Es scheint, als ob Sie versuchen, sich aus einer App heraus anzumelden (wie z. B. X, Telegram oder Instagram). Der in dieser App integrierte Browser wird nicht unterstützt."
@@ -477,10 +477,10 @@ msgid "It seems like the connection with the service could not be established. T
 msgstr "Die Verbindung zum Dienst konnte nicht hergestellt werden. Versuchen Sie einen anderen Browser; falls das Problem weiterhin besteht, kontaktieren Sie den Support."
 
 msgid "It seems like the connection with the service could not be re-established."
-msgstr ""
+msgstr "Es scheint, als konnte die Verbindung zum Dienst nicht wiederhergestellt werden."
 
 msgid "It seems like the request could not be processed."
-msgstr ""
+msgstr "Es scheint, als konnte die Anfrage nicht verarbeitet werden."
 
 msgid "It won't be removed from your device or password manager."
 msgstr "Es wird nicht von Ihrem Gerät oder Passwort-Manager entfernt."
@@ -492,13 +492,13 @@ msgid "Keep linked"
 msgstr "Verknüpft lassen"
 
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
-msgstr ""
+msgstr "Auf einem physischen Schlüssel gespeichert. Authentifizieren Sie sich auf unterstützten Geräten durch Tippen/Einstecken."
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "Kennzeichnen Sie die Nutzung (z.B. 'Arbeit' oder 'Demo')."
 
 msgid "Language"
-msgstr ""
+msgstr "Sprache"
 
 msgid "Last used"
 msgstr "Zuletzt verwendet"
@@ -507,10 +507,10 @@ msgid "Learn how to open links in your browser"
 msgstr "Erfahren Sie, wie Sie Links in Ihrem Browser öffnen"
 
 msgid "Ledger has been confirmed to be incompatible."
-msgstr ""
+msgstr "Es wurde bestätigt, dass Ledger inkompatibel ist."
 
 msgid "Legacy"
-msgstr ""
+msgstr "Legacy"
 
 msgid "Let's get started"
 msgstr "Legen wir los"
@@ -522,25 +522,25 @@ msgid "Link copied to clipboard"
 msgstr "Link in die Zwischenablage kopiert"
 
 msgid "Locked legacy recovery phrase"
-msgstr ""
+msgstr "Gesperrte Legacy-Wiederherstellungsphrase"
 
 msgid "Long-press the link that opened this page."
 msgstr "Drücken Sie lange auf den Link, der diese Seite geöffnet hat."
 
 msgid "Lookup by passkey"
-msgstr ""
+msgstr "Suche per Passkey"
 
 msgid "Lookup identity"
-msgstr ""
+msgstr "Identität suchen"
 
 msgid "Lost access to your identity?"
-msgstr ""
+msgstr "Zugriff auf Ihre Identität verloren?"
 
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
 msgstr "Machen Sie die Anmeldung mit Google, Apple oder Microsoft einfach. Der Login, den Sie kennen, jetzt mit erhöhter Privatsphäre."
 
 msgid "Make sure no one can see what's on your screen or what you are writing."
-msgstr ""
+msgstr "Stellen Sie sicher, dass niemand Ihren Bildschirm oder das, was Sie schreiben, sehen kann."
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
 msgstr "Stellen Sie sicher, dass Sie eine neue Zugriffsmethode hinzufügen, damit Sie sich beim nächsten Mal anmelden oder Ihre Wiederherstellungsphrase zurücksetzen können."
@@ -549,7 +549,7 @@ msgid "Manage your identities and stay in control of your apps and websites with
 msgstr "Verwalten Sie Ihre Identitäten und behalten Sie die Kontrolle über Ihre Apps und Websites mit Ihrem Dashboard. Entdecken Sie Pro-Funktionen, um Ihre Erfahrung weiter anzupassen und zu sichern."
 
 msgid "Manage your Internet Identity"
-msgstr ""
+msgstr "Verwalten Sie Ihre Internet Identity"
 
 msgid "Maximum length is 32 characters."
 msgstr "Maximale Länge ist 32 Zeichen."
@@ -591,34 +591,34 @@ msgid "No identity found"
 msgstr "Keine Identität gefunden"
 
 msgid "No passkey tests yet"
-msgstr ""
+msgstr "Noch keine Passkey-Tests"
 
 msgid "No recovery phrase"
-msgstr ""
+msgstr "Keine Wiederherstellungsphrase"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten werden niemals mit Internet Identity oder anderen Websites oder Apps geteilt."
 
 msgid "NordPass has been confirmed to be incompatible."
-msgstr ""
+msgstr "Es wurde bestätigt, dass NordPass inkompatibel ist."
 
 msgid "Not upgraded"
-msgstr ""
+msgstr "Nicht aktualisiert"
 
 msgid "Number of access methods"
 msgstr "Anzahl der Zugriffsmethoden"
 
 msgid "One or more words are wrong or out of order."
-msgstr ""
+msgstr "Ein oder mehrere Wörter sind falsch oder in der falschen Reihenfolge."
 
 msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
 msgstr "Geben Sie den Code von diesem Gerät nur ein, wenn Sie diesen Vorgang <0>selbst</0> gestartet haben."
 
 msgid "Open in browser"
-msgstr ""
+msgstr "Im Browser öffnen"
 
 msgid "Open in browser to continue"
-msgstr ""
+msgstr "Im Browser öffnen, um fortzufahren"
 
 msgid "Open menu"
 msgstr "Menü öffnen"
@@ -630,7 +630,7 @@ msgid "Passkey"
 msgstr "Passkey"
 
 msgid "Passkey ({0})"
-msgstr ""
+msgstr "Passkey ({0})"
 
 msgid "Passkey has been registered from another device."
 msgstr "Passkey wurde von einem anderen Gerät registriert."
@@ -639,7 +639,7 @@ msgid "Passkey name"
 msgstr "Passkey-Name"
 
 msgid "Passkey testing"
-msgstr ""
+msgstr "Passkey-Tests"
 
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
 msgstr "Passkeys sind eine sichere und einfache Möglichkeit, sich ohne Passwörter anzumelden. Sie werden in Ihrem Passwort-Manager (Google Password Manager, iCloud Keychain, 1Password, etc.) gespeichert und können durch Fingerabdruck, Gesicht oder Gerätecode geschützt werden."
@@ -663,22 +663,22 @@ msgid "Password-free"
 msgstr "Passwortfrei"
 
 msgid "Pick something recognizable, like your name"
-msgstr ""
+msgstr "Wählen Sie etwas Erkennbares, zum Beispiel Ihren Namen"
 
 msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
 msgstr "Gehen Sie zu Ihrem <0>bestehenden Gerät</0> zurück und wählen Sie <1>Neu starten</1>, um es erneut zu versuchen."
 
 msgid "Powered by"
-msgstr ""
+msgstr "Unterstützt durch"
 
 msgid "Real Privacy"
 msgstr "Echte Privatsphäre"
 
 msgid "Recover"
-msgstr ""
+msgstr "Wiederherstellen"
 
 msgid "Recover your identity"
-msgstr ""
+msgstr "Stellen Sie Ihre Identität wieder her"
 
 msgid "Recovery phrase"
 msgstr "Wiederherstellungsphrase"
@@ -690,10 +690,10 @@ msgid "Recovery phrase not activated"
 msgstr "Wiederherstellungsphrase nicht aktiviert"
 
 msgid "Recovery phrase not verified"
-msgstr ""
+msgstr "Wiederherstellungsphrase nicht verifiziert"
 
 msgid "Recovery phrase set"
-msgstr ""
+msgstr "Wiederherstellungsphrase festgelegt"
 
 msgid "Redirecting to the app"
 msgstr "Weiterleitung zur App..."
@@ -726,19 +726,19 @@ msgid "Replace it anytime"
 msgstr "Jederzeit ersetzen"
 
 msgid "Requires unlocking before it can be reset."
-msgstr ""
+msgstr "Erfordert Entsperrung, bevor ein Zurücksetzen möglich ist."
 
 msgid "Reset"
 msgstr "Zurücksetzen"
 
 msgid "Reset your recovery phrase?"
-msgstr ""
+msgstr "Wiederherstellungsphrase zurücksetzen?"
 
 msgid "Resetting recovery phrase..."
-msgstr ""
+msgstr "Wiederherstellungsphrase wird zurückgesetzt..."
 
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
-msgstr ""
+msgstr "Das Zurücksetzen macht Ihre aktuelle Wiederherstellungsphrase ungültig; nur die neue bleibt nutzbar."
 
 msgid "Retry"
 msgstr "Wiederholen"
@@ -747,19 +747,19 @@ msgid "Return to app"
 msgstr "Zurück zur App"
 
 msgid "Return to application"
-msgstr ""
+msgstr "Zur Anwendung zurückkehren"
 
 msgid "Right now"
 msgstr "Jetzt gerade"
 
 msgid "Run a passkey test to see results"
-msgstr ""
+msgstr "Führen Sie einen Passkey-Test aus, um Ergebnisse zu sehen"
 
 msgid "Save changes"
 msgstr "Änderungen speichern"
 
 msgid "Save your recovery phrase"
-msgstr ""
+msgstr "Speichern Sie Ihre Wiederherstellungsphrase"
 
 msgid "Saving changes..."
 msgstr "Änderungen werden gespeichert..."
@@ -777,7 +777,7 @@ msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Wählen Sie <0>In Safari öffnen</0> oder <1>In Chrome öffnen</1>."
 
 msgid "Select each word in the correct order:"
-msgstr ""
+msgstr "Wählen Sie jedes Wort in der richtigen Reihenfolge aus:"
 
 msgid "Set as default sign-in"
 msgstr "Als Standardanmeldung festlegen"
@@ -795,13 +795,13 @@ msgid "Sign in using familiar methods"
 msgstr "Anmelden mit bekannten Methoden"
 
 msgid "Sign in with another identity"
-msgstr ""
+msgstr "Mit einer anderen Identität anmelden"
 
 msgid "Sign in with your {name} account from any device."
 msgstr "Melden Sie sich von jedem Gerät aus mit Ihrem {name}-Konto an."
 
 msgid "Sign out"
-msgstr ""
+msgstr "Abmelden"
 
 msgid "Signing in securely"
 msgstr "Sichere Anmeldung"
@@ -825,25 +825,25 @@ msgid "Still have an identity number?"
 msgstr "Haben Sie noch eine Identitätsnummer?"
 
 msgid "Still using an identity number?"
-msgstr ""
+msgstr "Nutzen Sie noch eine Identitätsnummer?"
 
 msgid "Store it safely"
 msgstr "Sicher aufbewahren"
 
 msgid "Stored and usable only in {0} on the {1} device it was created on."
-msgstr ""
+msgstr "Gespeichert und nur verwendbar in {0} auf dem {1}-Gerät, auf dem es erstellt wurde."
 
 msgid "Stored and usable only in {0} on the device it was created on."
-msgstr ""
+msgstr "Gespeichert und nur verwendbar in {0} auf dem Gerät, auf dem es erstellt wurde."
 
 msgid "Stored and usable only on the {0} device it was created on."
-msgstr ""
+msgstr "Gespeichert und nur verwendbar auf dem {0}-Gerät, auf dem es erstellt wurde."
 
 msgid "Stored in your {0} account and synced across your {1} devices."
-msgstr ""
+msgstr "In Ihrem {0}-Konto gespeichert und über Ihre {1}-Geräte synchronisiert."
 
 msgid "Stored in your {0} account and synced across your devices."
-msgstr ""
+msgstr "In Ihrem {0}-Konto gespeichert und über Ihre Geräte synchronisiert."
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "Sicher auf Ihrem Gerät, in Ihrem Passwort-Manager oder auf einem Sicherheitsschlüssel gespeichert."
@@ -858,22 +858,22 @@ msgid "Support"
 msgstr "Support"
 
 msgid "Supported"
-msgstr ""
+msgstr "Unterstützt"
 
 msgid "Switch identity"
 msgstr "Identität wechseln"
 
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
-msgstr ""
+msgstr "Tippen Sie auf die <0>Adressleiste</0> und <1>im Browser öffnen</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
-msgstr ""
+msgstr "Tippen Sie auf die hervorgehobene <0>Zurück</0>-Schaltfläche."
 
 msgid "Test passkey support"
-msgstr ""
+msgstr "Passkey-Unterstützung testen"
 
 msgid "Test passkey support and view authenticator details"
-msgstr ""
+msgstr "Passkey-Unterstützung testen und Authentifikator-Details anzeigen"
 
 msgid "The <0>existing device</0> is preparing to continue."
 msgstr "Das <0>bestehende Gerät</0> bereitet die Fortsetzung vor."
@@ -885,46 +885,46 @@ msgid "The integration with Google, Microsoft and Apple uses a standard authenti
 msgstr "Die Integration von Google, Microsoft und Apple verwendet ein standardisiertes Authentifizierungsprotokoll namens OpenID. Dies ist dasselbe Protokoll, das andere Anwendungen für die Anmeldung über Google nutzen."
 
 msgid "The passkey could not be identified, support unknown."
-msgstr ""
+msgstr "Der Passkey konnte nicht identifiziert werden, Unterstützung unbekannt."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
-msgstr ""
+msgstr "Die Phrase wurde korrekt eingegeben, gehört aber zu einem anderen Produkt als Internet Identity."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "Beim Verbinden mit der Anwendung ist ein Problem aufgetreten. Versuchen Sie einen anderen Browser; wenn das Problem weiterhin besteht, kontaktieren Sie den Entwickler."
 
 msgid "This app has moved to the new Internet Identity"
-msgstr ""
+msgstr "Diese App ist zur neuen Internet Identity umgezogen"
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Diese Identität wurde bereits auf die neue Version aktualisiert."
 
 msgid "This legacy passkey is no longer usable and should be removed."
-msgstr ""
+msgstr "Dieser Legacy-Passkey ist nicht mehr verwendbar und sollte entfernt werden."
 
 msgid "This may take a few seconds"
-msgstr ""
+msgstr "Dies kann einige Sekunden dauern"
 
 msgid "This passkey is no longer associated with any identity."
-msgstr ""
+msgstr "Dieser Passkey ist mit keiner Identität mehr verknüpft."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
-msgstr ""
+msgstr "Dieser YubiKey hat eine ältere Firmware (5.1), die inkompatibel ist."
 
 msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
-msgstr ""
+msgstr "Dieser YubiKey hat eine ältere Firmware (5.2 - 5.4), die möglicherweise inkompatibel ist."
 
 msgid "This YubiKey has older firmware (5.2) that might be incompatible."
-msgstr ""
+msgstr "Dieser YubiKey hat eine ältere Firmware (5.2), die möglicherweise inkompatibel ist."
 
 msgid "This YubiKey has older firmware (5.4) that might be incompatible."
-msgstr ""
+msgstr "Dieser YubiKey hat eine ältere Firmware (5.4), die möglicherweise inkompatibel ist."
 
 msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
-msgstr ""
+msgstr "Dieser YubiKey hat eine ältere Firmware (5.5 - 5.6), die möglicherweise inkompatibel ist."
 
 msgid "This YubiKey has older firmware (5.6) that might be incompatible."
-msgstr ""
+msgstr "Dieser YubiKey hat eine ältere Firmware (5.6), die möglicherweise inkompatibel ist."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Geben Sie zur Bestätigung den Code auf Ihrem <0>bestehenden Gerät</0> ein."
@@ -945,7 +945,7 @@ msgid "To finish setting up your passkey, follow the instructions shown on your 
 msgstr "Um die Einrichtung Ihres Passkeys abzuschließen, folgen Sie den Anweisungen auf Ihrem <0>neuen Gerät</0>."
 
 msgid "Type each word in the correct order:"
-msgstr ""
+msgstr "Geben Sie jedes Wort in der richtigen Reihenfolge ein:"
 
 msgid "Type the characters exactly as shown below"
 msgstr "Geben Sie die Zeichen genau wie unten gezeigt ein"
@@ -954,13 +954,13 @@ msgid "Unable to complete setup"
 msgstr "Einrichtung konnte nicht abgeschlossen werden"
 
 msgid "Unable to connect"
-msgstr ""
+msgstr "Verbindung nicht möglich"
 
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity verstehen"
 
 msgid "Unexpected error"
-msgstr ""
+msgstr "Unerwarteter Fehler"
 
 msgid "Unknown"
 msgstr "Unbekannt"
@@ -978,13 +978,13 @@ msgid "Unlinking {name} account..."
 msgstr "Verknüpfung mit {name}-Konto wird aufgehoben..."
 
 msgid "Unlock and reset"
-msgstr ""
+msgstr "Entsperren und zurücksetzen"
 
 msgid "Unlock to continue"
-msgstr ""
+msgstr "Zum Fortfahren entsperren"
 
 msgid "Unsupported"
-msgstr ""
+msgstr "Nicht unterstützt"
 
 msgid "Unsupported Browser"
 msgstr "Nicht unterstützter Browser"
@@ -999,16 +999,16 @@ msgid "Upgrade again"
 msgstr "Erneut aktualisieren"
 
 msgid "Upgrade completed successfully"
-msgstr ""
+msgstr "Aktualisierung erfolgreich abgeschlossen"
 
 msgid "Upgrade identity"
 msgstr "Identität aktualisieren"
 
 msgid "Upgrade your existing identity to the new experience in a two steps."
-msgstr ""
+msgstr "Aktualisieren Sie Ihre bestehende Identität in zwei Schritten auf die neue Version."
 
 msgid "Upgrade your identity"
-msgstr ""
+msgstr "Aktualisieren Sie Ihre Identität"
 
 msgid "Upgrading identity..."
 msgstr "Identität wird aktualisiert..."
@@ -1023,19 +1023,19 @@ msgid "Verify"
 msgstr "Überprüfen"
 
 msgid "Verify recovery to remove"
-msgstr ""
+msgstr "Wiederherstellung verifizieren, um zu entfernen"
 
 msgid "Verify you are human"
 msgstr "Bestätigen Sie, dass Sie ein Mensch sind"
 
 msgid "Verify your recovery phrase"
-msgstr ""
+msgstr "Verifizieren Sie Ihre Wiederherstellungsphrase"
 
 msgid "Verifying..."
 msgstr "Überprüfung..."
 
 msgid "View your last used identities"
-msgstr ""
+msgstr "Zuletzt verwendete Identitäten anzeigen"
 
 msgid "Waiting for your existing device"
 msgstr "Warten auf Ihr bestehendes Gerät"
@@ -1044,7 +1044,7 @@ msgid "Waiting for your new device"
 msgstr "Warten auf Ihr neues Gerät"
 
 msgid "Warning"
-msgstr ""
+msgstr "Warnung"
 
 msgid "We didn't recognize that activation code."
 msgstr "Wir haben diesen Aktivierungscode nicht erkannt."
@@ -1080,13 +1080,13 @@ msgid "with your Internet Identity"
 msgstr "mit Ihrer Internet Identity"
 
 msgid "Word {position}"
-msgstr ""
+msgstr "Wort {position}"
 
 msgid "Write down all 24 words correctly and keep them offline. Do not store them in the cloud or on devices."
-msgstr ""
+msgstr "Schreiben Sie alle 24 Wörter korrekt auf und bewahren Sie diese offline auf. Speichern Sie sie nicht in der Cloud oder auf Geräten."
 
 msgid "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
-msgstr ""
+msgstr "Schreiben Sie Ihre Wiederherstellungsphrase in der richtigen Reihenfolge auf und verifizieren Sie diese anschließend. Bewahren Sie sie sicher auf und geben Sie sie nicht weiter. Ein Verlust bedeutet den Verlust des Zugriffs."
 
 msgid "Wrong domain was set. Please try again."
 msgstr "Falsche Domain wurde festgelegt. Bitte versuchen Sie es erneut."
@@ -1104,10 +1104,10 @@ msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Sie können im Anmeldeprozess mit <0>Bestehenden Passkey verwenden</0> fortfahren."
 
 msgid "You can recover your identity now, verify you saved it correctly."
-msgstr ""
+msgstr "Sie können Ihre Identität jetzt wiederherstellen; verifizieren Sie, dass Sie sie korrekt gespeichert haben."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
-msgstr ""
+msgstr "Sie können Ihre Wiederherstellungsphrase jederzeit zurücksetzen. Dies hält Ihre Identität sicher, falls die Phrase jemals bekannt wird."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Sie haben die maximale Anzahl von Passkeys erreicht."
@@ -1119,7 +1119,7 @@ msgid "You no longer need to remember your identity number and can use your fing
 msgstr "Sie müssen sich Ihre Identitätsnummer nicht mehr merken. Stattdessen können Sie Fingerabdruck, Gesicht oder Bildschirmsperre nutzen."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
-msgstr ""
+msgstr "Sie sind dabei, Ihre Wiederherstellungsphrase zu sehen, die von Internet Identity nicht gespeichert wird und daher bei Verlust nicht wiederhergestellt werden kann. Bewahren Sie sie daher sicher offline auf."
 
 msgid "You're about to sign in on a <0>new device</0>."
 msgstr "Sie sind dabei, sich auf einem <0>neuen Gerät</0> anzumelden."
@@ -1146,10 +1146,10 @@ msgid "Your identity name is currently not editable. It is only ever visible to 
 msgstr "Ihr Identitätsname ist derzeit nicht bearbeitbar. Er ist nur für Sie sichtbar."
 
 msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
-msgstr ""
+msgstr "Ihre Wiederherstellungsphrase gewährt die volle Kontrolle über Ihre Identität. Teilen Sie sie niemals und verwenden Sie sie nur auf der offiziellen Website."
 
 msgid "Your recovery phrase is active, verify you saved it correctly."
-msgstr ""
+msgstr "Ihre Wiederherstellungsphrase ist aktiv. Verifizieren Sie, dass Sie sie korrekt gespeichert haben."
 
 msgid "Your recovery phrase is now active and can be reset anytime."
-msgstr ""
+msgstr "Ihre Wiederherstellungsphrase ist jetzt aktiv und kann jederzeit zurückgesetzt werden."
