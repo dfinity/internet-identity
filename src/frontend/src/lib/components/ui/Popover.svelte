@@ -38,7 +38,12 @@
     let tracking = true;
 
     const track = () => {
-      if (anchorRef !== undefined && popoverRef !== undefined) {
+      if (
+        anchorRef !== undefined &&
+        anchorRef !== null &&
+        popoverRef !== undefined &&
+        popoverRef !== null
+      ) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
 

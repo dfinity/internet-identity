@@ -48,7 +48,12 @@
     }
     let tracking = true;
     const track = () => {
-      if (anchorRef !== undefined && tooltipRef !== undefined) {
+      if (
+        anchorRef !== undefined &&
+        anchorRef !== null &&
+        tooltipRef !== undefined &&
+        tooltipRef !== null
+      ) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const tooltipRect = tooltipRef.getBoundingClientRect();
         tooltipRef.style.top = {
