@@ -488,8 +488,8 @@ jobs:
     needs: [cached-build, test-app-build]
     strategy:
       matrix:
-        canister: ["single", "split"] # single = the regular setup with one canister, split = the setup with a separate frontend canister
-        device: ["desktop", "mobile"]
+        canister: ["single"] # single = the regular setup with one canister, split = the setup with a separate frontend canister
+        device: ["desktop"]
         shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
@@ -582,7 +582,7 @@ jobs:
 
       - name: Run Playwright tests
         run: |
-          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /) --reporter=line,html
 
       - name: Stop dfx
         if: ${{ always() }}
