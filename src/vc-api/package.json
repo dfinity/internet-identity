@@ -8,9 +8,9 @@
   },
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
-    "zod": "*",
     "@dfinity/principal": "*",
-    "@dfinity/utils": "*"
+    "@dfinity/utils": "^4.0.2",
+    "zod": "*"
   },
   "devDependencies": {
     "typescript": "*"
