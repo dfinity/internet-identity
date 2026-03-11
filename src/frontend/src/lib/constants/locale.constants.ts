@@ -2,7 +2,7 @@
 export const availableLocales = ["en", "de", "es", "id", "ur"];
 
 // List of languages that are actually enabled
-export const enabledLocales = ["en", "es", "ur"];
+export const enabledLocales = ["en", "es"];
 
 const rtlLocales = ["ur"];
 
