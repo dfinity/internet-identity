@@ -4,9 +4,9 @@
   "private": true,
   "license": "SEE LICENSE IN LICENSE.md",
   "dependencies": {
-    "@dfinity/utils": "*",
-    "@icp-sdk/auth": "*",
-    "@icp-sdk/core": "^4.0.4",
+    "@dfinity/utils": "^4.0.2",
+    "@icp-sdk/auth": "^4.2.0",
+    "@icp-sdk/core": "^4.2.3",
     "buffer": "^6.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -24,9 +24,9 @@
     "@dfinity/internet-identity-vite-plugins": "*",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.0",
+    "@vitejs/plugin-react": "^5.1.4",
     "typescript": "5.2.2",
-    "vite": "^6.4.1",
-    "vite-plugin-node-polyfills": "^0.23.0"
+    "vite": "^7.3.1",
+    "vite-plugin-node-polyfills": "^0.25.0"
   }
 }
