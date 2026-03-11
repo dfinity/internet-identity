@@ -19,6 +19,24 @@ const insecureFetch: typeof fetch = (url, options = {}) =>
     ...options,
   } as RequestInit);
 
+const FORWARDED_HOST = new URL(II_URL).host;
+
+const actorFetchForHost =
+  (host: string): typeof fetch =>
+  (url, options = {}) => {
+    if (new URL(host).host !== "localhost:5173") {
+      return insecureFetch(url, options);
+    }
+
+    const headers = new Headers(options.headers);
+    headers.set("host", FORWARDED_HOST);
+
+    return insecureFetch(url, {
+      ...options,
+      headers,
+    });
+  };
+
 export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
 export const DEFAULT_NAME = "Test User";
 
@@ -117,7 +135,7 @@ const createActor = async (
       host,
       shouldFetchRootKey: true,
       verifyQuerySignatures: false,
-      fetch: insecureFetch,
+      fetch: actorFetchForHost(host),
       identity: Ed25519KeyIdentity.generate(toSeed(dummyAuthIndex)),
     }),
     canisterId,
