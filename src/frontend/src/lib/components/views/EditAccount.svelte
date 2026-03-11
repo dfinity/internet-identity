@@ -22,7 +22,7 @@
   let { account, existingNames, save }: Props = $props();
 
   let inputRef = $state<HTMLInputElement>();
-  let sourceAccount = $state<Account | undefined>(undefined);
+  let sourceAccount = $state.raw<Account | undefined>(undefined);
   let name = $state("");
   let isDefaultSignIn = $state(false);
   let isSubmitting = $state(false);
@@ -30,6 +30,7 @@
 
   $effect.pre(() => {
     if (account !== sourceAccount) {
+      console.log("Loading account", account);
       sourceAccount = account;
       name = account?.name ?? "";
       isDefaultSignIn = account?.isDefaultSignIn ?? false;
@@ -37,12 +38,12 @@
   });
 
   const showSetDefault = $derived(
-    account === undefined || !account.isDefaultSignIn,
+    sourceAccount === undefined || !sourceAccount.isDefaultSignIn,
   );
   const hasChanges = $derived(
-    account === undefined ||
-      account.name !== name.trim() ||
-      account.isDefaultSignIn !== isDefaultSignIn,
+    sourceAccount === undefined ||
+      sourceAccount.name !== name.trim() ||
+      sourceAccount.isDefaultSignIn !== isDefaultSignIn,
   );
 
   const handleSubmit = () => {
@@ -69,10 +70,10 @@
       <PencilIcon class="size-6" />
     </FeaturedIcon>
     <h1 class="text-text-primary mb-3 text-2xl font-medium">
-      {account === undefined ? $t`Name account` : $t`Edit account`}
+      {sourceAccount === undefined ? $t`Name account` : $t`Edit account`}
     </h1>
     <p class="text-text-tertiary mb-6 text-base font-medium">
-      {account === undefined
+      {sourceAccount === undefined
         ? $t`Label it by use (e.g. 'Work' or 'Demo').`
         : showSetDefault
           ? $t`Rename or make this your default sign-in`
@@ -120,13 +121,13 @@
       {#if isSubmitting}
         <ProgressRing />
         <span>
-          {account === undefined
+          {sourceAccount === undefined
             ? $t`Creating account...`
             : $t`Saving changes...`}
         </span>
       {:else}
         <span>
-          {account === undefined ? $t`Create account` : $t`Save changes`}
+          {sourceAccount === undefined ? $t`Create account` : $t`Save changes`}
         </span>
       {/if}
     </Button>

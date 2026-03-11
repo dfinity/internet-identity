@@ -38,7 +38,7 @@
   );
 
   let name = $state("");
-  let sourcePasskey = $state<AuthnMethodData | undefined>(undefined);
+  let sourcePasskey = $state.raw<AuthnMethodData | undefined>(undefined);
 
   $effect.pre(() => {
     if (passkey !== sourcePasskey) {
