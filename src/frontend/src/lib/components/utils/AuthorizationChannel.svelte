@@ -124,7 +124,7 @@
         return authorizeChannel(channel);
       });
 
-  let authorizePromise = $derived(createAuthorizePromise(options));
+  let authorizePromise = $state(createAuthorizePromise(options));
 </script>
 
 {#await authorizePromise then _}
