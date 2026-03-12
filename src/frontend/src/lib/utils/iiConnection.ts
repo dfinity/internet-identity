@@ -500,6 +500,7 @@ export class Connection {
           e,
           "unknown error",
         )}, ${await diagnosticInfo()}`,
+        { cause: e },
       );
     }
 
