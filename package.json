@@ -80,8 +80,8 @@
   "dependencies": {
     "@dfinity/internet-identity-vc-api": "*",
     "@icp-sdk/core": "^5.0.0",
-    "@lingui/core": "^5.5.1",
-    "@lucide/svelte": "^0.553.0",
+    "@lingui/core": "^5.9.2",
+    "@lucide/svelte": "^0.577.0",
     "@noble/hashes": "^2.0.1",
     "bip39": "^3.0.4",
     "borc": "^2.1.1",
