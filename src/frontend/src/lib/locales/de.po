@@ -41,10 +41,10 @@ msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Mehr erfahren</0> über Passkeys"
 
 msgid "<0>Never</0> enter a code from another source."
-msgstr "<0>Geben Sie niemals</0> einen Code von einer anderen Quelle ein."
+msgstr "Geben Sie <0>niemals</0> einen Code von einer anderen Quelle ein."
 
 msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
-msgstr "<0>Keine Identitätsnummern mehr:</0> Wie oben erklärt, bedeuten entdeckbare Passkeys, dass Sie keine Identitätsnummer mehr merken oder speichern müssen. Das Einloggen ist jetzt einfacher und effizienter."
+msgstr "<0>Keine Identitätsnummern mehr:</0> Wie oben erklärt, bedeuten auffindbare Passkeys, dass Sie keine Identitätsnummer mehr merken oder speichern müssen. Das Einloggen ist jetzt einfacher und effizienter."
 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Nahtlose Passkey-Integration:</0> Wir setzen weiterhin auf Passkeys als die Zukunft sicherer Authentifizierung. Internet Identity 2.0 nutzt die neuesten Passkey-Standards für erhöhte Sicherheit und Benutzerfreundlichkeit."
@@ -68,7 +68,7 @@ msgid "Activate it so that you can recover your identity at any time."
 msgstr "Aktivieren Sie sie, damit Sie Ihre Identität jederzeit wiederherstellen können."
 
 msgid "Activate recovery to remove"
-msgstr "Wiederherstellung aktivieren zum Entfernen"
+msgstr "Wiederherstellung aktivieren, um zu entfernen"
 
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
 msgstr "Aktivieren Sie Ihre Wiederherstellungsphrase, damit Sie Ihre Identität jederzeit wiederherstellen können."
@@ -95,10 +95,10 @@ msgid "Add new"
 msgstr "Neu hinzufügen"
 
 msgid "Add or remove the ways you can sign in with your identity."
-msgstr "Fügen Sie die Möglichkeiten hinzu oder entfernen Sie sie, mit denen Sie sich mit Ihrer Identität anmelden können."
+msgstr "Verwalten Sie die Anmeldemethoden Ihrer Identität."
 
 msgid "Advanced identity management"
-msgstr "Fortgeschrittenes Identitäts-Management"
+msgstr "Erweiterte Identitätsverwaltung"
 
 msgid "Are you sure?"
 msgstr "Sind Sie sicher?"
@@ -146,7 +146,7 @@ msgid "Checking recovery phrase"
 msgstr "Wiederherstellungsphrase wird überprüft"
 
 msgid "Checking your order"
-msgstr "Ihre Bestellung wird überprüft"
+msgstr "Ihre Reihenfolge wird überprüft"
 
 msgid "Choose an account"
 msgstr "Wählen Sie ein Konto aus"
@@ -164,7 +164,7 @@ msgid "Clear all"
 msgstr "Alle löschen"
 
 msgid "Click to reveal"
-msgstr "Zum Aufdecken klicken"
+msgstr "Klicken zum Anzeigen"
 
 msgid "Close"
 msgstr "Schließen"
@@ -254,7 +254,7 @@ msgid "Default"
 msgstr "Standard"
 
 msgid "Discoverable passkeys"
-msgstr "Entdeckbare Passkeys"
+msgstr "Auffindbare Passkeys"
 
 msgid "Dismiss"
 msgstr "Verwerfen"
@@ -315,7 +315,7 @@ msgid "Full control"
 msgstr "Volle Kontrolle"
 
 msgid "Full Ownership"
-msgstr "Volle Eigentümerschaft"
+msgstr "Volle Datenhoheit"
 
 msgid "Generating code..."
 msgstr "Code wird generiert..."
@@ -363,7 +363,7 @@ msgid "How do passkeys work?"
 msgstr "Wie funktionieren Passkeys?"
 
 msgid "How does Internet Identity compare to other Web3 authentication tools?"
-msgstr "Wie vergleicht sich Internet Identity mit anderen Web3-Authentifizierungstools?"
+msgstr "Wie unterscheidet sich Internet Identity von anderen Web3-Authentifizierungstools?"
 
 msgid "How to stay secure"
 msgstr "So bleiben Sie sicher"
@@ -411,7 +411,7 @@ msgid "Incorrect spelling"
 msgstr "Falsche Schreibweise"
 
 msgid "Incorrect word order. Review and try again."
-msgstr "Falsche Wortreihenfolge. Überprüfen und erneut versuchen."
+msgstr "Falsche Wortreihenfolge. Überprüfen Sie die Reihenfolge und versuchen Sie es erneut."
 
 msgid "Incorrect. Try again with the new code."
 msgstr "Falsch. Versuchen Sie es erneut mit dem neuen Code."
@@ -432,7 +432,7 @@ msgid "Internet Identity is as secure as the authentication methods it uses — 
 msgstr "Internet Identity ist so sicher wie die verwendeten Authentifizierungsmethoden – z. B. Google, Apple, Microsoft oder Passkeys. Das bedeutet, dass es auf modernster Sicherheitstechnologie basiert. Bei der Wahl von Passkeys wird der Zugriff durch die Entsperrmethode Ihres Geräts (Face ID oder Fingerabdruck) geschützt, wodurch es genauso einfach ist wie das Entsperren Ihres Telefons."
 
 msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
-msgstr "Internet Identity wird verwendet, um sich sicher anzumelden und sich mit Passkeys mit Apps zu verbinden."
+msgstr "Internet Identity wird verwendet, um sich sicher anzumelden und über Passkeys eine Verbindung zu Apps herzustellen."
 
 msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
 msgstr "Internet Identity ermöglicht den sicheren Zugriff auf Apps und Dienste, ohne Passwörter zu erstellen, persönliche Daten zu teilen oder Kontrolle abzugeben."
@@ -444,7 +444,7 @@ msgid "Internet Identity number"
 msgstr "Internet Identity-Nummer"
 
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
-msgstr "Internet Identity vermittelt dann die Authentifizierung zwischen diesen Anbietern und dem Internet Computer. Durch die Authentifizierung bei einem dieser Dienste kann Internet Identity sicherstellen, dass Sie Sie sind, und anschließend eine weitere Authentifizierung für die Anwendungen erstellen, die auf dem Internet Computer laufen."
+msgstr "Internet Identity vermittelt dann die Authentifizierung zwischen diesen Anbietern und dem Internet Computer. Durch die Authentifizierung bei einem dieser Dienste kann Internet Identity Ihre Identität bestätigen und anschließend eine weitere Authentifizierung für die Anwendungen erstellen, die auf dem Internet Computer laufen."
 
 msgid "Invalid code link"
 msgstr "Ungültiger Code-Link"
@@ -459,7 +459,7 @@ msgid "Invalid request"
 msgstr "Ungültige Anfrage"
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
-msgstr "Wird mein Face ID oder Fingerabdruck in Internet Identity gespeichert?"
+msgstr "Werden Face ID oder Fingerabdruck in Internet Identity gespeichert?"
 
 msgid "It can be used at any time to recover your identity."
 msgstr "Es kann jederzeit verwendet werden, um Ihre Identität wiederherzustellen."
@@ -495,7 +495,7 @@ msgid "Kept on a physical key. Authenticate on supported devices via tap/insert.
 msgstr "Auf einem physischen Schlüssel gespeichert. Authentifizieren Sie sich auf unterstützten Geräten durch Tippen/Einstecken."
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
-msgstr "Kennzeichnen Sie die Nutzung (z.B. 'Arbeit' oder 'Demo')."
+msgstr "Benennen Sie es nach dem Verwendungszweck (z.B. 'Arbeit' oder 'Demo')."
 
 msgid "Language"
 msgstr "Sprache"
@@ -537,7 +537,7 @@ msgid "Lost access to your identity?"
 msgstr "Zugriff auf Ihre Identität verloren?"
 
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
-msgstr "Machen Sie die Anmeldung mit Google, Apple oder Microsoft einfach. Der Login, den Sie kennen, jetzt mit erhöhter Privatsphäre."
+msgstr "Vereinfachen Sie die Anmeldung mit Google, Apple oder Microsoft. Der Login, den Sie kennen, jetzt mit erhöhter Privatsphäre."
 
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Stellen Sie sicher, dass niemand Ihren Bildschirm oder das, was Sie schreiben, sehen kann."
@@ -864,7 +864,7 @@ msgid "Switch identity"
 msgstr "Identität wechseln"
 
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
-msgstr "Tippen Sie auf die <0>Adressleiste</0> und <1>im Browser öffnen</1>."
+msgstr "Tippen Sie auf die <0>Adressleiste</0> und dann auf <1>Im Browser öffnen</1>."
 
 msgid "Tap on the highlighted <0>back</0> button."
 msgstr "Tippen Sie auf die hervorgehobene <0>Zurück</0>-Schaltfläche."
@@ -1092,7 +1092,7 @@ msgid "Wrong domain was set. Please try again."
 msgstr "Falsche Domain wurde festgelegt. Bitte versuchen Sie es erneut."
 
 msgid "You <0>cannot</0> rename this once it is set."
-msgstr "Kann nach Festlegung <0>nicht</0> mehr umbenannt werden."
+msgstr "Sie können dies nach der Festlegung <0>nicht</0> mehr umbenennen."
 
 msgid "You already have a {name} account linked"
 msgstr "Sie haben bereits ein {name}-Konto verknüpft"
@@ -1107,7 +1107,7 @@ msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Sie können Ihre Identität jetzt wiederherstellen; verifizieren Sie, dass Sie sie korrekt gespeichert haben."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
-msgstr "Sie können Ihre Wiederherstellungsphrase jederzeit zurücksetzen. Dies hält Ihre Identität sicher, falls die Phrase jemals bekannt wird."
+msgstr "Sie können Ihre Wiederherstellungsphrase jederzeit zurücksetzen. Dies schützt Ihre Identität, falls die Phrase jemals bekannt werden sollte."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Sie haben die maximale Anzahl von Passkeys erreicht."
