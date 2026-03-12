@@ -2,6 +2,8 @@ import { CDPSession, expect, Page } from "@playwright/test";
 import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
+import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
+import borc from "borc";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
@@ -363,6 +365,63 @@ export const addCredentialToVirtualAuthenticator = async (
     authenticatorId,
     credential,
   });
+};
+
+export const fromBase64 = (base64: string): Uint8Array =>
+  Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0));
+
+export const fromBase64URL = (base64Url: string): Uint8Array =>
+  fromBase64(
+    base64Url
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
+  );
+
+/**
+ * Converts the WebAuthn CDP private key (base64 PKCS#8 DER) to a DER-encoded
+ * COSE public key (DER wrapper with DER_COSE_OID).
+ */
+export const virtualAuthenticatorPrivKeyToPubKey = async (
+  privateKey: string,
+): Promise<Uint8Array> => {
+  const privateKeyDer = Buffer.from(privateKey, "base64");
+  const privateKeyObject = await crypto.subtle.importKey(
+    "pkcs8",
+    privateKeyDer,
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign"],
+  );
+
+  const publicJwk = (await crypto.subtle.exportKey(
+    "jwk",
+    privateKeyObject,
+  )) as JsonWebKey;
+
+  if (
+    publicJwk.kty !== "EC" ||
+    publicJwk.crv !== "P-256" ||
+    publicJwk.x === undefined ||
+    publicJwk.y === undefined
+  ) {
+    throw new Error("Expected an EC P-256 WebAuthn key");
+  }
+
+  const x = fromBase64URL(publicJwk.x);
+  const y = fromBase64URL(publicJwk.y);
+
+  const coseKey = borc.encode(
+    new Map<number, number | Uint8Array>([
+      [1, 2],
+      [3, -7],
+      [-1, 1],
+      [-2, x],
+      [-3, y],
+    ]),
+  );
+
+  return wrapDER(coseKey, DER_COSE_OID);
 };
 
 /**

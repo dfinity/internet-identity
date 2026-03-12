@@ -1,0 +1,135 @@
+import { test } from "../fixtures";
+import { expect } from "@playwright/test";
+import {
+  addVirtualAuthenticator,
+  virtualAuthenticatorPrivKeyToPubKey,
+  dummyAuth,
+  fromBase64URL,
+  getCredentialsFromVirtualAuthenticator,
+  II_URL,
+  LEGACY_II_URL,
+} from "../utils";
+import { toSeed } from "../fixtures/identity";
+import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
+
+const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
+
+test("Can upgrade identity", async ({
+  page,
+  managePage,
+  identities,
+  actorForIdentity,
+}) => {
+  // Navigate to legacy page that doesn't redirect
+  await page.goto(LEGACY_II_URL + "/self-service");
+
+  // Add virtual authenticator and create a passkey in page context
+  const authenticatorId = await addVirtualAuthenticator(page);
+  await page.evaluate(
+    async (rpId) => {
+      await navigator.credentials.create({
+        publicKey: {
+          challenge: Uint8Array.from("<ic0.app>", (c) => c.charCodeAt(0)),
+          attestation: "direct",
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
+          rp: {
+            name: "Internet Identity Service",
+            id: rpId,
+          },
+          user: {
+            id: window.crypto.getRandomValues(new Uint8Array(16)),
+            displayName: "Internet Identity User",
+            name: "Internet Identity User",
+          },
+        },
+      });
+    },
+    LEGACY_II_URL.replace(/^https?:\/\//, ""),
+  );
+
+  // Get the created credential from the virtual authenticator
+  const [credential] = await getCredentialsFromVirtualAuthenticator(
+    page,
+    authenticatorId,
+  );
+  const publicKey = await virtualAuthenticatorPrivKeyToPubKey(
+    credential!.privateKey,
+  );
+  const credentialId = fromBase64URL(credential!.credentialId);
+
+  // Use an actor to create a legacy passkey (not id.ai)
+  // since this functionality is no longer available.
+  const actor = await actorForIdentity(identities[0].identityNumber);
+
+  // Add the legacy passkey to the identity
+  await actor.authn_method_add(identities[0].identityNumber, {
+    metadata: [
+      ["alias", { String: LEGACY_PASSKEY_NAME }],
+      ["origin", { String: LEGACY_II_URL }],
+    ],
+    authn_method: {
+      WebAuthn: {
+        pubkey: publicKey,
+        credential_id: credentialId,
+        aaguid: [],
+      },
+    },
+    security_settings: {
+      protection: { Unprotected: null },
+      purpose: { Authentication: null },
+    },
+    last_authentication: [],
+  });
+
+  // Remove the dummy auth so the identity is only accessible via the legacy passkey,
+  // which simulates the state of an identity that hasn't been upgraded yet.
+  await actor.authn_method_remove(
+    identities[0].identityNumber,
+    new Uint8Array(
+      Ed25519KeyIdentity.generate(toSeed(identities[0].dummyAuthIndex))
+        .getPublicKey()
+        .toDer(),
+    ),
+  );
+
+  // Verify identity can be upgraded multiple times
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // Navigate to the new II_URL to trigger the upgrade flow
+    await page.goto(II_URL);
+
+    // Open the sign-in dialog
+    if (attempt > 0) {
+      await page.getByRole("button", { name: "Switch identity" }).click();
+      await page.getByRole("button", { name: "Add another identity" }).click();
+    } else {
+      await page.getByRole("button", { name: "Sign in" }).click();
+    }
+
+    // Select the passkey authentication method
+    await page.getByRole("button", { name: "Continue with passkey" }).click();
+    await page.getByRole("button", { name: "Upgrade" }).click();
+
+    // Enter the identity number
+    await page
+      .getByPlaceholder("Internet Identity number")
+      .fill(identities[0].identityNumber.toString());
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // On subsequent attempts, we expect a message that the identity is already upgraded
+    if (attempt > 0) {
+      await expect(
+        page.getByRole("heading", { name: "Identity already upgraded" }),
+      ).toBeVisible();
+      await page.getByRole("button", { name: "Upgrade again" }).click();
+    }
+
+    // Set the identity name and register new dummy auth
+    const newAuth = dummyAuth();
+    await page.getByLabel("Identity name").fill(identities[0].name);
+    newAuth(page);
+
+    // Complete the upgrade process
+    await page.getByRole("button", { name: "Upgrade identity" }).click();
+    await managePage.assertVisible();
+  }
+});
