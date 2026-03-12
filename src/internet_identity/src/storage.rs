@@ -121,7 +121,6 @@ use crate::storage::storable::application::StorableOriginSha256;
 use crate::storage::storable::application_number::StorableApplicationNumber;
 use crate::storage::storable::passkey_credential::StorablePasskeyCredential;
 use crate::storage::storable::recovery_key::StorableRecoveryKey;
-use crate::utils::sha256sum;
 use internet_identity_interface::internet_identity::types::*;
 use storable::anchor::StorableAnchor;
 use storable::anchor_number::StorableAnchorNumber;
@@ -327,7 +326,7 @@ pub struct Storage<M: Memory> {
 
     lookup_anchor_with_passkey_pubkey_hash_memory_wrapper: MemoryWrapper<ManagedMemory<M>>,
     pub(crate) lookup_anchor_with_passkey_pubkey_hash_memory:
-        StableBTreeMap<[u8; 32], StorableAnchorNumber, ManagedMemory<M>>,
+        StableBTreeMap<Principal, StorableAnchorNumber, ManagedMemory<M>>,
 }
 
 #[repr(C, packed)]
@@ -824,9 +823,9 @@ impl<M: Memory + Clone> Storage<M> {
     }
 
     pub fn lookup_anchor_with_passkey_pubkey(&self, pubkey: &PublicKey) -> Option<AnchorNumber> {
-        let hash = sha256sum(pubkey);
+        let principal = Principal::self_authenticating(pubkey);
         self.lookup_anchor_with_passkey_pubkey_hash_memory
-            .get(&hash)
+            .get(&principal)
     }
 
     fn sync_anchor_with_passkey_pubkey_index(
@@ -835,25 +834,25 @@ impl<M: Memory + Clone> Storage<M> {
         previous_passkeys: &[StorablePasskeyCredential],
         current_passkeys: &[StorablePasskeyCredential],
     ) {
-        let previous_pubkey_hashes = previous_passkeys
+        let previous_principals = previous_passkeys
             .iter()
-            .map(|passkey| sha256sum(&passkey.pubkey))
+            .map(|passkey| Principal::self_authenticating(&passkey.pubkey))
             .collect::<BTreeSet<_>>();
 
-        let current_pubkey_hashes = current_passkeys
+        let current_principals = current_passkeys
             .iter()
-            .map(|passkey| sha256sum(&passkey.pubkey))
+            .map(|passkey| Principal::self_authenticating(&passkey.pubkey))
             .collect::<BTreeSet<_>>();
 
-        let pubkey_hashes_to_be_removed = previous_pubkey_hashes.difference(&current_pubkey_hashes);
-        let pubkey_hashes_to_be_added = current_pubkey_hashes.difference(&previous_pubkey_hashes);
+        let principals_to_be_removed = previous_principals.difference(&current_principals);
+        let principals_to_be_added = current_principals.difference(&previous_principals);
 
-        for pubkey_hash in pubkey_hashes_to_be_removed {
+        for principal in principals_to_be_removed {
             let Some(existing_anchor_number) = self
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(pubkey_hash)
+                .get(principal)
             else {
-                // This pubkey hash is not indexed, nothing to do.
+                // This principal is not indexed, nothing to do.
                 continue;
             };
             if existing_anchor_number != anchor_number {
@@ -861,20 +860,20 @@ impl<M: Memory + Clone> Storage<M> {
                 continue;
             }
             self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .remove(pubkey_hash);
+                .remove(principal);
         }
 
-        for pubkey_hash in pubkey_hashes_to_be_added {
+        for principal in principals_to_be_added {
             if self
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .contains_key(pubkey_hash)
+                .contains_key(principal)
             {
-                // This pubkey hash is already occupied; do not overwrite it.
+                // This principal is already occupied; do not overwrite it.
                 continue;
             };
 
             self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .insert(*pubkey_hash, anchor_number);
+                .insert(principal.clone(), anchor_number);
         }
     }
 

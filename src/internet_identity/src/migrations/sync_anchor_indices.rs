@@ -60,6 +60,12 @@ impl<M: Memory + Clone> Storage<M> {
             // Save this value for future invocations.
             ANCHOR_MIGRATION_LAST_ANCHOR_ID.replace(Some(last_anchor_id));
 
+            // Clear the passkey pubkey hash index to allow changing the key type
+            // from [u8; 32] (SHA-256 hash) to Principal. The migration will
+            // repopulate the index with Principal-keyed entries.
+            self.lookup_anchor_with_passkey_pubkey_hash_memory
+                .clear_new();
+
             last_anchor_id
         };
 
@@ -266,28 +272,28 @@ mod sync_anchor_indices_tests {
             None
         );
 
-        // Check that passkey pubkey hashes are indexed for anchors 2 and 3
-        let pubkey_hash_2 = crate::utils::sha256sum(&pubkey(2));
-        let pubkey_hash_4 = crate::utils::sha256sum(&pubkey(4));
-        let pubkey_hash_1 = crate::utils::sha256sum(&pubkey(1));
+        // Check that passkey pubkey principals are indexed for anchors 2 and 3
+        let passkey_principal_2 = Principal::self_authenticating(&pubkey(2));
+        let passkey_principal_4 = Principal::self_authenticating(&pubkey(4));
+        let passkey_principal_1 = Principal::self_authenticating(&pubkey(1));
 
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_2),
+                .get(&passkey_principal_2),
             Some(2)
         );
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_4),
+                .get(&passkey_principal_4),
             Some(3)
         );
         // Anchor 1 only has a recovery phrase, no passkey
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_1),
+                .get(&passkey_principal_1),
             None
         );
 
@@ -355,21 +361,21 @@ mod sync_anchor_indices_tests {
             None
         );
 
-        // Check passkey pubkey hash index: anchors 1 and 2 are in the first batch
-        let pubkey_hash_2 = crate::utils::sha256sum(&pubkey(2));
-        let pubkey_hash_4 = crate::utils::sha256sum(&pubkey(4));
+        // Check passkey pubkey principal index: anchors 1 and 2 are in the first batch
+        let passkey_principal_2 = Principal::self_authenticating(&pubkey(2));
+        let passkey_principal_4 = Principal::self_authenticating(&pubkey(4));
 
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_2),
+                .get(&passkey_principal_2),
             Some(2)
         );
         // Anchor 3's passkey not migrated yet
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_4),
+                .get(&passkey_principal_4),
             None
         );
 
@@ -386,7 +392,7 @@ mod sync_anchor_indices_tests {
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_4),
+                .get(&passkey_principal_4),
             Some(3)
         );
 
@@ -435,18 +441,18 @@ mod sync_anchor_indices_tests {
         // At this point, `stable_anchor_memory` has StorableAnchor entries for both anchors
         // AND the indices are populated (because `write()` synced them).
         // Verify the indices are populated as a sanity check.
-        let pubkey_hash_10 = crate::utils::sha256sum(&pubkey(10));
-        let pubkey_hash_20 = crate::utils::sha256sum(&pubkey(20));
+        let passkey_principal_10 = Principal::self_authenticating(&pubkey(10));
+        let passkey_principal_20 = Principal::self_authenticating(&pubkey(20));
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_10),
+                .get(&passkey_principal_10),
             Some(1)
         );
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_20),
+                .get(&passkey_principal_20),
             Some(2)
         );
 
@@ -464,7 +470,7 @@ mod sync_anchor_indices_tests {
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_10),
+                .get(&passkey_principal_10),
             None
         );
         assert_eq!(
@@ -483,16 +489,16 @@ mod sync_anchor_indices_tests {
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_10),
+                .get(&passkey_principal_10),
             Some(1),
-            "passkey pubkey hash index should be populated for anchor 1 even though StorableAnchor already existed"
+            "passkey pubkey principal index should be populated for anchor 1 even though StorableAnchor already existed"
         );
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
-                .get(&pubkey_hash_20),
+                .get(&passkey_principal_20),
             Some(2),
-            "passkey pubkey hash index should be populated for anchor 2 even though StorableAnchor already existed"
+            "passkey pubkey principal index should be populated for anchor 2 even though StorableAnchor already existed"
         );
 
         let principal_30 = Principal::self_authenticating(pubkey(30));
