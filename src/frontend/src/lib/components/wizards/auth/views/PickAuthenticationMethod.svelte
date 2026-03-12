@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { nonNullish } from "@dfinity/utils";
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
@@ -17,22 +16,22 @@
 
   const { setupOrUseExistingPasskey, continueWithOpenId }: Props = $props();
 
-  let authenticatingProviderId = $state<string | null>(null);
-  let cancelledProviderId = $state<string | null>(null);
+  let authenticatingProviderId = $state<string>();
+  let cancelledProviderId = $state<string>();
 
   const handleContinueWithOpenId = async (config: OpenIdConfig) => {
     authenticatingProviderId = config.client_id;
     const result = await continueWithOpenId(config);
-    authenticatingProviderId = null;
+    authenticatingProviderId = undefined;
 
     if (result === "cancelled") {
       cancelledProviderId = config.client_id;
       await waitFor(4000);
-      cancelledProviderId = null;
+      cancelledProviderId = undefined;
     }
   };
 
-  const supportsPasskeys = nonNullish(window.PublicKeyCredential);
+  const supportsPasskeys = window.PublicKeyCredential !== undefined;
   const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
 </script>
 
@@ -55,7 +54,7 @@
           <Button
             onclick={() => handleContinueWithOpenId(provider)}
             variant="secondary"
-            disabled={nonNullish(authenticatingProviderId)}
+            disabled={authenticatingProviderId !== undefined}
             size="xl"
             class="flex-1"
             aria-label={$t`Continue with ${name}`}
@@ -73,7 +72,7 @@
     </div>
     <Button
       onclick={setupOrUseExistingPasskey}
-      disabled={!supportsPasskeys || nonNullish(authenticatingProviderId)}
+      disabled={!supportsPasskeys || authenticatingProviderId !== undefined}
       size="xl"
       variant={"secondary"}
     >

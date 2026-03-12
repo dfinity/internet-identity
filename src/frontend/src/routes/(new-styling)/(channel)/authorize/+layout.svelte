@@ -5,7 +5,6 @@
     authorizationStore,
   } from "$lib/stores/authorization.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -111,12 +110,12 @@
 <div class="flex min-h-[100dvh] flex-col" data-page="new-authorize-view">
   <div class="h-[env(safe-area-inset-top)]"></div>
   <Header>
-    {#if nonNullish(selectedIdentity)}
+    {#if selectedIdentity !== undefined}
       <Button
         bind:element={identityButtonRef}
         onclick={() => (isIdentityPopoverOpen = true)}
         variant="tertiary"
-        class="ml-auto gap-2.5 pr-3 md:-mr-3"
+        class="ms-auto gap-2.5 pe-3 md:-me-3"
         aria-label="Switch identity"
       >
         <Avatar size="xs">

@@ -2,12 +2,11 @@ import { PublicKey, type Signature } from "@icp-sdk/core/agent";
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { DiscoverablePasskeyIdentity } from "./discoverablePasskeyIdentity";
 import { canisterConfig } from "$lib/globals";
-import { isNullish } from "@dfinity/utils";
 
 const getSeedIndex = (): bigint => {
   if (canisterConfig.dummy_auth[0]?.[0]?.prompt_for_index === true) {
     const value = prompt("Enter seed index", "0")?.trim();
-    if (isNullish(value)) {
+    if (value === undefined) {
       // We need to create the same error as WebAuthn for the E2E to behave the same.
       throw new DOMException("Operation cancelled", "NotAllowedError");
     }

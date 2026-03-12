@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { HTMLInputAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
 
   type Size = "sm" | "md";
 
@@ -40,7 +39,7 @@
       "bg-bg-quaternary",
       "peer-checked:bg-bg-brand-solid peer-checked:hover:bg-bg-brand-solid",
       "after:block after:rounded-full after:bg-white after:shadow-sm after:transition-transform after:duration-200",
-      "dark:peer-checked:after:bg-fg-primary-inversed peer-checked:after:translate-x-[100%]",
+      "dark:peer-checked:after:bg-fg-primary-inversed peer-checked:after:translate-x-[100%] rtl:peer-checked:after:-translate-x-[100%]",
       "peer-disabled:bg-bg-disabled peer-disabled:after:bg-surface-light-50  dark:peer-disabled:after:bg-surface-dark-600",
       "peer-focus-visible:ring-focus-ring peer-focus-visible:ring-offset-bg-primary outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2",
       {
@@ -49,9 +48,9 @@
       }[size],
     ]}
   ></div>
-  {#if nonNullish(label) || nonNullish(hint)}
+  {#if label !== undefined || hint !== undefined}
     <div class="flex flex-col">
-      {#if nonNullish(label)}
+      {#if label !== undefined}
         <p
           class={[
             "text-text-secondary font-medium select-none",
@@ -61,7 +60,7 @@
           {label}
         </p>
       {/if}
-      {#if nonNullish(hint)}
+      {#if hint !== undefined}
         <p
           class={[
             "text-text-tertiary select-none",

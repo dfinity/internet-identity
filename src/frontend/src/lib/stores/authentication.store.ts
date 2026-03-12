@@ -1,6 +1,5 @@
 import { type Readable, derived, writable } from "svelte/store";
 import { DelegationIdentity } from "@icp-sdk/core/identity";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import {
   Actor,
   ActorSubclass,
@@ -54,10 +53,10 @@ export const authenticationStore: AuthenticationStore = {
     internalStore.set({ initialized: { agent, actor } });
   },
   subscribe: derived(internalStore, ({ authenticated, initialized }) => {
-    if (isNullish(initialized)) {
+    if (initialized === undefined) {
       throw new Error("Not initialized");
     }
-    if (isNullish(authenticated)) {
+    if (authenticated === undefined) {
       return undefined;
     }
     return { ...authenticated, ...initialized };
@@ -67,7 +66,7 @@ export const authenticationStore: AuthenticationStore = {
       authenticated.identity.getPrincipal(),
     );
     internalStore.update(({ initialized }) => {
-      if (isNullish(initialized)) {
+      if (initialized === undefined) {
         throw new Error("Not initialized");
       }
       initialized.agent.replaceIdentity(authenticated.identity);
@@ -76,7 +75,7 @@ export const authenticationStore: AuthenticationStore = {
   },
   reset: () =>
     internalStore.update(({ initialized }) => {
-      if (isNullish(initialized)) {
+      if (initialized === undefined) {
         throw new Error("Not initialized");
       }
       initialized.agent.invalidateIdentity();
@@ -87,7 +86,7 @@ export const authenticationStore: AuthenticationStore = {
 export const authenticatedStore: Readable<Authenticated> = derived(
   authenticationStore,
   (authenticated) => {
-    if (isNullish(authenticated)) {
+    if (authenticated === undefined) {
       throw new Error("Not authenticated");
     }
     return authenticated;
@@ -96,5 +95,5 @@ export const authenticatedStore: Readable<Authenticated> = derived(
 
 export const isAuthenticatedStore: Readable<boolean> = derived(
   authenticationStore,
-  (authenticated) => nonNullish(authenticated),
+  (authenticated) => authenticated !== undefined,
 );

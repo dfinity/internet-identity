@@ -1,6 +1,5 @@
 <script lang="ts">
   import ConfirmDeviceIllustration from "$lib/components/illustrations/ConfirmDeviceIllustration.svelte";
-  import { isNullish, nonNullish } from "@dfinity/utils";
   import { CopyIcon } from "@lucide/svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -18,7 +17,7 @@
   let copied = $state(false);
 
   const handleCopyCode = async () => {
-    if (isNullish(confirmationCode)) {
+    if (confirmationCode === undefined) {
       return;
     }
     await navigator.clipboard.writeText(confirmationCode);
@@ -46,10 +45,10 @@
     onclick={handleCopyCode}
     variant="secondary"
     size="xl"
-    disabled={isNullish(confirmationCode)}
+    disabled={confirmationCode === undefined}
     aria-label={$t`Confirmation code`}
   >
-    {#if nonNullish(confirmationCode)}
+    {#if confirmationCode !== undefined}
       <span>
         {confirmationCode}
       </span>

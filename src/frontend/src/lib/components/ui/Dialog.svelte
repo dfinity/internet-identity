@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { scale, fly } from "svelte/transition";
   import type { ClassValue, HTMLAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
 
@@ -18,8 +17,8 @@
     children,
     onClose,
     class: className,
-    closeOnOutsideClick = nonNullish(onClose),
-    showCloseButton = nonNullish(onClose),
+    closeOnOutsideClick = onClose !== undefined,
+    showCloseButton = onClose !== undefined,
     backdrop = true,
     contentClass,
     ...props
@@ -185,7 +184,7 @@
           ]}
         >
           {@render children?.()}
-          {#if showCloseButton && nonNullish(onClose)}
+          {#if showCloseButton && onClose !== undefined}
             <button
               class="btn btn-tertiary btn-lg btn-icon absolute end-2 top-2 z-2 !rounded-full"
               onclick={onClose}

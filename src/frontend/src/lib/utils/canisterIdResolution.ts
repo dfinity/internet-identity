@@ -1,6 +1,5 @@
 import { unknownToString } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
-import { isNullish, nonNullish } from "@dfinity/utils";
 
 /**
  * Resolve the canister id of a canister based on the front-end origin.
@@ -25,7 +24,7 @@ export const resolveCanisterId = ({
   }
 
   const maybeCanisterId = parseCanisterIdFromHostname(url.hostname);
-  if (nonNullish(maybeCanisterId)) {
+  if (maybeCanisterId !== undefined) {
     return Promise.resolve({ ok: maybeCanisterId });
   }
 
@@ -78,7 +77,7 @@ const lookupCanister = async ({
     });
 
     const headerValue = response.headers.get(HEADER_NAME);
-    if (isNullish(headerValue)) {
+    if (headerValue === null) {
       console.error(
         `Canister ID header '${HEADER_NAME}' was not set on origin ${origin}`,
       );

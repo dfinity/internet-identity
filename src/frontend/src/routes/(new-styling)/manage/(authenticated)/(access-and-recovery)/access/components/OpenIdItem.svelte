@@ -49,7 +49,7 @@
         variant="tertiary"
         size="sm"
         iconOnly
-        class="ml-auto"
+        class="ms-auto"
         aria-label={$t`More options`}
       >
         <EllipsisVerticalIcon class="size-5" />

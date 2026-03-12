@@ -1,18 +1,13 @@
 import loaderUrl from "$lib/templates/loader.png?url";
-import { showWarningIfNecessary } from "./banner";
 import { displayError } from "$lib/templates/displayError";
 import { anyFeatures, features } from "./features";
-import { compatibilityNotice } from "$lib/legacy/flows/compatibilityNotice";
 import "./styles/main.css";
-import { supportsWebAuthn } from "$lib/utils/featureDetection";
 import { Connection } from "$lib/utils/iiConnection";
-import { version } from "./version";
 
 import { init } from "$lib/generated/internet_identity_idl";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { fromBase64 } from "$lib/utils/utils";
 import { IDL } from "@icp-sdk/core/candid";
-import { isNullish, nonNullish } from "@dfinity/utils";
 
 // Polyfill Buffer globally for the browser
 import { Buffer } from "buffer";
@@ -28,7 +23,7 @@ export const readCanisterId = (): string => {
   const setupJs = document.querySelector(
     "[data-canister-id]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
+  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
     void displayError({
       title: "Canister ID not set",
       message:
@@ -48,7 +43,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
   const setupJs = document.querySelector(
     "[data-canister-config]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
+  if (setupJs === null || setupJs.dataset.canisterConfig === undefined) {
     void displayError({
       title: "Canister config not set",
       message:
@@ -85,15 +80,6 @@ export const printDevMessage = () => {
   console.log(
     "The code can be found here: https://github.com/dfinity/internet-identity",
   );
-  console.log(
-    `https://github.com/dfinity/internet-identity/commit/${version.commit}`,
-  );
-  if (nonNullish(version.release)) {
-    console.log(`This is version ${version.release}`);
-  }
-  if (version.dirty) {
-    console.warn("This version is dirty");
-  }
 
   if (anyFeatures()) {
     const message = `
@@ -130,14 +116,6 @@ export const createSpa = (app: (connection: Connection) => Promise<never>) => {
 
   // Prepare the actor/connection to talk to the canister
   const connection = new Connection(readCanisterId(), readCanisterConfig());
-
-  // If the build is not "official", show a warning
-  // https://github.com/dfinity/internet-identity#build-features
-  showWarningIfNecessary(connection.canisterConfig);
-
-  if (!supportsWebAuthn()) {
-    return compatibilityNotice();
-  }
 
   return app(connection);
 };

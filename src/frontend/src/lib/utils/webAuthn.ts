@@ -1,44 +1,5 @@
-import type {
-  AuthnMethodData,
-  DeviceData,
-} from "$lib/generated/internet_identity_types";
-import { features } from "$lib/legacy/features";
-import {
-  DummyIdentity,
-  IIWebAuthnIdentity,
-  bufferEqual,
-  creationOptions,
-} from "$lib/utils/iiConnection";
-import { diagnosticInfo, unknownToString } from "$lib/utils/utils";
-import { WebAuthnIdentity } from "./webAuthnIdentity";
-
-export const constructIdentity = async ({
-  devices,
-  rpId,
-}: {
-  devices?: Array<DeviceData>;
-  rpId?: string;
-}): Promise<IIWebAuthnIdentity> => {
-  const opts = creationOptions(devices, undefined, rpId);
-
-  /* The Identity (i.e. key pair) used when creating the anchor.
-   * If the "DUMMY_AUTH" feature is set, we create a dummy identity. The same identity must then be used in iiConnection when authenticating.
-   */
-  const createIdentity = features.DUMMY_AUTH
-    ? () => Promise.resolve(new DummyIdentity())
-    : () => WebAuthnIdentity.create({ publicKey: opts });
-
-  try {
-    return createIdentity();
-  } catch (e: unknown) {
-    throw new Error(
-      `Failed to create passkey: ${unknownToString(
-        e,
-        "unknown error",
-      )}, ${await diagnosticInfo()}`,
-    );
-  }
-};
+import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
+import { bufferEqual } from "$lib/utils/iiConnection";
 
 /**
  * Extract AAGUID from `attestationObject.authData` in `AuthenticatorAttestationResponse`
@@ -68,20 +29,6 @@ export const aaguidToString = (aaguid: Uint8Array): string =>
     .map((byte: number) => byte.toString(16).padStart(2, "0"))
     .join("")
     .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
-
-/**
- * Lookup details from a list of known AAGUID
- * @param aaguid to lookup
- */
-export const lookupAAGUID = async (
-  aaguid: string,
-): Promise<string | undefined> => {
-  const knownProviders = (await import("$lib/assets/aaguid")).default;
-  const knownNames = Object.fromEntries(
-    Object.entries(knownProviders).map(([aaguid, { name }]) => [aaguid, name]),
-  );
-  return knownNames[aaguid];
-};
 
 /**
  * Check if two `AuthnMethodData` values are equal to one another

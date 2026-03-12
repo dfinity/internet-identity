@@ -2,7 +2,6 @@
   import type { HTMLAttributes } from "svelte/elements";
   import { fade } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
-  import { nonNullish } from "@dfinity/utils";
 
   type Direction = "up" | "right" | "down" | "left";
   type Align = "start" | "center" | "end";
@@ -35,13 +34,33 @@
   let popoverRef = $state<HTMLElement>();
   let windowWidth = $state(window.innerWidth);
 
+  const getInlineAlign = (align: Align): Align => {
+    if (document.documentElement.dir !== "rtl") {
+      return align;
+    }
+
+    if (align === "start") {
+      return "end";
+    }
+
+    if (align === "end") {
+      return "start";
+    }
+
+    return align;
+  };
+
   $effect(() => {
     let tracking = true;
 
     const track = () => {
-      if (nonNullish(anchorRef) && nonNullish(popoverRef)) {
+      if (anchorRef !== undefined && popoverRef !== undefined) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
+
+        popoverRef.style.inset = "auto";
+        popoverRef.style.right = "auto";
+        popoverRef.style.bottom = "auto";
 
         // Available space around the anchor
         const spaceAbove = anchorRect.top;
@@ -103,18 +122,20 @@
         }[finalDirection];
 
         // Compute left position
+        const inlineAlign = getInlineAlign(align);
+
         popoverRef.style.left = {
           up: {
             start: `${anchorRect.left}px`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
-          }[align],
+          }[inlineAlign],
           right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
             start: `${anchorRect.left}px`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - popoverRect.width * 0.5}px`,
             end: `${anchorRect.right - popoverRect.width}px`,
-          }[align],
+          }[inlineAlign],
           left: `calc(${anchorRect.left - popoverRect.width}px - ${distance})`,
         }[finalDirection];
       }
@@ -181,7 +202,7 @@
             start: "origin-bottom-left",
             center: "origin-bottom",
             end: "origin-bottom-right",
-          }[align],
+          }[getInlineAlign(align)],
           right: {
             start: "origin-top-left",
             center: "origin-left",
@@ -191,7 +212,7 @@
             start: "origin-top-left",
             center: "origin-top",
             end: "origin-top-right",
-          }[align],
+          }[getInlineAlign(align)],
           left: {
             start: "origin-top-right",
             center: "origin-right",

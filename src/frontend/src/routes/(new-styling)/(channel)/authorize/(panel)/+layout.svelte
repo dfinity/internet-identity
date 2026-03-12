@@ -2,7 +2,6 @@
   import type { LayoutProps } from "./$types";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
   import { fly, scale } from "svelte/transition";
-  import { nonNullish } from "@dfinity/utils";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import { XIcon } from "@lucide/svelte";
@@ -138,7 +137,7 @@
 {/snippet}
 
 <div class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100">
-  {#if nonNullish(selectedIdentity)}
+  {#if selectedIdentity !== undefined}
     {#key selectedIdentity.identityNumber}
       <div
         bind:this={animationWrapperRef}

@@ -6,7 +6,6 @@ import {
   Delegation,
   SignedDelegation as FrontendSignedDelegation,
 } from "@icp-sdk/core/identity";
-import { isNullish, nonNullish } from "@dfinity/utils";
 
 export function unknownToString(obj: unknown, def: string): string {
   // Only booleans, numbers and strings _may_ not be objects, so first we try
@@ -33,38 +32,6 @@ export async function diagnosticInfo(): Promise<string> {
   }", is platform auth available: ${await window?.PublicKeyCredential?.isUserVerifyingPlatformAuthenticatorAvailable()}`;
 }
 
-// Helper to gain access to the event's target
-export const withInputElement = <E extends Event>(
-  evnt: E,
-  f: (evnt: E, element: HTMLInputElement) => void,
-): void => {
-  const element = evnt.currentTarget;
-  if (!(element instanceof HTMLInputElement)) {
-    return;
-  }
-
-  return f(evnt, element);
-};
-
-/** Try to read unknown data as a record */
-export function unknownToRecord(
-  msg: unknown,
-): Record<string, unknown> | undefined {
-  if (typeof msg !== "object") {
-    return undefined;
-  }
-
-  if (msg === null) {
-    return undefined;
-  }
-
-  // Some extra conversions to take typescript by the hand
-  // eslint-disable-next-line
-  const tmp: {} = msg;
-  const obj: Record<string, unknown> = tmp;
-  return obj;
-}
-
 export type NonEmptyArray<T> = [T, ...T[]];
 
 export function isNonEmptyArray<T>(
@@ -80,77 +47,11 @@ export function asNonEmptyArray<T>(
 
   const first = arr.shift();
 
-  if (isNullish(first)) {
+  if (first === undefined) {
     return undefined;
   }
 
   return [first, ...arr];
-}
-
-// Returns true if we're in Safari or iOS (although technically iOS only has
-// Safari)
-export function iOSOrSafari(): boolean {
-  // List of values of navigator.userAgent, navigator.platform and
-  // navigator.userAgentData by device so far (note: navigator.platform is
-  // deprecated but navigator.userAgentdata is not implemented in many
-  // browsers):
-  //
-  // iPhone 12 Mini, iOS 15.0.2
-  //
-  // Safari
-  // navigator.userAgentData: undefined
-  // navigator.platform: "iPhone"
-  // navigator.userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
-  //
-  //
-  // MacBook Pro Intel, MacOS Big Sur 11.6
-  //
-  // Safari
-  // navigator.userAgentData: undefined
-  // navigator.platform: "MacIntel"
-  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15"
-  //
-  // Chrome
-  // navigator.userAgentData.plaftorm: "macOS"
-  // navigator.platform: "MacIntel"
-  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
-  //
-  // Firefox
-  // navigator.userAgentData: undefined
-  // navigator.platform: "MacIntel"
-  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:93.0) Gecko/20100101 Firefox/93.0"
-  //
-  //
-  // MacBook Air M1, MacOS Big Sur 11.6
-  //
-  // Safari
-  // navigator.userAgentData: undefined
-  // navigator.platform: "MacIntel" // yes, I double checked
-  // navigator.userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Safari/605.1.15"
-  //
-  // Firefox
-  // navigator.userAgentData: undefined
-  // navigator.platform: "MacIntel" // yes, I double checked
-  //
-  // iPad Pro, iPadOS 15.0.2
-  //
-  // Safari
-  // navigator.userAgentData: undefined
-  // navigator.platform: "iPad"
-  // navigator.userAgent: "Mozilla/5.0 (iPad; CPU OS 15_0_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
-
-  // For details, see https://stackoverflow.com/a/23522755/2716377
-  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-}
-
-/* A function that can never be called. Can be used to prove that all type alternatives have been exhausted. */
-export function unreachable(_: never, reason?: string): never {
-  throw new Error(`Unexpected error ${reason ?? ""}`);
-}
-
-/* A version of 'unreachable' that doesn't throw an error but allows execution to continue */
-export function unreachableLax(_: never) {
-  /* */
 }
 
 /* Wrap an unknown value as an error and try to extract a string from it */
@@ -201,7 +102,7 @@ export class Chan<A> implements AsyncIterable<A> {
   }
 
   send(a: A): void {
-    if (nonNullish(this.snd)) {
+    if (this.snd !== undefined) {
       this.snd(a);
       // After the promise was resolved, set as undefined so that
       // future `send`s go to the buffer.
@@ -317,54 +218,12 @@ export class Chan<A> implements AsyncIterable<A> {
   }
 }
 
-/** Return a random string of size 10
- *
- * NOTE: this is not a very robust random, so do not use this for
- * anything requiring anything resembling true randomness.
- * */
-export function randomString(): string {
-  return (Math.random() + 1).toString(36).substring(2);
-}
-
 // Create a promise that will resolve _after_ this amount of milliseconds.
 export function waitFor(duration: number) {
   return new Promise<void>((resolve) => {
     setTimeout(() => resolve(), duration);
   });
 }
-
-// Return a shuffled version of the array. Adapted from https://stackoverflow.com/a/12646864 to
-// avoid shuffling in place.
-export function shuffleArray<T>(array_: T[]): T[] {
-  const array = [...array_];
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
-// Omit specified functions parameters, for instance OmitParams<..., "foo" | "bar">
-// will transform
-//  f: (a: { foo, bar, baz }) => void
-// into
-//  f: (a: { baz }) => void
-//
-// eslint-disable-next-line
-export type OmitParams<T extends (arg: any) => any, A extends string> = (
-  a: Omit<Parameters<T>[0], A>,
-) => ReturnType<T>;
-
-// Zip two arrays together
-export const zip = <A, B>(a: A[], b: B[]): [A, B][] =>
-  Array.from(Array(Math.min(b.length, a.length)), (_, i) => [a[i], b[i]]);
-
-export const isValidKey = <T>(
-  key: string | number | symbol,
-  keys: Array<keyof T>,
-): key is keyof T => {
-  return keys.includes(key as keyof T);
-};
 
 // Converts a union type to an intersection type to extract shared keys
 export type UnionToIntersection<U> = (
@@ -407,7 +266,7 @@ export const throwCanisterError = <
   response: T,
 ): Promise<S> => {
   if ("Err" in response) {
-    if (isNullish(response.Err)) {
+    if (response.Err === null) {
       throw new Error("Unexpected error occurred");
     }
     throw new CanisterError(response.Err);

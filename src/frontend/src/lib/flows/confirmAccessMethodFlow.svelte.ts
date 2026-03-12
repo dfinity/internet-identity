@@ -1,5 +1,4 @@
 import { get } from "svelte/store";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { authenticatedStore } from "$lib/stores/authentication.store";
 import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
 
@@ -24,7 +23,7 @@ export class ConfirmAccessMethodFlow {
     const { actor, identityNumber } = get(authenticatedStore);
     const registrationId = existingRegistrationId ?? secureRandomId(5);
 
-    if (isNullish(existingRegistrationId)) {
+    if (existingRegistrationId === undefined) {
       this.#newDeviceLink = new URL(
         `/pair#${registrationId}`,
         window.location.origin,
@@ -44,11 +43,11 @@ export class ConfirmAccessMethodFlow {
           .identity_info(identityNumber)
           .then(throwCanisterError);
         // Exit if registration window was closed
-        if (isNullish(info.authn_method_registration[0])) {
+        if (info.authn_method_registration[0] === undefined) {
           break;
         }
         // Show confirmation code view if we got a pending session
-        if (nonNullish(info.authn_method_registration[0]?.session[0])) {
+        if (info.authn_method_registration[0]?.session[0] !== undefined) {
           this.#sessionExpiration =
             info.authn_method_registration[0].expiration;
           this.#view = "enterConfirmationCode";
@@ -71,7 +70,7 @@ export class ConfirmAccessMethodFlow {
       .then(throwCanisterError);
     this.#view = "finishOnNewDevice";
 
-    if (isNullish(this.#sessionExpiration)) {
+    if (this.#sessionExpiration === undefined) {
       throw new Error("Session expiration is missing");
     }
     while (BigInt(Date.now()) * BigInt(1_000_000) < this.#sessionExpiration) {
@@ -79,7 +78,7 @@ export class ConfirmAccessMethodFlow {
         .identity_info(identityNumber)
         .then(throwCanisterError);
       // Return when registration window is closed
-      if (isNullish(info.authn_method_registration[0])) {
+      if (info.authn_method_registration[0] === undefined) {
         return;
       }
       // Wait before retrying

@@ -16,8 +16,6 @@ The build requires the following dependencies:
 - [`ic-wasm`](https://github.com/dfinity/ic-wasm), which can be installed by running [./scripts/bootstrap](./scripts/bootstrap)
 - Node.js v16+
 
-> NOTE! If you're only going to hack on the HTML and CSS code, see the [showcase](#showcase) section.
-
 ## Running Locally
 
 To run the Internet Identity canister, proceed as follows after cloning the repository
@@ -200,22 +198,3 @@ npm run dev
 
 and access the issuer FE at http://issuer.localhost:5173/, and the test-app at http://test_app.localhost:5173/
 (the relying party is functionality is at the bottom of the page).
-
-## Showcase
-
-The simplest way to make visual changes (HTML & CSS, and non-flow JS) is to start the showcase:
-
-```bash
-npm run showcase
-```
-
-This will start a webserver showcasing most II pages & components. The showcase can also be built:
-
-```bash
-npm run build:showcase [--base 'some-base/']
-npm run preview:showcase [--base 'some-base/']
-```
-
-[releases]: https://github.com/dfinity/internet-identity/releases
-[docker-build]: ./README.md#building-with-docker
-[features-and-flavors]: ./README.md#build-features-and-flavors

@@ -1,7 +1,6 @@
 <script lang="ts">
   import Input from "$lib/components/ui/Input.svelte";
   import type { HTMLAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
 
   interface Props extends HTMLAttributes<HTMLDivElement> {
     element: HTMLInputElement | undefined;
@@ -85,16 +84,16 @@
         }
         onkeydown={(event) => handleKeyDown(event, index)}
         onpaste={handlePaste}
-        errorBorder={nonNullish(error)}
+        errorBorder={error !== undefined}
         {disabled}
       />
     {/each}
   </div>
-  {#if nonNullish(error) || nonNullish(hint)}
+  {#if error !== undefined || hint !== undefined}
     <div
       class={[
         "text-sm",
-        nonNullish(error) ? "text-text-error-primary" : "text-text-tertiary",
+        error !== undefined ? "text-text-error-primary" : "text-text-tertiary",
       ]}
     >
       {error ?? hint}

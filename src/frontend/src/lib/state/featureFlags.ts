@@ -1,6 +1,5 @@
 import { writable, type Writable } from "svelte/store";
 import { FeatureFlag } from "$lib/utils/featureFlags";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { getPrimaryOrigin } from "$lib/globals";
 
 declare global {
@@ -23,8 +22,7 @@ const createFeatureFlagStore = (
 ): FeatureFlagStore => {
   const { subscribe, set, update } = writable(defaultValue);
 
-  // We cannot use browser because this is also imported in our showcase
-  if (isNullish(globalThis.window)) {
+  if (globalThis.window === undefined) {
     return {
       subscribe,
       set,
@@ -55,7 +53,7 @@ const createFeatureFlagStore = (
   };
   const initialize = (): void => {
     // Call init callback if not already set
-    if (nonNullish(initCallback) && !initializedFeatureFlag.isSet()) {
+    if (initCallback !== undefined && !initializedFeatureFlag.isSet()) {
       initCallback?.(initializedFeatureFlag);
     }
   };

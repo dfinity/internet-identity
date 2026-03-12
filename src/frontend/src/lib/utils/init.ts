@@ -1,9 +1,7 @@
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { displayError } from "$lib/templates/displayError";
 import type { InternetIdentityInit } from "$lib/generated/internet_identity_types";
 import { IDL } from "@icp-sdk/core/candid";
 import { init } from "$lib/generated/internet_identity_idl";
-import { version } from "$lib/legacy/version";
 import { anyFeatures, features } from "$lib/legacy/features";
 import { fromBase64 } from "$lib/utils/utils";
 
@@ -16,7 +14,7 @@ export const readCanisterId = (): string => {
   const setupJs = document.querySelector(
     "[data-canister-id]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterId)) {
+  if (setupJs === null || setupJs.dataset.canisterId === undefined) {
     void displayError({
       title: "Canister ID not set",
       message:
@@ -36,7 +34,7 @@ export const readCanisterConfig = (): InternetIdentityInit => {
   const setupJs = document.querySelector(
     "[data-canister-config]",
   ) as HTMLElement | null;
-  if (isNullish(setupJs) || isNullish(setupJs.dataset.canisterConfig)) {
+  if (setupJs === null || setupJs.dataset.canisterConfig === undefined) {
     void displayError({
       title: "Canister config not set",
       message:
@@ -73,15 +71,6 @@ export const printDevMessage = () => {
   console.log(
     "The code can be found here: https://github.com/dfinity/internet-identity",
   );
-  console.log(
-    `https://github.com/dfinity/internet-identity/commit/${version.commit}`,
-  );
-  if (nonNullish(version.release)) {
-    console.log(`This is version ${version.release}`);
-  }
-  if (version.dirty) {
-    console.warn("This version is dirty");
-  }
 
   if (anyFeatures()) {
     const message = `

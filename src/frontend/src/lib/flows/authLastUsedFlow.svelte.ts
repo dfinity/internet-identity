@@ -11,7 +11,6 @@ import {
 import { decodeJWT, findConfig, requestJWT } from "$lib/utils/openID";
 import { get } from "svelte/store";
 import { sessionStore } from "$lib/stores/session.store";
-import { isNullish } from "@dfinity/utils";
 import { fetchIdentityCredentials } from "$lib/utils/fetchCredentials";
 import {
   AuthenticationV2Events,
@@ -62,7 +61,7 @@ export class AuthLastUsedFlow {
           issuer,
           lastUsedIdentity.authMethod.openid.metadata ?? [],
         );
-        if (isNullish(config)) {
+        if (config === undefined) {
           throw new Error(
             "OpenID authentication is not available for this account.",
           );

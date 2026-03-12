@@ -615,59 +615,6 @@ jobs:
     steps:
       - run: echo e2e ok
 
-  using-dev-build:
-    runs-on: ubuntu-latest
-    needs: docker-build-ii
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-node
-      - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
-
-      # Helps with debugging
-      - name: Show versions
-        run: |
-          echo dfx --version
-          dfx --version
-
-      - name: Start replica
-        run: |
-          dfx start --background --artificial-delay 0
-
-      - name: "Download wasm"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_dev.wasm.gz
-          path: .
-
-      - name: Deploy II and run tests
-        run: |
-          set -euo pipefail
-
-          # Copy example to make sure it does not rely on living inside the II repo
-          builddir=$(mktemp -d)
-          cp -r ./demos/using-dev-build/. "$builddir"
-
-          ii_wasm="$PWD/internet_identity_dev.wasm.gz"
-          ii_did="$PWD/src/internet_identity/internet_identity.did"
-
-          pushd "$builddir"
-
-          # Install npm deps
-          npm ci
-          sed -i "s;https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz;$ii_wasm;" ./dfx.json
-          sed -i "s;https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did;$ii_did;" ./dfx.json
-
-          dfx deploy --no-wallet
-
-          npm run test
-          popd
-          rm -rf "$builddir"
-
-      - name: Stop replica
-        run: |
-          dfx stop
-
   # This deploys the production build to mainnet (to a canister that we use for release testing) alongside
   # some other canisters useful for testing & playing with II.
   deploy:

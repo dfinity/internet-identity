@@ -5,36 +5,10 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { CredentialId } from "$lib/utils/credential-devices";
 import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
-import { nonNullish } from "@dfinity/utils";
 import {
   fromMnemonicWithoutValidation,
   IC_DERIVATION_PATH,
 } from "$lib/utils/recoveryPhrase";
-
-/**
- * Helper to create a new PinIdentity authn method to be used in a registration flow.
- */
-export const pinAuthnMethodData = ({
-  alias,
-  pubKey,
-}: {
-  alias: string;
-  pubKey: DerEncodedPublicKey;
-}): AuthnMethodData => {
-  const metadata: MetadataMapV2 = [
-    ["alias", { String: alias }],
-    ["usage", { String: "browser_storage_key" }],
-    ["origin", { String: window.origin }],
-  ];
-  return {
-    metadata,
-    authn_method: {
-      PubKey: { pubkey: new Uint8Array(pubKey) },
-    },
-    security_settings: defaultSecuritySettings(),
-    last_authentication: [],
-  };
-};
 
 /**
  * Helper to create a new passkey authn method to be used in a registration flow.
@@ -58,10 +32,10 @@ export const passkeyAuthnMethodData = ({
     // The origin in the metadata might not match the origin in the auth method if the origin is longer than 50 characters.
     ["origin", { String: origin }],
   ];
-  if (nonNullish(alias)) {
+  if (alias !== undefined) {
     metadata.push(["alias", { String: alias }]);
   }
-  if (nonNullish(authenticatorAttachment)) {
+  if (authenticatorAttachment !== undefined) {
     metadata.push([
       "authenticator_attachment",
       { String: authenticatorAttachment },

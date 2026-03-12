@@ -2,7 +2,6 @@
 
 import { parseUserNumber } from "$lib/utils/userNumber";
 import { Principal } from "@icp-sdk/core/principal";
-import { isNullish, nonNullish } from "@dfinity/utils";
 import { get as idbGet, set as idbSet } from "idb-keyval";
 import { ZodType, z } from "zod";
 
@@ -112,7 +111,7 @@ export const getAnchorIfLastUsed = async ({
     const lastUsed = anchor.knownPrincipals.filter(
       (knownPrincipal) => knownPrincipal.originDigest === originDigest,
     )[0];
-    if (isNullish(lastUsed)) {
+    if (lastUsed === undefined) {
       continue;
     }
     candidates.push({
@@ -124,7 +123,7 @@ export const getAnchorIfLastUsed = async ({
 
   candidates.sort((a, b) => b.lastUsedTimestamp - a.lastUsedTimestamp);
   const mostRecent = candidates[0];
-  if (isNullish(mostRecent)) {
+  if (mostRecent === undefined) {
     return;
   }
 
@@ -223,12 +222,16 @@ const updateStorage = async (
 
   const storedStorage = await readIndexedDB();
 
-  const { ret: migratedStorage, didMigrate } = nonNullish(storedStorage)
-    ? { ret: storedStorage, didMigrate: false }
-    : {
-        ret: (await migrated()) ?? { anchors: {}, hasher: await newHMACKey() },
-        didMigrate: true,
-      };
+  const { ret: migratedStorage, didMigrate } =
+    storedStorage !== undefined
+      ? { ret: storedStorage, didMigrate: false }
+      : {
+          ret: (await migrated()) ?? {
+            anchors: {},
+            hasher: await newHMACKey(),
+          },
+          didMigrate: true,
+        };
   doWrite ||= didMigrate;
 
   const { ret: updatedStorage, updated } = await op(migratedStorage);
@@ -265,7 +268,7 @@ const pruneAnchors = (anchors: Anchors): { ret: Anchors; pruned: boolean } => {
   let pruned = false;
   for (let i = 0; i < nExtras; i++) {
     const unused = mostUnused(filtered);
-    if (nonNullish(unused)) {
+    if (unused !== undefined) {
       delete filtered[unused];
       pruned = true;
     }
@@ -293,25 +296,25 @@ const mostUnused = (anchors: Anchors): string | undefined => {
 const migrated = async (): Promise<Storage | undefined> => {
   // Try to read the "v3" (idb.anchors) storage and return that if found
   const v3 = await migratedV3();
-  if (nonNullish(v3)) {
+  if (v3 !== undefined) {
     return v3;
   }
 
   // Try to read the "v2" (idb.anchors) storage and return that if found
   const v2 = await migratedV2();
-  if (nonNullish(v2)) {
+  if (v2 !== undefined) {
     return v2;
   }
 
   // Try to read the "v1" (localStorage.anchors) storage and return that if found
   const v1 = await migratedV1();
-  if (nonNullish(v1)) {
+  if (v1 !== undefined) {
     return v1;
   }
 
   // Try to read the "v0" (localStorage.userNumber) storage and return that if found
   const v0 = await migratedV0();
-  if (nonNullish(v0)) {
+  if (v0 !== undefined) {
     return v0;
   }
 };
@@ -486,7 +489,7 @@ const AnchorsV1 = z.record(z.string(), AnchorV1);
 const migratedV1 = async (): Promise<Storage | undefined> => {
   // NOTE: we do not wipe local storage but keep it around in case of rollback
   const anchors: AnchorsV1 | undefined = readLocalStorageV1();
-  if (isNullish(anchors)) {
+  if (anchors === undefined) {
     return undefined;
   }
 
@@ -547,7 +550,7 @@ const AnchorsV2 = z.record(z.string(), AnchorV2);
 const migratedV2 = async (): Promise<Storage | undefined> => {
   const readAnchors = await readIndexedDBV2();
 
-  if (isNullish(readAnchors)) {
+  if (readAnchors === undefined) {
     return undefined;
   }
 
@@ -612,7 +615,7 @@ const writeIndexedDBV3 = async (storage: StorageV3) => {
 const migratedV3 = async (): Promise<Storage | undefined> => {
   const readStorage = await readIndexedDBV3();
 
-  if (isNullish(readStorage)) {
+  if (readStorage === undefined) {
     return undefined;
   }
 
@@ -683,7 +686,7 @@ const readGeneric = async <T extends ZodType>({
 }): Promise<T["_output"] | undefined> => {
   const item: unknown = await idbGet(idbKey);
 
-  if (isNullish(item)) {
+  if (item === undefined || item === null) {
     return;
   }
 

@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { HTMLAttributes } from "svelte/elements";
-  import { nonNullish } from "@dfinity/utils";
 
   type Direction = "up" | "right" | "down" | "left";
   type Align = "start" | "center" | "end";
@@ -37,6 +36,22 @@
   let tooltipRef = $state<HTMLElement>();
   let isTooltipVisible = $state(manual ? !hidden : false);
 
+  const getInlineAlign = (value: Align): Align => {
+    if (document.documentElement.dir !== "rtl") {
+      return value;
+    }
+
+    if (value === "start") {
+      return "end";
+    }
+
+    if (value === "end") {
+      return "start";
+    }
+
+    return value;
+  };
+
   const anchorRef = $derived(
     anchor ??
       ((wrapperRef?.firstElementChild ?? undefined) as HTMLElement | undefined),
@@ -48,9 +63,15 @@
     }
     let tracking = true;
     const track = () => {
-      if (nonNullish(anchorRef) && nonNullish(tooltipRef)) {
+      if (anchorRef !== undefined && tooltipRef !== undefined) {
+        const inlineAlign = getInlineAlign(align);
         const anchorRect = anchorRef.getBoundingClientRect();
         const tooltipRect = tooltipRef.getBoundingClientRect();
+
+        tooltipRef.style.inset = "auto";
+        tooltipRef.style.right = "auto";
+        tooltipRef.style.bottom = "auto";
+
         tooltipRef.style.top = {
           up: `calc(${anchorRect.top - tooltipRect.height}px - ${distance})`,
           right: {
@@ -70,13 +91,13 @@
             start: `calc(${anchorRect.left}px - ${offset})`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
             end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`,
-          }[align],
+          }[inlineAlign],
           right: `calc(${anchorRect.right}px + ${distance})`,
           down: {
             start: `calc(${anchorRect.left}px - ${offset})`,
             center: `${anchorRect.left + anchorRect.width * 0.5 - tooltipRect.width * 0.5}px`,
             end: `calc(${anchorRect.right - tooltipRect.width}px + ${offset})`,
-          }[align],
+          }[inlineAlign],
           left: `calc(${anchorRect.left - tooltipRect.width}px - ${distance})`,
         }[direction];
       }
@@ -143,7 +164,7 @@
             start: "origin-[1.6rem_100%]",
             center: "origin-bottom",
             end: "origin-[calc(100%-1.6rem)_100%]",
-          }[align],
+          }[getInlineAlign(align)],
           right: {
             start: "origin-[0_1.6rem]",
             center: "origin-left",
@@ -153,7 +174,7 @@
             start: "origin-[1.6rem_0]",
             center: "origin-top",
             end: "origin-[calc(100%-1.6rem)_0]",
-          }[align],
+          }[getInlineAlign(align)],
           left: {
             start: "origin-[100%_1.6rem]",
             center: "origin-right",
@@ -167,7 +188,7 @@
       <span class="text-text-primary text-start text-xs font-semibold">
         {label}
       </span>
-      {#if nonNullish(description)}
+      {#if description !== undefined}
         <span class="text-text-tertiary mt-1 text-start text-xs font-medium">
           {description}
         </span>
