@@ -7,7 +7,7 @@ import {
   Signature,
   wrapDER,
 } from "@icp-sdk/core/agent";
-import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import borc from "borc";
 import { bufFromBufLike } from "$lib/utils/utils";
 
@@ -21,7 +21,7 @@ import { bufFromBufLike } from "$lib/utils/utils";
  */
 
 function _coseToDerEncodedBlob(cose: Uint8Array): DerEncodedPublicKey {
-  return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
+  return wrapDER(cose, DER_COSE_OID) as DerEncodedPublicKey;
 }
 
 type PublicKeyCredentialWithAttachment = Omit<PublicKeyCredential, "toJSON"> & {
@@ -42,7 +42,7 @@ type PublicKeyCredentialWithAttachment = Omit<PublicKeyCredential, "toJSON"> & {
  * @param authData The authData field of the attestation response.
  * @returns The COSE key of the authData.
  */
-function _authDataToCose(authData: ArrayBuffer): ArrayBuffer {
+function _authDataToCose(authData: Uint8Array): Uint8Array {
   const dataView = new DataView(new ArrayBuffer(2));
   const idLenBytes = authData.slice(53, 55);
   [...new Uint8Array(idLenBytes)].forEach((v, i) => dataView.setUint8(i, v));
@@ -69,7 +69,7 @@ export class CosePublicKey implements PublicKey {
 }
 
 /**
- * Create a challenge from a string or array. The default challenge is always the same
+ * Create a challenge from a string. The default challenge is always the same
  * because we don't need to verify the authenticity of the key on the server (we don't
  * register our keys with the IC). Any challenge would do, even one per key, randomly
  * generated.
@@ -77,8 +77,8 @@ export class CosePublicKey implements PublicKey {
  *        coded string.
  */
 function _createChallengeBuffer(
-  challenge: string | Uint8Array = "<ic0.app>",
-): Uint8Array {
+  challenge: string = "<ic0.app>",
+): Uint8Array<ArrayBuffer> {
   if (typeof challenge === "string") {
     return Uint8Array.from(challenge, (c) => c.charCodeAt(0));
   } else {
@@ -111,7 +111,7 @@ async function _createCredential(
           name: "Internet Identity Service",
         },
         user: {
-          id: randomBytes(16),
+          id: globalThis.crypto.getRandomValues(new Uint8Array(16)),
           name: "Internet Identity",
           displayName: "Internet Identity",
         },
@@ -189,12 +189,10 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     // Parse the attestationObject as CBOR.
-    const attObject = borc.decodeFirst(
-      new Uint8Array(response.attestationObject),
-    );
+    const attObject = borc.decodeFirst(response.attestationObject);
 
     return new this(
-      creds.rawId,
+      new Uint8Array(creds.rawId),
       _authDataToCose(attObject.authData),
       creds.authenticatorAttachment ?? undefined,
       credentialCreationOptions?.publicKey?.rp.id,
@@ -205,8 +203,8 @@ export class WebAuthnIdentity extends SignIdentity {
   protected _publicKey: CosePublicKey;
 
   public constructor(
-    public readonly rawId: ArrayBuffer,
-    cose: ArrayBuffer,
+    public readonly rawId: Uint8Array,
+    cose: Uint8Array,
     protected authenticatorAttachment: AuthenticatorAttachment | undefined,
     protected rpId: string | undefined,
     public readonly aaguid: Uint8Array | undefined,
@@ -231,16 +229,16 @@ export class WebAuthnIdentity extends SignIdentity {
     return this.authenticatorAttachment;
   }
 
-  public async sign(blob: ArrayBuffer): Promise<Signature> {
+  public async sign(blob: Uint8Array): Promise<Signature> {
     const result = (await navigator.credentials.get({
       publicKey: {
         allowCredentials: [
           {
             type: "public-key",
-            id: this.rawId,
+            id: new Uint8Array(this.rawId),
           },
         ],
-        challenge: blob,
+        challenge: new Uint8Array(blob),
         userVerification: "preferred",
         rpId: this.rpId,
       },
@@ -262,7 +260,7 @@ export class WebAuthnIdentity extends SignIdentity {
     if (cbor === undefined || cbor === null) {
       throw new Error("failed to encode cbor");
     }
-    return cbor.buffer as Signature;
+    return cbor as Signature;
   }
 
   /**

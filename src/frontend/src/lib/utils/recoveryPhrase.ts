@@ -81,7 +81,11 @@ async function generateMasterKey(
     false,
     ["sign"],
   );
-  const h = await globalThis.crypto.subtle.sign("HMAC", key, seed);
+  const h = await globalThis.crypto.subtle.sign(
+    "HMAC",
+    key,
+    new Uint8Array(seed),
+  );
   const slipSeed = new Uint8Array(h.slice(0, 32));
   const chainCode = new Uint8Array(h.slice(32));
   return [slipSeed, chainCode];
@@ -96,7 +100,7 @@ async function derive(
   const data = new Uint8Array([0, ...parentKey, ...toBigEndianArray(i)]);
   const key = await globalThis.crypto.subtle.importKey(
     "raw",
-    parentChaincode,
+    new Uint8Array(parentChaincode),
     {
       name: "HMAC",
       hash: { name: "SHA-512" },

@@ -10,6 +10,7 @@ import {
 } from "$lib/utils/recoveryPhrase";
 import { throwCanisterError } from "$lib/utils/utils";
 import { DerEncodedPublicKey, HttpAgent, SignIdentity } from "@dfinity/agent";
+import { uint8Equals } from "@icp-sdk/core/candid";
 import {
   DelegationChain,
   DelegationIdentity,
@@ -40,7 +41,7 @@ const bufferEqual = (buf1: ArrayBuffer, buf2: ArrayBuffer): boolean => {
 };
 
 const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
-  new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
+  new Uint8Array(pubkey) as DerEncodedPublicKey;
 
 export class InvalidMnemonicError extends Error {
   constructor() {
@@ -74,7 +75,7 @@ export const recoverWithPhrase = async (
   const userNumber = BigInt(window.prompt("Identity number")!);
   const devices = await anonymousActor.get_anchor_credentials(userNumber);
   const isCorrectPhrase = devices.recovery_phrases.some((pubkey) =>
-    bufferEqual(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
+    uint8Equals(identity.getPublicKey().toDer(), derFromPubkey(pubkey)),
   );
   if (!isCorrectPhrase) {
     throw new IdentityNotFoundError();

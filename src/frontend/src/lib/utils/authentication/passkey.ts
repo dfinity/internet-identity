@@ -71,9 +71,7 @@ export const authenticateWithPasskey = async ({
       });
   if (dummyAuth) {
     identityNumber = (
-      await actor.lookup_device_key(
-        new Uint8Array(passkeyIdentity.getCredentialId()!),
-      )
+      await actor.lookup_device_key(passkeyIdentity.getCredentialId()!)
     )[0]!.anchor_number;
   }
   const delegation = await DelegationChain.create(
@@ -91,6 +89,6 @@ export const authenticateWithPasskey = async ({
   return {
     identity,
     identityNumber,
-    credentialId: new Uint8Array(passkeyIdentity.getCredentialId()!),
+    credentialId: passkeyIdentity.getCredentialId()!,
   };
 };

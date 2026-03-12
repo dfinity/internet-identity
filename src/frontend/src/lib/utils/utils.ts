@@ -287,7 +287,7 @@ export const bufFromBufLike = (
   return bufLike.buffer.slice(
     bufLike.byteOffset,
     bufLike.byteOffset + bufLike.byteLength,
-  );
+  ) as ArrayBuffer;
 };
 
 export const toBase64 = (bytes: Uint8Array): string =>
