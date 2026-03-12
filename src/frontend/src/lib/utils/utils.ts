@@ -290,14 +290,18 @@ export const bufFromBufLike = (
   ) as ArrayBuffer;
 };
 
-export const toBase64 = (bytes: Uint8Array): string =>
-  btoa(String.fromCharCode(...bytes));
-
-export const toBase64URL = (bytes: Uint8Array): string =>
-  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-export const fromBase64 = (base64: string): Uint8Array =>
-  Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0));
+export const fromBase64 = (base64: string): Uint8Array => {
+  if (
+    "fromBase64" in Uint8Array &&
+    typeof Uint8Array.fromBase64 === "function"
+  ) {
+    return Uint8Array.fromBase64(base64);
+  }
+  if (typeof globalThis.atob !== "undefined") {
+    return Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0));
+  }
+  throw Error("Could not decode base64 string");
+};
 
 export const fromBase64URL = (base64Url: string): Uint8Array =>
   fromBase64(
@@ -306,6 +310,43 @@ export const fromBase64URL = (base64Url: string): Uint8Array =>
       .replace(/_/g, "/")
       .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
   );
+
+export const toBase64 = (bytes: Uint8Array): string => {
+  if ("toBase64" in bytes && typeof bytes.toBase64 === "function") {
+    return bytes.toBase64();
+  }
+  if (typeof globalThis.btoa !== "undefined") {
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+  throw Error("Could not encode base64 string");
+};
+
+export const toBase64URL = (bytes: Uint8Array): string =>
+  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+export const fromHex = (hex: string): Uint8Array => {
+  if ("fromHex" in Uint8Array && typeof Uint8Array.fromHex === "function") {
+    return Uint8Array.fromHex(hex);
+  }
+  return new Uint8Array(
+    Array.from({ length: hex.length / 2 }, (_, i) =>
+      parseInt(hex.slice(i * 2, i * 2 + 2), 16),
+    ),
+  );
+};
+
+export const toHex = (bytes: Uint8Array): string => {
+  if ("toHex" in bytes && typeof bytes.toHex === "function") {
+    return bytes.toHex();
+  }
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+};
 
 // Utility to transform the signed delegation received from the backend into one that the frontend DelegationChain understands.
 export const transformSignedDelegation = (

@@ -1,6 +1,6 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { mnemonicToSeedSync, validateMnemonic, entropyToMnemonic } from "bip39";
-import { bytesToHex } from "@noble/hashes/utils";
+import { toHex } from "./utils";
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
@@ -12,7 +12,7 @@ const HARDENED = 0x80000000;
  */
 export const generateMnemonic = (): string[] => {
   const entropy = globalThis.crypto.getRandomValues(new Uint8Array(32));
-  return entropyToMnemonic(bytesToHex(entropy)).split(" ");
+  return entropyToMnemonic(toHex(entropy)).split(" ");
 };
 
 /**

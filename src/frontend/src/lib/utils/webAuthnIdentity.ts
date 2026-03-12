@@ -7,9 +7,8 @@ import {
   Signature,
   wrapDER,
 } from "@icp-sdk/core/agent";
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import borc from "borc";
-import { bufFromBufLike } from "$lib/utils/utils";
+import { bufFromBufLike, fromHex, toHex } from "$lib/utils/utils";
 
 /**
  * This whole file was copied agent-js:
@@ -162,8 +161,8 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     return new this(
-      hexToBytes(rawId),
-      hexToBytes(publicKey),
+      fromHex(rawId),
+      fromHex(publicKey),
       undefined,
       rpId,
       undefined,
@@ -268,8 +267,8 @@ export class WebAuthnIdentity extends SignIdentity {
    */
   public toJSON(): JsonnableWebAuthnIdentity {
     return {
-      publicKey: bytesToHex(this._publicKey.getCose()),
-      rawId: bytesToHex(new Uint8Array(this.rawId)),
+      publicKey: toHex(this._publicKey.getCose()),
+      rawId: toHex(new Uint8Array(this.rawId)),
       rpId: this.rpId,
     };
   }

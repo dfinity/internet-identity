@@ -11,7 +11,7 @@ import { Session } from "$lib/stores/session.store";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
 import { canisterConfig } from "$lib/globals";
-import { bytesToHex } from "@noble/hashes/utils";
+import { toHex } from "../utils";
 
 export class CredentialNotFound extends Error {
   constructor() {
@@ -63,7 +63,7 @@ export const authenticateWithPasskey = async ({
             // To help debug, log the credential id
             console.error(error);
             console.error(
-              `Error looking up device key ${bytesToHex(new Uint8Array(result.rawId))}`,
+              `Error looking up device key ${toHex(new Uint8Array(result.rawId))}`,
             );
             throw error;
           }
