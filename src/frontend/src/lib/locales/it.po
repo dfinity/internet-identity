@@ -32,7 +32,7 @@ msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
 msgstr "{num, plural, one {# passkey} other {# passkey}}"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
-msgstr "<0>Interfaccia completamente riprogettata:</0> Abbiamo dato a Internet Identity un look-and-feel fresco e moderno. Il nuovo design è intuitivo e più facile da navigare, garantendo un'esperienza utente più fluida."
+msgstr "<0>Interfaccia completamente riprogettata:</0> Abbiamo dato a Internet Identity un aspetto fresco e moderno. Il nuovo design è intuitivo e più facile da navigare, garantendo un'esperienza utente più fluida."
 
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
 msgstr "<0>Integrazione con Google, Apple e Microsoft:</0> Sebbene le passkey stiano diventando più mature, non sono ancora diffuse per tutti. Abbiamo osservato un tasso di abbandono del 50% nel nostro flusso di registrazione, il che indica la necessità di metodi di autenticazione alternativi. Per rendere Internet Identity accessibile a un pubblico ancora più ampio, abbiamo integrato Google, Apple e Microsoft come opzioni di autenticazione alternative."
@@ -882,7 +882,7 @@ msgid "The <0>new device</0> is preparing to continue."
 msgstr "Il <0>nuovo dispositivo</0> si sta preparando per continuare."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
-msgstr "L'integrazione con Google, Microsoft e Apple utilizza un protocollo di autenticazione standard chiamato OpenID. Questo è lo stesso protocollo che le altre applicazioni utilizzano per accedere con Google."
+msgstr "L'integrazione con Google, Microsoft e Apple utilizza un protocollo di autenticazione standard chiamato OpenID. È lo stesso protocollo che molte altre applicazioni usano per accedere con Google."
 
 msgid "The passkey could not be identified, support unknown."
 msgstr "La passkey non è stata identificata, supporto sconosciuto."
@@ -909,22 +909,22 @@ msgid "This passkey is no longer associated with any identity."
 msgstr "Questa passkey non è più associata ad alcuna identità."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
-msgstr "Questa YubiKey ha un firmware precedente (5.1) che è incompatibile."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.1) che è incompatibile."
 
 msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
-msgstr "Questa YubiKey ha un firmware precedente (5.2 - 5.4) che potrebbe essere incompatibile."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.2 - 5.4) che potrebbe essere incompatibile."
 
 msgid "This YubiKey has older firmware (5.2) that might be incompatible."
-msgstr "Questa YubiKey ha un firmware precedente (5.2) che potrebbe essere incompatibile."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.2) che potrebbe essere incompatibile."
 
 msgid "This YubiKey has older firmware (5.4) that might be incompatible."
-msgstr "Questa YubiKey ha un firmware precedente (5.4) che potrebbe essere incompatibile."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.4) che potrebbe essere incompatibile."
 
 msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
-msgstr "Questa YubiKey ha un firmware precedente (5.5 - 5.6) che potrebbe essere incompatibile."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.5 - 5.6) che potrebbe essere incompatibile."
 
 msgid "This YubiKey has older firmware (5.6) that might be incompatible."
-msgstr "Questa YubiKey ha un firmware precedente (5.6) che potrebbe essere incompatibile."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.6) che potrebbe essere incompatibile."
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "Per confermare che sei tu, inserisci il codice sottostante sul tuo <0>dispositivo esistente</0>."
