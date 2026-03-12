@@ -1,5 +1,4 @@
 import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
-import { bufferEqual } from "$lib/utils/iiConnection";
 import { uint8Equals } from "@icp-sdk/core/candid";
 
 /**
