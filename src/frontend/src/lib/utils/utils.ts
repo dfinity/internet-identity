@@ -332,6 +332,9 @@ export const fromHex = (hex: string): Uint8Array => {
   if ("fromHex" in Uint8Array && typeof Uint8Array.fromHex === "function") {
     return Uint8Array.fromHex(hex);
   }
+  if (hex.length % 2 !== 0) {
+    throw new Error("Invalid hex string");
+  }
   return new Uint8Array(
     Array.from({ length: hex.length / 2 }, (_, i) =>
       parseInt(hex.slice(i * 2, i * 2 + 2), 16),

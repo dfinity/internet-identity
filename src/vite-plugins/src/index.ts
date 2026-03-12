@@ -91,7 +91,6 @@ export const replicaForwardPlugin = ({
   configureServer(server: ViteDevServer) {
     const replicaOrigin = `127.0.0.1:${readReplicaPort()}`;
     server.middlewares.use((req, res, next) => {
-      console.log(`Incoming request`, req);
       const authority = req.headers[":authority"] as string;
       if (
         /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
