@@ -146,7 +146,6 @@ mod tests;
 /// * version 1-8: no longer supported
 /// * version   9: 4KB anchors, candid anchor record layout, persistent state in virtual memory,
 ///   with memory manager (from 2nd page on), archive entries buffer in stable memory
-/// * version  10: passkey pubkey hash index key type changed from [u8; 32] to Principal
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 9..=9;
 
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
@@ -713,7 +712,7 @@ impl<M: Memory + Clone> Storage<M> {
     /// and syncing indices with empty previous data. This is intended for data migrations
     /// where the `StorableAnchor` already exists in `stable_anchor_memory` but the index
     /// was not yet populated.
-    pub(crate) fn force_sync_all_indices(
+    pub(crate) fn force_sync_passkey_pubkey_index(
         &mut self,
         anchor_number: AnchorNumber,
     ) -> Result<(), StorageError> {

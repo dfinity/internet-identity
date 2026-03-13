@@ -5,7 +5,6 @@
 
 set -euo pipefail
 
-PRODUCTION_ASSET=${INPUT_PRODUCTION_ASSET:?No production asset specified}
 RELEASE_TAG=${RELEASE_TAG:-${GITHUB_REF_NAME:?No value for tag}}
 
 # Starting the "intro" section where we display a short intro
@@ -14,16 +13,14 @@ cat > "$section_intro" << EOF
 This is Internet Identity release [$RELEASE_TAG](https://github.com/dfinity/internet-identity/releases/tag/$RELEASE_TAG) for commit [$GITHUB_SHA](https://github.com/dfinity/internet-identity/commit/$GITHUB_SHA).
 EOF
 
-# Starting the "build flavors" section where we add the shas of all input assets
+# Starting the artifacts section where we add the shas of all input assets
 section_build_flavors=$(mktemp)
 
 # Start the body with a paragraph and table headers
 # NOTE: throughout the doc we link to the current release (not to master) because things might
 # change
 cat > "$section_build_flavors" <<EOF
-## Build flavors
-
-For more information please see the [Build flavors](https://github.com/dfinity/internet-identity/tree/$RELEASE_TAG#build-features-and-flavors) section of the README.
+## Artifacts
 
 | Filename | sha256 (links to CI Run) |
 | --- | --- |
@@ -38,7 +35,9 @@ To build the wasm modules yourself and verify their hashes, run the following co
 \`\`\`
 git pull # to ensure you have the latest changes.
 git checkout $GITHUB_SHA
-./scripts/verify-hash --ii-hash $(shasum -a 256 "$PRODUCTION_ASSET" | cut -d ' ' -f1) --iife-hash $(shasum -a 256 internet_identity_frontend.wasm.gz | cut -d ' ' -f1)
+./scripts/verify-hash \
+    --ii-hash $(shasum -a 256 "internet_identity_production.wasm.gz" | cut -d ' ' -f1) \
+    --iife-hash $(shasum -a 256 internet_identity_frontend.wasm.gz | cut -d ' ' -f1)
 \`\`\`
 
 Make sure to compare the hashes also with the proposal payload when verifying canister upgrade proposals.
@@ -95,12 +94,6 @@ do
 
     # Get the shasum and capture the sha (using only POSIX sed)
     shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%|$download|$sha|%" >> "$section_build_flavors"
-
-    # Mention production asset in intro section
-    if [[ "$filename" == "$PRODUCTION_ASSET" ]]
-    then
-        shasum -a 256 "$filename"  | sed -r "s%^([a-z0-9]+)[[:space:]][[:space:]](.*)$%The sha256 of production asset [\2]($download_link) is [\1]($run_link).%" >> "$section_intro"
-    fi
 done <<< "$INPUT_ASSETS"
 
 >&2 echo "Creating release notes"

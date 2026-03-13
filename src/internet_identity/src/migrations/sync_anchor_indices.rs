@@ -83,11 +83,10 @@ impl<M: Memory + Clone> Storage<M> {
         // anchors within this entire batch failed to migrate.
         let mut batch_did_not_fail_completely = false;
 
-        // This is where the index migration happens. For each anchor in the batch,
-        // force-sync its indices with empty previous data so that all current entries
-        // get added to the indices (even if the StorableAnchor already existed).
+        // force-sync the passkey pubkey index with empty previous data so that all current
+        // entries get added to that index (even if the StorableAnchor already existed).
         for anchor_number in begin..=end {
-            match self.force_sync_all_indices(anchor_number) {
+            match self.force_sync_passkey_pubkey_index(anchor_number) {
                 Ok(_) => {}
                 Err(StorageError::AnchorNotFound { .. }) => {
                     ic_cdk::println!("Marking {} as <DUMMY ANCHOR>", anchor_number);
@@ -417,7 +416,7 @@ mod sync_anchor_indices_tests {
         reset_migration_state();
         storage.sync_anchor_indices(0, BATCH_SIZE);
 
-        // After the fix (force_sync_all_indices), the indices must be fully populated.
+        // After the fix (force_sync_passkey_pubkey_index), the indices must be fully populated.
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
