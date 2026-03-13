@@ -645,6 +645,9 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
+    // Run synchronous one-time migrations (e.g. clearing incompatible indices)
+    // before any other code can access the storage.
+    state::storage_borrow_mut(|storage| storage.run_post_upgrade_migrations());
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
 

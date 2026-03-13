@@ -146,6 +146,7 @@ mod tests;
 /// * version 1-8: no longer supported
 /// * version   9: 4KB anchors, candid anchor record layout, persistent state in virtual memory,
 ///   with memory manager (from 2nd page on), archive entries buffer in stable memory
+/// * version  10: passkey pubkey hash index key type changed from [u8; 32] to Principal
 const SUPPORTED_LAYOUT_VERSIONS: RangeInclusive<u8> = 9..=9;
 
 const DEFAULT_ENTRY_SIZE: u16 = 4096;
@@ -708,10 +709,10 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Force-sync all indices for an anchor by reading its current `StorableAnchor`
+    /// Force-sync the passkey pubkey index for an anchor by reading its current `StorableAnchor`
     /// and syncing indices with empty previous data. This is intended for data migrations
-    /// where the `StorableAnchor` already exists in `stable_anchor_memory` but the indices
-    /// were not yet populated.
+    /// where the `StorableAnchor` already exists in `stable_anchor_memory` but the index
+    /// was not yet populated.
     pub(crate) fn force_sync_all_indices(
         &mut self,
         anchor_number: AnchorNumber,
@@ -721,24 +722,8 @@ impl<M: Memory + Clone> Storage<M> {
             .get(&anchor_number)
             .ok_or(StorageError::AnchorNotFound { anchor_number })?;
 
-        self.sync_anchor_with_openid_credential_index(
-            anchor_number,
-            vec![],
-            storable_anchor.openid_credentials,
-        );
-        self.sync_anchor_with_recovery_phrase_principal_index(
-            anchor_number,
-            &[],
-            &storable_anchor.recovery_keys.unwrap_or_default(),
-        );
-
         let current_passkey_credentials = storable_anchor.passkey_credentials.unwrap_or_default();
 
-        self.sync_anchor_with_passkey_credential_index(
-            anchor_number,
-            &[],
-            &current_passkey_credentials,
-        );
         self.sync_anchor_with_passkey_pubkey_index(
             anchor_number,
             &[],
@@ -869,6 +854,12 @@ impl<M: Memory + Clone> Storage<M> {
                 .contains_key(principal)
             {
                 // This principal is already occupied; do not overwrite it.
+                ic_cdk::println!(
+                    "WARNING: Principal {:?} derived from a passkey credential pubkey is already \
+                     indexed for another anchor; skipping indexing for anchor number {}",
+                    principal,
+                    anchor_number,
+                );
                 continue;
             };
 
@@ -1861,6 +1852,17 @@ impl<M: Memory + Clone> Storage<M> {
 
     pub fn version(&self) -> u8 {
         self.header.version
+    }
+
+    /// Runs one-time migrations that must complete synchronously during post_upgrade.
+    ///
+    /// This method is idempotent: `clear_new()` on an already-cleared BTreeMap is a no-op.
+    pub fn run_post_upgrade_migrations(&mut self) {
+        // The passkey pubkey hash index key type changed from [u8; 32] (SHA-256
+        // hash) to Principal. Clear the old index so that the timer-based
+        // migration can repopulate it with the new key type.
+        self.lookup_anchor_with_passkey_pubkey_hash_memory
+            .clear_new();
     }
 
     pub fn memory_sizes(&self) -> HashMap<String, u64> {

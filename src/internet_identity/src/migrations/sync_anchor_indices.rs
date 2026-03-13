@@ -60,11 +60,9 @@ impl<M: Memory + Clone> Storage<M> {
             // Save this value for future invocations.
             ANCHOR_MIGRATION_LAST_ANCHOR_ID.replace(Some(last_anchor_id));
 
-            // Clear the passkey pubkey hash index to allow changing the key type
-            // from [u8; 32] (SHA-256 hash) to Principal. The migration will
-            // repopulate the index with Principal-keyed entries.
-            self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .clear_new();
+            // Note: clearing of `lookup_anchor_with_passkey_pubkey_hash_memory`
+            // (key type changed from [u8; 32] to Principal) is now done
+            // synchronously in `run_post_upgrade_migrations`.
 
             last_anchor_id
         };
