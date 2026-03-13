@@ -809,9 +809,11 @@ msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "کچھ غلط ہے!"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
 msgstr "کچھ غلط ہو گیا"
 

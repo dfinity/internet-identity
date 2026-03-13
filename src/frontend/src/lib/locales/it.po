@@ -809,9 +809,11 @@ msgstr "Accesso sicuro in corso"
 msgid "Simplify your sign-in"
 msgstr "Semplifica il tuo accesso"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "Qualcosa non è corretto!"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
 msgstr "Qualcosa è andato storto"
 

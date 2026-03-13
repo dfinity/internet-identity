@@ -809,11 +809,13 @@ msgstr "Connexion sécurisée"
 msgid "Simplify your sign-in"
 msgstr "Simplifiez votre connexion"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
-msgstr "Un problème est survenu !"
+msgstr "Incorrect"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
-msgstr "Une erreur s’est produite"
+msgstr "Un problème est survenu."
 
 msgid "Source code"
 msgstr "Code source"

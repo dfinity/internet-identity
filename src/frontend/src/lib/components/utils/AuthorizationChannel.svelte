@@ -136,7 +136,11 @@
       ? error.description
       : error instanceof Error
         ? error.message
-        : $t`Something went wrong`}
+        : $t({
+            message: "Something went wrong",
+            context:
+              "Fallback error message when an unexpected error is caught",
+          })}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
       <CircleAlertIcon class="size-6" />

@@ -98,7 +98,7 @@ Entries to translate:
 $untranslated_entries"
 
   local translated_entries
-  translated_entries=$(npx @google/gemini-cli -m gemini-2.5-flash-lite -p "$prompt")
+  translated_entries=$(npx -y @google/gemini-cli -m gemini-2.5-flash-lite -p "$prompt")
 
   if [[ -z "${translated_entries//[[:space:]]/}" ]]; then
     echo "Failed translating $po_filename with Gemini CLI: empty response content" >&2
