@@ -214,14 +214,7 @@ fn should_repopulate_passkey_index_after_upgrade() {
         origin: Some("https://identity.ic0.app".to_string()),
         ..DeviceData::auth_test_device()
     };
-    api::add(
-        &env,
-        canister_id,
-        principal_1(),
-        user_number_1,
-        &new_device,
-    )
-    .unwrap();
+    api::add(&env, canister_id, principal_1(), user_number_1, &new_device).unwrap();
 
     let passkey_count_after_add = api::count_passkeys(&env, canister_id).unwrap();
     assert_eq!(
