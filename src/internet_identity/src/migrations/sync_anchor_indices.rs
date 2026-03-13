@@ -229,11 +229,8 @@ mod sync_anchor_indices_tests {
         storage.write(a2.clone()).unwrap();
         storage.write(a3.clone()).unwrap();
 
-        // Clear indices to simulate the state before the migration
-        // (i.e., StorableAnchors exist but the indices are empty).
-        storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
-            .clear_new();
+        // Clear the passkey pubkey hash index to simulate the state before the
+        // migration (StorableAnchors exist but the index is empty).
         storage
             .lookup_anchor_with_passkey_pubkey_hash_memory
             .clear_new();
@@ -244,31 +241,6 @@ mod sync_anchor_indices_tests {
 
         // Run migration
         storage.sync_anchor_indices(0, BATCH_SIZE);
-
-        // Check that recovery phrase principals are indexed for anchors 1 and 3
-        let principal_1 = Principal::self_authenticating(pubkey(1));
-        let principal_2 = Principal::self_authenticating(pubkey(2));
-        let principal_3 = Principal::self_authenticating(pubkey(3));
-
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_1),
-            Some(1)
-        );
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_3),
-            Some(3)
-        );
-        // Anchor 2 has no recovery device, so nothing indexed for its pubkey
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_2),
-            None
-        );
 
         // Check that passkey pubkey principals are indexed for anchors 2 and 3
         let passkey_principal_2 = Principal::self_authenticating(pubkey(2));
@@ -316,11 +288,8 @@ mod sync_anchor_indices_tests {
         storage.write(a2.clone()).unwrap();
         storage.write(a3.clone()).unwrap();
 
-        // Clear indices to simulate the state before the migration
-        // (i.e., StorableAnchors exist but the indices are empty).
-        storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
-            .clear_new();
+        // Clear the passkey pubkey hash index to simulate the state before the
+        // migration (StorableAnchors exist but the index is empty).
         storage
             .lookup_anchor_with_passkey_pubkey_hash_memory
             .clear_new();
@@ -332,32 +301,6 @@ mod sync_anchor_indices_tests {
 
         // Run migration (1)
         storage.sync_anchor_indices(0, BATCH_SIZE);
-
-        // Check that recovery phrase principals are indexed for anchors 1 and 3
-        let principal_1 = Principal::self_authenticating(pubkey(1));
-        let principal_2 = Principal::self_authenticating(pubkey(2));
-        let principal_3 = Principal::self_authenticating(pubkey(3));
-
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_1),
-            Some(1)
-        );
-        // Anchor 2 has no recovery device, so nothing indexed for its pubkey
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_2),
-            None
-        );
-        // Anchor 3 not migrated yet
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_3),
-            None
-        );
 
         // Check passkey pubkey principal index: anchors 1 and 2 are in the first batch
         let passkey_principal_2 = Principal::self_authenticating(pubkey(2));
@@ -381,12 +324,6 @@ mod sync_anchor_indices_tests {
         storage.sync_anchor_indices(0, BATCH_SIZE);
 
         // Now anchor 3 should be migrated
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_3),
-            Some(3)
-        );
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
