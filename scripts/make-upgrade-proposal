@@ -515,6 +515,9 @@ prepare_proposal_argument() {
   echo "You need at least the didc from 2024-07-29 https://github.com/dfinity/candid/releases/tag/2024-07-29"
   
   if should_upgrade_backend "$upgrade_type"; then
+    echo ""
+    echo "=== Filling init arguments for BACKEND canister (InternetIdentityInit) ==="
+    echo ""
     didc_assist_ii_init > args.txt
     didc_encode_ii_init args.txt > dfx_arg.bin
     # DFX raw arguments are encoded differently than ic-admin's --arg values (mainnet_arg.bin).
@@ -522,6 +525,9 @@ prepare_proposal_argument() {
   fi
   
   if should_upgrade_frontend "$upgrade_type"; then
+    echo ""
+    echo "=== Filling init arguments for FRONTEND canister (InternetIdentityFrontendInit) ==="
+    echo ""
     didc_assist_frontend_init > frontend_args.txt
     didc_encode_frontend_init frontend_args.txt > dfx_frontend_arg.bin
     xxd -r -p dfx_frontend_arg.bin > mainnet_frontend_arg.bin
