@@ -842,10 +842,10 @@ msgid "Stored and usable only on the {0} device it was created on."
 msgstr "صرف اس {0} آلے پر محفوظ اور قابل استعمال ہے جس پر یہ بنایا گیا تھا۔"
 
 msgid "Stored in your {0} account and synced across your {1} devices."
-msgstr "یہ آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے {1} ڈیوائسز میں ہم آہنگ"
+msgstr "یہ آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے {1} ڈیوائسز میں ہم آہنگ کیا جاتا ہے۔"
 
 msgid "Stored in your {0} account and synced across your devices."
-msgstr "یہ آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے تمام ڈیوائسز میں ہم آہنگ"
+msgstr "یہ آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے تمام ڈیوائسز میں ہم آہنگ کیا جاتا ہے۔"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "آپ کے آلے، پاس ورڈ مینیجر، یا سیکیورٹی کی پر محفوظ طریقے سے سٹور کیا گیا ہے۔"
