@@ -6,8 +6,6 @@ This document explains how to build the Wasm module of the Internet Identity can
 
 > 💡 The simplest way to build the code is to use the [Docker build][docker-build].
 
-> 💡 Make sure to read up on the [build features and flavors][features-and-flavors].
-
 The build requires the following dependencies:
 
 - [`dfx`](https://github.com/dfinity/sdk/releases/latest) version 0.10.0 or later
