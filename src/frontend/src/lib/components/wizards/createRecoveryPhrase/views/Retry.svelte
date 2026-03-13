@@ -17,7 +17,10 @@
   <MessageSquareXIcon class="size-6" />
 </FeaturedIcon>
 <h2 class="text-text-primary mb-3 text-2xl font-medium">
-  {$t`Something is wrong!`}
+  {$t({
+    message: "Something is wrong!",
+    context: "The user entered an incorrect value during a verification step",
+  })}
 </h2>
 <p class="text-text-tertiary mb-8 text-base font-medium">
   {#if inputMethod === "selecting"}

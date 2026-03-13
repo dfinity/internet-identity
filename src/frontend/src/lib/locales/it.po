@@ -1,0 +1,1157 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-03-11 17:58+0100\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: it\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "{0} logo"
+msgstr "Logo {0}"
+
+msgid "{0} user"
+msgstr "Utente {0}"
+
+msgid "{application} has moved to the new Internet Identity"
+msgstr "{application} si è spostata sulla nuova Internet Identity"
+
+msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
+msgstr "{MAX_ACCOUNTS, plural, one {Hai raggiunto il limite massimo di # account per una singola app.} other {Hai raggiunto il limite massimo di # account per una singola app.}}"
+
+msgid "{name} account"
+msgstr "Account {name}"
+
+msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
+msgstr "{num, plural, one {# passkey} other {# passkey}}"
+
+msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
+msgstr "<0>Interfaccia completamente riprogettata:</0> Abbiamo dato a Internet Identity un aspetto fresco e moderno. Il nuovo design è intuitivo e più facile da navigare, garantendo un'esperienza utente più fluida."
+
+msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
+msgstr "<0>Integrazione con Google, Apple e Microsoft:</0> Sebbene le passkey stiano diventando più mature, non sono ancora diffuse per tutti. Abbiamo osservato un tasso di abbandono del 50% nel nostro flusso di registrazione, il che indica la necessità di metodi di autenticazione alternativi. Per rendere Internet Identity accessibile a un pubblico ancora più ampio, abbiamo integrato Google, Apple e Microsoft come opzioni di autenticazione alternative."
+
+msgid "<0>Learn more</0> about passkeys"
+msgstr "<0>Scopri di più</0> sulle passkey"
+
+msgid "<0>Never</0> enter a code from another source."
+msgstr "<0>Non</0> inserire mai un codice proveniente da un'altra fonte."
+
+msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
+msgstr "<0>Niente più numeri di identità:</0> Come spiegato sopra, le passkey rilevabili significano che non è più necessario ricordare o memorizzare un numero di identità. L'accesso è ora più semplice e immediato."
+
+msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
+msgstr "<0>Integrazione fluida delle passkey:</0> Continuiamo ad adottare le passkey come futuro dell'autenticazione sicura. Internet Identity 2.0 sfrutta gli standard più recenti delle passkey per una maggiore sicurezza e facilità d'uso."
+
+msgid "A way to regain access to your identity if you ever lose it."
+msgstr "Un modo per riottenere l'accesso alla tua identità se dovessi perderla."
+
+msgid "Access and recovery"
+msgstr "Accesso e recupero"
+
+msgid "Access methods"
+msgstr "Metodi di accesso"
+
+msgid "Account name"
+msgstr "Nome dell'account"
+
+msgid "Activate"
+msgstr "Attiva"
+
+msgid "Activate it so that you can recover your identity at any time."
+msgstr "Attivalo in modo da poter recuperare la tua identità in qualsiasi momento."
+
+msgid "Activate recovery to remove"
+msgstr "Attiva il recupero prima di rimuovere"
+
+msgid "Activate your recovery phrase so that you can recover your identity at any point."
+msgstr "Attiva la tua frase di recupero per poter recuperare la tua identità in qualsiasi momento."
+
+msgid "Add a passkey"
+msgstr "Aggiungi una passkey"
+
+msgid "Add access method"
+msgstr "Aggiungi metodo di accesso"
+
+msgid "Add another account"
+msgstr "Aggiungi un altro account"
+
+msgid "Add another identity"
+msgstr "Aggiungi un'altra identità"
+
+msgid "Add another passkey"
+msgstr "Aggiungi un'altra passkey"
+
+msgid "Add another way to sign in with a passkey or third-party account for secure access."
+msgstr "Aggiungi un altro modo per accedere con una passkey o un account di terze parti per un accesso sicuro."
+
+msgid "Add new"
+msgstr "Aggiungi nuovo"
+
+msgid "Add or remove the ways you can sign in with your identity."
+msgstr "Aggiungi o rimuovi i modi in cui puoi accedere con la tua identità."
+
+msgid "Advanced identity management"
+msgstr "Gestione avanzata dell'identità"
+
+msgid "Are you sure?"
+msgstr "Sei sicuro?"
+
+msgid "As you are currently signed in with this Account, you will be signed out."
+msgstr "Poiché sei attualmente connesso con questo account, verrai disconnesso."
+
+msgid "As you are currently signed in with this passkey, you will be signed out."
+msgstr "Poiché sei attualmente connesso con questa passkey, verrai disconnesso."
+
+msgid "Authenticating..."
+msgstr "Autenticazione in corso..."
+
+msgid "Authentication successful"
+msgstr "Autenticazione riuscita"
+
+msgid "Authorize new device"
+msgstr "Autorizza nuovo dispositivo"
+
+msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
+msgstr "Prima di iniziare, trova un posto riservato e tieni pronta la tua frase di recupero. Mantienila nascosta per proteggere la tua identità."
+
+msgid "Before you continue"
+msgstr "Prima di continuare"
+
+msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
+msgstr "Abilitando questa funzione, puoi creare più di un account per una singola app. Passa facilmente da un account all'altro (ad es. lavoro, personale o demo)."
+
+msgid "Can't find your identity?"
+msgstr "Non riesci a trovare la tua identità?"
+
+msgid "Cancel"
+msgstr "Annulla"
+
+msgid "CAPTCHA characters"
+msgstr "Caratteri CAPTCHA"
+
+msgid "Characters are case-sensitive"
+msgstr "I caratteri fanno distinzione tra maiuscole e minuscole"
+
+msgid "Check out the other domains:"
+msgstr "Dai un'occhiata agli altri domini:"
+
+msgid "Checking recovery phrase"
+msgstr "Verifica della frase di recupero in corso"
+
+msgid "Checking your order"
+msgstr "Verifica del tuo ordine in corso"
+
+msgid "Choose an account"
+msgstr "Scegli un account"
+
+msgid "choose language to continue"
+msgstr "scegli la lingua per continuare"
+
+msgid "Choose method"
+msgstr "Scegli il metodo"
+
+msgid "Choose method to continue"
+msgstr "Scegli il metodo per continuare"
+
+msgid "Clear all"
+msgstr "Cancella tutto"
+
+msgid "Click to reveal"
+msgstr "Clicca per rivelare"
+
+msgid "Close"
+msgstr "Chiudi"
+
+msgid "Close menu"
+msgstr "Chiudi menu"
+
+msgid "Code copied to clipboard"
+msgstr "Codice copiato negli appunti"
+
+msgid "Complete set-up"
+msgstr "Completa la configurazione"
+
+msgid "Confirm sign-in"
+msgstr "Conferma l'accesso"
+
+msgid "Confirm this device"
+msgstr "Conferma questo dispositivo"
+
+msgid "Confirm your sign-in"
+msgstr "Conferma il tuo accesso"
+
+msgid "Confirmation code"
+msgstr "Codice di conferma"
+
+msgid "Confirming..."
+msgstr "Conferma in corso..."
+
+msgid "Connection closed"
+msgstr "Connessione interrotta"
+
+msgid "Continue"
+msgstr "Continua"
+
+msgid "Continue on another device"
+msgstr "Continua da un altro dispositivo"
+
+msgid "Continue on your new device"
+msgstr "Continua dal tuo nuovo dispositivo"
+
+msgid "Continue with {name}"
+msgstr "Continua con {name}"
+
+msgid "Continue with passkey"
+msgstr "Continua con passkey"
+
+msgid "Create account"
+msgstr "Crea account"
+
+msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
+msgstr "Crea un'identità con una passkey, usando la biometria o una chiave di sicurezza. I tuoi dati non lasciano mai il tuo dispositivo."
+
+msgid "Create identity"
+msgstr "Crea identità"
+
+msgid "Create new identity"
+msgstr "Crea nuova identità"
+
+msgid "Create passkey"
+msgstr "Crea passkey"
+
+msgid "Created {0}"
+msgstr "Creato il {0}"
+
+msgid "Created {date}"
+msgstr "Creato il {date}"
+
+msgid "Creating account..."
+msgstr "Creazione account in corso..."
+
+msgid "Creating identity..."
+msgstr "Creazione identità in corso..."
+
+msgid "Creating passkey..."
+msgstr "Creazione passkey in corso..."
+
+msgid "Currently signed in with this account"
+msgstr "Attualmente connesso con questo account"
+
+msgid "Currently signed in with this passkey"
+msgstr "Attualmente connesso con questa passkey"
+
+msgid "Dashlane has been confirmed to be incompatible."
+msgstr "È stato confermato che Dashlane non è compatibile."
+
+msgid "Default"
+msgstr "Predefinito"
+
+msgid "Discoverable passkeys"
+msgstr "Passkey rilevabili"
+
+msgid "Dismiss"
+msgstr "Chiudi"
+
+msgid "Do you want to continue?"
+msgstr "Vuoi continuare?"
+
+msgid "Easy access"
+msgstr "Accesso facile"
+
+msgid "Edit {name}"
+msgstr "Modifica {name}"
+
+msgid "Edit account"
+msgstr "Modifica account"
+
+msgid "Enable multiple accounts"
+msgstr "Abilita account multipli"
+
+msgid "Encountered an internal error while processing the request."
+msgstr "Si è verificato un errore interno durante l'elaborazione della richiesta."
+
+msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
+msgstr "Inserisci un nome per la tua identità per completare l'aggiornamento. Una volta impostato, non potrà essere modificato in seguito."
+
+msgid "Enter characters"
+msgstr "Inserisci i caratteri"
+
+msgid "Enter each word in the correct order:"
+msgstr "Inserisci ogni parola nell'ordine corretto:"
+
+msgid "Enter recovery phrase"
+msgstr "Inserisci la frase di recupero"
+
+msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
+msgstr "Tutto ciò che devi sapere su Internet Identity: il metodo privato, sicuro e facile per accedere alle app su Internet Computer."
+
+msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
+msgid "Experience"
+msgstr "Provalo"
+
+msgid "Export JSON"
+msgstr "Esporta JSON"
+
+msgid "FAQ & Support"
+msgstr "FAQ e Supporto"
+
+msgid "FAQs"
+msgstr "FAQ"
+
+msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
+msgstr "Ad esempio, l'utente A accede a Internet Identity con il proprio account Google \"A@gmail.com\", e poi usa Internet Identity per autenticarsi nell'applicazione Z. Google non saprà mai che l'utente è autenticato nell'applicazione Z, ma solo in Internet Identity. Inoltre, anche l'applicazione Z non saprà mai che l'utente A ha usato Google per autenticare il proprio utente Internet Identity."
+
+msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
+msgstr "Dimentica di dover ricordare nomi utente e password complicati. Con le passkey, ti basta scegliere il tuo nome per accedere: veloce, sicuro e senza problemi."
+
+msgid "Full control"
+msgstr "Controllo totale"
+
+msgid "Full Ownership"
+msgstr "Proprietà completa"
+
+msgid "Generating code..."
+msgstr "Generazione del codice..."
+
+msgid "Generating phrase..."
+msgstr "Generazione della frase..."
+
+msgid "Get started"
+msgstr "Inizia"
+
+msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
+msgstr "Assegna alla tua identità un nome chiaro, semplice e memorabile che riconoscerai facilmente."
+
+msgid "Give your passkey a memorable name to help you identify it."
+msgstr "Assegna alla tua passkey un nome memorabile per aiutarti a identificarla."
+
+msgid "Go to the app"
+msgstr "Vai all'app"
+
+msgid "Go to the app - (<0>{countdown}</0>)"
+msgstr "Vai all'app - (<0>{countdown}</0>)"
+
+msgid "Has not been used yet"
+msgstr "Non è stato ancora usato"
+
+msgid "Help & FAQ"
+msgstr "Aiuto e FAQ"
+
+msgid "Here is the identity that is linked to your recovery phrase. Continue to access it and add another access method if required."
+msgstr "Ecco l'identità collegata alla tua frase di recupero. Continua per accedervi e aggiungi un altro metodo di accesso se necessario."
+
+msgid "Hidden email"
+msgstr "Email nascosta"
+
+msgid "Hide all"
+msgstr "Nascondi tutto"
+
+msgid "Home"
+msgstr "Home"
+
+msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
+msgstr "Come funzionano le integrazioni di Google, Microsoft e Apple con Internet Identity?"
+
+msgid "How do passkeys work?"
+msgstr "Come funzionano le passkey?"
+
+msgid "How does Internet Identity compare to other Web3 authentication tools?"
+msgstr "Qual è la differenza tra Internet Identity e altri strumenti di autenticazione Web3?"
+
+msgid "How to stay secure"
+msgstr "Come restare al sicuro"
+
+msgid "I Acknowledge"
+msgstr "Prendo atto"
+
+msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
+msgstr "Sono responsabile della mia frase di recupero e, se smarrita, non può essere recuperata da Internet Identity."
+
+msgid "I have written it down"
+msgstr "L'ho scritta"
+
+msgid "Identity already upgraded"
+msgstr "Identità già aggiornata"
+
+msgid "Identity found"
+msgstr "Identità trovata"
+
+msgid "Identity list"
+msgstr "Elenco identità"
+
+msgid "Identity name"
+msgstr "Nome dell'identità"
+
+msgid "Identity not found"
+msgstr "Identità non trovata"
+
+msgid "Identity number"
+msgstr "Numero di identità"
+
+msgid "Identity upgraded!"
+msgstr "Identità aggiornata!"
+
+msgid "If you proceed, you will no longer be able to sign-in to your identity or dapps using your {name} account."
+msgstr "Se procedi, non potrai più accedere alla tua identità o alle app utilizzando il tuo account {name}."
+
+msgid "In use on another account."
+msgstr "In uso su un altro account."
+
+msgid "Incorrect recovery phrase. Please try again."
+msgstr "Frase di recupero errata. Riprova."
+
+msgid "Incorrect spelling"
+msgstr "Ortografia errata"
+
+msgid "Incorrect word order. Review and try again."
+msgstr "Ordine delle parole errato. Controlla e riprova."
+
+msgid "Incorrect. Try again with the new code."
+msgstr "Errato. Riprova con il nuovo codice."
+
+msgid "Interaction canceled. Please try again."
+msgstr "Interazione annullata. Riprova."
+
+msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
+msgstr "Internet Identity <0>non</0> memorizza i tuoi dati biometrici. Restano sul tuo dispositivo. La tua identità funge da gestore sicuro di passkey."
+
+msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
+msgstr "Internet Identity 2.0 introduce una serie di miglioramenti progettati per migliorare la tua esperienza:"
+
+msgid "Internet Identity is an authentication system for applications running on the <0>Internet Computer</0>. Instead of traditional usernames and passwords, it uses keys created via <1>passkeys</1> or other authentication systems like Google, Microsoft or Apple."
+msgstr "Internet Identity è un sistema di autenticazione per applicazioni in esecuzione su <0>Internet Computer</0>. Invece dei tradizionali nomi utente e password, utilizza chiavi create tramite <1>passkey</1> o altri sistemi di autenticazione come Google, Microsoft o Apple."
+
+msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
+msgstr "Internet Identity è sicura quanto i metodi di autenticazione che utilizza, come Google, Apple, Microsoft o le passkey. Ciò significa che è basata su una sicurezza all'avanguardia. Quando scegli le passkey, l'accesso è protetto dal metodo di sblocco del tuo dispositivo (Face ID o impronta digitale), rendendolo semplice come sbloccare il telefono."
+
+msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
+msgstr "Internet Identity viene utilizzata per accedere in modo sicuro e connettersi alle app con le passkey."
+
+msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
+msgstr "Internet Identity ti consente di accedere ad app e servizi in modo sicuro, senza creare password, condividere dati personali o perdere il controllo."
+
+msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can’t track you across services. All of this happens automatically in the background — you don't need to manage anything."
+msgstr "Internet Identity non condivide mai i tuoi dati personali, come la tua email, con app o siti web. Crea invece uno pseudonimo univoco per te in ogni app. Ogni app ne riceve uno diverso, in modo che non possano tracciarti tra i vari servizi. Tutto questo avviene automaticamente in background: non devi gestire nulla."
+
+msgid "Internet Identity number"
+msgstr "Numero Internet Identity"
+
+msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
+msgstr "Internet Identity collega poi l'autenticazione con questi fornitori a Internet Computer. Autenticandoti con uno di questi servizi, Internet Identity può garantire la tua identità e quindi creare un'altra autenticazione per le applicazioni in esecuzione su Internet Computer."
+
+msgid "Invalid code link"
+msgstr "Link del codice non valido"
+
+msgid "Invalid code. Please check and try again."
+msgstr "Codice non valido. Controlla e riprova."
+
+msgid "Invalid recovery phrase"
+msgstr "Frase di recupero non valida"
+
+msgid "Invalid request"
+msgstr "Richiesta non valida"
+
+msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
+msgstr "Il mio Face ID o la mia impronta digitale sono memorizzati in Internet Identity?"
+
+msgid "It can be used at any time to recover your identity."
+msgstr "Può essere utilizzata in qualsiasi momento per recuperare la tua identità."
+
+msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
+msgstr "Sembra che tu stia cercando di accedere da un'app social. Segui questi passaggi per continuare:"
+
+msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr "Sembra che tu stia cercando di accedere dall'interno di un'app (come X, Telegram o Instagram). Il browser integrato di questa app non è supportato."
+
+msgid "It seems like an invalid authentication request was received."
+msgstr "Sembra che sia stata ricevuta una richiesta di autenticazione non valida."
+
+msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
+msgstr "Sembra che non sia stato possibile stabilire la connessione con il servizio. Prova un browser diverso. Se il problema persiste, contatta l'assistenza."
+
+msgid "It seems like the connection with the service could not be re-established."
+msgstr "Sembra che non sia stato possibile ristabilire la connessione con il servizio."
+
+msgid "It seems like the request could not be processed."
+msgstr "Sembra che non sia stato possibile elaborare la richiesta."
+
+msgid "It won't be removed from your device or password manager."
+msgstr "Non verrà rimossa dal tuo dispositivo o dal gestore di password."
+
+msgid "Keep it secret"
+msgstr "Mantienila segreta"
+
+msgid "Keep linked"
+msgstr "Mantieni collegato"
+
+msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
+msgstr "Conservata su una chiave fisica. Autenticati sui dispositivi supportati tramite tocco/inserimento."
+
+msgid "Label it by use (e.g. 'Work' or 'Demo')."
+msgstr "Etichettala in base all'uso (ad es. 'Lavoro' o 'Demo')."
+
+msgid "Language"
+msgstr "Lingua"
+
+msgid "Last used"
+msgstr "Ultimo utilizzo"
+
+msgid "Learn how to open links in your browser"
+msgstr "Scopri come aprire i link nel tuo browser"
+
+msgid "Ledger has been confirmed to be incompatible."
+msgstr "È stato confermato che Ledger non è compatibile."
+
+msgid "Legacy"
+msgstr "Legacy"
+
+msgid "Let's get started"
+msgstr "Iniziamo"
+
+msgid "Limit reached"
+msgstr "Limite raggiunto"
+
+msgid "Link copied to clipboard"
+msgstr "Link copiato negli appunti"
+
+msgid "Locked legacy recovery phrase"
+msgstr "Frase di recupero legacy bloccata"
+
+msgid "Long-press the link that opened this page."
+msgstr "Premi a lungo sul link che ha aperto questa pagina."
+
+msgid "Lookup by passkey"
+msgstr "Cerca tramite passkey"
+
+msgid "Lookup identity"
+msgstr "Cerca identità"
+
+msgid "Lost access to your identity?"
+msgstr "Hai perso l'accesso alla tua identità?"
+
+msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
+msgstr "Rendi semplice la registrazione e l'accesso con Google, Apple o Microsoft. L'accesso che già conosci, con una privacy migliorata."
+
+msgid "Make sure no one can see what's on your screen or what you are writing."
+msgstr "Assicurati che nessuno possa vedere il tuo schermo o cosa stai scrivendo."
+
+msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
+msgstr "Assicurati di aggiungere un nuovo metodo di accesso per poter accedere la prossima volta o reimpostare la tua frase di recupero."
+
+msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
+msgstr "Gestisci le tue identità e mantieni il controllo delle tue app e dei tuoi siti web con la dashboard. Esplora le Funzioni Pro per personalizzare ulteriormente e rendere più sicura la tua esperienza."
+
+msgid "Manage your Internet Identity"
+msgstr "Gestisci la tua Internet Identity"
+
+msgid "Maximum length is 32 characters."
+msgstr "La lunghezza massima è di 32 caratteri."
+
+msgid "Maximum length is 64 characters."
+msgstr "La lunghezza massima è di 64 caratteri."
+
+msgid "More information about multiple accounts"
+msgstr "Ulteriori informazioni sugli account multipli"
+
+msgid "More options"
+msgstr "Altre opzioni"
+
+msgid "Multiple accounts"
+msgstr "Account multipli"
+
+msgid "My {application} account"
+msgstr "Il mio account {application}"
+
+msgid "My account"
+msgstr "Il mio account"
+
+msgid "My identity"
+msgstr "La mia identità"
+
+msgid "n/a"
+msgstr "n/d"
+
+msgid "Name account"
+msgstr "Nome account"
+
+msgid "Name your identity"
+msgstr "Dai un nome alla tua identità"
+
+msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
+msgstr "Nessun dato relativo alle applicazioni a cui accedi con Internet Identity viene condiviso con Google, Microsoft o Apple."
+
+msgid "No identity found"
+msgstr "Nessuna identità trovata"
+
+msgid "No passkey tests yet"
+msgstr "Nessun test delle passkey ancora"
+
+msgid "No recovery phrase"
+msgstr "Nessuna frase di recupero"
+
+msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
+msgstr "No. Il tuo Face ID o l'impronta digitale vengono utilizzati solo per creare o sbloccare la tua passkey. I tuoi dati biometrici non vengono mai condivisi con Internet Identity né con alcun sito web o app che utilizzi."
+
+msgid "NordPass has been confirmed to be incompatible."
+msgstr "È stato confermato che NordPass non è compatibile."
+
+msgid "Not upgraded"
+msgstr "Non aggiornata"
+
+msgid "Number of access methods"
+msgstr "Numero di metodi di accesso"
+
+msgid "One or more words are wrong or out of order."
+msgstr "Una o più parole sono errate o non in ordine."
+
+msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
+msgstr "Inserisci il codice da quel dispositivo solo se hai avviato <0>tu stesso</0> questo processo."
+
+msgid "Open in browser"
+msgstr "Apri nel browser"
+
+msgid "Open in browser to continue"
+msgstr "Apri nel browser per continuare"
+
+msgid "Open menu"
+msgstr "Apri menu"
+
+msgid "Pairing link"
+msgstr "Link di abbinamento"
+
+msgid "Passkey"
+msgstr "Passkey"
+
+msgid "Passkey ({0})"
+msgstr "Passkey ({0})"
+
+msgid "Passkey has been registered from another device."
+msgstr "La passkey è stata registrata da un altro dispositivo."
+
+msgid "Passkey name"
+msgstr "Nome passkey"
+
+msgid "Passkey testing"
+msgstr "Test passkey"
+
+msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
+msgstr "Le passkey sono un modo sicuro e semplice per accedere senza usare password. Sono archiviate nel tuo gestore di password (Gestore password di Google, iCloud, 1Password, ecc.) e possono essere protette dalla tua impronta digitale, dal volto, o dal codice del dispositivo."
+
+msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
+msgstr "Le passkey sono resistenti al phishing, difficili da rubare, e possono sincronizzarsi sui tuoi dispositivi tramite provider come Google, Apple o Microsoft. <0>Scopri di più.</0>"
+
+msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
+msgstr "Le passkey non sono disponibili su questo dispositivo o browser. Scegli un altro metodo di accesso per continuare."
+
+msgid "Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue."
+msgstr "Le passkey non sono disponibili su questo dispositivo o browser. Scegli un altro metodo di accesso per continuare."
+
+msgid "Passkeys not available here"
+msgstr "Passkey non disponibili qui"
+
+msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
+msgstr "Le passkey utilizzano chiavi crittografiche archiviate sul tuo dispositivo per accessi sicuri e senza password, con Face ID, Touch ID o una chiave di sicurezza. I tuoi dati non vengono mai condivisi."
+
+msgid "Password-free"
+msgstr "Senza password"
+
+msgid "Pick something recognizable, like your name"
+msgstr "Scegli qualcosa di riconoscibile, come il tuo nome"
+
+msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
+msgstr "Torna al tuo <0>dispositivo esistente</0> e scegli <1>Inizia da capo</1> per riprovare."
+
+msgid "Powered by"
+msgstr "Basato su"
+
+msgid "Real Privacy"
+msgstr "Vera Privacy"
+
+msgid "Recover"
+msgstr "Recupera"
+
+msgid "Recover your identity"
+msgstr "Recupera la tua identità"
+
+msgid "Recovery phrase"
+msgstr "Frase di recupero"
+
+msgid "Recovery phrase activated"
+msgstr "Frase di recupero attivata"
+
+msgid "Recovery phrase not activated"
+msgstr "Frase di recupero non attivata"
+
+msgid "Recovery phrase not verified"
+msgstr "Frase di recupero non verificata"
+
+msgid "Recovery phrase set"
+msgstr "Frase di recupero impostata"
+
+msgid "Redirecting to the app"
+msgstr "Reindirizzamento all'app"
+
+msgid "Remove"
+msgstr "Rimuovi"
+
+msgid "Remove passkey"
+msgstr "Rimuovi passkey"
+
+msgid "Removing passkey..."
+msgstr "Rimozione passkey in corso..."
+
+msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
+msgstr "La rimozione di questa passkey significa che non potrai più usarla per accedere. Puoi sempre aggiungerne una nuova in seguito."
+
+msgid "Rename"
+msgstr "Rinomina"
+
+msgid "Rename or make this your default sign-in"
+msgstr "Rinomina o imposta come accesso predefinito"
+
+msgid "Rename passkey"
+msgstr "Rinomina passkey"
+
+msgid "Rename this account"
+msgstr "Rinomina questo account"
+
+msgid "Replace it anytime"
+msgstr "Sostituiscila in qualsiasi momento"
+
+msgid "Requires unlocking before it can be reset."
+msgstr "Richiede lo sblocco prima che possa essere reimpostata."
+
+msgid "Reset"
+msgstr "Reimposta"
+
+msgid "Reset your recovery phrase?"
+msgstr "Reimpostare la tua frase di recupero?"
+
+msgid "Resetting recovery phrase..."
+msgstr "Reimpostazione frase di recupero in corso..."
+
+msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
+msgstr "La reimpostazione invaliderà la tua frase di recupero corrente, lasciando utilizzabile solo quella nuova."
+
+msgid "Retry"
+msgstr "Riprova"
+
+msgid "Return to app"
+msgstr "Torna all'app"
+
+msgid "Return to application"
+msgstr "Torna all'applicazione"
+
+msgid "Right now"
+msgstr "Adesso"
+
+msgid "Run a passkey test to see results"
+msgstr "Esegui un test passkey per vedere i risultati"
+
+msgid "Save changes"
+msgstr "Salva modifiche"
+
+msgid "Save your recovery phrase"
+msgstr "Salva la tua frase di recupero"
+
+msgid "Saving changes..."
+msgstr "Salvataggio modifiche in corso..."
+
+msgid "Scan the above QR code with your <0>new device</0> or enter the URL manually."
+msgstr "Scansiona il codice QR sopra con il tuo <0>nuovo dispositivo</0> o inserisci l'URL manualmente."
+
+msgid "Seamless Access"
+msgstr "Accesso senza interruzioni"
+
+msgid "See how many access methods are within your identity and manage your recovery phrase."
+msgstr "Vedi quanti metodi di accesso sono presenti nella tua identità e gestisci la tua frase di recupero."
+
+msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
+msgstr "Seleziona <0>Apri in Safari</0> o <1>Apri in Chrome</1>."
+
+msgid "Select each word in the correct order:"
+msgstr "Seleziona ogni parola nell'ordine corretto:"
+
+msgid "Set as default sign-in"
+msgstr "Imposta come accesso predefinito"
+
+msgid "Show all"
+msgstr "Mostra tutto"
+
+msgid "Sign in"
+msgstr "Accedi"
+
+msgid "Sign in there."
+msgstr "Accedi lì."
+
+msgid "Sign in using familiar methods"
+msgstr "Accedi utilizzando metodi familiari"
+
+msgid "Sign in with another identity"
+msgstr "Accedi con un'altra identità"
+
+msgid "Sign in with your {name} account from any device."
+msgstr "Accedi con il tuo account {name} da qualsiasi dispositivo."
+
+msgid "Sign out"
+msgstr "Esci"
+
+msgid "Signing in securely"
+msgstr "Accesso sicuro in corso"
+
+msgid "Simplify your sign-in"
+msgstr "Semplifica il tuo accesso"
+
+msgctxt "The user entered an incorrect value during a verification step"
+msgid "Something is wrong!"
+msgstr "Qualcosa non è corretto!"
+
+msgctxt "Fallback error message when an unexpected error is caught"
+msgid "Something went wrong"
+msgstr "Qualcosa è andato storto"
+
+msgid "Source code"
+msgstr "Codice sorgente"
+
+msgid "Start over"
+msgstr "Inizia da capo"
+
+msgid "Still have an identity number?"
+msgstr "Hai ancora un numero di identità?"
+
+msgid "Still using an identity number?"
+msgstr "Stai ancora usando un numero di identità?"
+
+msgid "Store it safely"
+msgstr "Conservalo in modo sicuro"
+
+msgid "Stored and usable only in {0} on the {1} device it was created on."
+msgstr "Archiviato e utilizzabile solo in {0} sul dispositivo {1} su cui è stato creato."
+
+msgid "Stored and usable only in {0} on the device it was created on."
+msgstr "Archiviato e utilizzabile solo in {0} sul dispositivo su cui è stato creato."
+
+msgid "Stored and usable only on the {0} device it was created on."
+msgstr "Archiviato e utilizzabile solo sul dispositivo {0} su cui è stato creato."
+
+msgid "Stored in your {0} account and synced across your {1} devices."
+msgstr "Archiviato nel tuo account {0} e sincronizzato sui tuoi dispositivi {1}."
+
+msgid "Stored in your {0} account and synced across your devices."
+msgstr "Archiviato nel tuo account {0} e sincronizzato sui tuoi dispositivi."
+
+msgid "Stored securely on your device, in your password manager, or on a security key."
+msgstr "Archiviato in modo sicuro sul tuo dispositivo, nel tuo gestore di password, o su una chiave di sicurezza."
+
+msgid "Submit"
+msgstr "Invia"
+
+msgid "Successfully restored access to your identity"
+msgstr "Accesso alla tua identità ripristinato correttamente"
+
+msgid "Support"
+msgstr "Supporto"
+
+msgid "Supported"
+msgstr "Supportato"
+
+msgid "Switch identity"
+msgstr "Cambia identità"
+
+msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
+msgstr "Tocca la <0>barra degli indirizzi</0> e <1>apri nel browser</1>."
+
+msgid "Tap on the highlighted <0>back</0> button."
+msgstr "Tocca il pulsante <0>indietro</0> evidenziato."
+
+msgid "Test passkey support"
+msgstr "Testa il supporto passkey"
+
+msgid "Test passkey support and view authenticator details"
+msgstr "Testa il supporto passkey e visualizza i dettagli dell'autenticatore"
+
+msgid "The <0>existing device</0> is preparing to continue."
+msgstr "Il <0>dispositivo esistente</0> si sta preparando per continuare."
+
+msgid "The <0>new device</0> is preparing to continue."
+msgstr "Il <0>nuovo dispositivo</0> si sta preparando per continuare."
+
+msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
+msgstr "L'integrazione con Google, Microsoft e Apple utilizza un protocollo di autenticazione standard chiamato OpenID. È lo stesso protocollo che molte altre applicazioni usano per accedere con Google."
+
+msgid "The passkey could not be identified, support unknown."
+msgstr "La passkey non è stata identificata, supporto sconosciuto."
+
+msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
+msgstr "La frase è stata inserita correttamente ma appartiene a un prodotto diverso da Internet Identity."
+
+msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
+msgstr "Si è verificato un problema durante la connessione all'applicazione. Prova un browser diverso; se il problema persiste, contatta lo sviluppatore."
+
+msgid "This app has moved to the new Internet Identity"
+msgstr "Questa app è stata spostata nella nuova Internet Identity"
+
+msgid "This identity has already been upgraded to the new experience."
+msgstr "Questa identità è già stata aggiornata alla nuova esperienza."
+
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr "Questa passkey legacy non è più utilizzabile e dovrebbe essere rimossa."
+
+msgid "This may take a few seconds"
+msgstr "Potrebbero volerci alcuni secondi"
+
+msgid "This passkey is no longer associated with any identity."
+msgstr "Questa passkey non è più associata ad alcuna identità."
+
+msgid "This YubiKey has older firmware (5.1) that's incompatible."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.1) che è incompatibile."
+
+msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.2 - 5.4) che potrebbe essere incompatibile."
+
+msgid "This YubiKey has older firmware (5.2) that might be incompatible."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.2) che potrebbe essere incompatibile."
+
+msgid "This YubiKey has older firmware (5.4) that might be incompatible."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.4) che potrebbe essere incompatibile."
+
+msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.5 - 5.6) che potrebbe essere incompatibile."
+
+msgid "This YubiKey has older firmware (5.6) that might be incompatible."
+msgstr "Questa YubiKey utilizza un firmware precedente (5.6) che potrebbe essere incompatibile."
+
+msgid "To confirm it's you, enter below code on your <0>existing device</0>."
+msgstr "Per confermare che sei tu, inserisci il codice sottostante sul tuo <0>dispositivo esistente</0>."
+
+msgid "to continue with <0>{application}</0>"
+msgstr "per continuare con <0>{application}</0>"
+
+msgid "to continue with this app"
+msgstr "per continuare con questa app"
+
+msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
+msgstr "Per continuare, crea una passkey per proteggere la tua identità e semplificare gli accessi futuri."
+
+msgid "To continue:"
+msgstr "Per continuare:"
+
+msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
+msgstr "Per terminare la configurazione della tua passkey, segui le istruzioni mostrate sul tuo <0>nuovo dispositivo</0>."
+
+msgid "Type each word in the correct order:"
+msgstr "Digita ogni parola nell'ordine corretto:"
+
+msgid "Type the characters exactly as shown below"
+msgstr "Digita i caratteri esattamente come mostrato di seguito"
+
+msgid "Unable to complete setup"
+msgstr "Impossibile completare l'impostazione"
+
+msgid "Unable to connect"
+msgstr "Impossibile connettersi"
+
+msgid "Understanding Internet Identity"
+msgstr "Capire Internet Identity"
+
+msgid "Unexpected error"
+msgstr "Errore imprevisto"
+
+msgid "Unknown"
+msgstr "Sconosciuto"
+
+msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
+msgstr "A differenza di molti sistemi di autenticazione Web3 che richiedono la firma manuale per ogni azione, Internet Identity crea sessioni autenticate per ogni applicazione. Ciò offre sia sicurezza che comodità, nessuna firma ripetuta, pur dando a ogni sessione la propria identità."
+
+msgid "Unlink"
+msgstr "Dissocia"
+
+msgid "Unlink {name} account"
+msgstr "Dissocia l'account {name}"
+
+msgid "Unlinking {name} account..."
+msgstr "Dissociazione dell'account {name}..."
+
+msgid "Unlock and reset"
+msgstr "Sblocca e reimposta"
+
+msgid "Unlock to continue"
+msgstr "Sblocca per continuare"
+
+msgid "Unsupported"
+msgstr "Non supportato"
+
+msgid "Unsupported Browser"
+msgstr "Browser non supportato"
+
+msgid "Unverified origin"
+msgstr "Origine non verificata"
+
+msgid "Upgrade"
+msgstr "Aggiorna"
+
+msgid "Upgrade again"
+msgstr "Aggiorna di nuovo"
+
+msgid "Upgrade completed successfully"
+msgstr "Aggiornamento completato con successo"
+
+msgid "Upgrade identity"
+msgstr "Aggiorna identità"
+
+msgid "Upgrade your existing identity to the new experience in a two steps."
+msgstr "Aggiorna la tua identità esistente alla nuova esperienza in due passaggi."
+
+msgid "Upgrade your identity"
+msgstr "Aggiorna la tua identità"
+
+msgid "Upgrading identity..."
+msgstr "Aggiornamento identità..."
+
+msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
+msgstr "Usa un dispositivo che possiede già la tua identità per scansionare o aprire l'URL. Questo collegherà la tua identità a questo dispositivo."
+
+msgid "Use existing identity"
+msgstr "Usa identità esistente"
+
+msgid "Verify"
+msgstr "Verifica"
+
+msgid "Verify recovery to remove"
+msgstr "Verifica recupero per rimuovere"
+
+msgid "Verify you are human"
+msgstr "Verifica di essere umano"
+
+msgid "Verify your recovery phrase"
+msgstr "Verifica la tua frase di recupero"
+
+msgid "Verifying..."
+msgstr "Verifica in corso..."
+
+msgid "View your last used identities"
+msgstr "Visualizza le tue ultime identità utilizzate"
+
+msgid "Waiting for your existing device"
+msgstr "In attesa del tuo dispositivo esistente"
+
+msgid "Waiting for your new device"
+msgstr "In attesa del tuo nuovo dispositivo"
+
+msgid "Warning"
+msgstr "Attenzione"
+
+msgid "We didn't recognize that activation code."
+msgstr "Non abbiamo riconosciuto il codice di attivazione."
+
+msgid "Welcome, {name}!"
+msgstr "Benvenuto, {name}!"
+
+msgid "What are passkeys?"
+msgstr "Cosa sono le passkey?"
+
+msgid "What is Internet Identity?"
+msgstr "Cos'è Internet Identity?"
+
+msgid "What makes Internet Identity privacy-preserving?"
+msgstr "Cosa rende Internet Identity rispettosa della privacy?"
+
+msgid "What makes Internet Identity secure & easy to use?"
+msgstr "Cosa rende Internet Identity sicura e facile da usare?"
+
+msgid "What's new in Internet Identity 2.0?"
+msgstr "Novità in Internet Identity 2.0?"
+
+msgid "What's your name?"
+msgstr "Qual è il tuo nome?"
+
+msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
+msgstr "Quando crei una passkey, il tuo dispositivo crea due chiavi corrispondenti. Una rimane al sicuro sul tuo dispositivo, e l'altra va all'app o al servizio. Lavorano insieme per confermare che sei tu, senza mai condividere le tue informazioni personali o una password."
+
+msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it’s really you."
+msgstr "Con le passkey, puoi ora usare la tua impronta digitale, il volto o il blocco schermo per confermare rapidamente e in modo sicuro che sei davvero tu."
+
+msgid "with your Internet Identity"
+msgstr "con la tua Internet Identity"
+
+msgid "Word {position}"
+msgstr "Parola {position}"
+
+msgid "Write down all 24 words correctly and keep them offline. Do not store them in the cloud or on devices."
+msgstr "Scrivi correttamente tutte le 24 parole e conservale offline. Non conservarle nel cloud o sui dispositivi."
+
+msgid "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
+msgstr "Scrivi la tua frase di recupero in ordine e verificala in seguito. Conservala in modo sicuro e non condividerla. Perderla significa perdere l'accesso."
+
+msgid "Wrong domain was set. Please try again."
+msgstr "Il dominio impostato non è corretto. Per favore riprova."
+
+msgid "You <0>cannot</0> rename this once it is set."
+msgstr "Non <0>puoi</0> rinominare questo una volta impostato."
+
+msgid "You already have a {name} account linked"
+msgstr "Hai già un account {name} collegato"
+
+msgid "You are upgrading ID <0>{identityNumber}</0>"
+msgstr "Stai aggiornando l'ID <0>{identityNumber}</0>"
+
+msgid "You can continue with <0>Use existing Passkey</0> in the login process."
+msgstr "Puoi continuare con <0>Usa Passkey esistente</0> nel processo di accesso."
+
+msgid "You can recover your identity now, verify you saved it correctly."
+msgstr "Puoi recuperare la tua identità ora, verifica di averla salvata correttamente."
+
+msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
+msgstr "Puoi reimpostare la tua frase di recupero in qualsiasi momento. Questo mantiene la tua identità sicura se dovesse mai essere compromessa."
+
+msgid "You have reached the maximum number of passkeys"
+msgstr "Hai raggiunto il numero massimo di passkey"
+
+msgid "You may close this page."
+msgstr "Puoi chiudere questa pagina."
+
+msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
+msgstr "Non devi più ricordare il tuo numero di identità e puoi usare invece la tua impronta digitale, il volto o il blocco schermo."
+
+msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
+msgstr "Stai per visualizzare la tua frase di recupero, che Internet Identity non memorizza e quindi non può essere recuperata se persa, quindi conservala in modo sicuro offline."
+
+msgid "You're about to sign in on a <0>new device</0>."
+msgstr "Stai per accedere su un <0>nuovo dispositivo</0>."
+
+msgid "You're about to sign in."
+msgstr "Stai per accedere."
+
+msgid "You're about to unlink your {name} account."
+msgstr "Stai per dissociare il tuo account {name}."
+
+msgid "You're all set. Your identity has been created."
+msgstr "Hai finito. La tua identità è stata creata."
+
+msgid "You're all set. Your passkey has been registered."
+msgstr "Hai finito. La tua passkey è stata registrata."
+
+msgid "You're signing in as <0>{name}</0>."
+msgstr "Stai accedendo come <0>{name}</0>."
+
+msgid "Your identity and sign-in methods at a glance."
+msgstr "La tua identità e i metodi di accesso a colpo d'occhio."
+
+msgid "Your identity name is currently not editable. It is only ever visible to you."
+msgstr "Il nome della tua identità non è attualmente modificabile. È visibile solo a te."
+
+msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
+msgstr "La tua frase di recupero ti dà il controllo completo sulla tua identità. Non condividerla mai, e usala solo sul sito ufficiale."
+
+msgid "Your recovery phrase is active, verify you saved it correctly."
+msgstr "La tua frase di recupero è attiva, verifica di averla salvata correttamente."
+
+msgid "Your recovery phrase is now active and can be reset anytime."
+msgstr "La tua frase di recupero è ora attiva e può essere reimpostata in qualsiasi momento."

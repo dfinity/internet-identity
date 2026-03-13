@@ -137,7 +137,7 @@ msgid "CAPTCHA characters"
 msgstr "CAPTCHA حروف"
 
 msgid "Characters are case-sensitive"
-msgstr "حروف بڑے اور چھوٹے (case-sensitive) ہوتے ہیں"
+msgstr "حروف میں بڑے اور چھوٹے کا فرق اہم ہے"
 
 msgid "Check out the other domains:"
 msgstr "دیگر ڈومینز دیکھیں:"
@@ -215,7 +215,7 @@ msgid "Create account"
 msgstr "اکاؤنٹ بنائیں"
 
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
-msgstr "بایومیٹرکس یا سیکیورٹی کی کا استعمال کرتے ہوئے پاس کی کے ساتھ ایک شناخت بنائیں۔ آپ کا ڈیٹا کبھی بھی آپ کے آلے سے باہر نہیں جاتا۔"
+msgstr "بایومیٹرکس یا سیکیورٹی کلید استعمال کرتے ہوئے پاس کی کے ساتھ اپنی شناخت بنائیں۔ آپ کا ڈیٹا کبھی بھی آپ کے آلے سے باہر نہیں جاتا۔"
 
 msgid "Create identity"
 msgstr "شناخت بنائیں"
@@ -254,7 +254,7 @@ msgid "Default"
 msgstr "ڈیفالٹ"
 
 msgid "Discoverable passkeys"
-msgstr "دریافت پذیر پاس کیز"
+msgstr "قابل دریافت پاس کیز"
 
 msgid "Dismiss"
 msgstr "رد کریں"
@@ -447,16 +447,16 @@ msgid "Internet Identity then bridges the authentication with those providers wi
 msgstr "اس کے بعد Internet Identity ان فراہم کنندگان کی تصدیق کو Internet Computer کے ساتھ جوڑتی ہے۔ ان سروسز میں سے کسی ایک کے ذریعے تصدیق کر کے، Internet Identity اس بات کی توثیق کر سکتی ہے کہ آپ واقعی وہی ہیں، اور پھر Internet Computer پر چلنے والی ایپلیکیشنز کے لیے ایک الگ تصدیق تخلیق کرتی ہے۔"
 
 msgid "Invalid code link"
-msgstr "ناجائز کوڈ لنک"
+msgstr "غیر معتبر کوڈ لنک"
 
 msgid "Invalid code. Please check and try again."
-msgstr "ناجائز کوڈ۔ براہ کرم چیک کریں اور دوبارہ کوشش کریں۔"
+msgstr "غلط کوڈ۔ براہ کرم چیک کریں اور دوبارہ کوشش کریں۔"
 
 msgid "Invalid recovery phrase"
-msgstr "ناجائز ریکوری فریز"
+msgstr "غیر معتبر ریکوری فریز"
 
 msgid "Invalid request"
-msgstr "ناجائز درخواست"
+msgstr "غیر معتبر درخواست"
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "کیا میرا Face ID یا فنگر پرنٹ Internet Identity میں محفوظ ہوتا ہے؟"
@@ -471,7 +471,7 @@ msgid "It looks like you're trying to sign in from inside an app (such as X, Tel
 msgstr "ایسا لگتا ہے کہ آپ کسی ایپ (جیسے X، Telegram، یا Instagram) کے اندر سے سائن اِن کرنے کی کوشش کر رہے ہیں۔ اس ایپ کا بلٹ ان براؤزر معاون نہیں ہے۔"
 
 msgid "It seems like an invalid authentication request was received."
-msgstr "ایسا لگتا ہے کہ ایک ناجائز تصدیقی درخواست موصول ہوئی ہے۔"
+msgstr "ایسا لگتا ہے کہ ایک غیر معتبر تصدیقی درخواست موصول ہوئی ہے۔"
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "ایسا لگتا ہے کہ سروس کے ساتھ رابطہ قائم نہیں ہو سکا۔ دوسرا براؤزر آزمائیں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
@@ -492,7 +492,7 @@ msgid "Keep linked"
 msgstr "منسلک رکھیں"
 
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
-msgstr "فزیکل کی (physical key) پر رکھا گیا ہے۔ معاون آلات پر ٹیپ یا داخل کر کے تصدیق کریں۔"
+msgstr "فزیکل کلید پر محفوظ ہے۔ معاون آلات پر ٹیپ یا داخل کر کے تصدیق کریں۔"
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "اسے استعمال کے مطابق لیبل کریں (مثلاً 'کام' یا 'ڈیمو')۔"
@@ -510,7 +510,7 @@ msgid "Ledger has been confirmed to be incompatible."
 msgstr "Ledger کے غیر ہم آہنگ ہونے کی تصدیق ہو گئی ہے۔"
 
 msgid "Legacy"
-msgstr "پرانا (Legacy)"
+msgstr "پرانا"
 
 msgid "Let's get started"
 msgstr "آئیے شروع کرتے ہیں"
@@ -654,7 +654,7 @@ msgid "Passkeys are unavailable on this device or browser. Please choose another
 msgstr "اس آلے یا براؤزر پر پاس کیز دستیاب نہیں ہیں۔ براہ کرم جاری رکھنے کے لیے سائن اِن کا کوئی دوسرا طریقہ منتخب کریں۔"
 
 msgid "Passkeys not available here"
-msgstr "پاس کیز یہاں دستیاب نہیں ہیں"
+msgstr "پاس کیز اس آلے پر دستیاب نہیں ہیں"
 
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
 msgstr "پاس کیز آپ کے آلے پر محفوظ کرپٹوگرافک کلیدیں استعمال کرتی ہیں تاکہ Face ID، Touch ID، یا سیکیورٹی کی کے ذریعے محفوظ اور پاس ورڈ کے بغیر سائن اِن کیا جا سکے۔ آپ کا ڈیٹا کبھی بھی شیئر نہیں کیا جاتا۔"
@@ -669,7 +669,7 @@ msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1
 msgstr "براہِ کرم اپنے <0>موجودہ ڈیوائس</0> پر واپس جائیں اور دوبارہ کوشش کرنے کے لیے <1>دوبارہ شروع کریں</1> منتخب کریں۔"
 
 msgid "Powered by"
-msgstr "زیر اہتمام"
+msgstr "بذریعہ"
 
 msgid "Real Privacy"
 msgstr "حقیقی رازداری"
@@ -809,9 +809,11 @@ msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "کچھ غلط ہے!"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
 msgstr "کچھ غلط ہو گیا"
 
@@ -840,10 +842,10 @@ msgid "Stored and usable only on the {0} device it was created on."
 msgstr "صرف اس {0} آلے پر محفوظ اور قابل استعمال ہے جس پر یہ بنایا گیا تھا۔"
 
 msgid "Stored in your {0} account and synced across your {1} devices."
-msgstr "آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے {1} آلات پر ہم آہنگ (synced) ہے۔"
+msgstr "آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے {1} آلات پر ہم آہنگ ہے۔"
 
 msgid "Stored in your {0} account and synced across your devices."
-msgstr "آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے آلات پر ہم آہنگ (synced) ہے۔"
+msgstr "آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے آلات پر ہم آہنگ ہے۔"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "آپ کے آلے، پاس ورڈ مینیجر، یا سیکیورٹی کی پر محفوظ طریقے سے سٹور کیا گیا ہے۔"
@@ -900,7 +902,7 @@ msgid "This identity has already been upgraded to the new experience."
 msgstr "یہ شناخت پہلے ہی نئے تجربے پر اپ گریڈ ہو چکی ہے۔"
 
 msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "یہ پرانی (legacy) پاس کی اب قابل استعمال نہیں ہے اور اسے ہٹا دینا چاہیے۔"
+msgstr "یہ پرانی پاس کی اب قابلِ استعمال نہیں ہے اور اسے ہٹا دینا چاہیے۔"
 
 msgid "This may take a few seconds"
 msgstr "اس میں کچھ سیکنڈ لگ سکتے ہیں"

@@ -809,11 +809,13 @@ msgstr "Masuk dengan aman"
 msgid "Simplify your sign-in"
 msgstr "Sederhanakan proses masuk Anda"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "Ada yang salah!"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
-msgstr "Terjadi kesalahan"
+msgstr "Sesuatu yang salah"
 
 msgid "Source code"
 msgstr "Kode sumber"
