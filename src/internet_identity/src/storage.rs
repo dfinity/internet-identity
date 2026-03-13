@@ -864,7 +864,7 @@ impl<M: Memory + Clone> Storage<M> {
             };
 
             self.lookup_anchor_with_passkey_pubkey_hash_memory
-                .insert(principal.clone(), anchor_number);
+                .insert(*principal, anchor_number);
         }
     }
 
