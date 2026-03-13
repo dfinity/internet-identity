@@ -271,9 +271,9 @@ mod sync_anchor_indices_tests {
         );
 
         // Check that passkey pubkey principals are indexed for anchors 2 and 3
-        let passkey_principal_2 = Principal::self_authenticating(&pubkey(2));
-        let passkey_principal_4 = Principal::self_authenticating(&pubkey(4));
-        let passkey_principal_1 = Principal::self_authenticating(&pubkey(1));
+        let passkey_principal_2 = Principal::self_authenticating(pubkey(2));
+        let passkey_principal_4 = Principal::self_authenticating(pubkey(4));
+        let passkey_principal_1 = Principal::self_authenticating(pubkey(1));
 
         assert_eq!(
             storage
@@ -360,8 +360,8 @@ mod sync_anchor_indices_tests {
         );
 
         // Check passkey pubkey principal index: anchors 1 and 2 are in the first batch
-        let passkey_principal_2 = Principal::self_authenticating(&pubkey(2));
-        let passkey_principal_4 = Principal::self_authenticating(&pubkey(4));
+        let passkey_principal_2 = Principal::self_authenticating(pubkey(2));
+        let passkey_principal_4 = Principal::self_authenticating(pubkey(4));
 
         assert_eq!(
             storage
@@ -439,8 +439,8 @@ mod sync_anchor_indices_tests {
         // At this point, `stable_anchor_memory` has StorableAnchor entries for both anchors
         // AND the indices are populated (because `write()` synced them).
         // Verify the indices are populated as a sanity check.
-        let passkey_principal_10 = Principal::self_authenticating(&pubkey(10));
-        let passkey_principal_20 = Principal::self_authenticating(&pubkey(20));
+        let passkey_principal_10 = Principal::self_authenticating(pubkey(10));
+        let passkey_principal_20 = Principal::self_authenticating(pubkey(20));
         assert_eq!(
             storage
                 .lookup_anchor_with_passkey_pubkey_hash_memory
