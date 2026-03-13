@@ -30,8 +30,6 @@ For more information, see [What is Internet Identity?](https://internetcomputer.
   - [Architecture Overview](#architecture-overview)
   - [Building with Docker](#building-with-docker)
   - [Integration with Internet Identity](#integration-with-internet-identity)
-- [Build Features](#build-features-and-flavors)
-  - [Features](#features)
 - [Stable Memory Compatibility](#stable-memory-compatibility)
 - [Getting Help](#getting-help)
 - [Links](#links)
@@ -101,9 +99,7 @@ $ ./scripts/docker-build
 
 The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Identity. Building the `Dockerfile` will result in a scratch container that contains the Wasm module at `/internet_identity.wasm.gz`.
 
-> 💡 The build can be customized with [build features](#build-features-and-flavors).
-
-We recommend using the [`docker-build`](./scripts/docker-build) script. It simplifies the usage of [build features](#build-features-and-flavors) and extracts the Wasm module from the final scratch container.
+We recommend using the [`docker-build`](./scripts/docker-build) script. It extracts the Wasm module from the final scratch container.
 
 > 💡 You can find instructions for building the code without Docker in the [HACKING] document.
 
