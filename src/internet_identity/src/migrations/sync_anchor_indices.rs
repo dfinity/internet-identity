@@ -454,14 +454,11 @@ mod sync_anchor_indices_tests {
             Some(2)
         );
 
-        // Now clear ONLY the indices (not stable_anchor_memory) to simulate the real
-        // production scenario: StorableAnchors already exist, but the passkey pubkey hash
-        // index was introduced later and is empty.
+        // Now clear ONLY the passkey pubkey hash index (not stable_anchor_memory) to
+        // simulate the real production scenario: StorableAnchors already exist, but the
+        // passkey pubkey hash index was introduced later and is empty.
         storage
             .lookup_anchor_with_passkey_pubkey_hash_memory
-            .clear_new();
-        storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
             .clear_new();
 
         // Confirm indices are now empty.
@@ -497,15 +494,6 @@ mod sync_anchor_indices_tests {
                 .get(&passkey_principal_20),
             Some(2),
             "passkey pubkey principal index should be populated for anchor 2 even though StorableAnchor already existed"
-        );
-
-        let principal_30 = Principal::self_authenticating(pubkey(30));
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_30),
-            Some(2),
-            "recovery phrase principal index should be populated for anchor 2 even though StorableAnchor already existed"
         );
 
         assert_migration_completed(vec![]);
