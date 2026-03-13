@@ -53,7 +53,7 @@ export const authorizationStore: AuthorizationStore = {
     internalStore.set({
       authRequest: {
         kind: "authorize-client",
-        sessionPublicKey: params.publicKey.toDer(),
+        sessionPublicKey: new Uint8Array(params.publicKey.toDer()),
         maxTimeToLive: params.maxTimeToLive,
         derivationOrigin: params.icrc95DerivationOrigin,
       },

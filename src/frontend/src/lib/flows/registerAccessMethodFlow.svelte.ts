@@ -10,6 +10,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { nanosToMillis } from "$lib/utils/time";
+import { SvelteDate, SvelteURL } from "svelte/reactivity";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
 
@@ -42,14 +43,14 @@ export class RegisterAccessMethodFlow {
   waitForExistingDevice = async (existingRegistrationId?: string) => {
     const registrationId = existingRegistrationId ?? secureRandomId(5);
     if (existingRegistrationId === undefined) {
-      this.#existingDeviceLink = new URL(
+      this.#existingDeviceLink = new SvelteURL(
         `/activate#${registrationId}`,
         window.location.origin,
       );
     }
     this.#view = "continueFromExistingDevice";
 
-    const expiration = new Date(Date.now() + 300000).getTime(); // 5 min
+    const expiration = new SvelteDate(Date.now() + 300000).getTime(); // 5 min
     while (Date.now() < expiration) {
       const identityNumber = (
         await anonymousActor.lookup_by_registration_mode_id(registrationId)

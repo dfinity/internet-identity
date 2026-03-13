@@ -49,7 +49,7 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
     return this.#identity.getPublicKey();
   }
 
-  getCredentialId(): ArrayBuffer | undefined {
+  getCredentialId(): Uint8Array | undefined {
     return this.#credentialId;
   }
 

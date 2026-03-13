@@ -22,7 +22,7 @@ import { getPrimaryOrigin } from "$lib/globals";
 export function authDataToCose(authData: Uint8Array): Uint8Array {
   const view = new DataView(authData.buffer);
   const coseKey = authData.slice(55 + view.getUint16(53, false));
-  const decoded = borc.decodeFirst(coseKey);
+  const decoded = borc.decodeFirst(bufFromBufLike(coseKey));
   const cleaned = new Map();
   for (const [key, value] of decoded.entries()) {
     if (typeof key === "number") {
@@ -34,7 +34,7 @@ export function authDataToCose(authData: Uint8Array): Uint8Array {
 }
 
 function coseToDerEncodedBlob(cose: Uint8Array): DerEncodedPublicKey {
-  return wrapDER(cose, DER_COSE_OID).buffer as DerEncodedPublicKey;
+  return wrapDER(cose, DER_COSE_OID) as DerEncodedPublicKey;
 }
 
 function coseFromDerEncodedBlob(derEncoded: DerEncodedPublicKey): Uint8Array {
@@ -125,9 +125,7 @@ const publicKeyFromResult = (
   }
 
   // Parse the attestationObject as CBOR.
-  const attObject = borc.decodeFirst(
-    new Uint8Array(result.response.attestationObject),
-  );
+  const attObject = borc.decodeFirst(result.response.attestationObject);
   return Promise.resolve(
     new CosePublicKey(authDataToCose(new Uint8Array(attObject.authData))),
   );
@@ -145,7 +143,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
   #credentialCreationOptions?: CredentialCreationOptionsWithoutChallenge;
   #credentialRequestOptions?: CredentialRequestOptionsWithoutChallenge;
   #authenticatorAttachment?: AuthenticatorAttachment;
-  #credentialId?: ArrayBuffer;
+  #credentialId?: Uint8Array;
   #aaguid?: Uint8Array;
   #publicKey?: CosePublicKey;
 
@@ -202,7 +200,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     return this.#publicKey;
   }
 
-  getCredentialId(): ArrayBuffer | undefined {
+  getCredentialId(): Uint8Array | undefined {
     return this.#credentialId;
   }
 
@@ -224,7 +222,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
           ...this.#credentialCreationOptions,
           publicKey: {
             ...this.#credentialCreationOptions.publicKey,
-            challenge: blob,
+            challenge: new Uint8Array(blob),
           },
         })
       : this.#credentialRequestOptions !== undefined
@@ -232,7 +230,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
             ...this.#credentialRequestOptions,
             publicKey: {
               ...this.#credentialRequestOptions.publicKey,
-              challenge: blob,
+              challenge: new Uint8Array(blob),
             },
           })
         : Promise.reject(new Error("Missing credential options")));
@@ -246,7 +244,7 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     if (result.authenticatorAttachment !== null) {
       this.#authenticatorAttachment = result.authenticatorAttachment;
     }
-    this.#credentialId = result.rawId;
+    this.#credentialId = new Uint8Array(result.rawId);
     if (!this.#publicKey) {
       this.#publicKey = await this.#getPublicKey(result);
     }
@@ -264,12 +262,10 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     }
     if (result.response.attestationObject !== undefined) {
       // Parse the attestationObject as CBOR.
-      const attObject = borc.decodeFirst(
-        new Uint8Array(result.response.attestationObject),
-      );
+      const attObject = borc.decodeFirst(result.response.attestationObject);
       this.#aaguid = extractAAGUID(attObject.authData);
     }
-    return cbor.buffer as Signature;
+    return cbor as Signature;
   }
 }
 
@@ -334,7 +330,10 @@ export const requestOptions = (
     // Either use the specified credential ids or let the user pick a passkey
     allowCredentials:
       credentialIds !== undefined && credentialIds.length > 0
-        ? credentialIds.map((id) => ({ id, type: "public-key" as const }))
+        ? credentialIds.map((id) => ({
+            id: new Uint8Array(id),
+            type: "public-key" as const,
+          }))
         : undefined,
     // Require passkeys to verify the user e.g. TouchID
     userVerification: "required",

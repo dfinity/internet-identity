@@ -35,8 +35,7 @@
     ECDSAKeyIdentity,
   } from "@icp-sdk/core/identity";
   import { toaster } from "$lib/components/utils/toaster";
-  import { waitFor } from "$lib/utils/utils";
-  import { bytesToHex } from "@noble/hashes/utils";
+  import { toHex, waitFor } from "$lib/utils/utils";
   import { handleError } from "$lib/components/utils/error";
 
   interface IdentityResult {
@@ -210,7 +209,7 @@
       },
       (_, value) =>
         value instanceof Uint8Array
-          ? bytesToHex(value as Uint8Array)
+          ? toHex(value as Uint8Array)
           : typeof value === "bigint"
             ? value.toString()
             : value,

@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { bytesToHex } from "@noble/hashes/utils";
 import {
   type AccessMethod,
   compareAccessMethods,
@@ -12,6 +11,7 @@ import type {
   IdentityInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
+import { toHex } from "$lib/utils/utils";
 
 const makePasskey = (id: number, lastAuth?: bigint): AuthnMethodData => ({
   authn_method: {
@@ -122,7 +122,7 @@ describe("toKey", () => {
     const accessMethod: AccessMethod = {
       passkey: makePasskey(42),
     };
-    const expected = bytesToHex(new Uint8Array([42]));
+    const expected = toHex(new Uint8Array([42]));
     expect(toKey(accessMethod)).toBe(expected);
   });
 

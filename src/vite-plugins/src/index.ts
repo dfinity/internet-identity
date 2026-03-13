@@ -56,7 +56,7 @@ export const injectCanisterIdAndConfigPlugin = ({
 export const compression = (): Plugin =>
   viteCompression({
     // II canister only supports one content type per resource. That is why we remove the original file.
-    algorithm: "gzip",
+    algorithms: ["gzip"],
     deleteOriginalAssets: true,
     include: /\.(js|woff2)$/,
   });
@@ -87,44 +87,43 @@ export const replicaForwardPlugin = ({
   forwardRules: Array<{ canisterName: string; hosts: string[] }>;
 }) => ({
   name: "replica-forward",
+  enforce: "pre",
   configureServer(server: ViteDevServer) {
     const replicaOrigin = `127.0.0.1:${readReplicaPort()}`;
     server.middlewares.use((req, res, next) => {
+      const authority = req.headers[":authority"] as string;
       if (
         /* Deny requests to raw URLs, e.g. <canisterId>.raw.ic0.app to make sure that II always uses certified assets
          * to verify the alternative origins. */
-        req.headers["host"]?.includes(".raw.")
+        authority?.includes(".raw.")
       ) {
         console.log(
-          `Denying access to raw URL ${req.method} https://${req.headers.host}${req.url}`,
+          `Denying access to raw URL ${req.method} https://${authority}${req.url}`,
         );
         res.statusCode = 400;
         res.end("Raw IC URLs are not supported");
         return;
       }
 
-      const host_ = req.headers["host"];
-      if (isNullish(host_)) {
+      if (isNullish(authority)) {
         // default handling
         return next();
       }
 
-      const [host, _port] = host_.split(":");
-
       const matchingRule = forwardRules.find((rule) =>
-        rule.hosts.includes(host),
+        rule.hosts.includes(authority),
       );
 
       if (!isNullish(matchingRule)) {
         const canisterId = readCanisterId({
           canisterName: matchingRule.canisterName,
         });
-        console.log("Host matches forward rule", host);
+        console.log("Host matches forward rule", authority);
         return forwardToReplica({ canisterId, req, res, replicaOrigin });
       }
 
       // split the subdomain & domain by splitting on the first dot
-      const [subdomain_, ...domain_] = host.split(".");
+      const [subdomain_, ...domain_] = authority.split(".");
       const [subdomain, domain] =
         domain_.length > 0
           ? [subdomain_, domain_.join(".")]

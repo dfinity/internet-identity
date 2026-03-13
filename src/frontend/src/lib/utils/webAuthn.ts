@@ -1,5 +1,5 @@
 import type { AuthnMethodData } from "$lib/generated/internet_identity_types";
-import { bufferEqual } from "$lib/utils/iiConnection";
+import { uint8Equals } from "@icp-sdk/core/candid";
 
 /**
  * Extract AAGUID from `attestationObject.authData` in `AuthenticatorAttestationResponse`
@@ -38,13 +38,13 @@ export const authnMethodEqual = (
   b: AuthnMethodData,
 ): boolean => {
   if ("WebAuthn" in a.authn_method && "WebAuthn" in b.authn_method) {
-    return bufferEqual(
+    return uint8Equals(
       new Uint8Array(a.authn_method.WebAuthn.pubkey),
       new Uint8Array(b.authn_method.WebAuthn.pubkey),
     );
   }
   if ("PubKey" in a.authn_method && "PubKey" in b.authn_method) {
-    return bufferEqual(
+    return uint8Equals(
       new Uint8Array(a.authn_method.PubKey.pubkey),
       new Uint8Array(b.authn_method.PubKey.pubkey),
     );

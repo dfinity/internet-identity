@@ -12,8 +12,8 @@ import { PublicKey, Signature, SignIdentity } from "@icp-sdk/core/agent";
 import { DER_COSE_OID, unwrapDER } from "@icp-sdk/core/identity";
 import borc from "borc";
 import { CredentialData } from "./credential-devices";
-import { bufferEqual } from "./iiConnection";
 import { WebAuthnIdentity } from "./webAuthnIdentity";
+import { uint8Equals } from "@icp-sdk/core/candid";
 
 /**
  * A SignIdentity that uses `navigator.credentials`. See https://webauthn.guide/ for
@@ -79,7 +79,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
    * WebAuthnIdentity created with the pubkey that we picked up during the
    * first signing.
    */
-  public async sign(blob: ArrayBuffer): Promise<Signature> {
+  public async sign(blob: Uint8Array): Promise<Signature> {
     if (this._actualIdentity !== undefined) {
       return this._actualIdentity.sign(blob);
     }
@@ -87,9 +87,9 @@ export class MultiWebAuthnIdentity extends SignIdentity {
       publicKey: {
         allowCredentials: this.credentialData.map((cd) => ({
           type: "public-key",
-          id: cd.credentialId,
+          id: new Uint8Array(cd.credentialId),
         })),
-        challenge: blob,
+        challenge: new Uint8Array(blob),
         userVerification: this.userVerification,
         rpId: this.rpId,
       },
@@ -101,9 +101,14 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     ) as PublicKeyCredential;
 
     for (const cd of this.credentialData) {
-      if (bufferEqual(cd.credentialId, Buffer.from(result.rawId))) {
+      if (
+        uint8Equals(
+          new Uint8Array(cd.credentialId),
+          new Uint8Array(result.rawId),
+        )
+      ) {
         this._actualIdentity = new WebAuthnIdentity(
-          cd.credentialId,
+          new Uint8Array(cd.credentialId),
           unwrapDER(cd.pubkey, DER_COSE_OID),
           undefined,
           this.rpId,
@@ -130,7 +135,7 @@ export class MultiWebAuthnIdentity extends SignIdentity {
     if (!cbor) {
       throw new Error("failed to encode cbor");
     }
-    return new Uint8Array(cbor).buffer as Signature;
+    return new Uint8Array(cbor) as Signature;
   }
 }
 

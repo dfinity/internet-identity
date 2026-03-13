@@ -25,6 +25,7 @@ import {
 } from "$lib/utils/analytics/upgradeIdentityFunnel";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
+import { SvelteDate } from "svelte/reactivity";
 
 export class WrongDomainError extends Error {
   constructor() {
@@ -221,7 +222,7 @@ export class MigrationFlow {
       const delegation = await DelegationChain.create(
         passkeyIdentity,
         session.identity.getPublicKey(),
-        new Date(Date.now() + 30 * 60 * 1000),
+        new SvelteDate(Date.now() + 30 * 60 * 1000),
       );
 
       const identity = DelegationIdentity.fromDelegation(
