@@ -23,7 +23,7 @@
     DirectOpenIdEvents,
     directOpenIdFunnel,
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
-  import { draw, fade, scale } from "svelte/transition";
+  import { fade, scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import Logo from "$lib/components/ui/Logo.svelte";
@@ -199,14 +199,10 @@
               }}
             >
               <path
-                transition:draw|global={{
-                  duration: 6000,
-                  easing: cubicOut,
-                  delay: 500,
-                }}
                 d="M 46 1 H 71 A 20 20 0 0 1 91 21 V 71 A 20 20 0 0 1 71 91 H 21 A 20 20 0 0 1 1 71 V 21 A 20 20 0 0 1 21 1 H 46"
                 stroke-linecap="round"
-                class="stroke-fg-primary fill-none stroke-2"
+                pathLength="100"
+                class="chase-stroke stroke-fg-primary fill-none stroke-2"
               />
             </g>
           </svg>
@@ -233,16 +229,12 @@
             }}
           >
             <circle
-              transition:draw|global={{
-                duration: 6000,
-                easing: cubicOut,
-                delay: 500,
-              }}
               cx="46"
               cy="46"
               r="45"
               stroke-linecap="round"
-              class="stroke-fg-primary origin-center -rotate-90 fill-none stroke-2"
+              pathLength="100"
+              class="chase-stroke stroke-fg-primary origin-center -rotate-90 fill-none stroke-2"
             />
           </g>
         </svg>
@@ -262,3 +254,19 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .chase-stroke {
+    stroke-dasharray: 25, 75;
+    animation: chase-rotate 2s linear infinite;
+  }
+
+  @keyframes chase-rotate {
+    0% {
+      stroke-dashoffset: 0;
+    }
+    100% {
+      stroke-dashoffset: -100;
+    }
+  }
+</style>
