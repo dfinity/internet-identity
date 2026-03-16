@@ -21,7 +21,6 @@ import { getPrimaryOrigin } from "$lib/globals";
  */
 export function authDataToCose(authData: Uint8Array): Uint8Array {
   const view = new DataView(bufFromBufLike(authData));
-  console.log("authData flags byte", authData.byteLength, authData.byteOffset);
   const coseKey = authData.slice(55 + view.getUint16(53, false));
   const decoded = borc.decodeFirst(coseKey);
   const cleaned = new Map();
