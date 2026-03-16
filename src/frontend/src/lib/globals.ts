@@ -31,6 +31,7 @@ export const IFRAME_PARENT_PARAM = "parent_origin";
 export const initGlobals = async () => {
   canisterId = Principal.fromText(readCanisterId());
   const frontendConfig = readCanisterConfig();
+  frontendConfig.dummy_auth = [];
 
   const backendOrigin = frontendConfig.backend_origin[0];
 

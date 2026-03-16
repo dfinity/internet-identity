@@ -20,9 +20,10 @@ import { getPrimaryOrigin } from "$lib/globals";
  * @returns The COSE key of the authData.
  */
 export function authDataToCose(authData: Uint8Array): Uint8Array {
-  const view = new DataView(authData.buffer);
+  const view = new DataView(bufFromBufLike(authData));
+  console.log("authData flags byte", authData.byteLength, authData.byteOffset);
   const coseKey = authData.slice(55 + view.getUint16(53, false));
-  const decoded = borc.decodeFirst(bufFromBufLike(coseKey));
+  const decoded = borc.decodeFirst(coseKey);
   const cleaned = new Map();
   for (const [key, value] of decoded.entries()) {
     if (typeof key === "number") {
@@ -125,7 +126,10 @@ const publicKeyFromResult = (
   }
 
   // Parse the attestationObject as CBOR.
-  const attObject = borc.decodeFirst(result.response.attestationObject);
+  const attObject = borc.decodeFirst(
+    new Uint8Array(result.response.attestationObject),
+  );
+  console.log("attObject.authData", attObject, attObject.authData);
   return Promise.resolve(
     new CosePublicKey(authDataToCose(new Uint8Array(attObject.authData))),
   );
@@ -262,7 +266,9 @@ export class DiscoverablePasskeyIdentity extends SignIdentity {
     }
     if (result.response.attestationObject !== undefined) {
       // Parse the attestationObject as CBOR.
-      const attObject = borc.decodeFirst(result.response.attestationObject);
+      const attObject = borc.decodeFirst(
+        new Uint8Array(result.response.attestationObject),
+      );
       this.#aaguid = extractAAGUID(attObject.authData);
     }
     return cbor as Signature;
