@@ -128,7 +128,6 @@ const publicKeyFromResult = (
   const attObject = borc.decodeFirst(
     new Uint8Array(result.response.attestationObject),
   );
-  console.log("attObject.authData", attObject, attObject.authData);
   return Promise.resolve(
     new CosePublicKey(authDataToCose(new Uint8Array(attObject.authData))),
   );
