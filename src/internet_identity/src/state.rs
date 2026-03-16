@@ -26,8 +26,8 @@ mod temp_keys;
 
 /// Default captcha config
 pub const DEFAULT_CAPTCHA_CONFIG: CaptchaConfig = CaptchaConfig {
-    max_unsolved_captchas: 500,
-    captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+    max_unsolved_captchas: 50,
+    captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
 };
 
 /// Default registration rate limit config.
