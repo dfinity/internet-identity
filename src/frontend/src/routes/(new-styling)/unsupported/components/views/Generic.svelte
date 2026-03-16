@@ -33,7 +33,7 @@
               <strong>{$t`To continue:`}</strong>
             </p>
             <ol
-              class="text-text-tertiary mb-5 list-decimal space-y-2 pl-6 text-start text-base font-medium"
+              class="text-text-tertiary mb-5 list-decimal space-y-2 ps-6 text-start text-base font-medium"
             >
               <li>{$t`Long-press the link that opened this page.`}</li>
               <li>
