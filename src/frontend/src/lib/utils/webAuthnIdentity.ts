@@ -188,7 +188,9 @@ export class WebAuthnIdentity extends SignIdentity {
     }
 
     // Parse the attestationObject as CBOR.
-    const attObject = borc.decodeFirst(response.attestationObject);
+    const attObject = borc.decodeFirst(
+      new Uint8Array(response.attestationObject),
+    );
 
     return new this(
       new Uint8Array(creds.rawId),
