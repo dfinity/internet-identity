@@ -6,6 +6,7 @@
     LogOutIcon,
     ArrowRightIcon,
     PlusIcon,
+    PencilIcon,
   } from "@lucide/svelte";
   import type { HTMLAttributes } from "svelte/elements";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
@@ -20,6 +21,7 @@
     onSwitchIdentity: (identityNumber: bigint) => Promise<void>;
     onUseAnotherIdentity: () => void;
     onManageIdentity?: () => Promise<void>;
+    onManageIdentities?: () => void;
     onError: (error: unknown) => void;
     onClose: () => void;
     onSignOut?: () => Promise<void>;
@@ -31,6 +33,7 @@
     onSwitchIdentity,
     onUseAnotherIdentity,
     onManageIdentity,
+    onManageIdentities,
     onError,
     onClose,
     onSignOut,
@@ -119,8 +122,8 @@
     class={[
       "bg-bg-primary_alt border-border-secondary absolute flex items-center justify-center rounded-full border",
       size === "lg"
-        ? "-end-1 -bottom-1 size-6.5"
-        : "-end-1.25 -bottom-1.25 size-5",
+        ? "-inset-e-1 -bottom-1 size-6.5"
+        : "-inset-e-1.25 -bottom-1.25 size-5",
     ]}
   >
     {#if logo !== undefined}
@@ -131,7 +134,7 @@
       </span>
     {:else}
       <PasskeyIcon
-        class={["text-fg-tertiary", size === "lg" ? "!size-4.25" : "!size-3"]}
+        class={["text-fg-tertiary", size === "lg" ? "size-4.25!" : "size-3!"]}
       />
     {/if}
   </span>
@@ -139,7 +142,7 @@
 
 {#snippet selectedIdentityCard()}
   <div
-    class="bg-bg-secondary border-border-secondary relative mx-[-1px] my-[-1px] flex flex-col items-center rounded-b-2xl border-x border-b p-8"
+    class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex flex-col items-center rounded-b-2xl border-x border-b p-8"
   >
     <div class="relative mb-2">
       <Avatar size="lg">
@@ -183,10 +186,10 @@
     {/if}
     <button
       onclick={onClose}
-      class="btn btn-tertiary btn-sm btn-icon absolute end-2 top-2 !rounded-full"
-      aria-label={$t`Close`}
+      class="btn btn-tertiary btn-sm btn-icon absolute inset-e-2 top-2 rounded-full"
     >
       <XIcon class="size-5" />
+      <span>{$t`Close`}</span>
     </button>
   </div>
 {/snippet}
@@ -266,9 +269,20 @@
 
 {#snippet otherIdentitiesList()}
   <div>
-    <h2 class="text-text-primary mx-4 mt-6 mb-4 text-sm font-semibold">
-      {$t`Sign in with another identity`}
-    </h2>
+    <div class="mt-4 mb-2 flex h-9 flex-row items-center">
+      <h2 class="text-text-primary mx-4 text-sm font-semibold">
+        {$t`Sign in with another identity`}
+      </h2>
+      {#if onManageIdentities !== undefined}
+        <button
+          onclick={onManageIdentities}
+          class="btn btn-tertiary btn-icon btn-sm ms-auto me-2 rounded-full"
+        >
+          <PencilIcon class="size-4" />
+          <span>{$t`Edit`}</span>
+        </button>
+      {/if}
+    </div>
     <ul
       class="flex flex-col gap-2 overflow-y-auto"
       style={`max-height: ${Math.max(2, Math.floor((windowHeight - 380) / 74)) * 74 - 41}px`}

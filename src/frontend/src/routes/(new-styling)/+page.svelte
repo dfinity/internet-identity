@@ -610,7 +610,7 @@
     direction="down"
     align="end"
     distance="0.75rem"
-    class="!bg-bg-primary"
+    class="bg-bg-primary!"
   >
     <IdentitySwitcher
       selected={selectedIdentity.identityNumber}
@@ -621,6 +621,9 @@
         isAuthDialogOpen = true;
       }}
       onManageIdentity={() => handleSignIn(selectedIdentity.identityNumber)}
+      onManageIdentities={() => {
+        isIdentityPopoverOpen = false;
+      }}
       onError={(error) => {
         isIdentityPopoverOpen = false;
         isAuthenticating = false;
