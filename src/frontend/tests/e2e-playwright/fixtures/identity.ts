@@ -53,6 +53,9 @@ const CREDENTIAL_CREATE_HOOK_FLAG = "__iiCredentialCreateHookInstalled";
 /**
  * Patches `navigator.credentials.create` in the browser page so tests can react
  * when a new passkey is created and mirror it into the virtual authenticator.
+ *
+ * The patch also constrains passkey creation to ES256 (`alg: -7`), i.e. ECDSA
+ * on P-256, so created credentials match fixture expectations.
  */
 const installCredentialCreateHook = ({
   hookName,
@@ -77,7 +80,19 @@ const installCredentialCreateHook = ({
 
   const originalCreate = credentialsContainer.create.bind(credentialsContainer);
   credentialsContainer.create = async (...args) => {
-    const result = await originalCreate(...args);
+    const createArgs = [...args] as [CredentialCreationOptions?];
+    const [options] = createArgs;
+    if (options?.publicKey !== undefined) {
+      createArgs[0] = {
+        ...options,
+        publicKey: {
+          ...options.publicKey,
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        },
+      };
+    }
+
+    const result = await originalCreate(...createArgs);
     const hook = (window as unknown as Record<string, () => Promise<void>>)[
       hookName
     ];
