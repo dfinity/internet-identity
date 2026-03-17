@@ -1,7 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
 import {
-  createNewIdentityInII,
   getMessageText,
   II_URL,
   openIiTab,

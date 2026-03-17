@@ -1,5 +1,5 @@
 import { expect, Locator, Page, test as base } from "@playwright/test";
-import { DummyAuthFn, II_URL } from "../utils";
+import { II_URL } from "../utils";
 
 export const DEFAULT_PASSKEY_NAME = "Unknown";
 
