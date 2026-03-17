@@ -50,28 +50,10 @@ const credentialCreateSyncState = new WeakMap<Page, CredentialSyncState>();
 const CREDENTIAL_CREATE_HOOK = "__iiOnCredentialCreate";
 const CREDENTIAL_CREATE_HOOK_FLAG = "__iiCredentialCreateHookInstalled";
 
-const refreshIdentityCredentials = async (
-  page: Page,
-  authenticatorId: string,
-  identity: Identity,
-): Promise<void> => {
-  identity.credentials = await getCredentialsFromVirtualAuthenticator(
-    page,
-    authenticatorId,
-  );
-};
-
-const registerCredentialCreateSync = (
-  page: Page,
-  syncState: CredentialSyncState,
-): void => {
-  credentialCreateSyncState.set(page, syncState);
-};
-
-const clearCredentialCreateSync = (page: Page): void => {
-  credentialCreateSyncState.delete(page);
-};
-
+/**
+ * Patches `navigator.credentials.create` in the browser page so tests can react
+ * when a new passkey is created and mirror it into the virtual authenticator.
+ */
 const installCredentialCreateHook = ({
   hookName,
   installedFlag,
@@ -108,18 +90,18 @@ const installCredentialCreateHook = ({
   global[installedFlag] = true;
 };
 
-const isInternetIdentityUrl = (url: string): boolean => {
-  try {
-    return new URL(url).origin === new URL(II_URL).origin;
-  } catch {
-    return false;
-  }
-};
-
+/**
+ * Installs the credential-create hook in the currently loaded document when
+ * the page points at Internet Identity. Safe to call repeatedly.
+ */
 const installCredentialCreateHookOnCurrentDocument = async (
   page: Page,
 ): Promise<void> => {
-  if (!isInternetIdentityUrl(page.url())) {
+  try {
+    if (new URL(page.url()).origin !== new URL(II_URL).origin) {
+      return;
+    }
+  } catch {
     return;
   }
 
@@ -133,6 +115,10 @@ const installCredentialCreateHookOnCurrentDocument = async (
   }
 };
 
+/**
+ * Exposes a single Playwright binding per page and keeps the in-page
+ * credential-create hook installed across navigations.
+ */
 const ensureCredentialCreateSyncHook = async (page: Page): Promise<void> => {
   if (credentialCreateHookInstalled.has(page)) {
     return;
@@ -149,7 +135,7 @@ const ensureCredentialCreateSyncHook = async (page: Page): Promise<void> => {
         await state.syncCredentials();
       } catch {
         // The page hook can outlive the authenticator it was tracking.
-        clearCredentialCreateSync(sourcePage);
+        credentialCreateSyncState.delete(sourcePage);
       }
     }
   });
@@ -231,14 +217,13 @@ export class IdentityWizard {
   }
 }
 
-export const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
-  // Same implementation as found in `DiscoverableDummyIdentity`
-  const buffer = new ArrayBuffer(32);
-  const view = new DataView(buffer);
-  view.setBigUint64(0, dummyAuthIndex);
-  return new Uint8Array(buffer);
-};
-
+/**
+ * Builds an ECDSA identity from a WebAuthn credential's private key.
+ *
+ * @param credential WebAuthn credential containing a base64 PKCS#8 P-256 private key.
+ * @returns ECDSA identity that can sign requests as this credential.
+ * @throws Error If the decoded key is not an EC P-256 key.
+ */
 const createEcdsaIdentityFromCredential = async (
   credential: Protocol.WebAuthn.Credential,
 ): Promise<ECDSAKeyIdentity> => {
@@ -281,6 +266,9 @@ const createEcdsaIdentityFromCredential = async (
   });
 };
 
+/**
+ * Creates an Internet Identity actor authenticated as the supplied credential.
+ */
 const createActor = async (
   host: string,
   canisterId: Principal,
@@ -308,10 +296,6 @@ export const test = base.extend<{
   actorForIdentity: (
     identityNumber: bigint,
   ) => Promise<ActorSubclass<_SERVICE>>;
-  replaceAuthForIdentity: (
-    identityNumber: bigint,
-    newDummyAuthIndex: bigint,
-  ) => void;
   addAuthenticatorForIdentity: (
     page: Page,
     identityNumber: bigint,
@@ -383,16 +367,6 @@ export const test = base.extend<{
         identity.credentials[0],
       );
     }),
-  replaceAuthForIdentity: ({ identities }, use) =>
-    use((identityNumber: bigint, _newDummyAuthIndex: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
-      );
-      if (identity === undefined) {
-        throw new Error("Identity not found");
-      }
-      // No-op for passkey-based fixture identities.
-    }),
   addAuthenticatorForIdentity: ({ identities }, use) =>
     use(async (page: Page, identityNumber: bigint) => {
       const identity = identities.find(
@@ -401,17 +375,9 @@ export const test = base.extend<{
       if (identity === undefined) {
         throw new Error("Identity not found");
       }
+
+      // Add virtual authenticator and populate it with the identity's credentials
       const authenticatorId = await addVirtualAuthenticator(page);
-
-      // Keep fixture credentials synchronized with passkeys created in page code.
-      registerCredentialCreateSync(page, {
-        syncCredentials: async () => {
-          await refreshIdentityCredentials(page, authenticatorId, identity);
-        },
-      });
-
-      await ensureCredentialCreateSyncHook(page);
-
       for (const credential of identity.credentials) {
         await addCredentialToVirtualAuthenticator(
           page,
@@ -420,7 +386,17 @@ export const test = base.extend<{
         );
       }
 
-      await refreshIdentityCredentials(page, authenticatorId, identity);
+      // Set up sync hook for this virtual authenticator so credentials created in tests
+      // will be automatically added to the identity's credentials keeping both in sync.
+      credentialCreateSyncState.set(page, {
+        syncCredentials: async () => {
+          identity.credentials = await getCredentialsFromVirtualAuthenticator(
+            page,
+            authenticatorId,
+          );
+        },
+      });
+      await ensureCredentialCreateSyncHook(page);
 
       return authenticatorId;
     }),
