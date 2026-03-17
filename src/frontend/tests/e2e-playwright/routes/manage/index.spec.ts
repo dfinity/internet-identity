@@ -1,28 +1,19 @@
-import { expect, test } from "@playwright/test";
-import { clearStorage, createIdentity, dummyAuth, II_URL } from "../../utils";
-
-const TEST_USER_NAME = "Test User";
+import { expect } from "@playwright/test";
+import { test } from "../../fixtures";
+import { II_URL, removeVirtualAuthenticator } from "../../utils";
 
 test.describe("Dashboard Navigation", () => {
   test("User can register, sign in, access the dashboard and navigate to security page", async ({
     page,
+    identities,
+    addAuthenticatorForIdentity,
+    signInWithIdentity,
+    managePage,
   }) => {
-    const auth = dummyAuth();
-    await createIdentity(page, TEST_USER_NAME, auth);
-    await clearStorage(page);
     await page.goto(II_URL);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
-    auth(page);
-    await page.getByRole("button", { name: "Use existing identity" }).click();
-
-    // Verify we're at the dashboard
-    await page.waitForURL(II_URL + "/manage");
-    await expect(
-      page.getByRole("heading", {
-        name: new RegExp(`Welcome, ${TEST_USER_NAME}!`),
-      }),
-    ).toBeVisible();
+    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
+    await signInWithIdentity(page, identities[0].identityNumber);
+    await managePage.assertVisible();
 
     // Navigate to access methods
     const menuButton = page.getByRole("button", { name: "Open menu" });
@@ -37,45 +28,85 @@ test.describe("Dashboard Navigation", () => {
     await expect(passkey).toHaveCount(1);
   });
 
-  test("User can switch between identities", async ({ page }) => {
-    // Create two identities
-    const auth1 = dummyAuth();
-    const auth2 = dummyAuth();
-    await createIdentity(page, "Test 1", auth1);
-    await createIdentity(page, "Test 2", auth2);
+  test.describe("multiple identities", () => {
+    test.use({
+      identityConfig: {
+        createIdentities: [{ name: "Test 1" }, { name: "Test 2" }],
+      },
+    });
 
-    // Sign in to dashboard with first identity
-    await page.goto(II_URL);
-    await page.getByRole("button", { name: "Switch identity" }).click();
-    auth1(page);
-    await page.getByRole("button", { name: "Test 1" }).click();
+    test.beforeEach(
+      async ({
+        page,
+        managePage,
+        identities,
+        addAuthenticatorForIdentity,
+        signInWithIdentity,
+      }) => {
+        // Sign in with both identities to add them both to switcher
+        await page.goto(II_URL);
+        const authenticatorId1 = await addAuthenticatorForIdentity(
+          page,
+          identities[0].identityNumber,
+        );
+        await signInWithIdentity(page, identities[0].identityNumber);
+        await managePage.signOut();
+        await removeVirtualAuthenticator(page, authenticatorId1);
+        const authenticatorId2 = await addAuthenticatorForIdentity(
+          page,
+          identities[1].identityNumber,
+        );
+        await signInWithIdentity(page, identities[1].identityNumber);
+        await managePage.signOut();
+        await removeVirtualAuthenticator(page, authenticatorId2);
+      },
+    );
 
-    // Verify we're at the dashboard and signed in as the first identity
-    await page.waitForURL(II_URL + "/manage");
-    await expect(
-      page.getByRole("heading", {
-        name: new RegExp("Welcome, Test 1!"),
-      }),
-    ).toBeVisible();
+    test("User can switch between identities", async ({
+      page,
+      managePage,
+      identities,
+      addAuthenticatorForIdentity,
+    }) => {
+      // Sign in to dashboard with first identity
+      await page.goto(II_URL);
+      const authenticatorId1 = await addAuthenticatorForIdentity(
+        page,
+        identities[0].identityNumber,
+      );
+      await page.getByRole("button", { name: "Switch identity" }).click();
+      await page
+        .getByRole("button", { name: "Manage your Internet Identity" })
+        .click();
 
-    // Navigate to access methods
-    const menuButton = page.getByRole("button", { name: "Open menu" });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
-    }
-    await page.getByRole("link", { name: "Access and recovery" }).click();
+      // Verify we're at the dashboard and signed in as the first identity
+      await managePage.assertVisible();
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${identities[0].name}!`),
+        }),
+      ).toBeVisible();
 
-    // Switch to second identity
-    await page.getByRole("button", { name: "Switch identity" }).click();
-    auth2(page);
-    await page.getByRole("button", { name: "Test 2" }).click();
+      // Navigate to access methods
+      const menuButton = page.getByRole("button", { name: "Open menu" });
+      if (await menuButton.isVisible()) {
+        await menuButton.click();
+      }
+      await page.getByRole("link", { name: "Access and recovery" }).click();
 
-    // Verify we're back at the dashboard homepage and signed in as the second identity
-    await page.waitForURL(II_URL + "/manage");
-    await expect(
-      page.getByRole("heading", {
-        name: new RegExp("Welcome, Test 2!"),
-      }),
-    ).toBeVisible();
+      // Switch to second identity
+      await removeVirtualAuthenticator(page, authenticatorId1);
+      await addAuthenticatorForIdentity(page, identities[1].identityNumber);
+      await page.getByRole("button", { name: "Switch identity" }).click();
+      await page.getByRole("button", { name: identities[1].name }).click();
+
+      // Verify we're back at the dashboard homepage and signed in as the second identity
+      await managePage.assertVisible();
+      await expect(
+        page.getByRole("heading", {
+          name: new RegExp(`Welcome, ${identities[1].name}!`),
+        }),
+      ).toBeVisible();
+    });
   });
 });

@@ -1,11 +1,12 @@
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
 import {
-  dummyAuth,
+  addVirtualAuthenticator,
   II_URL,
   NOT_TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   TEST_APP_URL,
 } from "../../utils";
+import { test } from "../../fixtures";
 
 test("Should not issue delegation when alternative origins are empty", async ({
   page,
@@ -103,11 +104,10 @@ test("Should issue delegation when derivationOrigin is properly configured in /.
   const authPage = await pagePromise;
 
   // Create a new identity in II
+  await addVirtualAuthenticator(authPage);
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
   await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("John Doe");
-  const auth = dummyAuth();
-  auth(authPage);
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();
 
@@ -207,10 +207,10 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
 
 test("Should issue the same principal to nice url and canonical url", async ({
   page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
 }) => {
-  // Create a new identity using dummy auth
-  const auth = dummyAuth();
-
   // First authentication: Test app configured with canonical URL as derivation origin
   await page.goto(TEST_APP_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
@@ -238,14 +238,9 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await page.getByRole("button", { name: "Sign In" }).click();
   const authPage1 = await pagePromise1;
 
-  // Create identity in II
-  await authPage1
-    .getByRole("button", { name: "Continue with Passkey" })
-    .click();
-  await authPage1.getByRole("button", { name: "Create new identity" }).click();
-  await authPage1.getByLabel("Identity name").fill("Test User");
-  auth(authPage1);
-  await authPage1.getByRole("button", { name: "Create identity" }).click();
+  // Sign in with identity
+  await addAuthenticatorForIdentity(authPage1, identities[0].identityNumber);
+  await signInWithIdentity(authPage1, identities[0].identityNumber);
   await authPage1
     .getByRole("button", { name: "Continue", exact: true })
     .click();
@@ -270,8 +265,9 @@ test("Should issue the same principal to nice url and canonical url", async ({
   await page.getByRole("button", { name: "Sign In" }).click();
   const authPage2 = await pagePromise2;
 
-  // Use existing passkey
-  auth(authPage2);
+  // Use existing identity and passkey
+  await addAuthenticatorForIdentity(authPage2, identities[0].identityNumber);
+  await signInWithIdentity(authPage2, identities[0].identityNumber);
   await authPage2
     .getByRole("button", { name: "Continue", exact: true })
     .click();

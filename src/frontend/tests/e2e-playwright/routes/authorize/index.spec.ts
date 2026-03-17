@@ -2,27 +2,23 @@ import { expect } from "@playwright/test";
 import {
   authorize,
   authorizeWithUrl,
-  clearStorage,
-  createIdentity,
-  dummyAuth,
   TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   II_URL,
-  cancelDummyAuth,
+  addVirtualAuthenticator,
 } from "../../utils";
 import { test } from "../../fixtures";
 
 const DEFAULT_USER_NAME = "John Doe";
 
 test("Authorize by registering a new passkey", async ({ page }) => {
-  const auth = dummyAuth();
   await authorize(page, async (authPage) => {
+    await addVirtualAuthenticator(authPage);
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
     await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
-    auth(authPage);
     await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -30,15 +26,16 @@ test("Authorize by registering a new passkey", async ({ page }) => {
   });
 });
 
-test("Authorize by signing in with an existing passkey", async ({ page }) => {
-  const auth = dummyAuth();
-  await createIdentity(page, DEFAULT_USER_NAME, auth);
-  await clearStorage(page);
+test("Authorize by signing in with an existing passkey", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+}) => {
   await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
-    auth(authPage);
     await authPage
       .getByRole("button", { name: "Use existing identity" })
       .click();
@@ -51,15 +48,28 @@ test("Authorize by signing in with an existing passkey", async ({ page }) => {
 test("Authorize by signing in from another device", async ({
   browser,
   page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
 }) => {
-  // Create identity on other device
+  // Create a separate context to simulate another device
   const newContext = await browser.newContext();
   const otherDevicePage = await newContext.newPage();
-  const authOtherDevice = dummyAuth();
-  const expectedPrincipal = await createIdentity(
+  await addAuthenticatorForIdentity(
     otherDevicePage,
-    DEFAULT_USER_NAME,
-    authOtherDevice,
+    identities[0].identityNumber,
+  );
+
+  // Get principal from authorizing on other device
+  const expectedPrincipal = await authorize(
+    otherDevicePage,
+    async (authPage) => {
+      await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+      await signInWithIdentity(authPage, identities[0].identityNumber);
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    },
   );
 
   const principal = await authorize(page, async (authPage) => {
@@ -67,7 +77,6 @@ test("Authorize by signing in from another device", async ({
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
-    cancelDummyAuth(authPage);
     await authPage
       .getByRole("button", {
         name: "Use existing identity",
@@ -86,7 +95,6 @@ test("Authorize by signing in from another device", async ({
     await otherDevicePage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
-    authOtherDevice(otherDevicePage);
     await otherDevicePage
       .getByRole("button", { name: "Use existing identity" })
       .click();
@@ -117,11 +125,10 @@ test("Authorize by signing in from another device", async ({
       .waitFor();
 
     // Switch to current device and register new passkey
+    await addVirtualAuthenticator(authPage);
     await authPage
       .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
       .waitFor();
-    const authCurrentDevice = dummyAuth();
-    authCurrentDevice(authPage);
     await authPage.getByRole("button", { name: "Create passkey" }).click();
     await authPage
       .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
@@ -151,6 +158,8 @@ test("Authorize by signing in from another device", async ({
       .getByRole("button", { name: "Continue", exact: true })
       .click();
   });
+
+  // Assert that the principals from both devices match
   expect(principal).toBe(expectedPrincipal);
 });
 
@@ -193,12 +202,12 @@ test("Authorize by signing up with OpenID", async ({
 });
 
 test("Authorize with ICRC-29", async ({ page }) => {
-  const auth = dummyAuth();
   await authorizeWithUrl(
     page,
     TEST_APP_URL,
     II_URL + "/authorize",
     async (authPage) => {
+      await addVirtualAuthenticator(authPage);
       await authPage
         .getByRole("button", { name: "Continue with Passkey" })
         .click();
@@ -206,7 +215,6 @@ test("Authorize with ICRC-29", async ({ page }) => {
         .getByRole("button", { name: "Create new identity" })
         .click();
       await authPage.getByLabel("Identity name").fill(DEFAULT_USER_NAME);
-      auth(authPage);
       await authPage.getByRole("button", { name: "Create identity" }).click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
@@ -217,8 +225,8 @@ test("Authorize with ICRC-29", async ({ page }) => {
 });
 
 test("App logo appears when app is known", async ({ page }) => {
-  const auth = dummyAuth();
   await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
+    await addVirtualAuthenticator(authPage);
     await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
 
     await authPage
@@ -226,7 +234,6 @@ test("App logo appears when app is known", async ({ page }) => {
       .click();
     await authPage.getByRole("button", { name: "Create new identity" }).click();
     await authPage.getByLabel("Identity name").fill("John Doe");
-    auth(authPage);
     await authPage.getByRole("button", { name: "Create identity" }).click();
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -235,12 +242,12 @@ test("App logo appears when app is known", async ({ page }) => {
 });
 
 test("App logo doesn't appear when app is not known", async ({ page }) => {
-  const auth = dummyAuth();
   await authorizeWithUrl(
     page,
     TEST_APP_CANONICAL_URL,
     II_URL,
     async (authPage) => {
+      await addVirtualAuthenticator(authPage);
       await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
@@ -251,7 +258,6 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
         .getByRole("button", { name: "Create new identity" })
         .click();
       await authPage.getByLabel("Identity name").fill("John Doe");
-      auth(authPage);
       await authPage.getByRole("button", { name: "Create identity" }).click();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })

@@ -4,13 +4,12 @@ import {
   LEGACY_II_URL,
   ALT_LEGACY_II_URL,
   TEST_APP_URL,
-  dummyAuth,
   authorizeWithUrl,
+  addVirtualAuthenticator,
 } from "../../utils";
 [LEGACY_II_URL, ALT_LEGACY_II_URL].forEach((legacyURL) => {
   test.describe(`Legacy domain ${legacyURL}`, () => {
     test(`sees upgrade banner during authentication`, async ({ page }) => {
-      const auth = dummyAuth();
       await authorizeWithUrl(
         page,
         TEST_APP_URL,
@@ -18,6 +17,8 @@ import {
         async (authPage) => {
           // Assert that we've been redirected to non-legacy domain
           await expect(authPage).toHaveURL((url) => url.origin === II_URL);
+          // Add virtual authenticator
+          await addVirtualAuthenticator(page);
           // Assert that the user is informed about the upgrade
           await expect(
             authPage.getByRole("heading", {
@@ -32,7 +33,6 @@ import {
             .getByRole("button", { name: "Create new identity" })
             .click();
           await authPage.getByLabel("Identity name").fill("Test");
-          auth(authPage);
           await authPage
             .getByRole("button", { name: "Create identity" })
             .click();

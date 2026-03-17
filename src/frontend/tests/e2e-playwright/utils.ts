@@ -333,6 +333,21 @@ export const addVirtualAuthenticator = async (page: Page): Promise<string> => {
 };
 
 /**
+ * Removes a virtual authenticator from the browser
+ * @param page The page to remove the virtual authenticator from
+ * @param authenticatorId The authenticator ID
+ */
+export const removeVirtualAuthenticator = async (
+  page: Page,
+  authenticatorId: string,
+): Promise<void> => {
+  const client = await getWebAuthnClient(page);
+  await client.send("WebAuthn.removeVirtualAuthenticator", {
+    authenticatorId,
+  });
+};
+
+/**
  * Gets credentials from a virtual authenticator
  * @param page The page to get the credentials from
  * @param authenticatorId The authenticator ID

@@ -3,14 +3,12 @@ import { expect } from "@playwright/test";
 import {
   addVirtualAuthenticator,
   virtualAuthenticatorPrivKeyToPubKey,
-  dummyAuth,
   fromBase64URL,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
   LEGACY_II_URL,
+  removeVirtualAuthenticator,
 } from "../utils";
-import { toSeed } from "../fixtures/identity";
-import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 
 const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
 
@@ -24,7 +22,7 @@ test("Can upgrade identity", async ({
   await page.goto(LEGACY_II_URL + "/self-service");
 
   // Add virtual authenticator and create a passkey in page context
-  const authenticatorId = await addVirtualAuthenticator(page);
+  const legacyAuthenticatorId = await addVirtualAuthenticator(page);
   await page.evaluate(
     async (rpId) => {
       await navigator.credentials.create({
@@ -50,8 +48,9 @@ test("Can upgrade identity", async ({
   // Get the created credential from the virtual authenticator
   const [credential] = await getCredentialsFromVirtualAuthenticator(
     page,
-    authenticatorId,
+    legacyAuthenticatorId,
   );
+  await removeVirtualAuthenticator(page, legacyAuthenticatorId);
   const publicKey = await virtualAuthenticatorPrivKeyToPubKey(
     credential!.privateKey,
   );
@@ -81,14 +80,12 @@ test("Can upgrade identity", async ({
     last_authentication: [],
   });
 
-  // Remove the dummy auth so the identity is only accessible via the legacy passkey,
+  // Remove the non-legacy passkey so the identity is only accessible via the legacy passkey,
   // which simulates the state of an identity that hasn't been upgraded yet.
   await actor.authn_method_remove(
     identities[0].identityNumber,
-    new Uint8Array(
-      Ed25519KeyIdentity.generate(toSeed(identities[0].dummyAuthIndex))
-        .getPublicKey()
-        .toDer(),
+    await virtualAuthenticatorPrivKeyToPubKey(
+      identities[0].credentials[0].privateKey,
     ),
   );
 
@@ -96,6 +93,7 @@ test("Can upgrade identity", async ({
   for (let attempt = 0; attempt < 3; attempt++) {
     // Navigate to the new II_URL to trigger the upgrade flow
     await page.goto(II_URL);
+    const authenticatorId = await addVirtualAuthenticator(page);
 
     // Open the sign-in dialog
     if (attempt > 0) {
@@ -123,13 +121,13 @@ test("Can upgrade identity", async ({
       await page.getByRole("button", { name: "Upgrade again" }).click();
     }
 
-    // Set the identity name and register new dummy auth
-    const newAuth = dummyAuth();
-    await page.getByLabel("Identity name").fill(identities[0].name);
-    newAuth(page);
-
     // Complete the upgrade process
+    await page.getByLabel("Identity name").fill(identities[0].name);
     await page.getByRole("button", { name: "Upgrade identity" }).click();
     await managePage.assertVisible();
+
+    // Cleanup by removing the newly added authenticator and signing out
+    await managePage.signOut();
+    await removeVirtualAuthenticator(page, authenticatorId);
   }
 });

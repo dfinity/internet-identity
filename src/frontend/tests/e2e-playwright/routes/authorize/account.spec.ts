@@ -1,11 +1,22 @@
-import { expect, test } from "@playwright/test";
-import { authorize, createIdentity, dummyAuth } from "../../utils";
+import { expect } from "@playwright/test";
+import { test } from "../../fixtures";
+import { authorize } from "../../utils";
 
-test("Create another account and authorize with primary", async ({ page }) => {
-  const auth = dummyAuth();
-  const primaryPrincipal = await createIdentity(page, "John Doe", auth);
+test("Create another account and authorize with primary", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
+  const primaryPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
   const principal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);
@@ -19,11 +30,21 @@ test("Create another account and authorize with primary", async ({ page }) => {
   expect(principal).toEqual(primaryPrincipal);
 });
 
-test("Create another account and authorize with it", async ({ page }) => {
-  const auth = dummyAuth();
-  const primaryPrincipal = await createIdentity(page, "John Doe", auth);
+test("Create another account and authorize with it", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
+  const primaryPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
   const principal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);
@@ -39,11 +60,19 @@ test("Create another account and authorize with it", async ({ page }) => {
 
 test("Create another account, make it default and authorize with it", async ({
   page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
 }) => {
-  const auth = dummyAuth();
-  const primaryPrincipal = await createIdentity(page, "John Doe", auth);
+  const primaryPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
   const principal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);
@@ -58,7 +87,7 @@ test("Create another account, make it default and authorize with it", async ({
       .click();
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
       .click();
@@ -67,11 +96,21 @@ test("Create another account, make it default and authorize with it", async ({
   expect(secondaryPrincipal).not.toEqual(primaryPrincipal);
 });
 
-test("Rename primary account and authorize with it", async ({ page }) => {
-  const auth = dummyAuth();
-  const primaryPrincipal = await createIdentity(page, "John Doe", auth);
+test("Rename primary account and authorize with it", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
+  const primaryPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
   const principal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);
@@ -87,11 +126,21 @@ test("Rename primary account and authorize with it", async ({ page }) => {
   expect(principal).toEqual(primaryPrincipal);
 });
 
-test("Rename secondary account and authorize with it", async ({ page }) => {
-  const auth = dummyAuth();
-  const primaryPrincipal = await createIdentity(page, "John Doe", auth);
+test("Rename secondary account and authorize with it", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
+  const primaryPrincipal = await authorize(page, async (authPage) => {
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await signInWithIdentity(authPage, identities[0].identityNumber);
+    await authPage
+      .getByRole("button", { name: "Continue", exact: true })
+      .click();
+  });
   const principal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);
@@ -103,7 +152,7 @@ test("Rename secondary account and authorize with it", async ({ page }) => {
       .click();
   });
   const secondaryPrincipal = await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);
@@ -118,11 +167,15 @@ test("Rename secondary account and authorize with it", async ({ page }) => {
   expect(secondaryPrincipal).not.toEqual(primaryPrincipal);
 });
 
-test("Can't create more than 5 accounts", async ({ page }) => {
-  const auth = dummyAuth();
-  await createIdentity(page, "John Doe", auth);
+test("Can't create more than 5 accounts", async ({
+  page,
+  identities,
+  addAuthenticatorForIdentity,
+  signInWithIdentity,
+}) => {
   await authorize(page, async (authPage) => {
-    auth(authPage);
+    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
+    await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })
       .setChecked(true);

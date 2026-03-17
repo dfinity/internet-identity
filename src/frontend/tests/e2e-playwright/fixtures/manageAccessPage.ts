@@ -139,7 +139,7 @@ class AddDialog {
     this.#dialog = dialog;
   }
 
-  async passkey(auth: DummyAuthFn): Promise<void> {
+  async passkey(): Promise<void> {
     await this.#dialog
       .getByRole("button", { name: "Continue with passkey" })
       .click();
@@ -148,7 +148,6 @@ class AddDialog {
         name: /Add a passkey|Add another passkey/,
       }),
     ).toBeVisible();
-    auth(this.#dialog.page());
     await this.#dialog.getByRole("button", { name: "Create passkey" }).click();
   }
 
