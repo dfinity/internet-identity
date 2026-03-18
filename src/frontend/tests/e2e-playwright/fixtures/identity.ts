@@ -26,8 +26,8 @@ interface Identity {
   canisterId: Principal;
   identityNumber: bigint;
   name: string;
-  authenticatorId?: string;
   credentials: Protocol.WebAuthn.Credential[];
+  authenticatorIds: WeakMap<Page, string>;
 }
 
 const credentialCreateTrackingInstalled = new WeakSet<Page>();
@@ -129,15 +129,29 @@ const refreshTrackedIdentityCredentials = async (source: {
   }
 
   const identity = trackedIdentityByPage.get(page);
-  if (identity?.authenticatorId === undefined) {
+  if (identity === undefined) {
+    return;
+  }
+  const authenticatorId = identity.authenticatorIds.get(page);
+  if (authenticatorId === undefined) {
     return;
   }
 
   try {
-    identity.credentials = await getCredentialsFromVirtualAuthenticator(
+    // Add any new credentials created since the last refresh to the fixture identity.
+    const newCredentials = await getCredentialsFromVirtualAuthenticator(
       page,
-      identity.authenticatorId,
+      authenticatorId,
     );
+    const credentialIds = new Set(
+      identity.credentials.map((credential) => credential.credentialId),
+    );
+    identity.credentials = [
+      ...identity.credentials,
+      ...newCredentials.filter(
+        (credential) => !credentialIds.has(credential.credentialId),
+      ),
+    ];
   } catch {
     // The page hook can outlive the authenticator it was tracking.
     trackedIdentityByPage.delete(page);
@@ -310,17 +324,15 @@ export const test = base.extend<{
             name,
             credentials,
             identityNumber,
+            authenticatorIds: new WeakMap(),
           };
           return identity;
         }),
       ),
     ),
-  signInWithIdentity: ({ identities, addAuthenticatorForIdentity }, use) =>
+  signInWithIdentity: ({ addAuthenticatorForIdentity }, use) =>
     use(async (page: Page, identityNumber: bigint) => {
-      const identity = getIdentityByNumber(identities, identityNumber);
-      if (identity.authenticatorId === undefined) {
-        await addAuthenticatorForIdentity(page, identityNumber);
-      }
+      await addAuthenticatorForIdentity(page, identityNumber);
       const wizard = new IdentityWizard(page);
       await wizard.signIn();
     }),
@@ -329,12 +341,9 @@ export const test = base.extend<{
       const identity = getIdentityByNumber(identities, identityNumber);
 
       // Add virtual authenticator and populate it with the identity's credentials
-      identity.authenticatorId = await addVirtualAuthenticator(page);
+      const authenticatorId = await addVirtualAuthenticator(page);
+      identity.authenticatorIds.set(page, authenticatorId);
       for (const credential of identity.credentials) {
-        const { authenticatorId } = identity;
-        if (authenticatorId === undefined) {
-          continue;
-        }
         await addCredentialToVirtualAuthenticator(
           page,
           authenticatorId,
@@ -353,7 +362,8 @@ export const test = base.extend<{
         credentials: Protocol.WebAuthn.Credential[],
       ) => {
         const identity = getIdentityByNumber(identities, identityNumber);
-        if (identity.authenticatorId !== undefined) {
+        const authenticatorId = identity.authenticatorIds.get(page);
+        if (authenticatorId !== undefined) {
           const existingCredentialIds = new Set(
             identity.credentials.map((cred) => cred.credentialId),
           );
@@ -369,10 +379,6 @@ export const test = base.extend<{
               !existingCredentialIds.has(newCredential.credentialId),
           );
           for (const credential of credentialToRemove) {
-            const { authenticatorId } = identity;
-            if (authenticatorId === undefined) {
-              continue;
-            }
             await removeCredentialFromVirtualAuthenticator(
               page,
               authenticatorId,
@@ -380,10 +386,6 @@ export const test = base.extend<{
             );
           }
           for (const credential of credentialToAdd) {
-            const { authenticatorId } = identity;
-            if (authenticatorId === undefined) {
-              continue;
-            }
             await addCredentialToVirtualAuthenticator(
               page,
               authenticatorId,
