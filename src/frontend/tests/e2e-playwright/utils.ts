@@ -381,7 +381,6 @@ export const addCredentialToVirtualAuthenticator = async (
     credential,
   });
 };
-};
 
 /**
  * Removes a credential from a virtual authenticator
