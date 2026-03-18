@@ -4,7 +4,6 @@ import { II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { LEGACY_II_URL } from "$lib/config";
-import { set } from "zod";
 
 test.describe("Access methods", () => {
   test.beforeEach(
