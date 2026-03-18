@@ -46,99 +46,107 @@ test.describe("First visit", () => {
     identities,
     addAuthenticatorForIdentity,
   }) => {
-    // Create identity on existing device
-    const existingDevicePage = page; // Create alias variable for clarity
-    await existingDevicePage.goto(II_URL);
+    // Create a separate context to simulate another device
+    const newDeviceContext = await browser.newContext();
 
-    // Switch to new device and start "Continue from another device" flow to get link
-    const newContext = await browser.newContext();
-    const newDevicePage = await newContext.newPage();
-    await addVirtualAuthenticator(newDevicePage);
-    await newDevicePage.goto(II_URL);
-    await newDevicePage.getByRole("button", { name: "Sign in" }).click();
-    await newDevicePage
-      .getByRole("button", { name: "Continue with passkey" })
-      .click();
-    await newDevicePage
-      .getByRole("button", { name: "Use existing identity" })
-      .click();
-    await newDevicePage
-      .getByRole("heading", {
-        level: 1,
-        name: "Can't find your identity?",
-      })
-      .waitFor();
-    const linkToPair = `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`;
+    try {
+      // Create identity on existing device
+      const existingDevicePage = page; // Create alias variable for clarity
+      await existingDevicePage.goto(II_URL);
 
-    // Switch to existing device and authenticate after visiting link
-    await addAuthenticatorForIdentity(
-      existingDevicePage,
-      identities[0].identityNumber,
-    );
-    await existingDevicePage.goto(linkToPair);
-    await existingDevicePage
-      .getByRole("button", { name: "Continue with passkey" })
-      .click();
-    await existingDevicePage
-      .getByRole("button", { name: "Use existing identity" })
-      .click();
+      // Switch to new device and start "Continue from another device" flow to get link
+      const newDevicePage = await newDeviceContext.newPage();
+      await addVirtualAuthenticator(newDevicePage);
+      await newDevicePage.goto(II_URL);
+      await newDevicePage.getByRole("button", { name: "Sign in" }).click();
+      await newDevicePage
+        .getByRole("button", { name: "Continue with passkey" })
+        .click();
+      await newDevicePage
+        .getByRole("button", { name: "Use existing identity" })
+        .click();
+      await newDevicePage
+        .getByRole("heading", {
+          level: 1,
+          name: "Can't find your identity?",
+        })
+        .waitFor();
+      const linkToPair = `https://${await newDevicePage.getByLabel("Pairing link").innerText()}`;
 
-    // Switch to new device and get confirmation code
-    await newDevicePage.getByLabel("Confirmation Code").waitFor();
-    await newDevicePage
-      .getByRole("button", { name: "Generating code..." })
-      .waitFor({ state: "hidden" });
-    const confirmationCode = await newDevicePage
-      .getByLabel("Confirmation Code")
-      .innerText();
-    const confirmationCodeArray = confirmationCode.split("");
+      // Switch to existing device and authenticate after visiting link
+      await addAuthenticatorForIdentity(
+        existingDevicePage,
+        identities[0].identityNumber,
+      );
+      await existingDevicePage.goto(linkToPair);
+      await existingDevicePage
+        .getByRole("button", { name: "Continue with passkey" })
+        .click();
+      await existingDevicePage
+        .getByRole("button", { name: "Use existing identity" })
+        .click();
 
-    // Switch to existing device and enter confirmation code
-    await existingDevicePage
-      .getByRole("heading", { level: 1, name: "Authorize new device" })
-      .waitFor();
-    for (let i = 0; i < confirmationCodeArray.length; i++) {
-      const code = confirmationCodeArray[i];
-      await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);
+      // Switch to new device and get confirmation code
+      await newDevicePage.getByLabel("Confirmation Code").waitFor();
+      await newDevicePage
+        .getByRole("button", { name: "Generating code..." })
+        .waitFor({ state: "hidden" });
+      const confirmationCode = await newDevicePage
+        .getByLabel("Confirmation Code")
+        .innerText();
+      const confirmationCodeArray = confirmationCode.split("");
+
+      // Switch to existing device and enter confirmation code
+      await existingDevicePage
+        .getByRole("heading", { level: 1, name: "Authorize new device" })
+        .waitFor();
+      for (let i = 0; i < confirmationCodeArray.length; i++) {
+        const code = confirmationCodeArray[i];
+        await existingDevicePage.getByLabel(`Code input ${i}`).fill(code);
+      }
+      await existingDevicePage
+        .getByRole("button", { name: "Confirm sign-in" })
+        .click();
+      await existingDevicePage
+        .getByRole("heading", { level: 1, name: "Continue on your new device" })
+        .waitFor();
+
+      // Switch to new device and register new passkey
+      await newDevicePage
+        .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
+        .waitFor();
+      await newDevicePage
+        .getByRole("button", { name: "Create passkey" })
+        .click();
+      await newDevicePage
+        .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
+        .waitFor({ state: "hidden" });
+
+      // Switch to existing device, navigate to access methods and verify we have two passkeys
+      await existingDevicePage
+        .getByRole("heading", { level: 1, name: "Continue on your new device" })
+        .waitFor({ state: "hidden" });
+      const existingMenuButton = existingDevicePage.getByRole("button", {
+        name: "Open menu",
+      });
+      if (await existingMenuButton.isVisible()) {
+        await existingMenuButton.click();
+      }
+      await existingDevicePage
+        .getByRole("link", { name: "Access and recovery" })
+        .click();
+      await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
+
+      // Switch to new device and verify we are signed in
+      await newDevicePage.waitForURL(II_URL + "/manage");
+      await expect(
+        newDevicePage.getByRole("heading", {
+          name: new RegExp(`Welcome, ${identities[0].name}!`),
+        }),
+      ).toBeVisible();
+    } finally {
+      await newDeviceContext.close();
     }
-    await existingDevicePage
-      .getByRole("button", { name: "Confirm sign-in" })
-      .click();
-    await existingDevicePage
-      .getByRole("heading", { level: 1, name: "Continue on your new device" })
-      .waitFor();
-
-    // Switch to new device and register new passkey
-    await newDevicePage
-      .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
-      .waitFor();
-    await newDevicePage.getByRole("button", { name: "Create passkey" }).click();
-    await newDevicePage
-      .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
-      .waitFor({ state: "hidden" });
-
-    // Switch to existing device, navigate to access methods and verify we have two passkeys
-    await existingDevicePage
-      .getByRole("heading", { level: 1, name: "Continue on your new device" })
-      .waitFor({ state: "hidden" });
-    const existingMenuButton = existingDevicePage.getByRole("button", {
-      name: "Open menu",
-    });
-    if (await existingMenuButton.isVisible()) {
-      await existingMenuButton.click();
-    }
-    await existingDevicePage
-      .getByRole("link", { name: "Access and recovery" })
-      .click();
-    await expect(existingDevicePage.getByText("Unknown")).toHaveCount(2);
-
-    // Switch to new device and verify we are signed in
-    await newDevicePage.waitForURL(II_URL + "/manage");
-    await expect(
-      newDevicePage.getByRole("heading", {
-        name: new RegExp(`Welcome, ${identities[0].name}!`),
-      }),
-    ).toBeVisible();
   });
 
   test.describe("OpenID user with name claim", () => {
