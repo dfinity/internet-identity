@@ -65,10 +65,6 @@ test("Authorize by signing in from another device", async ({
     const expectedPrincipal = await authorize(
       otherDevicePage,
       async (authPage) => {
-        await addAuthenticatorForIdentity(
-          authPage,
-          identities[0].identityNumber,
-        );
         await signInWithIdentity(authPage, identities[0].identityNumber);
         await authPage
           .getByRole("button", { name: "Continue", exact: true })

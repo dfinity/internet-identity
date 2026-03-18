@@ -208,7 +208,6 @@ test("Should not follow redirect returned by /.well-known/ii-alternative-origins
 test("Should issue the same principal to nice url and canonical url", async ({
   page,
   identities,
-  addAuthenticatorForIdentity,
   signInWithIdentity,
 }) => {
   // First authentication: Test app configured with canonical URL as derivation origin
@@ -239,7 +238,6 @@ test("Should issue the same principal to nice url and canonical url", async ({
   const authPage1 = await pagePromise1;
 
   // Sign in with identity
-  await addAuthenticatorForIdentity(authPage1, identities[0].identityNumber);
   await signInWithIdentity(authPage1, identities[0].identityNumber);
   await authPage1
     .getByRole("button", { name: "Continue", exact: true })
@@ -266,7 +264,6 @@ test("Should issue the same principal to nice url and canonical url", async ({
   const authPage2 = await pagePromise2;
 
   // Use existing identity and passkey
-  await addAuthenticatorForIdentity(authPage2, identities[0].identityNumber);
   await signInWithIdentity(authPage2, identities[0].identityNumber);
   await authPage2
     .getByRole("button", { name: "Continue", exact: true })

@@ -6,12 +6,10 @@ test.describe("Dashboard Navigation", () => {
   test("User can register, sign in, access the dashboard and navigate to security page", async ({
     page,
     identities,
-    addAuthenticatorForIdentity,
     signInWithIdentity,
     managePage,
   }) => {
     await page.goto(II_URL);
-    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
     await signInWithIdentity(page, identities[0].identityNumber);
     await managePage.assertVisible();
 
@@ -36,20 +34,12 @@ test.describe("Dashboard Navigation", () => {
     });
 
     test.beforeEach(
-      async ({
-        page,
-        managePage,
-        identities,
-        addAuthenticatorForIdentity,
-        signInWithIdentity,
-      }) => {
+      async ({ page, managePage, identities, signInWithIdentity }) => {
         // Sign in with both identities to add them both to switcher
         await page.goto(II_URL);
-        await addAuthenticatorForIdentity(page, identities[0].identityNumber);
         await signInWithIdentity(page, identities[0].identityNumber);
         await managePage.signOut();
         await removeVirtualAuthenticator(page, identities[0].authenticatorId!);
-        await addAuthenticatorForIdentity(page, identities[1].identityNumber);
         await signInWithIdentity(page, identities[1].identityNumber);
         await managePage.signOut();
         await removeVirtualAuthenticator(page, identities[1].authenticatorId!);

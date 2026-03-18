@@ -3,6 +3,12 @@ import { Principal } from "@icp-sdk/core/principal";
 import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
 import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
+import {
+  type DerEncodedPublicKey,
+  type PublicKey,
+  type Signature,
+  SignIdentity,
+} from "@icp-sdk/core/agent";
 import borc from "borc";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
@@ -411,51 +417,211 @@ export const fromBase64URL = (base64Url: string): Uint8Array =>
       .padEnd(Math.ceil(base64Url.length / 4) * 4, "="),
   );
 
-/**
- * Converts the WebAuthn CDP private key (base64 PKCS#8 DER) to a DER-encoded
- * COSE public key (DER wrapper with DER_COSE_OID).
- */
-export const virtualAuthenticatorPrivKeyToPubKey = async (
-  privateKey: string,
-): Promise<Uint8Array> => {
-  const privateKeyDer = Buffer.from(privateKey, "base64");
-  const privateKeyObject = await crypto.subtle.importKey(
-    "pkcs8",
-    privateKeyDer,
-    { name: "ECDSA", namedCurve: "P-256" },
-    true,
-    ["sign"],
-  );
+export const toBase64 = (bytes: Uint8Array): string => {
+  if ("toBase64" in bytes && typeof bytes.toBase64 === "function") {
+    return bytes.toBase64();
+  }
+  if (typeof globalThis.btoa !== "undefined") {
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+  throw Error("Could not encode base64 string");
+};
 
-  const publicJwk = (await crypto.subtle.exportKey(
-    "jwk",
-    privateKeyObject,
-  )) as JsonWebKey;
+export const toBase64URL = (bytes: Uint8Array): string =>
+  toBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-  if (
-    publicJwk.kty !== "EC" ||
-    publicJwk.crv !== "P-256" ||
-    publicJwk.x === undefined ||
-    publicJwk.y === undefined
+export class CredentialIdentity extends SignIdentity {
+  #privateKey: CryptoKey;
+  #derPublicKey: DerEncodedPublicKey;
+  #credential: Protocol.WebAuthn.Credential;
+  #originHost: string;
+
+  private constructor(
+    privateKey: CryptoKey,
+    derPublicKey: Uint8Array,
+    credential: Protocol.WebAuthn.Credential,
+    originHost: string,
   ) {
-    throw new Error("Expected an EC P-256 WebAuthn key");
+    super();
+    this.#privateKey = privateKey;
+    this.#derPublicKey = derPublicKey as DerEncodedPublicKey;
+    this.#credential = credential;
+    this.#originHost = originHost;
   }
 
-  const x = fromBase64URL(publicJwk.x);
-  const y = fromBase64URL(publicJwk.y);
+  static async fromCredential(
+    credential: Protocol.WebAuthn.Credential,
+  ): Promise<CredentialIdentity> {
+    if (credential.rpId === undefined) {
+      throw new Error("Credential rpId is required");
+    }
+    const originHost = credential.rpId;
 
-  const coseKey = borc.encode(
-    new Map<number, number | Uint8Array>([
-      [1, 2],
-      [3, -7],
-      [-1, 1],
-      [-2, x],
-      [-3, y],
-    ]),
-  );
+    // Convert the WebAuthn CDP private key (base64 PKCS#8 DER) to a
+    // DER-encoded COSE public key (DER wrapper with DER_COSE_OID).
+    const privateKeyDer = Buffer.from(credential.privateKey, "base64");
+    const privateKeyObject = await crypto.subtle.importKey(
+      "pkcs8",
+      privateKeyDer,
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign"],
+    );
+    const publicJwk = (await crypto.subtle.exportKey(
+      "jwk",
+      privateKeyObject,
+    )) as JsonWebKey;
+    if (
+      publicJwk.kty !== "EC" ||
+      publicJwk.crv !== "P-256" ||
+      publicJwk.x === undefined ||
+      publicJwk.y === undefined
+    ) {
+      throw new Error("Expected an EC P-256 WebAuthn key");
+    }
+    const x = fromBase64URL(publicJwk.x);
+    const y = fromBase64URL(publicJwk.y);
+    const coseKey = borc.encode(
+      new Map<number, number | Uint8Array>([
+        [1, 2],
+        [3, -7],
+        [-1, 1],
+        [-2, x],
+        [-3, y],
+      ]),
+    );
+    const derPublicKey = wrapDER(coseKey, DER_COSE_OID);
+    const privateKey = await crypto.subtle.importKey(
+      "pkcs8",
+      Buffer.from(credential.privateKey, "base64"),
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
+      ["sign"],
+    );
+    return new CredentialIdentity(
+      privateKey,
+      derPublicKey,
+      credential,
+      originHost,
+    );
+  }
 
-  return wrapDER(coseKey, DER_COSE_OID);
-};
+  getPublicKey(): PublicKey {
+    const derPublicKey = this.#derPublicKey;
+    return {
+      toDer: () => derPublicKey,
+    };
+  }
+
+  /**
+   * Signs a blob using the WebAuthn virtual authenticator and returns a CBOR-encoded signature object.
+   */
+  async sign(blob: Uint8Array): Promise<Signature> {
+    // Update sign counter and determine rpId
+    const nextSignCount = (this.#credential.signCount ?? 0) + 1;
+    this.#credential.signCount = nextSignCount;
+    const rpId = this.#originHost;
+    const origin = `https://${rpId}`;
+
+    // Construct WebAuthn client data JSON and hash
+    const challenge = new Uint8Array(blob);
+    const clientDataJson = JSON.stringify({
+      type: "webauthn.get",
+      challenge: toBase64URL(challenge),
+      origin,
+      crossOrigin: false,
+    });
+    const clientDataBytes = new Uint8Array(
+      new TextEncoder().encode(clientDataJson),
+    );
+    const clientDataHash = new Uint8Array(
+      await crypto.subtle.digest("SHA-256", clientDataBytes),
+    );
+
+    // Construct authenticator data (rpId hash, user present, sign counter)
+    const rpIdBytes = new Uint8Array(new TextEncoder().encode(rpId));
+    const rpIdHash = new Uint8Array(
+      await crypto.subtle.digest("SHA-256", rpIdBytes),
+    );
+    const authenticatorData = new Uint8Array(37);
+    authenticatorData.set(rpIdHash, 0);
+    authenticatorData[32] = 0x01; // User Present
+    new DataView(authenticatorData.buffer).setUint32(33, nextSignCount, false);
+
+    // Concatenate authenticator data and client data hash for signing
+    const signInput = new Uint8Array(
+      authenticatorData.length + clientDataHash.length,
+    );
+    signInput.set(authenticatorData, 0);
+    signInput.set(clientDataHash, authenticatorData.length);
+
+    // Sign input with ECDSA P-256
+    const signature = await crypto.subtle.sign(
+      {
+        name: "ECDSA",
+        hash: { name: "SHA-256" },
+      },
+      this.#privateKey,
+      signInput,
+    );
+    const sigBytes = new Uint8Array(signature);
+    let derSignature: Uint8Array;
+    if (sigBytes[0] === 0x30) {
+      // Already DER encoded
+      derSignature = sigBytes;
+    } else {
+      // Convert raw r||s signature to ASN.1 DER sequence
+      // DER encoding requires each integer (r, s) to be minimally encoded and positive.
+      // This block slices the signature into r and s, trims leading zeros, and prepends a zero byte if the value is negative.
+      if (sigBytes.length % 2 !== 0) {
+        throw new Error("Expected ECDSA signature in raw r||s format");
+      }
+      /**
+       * Encodes an integer for DER: trims leading zeros, prepends 0x00 if MSB is set.
+       * This ensures the integer is positive and minimally encoded.
+       */
+      const encodeInt = (bytes: Uint8Array): Uint8Array => {
+        let start = 0;
+        while (start < bytes.length - 1 && bytes[start] === 0) {
+          start += 1;
+        }
+        let value = bytes.slice(start);
+        if ((value[0] & 0x80) !== 0) {
+          value = Uint8Array.from([0, ...value]);
+        }
+        return value;
+      };
+      const half = sigBytes.length / 2;
+      const r = encodeInt(sigBytes.slice(0, half));
+      const s = encodeInt(sigBytes.slice(half));
+      // Construct DER sequence: 0x30 [len] 0x02 [rlen] r 0x02 [slen] s
+      derSignature = Uint8Array.from([
+        0x30,
+        2 + r.length + 2 + s.length,
+        0x02,
+        r.length,
+        ...r,
+        0x02,
+        s.length,
+        ...s,
+      ]);
+    }
+
+    // Return CBOR-encoded signature object
+    const cbor = borc.encode(
+      new borc.Tagged(55799, {
+        authenticator_data: authenticatorData,
+        client_data_json: clientDataJson,
+        signature: derSignature,
+      }),
+    );
+    return cbor as Signature;
+  }
+}
 
 /**
  * Read current text value from clipboard, this is an alternative to

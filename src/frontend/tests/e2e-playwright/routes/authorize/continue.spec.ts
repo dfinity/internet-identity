@@ -18,7 +18,6 @@ test("Authorize with last used identity", async ({
 }) => {
   // Sign in with an identity to have a last used identity
   const expectedPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber); // Identity isn't "last used" yet
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -49,14 +48,12 @@ test.describe("multiple identities", () => {
     signInWithIdentity,
   }) => {
     const expectedPrincipal = await authorize(page, async (authPage) => {
-      await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
       await signInWithIdentity(authPage, identities[0].identityNumber);
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
     });
     const otherPrincipal = await authorize(page, async (authPage) => {
-      await addAuthenticatorForIdentity(authPage, identities[1].identityNumber);
       await signInWithIdentity(authPage, identities[1].identityNumber);
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
@@ -79,14 +76,12 @@ test.describe("multiple identities", () => {
     signInWithIdentity,
   }) => {
     const expectedPrincipal = await authorize(page, async (authPage) => {
-      await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
       await signInWithIdentity(authPage, identities[0].identityNumber);
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
         .click();
     });
     const otherPrincipal = await authorize(page, async (authPage) => {
-      await addAuthenticatorForIdentity(authPage, identities[1].identityNumber);
       await signInWithIdentity(authPage, identities[1].identityNumber);
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
@@ -116,11 +111,9 @@ test.describe("multiple identities", () => {
 test("Authorize by creating a new identity", async ({
   page,
   identities,
-  addAuthenticatorForIdentity,
   signInWithIdentity,
 }) => {
   const initialPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -140,11 +133,9 @@ test("Authorize by creating a new identity", async ({
 test("App logo appears when app is known", async ({
   page,
   identities,
-  addAuthenticatorForIdentity,
   signInWithIdentity,
 }) => {
   await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
     await authPage
@@ -156,7 +147,6 @@ test("App logo appears when app is known", async ({
 test("App logo doesn't appear when app is not known", async ({
   page,
   identities,
-  addAuthenticatorForIdentity,
   signInWithIdentity,
 }) => {
   await authorizeWithUrl(
@@ -164,7 +154,6 @@ test("App logo doesn't appear when app is not known", async ({
     TEST_APP_CANONICAL_URL,
     II_URL,
     async (authPage) => {
-      await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
       await signInWithIdentity(authPage, identities[0].identityNumber);
       await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();

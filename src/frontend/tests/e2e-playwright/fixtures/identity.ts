@@ -2,6 +2,7 @@ import { Page, test as base, expect } from "@playwright/test";
 import {
   addCredentialToVirtualAuthenticator,
   addVirtualAuthenticator,
+  CredentialIdentity,
   fromBase64,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
@@ -10,7 +11,6 @@ import {
 import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { Agent } from "undici";
 import { Principal } from "@icp-sdk/core/principal";
 import Protocol from "devtools-protocol";
@@ -260,55 +260,6 @@ export class IdentityWizard {
 }
 
 /**
- * Builds an ECDSA identity from a WebAuthn credential's private key.
- *
- * @param credential WebAuthn credential containing a base64 PKCS#8 P-256 private key.
- * @returns ECDSA identity that can sign requests as this credential.
- * @throws Error If the decoded key is not an EC P-256 key.
- */
-const createEcdsaIdentityFromCredential = async (
-  credential: Protocol.WebAuthn.Credential,
-): Promise<ECDSAKeyIdentity> => {
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    Buffer.from(credential.privateKey, "base64"),
-    { name: "ECDSA", namedCurve: "P-256" },
-    true,
-    ["sign"],
-  );
-
-  const jwk = (await crypto.subtle.exportKey("jwk", privateKey)) as JsonWebKey;
-  if (
-    jwk.kty !== "EC" ||
-    jwk.crv !== "P-256" ||
-    jwk.x === undefined ||
-    jwk.y === undefined
-  ) {
-    throw new Error("Expected an EC P-256 credential key");
-  }
-
-  const publicKey = await crypto.subtle.importKey(
-    "jwk",
-    {
-      kty: "EC",
-      crv: "P-256",
-      x: jwk.x,
-      y: jwk.y,
-      ext: true,
-      key_ops: ["verify"],
-    },
-    { name: "ECDSA", namedCurve: "P-256" },
-    true,
-    ["verify"],
-  );
-
-  return await ECDSAKeyIdentity.fromKeyPair({
-    publicKey,
-    privateKey,
-  });
-};
-
-/**
  * Creates an Internet Identity actor authenticated as the supplied credential.
  */
 const createActor = async (
@@ -316,7 +267,7 @@ const createActor = async (
   canisterId: Principal,
   credential: Protocol.WebAuthn.Credential,
 ): Promise<ActorSubclass<_SERVICE>> => {
-  const identity = await createEcdsaIdentityFromCredential(credential);
+  const identity = await CredentialIdentity.fromCredential(credential);
   const agent = await HttpAgent.create({
     host,
     shouldFetchRootKey: true,
@@ -393,22 +344,21 @@ export const test = base.extend<{
             fromBase64(credentials[0].credentialId),
           );
           const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
-          return {
+          const identity: Identity = {
             canisterId,
             name,
             credentials,
             identityNumber,
           };
+          return identity;
         }),
       ),
     ),
-  signInWithIdentity: ({ identities }, use) =>
+  signInWithIdentity: ({ identities, addAuthenticatorForIdentity }, use) =>
     use(async (page: Page, identityNumber: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
-      );
-      if (identity === undefined) {
-        throw new Error("Identity not found");
+      const identity = getIdentityByNumber(identities, identityNumber);
+      if (identity.authenticatorId === undefined) {
+        await addAuthenticatorForIdentity(page, identityNumber);
       }
       const wizard = new IdentityWizard(page);
       await wizard.signIn();
@@ -416,9 +366,6 @@ export const test = base.extend<{
   actorForIdentity: ({ identityConfig, identities }, use) =>
     use((identityNumber: bigint) => {
       const identity = getIdentityByNumber(identities, identityNumber);
-      if (identity === undefined) {
-        throw new Error("Identity not found");
-      }
       return createActor(
         identityConfig.host ?? DEFAULT_HOST,
         identity.canisterId,

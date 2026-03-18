@@ -7,15 +7,8 @@ import { LEGACY_II_URL } from "$lib/config";
 
 test.describe("Access methods", () => {
   test.beforeEach(
-    async ({
-      page,
-      manageAccessPage,
-      identities,
-      signInWithIdentity,
-      addAuthenticatorForIdentity,
-    }) => {
+    async ({ page, manageAccessPage, identities, signInWithIdentity }) => {
       await manageAccessPage.goto();
-      await addAuthenticatorForIdentity(page, identities[0].identityNumber);
       await signInWithIdentity(page, identities[0].identityNumber);
     },
   );

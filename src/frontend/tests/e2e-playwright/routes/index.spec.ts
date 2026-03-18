@@ -244,13 +244,10 @@ test.describe("Last used identities listed", () => {
     page,
     managePage,
     identities,
-    addAuthenticatorForIdentity,
     signInWithIdentity,
   }) => {
-    await page.goto(II_URL);
-    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
-
     // Sign in with an identity to have a last used identity
+    await page.goto(II_URL);
     await signInWithIdentity(page, identities[0].identityNumber);
     await managePage.signOut();
 
@@ -271,11 +268,8 @@ test.describe("Last used identities listed", () => {
     page,
     managePage,
     identities,
-    addAuthenticatorForIdentity,
     signInWithIdentity,
   }) => {
-    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
-
     // Sign in and out to have an identity in the identity switcher
     await page.goto(II_URL);
     await signInWithIdentity(page, identities[0].identityNumber);
@@ -293,11 +287,9 @@ test.describe("Last used identities listed", () => {
     page,
     managePage,
     identities,
-    addAuthenticatorForIdentity,
     signInWithIdentity,
   }) => {
     // Sign in and out to have an identity in the identity switcher
-    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
     await page.goto(II_URL);
     await signInWithIdentity(page, identities[0].identityNumber);
     await managePage.signOut();

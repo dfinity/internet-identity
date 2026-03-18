@@ -2,12 +2,13 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import {
   addVirtualAuthenticator,
-  virtualAuthenticatorPrivKeyToPubKey,
   fromBase64URL,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
   LEGACY_II_URL,
   removeVirtualAuthenticator,
+  addCredentialToVirtualAuthenticator,
+  CredentialIdentity,
 } from "../utils";
 
 const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
@@ -46,21 +47,19 @@ test("Can upgrade identity", async ({
   );
 
   // Get the created credential from the virtual authenticator
-  const [credential] = await getCredentialsFromVirtualAuthenticator(
+  const [legacyCredential] = await getCredentialsFromVirtualAuthenticator(
     page,
     legacyAuthenticatorId,
   );
   await removeVirtualAuthenticator(page, legacyAuthenticatorId);
-  const publicKey = await virtualAuthenticatorPrivKeyToPubKey(
-    credential!.privateKey,
-  );
-  const credentialId = fromBase64URL(credential!.credentialId);
 
   // Use an actor to create a legacy passkey (not id.ai)
   // since this functionality is no longer available.
   const actor = await actorForIdentity(identities[0].identityNumber);
 
   // Add the legacy passkey to the identity
+  const legacyIdentity =
+    await CredentialIdentity.fromCredential(legacyCredential);
   await actor.authn_method_add(identities[0].identityNumber, {
     metadata: [
       ["alias", { String: LEGACY_PASSKEY_NAME }],
@@ -68,8 +67,8 @@ test("Can upgrade identity", async ({
     ],
     authn_method: {
       WebAuthn: {
-        pubkey: publicKey,
-        credential_id: credentialId,
+        pubkey: legacyIdentity.getPublicKey().toDer(),
+        credential_id: fromBase64URL(legacyCredential.credentialId),
         aaguid: [],
       },
     },
@@ -82,11 +81,12 @@ test("Can upgrade identity", async ({
 
   // Remove the non-legacy passkey so the identity is only accessible via the legacy passkey,
   // which simulates the state of an identity that hasn't been upgraded yet.
+  const nonLegacyIdentity = await CredentialIdentity.fromCredential(
+    identities[0].credentials[0],
+  );
   await actor.authn_method_remove(
     identities[0].identityNumber,
-    await virtualAuthenticatorPrivKeyToPubKey(
-      identities[0].credentials[0].privateKey,
-    ),
+    nonLegacyIdentity.getPublicKey().toDer(),
   );
 
   // Verify identity can be upgraded multiple times
@@ -94,6 +94,11 @@ test("Can upgrade identity", async ({
     // Navigate to the new II_URL to trigger the upgrade flow
     await page.goto(II_URL);
     const authenticatorId = await addVirtualAuthenticator(page);
+    await addCredentialToVirtualAuthenticator(
+      page,
+      authenticatorId,
+      legacyCredential,
+    );
 
     // Open the sign-in dialog
     if (attempt > 0) {
@@ -104,26 +109,28 @@ test("Can upgrade identity", async ({
     }
 
     // Select the passkey authentication method
-    await page.getByRole("button", { name: "Continue with passkey" }).click();
-    await page.getByRole("button", { name: "Upgrade" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Continue with passkey" }).click();
+    await dialog.getByRole("button", { name: "Upgrade" }).click();
 
     // Enter the identity number
-    await page
+    await dialog
       .getByPlaceholder("Internet Identity number")
       .fill(identities[0].identityNumber.toString());
-    await page.getByRole("button", { name: "Continue" }).click();
+    await dialog.getByRole("button", { name: "Continue" }).click();
 
     // On subsequent attempts, we expect a message that the identity is already upgraded
     if (attempt > 0) {
       await expect(
-        page.getByRole("heading", { name: "Identity already upgraded" }),
+        dialog.getByRole("heading", { name: "Identity already upgraded" }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Upgrade again" }).click();
+      await dialog.getByRole("button", { name: "Upgrade again" }).click();
     }
 
     // Complete the upgrade process
-    await page.getByLabel("Identity name").fill(identities[0].name);
-    await page.getByRole("button", { name: "Upgrade identity" }).click();
+    await dialog.getByLabel("Identity name").fill(identities[0].name);
+    await dialog.getByRole("button", { name: "Upgrade identity" }).click();
+    await expect(dialog).toBeHidden();
     await managePage.assertVisible();
 
     // Cleanup by removing the newly added authenticator and signing out

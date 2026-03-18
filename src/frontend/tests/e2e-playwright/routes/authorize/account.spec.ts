@@ -9,7 +9,6 @@ test("Create another account and authorize with primary", async ({
   signInWithIdentity,
 }) => {
   const primaryPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -37,7 +36,6 @@ test("Create another account and authorize with it", async ({
   signInWithIdentity,
 }) => {
   const primaryPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -65,7 +63,6 @@ test("Create another account, make it default and authorize with it", async ({
   signInWithIdentity,
 }) => {
   const primaryPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -103,7 +100,6 @@ test("Rename primary account and authorize with it", async ({
   signInWithIdentity,
 }) => {
   const primaryPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -133,7 +129,6 @@ test("Rename secondary account and authorize with it", async ({
   signInWithIdentity,
 }) => {
   const primaryPrincipal = await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("button", { name: "Continue", exact: true })
@@ -170,11 +165,9 @@ test("Rename secondary account and authorize with it", async ({
 test("Can't create more than 5 accounts", async ({
   page,
   identities,
-  addAuthenticatorForIdentity,
   signInWithIdentity,
 }) => {
   await authorize(page, async (authPage) => {
-    await addAuthenticatorForIdentity(authPage, identities[0].identityNumber);
     await signInWithIdentity(authPage, identities[0].identityNumber);
     await authPage
       .getByRole("switch", { name: "Enable multiple accounts" })

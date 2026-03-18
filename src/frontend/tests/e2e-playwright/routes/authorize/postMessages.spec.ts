@@ -20,7 +20,6 @@ test("Authorize ready message should be sent immediately", async ({ page }) => {
 test("Should allow valid message", async ({
   page,
   identities,
-  addAuthenticatorForIdentity,
   signInWithIdentity,
 }) => {
   await openTestAppWithII(page);
@@ -31,7 +30,6 @@ test("Should allow valid message", async ({
   await page.locator("#validMessageBtn").click(); // message 2: authorize-client
 
   // Complete authentication in II popup
-  await addAuthenticatorForIdentity(iiPage, identities[0].identityNumber);
   await signInWithIdentity(iiPage, identities[0].identityNumber);
   await iiPage.getByRole("button", { name: "Continue", exact: true }).click();
 
