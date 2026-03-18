@@ -405,44 +405,7 @@ fn get_static_assets(config: &InternetIdentityFrontendArgs) -> Vec<AssetUtilAsse
     }
 
     assets
-    }
-
-#[cfg(test)]
-mod tests {
-    use super::get_content_security_policy;
-
-    #[test]
-    fn csp_differs_between_dev_and_prod_for_connect_src_and_upgrade_insecure_requests() {
-    // Dev CSP: allow http: in connect-src and omit upgrade-insecure-requests
-    let dev_csp =
-        get_content_security_policy(Vec::new(), None, true);
-
-    assert!(
-        dev_csp.contains("connect-src 'self' https: http:"),
-        "dev CSP should allow http: in connect-src, got: {dev_csp}"
-    );
-    assert!(
-        !dev_csp.contains("upgrade-insecure-requests;"),
-        "dev CSP should not include upgrade-insecure-requests, got: {dev_csp}"
-    );
-
-    // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
-    let prod_csp =
-        get_content_security_policy(Vec::new(), None, false);
-
-    assert!(
-        prod_csp.contains("connect-src 'self' https:"),
-        "prod CSP should allow https: in connect-src, got: {prod_csp}"
-    );
-    assert!(
-        !prod_csp.contains("connect-src 'self' https: http:"),
-        "prod CSP should not allow http: in connect-src, got: {prod_csp}"
-    );
-    assert!(
-        prod_csp.contains("upgrade-insecure-requests;"),
-        "prod CSP should include upgrade-insecure-requests, got: {prod_csp}"
-    );
-    }
+}
 
 /// Fix up HTML pages by injecting canister ID and canister config
 fn fixup_html(html: &str, config: &InternetIdentityFrontendArgs) -> String {
@@ -505,7 +468,8 @@ candid::export_service!();
 fn main() {}
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use super::get_content_security_policy;
     use crate::__export_service;
     use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
@@ -522,5 +486,36 @@ mod test {
         .unwrap_or_else(|e| {
             panic!("the canister code interface is not equal to the did file: {e:?}")
         });
+    }
+
+    #[test]
+    fn csp_differs_between_dev_and_prod_for_connect_src_and_upgrade_insecure_requests() {
+        // Dev CSP: allow http: in connect-src and omit upgrade-insecure-requests
+        let dev_csp = get_content_security_policy(Vec::new(), None, true);
+
+        assert!(
+            dev_csp.contains("connect-src 'self' https: http:"),
+            "dev CSP should allow http: in connect-src, got: {dev_csp}"
+        );
+        assert!(
+            !dev_csp.contains("upgrade-insecure-requests;"),
+            "dev CSP should not include upgrade-insecure-requests, got: {dev_csp}"
+        );
+
+        // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
+        let prod_csp = get_content_security_policy(Vec::new(), None, false);
+
+        assert!(
+            prod_csp.contains("connect-src 'self' https:"),
+            "prod CSP should allow https: in connect-src, got: {prod_csp}"
+        );
+        assert!(
+            !prod_csp.contains("connect-src 'self' https: http:"),
+            "prod CSP should not allow http: in connect-src, got: {prod_csp}"
+        );
+        assert!(
+            prod_csp.contains("upgrade-insecure-requests;"),
+            "prod CSP should include upgrade-insecure-requests, got: {prod_csp}"
+        );
     }
 }
