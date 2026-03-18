@@ -4,6 +4,7 @@ import { II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { LEGACY_II_URL } from "$lib/config";
+import { set } from "zod";
 
 test.describe("Access methods", () => {
   test.beforeEach(
@@ -26,6 +27,7 @@ test.describe("Access methods", () => {
     manageAccessPage,
     identities,
     signInWithIdentity,
+    setCredentialsForIdentity,
   }) => {
     const existingCredential = identities[0].credentials[0];
     await manageAccessPage.assertPasskeyCount(1);
@@ -38,7 +40,9 @@ test.describe("Access methods", () => {
     expect(newCredential).toBeDefined();
 
     // Verify we can still sign in with the existing passkey
-    identities[0].credentials = [existingCredential];
+    await setCredentialsForIdentity(page, identities[0].identityNumber, [
+      existingCredential,
+    ]);
     await managePage.signOut();
     await manageAccessPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
@@ -46,7 +50,9 @@ test.describe("Access methods", () => {
 
     // Verify we can now also sign in with the new passkey
     await managePage.signOut();
-    identities[0].credentials = [newCredential];
+    await setCredentialsForIdentity(page, identities[0].identityNumber, [
+      newCredential,
+    ]);
     await manageAccessPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
     await manageAccessPage.assertVisible();
