@@ -432,9 +432,13 @@ export const test = base.extend<{
       // Add virtual authenticator and populate it with the identity's credentials
       identity.authenticatorId = await addVirtualAuthenticator(page);
       for (const credential of identity.credentials) {
+        const { authenticatorId } = identity;
+        if (authenticatorId === undefined) {
+          continue;
+        }
         await addCredentialToVirtualAuthenticator(
           page,
-          identity.authenticatorId!,
+          authenticatorId,
           credential,
         );
       }
@@ -466,16 +470,24 @@ export const test = base.extend<{
               !existingCredentialIds.has(newCredential.credentialId),
           );
           for (const credential of credentialToRemove) {
+            const { authenticatorId } = identity;
+            if (authenticatorId === undefined) {
+              continue;
+            }
             await removeCredentialFromVirtualAuthenticator(
               page,
-              identity.authenticatorId!,
+              authenticatorId,
               credential.credentialId,
             );
           }
           for (const credential of credentialToAdd) {
+            const { authenticatorId } = identity;
+            if (authenticatorId === undefined) {
+              continue;
+            }
             await addCredentialToVirtualAuthenticator(
               page,
-              identity.authenticatorId!,
+              authenticatorId,
               credential,
             );
           }
