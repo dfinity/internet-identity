@@ -2,30 +2,14 @@ import { Page, test as base, expect } from "@playwright/test";
 import {
   addCredentialToVirtualAuthenticator,
   addVirtualAuthenticator,
-  CredentialIdentity,
+  createActorForCredential,
   fromBase64,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
   removeCredentialFromVirtualAuthenticator,
 } from "../utils";
-import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import { Agent } from "undici";
 import { Principal } from "@icp-sdk/core/principal";
 import Protocol from "devtools-protocol";
-
-// Fetch that's compatible with Vite server's self-signed certs
-const insecureAgent = new Agent({
-  connect: {
-    rejectUnauthorized: false,
-  },
-});
-const insecureFetch: typeof fetch = (url, options = {}) =>
-  fetch(url, {
-    dispatcher: insecureAgent,
-    ...options,
-  } as RequestInit);
 
 export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
 export const DEFAULT_NAME = "Test User";
@@ -38,6 +22,7 @@ export type IdentityConfig = {
 };
 
 interface Identity {
+  host: string;
   canisterId: Principal;
   identityNumber: bigint;
   name: string;
@@ -259,29 +244,6 @@ export class IdentityWizard {
   }
 }
 
-/**
- * Creates an Internet Identity actor authenticated as the supplied credential.
- */
-const createActor = async (
-  host: string,
-  canisterId: Principal,
-  credential: Protocol.WebAuthn.Credential,
-): Promise<ActorSubclass<_SERVICE>> => {
-  const identity = await CredentialIdentity.fromCredential(credential);
-  const agent = await HttpAgent.create({
-    host,
-    shouldFetchRootKey: true,
-    verifyQuerySignatures: false,
-    fetch: insecureFetch,
-    identity,
-  });
-  const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
-    agent,
-    canisterId,
-  });
-  return actor;
-};
-
 const getIdentityByNumber = (
   identities: Identity[],
   identityNumber: bigint,
@@ -299,9 +261,6 @@ export const test = base.extend<{
   identityConfig: IdentityConfig;
   identities: Identity[];
   signInWithIdentity: (page: Page, identityNumber: bigint) => Promise<void>;
-  actorForIdentity: (
-    identityNumber: bigint,
-  ) => Promise<ActorSubclass<_SERVICE>>;
   addAuthenticatorForIdentity: (
     page: Page,
     identityNumber: bigint,
@@ -335,8 +294,9 @@ export const test = base.extend<{
           );
           await page.close();
           await context.close();
-          const actor = await createActor(
-            identityConfig.host ?? DEFAULT_HOST,
+          const host = identityConfig.host ?? DEFAULT_HOST;
+          const actor = await createActorForCredential(
+            host,
             canisterId,
             credentials[0],
           );
@@ -345,6 +305,7 @@ export const test = base.extend<{
           );
           const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
           const identity: Identity = {
+            host,
             canisterId,
             name,
             credentials,
@@ -362,15 +323,6 @@ export const test = base.extend<{
       }
       const wizard = new IdentityWizard(page);
       await wizard.signIn();
-    }),
-  actorForIdentity: ({ identityConfig, identities }, use) =>
-    use((identityNumber: bigint) => {
-      const identity = getIdentityByNumber(identities, identityNumber);
-      return createActor(
-        identityConfig.host ?? DEFAULT_HOST,
-        identity.canisterId,
-        identity.credentials[0],
-      );
     }),
   addAuthenticatorForIdentity: ({ identities }, use) =>
     use(async (page: Page, identityNumber: bigint) => {

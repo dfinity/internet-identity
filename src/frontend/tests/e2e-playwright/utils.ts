@@ -4,12 +4,18 @@ import { readCanisterId } from "@dfinity/internet-identity-vite-plugins/utils";
 import Protocol from "devtools-protocol";
 import { DER_COSE_OID, wrapDER } from "@icp-sdk/core/identity";
 import {
+  Actor,
+  ActorSubclass,
   type DerEncodedPublicKey,
+  HttpAgent,
   type PublicKey,
   type Signature,
   SignIdentity,
 } from "@icp-sdk/core/agent";
+import { Agent } from "undici";
 import borc from "borc";
+import { _SERVICE } from "$lib/generated/internet_identity_types";
+import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
 
 const testAppCanisterId = readCanisterId({ canisterName: "test_app" });
 export const II_URL = "https://id.ai";
@@ -622,6 +628,41 @@ export class CredentialIdentity extends SignIdentity {
     return cbor as Signature;
   }
 }
+
+// Fetch that's compatible with Vite server's self-signed certs
+const insecureAgent = new Agent({
+  connect: {
+    rejectUnauthorized: false,
+  },
+});
+const insecureFetch: typeof fetch = (url, options = {}) =>
+  fetch(url, {
+    dispatcher: insecureAgent,
+    ...options,
+  } as RequestInit);
+
+/**
+ * Creates an Internet Identity actor authenticated as the supplied credential.
+ */
+export const createActorForCredential = async (
+  host: string,
+  canisterId: Principal,
+  credential: Protocol.WebAuthn.Credential,
+): Promise<ActorSubclass<_SERVICE>> => {
+  const identity = await CredentialIdentity.fromCredential(credential);
+  const agent = await HttpAgent.create({
+    host,
+    shouldFetchRootKey: true,
+    verifyQuerySignatures: false,
+    fetch: insecureFetch,
+    identity,
+  });
+  const actor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+    agent,
+    canisterId,
+  });
+  return actor;
+};
 
 /**
  * Read current text value from clipboard, this is an alternative to

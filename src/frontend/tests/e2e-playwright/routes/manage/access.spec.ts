@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { II_URL } from "../../utils";
+import { createActorForCredential, II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { LEGACY_II_URL } from "$lib/config";
@@ -167,7 +167,6 @@ test.describe("Access methods", () => {
         manageAccessPage,
         identities,
         signInWithIdentity,
-        actorForIdentity,
       }) => {
         // Rename current passkey so we can differentiate it from the legacy passkey
         await manageAccessPage.assertPasskeyCount(1);
@@ -180,7 +179,11 @@ test.describe("Access methods", () => {
 
         // Use an actor to create a legacy passkey (not id.ai)
         // since this functionality is no longer available.
-        const actor = await actorForIdentity(identities[0].identityNumber);
+        const actor = await createActorForCredential(
+          identities[0].host,
+          identities[0].canisterId,
+          identities[0].credentials[0],
+        );
         const identity = await ECDSAKeyIdentity.generate();
         await actor.authn_method_add(identities[0].identityNumber, {
           metadata: [

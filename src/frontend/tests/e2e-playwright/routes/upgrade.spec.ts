@@ -9,16 +9,12 @@ import {
   removeVirtualAuthenticator,
   addCredentialToVirtualAuthenticator,
   CredentialIdentity,
+  createActorForCredential,
 } from "../utils";
 
 const LEGACY_PASSKEY_NAME = "pre-upgrade-passkey";
 
-test("Can upgrade identity", async ({
-  page,
-  managePage,
-  identities,
-  actorForIdentity,
-}) => {
+test("Can upgrade identity", async ({ page, managePage, identities }) => {
   // Navigate to legacy page that doesn't redirect
   await page.goto(LEGACY_II_URL + "/self-service");
 
@@ -55,7 +51,11 @@ test("Can upgrade identity", async ({
 
   // Use an actor to create a legacy passkey (not id.ai)
   // since this functionality is no longer available.
-  const actor = await actorForIdentity(identities[0].identityNumber);
+  const actor = await createActorForCredential(
+    identities[0].host,
+    identities[0].canisterId,
+    identities[0].credentials[0],
+  );
 
   // Add the legacy passkey to the identity
   const legacyIdentity =
