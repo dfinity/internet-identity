@@ -7,6 +7,7 @@ import {
   getCredentialsFromVirtualAuthenticator,
   II_URL,
   removeCredentialFromVirtualAuthenticator,
+  removeVirtualAuthenticator,
 } from "../utils";
 import { Principal } from "@icp-sdk/core/principal";
 import Protocol from "devtools-protocol";
@@ -279,6 +280,10 @@ export const test = base.extend<{
     page: Page,
     identityNumber: bigint,
   ) => Promise<void>;
+  removeAuthenticatorForIdentity: (
+    page: Page,
+    identityNumber: bigint,
+  ) => Promise<void>;
   setCredentialsForIdentity: (
     page: Page,
     identityNumber: bigint,
@@ -353,6 +358,18 @@ export const test = base.extend<{
 
       // Keep this identity synchronized with passkeys created in page code.
       await trackIdentityCredentialCreation(page, identity);
+    }),
+  removeAuthenticatorForIdentity: ({ identities }, use) =>
+    use(async (page: Page, identityNumber: bigint) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+      const authenticatorId = identity.authenticatorIds.get(page);
+      if (authenticatorId === undefined) {
+        throw new Error(
+          `No authenticator found for identity ${identityNumber} on the provided page`,
+        );
+      }
+      await removeVirtualAuthenticator(page, authenticatorId);
+      identity.authenticatorIds.delete(page);
     }),
   setCredentialsForIdentity: ({ identities }, use) =>
     use(

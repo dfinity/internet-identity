@@ -34,15 +34,27 @@ test.describe("Dashboard Navigation", () => {
     });
 
     test.beforeEach(
-      async ({ page, managePage, identities, signInWithIdentity }) => {
+      async ({
+        page,
+        managePage,
+        identities,
+        signInWithIdentity,
+        removeAuthenticatorForIdentity,
+      }) => {
         // Sign in with both identities to add them both to switcher
         await page.goto(II_URL);
         await signInWithIdentity(page, identities[0].identityNumber);
         await managePage.signOut();
-        await removeVirtualAuthenticator(page, identities[0].authenticatorId!);
+        await removeAuthenticatorForIdentity(
+          page,
+          identities[0].identityNumber,
+        );
         await signInWithIdentity(page, identities[1].identityNumber);
         await managePage.signOut();
-        await removeVirtualAuthenticator(page, identities[1].authenticatorId!);
+        await removeAuthenticatorForIdentity(
+          page,
+          identities[1].identityNumber,
+        );
       },
     );
 
@@ -51,6 +63,7 @@ test.describe("Dashboard Navigation", () => {
       managePage,
       identities,
       addAuthenticatorForIdentity,
+      removeAuthenticatorForIdentity,
     }) => {
       // Sign in to dashboard with first identity
       await page.goto(II_URL);
@@ -76,7 +89,7 @@ test.describe("Dashboard Navigation", () => {
       await page.getByRole("link", { name: "Access and recovery" }).click();
 
       // Switch to second identity
-      await removeVirtualAuthenticator(page, identities[0].authenticatorId!);
+      await removeAuthenticatorForIdentity(page, identities[0].identityNumber);
       await addAuthenticatorForIdentity(page, identities[1].identityNumber);
       await page.getByRole("button", { name: "Switch identity" }).click();
       await page.getByRole("button", { name: identities[1].name }).click();

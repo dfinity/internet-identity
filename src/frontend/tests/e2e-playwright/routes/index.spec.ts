@@ -288,12 +288,13 @@ test.describe("Last used identities listed", () => {
     managePage,
     identities,
     signInWithIdentity,
+    removeAuthenticatorForIdentity,
   }) => {
     // Sign in and out to have an identity in the identity switcher
     await page.goto(II_URL);
     await signInWithIdentity(page, identities[0].identityNumber);
     await managePage.signOut();
-    await removeVirtualAuthenticator(page, identities[0].authenticatorId!);
+    await removeAuthenticatorForIdentity(page, identities[0].identityNumber);
 
     // Now sign up for a new identity
     await addVirtualAuthenticator(page);
