@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { II_URL, removeVirtualAuthenticator } from "../../utils";
+import { II_URL } from "../../utils";
 
 test.describe("Dashboard Navigation", () => {
   test("User can register, sign in, access the dashboard and navigate to security page", async ({

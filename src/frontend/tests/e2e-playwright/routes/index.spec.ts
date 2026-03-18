@@ -1,9 +1,5 @@
 import { expect } from "@playwright/test";
-import {
-  addVirtualAuthenticator,
-  removeVirtualAuthenticator,
-  II_URL,
-} from "../utils";
+import { addVirtualAuthenticator, II_URL } from "../utils";
 import { test } from "../fixtures";
 
 const DEFAULT_USER_NAME = "John Doe";
