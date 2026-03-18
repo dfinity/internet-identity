@@ -6,6 +6,7 @@ import {
   TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   II_URL,
+  addVirtualAuthenticator,
 } from "../../utils";
 import { IdentityWizard } from "../../fixtures/identity";
 
@@ -126,6 +127,7 @@ test("Authorize by creating a new identity", async ({
       .click();
   });
   const newIdentityPrincipal = await authorize(page, async (authPage) => {
+    await addVirtualAuthenticator(authPage);
     const wizard = new IdentityWizard(authPage);
     await wizard.signUp("Jane Doe");
     await authPage

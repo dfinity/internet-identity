@@ -202,32 +202,31 @@ export class IdentityWizard {
    * of buttons in order (if visible) to get to the intended view from any page.
    */
   async #goto(): Promise<void> {
-    // Wait for any of the buttons we need to click to show up
-    const buttons = [
-      "Sign in",
-      "Switch identity",
-      "Add another identity",
-      "Continue with passkey",
-    ];
-    await this.#page
-      .getByRole("button", { name: new RegExp(buttons.join("|")) })
-      .first()
-      .waitFor();
-    // If continue with passkey button is already visible,
-    // e.g. after /login redirect we only need to click that.
-    const continueWithPasskeyButton = this.#page.getByRole("button", {
+    const signInLocator = this.#page.getByRole("button", {
+      name: "Sign in",
+    });
+    const switchIdentityLocator = this.#page.getByRole("button", {
+      name: "Switch identity",
+    });
+    const addAnotherIdentityLocator = this.#page.getByRole("button", {
+      name: "Add another identity",
+    });
+    const continueWithPasskeyLocator = this.#page.getByRole("button", {
       name: "Continue with passkey",
     });
-    if (await continueWithPasskeyButton.isVisible()) {
-      await continueWithPasskeyButton.click();
-      return;
-    }
-    // Else click all buttons in order (if visible)
-    for (const button of buttons) {
-      const locator = this.#page.getByRole("button", { name: button });
-      if (await locator.isVisible()) {
-        await locator.click();
-      }
+    await signInLocator
+      .or(switchIdentityLocator)
+      .or(continueWithPasskeyLocator)
+      .waitFor();
+    if (await switchIdentityLocator.isVisible()) {
+      await switchIdentityLocator.click();
+      await addAnotherIdentityLocator.click();
+      await continueWithPasskeyLocator.click();
+    } else if (await signInLocator.isVisible()) {
+      await signInLocator.click();
+      await continueWithPasskeyLocator.click();
+    } else if (await continueWithPasskeyLocator.isVisible()) {
+      await continueWithPasskeyLocator.click();
     }
   }
 }
