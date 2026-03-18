@@ -381,6 +381,25 @@ export const addCredentialToVirtualAuthenticator = async (
     credential,
   });
 };
+};
+
+/**
+ * Removes a credential from a virtual authenticator
+ * @param page The page to remove the credential from
+ * @param authenticatorId The authenticator ID
+ * @param credentialId The credential ID to remove
+ */
+export const removeCredentialFromVirtualAuthenticator = async (
+  page: Page,
+  authenticatorId: string,
+  credentialId: string,
+): Promise<void> => {
+  const client = await getWebAuthnClient(page);
+  await client.send("WebAuthn.removeCredential", {
+    authenticatorId,
+    credentialId,
+  });
+};
 
 export const fromBase64 = (base64: string): Uint8Array =>
   Uint8Array.from(globalThis.atob(base64), (m) => m.charCodeAt(0));

@@ -45,20 +45,14 @@ test.describe("Dashboard Navigation", () => {
       }) => {
         // Sign in with both identities to add them both to switcher
         await page.goto(II_URL);
-        const authenticatorId1 = await addAuthenticatorForIdentity(
-          page,
-          identities[0].identityNumber,
-        );
+        await addAuthenticatorForIdentity(page, identities[0].identityNumber);
         await signInWithIdentity(page, identities[0].identityNumber);
         await managePage.signOut();
-        await removeVirtualAuthenticator(page, authenticatorId1);
-        const authenticatorId2 = await addAuthenticatorForIdentity(
-          page,
-          identities[1].identityNumber,
-        );
+        await removeVirtualAuthenticator(page, identities[0].authenticatorId!);
+        await addAuthenticatorForIdentity(page, identities[1].identityNumber);
         await signInWithIdentity(page, identities[1].identityNumber);
         await managePage.signOut();
-        await removeVirtualAuthenticator(page, authenticatorId2);
+        await removeVirtualAuthenticator(page, identities[1].authenticatorId!);
       },
     );
 
@@ -70,10 +64,7 @@ test.describe("Dashboard Navigation", () => {
     }) => {
       // Sign in to dashboard with first identity
       await page.goto(II_URL);
-      const authenticatorId1 = await addAuthenticatorForIdentity(
-        page,
-        identities[0].identityNumber,
-      );
+      await addAuthenticatorForIdentity(page, identities[0].identityNumber);
       await page.getByRole("button", { name: "Switch identity" }).click();
       await page
         .getByRole("button", { name: "Manage your Internet Identity" })
@@ -95,7 +86,7 @@ test.describe("Dashboard Navigation", () => {
       await page.getByRole("link", { name: "Access and recovery" }).click();
 
       // Switch to second identity
-      await removeVirtualAuthenticator(page, authenticatorId1);
+      await removeVirtualAuthenticator(page, identities[0].authenticatorId!);
       await addAuthenticatorForIdentity(page, identities[1].identityNumber);
       await page.getByRole("button", { name: "Switch identity" }).click();
       await page.getByRole("button", { name: identities[1].name }).click();

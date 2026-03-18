@@ -5,6 +5,7 @@ import {
   fromBase64,
   getCredentialsFromVirtualAuthenticator,
   II_URL,
+  removeCredentialFromVirtualAuthenticator,
 } from "../utils";
 import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
@@ -40,13 +41,12 @@ interface Identity {
   canisterId: Principal;
   identityNumber: bigint;
   name: string;
+  authenticatorId?: string;
   credentials: Protocol.WebAuthn.Credential[];
 }
 
-type CredentialSyncState = { syncCredentials: () => Promise<void> };
-
-const credentialCreateHookInstalled = new WeakSet<Page>();
-const credentialCreateSyncState = new WeakMap<Page, CredentialSyncState>();
+const credentialCreateTrackingInstalled = new WeakSet<Page>();
+const trackedIdentityByPage = new WeakMap<Page, Identity>();
 const CREDENTIAL_CREATE_HOOK = "__iiOnCredentialCreate";
 const CREDENTIAL_CREATE_HOOK_FLAG = "__iiCredentialCreateHookInstalled";
 
@@ -57,7 +57,7 @@ const CREDENTIAL_CREATE_HOOK_FLAG = "__iiCredentialCreateHookInstalled";
  * The patch also constrains passkey creation to ES256 (`alg: -7`), i.e. ECDSA
  * on P-256, so created credentials match fixture expectations.
  */
-const installCredentialCreateHook = ({
+const installCredentialCreateOverride = ({
   hookName,
   installedFlag,
 }: {
@@ -109,7 +109,7 @@ const installCredentialCreateHook = ({
  * Installs the credential-create hook in the currently loaded document when
  * the page points at Internet Identity. Safe to call repeatedly.
  */
-const installCredentialCreateHookOnCurrentDocument = async (
+const installCredentialCreateOverrideOnCurrentDocument = async (
   page: Page,
 ): Promise<void> => {
   try {
@@ -121,7 +121,7 @@ const installCredentialCreateHookOnCurrentDocument = async (
   }
 
   try {
-    await page.evaluate(installCredentialCreateHook, {
+    await page.evaluate(installCredentialCreateOverride, {
       hookName: CREDENTIAL_CREATE_HOOK,
       installedFlag: CREDENTIAL_CREATE_HOOK_FLAG,
     });
@@ -131,32 +131,55 @@ const installCredentialCreateHookOnCurrentDocument = async (
 };
 
 /**
- * Exposes a single Playwright binding per page and keeps the in-page
- * credential-create hook installed across navigations.
+ * Refreshes fixture credentials from the authenticator currently tracked for
+ * the binding source page. If the authenticator is no longer valid, tracking
+ * is cleared.
  */
-const ensureCredentialCreateSyncHook = async (page: Page): Promise<void> => {
-  if (credentialCreateHookInstalled.has(page)) {
+const refreshTrackedIdentityCredentials = async (source: {
+  page?: Page;
+}): Promise<void> => {
+  const page = source.page;
+  if (page === undefined) {
     return;
   }
 
-  await page.exposeBinding(CREDENTIAL_CREATE_HOOK, async (source) => {
-    const sourcePage = source.page;
-    if (sourcePage === undefined) {
-      return;
-    }
-    const state = credentialCreateSyncState.get(sourcePage);
-    if (state !== undefined) {
-      try {
-        await state.syncCredentials();
-      } catch {
-        // The page hook can outlive the authenticator it was tracking.
-        credentialCreateSyncState.delete(sourcePage);
-      }
-    }
-  });
+  const identity = trackedIdentityByPage.get(page);
+  if (identity?.authenticatorId === undefined) {
+    return;
+  }
+
+  try {
+    identity.credentials = await getCredentialsFromVirtualAuthenticator(
+      page,
+      identity.authenticatorId,
+    );
+  } catch {
+    // The page hook can outlive the authenticator it was tracking.
+    trackedIdentityByPage.delete(page);
+  }
+};
+
+/**
+ * Tracks passkeys created on this page for the given identity and ensures the
+ * browser-side credential-create override stays installed across navigations.
+ */
+const trackIdentityCredentialCreation = async (
+  page: Page,
+  identity: Identity,
+): Promise<void> => {
+  trackedIdentityByPage.set(page, identity);
+
+  if (credentialCreateTrackingInstalled.has(page)) {
+    return;
+  }
+
+  await page.exposeBinding(
+    CREDENTIAL_CREATE_HOOK,
+    refreshTrackedIdentityCredentials,
+  );
 
   // Install for future navigations and current document.
-  await page.addInitScript(installCredentialCreateHook, {
+  await page.addInitScript(installCredentialCreateOverride, {
     hookName: CREDENTIAL_CREATE_HOOK,
     installedFlag: CREDENTIAL_CREATE_HOOK_FLAG,
   });
@@ -164,12 +187,12 @@ const ensureCredentialCreateSyncHook = async (page: Page): Promise<void> => {
     if (frame !== page.mainFrame()) {
       return;
     }
-    void installCredentialCreateHookOnCurrentDocument(page);
+    void installCredentialCreateOverrideOnCurrentDocument(page);
   });
 
-  await installCredentialCreateHookOnCurrentDocument(page);
+  await installCredentialCreateOverrideOnCurrentDocument(page);
 
-  credentialCreateHookInstalled.add(page);
+  credentialCreateTrackingInstalled.add(page);
 };
 
 export class IdentityWizard {
@@ -308,6 +331,19 @@ const createActor = async (
   return actor;
 };
 
+const getIdentityByNumber = (
+  identities: Identity[],
+  identityNumber: bigint,
+): Identity => {
+  const identity = identities.find(
+    (identity) => identity.identityNumber === identityNumber,
+  );
+  if (identity === undefined) {
+    throw new Error(`Identity with number ${identityNumber} not found`);
+  }
+  return identity;
+};
+
 export const test = base.extend<{
   identityConfig: IdentityConfig;
   identities: Identity[];
@@ -318,7 +354,12 @@ export const test = base.extend<{
   addAuthenticatorForIdentity: (
     page: Page,
     identityNumber: bigint,
-  ) => Promise<string>;
+  ) => Promise<void>;
+  setCredentialsForIdentity: (
+    page: Page,
+    identityNumber: bigint,
+    credentials: Protocol.WebAuthn.Credential[],
+  ) => void;
 }>({
   identityConfig: {
     createIdentities: [{ name: DEFAULT_NAME }],
@@ -374,9 +415,7 @@ export const test = base.extend<{
     }),
   actorForIdentity: ({ identityConfig, identities }, use) =>
     use((identityNumber: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
-      );
+      const identity = getIdentityByNumber(identities, identityNumber);
       if (identity === undefined) {
         throw new Error("Identity not found");
       }
@@ -388,35 +427,60 @@ export const test = base.extend<{
     }),
   addAuthenticatorForIdentity: ({ identities }, use) =>
     use(async (page: Page, identityNumber: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
-      );
-      if (identity === undefined) {
-        throw new Error("Identity not found");
-      }
+      const identity = getIdentityByNumber(identities, identityNumber);
 
       // Add virtual authenticator and populate it with the identity's credentials
-      const authenticatorId = await addVirtualAuthenticator(page);
+      identity.authenticatorId = await addVirtualAuthenticator(page);
       for (const credential of identity.credentials) {
         await addCredentialToVirtualAuthenticator(
           page,
-          authenticatorId,
+          identity.authenticatorId!,
           credential,
         );
       }
 
-      // Set up sync hook for this virtual authenticator so credentials created in tests
-      // will be automatically added to the identity's credentials keeping both in sync.
-      credentialCreateSyncState.set(page, {
-        syncCredentials: async () => {
-          identity.credentials = await getCredentialsFromVirtualAuthenticator(
-            page,
-            authenticatorId,
-          );
-        },
-      });
-      await ensureCredentialCreateSyncHook(page);
-
-      return authenticatorId;
+      // Keep this identity synchronized with passkeys created in page code.
+      await trackIdentityCredentialCreation(page, identity);
     }),
+  setCredentialsForIdentity: ({ identities }, use) =>
+    use(
+      async (
+        page,
+        identityNumber: bigint,
+        credentials: Protocol.WebAuthn.Credential[],
+      ) => {
+        const identity = getIdentityByNumber(identities, identityNumber);
+        if (identity.authenticatorId !== undefined) {
+          const existingCredentialIds = new Set(
+            identity.credentials.map((cred) => cred.credentialId),
+          );
+          const newCredentialIds = new Set(
+            credentials.map((cred) => cred.credentialId),
+          );
+          const credentialToRemove = identity.credentials.filter(
+            (existingCredential) =>
+              !newCredentialIds.has(existingCredential.credentialId),
+          );
+          const credentialToAdd = credentials.filter(
+            (newCredential) =>
+              !existingCredentialIds.has(newCredential.credentialId),
+          );
+          for (const credential of credentialToRemove) {
+            await removeCredentialFromVirtualAuthenticator(
+              page,
+              identity.authenticatorId!,
+              credential.credentialId,
+            );
+          }
+          for (const credential of credentialToAdd) {
+            await addCredentialToVirtualAuthenticator(
+              page,
+              identity.authenticatorId!,
+              credential,
+            );
+          }
+        }
+        identity.credentials = credentials;
+      },
+    ),
 });
