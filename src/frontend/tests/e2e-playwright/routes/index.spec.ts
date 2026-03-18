@@ -234,11 +234,19 @@ test.describe("First visit", () => {
 test.describe("Last used identities listed", () => {
   test("Sign in with last used identity", async ({
     page,
+    managePage,
     identities,
     addAuthenticatorForIdentity,
+    signInWithIdentity,
   }) => {
-    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
     await page.goto(II_URL);
+    await addAuthenticatorForIdentity(page, identities[0].identityNumber);
+
+    // Sign in with an identity to have a last used identity
+    await signInWithIdentity(page, identities[0].identityNumber);
+    await managePage.signOut();
+
+    // Sign in again and expect to see the last used identity
     await page.getByRole("button", { name: "Switch identity" }).click();
     await page
       .getByRole("button", { name: "Manage your Internet Identity" })

@@ -74,6 +74,7 @@ test("Authorize by signing in from another device", async ({
 
   const principal = await authorize(page, async (authPage) => {
     // Switch to current device and start "Continue from another device" flow to get link
+    await addVirtualAuthenticator(authPage);
     await authPage
       .getByRole("button", { name: "Continue with Passkey" })
       .click();
@@ -125,7 +126,6 @@ test("Authorize by signing in from another device", async ({
       .waitFor();
 
     // Switch to current device and register new passkey
-    await addVirtualAuthenticator(authPage);
     await authPage
       .getByRole("heading", { level: 1, name: "Confirm your sign-in" })
       .waitFor();

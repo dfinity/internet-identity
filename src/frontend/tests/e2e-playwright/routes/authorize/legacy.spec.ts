@@ -18,7 +18,7 @@ import {
           // Assert that we've been redirected to non-legacy domain
           await expect(authPage).toHaveURL((url) => url.origin === II_URL);
           // Add virtual authenticator
-          await addVirtualAuthenticator(page);
+          await addVirtualAuthenticator(authPage);
           // Assert that the user is informed about the upgrade
           await expect(
             authPage.getByRole("heading", {

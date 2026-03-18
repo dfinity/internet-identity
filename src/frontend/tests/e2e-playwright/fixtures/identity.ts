@@ -217,17 +217,22 @@ export class IdentityWizard {
     await signInLocator
       .or(switchIdentityLocator)
       .or(continueWithPasskeyLocator)
+      .first()
       .waitFor();
+
+    // Either continue to passkey flow immediately
+    if (await continueWithPasskeyLocator.isVisible()) {
+      await continueWithPasskeyLocator.click();
+      return;
+    }
+    // Or go first trough identity switcher/sign in if necessary
     if (await switchIdentityLocator.isVisible()) {
       await switchIdentityLocator.click();
       await addAnotherIdentityLocator.click();
-      await continueWithPasskeyLocator.click();
     } else if (await signInLocator.isVisible()) {
       await signInLocator.click();
-      await continueWithPasskeyLocator.click();
-    } else if (await continueWithPasskeyLocator.isVisible()) {
-      await continueWithPasskeyLocator.click();
     }
+    await continueWithPasskeyLocator.click();
   }
 }
 
