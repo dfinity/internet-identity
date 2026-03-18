@@ -8,7 +8,6 @@ import {
   addVirtualAuthenticator,
 } from "../../utils";
 import { test } from "../../fixtures";
-import { fi } from "zod/locales";
 
 const DEFAULT_USER_NAME = "John Doe";
 
