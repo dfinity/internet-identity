@@ -575,47 +575,41 @@ export class CredentialIdentity extends SignIdentity {
       signInput,
     );
     const sigBytes = new Uint8Array(signature);
-    let derSignature: Uint8Array;
-    if (sigBytes[0] === 0x30) {
-      // Already DER encoded
-      derSignature = sigBytes;
-    } else {
-      // Convert raw r||s signature to ASN.1 DER sequence
-      // DER encoding requires each integer (r, s) to be minimally encoded and positive.
-      // This block slices the signature into r and s, trims leading zeros, and prepends a zero byte if the value is negative.
-      if (sigBytes.length % 2 !== 0) {
-        throw new Error("Expected ECDSA signature in raw r||s format");
-      }
-      /**
-       * Encodes an integer for DER: trims leading zeros, prepends 0x00 if MSB is set.
-       * This ensures the integer is positive and minimally encoded.
-       */
-      const encodeInt = (bytes: Uint8Array): Uint8Array => {
-        let start = 0;
-        while (start < bytes.length - 1 && bytes[start] === 0) {
-          start += 1;
-        }
-        let value = bytes.slice(start);
-        if ((value[0] & 0x80) !== 0) {
-          value = Uint8Array.from([0, ...value]);
-        }
-        return value;
-      };
-      const half = sigBytes.length / 2;
-      const r = encodeInt(sigBytes.slice(0, half));
-      const s = encodeInt(sigBytes.slice(half));
-      // Construct DER sequence: 0x30 [len] 0x02 [rlen] r 0x02 [slen] s
-      derSignature = Uint8Array.from([
-        0x30,
-        2 + r.length + 2 + s.length,
-        0x02,
-        r.length,
-        ...r,
-        0x02,
-        s.length,
-        ...s,
-      ]);
+    // Convert raw r||s signature to ASN.1 DER sequence
+    // DER encoding requires each integer (r, s) to be minimally encoded and positive.
+    // This block slices the signature into r and s, trims leading zeros, and prepends a zero byte if the value is negative.
+    if (sigBytes.length % 2 !== 0) {
+      throw new Error("Expected ECDSA signature in raw r||s format");
     }
+    /**
+     * Encodes an integer for DER: trims leading zeros, prepends 0x00 if MSB is set.
+     * This ensures the integer is positive and minimally encoded.
+     */
+    const encodeInt = (bytes: Uint8Array): Uint8Array => {
+      let start = 0;
+      while (start < bytes.length - 1 && bytes[start] === 0) {
+        start += 1;
+      }
+      let value = bytes.slice(start);
+      if ((value[0] & 0x80) !== 0) {
+        value = Uint8Array.from([0, ...value]);
+      }
+      return value;
+    };
+    const half = sigBytes.length / 2;
+    const r = encodeInt(sigBytes.slice(0, half));
+    const s = encodeInt(sigBytes.slice(half));
+    // Construct DER sequence: 0x30 [len] 0x02 [rlen] r 0x02 [slen] s
+    const derSignature = Uint8Array.from([
+      0x30,
+      2 + r.length + 2 + s.length,
+      0x02,
+      r.length,
+      ...r,
+      0x02,
+      s.length,
+      ...s,
+    ]);
 
     // Return CBOR-encoded signature object
     const cbor = borc.encode(
