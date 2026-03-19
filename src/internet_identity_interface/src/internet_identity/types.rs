@@ -219,6 +219,11 @@ pub struct InternetIdentityFrontendArgs {
     pub fetch_root_key: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
+    /// Weakens the Content Security Policy to facilitate local development over HTTP.
+    /// When enabled:
+    /// * allows accessing II using http instead of https
+    /// * allows II to connect to localhost on both http and https
+    pub dev_csp: Option<bool>,
 }
 
 impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
@@ -230,6 +235,7 @@ impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
             analytics_config,
             dummy_auth,
             related_origins,
+            dev_csp: _,
         } = value;
 
         Self {

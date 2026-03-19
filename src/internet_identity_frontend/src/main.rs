@@ -38,6 +38,7 @@ fn post_upgrade(args: InternetIdentityFrontendArgs) {
 fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
     let related_origins = args.related_origins.as_ref();
+    let dev_csp = args.dev_csp.unwrap_or(false);
 
     // 2. Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
@@ -84,6 +85,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         headers: get_asset_headers(
                             integrity_hashes.clone(),
                             related_origins,
+                            dev_csp,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -120,6 +122,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         headers: get_asset_headers(
                             integrity_hashes.clone(),
                             related_origins,
+                            dev_csp,
                             vec![headers],
                         ),
                         fallback_for: vec![],
@@ -144,6 +147,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
 fn get_asset_headers(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
+    dev_csp: bool,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
     let credentials_allowlist = if let Some(related_origins) = related_origins {
@@ -176,7 +180,7 @@ fn get_asset_headers(
         // Comprehensive policy to prevent XSS attacks and data injection
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes, related_origins),
+            get_content_security_policy(integrity_hashes, related_origins, dev_csp),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -279,12 +283,14 @@ fn get_asset_headers(
 fn get_content_security_policy(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
+    dev_csp: bool,
 ) -> String {
-    let connect_src = "'self' https:";
-
-    // Allow connecting via http for development purposes
-    #[cfg(feature = "dev_csp")]
-    let connect_src = format!("{connect_src} http:");
+    let connect_src = if dev_csp {
+        // Allow connecting via http for development purposes
+        "'self' https: http:".to_string()
+    } else {
+        "'self' https:".to_string()
+    };
 
     // Build script-src with integrity hashes if provided
     let script_src = if integrity_hashes.is_empty() {
@@ -326,10 +332,11 @@ fn get_content_security_policy(
 
     // For production builds, upgrade all HTTP connections to HTTPS
     // Omitted in dev builds to allow localhost development
-    #[cfg(not(feature = "dev_csp"))]
-    let csp = format!("{csp}upgrade-insecure-requests;");
-
-    csp
+    if !dev_csp {
+        format!("{csp}upgrade-insecure-requests;")
+    } else {
+        csp
+    }
 }
 
 /// Gets the static assets with HTML fixup and well-known endpoints
