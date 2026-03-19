@@ -43,17 +43,17 @@ test.describe("Dashboard Navigation", () => {
       }) => {
         // Sign in with both identities to add them both to switcher
         await page.goto(II_URL);
-        await signInWithIdentity(page, identities[0].identityNumber);
-        await managePage.signOut();
-        await removeAuthenticatorForIdentity(
-          page,
-          identities[0].identityNumber,
-        );
         await signInWithIdentity(page, identities[1].identityNumber);
         await managePage.signOut();
         await removeAuthenticatorForIdentity(
           page,
           identities[1].identityNumber,
+        );
+        await signInWithIdentity(page, identities[0].identityNumber);
+        await managePage.signOut();
+        await removeAuthenticatorForIdentity(
+          page,
+          identities[0].identityNumber,
         );
       },
     );

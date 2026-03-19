@@ -4,6 +4,7 @@ import { createActorForCredential, II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
 import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { LEGACY_II_URL } from "$lib/config";
+import { set } from "zod";
 
 test.describe("Access methods", () => {
   test.beforeEach(
@@ -116,6 +117,7 @@ test.describe("Access methods", () => {
       manageAccessPage,
       identities,
       signInWithIdentity,
+      setCredentialsForIdentity,
     }) => {
       // Remove currently in use passkey
       await manageAccessPage.assertPasskeyCount(2);
@@ -128,6 +130,13 @@ test.describe("Access methods", () => {
 
       await page.waitForURL(II_URL); // Expect to be signed out
       await manageAccessPage.goto(); // Go back to the manage page
+
+      // Remove the credential corresponding to the removed passkey
+      setCredentialsForIdentity(
+        page,
+        identities[0].identityNumber,
+        identities[0].credentials.slice(1),
+      );
 
       // Sign in with the new passkey and assert it's the only passkey
       await signInWithIdentity(page, identities[0].identityNumber);
