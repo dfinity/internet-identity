@@ -162,7 +162,7 @@
       }
       if (
         dapp?.certifiedAttributes === true ||
-        canisterConfig.dummy_auth[0] !== undefined
+        canisterConfig.fetch_root_key[0] === true
       ) {
         const listener = createAttributesListener(config.issuer);
         void $establishedChannelStore.addEventListener("request", listener);
