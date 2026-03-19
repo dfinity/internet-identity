@@ -144,12 +144,52 @@ test.describe("Access methods", () => {
     await manageAccessPage.assertPasskeyCount(1);
   });
 
-  test("cannot have more than 16 passkeys", async ({ manageAccessPage }) => {
+  test("cannot have more than 16 passkeys", async ({
+    page,
+    managePage,
+    manageAccessPage,
+    identities,
+    signInWithIdentity,
+  }) => {
+    // Verify we start with 1 passkey
     await manageAccessPage.assertPasskeyCount(1);
+    await managePage.signOut();
+
+    // Add 15 passkeys via an actor to avoid getting
+    // rate limited by Chrome when adding via the UI.
+    const actor = await createActorForCredential(
+      identities[0].host,
+      identities[0].canisterId,
+      identities[0].credentials[0],
+    );
     for (let i = 0; i < 15; i++) {
-      await manageAccessPage.add((dialog) => dialog.passkey());
+      const identity = await ECDSAKeyIdentity.generate();
+      await actor.authn_method_add(identities[0].identityNumber, {
+        metadata: [
+          ["alias", { String: `passkey-${i}` }],
+          ["origin", { String: II_URL }],
+        ],
+        authn_method: {
+          WebAuthn: {
+            pubkey: identity.getPublicKey().toDer(),
+            credential_id: crypto.getRandomValues(new Uint8Array(16)),
+            aaguid: [],
+          },
+        },
+        security_settings: {
+          protection: { Unprotected: null },
+          purpose: { Authentication: null },
+        },
+        last_authentication: [],
+      });
     }
+
+    // Sign in and assert all 16 passkeys are present
+    await manageAccessPage.goto();
+    await signInWithIdentity(page, identities[0].identityNumber);
     await manageAccessPage.assertPasskeyCount(16);
+
+    // Assert we cannot add another passkey via the UI
     await manageAccessPage.add(async (dialog) => {
       await dialog.assertPasskeyUnavailable();
       await dialog.close();
