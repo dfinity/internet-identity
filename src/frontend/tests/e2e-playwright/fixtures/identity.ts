@@ -293,48 +293,46 @@ export const test = base.extend<{
   identityConfig: {
     createIdentities: [{ name: DEFAULT_NAME }],
   },
-  identities: async ({ browser, identityConfig }, use) =>
-    use(
-      await Promise.all(
-        identityConfig.createIdentities.map(async ({ name }) => {
-          const context = await browser.newContext();
-          const page = await context.newPage();
-          await page.goto(II_URL);
-          const element = (await page.$("[data-canister-id]"))!;
-          const canisterId = Principal.fromText(
-            (await element.getAttribute("data-canister-id"))!,
-          );
-          const authenticatorId = await addVirtualAuthenticator(page);
-          const wizard = new IdentityWizard(page);
-          await wizard.signUp(name);
-          const credentials = await getCredentialsFromVirtualAuthenticator(
-            page,
-            authenticatorId,
-          );
-          await page.close();
-          await context.close();
-          const host = identityConfig.host ?? DEFAULT_HOST;
-          const actor = await createActorForCredential(
-            host,
-            canisterId,
-            credentials[0],
-          );
-          const [deviceKeyWithAnchor] = await actor.lookup_device_key(
-            fromBase64(credentials[0].credentialId),
-          );
-          const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
-          const identity: Identity = {
-            host,
-            canisterId,
-            name,
-            credentials,
-            identityNumber,
-            authenticatorIds: new WeakMap(),
-          };
-          return identity;
-        }),
-      ),
-    ),
+  identities: async ({ browser, identityConfig }, use) => {
+    const identities: Identity[] = [];
+    for (const { name } of identityConfig.createIdentities) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(II_URL);
+      const element = (await page.$("[data-canister-id]"))!;
+      const canisterId = Principal.fromText(
+        (await element.getAttribute("data-canister-id"))!,
+      );
+      const authenticatorId = await addVirtualAuthenticator(page);
+      const wizard = new IdentityWizard(page);
+      await wizard.signUp(name);
+      const credentials = await getCredentialsFromVirtualAuthenticator(
+        page,
+        authenticatorId,
+      );
+      await page.close();
+      await context.close();
+      const host = identityConfig.host ?? DEFAULT_HOST;
+      const actor = await createActorForCredential(
+        host,
+        canisterId,
+        credentials[0],
+      );
+      const [deviceKeyWithAnchor] = await actor.lookup_device_key(
+        fromBase64(credentials[0].credentialId),
+      );
+      const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
+      identities.push({
+        host,
+        canisterId,
+        name,
+        credentials,
+        identityNumber,
+        authenticatorIds: new WeakMap(),
+      });
+    }
+    return use(identities);
+  },
   signInWithIdentity: ({ addAuthenticatorForIdentity }, use) =>
     use(async (page: Page, identityNumber: bigint) => {
       await addAuthenticatorForIdentity(page, identityNumber);
