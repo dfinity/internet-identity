@@ -10,7 +10,13 @@ export type AnalyticsConfig = {
       'api_host' : [] | [string],
     }
   };
-export interface DummyAuthConfig { 'prompt_for_index' : boolean }
+export interface DummyAuthConfig {
+  /**
+   * Prompts user for a index value (0 - 255) when set to true,
+   * this is used in e2e to have multiple dummy auth identities.
+   */
+  'prompt_for_index' : boolean,
+}
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
