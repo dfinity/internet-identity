@@ -209,8 +209,7 @@ pub fn upgrade_ii_frontend_canister(
     wasm: Vec<u8>,
     arg: InternetIdentityFrontendArgs,
 ) {
-    let bytes =
-        candid::encode_one(arg).expect("error encoding II frontend upgrade arg as candid");
+    let bytes = candid::encode_one(arg).expect("error encoding II frontend upgrade arg as candid");
     env.upgrade_canister(canister_id, wasm, bytes, None)
         .unwrap_or_else(|e| panic!("Failed to upgrade II frontend canister: {e:?}"));
 }

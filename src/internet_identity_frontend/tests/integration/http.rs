@@ -1,9 +1,9 @@
 //! Tests for the HTTP interactions of the II frontend canister.
 //! These tests verify asset serving, certification, and well-known endpoints.
 
+use candid::Principal;
 use canister_tests::api::http_request;
 use canister_tests::framework::*;
-use candid::Principal;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
@@ -140,8 +140,7 @@ fn frontend_canister_serves_webauthn_assets_after_upgrade() -> Result<(), Reject
         related_origins: Some(related_origins.clone()),
         ..default_frontend_args()
     };
-    let canister_id =
-        install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), args.clone());
+    let canister_id = install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), args.clone());
 
     upgrade_ii_frontend_canister(&env, canister_id, II_FRONTEND_WASM.clone(), args);
 
