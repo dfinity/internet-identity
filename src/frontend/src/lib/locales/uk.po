@@ -5,7 +5,7 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: @lingui/cli\n"
-"Language: ua\n"
+"Language: uk\n"
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "PO-Revision-Date: \n"
@@ -306,7 +306,7 @@ msgid "FAQs"
 msgstr "FAQ"
 
 msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
-msgstr “Наприклад, користувач А входить в Internet Identity через свій обліковий запис Google «A@gmail.com», а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач увійшов у застосунок Z через Internet Identity. Застосунок Z теж не дізнається, що користувач А використовував Google для входу в Internet Identity.”
+msgstr "Наприклад, користувач А входить в Internet Identity через свій обліковий запис Google «A@gmail.com», а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач увійшов у застосунок Z через Internet Identity. Застосунок Z теж не дізнається, що користувач А використовував Google для входу в Internet Identity."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Забудьте про запам'ятовування складних імен користувачів та паролів. Завдяки ключам доступу ви просто обираєте своє ім'я для входу — швидко, безпечно та без проблем."
