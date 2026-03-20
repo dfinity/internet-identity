@@ -4,6 +4,7 @@ export const availableLocales = [
   "de",
   "es",
   "fr",
+  "nl",
   "id",
   "it",
   "pl",
@@ -11,7 +12,17 @@ export const availableLocales = [
 ];
 
 // List of languages that are actually enabled
-export const enabledLocales = ["en", "de", "es", "fr", "id", "it", "pl", "ur"];
+export const enabledLocales = [
+  "en",
+  "de",
+  "es",
+  "fr",
+  "nl",
+  "id",
+  "it",
+  "pl",
+  "ur",
+];
 
 const rtlLocales = ["ur"];
 
