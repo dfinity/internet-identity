@@ -31,7 +31,6 @@ export const readCanisterId = ({
   }
 };
 
-
 /** Get the http host of a running replica */
 export const getReplicaHost = (): string => {
   const command = `dfx info webserver-port`;

@@ -2,11 +2,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import { minify } from "html-minifier-terser";
 import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression2";
-import {
-  forwardToReplica,
-  readCanisterId,
-  readReplicaPort,
-} from "./utils.js";
+import { forwardToReplica, readCanisterId, readReplicaPort } from "./utils.js";
 
 export * from "./utils.js";
 
@@ -28,7 +24,6 @@ export const injectCanisterIdPlugin = ({
     });
   },
 });
-
 
 /**
  * GZip generated resources e.g. index.js => index.js.gz
