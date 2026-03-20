@@ -4,8 +4,10 @@ import { localeStore } from "$lib/stores/locale.store";
 
 const transformHtml =
   process.env.NODE_ENV === "development"
-    ? (injectCanisterIdAndConfigPlugin({ canisterName: "internet_identity", configCanisterName: "internet_identity_frontend" })
-        ?.transformIndexHtml as (html: string) => Promise<string>)
+    ? (injectCanisterIdAndConfigPlugin({
+        canisterName: "internet_identity",
+        configCanisterName: "internet_identity_frontend",
+      })?.transformIndexHtml as (html: string) => Promise<string>)
     : undefined;
 
 export const handle: Handle = async ({ event, resolve }) => {
