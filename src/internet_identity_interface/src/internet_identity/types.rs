@@ -231,10 +231,11 @@ impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
         let InternetIdentityFrontendArgs {
             backend_canister_id,
             backend_origin,
-            fetch_root_key,
             analytics_config,
             dummy_auth,
             related_origins,
+
+            fetch_root_key: _,
             dev_csp: _,
         } = value;
 
@@ -242,7 +243,6 @@ impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
             backend_canister_id: Some(backend_canister_id),
             backend_origin: Some(backend_origin),
 
-            fetch_root_key,
             analytics_config,
             dummy_auth,
             related_origins,
@@ -303,7 +303,6 @@ pub struct InternetIdentityInit {
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
-    pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,

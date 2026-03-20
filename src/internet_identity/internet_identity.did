@@ -282,8 +282,6 @@ type InternetIdentityInit = record {
     openid_configs : opt vec OpenIdConfig;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
-    // Configuration to fetch root key or not from frontend assets
-    fetch_root_key : opt bool;
     // Configuration to show dapps explorer or not
     enable_dapps_explorer : opt bool;
     // Configuration to set the canister as production mode.

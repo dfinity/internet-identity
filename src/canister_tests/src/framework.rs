@@ -186,6 +186,10 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_fetch_limit: 10,
         }),
         canister_creation_cycles_cost: Some(0),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+        }),
         ..InternetIdentityInit::default()
     })
 }
