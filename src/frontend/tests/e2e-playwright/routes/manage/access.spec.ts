@@ -131,7 +131,7 @@ test.describe("Access methods", () => {
       await manageAccessPage.goto(); // Go back to the manage page
 
       // Remove the credential corresponding to the removed passkey
-      setCredentialsForIdentity(
+      await setCredentialsForIdentity(
         page,
         identities[0].identityNumber,
         identities[0].credentials.slice(1),

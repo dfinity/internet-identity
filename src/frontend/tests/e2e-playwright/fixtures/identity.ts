@@ -288,7 +288,7 @@ export const test = base.extend<{
     page: Page,
     identityNumber: bigint,
     credentials: Protocol.WebAuthn.Credential[],
-  ) => void;
+  ) => Promise<void>;
 }>({
   identityConfig: {
     createIdentities: [{ name: DEFAULT_NAME }],
@@ -334,13 +334,13 @@ export const test = base.extend<{
     return use(identities);
   },
   signInWithIdentity: ({ addAuthenticatorForIdentity }, use) =>
-    use(async (page: Page, identityNumber: bigint) => {
+    use(async (page, identityNumber) => {
       await addAuthenticatorForIdentity(page, identityNumber);
       const wizard = new IdentityWizard(page);
       await wizard.signIn();
     }),
   addAuthenticatorForIdentity: ({ identities }, use) =>
-    use(async (page: Page, identityNumber: bigint) => {
+    use(async (page, identityNumber) => {
       const identity = getIdentityByNumber(identities, identityNumber);
 
       // Add virtual authenticator and populate it with the identity's credentials
@@ -358,7 +358,7 @@ export const test = base.extend<{
       await trackIdentityCredentialCreation(page, identity);
     }),
   removeAuthenticatorForIdentity: ({ identities }, use) =>
-    use(async (page: Page, identityNumber: bigint) => {
+    use(async (page, identityNumber) => {
       const identity = getIdentityByNumber(identities, identityNumber);
       const authenticatorId = identity.authenticatorIds.get(page);
       if (authenticatorId === undefined) {
@@ -370,45 +370,39 @@ export const test = base.extend<{
       identity.authenticatorIds.delete(page);
     }),
   setCredentialsForIdentity: ({ identities }, use) =>
-    use(
-      async (
-        page,
-        identityNumber: bigint,
-        credentials: Protocol.WebAuthn.Credential[],
-      ) => {
-        const identity = getIdentityByNumber(identities, identityNumber);
-        const authenticatorId = identity.authenticatorIds.get(page);
-        if (authenticatorId !== undefined) {
-          const existingCredentialIds = new Set(
-            identity.credentials.map((cred) => cred.credentialId),
+    use(async (page, identityNumber, credentials) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+      const authenticatorId = identity.authenticatorIds.get(page);
+      if (authenticatorId !== undefined) {
+        const existingCredentialIds = new Set(
+          identity.credentials.map((cred) => cred.credentialId),
+        );
+        const newCredentialIds = new Set(
+          credentials.map((cred) => cred.credentialId),
+        );
+        const credentialToRemove = identity.credentials.filter(
+          (existingCredential) =>
+            !newCredentialIds.has(existingCredential.credentialId),
+        );
+        const credentialToAdd = credentials.filter(
+          (newCredential) =>
+            !existingCredentialIds.has(newCredential.credentialId),
+        );
+        for (const credential of credentialToRemove) {
+          await removeCredentialFromVirtualAuthenticator(
+            page,
+            authenticatorId,
+            credential.credentialId,
           );
-          const newCredentialIds = new Set(
-            credentials.map((cred) => cred.credentialId),
-          );
-          const credentialToRemove = identity.credentials.filter(
-            (existingCredential) =>
-              !newCredentialIds.has(existingCredential.credentialId),
-          );
-          const credentialToAdd = credentials.filter(
-            (newCredential) =>
-              !existingCredentialIds.has(newCredential.credentialId),
-          );
-          for (const credential of credentialToRemove) {
-            await removeCredentialFromVirtualAuthenticator(
-              page,
-              authenticatorId,
-              credential.credentialId,
-            );
-          }
-          for (const credential of credentialToAdd) {
-            await addCredentialToVirtualAuthenticator(
-              page,
-              authenticatorId,
-              credential,
-            );
-          }
         }
-        identity.credentials = credentials;
-      },
-    ),
+        for (const credential of credentialToAdd) {
+          await addCredentialToVirtualAuthenticator(
+            page,
+            authenticatorId,
+            credential,
+          );
+        }
+      }
+      identity.credentials = credentials;
+    }),
 });
