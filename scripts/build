@@ -118,15 +118,6 @@ EOF
 	printf '%s\n' "$init_arg"
 }
 
-frontend_init_arg() {
-	local init_arg
-	init_arg=$(cat <<'EOF'
-(record { fetch_root_key = opt true; backend_canister_id = principal "rdmx6-jaaaa-aaaaa-aaadq-cai"; related_origins = opt vec { "http://uqzsh-gqaaa-aaaaq-qaada-cai.localhost:4943" }; backend_origin = "http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943"; dev_csp = opt true})
-EOF
-)
-	printf '%s\n' "$init_arg"
-}
-
 # Builds a single canister
 # build_canister CANISTER EXTRA_BUILD_ARGS...
 # CANISTER: possible values: [internet_identity, archive]

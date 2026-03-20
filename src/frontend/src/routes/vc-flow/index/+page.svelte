@@ -8,7 +8,6 @@
   analytics.event("page-webauthn-iframe");
 
   const connection = new Connection(canisterId.toText(), {
-    fetch_root_key: frontendCanisterConfig.fetch_root_key,
     is_production: [],
     backend_canister_id: [frontendCanisterConfig.backend_canister_id],
     enable_dapps_explorer: [],
