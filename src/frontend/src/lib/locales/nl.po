@@ -1006,7 +1006,7 @@ msgstr "Upgrade succesvol voltooid"
 msgid "Upgrade identity"
 msgstr "Identiteit upgraden"
 
-msgid "Upgrade your existing identity to the new experience in two steps."
+msgid "Upgrade your existing identity to the new experience in a two steps."
 msgstr "Upgrade uw bestaande identiteit naar de nieuwe ervaring in twee stappen."
 
 msgid "Upgrade your identity"
