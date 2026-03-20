@@ -118,6 +118,15 @@ EOF
 	printf '%s\n' "$init_arg"
 }
 
+frontend_init_arg() {
+	local init_arg
+	init_arg=$(cat <<'EOF'
+(record { fetch_root_key = opt true; backend_canister_id = principal "rdmx6-jaaaa-aaaaa-aaadq-cai"; related_origins = opt vec { "http://uqzsh-gqaaa-aaaaq-qaada-cai.localhost:4943" }; backend_origin = "http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943"; dev_csp = opt true})
+EOF
+)
+	printf '%s\n' "$init_arg"
+}
+
 # Builds a single canister
 # build_canister CANISTER EXTRA_BUILD_ARGS...
 # CANISTER: possible values: [internet_identity, archive]
@@ -190,6 +199,33 @@ function build_canister() {
                   --arg init_arg "$init_arg" \
                   --arg init_guide "$init_guide" \
                   '. | .pullable = { wasm_url: $wasm_url, wasm_hash_url: $wasm_hash_url, dependencies: [], init_arg: "(null)", init_guide: $init_guide} ')
+              ic-wasm "$canister.wasm" -o "$canister.wasm" metadata dfx -d "$metadata_json" -v public
+          fi
+
+        fi
+
+        if [ "$canister" == "internet_identity_frontend" ]
+        then
+          # indicate the frontend canister init argument type
+          ic-wasm "$canister.wasm" -o "$canister.wasm" metadata candid:args -d "(InternetIdentityFrontendInit)" -v public
+
+          # Write pullable metadata for dfx.
+          IFS=, read -r -a version_parts <<< "$II_VERSION"
+          release="${version_parts[1]}"
+          if [ -n "$release" ]
+          then
+              asset_name="internet_identity_frontend.wasm.gz"
+              wasm_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name"
+              wasm_hash_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name.sha256"
+
+              fe_init_arg=$(frontend_init_arg)
+              init_guide="Provide backend_canister_id and backend_origin matching your II backend deployment. Set related_origins to contain the frontend canister's local origin, e.g., \"http://uqzsh-gqaaa-aaaaq-qaada-cai.localhost:4943\". Set dev_csp = opt true for local development over HTTP."
+              metadata_json=$(echo '{}' | jq -cMr \
+                  --arg wasm_url "$wasm_url" \
+                  --arg wasm_hash_url "$wasm_hash_url" \
+                  --arg init_arg "$fe_init_arg" \
+                  --arg init_guide "$init_guide" \
+                  '. | .pullable = { wasm_url: $wasm_url, wasm_hash_url: $wasm_hash_url, dependencies: ["rdmx6-jaaaa-aaaaa-aaadq-cai"], init_arg: $init_arg, init_guide: $init_guide} ')
               ic-wasm "$canister.wasm" -o "$canister.wasm" metadata dfx -d "$metadata_json" -v public
           fi
 
