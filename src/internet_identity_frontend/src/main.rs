@@ -9,7 +9,7 @@ use ic_cdk_macros::query;
 use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
-    InternetIdentityFrontendArgs, InternetIdentityInit,
+    InternetIdentityFrontendArgs,
 };
 use serde_json::json;
 use sha2::Digest;
@@ -420,8 +420,6 @@ fn fixup_html(html: &str, config: &InternetIdentityFrontendArgs) -> String {
     );
 
     // Encode config to base64-encoded Candid to avoid JSON escaping issues.
-    // For backward compatibility, we use the same struct as before the II canister split.
-    let config = InternetIdentityInit::from(config.clone());
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
 
     // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.

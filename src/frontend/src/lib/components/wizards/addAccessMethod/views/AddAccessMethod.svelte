@@ -6,7 +6,7 @@
   import Button from "$lib/components/ui/Button.svelte";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { issuerMatches } from "$lib/utils/openID";
-  import { canisterConfig } from "$lib/globals";
+  import { backendCanisterConfig } from "$lib/globals";
   import type {
     OpenIdConfig,
     OpenIdCredential,
@@ -46,7 +46,7 @@
     }
   };
 
-  const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
+  const openIdProviders = backendCanisterConfig.openid_configs?.[0] ?? [];
 
   const hasCredential = (configIssuer: string): boolean =>
     openIdCredentials.some((cred) =>

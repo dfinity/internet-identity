@@ -4,8 +4,8 @@ import { localeStore } from "$lib/stores/locale.store";
 
 const transformHtml =
   process.env.NODE_ENV === "development"
-    ? (injectCanisterIdAndConfigPlugin({ canisterName: "internet_identity" })
-        ?.transformIndexHtml as (html: string) => string)
+    ? (injectCanisterIdAndConfigPlugin({ canisterName: "internet_identity", configCanisterName: "internet_identity_frontend" })
+        ?.transformIndexHtml as (html: string) => Promise<string>)
     : undefined;
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -16,7 +16,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.ok
   ) {
     const html = await response.text();
-    return new Response(transformHtml(html), {
+    return new Response(await transformHtml(html), {
       ...response,
       headers: {
         ...response.headers,

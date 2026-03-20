@@ -36,14 +36,18 @@ export const injectCanisterIdPlugin = ({
  */
 export const injectCanisterIdAndConfigPlugin = ({
   canisterName,
+  configCanisterName,
 }: {
   canisterName: string;
+  configCanisterName?: string;
 }): Plugin => ({
   name: "inject-canister-id-and-config",
-  transformIndexHtml(html): string {
+  async transformIndexHtml(html): Promise<string> {
     const rgx = /<body /;
     const canisterId = readCanisterId({ canisterName });
-    const canisterConfig = readCanisterConfig({ canisterName });
+    const canisterConfig = await readCanisterConfig({
+      canisterName: configCanisterName ?? canisterName,
+    });
     return html.replace(rgx, (_match, src) => {
       return `<body data-canister-id="${canisterId}" data-canister-config="${canisterConfig}" `;
     });

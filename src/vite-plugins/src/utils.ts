@@ -32,20 +32,27 @@ export const readCanisterId = ({
 };
 
 /**
- * Read a canister config from dfx's local state
+ * Read a canister config by fetching the /.config endpoint from the canister's HTTP interface.
+ * The endpoint returns Candid text which is then encoded to binary and base64.
  */
-export const readCanisterConfig = ({
+export const readCanisterConfig = async ({
   canisterName,
 }: {
   canisterName: string;
-}): string => {
-  const command = `dfx canister call ${canisterName} config --output raw`;
+}): Promise<string> => {
+  const canisterId = readCanisterId({ canisterName });
+  const port = readReplicaPort();
+  const url = `http://${canisterId}.localhost:${port}/.config`;
   try {
-    const stdout = execSync(command);
-    return Buffer.from(stdout.toString().trim(), "hex").toString("base64");
+    const response = await fetch(url);
+    const configText = (await response.text()).trim();
+    const hex = execSync(`didc encode '(${configText})'`)
+      .toString()
+      .trim();
+    return Buffer.from(hex, "hex").toString("base64");
   } catch (e) {
     throw Error(
-      `Could not get canister config for '${canisterName}' with command '${command}', was the canister deployed? ${e}`,
+      `Could not get canister config for '${canisterName}' from ${url}, was the canister deployed? ${e}`,
     );
   }
 };

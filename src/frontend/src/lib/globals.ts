@@ -1,9 +1,7 @@
 import { Principal } from "@icp-sdk/core/principal";
-import {
-  type _SERVICE,
-  type InternetIdentityInit,
-} from "$lib/generated/internet_identity_types";
-import { readCanisterConfig, readCanisterId } from "$lib/utils/init";
+import { type _SERVICE } from "$lib/generated/internet_identity_types";
+import { type InternetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_types";
+import { readCanisterId } from "$lib/utils/init";
 import {
   Actor,
   ActorSubclass,
@@ -11,69 +9,102 @@ import {
   HttpAgentOptions,
 } from "@icp-sdk/core/agent";
 import { inferHost } from "$lib/utils/iiConnection";
-import {
-  idlFactory as internet_identity_idl,
-  init as internet_identity_init,
-} from "$lib/generated/internet_identity_idl";
-import { features } from "$lib/legacy/features";
+import { idlFactory as internetIdentityIDL } from "$lib/generated/internet_identity_idl";
+import { init as internetIdentityFrontendInit } from "$lib/generated/internet_identity_frontend_idl";
 import { IDL } from "@icp-sdk/core/candid";
+import { fromBase64 } from "./utils/utils";
+
+// Frontend config types
+export type FrontendCanisterConfig = InternetIdentityFrontendInit;
+
+// Backend config types
+export type OpenIdEmailVerification =
+  | { Google: null }
+  | { Unknown: null }
+  | { Microsoft: null };
+export interface OpenIdConfig {
+  auth_uri: string;
+  jwks_uri: string;
+  logo: string;
+  name: string;
+  fedcm_uri: [] | [string];
+  email_verification: [] | [OpenIdEmailVerification];
+  issuer: string;
+  auth_scope: Array<string>;
+  client_id: string;
+}
+export type BackendCanisterConfig = { openid_configs: [] | [OpenIdConfig[]] };
+
+// Backend config IDL
+const backendCanisterConfigIDL = IDL.Record({
+  openid_configs: IDL.Opt(
+    IDL.Vec(
+      IDL.Record({
+        auth_uri: IDL.Text,
+        jwks_uri: IDL.Text,
+        logo: IDL.Text,
+        name: IDL.Text,
+        fedcm_uri: IDL.Opt(IDL.Text),
+        email_verification: IDL.Opt(
+          IDL.Variant({
+            Google: IDL.Null,
+            Unknown: IDL.Null,
+            Microsoft: IDL.Null,
+          }),
+        ),
+        issuer: IDL.Text,
+        auth_scope: IDL.Vec(IDL.Text),
+        client_id: IDL.Text,
+      }),
+    ),
+  ),
+});
 
 export let canisterId: Principal;
-export let canisterConfig: InternetIdentityInit;
+export let frontendCanisterConfig: FrontendCanisterConfig;
+export let backendCanisterConfig: BackendCanisterConfig;
 export let agentOptions: HttpAgentOptions;
 export let anonymousAgent: HttpAgent;
 export let anonymousActor: ActorSubclass<_SERVICE>;
-export let parentIFrameOrigin: string | undefined;
-
-// Search param passed by parent window to indicate its origin to child window
-export const IFRAME_PARENT_PARAM = "parent_origin";
 
 export const initGlobals = async () => {
   canisterId = Principal.fromText(readCanisterId());
-  const frontendConfig = readCanisterConfig();
 
-  const backendOrigin = frontendConfig.backend_origin[0];
-
-  if (backendOrigin !== undefined) {
-    // Patch the canister config with the `openid_configs` field from the backend HTTPS response
-    const response = await fetch(`${backendOrigin}/.config.did.bin`);
-    const openidConfigCandid = await response.arrayBuffer();
-
-    const [{ openid_configs }] = IDL.decode(
-      [internet_identity_init({ IDL })[0]._type],
-      new Uint8Array(openidConfigCandid),
-    ) as unknown as [InternetIdentityInit];
-
-    canisterConfig = {
-      ...frontendConfig,
-      openid_configs,
-    };
-  } else {
-    // Legacy flow, when the frontend assets are from the one and only II canister
-    canisterConfig = frontendConfig;
+  // Read frontend config from body tag
+  const base64Config = document.body.dataset.canisterConfig;
+  if (base64Config === undefined) {
+    throw new Error("Frontend canister config is missing from the page");
   }
+  [frontendCanisterConfig] = IDL.decode(
+    internetIdentityFrontendInit({ IDL }),
+    fromBase64(base64Config),
+  ) as unknown as [FrontendCanisterConfig];
+
+  // Fetch backend config from the backend canister
+  const response = await fetch(
+    `${frontendCanisterConfig.backend_origin}/.config.did.bin`,
+  );
+  [backendCanisterConfig] = IDL.decode(
+    [backendCanisterConfigIDL],
+    new Uint8Array(await response.arrayBuffer()),
+  ) as unknown as [BackendCanisterConfig];
 
   agentOptions = {
     host: inferHost(),
-    shouldFetchRootKey:
-      features.FETCH_ROOT_KEY || (canisterConfig.fetch_root_key[0] ?? false),
+    shouldFetchRootKey: frontendCanisterConfig.fetch_root_key[0] ?? false,
   };
   anonymousAgent = HttpAgent.createSync(agentOptions);
   // Fetch subnet keys to speed up queries during authentication,
   // this avoids having to fetch them later on user interaction.
   void anonymousAgent.fetchSubnetKeys(canisterId);
-  anonymousActor = Actor.createActor<_SERVICE>(internet_identity_idl, {
+  anonymousActor = Actor.createActor<_SERVICE>(internetIdentityIDL, {
     agent: anonymousAgent,
     canisterId,
   });
-  // Set when `IFRAME_PARENT_PARAM` search param contains a valid related origin
-  parentIFrameOrigin = canisterConfig.related_origins[0]?.find(
-    (origin) =>
-      origin ===
-      new URL(window.location.href).searchParams.get(IFRAME_PARENT_PARAM),
-  );
 };
 
 // Get primary origin (either https://id.ai or https://beta.id.ai) when deployed on beta or prod
 export const getPrimaryOrigin = () =>
-  canisterConfig.related_origins[0]?.find((origin) => origin.endsWith("id.ai"));
+  frontendCanisterConfig.related_origins[0]?.find((origin) =>
+    origin.endsWith("id.ai"),
+  );

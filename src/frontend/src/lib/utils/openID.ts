@@ -2,7 +2,7 @@ import type {
   MetadataMapV2,
   OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
-import { canisterConfig } from "$lib/globals";
+import { backendCanisterConfig } from "$lib/globals";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import {
@@ -268,7 +268,7 @@ export const findConfig = (
   issuer: string,
   metadata: MetadataMapV2,
 ): OpenIdConfig | undefined =>
-  canisterConfig.openid_configs[0]?.find((config) =>
+  backendCanisterConfig.openid_configs[0]?.find((config) =>
     issuerMatches(config.issuer, issuer, metadata),
   );
 

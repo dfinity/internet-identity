@@ -1,4 +1,4 @@
-import { canisterConfig } from "$lib/globals";
+import { frontendCanisterConfig } from "$lib/globals";
 import { get } from "svelte/store";
 import { decodeJWT, requestJWT } from "$lib/utils/openID";
 import { authenticatedStore } from "$lib/stores/authentication.store";
@@ -78,7 +78,8 @@ export class AddAccessMethodFlow {
     }
 
     const passkeyIdentity =
-      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+      features.DUMMY_AUTH ||
+      frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const credentialId = passkeyIdentity.getCredentialId();
