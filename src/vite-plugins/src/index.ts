@@ -4,7 +4,6 @@ import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression2";
 import {
   forwardToReplica,
-  readCanisterConfig,
   readCanisterId,
   readReplicaPort,
 } from "./utils.js";
@@ -30,29 +29,6 @@ export const injectCanisterIdPlugin = ({
   },
 });
 
-/**
- * Inject the canister ID and config of 'canisterName' as a <script /> tag in index.html for local development. Will process
- * at most 1 script tag.
- */
-export const injectCanisterIdAndConfigPlugin = ({
-  canisterName,
-  configCanisterName,
-}: {
-  canisterName: string;
-  configCanisterName?: string;
-}): Plugin => ({
-  name: "inject-canister-id-and-config",
-  async transformIndexHtml(html): Promise<string> {
-    const rgx = /<body /;
-    const canisterId = readCanisterId({ canisterName });
-    const canisterConfig = await readCanisterConfig({
-      canisterName: configCanisterName ?? canisterName,
-    });
-    return html.replace(rgx, (_match, src) => {
-      return `<body data-canister-id="${canisterId}" data-canister-config="${canisterConfig}" `;
-    });
-  },
-});
 
 /**
  * GZip generated resources e.g. index.js => index.js.gz

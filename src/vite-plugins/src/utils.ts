@@ -1,6 +1,6 @@
 /* Utils used both in the FE code & the FE config */
 
-import { execFileSync, execSync } from "child_process";
+import { execSync } from "child_process";
 import type { IncomingMessage, ServerResponse } from "http";
 import { request } from "undici";
 
@@ -31,31 +31,6 @@ export const readCanisterId = ({
   }
 };
 
-/**
- * Read a canister config by fetching the /.config endpoint from the canister's HTTP interface.
- * The endpoint returns Candid text which is then encoded to binary and base64.
- */
-export const readCanisterConfig = async ({
-  canisterName,
-}: {
-  canisterName: string;
-}): Promise<string> => {
-  const canisterId = readCanisterId({ canisterName });
-  const port = readReplicaPort();
-  const url = `http://${canisterId}.localhost:${port}/.config`;
-  try {
-    const response = await fetch(url);
-    const configText = (await response.text()).trim();
-    const hex = execFileSync("didc", ["encode", `(${configText})`])
-      .toString()
-      .trim();
-    return Buffer.from(hex, "hex").toString("base64");
-  } catch (e) {
-    throw Error(
-      `Could not get canister config for '${canisterName}' from ${url}, was the canister deployed? ${e}`,
-    );
-  }
-};
 
 /** Get the http host of a running replica */
 export const getReplicaHost = (): string => {
