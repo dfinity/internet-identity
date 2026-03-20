@@ -11,7 +11,7 @@ msgstr ""
 "PO-Revision-Date: \n"
 "Last-Translator: Thomas Gladdines\n"
 "Language-Team: Thomas Gladdines\n"
-"Plural-Forms: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "{0} logo"
 msgstr "{0} logo"
