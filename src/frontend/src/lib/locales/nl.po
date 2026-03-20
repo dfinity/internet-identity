@@ -543,7 +543,7 @@ msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Zorg ervoor dat niemand kan zien wat er op uw scherm staat of wat u aan het schrijven bent."
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
-msgstr "Zorg ervoor dat u een nieuwe toegangsmethode toevoegt, zodat u de volgende keer kunt inloggen of uw herstelzin kunt resetten."
+msgstr "Zorg ervoor dat u een nieuwe toegangsmethode toevoegt zodat u de volgende keer kunt inloggen, of reset uw herstelzin."
 
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Via uw dashboard beheert u uw identiteiten, apps en websites. Met Pro-functies kunt u uw ervaring verder personaliseren en beveiligen."
