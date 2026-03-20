@@ -20,7 +20,7 @@ msgid "{0} user"
 msgstr "{0} пользователь"
 
 msgid "{application} has moved to the new Internet Identity"
-msgstr "{application} переехало на новую версию Internet Identity"
+msgstr "приложение {application} переехало на новую версию Internet Identity"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Вы достигли максимума в # аккаунт для одного приложения.} other {Вы достигли максимума в # аккаунтов для одного приложения.}}"
