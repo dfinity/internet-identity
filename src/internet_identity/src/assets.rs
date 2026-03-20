@@ -43,12 +43,31 @@ pub fn init_assets(config: &InternetIdentityInit) {
 pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
     // Required to make the synchronized config available to the II frontend canister.
     // The synchronized config is the part of `InternetIdentityInit` that is needed for both the II backend and frontend.
-    vec![Asset {
+    let mut assets = vec![Asset {
         url_path: "/.config.did.bin".to_string(),
         content: Encode!(&InternetIdentitySynchronizedConfig::from(config)).unwrap(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
-    }]
+    }];
+
+    // Required to make II available on custom domains (e.g. backend.id.ai).
+    // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
+    assets.push(Asset {
+        url_path: "/.well-known/ic-domains".to_string(),
+        content: config
+            .related_origins
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|origin| origin.replace("https://", ""))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .into_bytes(),
+        encoding: ContentEncoding::Identity,
+        content_type: ContentType::OCTETSTREAM,
+    });
+
+    assets
 }
 
 /// Extract all integrity hashes from the given HTML
