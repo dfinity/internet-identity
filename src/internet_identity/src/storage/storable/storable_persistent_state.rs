@@ -146,8 +146,8 @@ mod tests {
             max_inflight_captchas: 0,
             event_stats_24h_start: None,
             captcha_config: Some(CaptchaConfig {
-                max_unsolved_captchas: 500,
-                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+                max_unsolved_captchas: 50,
+                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
             }),
             related_origins: None,
             new_flow_origins: None,
@@ -158,7 +158,7 @@ mod tests {
             dummy_auth: None,
         };
 
-        assert_eq!(StorablePersistentState::default(), expected_defaults);
+        pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
 
         let expected_defaults = PersistentState {
             archive_state: ArchiveState::default(),
@@ -171,8 +171,8 @@ mod tests {
             domain_active_anchor_stats: ActivityStats::new(test_time),
             active_authn_method_stats: ActivityStats::new(test_time),
             captcha_config: CaptchaConfig {
-                max_unsolved_captchas: 500,
-                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+                max_unsolved_captchas: 50,
+                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
             },
             related_origins: None,
             new_flow_origins: None,
@@ -183,6 +183,6 @@ mod tests {
             is_production: None,
             dummy_auth: None,
         };
-        assert_eq!(PersistentState::default(), expected_defaults);
+        pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }
 }
