@@ -12,7 +12,45 @@ use internet_identity_interface::internet_identity::types::InternetIdentityFront
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
+use internet_identity_interface::http_gateway::HeaderField;
 use std::time::Duration;
+
+/// Verify that expected security headers are present in the response.
+/// This is specific to the frontend canister, which sets its own Permissions-Policy
+/// that differs from the backend canister's.
+fn verify_frontend_security_headers(headers: &[HeaderField]) {
+    let header_map: std::collections::HashMap<String, &str> = headers
+        .iter()
+        .map(|(k, v)| (k.to_lowercase(), v.as_str()))
+        .collect();
+
+    assert_eq!(
+        header_map.get("x-frame-options"),
+        Some(&"DENY"),
+        "X-Frame-Options header missing or incorrect"
+    );
+    assert_eq!(
+        header_map.get("x-content-type-options"),
+        Some(&"nosniff"),
+        "X-Content-Type-Options header missing or incorrect"
+    );
+    assert!(
+        header_map.contains_key("content-security-policy"),
+        "Content-Security-Policy header missing"
+    );
+    assert!(
+        header_map.contains_key("strict-transport-security"),
+        "Strict-Transport-Security header missing"
+    );
+    assert!(
+        header_map.contains_key("referrer-policy"),
+        "Referrer-Policy header missing"
+    );
+    assert!(
+        header_map.contains_key("permissions-policy"),
+        "Permissions-Policy header missing"
+    );
+}
 
 fn default_frontend_args() -> InternetIdentityFrontendArgs {
     InternetIdentityFrontendArgs {
@@ -58,7 +96,7 @@ fn frontend_canister_serves_http_assets() -> Result<(), RejectResponse> {
                     "unexpected Content-Encoding header value"
                 );
             }
-            verify_security_headers(&http_response.headers, &None);
+            verify_frontend_security_headers(&http_response.headers);
 
             let result = verify_response_certification(
                 &env,
@@ -115,7 +153,7 @@ fn frontend_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
             content_type, "application/json",
             "unexpected Content-Type header value"
         );
-        verify_security_headers(&http_response.headers, &Some(related_origins.clone()));
+        verify_frontend_security_headers(&http_response.headers);
 
         let result = verify_response_certification(
             &env,
