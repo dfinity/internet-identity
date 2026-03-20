@@ -410,6 +410,12 @@ jobs:
           name: archive.wasm.gz
           path: .
 
+      - name: "Download II frontend wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: internet_identity_frontend_test_cached.wasm.gz
+          path: .
+
       - name: Run PocketIc
         run: |
           "${POCKET_IC_BIN}" --port-file pocket-ic-port &
@@ -417,6 +423,7 @@ jobs:
       - name: Run Tests
         run: |
           mv internet_identity_test.wasm.gz internet_identity.wasm.gz
+          mv internet_identity_frontend_test.wasm.gz internet_identity_frontend.wasm.gz
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
