@@ -1,10 +1,15 @@
 import type { Handle, ServerInit } from "@sveltejs/kit";
+import { building } from "$app/environment";
 import { localeStore } from "$lib/stores/locale.store";
 import { execSync } from "child_process";
 
 export const handle: Handle = async ({ event, resolve }) => {
   const response = await resolve(event);
-  if (response.headers.get("Content-Type") === "text/html" && response.ok) {
+  if (
+    !building &&
+    response.headers.get("Content-Type") === "text/html" &&
+    response.ok
+  ) {
     // Get frontend canister id and then fetch it's HTML
     const canisterId = execSync("dfx canister id internet_identity_frontend")
       .toString()
