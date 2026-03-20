@@ -185,8 +185,7 @@ fn frontend_must_not_cache_well_known_ic_domains() -> Result<(), RejectResponse>
         .map(|(_, value)| value.clone());
     assert!(
         cache_control
-            .as_ref()
-            .map_or(true, |v| v.contains("no-cache")),
+            .is_none_or(|v| v.contains("no-cache")),
         "expected no-cache or no Cache-Control header, got: {:?}",
         cache_control,
     );
@@ -235,8 +234,7 @@ fn frontend_must_not_cache_well_known_webauthn() -> Result<(), RejectResponse> {
         .map(|(_, value)| value.clone());
     assert!(
         cache_control
-            .as_ref()
-            .map_or(true, |v| v.contains("no-cache")),
+            .is_none_or(|v| v.contains("no-cache")),
         "expected no-cache or no Cache-Control header, got: {:?}",
         cache_control,
     );
