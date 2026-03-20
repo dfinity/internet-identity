@@ -1,6 +1,6 @@
 /* Utils used both in the FE code & the FE config */
 
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import type { IncomingMessage, ServerResponse } from "http";
 import { request } from "undici";
 
@@ -46,7 +46,7 @@ export const readCanisterConfig = async ({
   try {
     const response = await fetch(url);
     const configText = (await response.text()).trim();
-    const hex = execSync(`didc encode '(${configText})'`)
+    const hex = execFileSync("didc", ["encode", `(${configText})`])
       .toString()
       .trim();
     return Buffer.from(hex, "hex").toString("base64");
