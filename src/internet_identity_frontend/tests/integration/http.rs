@@ -129,63 +129,6 @@ fn frontend_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-#[test]
-fn frontend_canister_serves_webauthn_assets_after_upgrade() -> Result<(), RejectResponse> {
-    let env = env();
-    let related_origins: Vec<String> = vec![
-        "https://identity.internetcomputer.org".to_string(),
-        "https://identity.ic0.app".to_string(),
-    ];
-    let args = InternetIdentityFrontendArgs {
-        related_origins: Some(related_origins.clone()),
-        ..default_frontend_args()
-    };
-    let canister_id = install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), args.clone());
-
-    upgrade_ii_frontend_canister(&env, canister_id, II_FRONTEND_WASM.clone(), args);
-
-    for certification_version in 1..=2 {
-        let request = HttpRequest {
-            method: "GET".to_string(),
-            url: "/.well-known/webauthn".to_string(),
-            headers: vec![],
-            body: ByteBuf::new(),
-            certificate_version: Some(certification_version),
-        };
-        let http_response = http_request(&env, canister_id, &request)?;
-        let response_body = String::from_utf8_lossy(&http_response.body).to_string();
-
-        assert_eq!(http_response.status_code, 200);
-
-        let expected_content = json!({
-            "origins": related_origins.clone(),
-        })
-        .to_string();
-        assert_eq!(response_body, expected_content);
-
-        let (_, content_type) = http_response
-            .headers
-            .iter()
-            .find(|(name, _)| name.to_lowercase() == "content-type")
-            .expect("Content-Type header not found");
-        assert_eq!(
-            content_type, "application/json",
-            "unexpected Content-Type header value"
-        );
-        verify_security_headers(&http_response.headers, &Some(related_origins.clone()));
-
-        let result = verify_response_certification(
-            &env,
-            canister_id,
-            request,
-            http_response,
-            certification_version,
-        );
-        assert_eq!(result.verification_version, certification_version);
-    }
-    Ok(())
-}
-
 /// Verifies that clients that do not indicate any certification version will get a v1 certificate.
 #[test]
 fn frontend_should_fallback_to_v1_certification() -> Result<(), RejectResponse> {

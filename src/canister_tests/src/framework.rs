@@ -203,17 +203,6 @@ pub fn install_ii_frontend_canister(
     canister_id
 }
 
-pub fn upgrade_ii_frontend_canister(
-    env: &PocketIc,
-    canister_id: CanisterId,
-    wasm: Vec<u8>,
-    arg: InternetIdentityFrontendArgs,
-) {
-    let bytes = candid::encode_one(arg).expect("error encoding II frontend upgrade arg as candid");
-    env.upgrade_canister(canister_id, wasm, bytes, None)
-        .unwrap_or_else(|e| panic!("Failed to upgrade II frontend canister: {e:?}"));
-}
-
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
