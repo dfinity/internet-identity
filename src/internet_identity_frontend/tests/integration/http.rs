@@ -7,12 +7,12 @@ use canister_tests::framework::*;
 use ic_cdk::api::management_canister::main::CanisterId;
 use ic_response_verification::types::VerificationInfo;
 use ic_response_verification::verify_request_response_pair;
+use internet_identity_interface::http_gateway::HeaderField;
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::InternetIdentityFrontendArgs;
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
-use internet_identity_interface::http_gateway::HeaderField;
 use std::time::Duration;
 
 /// Verify that expected security headers are present in the response.
