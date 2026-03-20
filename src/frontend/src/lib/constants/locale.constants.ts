@@ -7,6 +7,8 @@ export const availableLocales = [
   "id",
   "it",
   "pl",
+  "ru",
+  "ua",
   "ur",
 ];
 

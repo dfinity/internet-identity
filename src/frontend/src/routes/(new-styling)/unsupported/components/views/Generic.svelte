@@ -22,18 +22,18 @@
           <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
             <TriangleAlertIcon size="1.25rem" class="text-fg-warning-primary" />
           </FeaturedIcon>
-          <h1 class="text-text-primary mb-3 text-left text-2xl font-medium">
+          <h1 class="text-text-primary mb-3 text-start text-2xl font-medium">
             {$t`Unsupported Browser`}
           </h1>
-          <p class="text-text-primary mb-5 text-left">
+          <p class="text-text-primary mb-5 text-start">
             {$t`It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported.`}
           </p>
           <div>
-            <p class="text-text-primary mb-3 text-left">
+            <p class="text-text-primary mb-3 text-start">
               <strong>{$t`To continue:`}</strong>
             </p>
             <ol
-              class="text-text-tertiary mb-5 list-decimal space-y-2 pl-6 text-left text-base font-medium"
+              class="text-text-tertiary mb-5 list-decimal space-y-2 ps-6 text-start text-base font-medium"
             >
               <li>{$t`Long-press the link that opened this page.`}</li>
               <li>

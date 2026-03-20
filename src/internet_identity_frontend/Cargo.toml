@@ -30,9 +30,4 @@ ic-cdk-timers.workspace = true
 [dev-dependencies]
 candid_parser.workspace = true
 
-[features]
-# The dev_csp feature weakens the CSP in order to facilitate development with a locally deployed II instance.
-# In particular, this allows
-# * accessing II using http instead of https
-# * II to connect to localhost both on http and https, which is useful when developing a vc issuer
-dev_csp = []
+
