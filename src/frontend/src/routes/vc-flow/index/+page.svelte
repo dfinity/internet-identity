@@ -7,10 +7,23 @@
 
   analytics.event("page-webauthn-iframe");
 
-  const connection = new Connection(
-    canisterId.toText(),
-    frontendCanisterConfig,
-  );
+  const connection = new Connection(canisterId.toText(), {
+    fetch_root_key: frontendCanisterConfig.fetch_root_key,
+    is_production: [],
+    backend_canister_id: [frontendCanisterConfig.backend_canister_id],
+    enable_dapps_explorer: [],
+    assigned_user_number_range: [],
+    new_flow_origins: [],
+    archive_config: [],
+    canister_creation_cycles_cost: [],
+    analytics_config: [],
+    related_origins: frontendCanisterConfig.related_origins,
+    openid_configs: [],
+    backend_origin: [frontendCanisterConfig.backend_origin],
+    captcha_config: [],
+    dummy_auth: [],
+    register_rate_limit: [],
+  });
 </script>
 
 <Flow promise={vcFlow} args={[{ connection }]} />
