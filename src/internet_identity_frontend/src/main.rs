@@ -8,9 +8,7 @@ use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
 use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
-use internet_identity_interface::internet_identity::types::{
-    InternetIdentityFrontendArgs,
-};
+use internet_identity_interface::internet_identity::types::InternetIdentityFrontendArgs;
 use serde_json::json;
 use sha2::Digest;
 use std::io::Read;
