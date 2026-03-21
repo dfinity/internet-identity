@@ -65,48 +65,48 @@ fn default_frontend_args() -> InternetIdentityFrontendArgs {
 }
 
 /// Verifies that some expected assets are delivered, certified and have security headers.
+/// The frontend canister's AssetRouter only supports v2 certification.
 #[test]
 fn frontend_canister_serves_http_assets() -> Result<(), RejectResponse> {
+    const CERTIFICATION_VERSION: u16 = 2;
     let assets: Vec<(&str, Option<&str>)> = vec![("/", None), ("/.well-known/ic-domains", None)];
     let env = env();
     let canister_id =
         install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
 
     for (asset, encoding) in assets {
-        for certification_version in 1..=2 {
-            let request = HttpRequest {
-                method: "GET".to_string(),
-                url: asset.to_string(),
-                headers: vec![],
-                body: ByteBuf::new(),
-                certificate_version: Some(certification_version),
-            };
-            let http_response = http_request(&env, canister_id, &request)?;
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            url: asset.to_string(),
+            headers: vec![],
+            body: ByteBuf::new(),
+            certificate_version: Some(CERTIFICATION_VERSION),
+        };
+        let http_response = http_request(&env, canister_id, &request)?;
 
-            assert_eq!(http_response.status_code, 200);
+        assert_eq!(http_response.status_code, 200);
 
-            if let Some(enc) = encoding {
-                let (_, content_encoding) = http_response
-                    .headers
-                    .iter()
-                    .find(|(name, _)| name.to_lowercase() == "content-encoding")
-                    .expect("Content-Encoding header not found");
-                assert_eq!(
-                    content_encoding, enc,
-                    "unexpected Content-Encoding header value"
-                );
-            }
-            verify_frontend_security_headers(&http_response.headers);
-
-            let result = verify_response_certification(
-                &env,
-                canister_id,
-                request,
-                http_response,
-                certification_version,
+        if let Some(enc) = encoding {
+            let (_, content_encoding) = http_response
+                .headers
+                .iter()
+                .find(|(name, _)| name.to_lowercase() == "content-encoding")
+                .expect("Content-Encoding header not found");
+            assert_eq!(
+                content_encoding, enc,
+                "unexpected Content-Encoding header value"
             );
-            assert_eq!(result.verification_version, certification_version);
         }
+        verify_frontend_security_headers(&http_response.headers);
+
+        let result = verify_response_certification(
+            &env,
+            canister_id,
+            request,
+            http_response,
+            CERTIFICATION_VERSION,
+        );
+        assert_eq!(result.verification_version, CERTIFICATION_VERSION);
     }
     Ok(())
 }
@@ -166,10 +166,11 @@ fn frontend_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
     Ok(())
 }
 
-/// Verifies that clients that do not indicate any certification version will get a v1 certificate.
+/// Verifies that clients that do not indicate any certification version will still get a valid
+/// (v2) certificate. The frontend canister's AssetRouter always uses v2 certification.
 #[test]
-fn frontend_should_fallback_to_v1_certification() -> Result<(), RejectResponse> {
-    const CERTIFICATION_VERSION: u16 = 1;
+fn frontend_serves_certified_response_without_version_hint() -> Result<(), RejectResponse> {
+    const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let canister_id =
         install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), default_frontend_args());
