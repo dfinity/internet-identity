@@ -597,7 +597,7 @@ msgid "No recovery phrase"
 msgstr "Keine Wiederherstellungsphrase"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
-msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten werden niemals mit Internet Identity oder anderen Websites oder Apps geteilt."
+msgstr "Keine Sorge. Face ID oder Ihr Fingerabdruck dienen lediglich dazu, Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten verlassen dabei nie Ihr Gerät und werden nicht mit Internet Identity oder Dritten geteilt."
 
 msgid "NordPass has been confirmed to be incompatible."
 msgstr "Es wurde bestätigt, dass NordPass inkompatibel ist."
