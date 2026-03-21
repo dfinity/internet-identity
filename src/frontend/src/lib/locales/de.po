@@ -294,7 +294,7 @@ msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, 
 
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
-msgstr "Erleben"
+msgstr "Entdecke"
 
 msgid "Export JSON"
 msgstr "JSON exportieren"
