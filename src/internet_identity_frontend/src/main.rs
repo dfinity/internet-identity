@@ -38,7 +38,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let related_origins = args.related_origins.as_ref();
     let dev_csp = args.dev_csp.unwrap_or(false);
 
-    // 2. Extract integrity hashes for inline scripts from HTML files
+    // Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
         .iter()
         .filter(|asset| asset.content_type == ContentType::HTML)

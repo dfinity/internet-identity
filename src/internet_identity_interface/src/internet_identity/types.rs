@@ -226,45 +226,6 @@ pub struct InternetIdentityFrontendArgs {
     pub dev_csp: Option<bool>,
 }
 
-impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
-    fn from(value: InternetIdentityFrontendArgs) -> Self {
-        let InternetIdentityFrontendArgs {
-            backend_canister_id,
-            backend_origin,
-            analytics_config,
-            dummy_auth,
-            related_origins,
-
-            fetch_root_key: _,
-            dev_csp: _,
-        } = value;
-
-        Self {
-            backend_canister_id: Some(backend_canister_id),
-            backend_origin: Some(backend_origin),
-
-            analytics_config,
-            dummy_auth,
-            related_origins,
-
-            // This config field is pulled in the frontend from the backend
-            openid_configs: None,
-
-            // Config fields not used by the frontend
-            canister_creation_cycles_cost: None,
-            assigned_user_number_range: None,
-            archive_config: None,
-            register_rate_limit: None,
-
-            // Deprecated config fields
-            enable_dapps_explorer: None,
-            captcha_config: None,
-            is_production: None,
-            new_flow_origins: None,
-        }
-    }
-}
-
 /// Config fields that are synchronized between the frontend and backend.
 ///
 /// Since the II frontend is stateless, this config is pulled from the backend
