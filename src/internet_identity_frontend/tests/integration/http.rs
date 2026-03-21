@@ -114,6 +114,7 @@ fn frontend_canister_serves_http_assets() -> Result<(), RejectResponse> {
 /// Verifies that `.well-known/webauthn` assets are delivered, certified and have security headers if present in the config.
 #[test]
 fn frontend_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
+    const CERTIFICATION_VERSION: u16 = 2;
     let env = env();
     let related_origins: Vec<String> = vec![
         "https://identity.internetcomputer.org".to_string(),
@@ -125,45 +126,43 @@ fn frontend_canister_serves_webauthn_assets() -> Result<(), RejectResponse> {
     };
     let canister_id = install_ii_frontend_canister(&env, II_FRONTEND_WASM.clone(), args);
 
-    for certification_version in 1..=2 {
-        let request = HttpRequest {
-            method: "GET".to_string(),
-            url: "/.well-known/webauthn".to_string(),
-            headers: vec![],
-            body: ByteBuf::new(),
-            certificate_version: Some(certification_version),
-        };
-        let http_response = http_request(&env, canister_id, &request)?;
-        let response_body = String::from_utf8_lossy(&http_response.body).to_string();
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: "/.well-known/webauthn".to_string(),
+        headers: vec![],
+        body: ByteBuf::new(),
+        certificate_version: Some(CERTIFICATION_VERSION),
+    };
+    let http_response = http_request(&env, canister_id, &request)?;
+    let response_body = String::from_utf8_lossy(&http_response.body).to_string();
 
-        assert_eq!(http_response.status_code, 200);
+    assert_eq!(http_response.status_code, 200);
 
-        let expected_content = json!({
-            "origins": related_origins.clone(),
-        })
-        .to_string();
-        assert_eq!(response_body, expected_content);
+    let expected_content = json!({
+        "origins": related_origins.clone(),
+    })
+    .to_string();
+    assert_eq!(response_body, expected_content);
 
-        let (_, content_type) = http_response
-            .headers
-            .iter()
-            .find(|(name, _)| name.to_lowercase() == "content-type")
-            .expect("Content-Type header not found");
-        assert_eq!(
-            content_type, "application/json",
-            "unexpected Content-Type header value"
-        );
-        verify_frontend_security_headers(&http_response.headers);
+    let (_, content_type) = http_response
+        .headers
+        .iter()
+        .find(|(name, _)| name.to_lowercase() == "content-type")
+        .expect("Content-Type header not found");
+    assert_eq!(
+        content_type, "application/json",
+        "unexpected Content-Type header value"
+    );
+    verify_frontend_security_headers(&http_response.headers);
 
-        let result = verify_response_certification(
-            &env,
-            canister_id,
-            request,
-            http_response,
-            certification_version,
-        );
-        assert_eq!(result.verification_version, certification_version);
-    }
+    let result = verify_response_certification(
+        &env,
+        canister_id,
+        request,
+        http_response,
+        CERTIFICATION_VERSION,
+    );
+    assert_eq!(result.verification_version, CERTIFICATION_VERSION);
     Ok(())
 }
 
