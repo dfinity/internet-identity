@@ -420,7 +420,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "Взаимодействие отменено. Пожалуйста, попробуйте снова."
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
-msgstr "Internet Identity <0>не</0> хранит ваши биометрические данные — они остаются на устройстве. Идентификатор управляет ключами доступа."
+msgstr "Internet Identity <0>не запоминает</0> ваши биометрические данные — они остаются на устройстве. Идентификатор управляет ключами доступа."
 
 msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
 msgstr "Internet Identity 2.0 содержит множество улучшений для более удобной работы:"
