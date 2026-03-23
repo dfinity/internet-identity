@@ -1,17 +1,17 @@
 msgid ""
 msgstr ""
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-03-20 11:56+0100\n"
+"PO-Revision-Date: \n"
+"Last-Translator: Dmytro Dintsen\n"
+"Language-Team: \n"
+"Language: uk\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: @lingui/cli\n"
-"Language: uk\n"
-"Project-Id-Version: \n"
-"Report-Msgid-Bugs-To: \n"
-"PO-Revision-Date: \n"
-"Last-Translator: \n"
-"Language-Team: \n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Generator: Poedit 3.9\n"
 
 msgid "{0} logo"
 msgstr "{0} логотип"
@@ -20,19 +20,19 @@ msgid "{0} user"
 msgstr "{0} користувач"
 
 msgid "{application} has moved to the new Internet Identity"
-msgstr "{application} перейшов на нову версію Internet Identity"
+msgstr "{application} перейшов до нової версії Internet Identity"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
-msgstr "{MAX_ACCOUNTS, plural, one {Ви досягли максимуму в # обліковий запис для однієї програми.} other {Ви досягли максимуму в # облікових записів для однієї програми.}}"
+msgstr "{MAX_ACCOUNTS, plural, one {Ви досягли максимуму # облікового запису для одного застосунку.} few {Ви досягли максимуму # облікових записів для одного застосунку.} many {Ви досягли максимуму # облікових записів для одного застосунку.} other {Ви досягли максимуму # облікових записів для одного застосунку.}}"
 
 msgid "{name} account"
 msgstr "{name} обліковий запис"
 
 msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
-msgstr "{num, plural, one {# ключ доступу} other {# ключів доступу}}"
+msgstr "{num, plural, one {# ключ доступу} few {# ключі доступу} many {# ключів доступу} other {# ключів доступу}}"
 
 msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
-msgstr "<0>Повністю оновлений інтерфейс:</0> Ми надали Internet Identity свіжого, сучасного вигляду. Новий дизайн інтуїтивно зрозумілий та зручний у навігації, що робить роботу з сервісом приємнішою."
+msgstr "<0>Повністю перероблений інтерфейс:</0> Ми надали Internet Identity свіжого, сучасного вигляду. Новий дизайн інтуїтивний і простіший для навігації, що забезпечує більш плавний користувацький досвід."
 
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
 msgstr "<0>Інтеграція з Google, Apple та Microsoft:</0> Хоча ключі доступу стають дедалі досконалішими, вони ще не стали звичними для всіх. Ми помітили, що 50% користувачів не завершують реєстрацію, — це свідчить про потребу в альтернативних способах входу. Щоб зробити Internet Identity доступним для ще ширшої аудиторії, ми додали вхід через Google, Apple та Microsoft."
@@ -71,7 +71,7 @@ msgid "Activate recovery to remove"
 msgstr "Активувати відновлення для видалення"
 
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
-msgstr "Активуйте вашу відновлювальну фразу, щоб ви могли відновити свій ідентифікатор у будь-який момент."
+msgstr "Активуйте вашу фразу відновлення, щоб ви могли відновити свій ідентифікатор у будь-який момент."
 
 msgid "Add a passkey"
 msgstr "Додати ключ доступу"
@@ -104,10 +104,10 @@ msgid "Are you sure?"
 msgstr "Ви впевнені?"
 
 msgid "As you are currently signed in with this Account, you will be signed out."
-msgstr "Оскільки ви зараз увійшли з цим обліковим записом, вас буде розлоговано."
+msgstr "Оскільки ви наразі увійшли в цей обліковий запис, вас буде виведено з нього."
 
 msgid "As you are currently signed in with this passkey, you will be signed out."
-msgstr "Оскільки ви зараз увійшли з цим ключем доступу, вас буде розлоговано."
+msgstr "Оскільки ви наразі увійшли з цим ключем доступу, вас буде виведено з нього."
 
 msgid "Authenticating..."
 msgstr "Автентифікація..."
@@ -119,13 +119,13 @@ msgid "Authorize new device"
 msgstr "Авторизувати новий пристрій"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
-msgstr "Перш ніж розпочати, знайдіть приватне місце та підготуйте свою відновлювальну фразу. Зберігайте її конфіденційно, щоб захистити свій ідентифікатор."
+msgstr "Перш ніж розпочати, знайдіть приватне місце та підготуйте свою фразу відновлення. Зберігайте її конфіденційно, щоб захистити свій ідентифікатор."
 
 msgid "Before you continue"
 msgstr "Перед тим, як продовжити"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
-msgstr "Увімкнувши цю функцію, ви можете створити більше одного облікового запису для однієї програми. Легко перемикайтеся між обліковими записами (наприклад, робочий, особистий або демонстраційний)."
+msgstr "Увімкнувши цю функцію, ви можете створити більше одного облікового запису для одного застосунку. Легко перемикайтеся між обліковими записами (наприклад, робочим, особистим або демонстраційним)."
 
 msgid "Can't find your identity?"
 msgstr "Не можете знайти свій ідентифікатор?"
@@ -143,7 +143,7 @@ msgid "Check out the other domains:"
 msgstr "Перегляньте інші домени:"
 
 msgid "Checking recovery phrase"
-msgstr "Перевірка відновлювальної фрази"
+msgstr "Перевірка фрази відновлення"
 
 msgid "Checking your order"
 msgstr "Перевірка вашого замовлення"
@@ -287,7 +287,7 @@ msgid "Enter each word in the correct order:"
 msgstr "Введіть кожне слово у правильному порядку:"
 
 msgid "Enter recovery phrase"
-msgstr "Введіть відновлювальну фразу"
+msgstr "Введіть фразу відновлення"
 
 msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
 msgstr "Усе, що потрібно знати про Internet Identity — ваш приватний, безпечний та простий спосіб входу в застосунки на Internet Computer."
@@ -305,11 +305,11 @@ msgstr "FAQ та Підтримка"
 msgid "FAQs"
 msgstr "FAQ"
 
-msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
-msgstr "Наприклад, користувач А входить в Internet Identity через свій обліковий запис Google «A@gmail.com», а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач увійшов у застосунок Z через Internet Identity. Застосунок Z теж не дізнається, що користувач А використовував Google для входу в Internet Identity."
+msgid "For example, user A logs into Internet Identity with their Google account \u201cA@gmail.com\u201d and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
+msgstr "Наприклад, користувач A входить в Internet Identity зі свого облікового запису Google \u201cA@gmail.com\u201d, а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач автентифікований у застосунку Z, — лише в Internet Identity. Більше того, застосунок Z також ніколи не дізнається, що користувач A використовував Google для автентифікації свого користувача Internet Identity."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
-msgstr "Забудьте про запам'ятовування складних імен користувачів та паролів. Завдяки ключам доступу ви просто обираєте своє ім'я для входу — швидко, безпечно та без проблем."
+msgstr "Забудьте про запам'ятовування складних імен користувача та паролів. Завдяки ключам доступу ви просто обираєте своє ім'я для входу — швидко, безпечно та без проблем."
 
 msgid "Full control"
 msgstr "Повний контроль"
@@ -327,16 +327,16 @@ msgid "Get started"
 msgstr "Почати"
 
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
-msgstr "Надайте вашому ідентифікатору чітку, просту та запам'ятовувану назву, яку ви легко впізнаєте."
+msgstr "Надайте своєму ідентифікатору чітку, просту та запам’ятовувану назву, яку ви легко впізнаєте."
 
 msgid "Give your passkey a memorable name to help you identify it."
 msgstr "Надайте вашому ключу доступу запам'ятовувану назву, щоб допомогти вам його ідентифікувати."
 
 msgid "Go to the app"
-msgstr "Перейти до програми"
+msgstr "Перейти до застосунку"
 
 msgid "Go to the app - (<0>{countdown}</0>)"
-msgstr "Перейти до програми - (<0>{countdown}</0>)"
+msgstr "Перейти до застосунку - (<0>{countdown}</0>)"
 
 msgid "Has not been used yet"
 msgstr "Ще не використовувався"
@@ -345,7 +345,7 @@ msgid "Help & FAQ"
 msgstr "Довідка та Поширені запитання"
 
 msgid "Here is the identity that is linked to your recovery phrase. Continue to access it and add another access method if required."
-msgstr "Ось ідентифікатор, пов'язаний із вашою відновлювальною фразою. Продовжуйте для доступу до нього та додайте інший метод доступу, якщо це необхідно."
+msgstr "Ось ідентифікатор, пов'язаний із вашою фразою відновлення. Продовжуйте для доступу до нього та додайте інший метод доступу, якщо це необхідно."
 
 msgid "Hidden email"
 msgstr "Прихована електронна пошта"
@@ -372,10 +372,10 @@ msgid "I Acknowledge"
 msgstr "Я підтверджую"
 
 msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
-msgstr "Я несу відповідальність за свою фразу для відновлення, і її неможливо отримати з Internet Identity у разі втрати."
+msgstr "Я несу відповідальність за свою фразу відновлення, і її неможливо отримати з Internet Identity у разі втрати."
 
 msgid "I have written it down"
-msgstr "Я записав"
+msgstr "Я це записав(-ла)"
 
 msgid "Identity already upgraded"
 msgstr "Ідентифікатор вже оновлено"
@@ -405,7 +405,7 @@ msgid "In use on another account."
 msgstr "Використовується в іншому обліковому записі."
 
 msgid "Incorrect recovery phrase. Please try again."
-msgstr "Неправильна відновлювальна фраза. Будь ласка, спробуйте ще раз."
+msgstr "Неправильна фраза відновлення. Будь ласка, спробуйте ще раз."
 
 msgid "Incorrect spelling"
 msgstr "Неправильне написання"
@@ -444,7 +444,7 @@ msgid "Internet Identity number"
 msgstr "Номер Internet Identity"
 
 msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
-msgstr "Після цього Internet Identity зв'язує автентифікацію через цих провайдерів з Internet Computer. Увійшовши через одну з цих служб, Internet Identity підтверджує вашу особу, а потім створює окрему автентифікацію для застосунків, що працюють на Internet Computer."
+msgstr "Після цього Internet Identity зв'язує автентифікацію через цих провайдерів з Internet Computer. Коли ви входите через одну з цих служб, Internet Identity підтверджує вашу особу, а потім створює окрему автентифікацію для застосунків, що працюють на Internet Computer."
 
 msgid "Invalid code link"
 msgstr "Недійсне посилання на код"
@@ -453,7 +453,7 @@ msgid "Invalid code. Please check and try again."
 msgstr "Недійсний код. Будь ласка, перевірте та спробуйте ще раз."
 
 msgid "Invalid recovery phrase"
-msgstr "Неправильна відновлювальна фраза"
+msgstr "Неправильна фраза відновлення"
 
 msgid "Invalid request"
 msgstr "Недійсний запит"
@@ -465,10 +465,10 @@ msgid "It can be used at any time to recover your identity."
 msgstr "Його можна використовувати будь-коли для відновлення вашого ідентифікатора."
 
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
-msgstr "Схоже, ви намагаєтеся увійти з соціальної програми. Виконайте такі кроки, щоб продовжити:"
+msgstr "Схоже, ви намагаєтеся увійти через соціальний застосунок. Виконайте ці кроки, щоб продовжити:"
 
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr "Схоже, ви намагаєтеся увійти зсередини програми (наприклад, X, Telegram або Instagram). Вбудований браузер цієї програми не підтримується."
+msgstr "Схоже, ви намагаєтеся увійти зсередини застосунку (наприклад, X, Telegram або Instagram). Вбудований браузер цього застосунку не підтримується."
 
 msgid "It seems like an invalid authentication request was received."
 msgstr "Здається, було отримано недійсний запит на автентифікацію."
@@ -483,16 +483,16 @@ msgid "It seems like the request could not be processed."
 msgstr "Здається, запит не вдалося обробити."
 
 msgid "It won't be removed from your device or password manager."
-msgstr "Він не буде видалений з вашого пристрою чи менеджера паролів."
+msgstr "Його не буде видалено з вашого пристрою чи менеджера паролів."
 
 msgid "Keep it secret"
 msgstr "Зберігайте це в секреті"
 
 msgid "Keep linked"
-msgstr "Зберігати пов'язаним"
+msgstr "Залишити пов'язаним"
 
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
-msgstr "Зберігається на фізичному ключі. Автентифікуйтеся на підтримуваних пристроях через дотик/вставлення."
+msgstr "Зберігається на фізичному ключі. Автентифікуйтеся на підтримуваних пристроях через дотик/підключення."
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "Назвіть його за призначенням (наприклад, 'Робота' чи 'Демо')."
@@ -522,7 +522,7 @@ msgid "Link copied to clipboard"
 msgstr "Посилання скопійовано в буфер обміну"
 
 msgid "Locked legacy recovery phrase"
-msgstr "Заблокована застаріла відновлювальна фраза"
+msgstr "Заблокована застаріла фраза відновлення"
 
 msgid "Long-press the link that opened this page."
 msgstr "Натисніть і утримуйте посилання, яке відкрило цю сторінку."
@@ -543,7 +543,7 @@ msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Переконайтеся, що ніхто не бачить, що на вашому екрані або що ви пишете."
 
 msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
-msgstr "Переконайтеся, що ви додали новий метод доступу, щоб наступного разу ви могли увійти або скинути свою відновлювальну фразу."
+msgstr "Переконайтеся, що ви додали новий метод доступу, щоб наступного разу ви могли увійти або скинути свою фразу відновлення."
 
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
 msgstr "Керуйте своїми обліковими записами та контролюйте доступ до застосунків і вебсайтів через панель керування. Скористайтеся розширеними функціями для додаткового налаштування та захисту."
@@ -594,7 +594,7 @@ msgid "No passkey tests yet"
 msgstr "Ще немає тестів ключів доступу"
 
 msgid "No recovery phrase"
-msgstr "Без відновлювальної фрази"
+msgstr "Без фрази відновлення"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
 msgstr "Ні. Face ID або відбиток пальця використовуються лише для створення або розблокування вашого ключа доступу. Ваші біометричні дані ніколи не передаються в Internet Identity і недоступні вебсайтам чи застосункам, якими ви користуєтесь."
@@ -681,22 +681,22 @@ msgid "Recover your identity"
 msgstr "Відновити свій ідентифікатор"
 
 msgid "Recovery phrase"
-msgstr "Фраза для відновлення"
+msgstr "Фраза відновлення"
 
 msgid "Recovery phrase activated"
-msgstr "Фраза для відновлення активована"
+msgstr "Фраза відновлення активована"
 
 msgid "Recovery phrase not activated"
-msgstr "Фраза для відновлення не активована"
+msgstr "Фраза відновлення не активована"
 
 msgid "Recovery phrase not verified"
-msgstr "Фраза для відновлення не перевірена"
+msgstr "Фраза відновлення не перевірена"
 
 msgid "Recovery phrase set"
-msgstr "Фраза для відновлення встановлена"
+msgstr "Фраза відновлення встановлена"
 
 msgid "Redirecting to the app"
-msgstr "Перенаправлення до програми"
+msgstr "Перенаправлення до застосунку"
 
 msgid "Remove"
 msgstr "Видалити"
@@ -732,25 +732,25 @@ msgid "Reset"
 msgstr "Скинути"
 
 msgid "Reset your recovery phrase?"
-msgstr "Скинути вашу фразу для відновлення?"
+msgstr "Скинути вашу фразу відновлення?"
 
 msgid "Resetting recovery phrase..."
-msgstr "Скидання фрази для відновлення..."
+msgstr "Скидання фрази відновлення..."
 
 msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
-msgstr "Скидання призведе до втрати чинності вашої поточної фрази для відновлення, залишаючи придатною лише нову."
+msgstr "Скидання призведе до втрати чинності вашої поточної фрази відновлення, залишаючи придатною лише нову."
 
 msgid "Retry"
 msgstr "Спробувати ще раз"
 
 msgid "Return to app"
-msgstr "Повернутися до програми"
+msgstr "Повернутися до застосунку"
 
 msgid "Return to application"
-msgstr "Повернутися до програми"
+msgstr "Повернутися до застосунку"
 
 msgid "Right now"
-msgstr "Прямо зараз"
+msgstr "Зараз"
 
 msgid "Run a passkey test to see results"
 msgstr "Запустіть тест ключа доступу, щоб побачити результати"
@@ -759,7 +759,7 @@ msgid "Save changes"
 msgstr "Зберегти зміни"
 
 msgid "Save your recovery phrase"
-msgstr "Збережіть вашу фразу для відновлення"
+msgstr "Збережіть вашу фразу відновлення"
 
 msgid "Saving changes..."
 msgstr "Збереження змін..."
@@ -771,7 +771,7 @@ msgid "Seamless Access"
 msgstr "Безперебійний доступ"
 
 msgid "See how many access methods are within your identity and manage your recovery phrase."
-msgstr "Перегляньте, скільки методів доступу є у вашому ідентифікаторі, та керуйте своєю фразою для відновлення."
+msgstr "Перегляньте, скільки методів доступу є у вашому ідентифікаторі, та керуйте своєю фразою відновлення."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Виберіть <0>Відкрити в Safari</0> або <1>Відкрити в Chrome</1>."
@@ -833,13 +833,13 @@ msgid "Store it safely"
 msgstr "Зберігайте це безпечно"
 
 msgid "Stored and usable only in {0} on the {1} device it was created on."
-msgstr "Збережено та доступно лише в {0} на пристрої {1}, на якому воно було створено."
+msgstr "Збережено та доступно лише в {0} на пристрої {1}, на якому його було створено."
 
 msgid "Stored and usable only in {0} on the device it was created on."
-msgstr "Збережено та доступно лише в {0} на пристрої, на якому воно було створено."
+msgstr "Збережено та доступно лише в {0} на пристрої, на якому його було створено."
 
 msgid "Stored and usable only on the {0} device it was created on."
-msgstr "Збережено та доступно лише на пристрої {0}, на якому воно було створено."
+msgstr "Збережено та доступно лише на пристрої {0}, на якому його було створено."
 
 msgid "Stored in your {0} account and synced across your {1} devices."
 msgstr "Збережено у вашому обліковому записі {0} та синхронізовано на ваших {1} пристроях."
@@ -884,7 +884,7 @@ msgid "The <0>new device</0> is preparing to continue."
 msgstr "Ваш <0>новий пристрій</0> готується до продовження."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
-msgstr "Інтеграція з Google, Microsoft та Apple використовує стандартний протокол автентифікації під назвою OpenID. Це той самий протокол, який інші програми використовують для входу через Google."
+msgstr "Інтеграція з Google, Microsoft та Apple використовує стандартний протокол автентифікації під назвою OpenID. Це той самий протокол, який інші застосунки використовують для входу через Google."
 
 msgid "The passkey could not be identified, support unknown."
 msgstr "Ключ доступу не вдалося ідентифікувати, підтримка невідома."
@@ -893,10 +893,10 @@ msgid "The phrase was entered correctly but belongs to a product other than Inte
 msgstr "Фразу введено правильно, але вона належить іншому продукту, а не Internet Identity."
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
-msgstr "Виникла проблема з підключенням до програми. Спробуйте інший браузер; якщо проблема не зникне, зв'яжіться з розробником."
+msgstr "Виникла проблема з підключенням до застосунку. Спробуйте інший браузер; якщо проблема не зникне, зверніться до розробника."
 
 msgid "This app has moved to the new Internet Identity"
-msgstr "Цей застосунок перейшов на нову версію Internet Identity"
+msgstr "Цей застосунок перейшов до нової версії Internet Identity"
 
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Цей ідентифікатор вже оновлено до нового інтерфейсу."
@@ -935,7 +935,7 @@ msgid "to continue with <0>{application}</0>"
 msgstr "щоб продовжити з <0>{application}</0>"
 
 msgid "to continue with this app"
-msgstr "щоб продовжити з цією програмою"
+msgstr "щоб продовжити з цим застосунком"
 
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
 msgstr "Щоб продовжити, створіть ключ доступу, щоб захистити свій ідентифікатор і спростити майбутні входи."
@@ -1031,7 +1031,7 @@ msgid "Verify you are human"
 msgstr "Підтвердіть, що ви людина"
 
 msgid "Verify your recovery phrase"
-msgstr "Перевірити вашу відновлювальну фразу"
+msgstr "Перевірте вашу фразу відновлення"
 
 msgid "Verifying..."
 msgstr "Перевірка..."
@@ -1088,19 +1088,19 @@ msgid "Write down all 24 words correctly and keep them offline. Do not store the
 msgstr "Запишіть усі 24 слова правильно і зберігайте їх офлайн. Не зберігайте їх у хмарі чи на пристроях."
 
 msgid "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
-msgstr "Запишіть фразу для відновлення по порядку та потім перевірте її. Зберігайте її в надійному місці й нікому не повідомляйте. Якщо ви її втратите — втратите й доступ."
+msgstr "Запишіть свою фразу відновлення по порядку та перевірте її. Зберігайте її в безпечному місці й нікому не передавайте. Втрата фрази означає втрату доступу."
 
 msgid "Wrong domain was set. Please try again."
 msgstr "Неправильний домен було встановлено. Будь ласка, спробуйте ще раз."
 
 msgid "You <0>cannot</0> rename this once it is set."
-msgstr "Ви <0>не можете</0> перейменувати це, якщо це вже встановлено."
+msgstr "Ви <0>не зможете</0> змінити назву після її збереження."
 
 msgid "You already have a {name} account linked"
 msgstr "Ви вже маєте пов'язаний обліковий запис {name}"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
-msgstr "Ви оновлюєте ідентифікатор ID <0>{identityNumber}</0>"
+msgstr "Ви оновлюєте ID <0>{identityNumber}</0>"
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Ви можете продовжити з <0>Використати існуючий ключ доступу</0> у процесі входу."
@@ -1109,7 +1109,7 @@ msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Ви можете відновити свій ідентифікатор зараз, перевірте, чи ви зберегли його правильно."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
-msgstr "Ви можете скинути свою відновлювальну фразу будь-коли. Це збереже ваш ідентифікатор у безпеці, якщо він коли-небудь буде скомпрометований."
+msgstr "Ви можете скинути свою фразу відновлення будь-коли. Це збереже ваш ідентифікатор у безпеці у разі її компрометації."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Ви досягли максимальної кількості ключів доступу"
@@ -1121,7 +1121,7 @@ msgid "You no longer need to remember your identity number and can use your fing
 msgstr "Більше не потрібно запам'ятовувати номер — тепер можна використовувати відбиток пальця, обличчя або блокування екрана."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
-msgstr "Зараз ви побачите свою фразу для відновлення. Internet Identity її не зберігає і не зможе відновити в разі втрати, тому збережіть її в безпечному місці офлайн."
+msgstr "Зараз ви побачите свою фразу відновлення. Internet Identity її не зберігає і не зможе відновити в разі втрати, тому збережіть її в безпечному місці офлайн."
 
 msgid "You're about to sign in on a <0>new device</0>."
 msgstr "Ви збираєтеся увійти на <0>новому пристрої</0>."
@@ -1145,13 +1145,13 @@ msgid "Your identity and sign-in methods at a glance."
 msgstr "Ваш ідентифікатор та способи входу — все в одному місці."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
-msgstr "Назву ідентифікатора зараз не можна змінити. Вона видима лише вам."
+msgstr "Назву ідентифікатора наразі не можна змінити. Її бачите лише ви."
 
 msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
-msgstr "Фраза для відновлення дає повний контроль над вашим ідентифікатором. Ніколи нікому її не повідомляйте та вводіть лише на офіційному вебсайті."
+msgstr "Фраза відновлення дає повний контроль над вашим ідентифікатором. Ніколи нікому її не повідомляйте та вводіть лише на офіційному вебсайті."
 
 msgid "Your recovery phrase is active, verify you saved it correctly."
-msgstr "Ваша відновлювальна фраза активна, перевірте, чи ви її правильно зберегли."
+msgstr "Ваша фраза відновлення активна, перевірте, чи ви її правильно зберегли."
 
 msgid "Your recovery phrase is now active and can be reset anytime."
-msgstr "Ваша відновлювальна фраза тепер активна і її можна скинути будь-коли."
+msgstr "Ваша фраза відновлення тепер активна і її можна скинути будь-коли."
