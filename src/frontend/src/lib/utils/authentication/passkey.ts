@@ -10,7 +10,7 @@ import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
-import { canisterConfig } from "$lib/globals";
+import { frontendCanisterConfig } from "$lib/globals";
 import { toHex } from "../utils";
 
 export class CredentialNotFound extends Error {
@@ -43,7 +43,8 @@ export const authenticateWithPasskey = async ({
     canisterId,
   });
   const dummyAuth =
-    features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined;
+    features.DUMMY_AUTH ||
+    frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined;
   let identityNumber: bigint;
   const passkeyIdentity = dummyAuth
     ? DiscoverableDummyIdentity.useExisting()

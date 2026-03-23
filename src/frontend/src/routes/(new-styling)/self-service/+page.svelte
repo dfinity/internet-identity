@@ -24,7 +24,11 @@
   import { onMount } from "svelte";
   import { aaguidToString } from "$lib/utils/webAuthn";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { anonymousActor, anonymousAgent, canisterConfig } from "$lib/globals";
+  import {
+    anonymousActor,
+    anonymousAgent,
+    frontendCanisterConfig,
+  } from "$lib/globals";
   import type { DeviceData } from "$lib/generated/internet_identity_types";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import { readStorage } from "$lib/legacy/storage";
@@ -395,7 +399,7 @@
         <div class="text-text-tertiary text-sm text-balance">
           <Trans>Check out the other domains:</Trans>
           <ul class="mt-1 flex flex-col gap-0.5">
-            {#each (canisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
+            {#each (frontendCanisterConfig.related_origins[0] ?? []).filter((relatedOrigin) => relatedOrigin !== window.location.origin) as relatedOrigin}
               <li>
                 <a
                   href={relatedOrigin + "/self-service"}

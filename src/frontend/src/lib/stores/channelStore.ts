@@ -8,7 +8,7 @@ import type {
 } from "$lib/utils/transport/utils";
 import { PostMessageTransport } from "$lib/utils/transport/postMessage";
 import { LegacyTransport } from "$lib/utils/transport/legacy";
-import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
+import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
 
 type ChannelStore = Readable<Channel | undefined> & {
   establish: (options?: ChannelOptions) => Promise<Channel>;
@@ -23,7 +23,7 @@ const getTransports = (): Transport[] => {
       primaryOrigin !== undefined
         ? {
             redirectToOrigin: primaryOrigin,
-            trustedOrigins: canisterConfig.related_origins[0] ?? [],
+            trustedOrigins: frontendCanisterConfig.related_origins[0] ?? [],
           }
         : undefined,
     ),

@@ -8,7 +8,7 @@ import {
   retryFor,
 } from "$lib/utils/utils";
 import { features } from "$lib/legacy/features";
-import { canisterConfig } from "$lib/globals";
+import { frontendCanisterConfig } from "$lib/globals";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
 import { DelegationChain } from "@icp-sdk/core/identity";
 import { AuthRequest, DelegationParams } from "$lib/utils/transport/utils";
@@ -72,7 +72,8 @@ export const authorizationStore: AuthorizationStore = {
     });
     const { identityNumber, actor } = get(authenticatedStore);
     const artificialDelayPromise = waitFor(
-      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+      features.DUMMY_AUTH ||
+        frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? 0
         : (artificialDelay ?? 0),
     );
