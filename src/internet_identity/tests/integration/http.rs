@@ -1,8 +1,5 @@
 //! Tests for the HTTP interactions according to the HTTP gateway spec: https://internetcomputer.org/docs/current/references/ic-interface-spec/#http-gateway
 //! Includes tests for the HTTP endpoint (including asset certification) and the metrics endpoint.
-//!
-//! Note: Tests for frontend assets (/, /.well-known/*) have been moved to `frontend_http.rs`
-//! since those are now served by the `internet_identity_frontend` canister.
 
 use crate::v2_api::authn_method_test_helpers::{
     create_identity_with_authn_method, create_identity_with_authn_methods,
