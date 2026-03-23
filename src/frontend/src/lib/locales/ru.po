@@ -824,10 +824,10 @@ msgid "Start over"
 msgstr "Начать заново"
 
 msgid "Still have an identity number?"
-msgstr "Есть старый ID?"
+msgstr "Ищете вход по номеру?"
 
 msgid "Still using an identity number?"
-msgstr "Все еще используете номер идентификации?"
+msgstr "Ищете вход по номеру?"
 
 msgid "Store it safely"
 msgstr "Храните его безопасно"
@@ -995,7 +995,7 @@ msgid "Unverified origin"
 msgstr "Непроверенный источник"
 
 msgid "Upgrade"
-msgstr "Обновить"
+msgstr "Начать обновление"
 
 msgid "Upgrade again"
 msgstr "Обновить снова"
