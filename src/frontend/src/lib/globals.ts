@@ -14,28 +14,12 @@ import { init as internetIdentityFrontendInit } from "$lib/generated/internet_id
 import { IDL } from "@icp-sdk/core/candid";
 import { fromBase64 } from "./utils/utils";
 
-// Frontend config types
-export type FrontendCanisterConfig = InternetIdentityFrontendInit;
-
-// Backend config types
-export type OpenIdEmailVerification =
-  | { Google: null }
-  | { Unknown: null }
-  | { Microsoft: null };
-export interface OpenIdConfig {
-  auth_uri: string;
-  jwks_uri: string;
-  logo: string;
-  name: string;
-  fedcm_uri: [] | [string];
-  email_verification: [] | [OpenIdEmailVerification];
-  issuer: string;
-  auth_scope: Array<string>;
-  client_id: string;
-}
-export type BackendCanisterConfig = { openid_configs: [] | [OpenIdConfig[]] };
-
-// Backend config IDL
+// IDL definition for decoding `InternetIdentitySynchronizedConfig` from the backend canister.
+//
+// This is intentionally maintained separately from the backend implementation to prevent
+// direct dependencies between frontend and backend, as they may be deployed independently.
+//
+// Only compatibility between the two is guaranteed, not strict synchronization.
 const backendCanisterConfigIDL = IDL.Record({
   openid_configs: IDL.Opt(
     IDL.Vec(
@@ -60,8 +44,26 @@ const backendCanisterConfigIDL = IDL.Record({
   ),
 });
 
+// Types for above IDL definition
+export type OpenIdEmailVerification =
+  | { Google: null }
+  | { Unknown: null }
+  | { Microsoft: null };
+export interface OpenIdConfig {
+  auth_uri: string;
+  jwks_uri: string;
+  logo: string;
+  name: string;
+  fedcm_uri: [] | [string];
+  email_verification: [] | [OpenIdEmailVerification];
+  issuer: string;
+  auth_scope: Array<string>;
+  client_id: string;
+}
+export type BackendCanisterConfig = { openid_configs: [] | [OpenIdConfig[]] };
+
 export let canisterId: Principal;
-export let frontendCanisterConfig: FrontendCanisterConfig;
+export let frontendCanisterConfig: InternetIdentityFrontendInit;
 export let backendCanisterConfig: BackendCanisterConfig;
 export let agentOptions: HttpAgentOptions;
 export let anonymousAgent: HttpAgent;
@@ -78,7 +80,7 @@ export const initGlobals = async () => {
   [frontendCanisterConfig] = IDL.decode(
     internetIdentityFrontendInit({ IDL }),
     fromBase64(base64Config),
-  ) as unknown as [FrontendCanisterConfig];
+  ) as unknown as [InternetIdentityFrontendInit];
 
   // Fetch backend config from the backend canister
   const response = await fetch(
