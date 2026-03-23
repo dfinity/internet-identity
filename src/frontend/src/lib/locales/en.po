@@ -265,6 +265,9 @@ msgstr "Do you want to continue?"
 msgid "Easy access"
 msgstr "Easy access"
 
+msgid "Edit"
+msgstr "Edit"
+
 msgid "Edit {name}"
 msgstr "Edit {name}"
 
@@ -701,6 +704,12 @@ msgstr "Redirecting to the app"
 msgid "Remove"
 msgstr "Remove"
 
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr "Remove identities you don't use. You can add them back anytime by signing in again."
+
+msgid "Remove identity from this device"
+msgstr "Remove identity from this device"
+
 msgid "Remove passkey"
 msgstr "Remove passkey"
 
@@ -761,6 +770,9 @@ msgstr "Save changes"
 msgid "Save your recovery phrase"
 msgstr "Save your recovery phrase"
 
+msgid "Saved identities on this device"
+msgstr "Saved identities on this device"
+
 msgid "Saving changes..."
 msgstr "Saving changes..."
 
@@ -802,6 +814,9 @@ msgstr "Sign in with your {name} account from any device."
 
 msgid "Sign out"
 msgstr "Sign out"
+
+msgid "Signed in"
+msgstr "Signed in"
 
 msgid "Signing in securely"
 msgstr "Signing in securely"
@@ -909,6 +924,12 @@ msgstr "This may take a few seconds"
 
 msgid "This passkey is no longer associated with any identity."
 msgstr "This passkey is no longer associated with any identity."
+
+msgid "This removes the identity from this device only. Sign in again with the same {removingIdentityOpenIdProvider} account to restore it."
+msgstr "This removes the identity from this device only. Sign in again with the same {removingIdentityOpenIdProvider} account to restore it."
+
+msgid "This removes the identity from this device only. Sign in again with the same passkey to restore it."
+msgstr "This removes the identity from this device only. Sign in again with the same passkey to restore it."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "This YubiKey has older firmware (5.1) that's incompatible."

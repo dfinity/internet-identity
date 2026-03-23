@@ -265,6 +265,9 @@ msgstr "¿Quieres continuar?"
 msgid "Easy access"
 msgstr "Fácil acceso"
 
+msgid "Edit"
+msgstr ""
+
 msgid "Edit {name}"
 msgstr "Editar {name}"
 
@@ -701,6 +704,12 @@ msgstr "Redirigiendo a la app..."
 msgid "Remove"
 msgstr "Eliminar"
 
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr ""
+
+msgid "Remove identity from this device"
+msgstr ""
+
 msgid "Remove passkey"
 msgstr "Eliminar passkey"
 
@@ -761,6 +770,9 @@ msgstr "Guardar cambios"
 msgid "Save your recovery phrase"
 msgstr "Guarda tu frase de recuperación"
 
+msgid "Saved identities on this device"
+msgstr ""
+
 msgid "Saving changes..."
 msgstr "Guardando cambios..."
 
@@ -802,6 +814,9 @@ msgstr "Inicia sesión con tu cuenta de {name} desde cualquier dispositivo."
 
 msgid "Sign out"
 msgstr "Cerrar sesión"
+
+msgid "Signed in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Iniciando sesión de forma segura"
@@ -909,6 +924,12 @@ msgstr "Esto puede tardar unos segundos"
 
 msgid "This passkey is no longer associated with any identity."
 msgstr "Esta passkey ya no está asociada a ninguna identidad."
+
+msgid "This removes the identity from this device only. Sign in again with the same {removingIdentityOpenIdProvider} account to restore it."
+msgstr ""
+
+msgid "This removes the identity from this device only. Sign in again with the same passkey to restore it."
+msgstr ""
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Esta YubiKey tiene un firmware antiguo (5.1) que es incompatible."

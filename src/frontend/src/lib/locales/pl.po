@@ -265,6 +265,9 @@ msgstr "Czy chcesz kontynuować?"
 msgid "Easy access"
 msgstr "Łatwy dostęp"
 
+msgid "Edit"
+msgstr ""
+
 msgid "Edit {name}"
 msgstr "Edytuj {name}"
 
@@ -701,6 +704,12 @@ msgstr "Przekierowywanie do aplikacji"
 msgid "Remove"
 msgstr "Usuń"
 
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr ""
+
+msgid "Remove identity from this device"
+msgstr ""
+
 msgid "Remove passkey"
 msgstr "Usuń klucz dostępu"
 
@@ -761,6 +770,9 @@ msgstr "Zapisz zmiany"
 msgid "Save your recovery phrase"
 msgstr "Zapisz swoją frazę odzyskiwania"
 
+msgid "Saved identities on this device"
+msgstr ""
+
 msgid "Saving changes..."
 msgstr "Zapisywanie zmian..."
 
@@ -802,6 +814,9 @@ msgstr "Zaloguj się na swoje konto {name} z dowolnego urządzenia."
 
 msgid "Sign out"
 msgstr "Wyloguj się"
+
+msgid "Signed in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Bezpieczne logowanie"
@@ -909,6 +924,12 @@ msgstr "Może to potrwać kilka sekund"
 
 msgid "This passkey is no longer associated with any identity."
 msgstr "Ten klucz dostępu nie jest już powiązany z żadną tożsamością."
+
+msgid "This removes the identity from this device only. Sign in again with the same {removingIdentityOpenIdProvider} account to restore it."
+msgstr ""
+
+msgid "This removes the identity from this device only. Sign in again with the same passkey to restore it."
+msgstr ""
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Ten YubiKey ma starsze oprogramowanie układowe (5.1), które jest niekompatybilne."

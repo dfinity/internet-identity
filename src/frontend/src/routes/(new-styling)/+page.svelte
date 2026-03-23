@@ -40,6 +40,7 @@
   import { sessionStore } from "$lib/stores/session.store";
   import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
@@ -50,6 +51,7 @@
   let next = $state("/manage");
   let isAuthDialogOpen = $state(false);
   let isIdentityPopoverOpen = $state(false);
+  let isManageIdentitiesDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let identityButtonRef = $state<HTMLButtonElement>();
 
@@ -89,6 +91,15 @@
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
+  };
+  const handleRemoveIdentity = (identityNumber: bigint) => {
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    const nextIdentity = lastUsedIdentities.find(
+      (identity) => identity.identityNumber !== identityNumber,
+    );
+    if (nextIdentity !== undefined) {
+      lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
+    }
   };
 
   let triggerAnimation =
@@ -625,6 +636,7 @@
       onManageIdentity={() => handleSignIn(selectedIdentity.identityNumber)}
       onManageIdentities={() => {
         isIdentityPopoverOpen = false;
+        isManageIdentitiesDialogOpen = true;
       }}
       onError={(error) => {
         isIdentityPopoverOpen = false;
@@ -634,6 +646,15 @@
       onClose={() => (isIdentityPopoverOpen = false)}
     />
   </Popover>
+{/if}
+
+{#if isManageIdentitiesDialogOpen && selectedIdentity !== undefined}
+  <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
+    <ManageIdentities
+      identities={lastUsedIdentities}
+      onRemoveIdentity={handleRemoveIdentity}
+    />
+  </Dialog>
 {/if}
 
 <style>

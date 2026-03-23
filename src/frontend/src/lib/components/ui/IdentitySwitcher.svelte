@@ -1,7 +1,5 @@
 <script lang="ts">
-  import Avatar from "$lib/components/ui/Avatar.svelte";
   import {
-    UserIcon,
     XIcon,
     LogOutIcon,
     ArrowRightIcon,
@@ -10,10 +8,11 @@
   } from "@lucide/svelte";
   import type { HTMLAttributes } from "svelte/elements";
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
-  import { formatRelative, t } from "$lib/stores/locale.store";
+  import { t } from "$lib/stores/locale.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { getMetadataString, openIdLogo } from "$lib/utils/openID";
-  import PasskeyIcon from "../icons/PasskeyIcon.svelte";
+  import { getMetadataString } from "$lib/utils/openID";
+  import IdentityAvatar from "./IdentityAvatar.svelte";
+  import IdentityListItem from "./IdentityListItem.svelte";
 
   type Props = HTMLAttributes<HTMLElement> & {
     selected: bigint;
@@ -53,16 +52,6 @@
     initialIdentities.find(
       (identity) => identity.identityNumber === initialSelected,
     )!,
-  );
-  const selectedLogo = $derived(
-    selectedIdentity !== undefined &&
-      "openid" in selectedIdentity.authMethod &&
-      selectedIdentity.authMethod.openid.metadata !== undefined
-      ? openIdLogo(
-          selectedIdentity.authMethod.openid.iss,
-          selectedIdentity.authMethod.openid.metadata,
-        )
-      : undefined,
   );
   const otherIdentities = $derived(
     initialIdentities.filter(
@@ -117,38 +106,12 @@
   };
 </script>
 
-{#snippet authMethodBadge(logo: string | undefined, size: "sm" | "lg")}
-  <span
-    class={[
-      "bg-bg-primary_alt border-border-secondary absolute flex items-center justify-center rounded-full border",
-      size === "lg"
-        ? "-inset-e-1 -bottom-1 size-6.5"
-        : "-inset-e-1.25 -bottom-1.25 size-5",
-    ]}
-  >
-    {#if logo !== undefined}
-      <span
-        class={["text-fg-tertiary", size === "lg" ? "size-4.25" : "size-3.25"]}
-      >
-        {@html logo}
-      </span>
-    {:else}
-      <PasskeyIcon
-        class={["text-fg-tertiary", size === "lg" ? "size-4.25!" : "size-3!"]}
-      />
-    {/if}
-  </span>
-{/snippet}
-
 {#snippet selectedIdentityCard()}
   <div
     class="bg-bg-secondary border-border-secondary relative -mx-px -my-px flex flex-col items-center rounded-b-2xl border-x border-b p-8"
   >
-    <div class="relative mb-2">
-      <Avatar size="lg">
-        <UserIcon class="size-6" />
-      </Avatar>
-      {@render authMethodBadge(selectedLogo, "lg")}
+    <div class="mb-2">
+      <IdentityAvatar identity={selectedIdentity} size="lg" />
     </div>
     <p
       class="text-text-primary max-w-full overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap"
@@ -195,14 +158,6 @@
 {/snippet}
 
 {#snippet identityListItem(identity: LastUsedIdentity)}
-  {@const logo =
-    "openid" in identity.authMethod &&
-    identity.authMethod.openid.metadata !== undefined
-      ? openIdLogo(
-          identity.authMethod.openid.iss,
-          identity.authMethod.openid.metadata,
-        )
-      : undefined}
   {@const notUnique =
     "passkey" in identity.authMethod &&
     (passkeyNameCounts.get(identity.name) ?? 0) > 1}
@@ -216,42 +171,7 @@
         "disabled:border-border-disabled",
       ]}
     >
-      <span class="relative">
-        <Avatar size="sm">
-          <UserIcon class="size-5" />
-        </Avatar>
-        {@render authMethodBadge(logo, "sm")}
-      </span>
-      <span class="flex flex-col overflow-hidden group-disabled:opacity-50">
-        <span class="text-text-primary text-sm font-semibold">
-          {identity.name ?? identity.identityNumber}
-        </span>
-        <span
-          class="text-text-tertiary overflow-hidden text-sm text-ellipsis whitespace-nowrap"
-        >
-          {#if "openid" in identity.authMethod && identity.authMethod.openid.metadata !== undefined}
-            <span
-              >{getMetadataString(
-                identity.authMethod.openid.metadata,
-                "email",
-              ) ?? $t`Hidden email`}</span
-            >
-          {:else}
-            <span>
-              {$t`Passkey`}
-              {#if notUnique && identity.createdAtMillis !== undefined}
-                {" | "}
-                {$t`Created ${$formatRelative(
-                  new Date(identity.createdAtMillis),
-                  {
-                    style: "long",
-                  },
-                )}`}
-              {/if}
-            </span>
-          {/if}
-        </span>
-      </span>
+      <IdentityListItem {identity} showCreatedAt={notUnique} />
       {#if switchingToIdentity === identity.identityNumber}
         <ProgressRing class="text-fg-disabled ms-auto size-5" />
       {:else}

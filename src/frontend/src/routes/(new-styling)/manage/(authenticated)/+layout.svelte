@@ -14,6 +14,7 @@
   import { page } from "$app/state";
   import { afterNavigate, goto } from "$app/navigation";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import {
     authenticatedStore,
     authenticationStore,
@@ -48,6 +49,7 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isManageIdentitiesDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
   let isRecoveryPhraseSetUpDismissed = $state(false);
 
@@ -381,6 +383,10 @@
         isAuthenticating = false;
         handleError(error);
       }}
+      onManageIdentities={() => {
+        isIdentityPopoverOpen = false;
+        isManageIdentitiesDialogOpen = true;
+      }}
       onClose={() => (isIdentityPopoverOpen = false)}
       onSignOut={handleSignOut}
     />
@@ -425,6 +431,18 @@
       onChange={(value) => {
         isLanguageDialogOpen = false;
         localeStore.setOrReset(value);
+      }}
+    />
+  </Dialog>
+{/if}
+
+{#if isManageIdentitiesDialogOpen}
+  <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
+    <ManageIdentities
+      selected={$authenticatedStore.identityNumber}
+      identities={lastUsedIdentities}
+      onRemoveIdentity={(identityNumber) => {
+        lastUsedIdentitiesStore.removeIdentity(identityNumber);
       }}
     />
   </Dialog>

@@ -265,6 +265,9 @@ msgstr "Apakah Anda ingin melanjutkan?"
 msgid "Easy access"
 msgstr "Akses mudah"
 
+msgid "Edit"
+msgstr ""
+
 msgid "Edit {name}"
 msgstr "Edit {name}"
 
@@ -701,6 +704,12 @@ msgstr "Mengalihkan ke aplikasi..."
 msgid "Remove"
 msgstr "Hapus"
 
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr ""
+
+msgid "Remove identity from this device"
+msgstr ""
+
 msgid "Remove passkey"
 msgstr "Hapus passkey"
 
@@ -761,6 +770,9 @@ msgstr "Simpan perubahan"
 msgid "Save your recovery phrase"
 msgstr "Simpan frasa pemulihan Anda"
 
+msgid "Saved identities on this device"
+msgstr ""
+
 msgid "Saving changes..."
 msgstr "Menyimpan perubahan..."
 
@@ -802,6 +814,9 @@ msgstr "Masuk dengan akun {name} Anda dari perangkat mana pun."
 
 msgid "Sign out"
 msgstr "Keluar"
+
+msgid "Signed in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
@@ -909,6 +924,12 @@ msgstr "Ini mungkin memakan waktu beberapa detik"
 
 msgid "This passkey is no longer associated with any identity."
 msgstr "Passkey ini tidak lagi dikaitkan dengan identitas apa pun."
+
+msgid "This removes the identity from this device only. Sign in again with the same {removingIdentityOpenIdProvider} account to restore it."
+msgstr ""
+
+msgid "This removes the identity from this device only. Sign in again with the same passkey to restore it."
+msgstr ""
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "YubiKey ini memiliki firmware lama (5.1) yang tidak kompatibel."
