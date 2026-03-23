@@ -17,7 +17,7 @@ import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdent
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { throwCanisterError } from "$lib/utils/utils";
 import { findWebAuthnFlows, WebAuthnFlow } from "$lib/utils/findWebAuthnFlows";
-import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
+import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
 import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
 import {
   upgradeIdentityFunnel,
@@ -90,7 +90,8 @@ export class MigrationFlow {
     }
     // TODO: Create the passkey in id.ai
     const passkeyIdentity =
-      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+      features.DUMMY_AUTH ||
+      frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const origin = window.location.origin;
@@ -190,7 +191,7 @@ export class MigrationFlow {
         devices: webAuthnAuthenticators,
         currentOrigin: window.location.origin,
         // Empty array is the same as no related origins.
-        relatedOrigins: canisterConfig.related_origins[0] ?? [],
+        relatedOrigins: frontendCanisterConfig.related_origins[0] ?? [],
       });
       this.#webAuthFlows = {
         flows,

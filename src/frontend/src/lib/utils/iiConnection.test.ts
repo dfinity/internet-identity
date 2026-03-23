@@ -56,7 +56,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
       "https://identity.icp0.io",
     ],
   ],
-  fetch_root_key: [],
   enable_dapps_explorer: [],
   is_production: [],
   new_flow_origins: [],
