@@ -4,7 +4,6 @@ mod assigned_user_number_range;
 mod canister_creation_cycles_cost;
 mod captcha_config;
 mod enable_dapps_explorer;
-mod fetch_root_key;
 mod is_production;
 mod new_flow_origins;
 mod openid_configs;

@@ -18,7 +18,7 @@
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { retryFor, throwCanisterError } from "$lib/utils/utils";
   import { z } from "zod";
-  import { canisterConfig } from "$lib/globals";
+  import { frontendCanisterConfig } from "$lib/globals";
   import {
     DirectOpenIdEvents,
     directOpenIdFunnel,
@@ -162,7 +162,7 @@
       }
       if (
         dapp?.certifiedAttributes === true ||
-        canisterConfig.fetch_root_key[0] === true
+        frontendCanisterConfig.fetch_root_key[0] === true
       ) {
         const listener = createAttributesListener(config.issuer);
         void $establishedChannelStore.addEventListener("request", listener);

@@ -7,7 +7,7 @@ import {
   authenticateWithPasskey,
   authenticateWithSession,
 } from "$lib/utils/authentication";
-import { canisterConfig, canisterId } from "$lib/globals";
+import { frontendCanisterConfig, canisterId } from "$lib/globals";
 import {
   authenticatedStore,
   authenticationStore,
@@ -132,7 +132,8 @@ export class AuthFlow {
       throw new Error("Name is not set");
     }
     const passkeyIdentity =
-      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+      features.DUMMY_AUTH ||
+      frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(this.#name)
         : await DiscoverablePasskeyIdentity.createNew(this.#name);
     await this.#startRegistration();

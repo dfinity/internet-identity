@@ -2,12 +2,7 @@ import { isNullish, nonNullish } from "@dfinity/utils";
 import { minify } from "html-minifier-terser";
 import type { Plugin, ViteDevServer } from "vite";
 import viteCompression from "vite-plugin-compression2";
-import {
-  forwardToReplica,
-  readCanisterConfig,
-  readCanisterId,
-  readReplicaPort,
-} from "./utils.js";
+import { forwardToReplica, readCanisterId, readReplicaPort } from "./utils.js";
 
 export * from "./utils.js";
 
@@ -26,26 +21,6 @@ export const injectCanisterIdPlugin = ({
     const canisterId = readCanisterId({ canisterName });
     return html.replace(rgx, (_match, src) => {
       return `<script data-canister-id="${canisterId}" type="module" src="${src}"></script>`;
-    });
-  },
-});
-
-/**
- * Inject the canister ID and config of 'canisterName' as a <script /> tag in index.html for local development. Will process
- * at most 1 script tag.
- */
-export const injectCanisterIdAndConfigPlugin = ({
-  canisterName,
-}: {
-  canisterName: string;
-}): Plugin => ({
-  name: "inject-canister-id-and-config",
-  transformIndexHtml(html): string {
-    const rgx = /<body /;
-    const canisterId = readCanisterId({ canisterName });
-    const canisterConfig = readCanisterConfig({ canisterName });
-    return html.replace(rgx, (_match, src) => {
-      return `<body data-canister-id="${canisterId}" data-canister-config="${canisterConfig}" `;
     });
   },
 });

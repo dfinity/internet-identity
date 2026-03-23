@@ -1,7 +1,7 @@
 <script lang="ts">
   import { handleCredentialRequest } from "./utils";
   import { analytics } from "$lib/utils/analytics/analytics";
-  import { canisterConfig } from "$lib/globals";
+  import { frontendCanisterConfig } from "$lib/globals";
   import { waitForWindowReadyRequest } from "$lib/utils/internalPostMessage";
   import { onMount } from "svelte";
 
@@ -16,7 +16,7 @@
       //
       // Additionally, the CSP configuration will block any attempt to render II
       // inside an iframe from domains that are not related origins.
-      canisterConfig.related_origins[0] ?? [],
+      frontendCanisterConfig.related_origins[0] ?? [],
     );
 
     // Get credential and send to parent window

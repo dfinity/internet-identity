@@ -429,7 +429,7 @@ msgid "Internet Identity is an authentication system for applications running on
 msgstr "Internet Identity <0>Internet Computer</0> پر چلنے والی ایپلی کیشنز کے لیے ایک توثیقی نظام ہے۔ روایتی یوزرنیم اور پاس ورڈز کے بجائے، یہ <1>پاس کیز</1> کے ذریعے بنائی گئی کیز یا Google، Microsoft یا Apple جیسے دیگر توثیقی نظام استعمال کرتی ہے۔"
 
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
-msgstr "Internet Identity اتنی ہی محفوظ ہے جتنے وہ تصدیقی طریقے جو یہ استعمال کرتی ہے — جیسے Google، Apple، Microsoft یا پاس کیز۔ یعنی یہ جدید ترین سیکیورٹی پر مبنی ہے۔ جب آپ پاس کیز منتخب کرتے ہیں تو رسائی آپ کے آلے کے ان لاک طریقے (Face ID یا فنگرپرنٹ) سے محفوظ ہوتی ہے، جس سے یہ اتنا ہی آسان ہو جاتا ہے جتنا اپنا فون ان لاک کرنا۔"
+msgstr "Internet Identity اتنی ہی محفوظ ہے جتنے وہ تصدیقی طریقے جو یہ استعمال کرتی ہے — جیسے Google، Apple، Microsoft یا پاس کیز۔ یعنی یہ جدید ترین سیکیورٹی پر مبنی ہے۔ جب آپ پاس کیز منتخب کرتے ہیں تو رسائی آپ کے آلے کے ان لاک طریقے (چہرے کی شناخت یا فنگرپرنٹ) سے محفوظ ہوتی ہے، جس سے یہ اتنا ہی آسان ہو جاتا ہے جتنا اپنا فون ان لاک کرنا۔"
 
 msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
 msgstr "Internet Identity محفوظ طور پر سائن اِن کرنے اور پاس کیز کے ذریعے ایپس سے منسلک ہونے کے لیے استعمال ہوتی ہے۔"
@@ -459,7 +459,7 @@ msgid "Invalid request"
 msgstr "غلط درخواست"
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
-msgstr "کیا میرا Face ID یا فنگر پرنٹ Internet Identity میں محفوظ ہوتا ہے؟"
+msgstr "کیا میری چہرے کی شناخت یا فنگر پرنٹ Internet Identity میں محفوظ ہوتا ہے؟"
 
 msgid "It can be used at any time to recover your identity."
 msgstr "اسے کسی بھی وقت آپ کی شناخت بحال کرنے کے لیے استعمال کیا جا سکتا ہے"
@@ -597,7 +597,7 @@ msgid "No recovery phrase"
 msgstr "کوئی ریکوری فریز نہیں"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
-msgstr "نہیں۔ آپ کا فیس آئی ڈی یا فنگر پرنٹ صرف پاس کی بنانے یا اسے اَن لاک کرنے کے لیے استعمال ہوتا ہے۔ آپ کا بایومیٹرک ڈیٹا کبھی بھی Internet Identity یا کسی بھی ایسی ویب سائٹ یا ایپ کے ساتھ شیئر نہیں کیا جاتا جسے آپ استعمال کرتے ہیں۔"
+msgstr "نہیں۔ آپ کی چہرے کی شناخت یا فنگر پرنٹ صرف پاس کی بنانے یا اسے اَن لاک کرنے کے لیے استعمال ہوتی ہے۔ آپ کا بایومیٹرک ڈیٹا کبھی بھی Internet Identity یا کسی بھی ایسی ویب سائٹ یا ایپ کے ساتھ شیئر نہیں کیا جاتا جسے آپ استعمال کرتے ہیں۔"
 
 msgid "NordPass has been confirmed to be incompatible."
 msgstr "NordPass کے غیر ہم آہنگ ہونے کی تصدیق ہو گئی ہے۔"

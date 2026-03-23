@@ -3,7 +3,7 @@
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { canisterConfig } from "$lib/globals";
+  import { backendCanisterConfig } from "$lib/globals";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
@@ -32,7 +32,7 @@
   };
 
   const supportsPasskeys = window.PublicKeyCredential !== undefined;
-  const openIdProviders = canisterConfig.openid_configs?.[0] ?? [];
+  const openIdProviders = backendCanisterConfig.openid_configs?.[0] ?? [];
 </script>
 
 <div class="flex flex-col items-stretch gap-5">
