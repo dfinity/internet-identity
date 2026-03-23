@@ -5,6 +5,7 @@ import {
   generateMnemonic,
   IC_DERIVATION_PATH,
 } from "$lib/utils/recoveryPhrase";
+import { createActorForCredential } from "../../utils";
 
 /**
  * Swap the first word around with the next different word found,
@@ -297,14 +298,17 @@ test.describe("Recovery phrase", () => {
           page,
           identities,
           signInWithIdentity,
-          actorForIdentity,
           managePage,
           manageRecoveryPage,
           words,
         }) => {
           // Use an actor to create a locked recovery phrase
           // since this functionality is no longer available.
-          const actor = await actorForIdentity(identities[0].identityNumber);
+          const actor = await createActorForCredential(
+            identities[0].host,
+            identities[0].canisterId,
+            identities[0].credentials[0],
+          );
           words.current = generateMnemonic();
           const recoveryIdentity = await fromMnemonicWithoutValidation(
             words.current.join(" "),

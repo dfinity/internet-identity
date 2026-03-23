@@ -1,9 +1,8 @@
 import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
-import { dummyAuth, getRandomIndex, II_URL } from "../../utils";
+import { createActorForCredential, II_URL } from "../../utils";
 import { DEFAULT_PASSKEY_NAME } from "../../fixtures/manageAccessPage";
-import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
-import { toSeed } from "../../fixtures/identity";
+import { ECDSAKeyIdentity } from "@icp-sdk/core/identity";
 import { LEGACY_II_URL } from "$lib/config";
 
 test.describe("Access methods", () => {
@@ -20,15 +19,22 @@ test.describe("Access methods", () => {
     manageAccessPage,
     identities,
     signInWithIdentity,
-    replaceAuthForIdentity,
+    setCredentialsForIdentity,
   }) => {
-    const authIndex = getRandomIndex();
-    const auth = dummyAuth(authIndex);
+    const existingCredential = identities[0].credentials[0];
     await manageAccessPage.assertPasskeyCount(1);
-    await manageAccessPage.add((dialog) => dialog.passkey(auth));
+    await manageAccessPage.add((dialog) => dialog.passkey());
     await manageAccessPage.assertPasskeyCount(2);
+    const newCredential = identities[0].credentials.find(
+      (credential) =>
+        credential.credentialId !== existingCredential.credentialId,
+    )!;
+    expect(newCredential).toBeDefined();
 
     // Verify we can still sign in with the existing passkey
+    await setCredentialsForIdentity(page, identities[0].identityNumber, [
+      existingCredential,
+    ]);
     await managePage.signOut();
     await manageAccessPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
@@ -36,7 +42,9 @@ test.describe("Access methods", () => {
 
     // Verify we can now also sign in with the new passkey
     await managePage.signOut();
-    replaceAuthForIdentity(identities[0].identityNumber, authIndex);
+    await setCredentialsForIdentity(page, identities[0].identityNumber, [
+      newCredential,
+    ]);
     await manageAccessPage.goto();
     await signInWithIdentity(page, identities[0].identityNumber);
     await manageAccessPage.assertVisible();
@@ -72,7 +80,7 @@ test.describe("Access methods", () => {
   });
 
   test.describe("can remove a passkey", () => {
-    test.beforeEach(async ({ manageAccessPage, identities }) => {
+    test.beforeEach(async ({ manageAccessPage }) => {
       // Rename passkey that's currently in use
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
@@ -82,8 +90,7 @@ test.describe("Access methods", () => {
         });
 
       // Add additional passkey and rename it
-      const auth = dummyAuth(identities[0].dummyAuthIndex + BigInt(1));
-      await manageAccessPage.add((dialog) => dialog.passkey(auth));
+      await manageAccessPage.add((dialog) => dialog.passkey());
       await manageAccessPage
         .findPasskey(DEFAULT_PASSKEY_NAME)
         .rename(async (dialog) => {
@@ -109,7 +116,7 @@ test.describe("Access methods", () => {
       manageAccessPage,
       identities,
       signInWithIdentity,
-      replaceAuthForIdentity,
+      setCredentialsForIdentity,
     }) => {
       // Remove currently in use passkey
       await manageAccessPage.assertPasskeyCount(2);
@@ -123,11 +130,14 @@ test.describe("Access methods", () => {
       await page.waitForURL(II_URL); // Expect to be signed out
       await manageAccessPage.goto(); // Go back to the manage page
 
-      // Sign in with the new passkey and assert it's the only passkey
-      replaceAuthForIdentity(
+      // Remove the credential corresponding to the removed passkey
+      await setCredentialsForIdentity(
+        page,
         identities[0].identityNumber,
-        identities[0].dummyAuthIndex + BigInt(1),
+        identities[0].credentials.slice(1),
       );
+
+      // Sign in with the new passkey and assert it's the only passkey
       await signInWithIdentity(page, identities[0].identityNumber);
       await manageAccessPage.assertPasskeyCount(1);
       await manageAccessPage.assertPasskeyExists("additional-passkey");
@@ -142,12 +152,52 @@ test.describe("Access methods", () => {
     await manageAccessPage.assertPasskeyCount(1);
   });
 
-  test("cannot have more than 16 passkeys", async ({ manageAccessPage }) => {
+  test("cannot have more than 16 passkeys", async ({
+    page,
+    managePage,
+    manageAccessPage,
+    identities,
+    signInWithIdentity,
+  }) => {
+    // Verify we start with 1 passkey
     await manageAccessPage.assertPasskeyCount(1);
+    await managePage.signOut();
+
+    // Add 15 passkeys via an actor to avoid getting
+    // rate limited by Chrome when adding via the UI.
+    const actor = await createActorForCredential(
+      identities[0].host,
+      identities[0].canisterId,
+      identities[0].credentials[0],
+    );
     for (let i = 0; i < 15; i++) {
-      await manageAccessPage.add((dialog) => dialog.passkey(dummyAuth()));
+      const identity = await ECDSAKeyIdentity.generate();
+      await actor.authn_method_add(identities[0].identityNumber, {
+        metadata: [
+          ["alias", { String: `passkey-${i}` }],
+          ["origin", { String: II_URL }],
+        ],
+        authn_method: {
+          WebAuthn: {
+            pubkey: identity.getPublicKey().toDer(),
+            credential_id: crypto.getRandomValues(new Uint8Array(16)),
+            aaguid: [],
+          },
+        },
+        security_settings: {
+          protection: { Unprotected: null },
+          purpose: { Authentication: null },
+        },
+        last_authentication: [],
+      });
     }
+
+    // Sign in and assert all 16 passkeys are present
+    await manageAccessPage.goto();
+    await signInWithIdentity(page, identities[0].identityNumber);
     await manageAccessPage.assertPasskeyCount(16);
+
+    // Assert we cannot add another passkey via the UI
     await manageAccessPage.add(async (dialog) => {
       await dialog.assertPasskeyUnavailable();
       await dialog.close();
@@ -165,7 +215,6 @@ test.describe("Access methods", () => {
         manageAccessPage,
         identities,
         signInWithIdentity,
-        actorForIdentity,
       }) => {
         // Rename current passkey so we can differentiate it from the legacy passkey
         await manageAccessPage.assertPasskeyCount(1);
@@ -178,10 +227,12 @@ test.describe("Access methods", () => {
 
         // Use an actor to create a legacy passkey (not id.ai)
         // since this functionality is no longer available.
-        const actor = await actorForIdentity(identities[0].identityNumber);
-        const authIndex = getRandomIndex();
-        const seed = toSeed(authIndex);
-        const identity = await Ed25519KeyIdentity.generate(seed);
+        const actor = await createActorForCredential(
+          identities[0].host,
+          identities[0].canisterId,
+          identities[0].credentials[0],
+        );
+        const identity = await ECDSAKeyIdentity.generate();
         await actor.authn_method_add(identities[0].identityNumber, {
           metadata: [
             ["alias", { String: LEGACY_PASSKEY_NAME }],
@@ -189,8 +240,8 @@ test.describe("Access methods", () => {
           ],
           authn_method: {
             WebAuthn: {
-              pubkey: new Uint8Array(identity.getPublicKey().derKey),
-              credential_id: seed,
+              pubkey: identity.getPublicKey().toDer(),
+              credential_id: crypto.getRandomValues(new Uint8Array(16)),
               aaguid: [],
             },
           },
@@ -294,7 +345,7 @@ test.describe("Access methods", () => {
         });
 
       // Add another, since we cannot remove a single passkey
-      await manageAccessPage.add((dialog) => dialog.passkey(dummyAuth()));
+      await manageAccessPage.add((dialog) => dialog.passkey());
 
       // Then remove the current passkey, but cancel instead of confirm
       await manageAccessPage

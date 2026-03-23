@@ -1,9 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { dummyAuth, II_URL, TEST_APP_URL } from "../../utils";
+import { addVirtualAuthenticator, II_URL, TEST_APP_URL } from "../../utils";
 
 test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
-  const auth = dummyAuth();
-
   // Open demo app and configure II URL
   await page.goto(TEST_APP_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
@@ -17,10 +15,10 @@ test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
   const authPage = await pagePromise;
 
   // Create new identity and authenticate
+  await addVirtualAuthenticator(authPage);
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
   await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
-  auth(authPage);
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();
 
@@ -38,8 +36,6 @@ test("Delegation maxTimeToLive: 1 min", async ({ page }) => {
 });
 
 test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
-  const auth = dummyAuth();
-
   // Open demo app and configure II URL
   await page.goto(TEST_APP_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
@@ -53,10 +49,10 @@ test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
   const authPage = await pagePromise;
 
   // Create new identity and authenticate
+  await addVirtualAuthenticator(authPage);
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
   await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
-  auth(authPage);
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();
 
@@ -73,8 +69,6 @@ test("Delegation maxTimeToLive: 1 day", async ({ page }) => {
 });
 
 test("Delegation maxTimeToLive: 2 months", async ({ page }) => {
-  const auth = dummyAuth();
-
   // Open demo app and configure II URL
   await page.goto(TEST_APP_URL);
   await page.getByRole("textbox", { name: "Identity Provider" }).fill(II_URL);
@@ -88,10 +82,10 @@ test("Delegation maxTimeToLive: 2 months", async ({ page }) => {
   const authPage = await pagePromise;
 
   // Create new identity and authenticate
+  await addVirtualAuthenticator(authPage);
   await authPage.getByRole("button", { name: "Continue with Passkey" }).click();
   await authPage.getByRole("button", { name: "Create new identity" }).click();
   await authPage.getByLabel("Identity name").fill("Test User");
-  auth(authPage);
   await authPage.getByRole("button", { name: "Create identity" }).click();
   await authPage.getByRole("button", { name: "Continue", exact: true }).click();
 

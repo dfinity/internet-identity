@@ -1,7 +1,7 @@
 import { test as base } from "../fixtures";
 import { expect } from "@playwright/test";
 import { generateMnemonic } from "$lib/utils/recoveryPhrase";
-import { II_URL } from "../utils";
+import { createActorForCredential, II_URL } from "../utils";
 
 /**
  * Replace the last word with the first different word found,
@@ -104,10 +104,13 @@ test.describe("Recovery flow", () => {
       recoveryPage,
       words,
       identities,
-      actorForIdentity,
     }) => {
       // Remove name from identity
-      const actor = await actorForIdentity(identities[0].identityNumber);
+      const actor = await createActorForCredential(
+        identities[0].host,
+        identities[0].canisterId,
+        identities[0].credentials[0],
+      );
       await actor.identity_properties_replace(identities[0].identityNumber, {
         name: [],
       });
@@ -196,10 +199,13 @@ test.describe("Recovery flow", () => {
       recoveryPage,
       words,
       identities,
-      actorForIdentity,
     }) => {
       // Remove name from identity
-      const actor = await actorForIdentity(identities[0].identityNumber);
+      const actor = await createActorForCredential(
+        identities[0].host,
+        identities[0].canisterId,
+        identities[0].credentials[0],
+      );
       await actor.identity_properties_replace(identities[0].identityNumber, {
         name: [],
       });
