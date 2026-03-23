@@ -5,10 +5,10 @@ import {
   extractIssuerTemplateClaims,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
-import { canisterConfig } from "$lib/globals";
+import { backendCanisterConfig } from "$lib/globals";
 
 vi.mock("$lib/globals", () => ({
-  canisterConfig: {
+  backendCanisterConfig: {
     openid_configs: [],
   },
 }));
@@ -184,12 +184,12 @@ describe("findConfig", () => {
   const appleIssuer = "https://appleid.apple.com";
 
   beforeEach(() => {
-    canisterConfig.openid_configs = [];
+    backendCanisterConfig.openid_configs = [];
   });
 
   it("returns OpenID config when issuer matches in openid_configs", () => {
     const cfg = createOpenIDConfig("https://example.com/oauth2");
-    canisterConfig.openid_configs = [[cfg]];
+    backendCanisterConfig.openid_configs = [[cfg]];
     expect(findConfig("https://example.com/oauth2", [])).toBe(cfg);
   });
 
@@ -197,7 +197,7 @@ describe("findConfig", () => {
     const msCfg = createOpenIDConfig(
       "https://login.microsoftonline.com/{tid}/v2.0",
     );
-    canisterConfig.openid_configs = [[msCfg]];
+    backendCanisterConfig.openid_configs = [[msCfg]];
     const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
       findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, [
@@ -210,7 +210,7 @@ describe("findConfig", () => {
     const msCfg = createOpenIDConfig(
       "https://login.microsoftonline.com/{tid}/v2.0",
     );
-    canisterConfig.openid_configs = [[msCfg]];
+    backendCanisterConfig.openid_configs = [[msCfg]];
     const tid = "4a435c5e-6451-4c1a-a81f-ab9666b6de8f";
     expect(
       findConfig(`https://login.microsoftonline.com/${tid}/v2.0`, []),
@@ -219,7 +219,7 @@ describe("findConfig", () => {
 
   it("returns Apple config if issuer is Apple (from openid_configs)", () => {
     const appleConfig = createOpenIDConfig(appleIssuer);
-    canisterConfig.openid_configs = [[appleConfig]];
+    backendCanisterConfig.openid_configs = [[appleConfig]];
     expect(findConfig(appleIssuer, [])).toBe(appleConfig);
   });
 
@@ -228,7 +228,7 @@ describe("findConfig", () => {
       createOpenIDConfig("https://example.com/oauth2"),
       createOpenIDConfig("https://login.microsoftonline.com/{tid}/v2.0"),
     ];
-    canisterConfig.openid_configs = [cfgs];
+    backendCanisterConfig.openid_configs = [cfgs];
     expect(
       findConfig("https://no-such-issuer.example.com", []),
     ).toBeUndefined();

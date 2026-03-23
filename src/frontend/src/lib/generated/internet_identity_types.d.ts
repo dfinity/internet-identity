@@ -705,10 +705,6 @@ export type IdentityPropertiesReplaceError = {
  */
 export interface InternetIdentityInit {
   /**
-   * Configuration to fetch root key or not from frontend assets
-   */
-  'fetch_root_key' : [] | [boolean],
-  /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.
    */

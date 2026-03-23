@@ -1,4 +1,4 @@
-import { anonymousActor, canisterConfig } from "$lib/globals";
+import { anonymousActor, frontendCanisterConfig } from "$lib/globals";
 import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { authenticateWithSession } from "$lib/utils/authentication";
@@ -99,7 +99,8 @@ export class RegisterAccessMethodFlow {
     }
     const name = this.#identityName ?? this.#identityNumber.toString(10);
     const passkeyIdentity =
-      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+      features.DUMMY_AUTH ||
+      frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const credentialId = passkeyIdentity.getCredentialId();
