@@ -113,6 +113,17 @@ FRONTEND_PATHS=(
   src/vite-plugins/
 )
 
+# Resolve a proposal tag to the release-* tag pointing at the same commit.
+# Falls back to the proposal tag itself if no matching release tag is found.
+resolve_release_tag() {
+  local proposal_tag="$1"
+  local commit
+  commit=$(git rev-parse "$proposal_tag" 2>/dev/null) || { echo "$proposal_tag"; return; }
+  local release_tag
+  release_tag=$(git tag --points-at "$commit" | grep "^release-" | head -1)
+  echo "${release_tag:-$proposal_tag}"
+}
+
 # Generate per-canister "What's Changed" section using proposal tags as baselines.
 # Falls back to the GitHub-generated changelog if no proposal tags exist.
 section_changelog=$(mktemp)
@@ -127,11 +138,14 @@ if [ -n "$LAST_BACKEND_TAG" ] || [ -n "$LAST_FRONTEND_TAG" ]; then
   if [ -n "$LAST_BACKEND_TAG" ]; then
     backend_log=$(git log --format='* %s' --no-merges "${LAST_BACKEND_TAG}..${RELEASE_TAG}" -- "${BACKEND_PATHS[@]}" || true)
     if [ -n "$backend_log" ]; then
+      LAST_BACKEND_RELEASE=$(resolve_release_tag "$LAST_BACKEND_TAG")
       {
         echo "### Backend Changes"
-        echo "_Since [\`${LAST_BACKEND_TAG}\`](https://github.com/dfinity/internet-identity/releases/tag/${LAST_BACKEND_TAG})_"
+        echo "_Since [${LAST_BACKEND_RELEASE}](https://github.com/dfinity/internet-identity/releases/tag/${LAST_BACKEND_RELEASE})_"
         echo ""
         echo "$backend_log"
+        echo ""
+        echo "**Full Changelog**: [${LAST_BACKEND_RELEASE}...${RELEASE_TAG}](https://github.com/dfinity/internet-identity/compare/${LAST_BACKEND_RELEASE}...${RELEASE_TAG})"
         echo ""
       } >> "$section_changelog"
     fi
@@ -140,11 +154,14 @@ if [ -n "$LAST_BACKEND_TAG" ] || [ -n "$LAST_FRONTEND_TAG" ]; then
   if [ -n "$LAST_FRONTEND_TAG" ]; then
     frontend_log=$(git log --format='* %s' --no-merges "${LAST_FRONTEND_TAG}..${RELEASE_TAG}" -- "${FRONTEND_PATHS[@]}" || true)
     if [ -n "$frontend_log" ]; then
+      LAST_FRONTEND_RELEASE=$(resolve_release_tag "$LAST_FRONTEND_TAG")
       {
         echo "### Frontend Changes"
-        echo "_Since [\`${LAST_FRONTEND_TAG}\`](https://github.com/dfinity/internet-identity/releases/tag/${LAST_FRONTEND_TAG})_"
+        echo "_Since [${LAST_FRONTEND_RELEASE}](https://github.com/dfinity/internet-identity/releases/tag/${LAST_FRONTEND_RELEASE})_"
         echo ""
         echo "$frontend_log"
+        echo ""
+        echo "**Full Changelog**: [${LAST_FRONTEND_RELEASE}...${RELEASE_TAG}](https://github.com/dfinity/internet-identity/compare/${LAST_FRONTEND_RELEASE}...${RELEASE_TAG})"
         echo ""
       } >> "$section_changelog"
     fi
