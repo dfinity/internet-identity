@@ -546,7 +546,7 @@ msgid "Make sure to add a new access method so that you can sign in next time or
 msgstr "Обязательно добавьте новый метод доступа, чтобы вы могли войти в систему в следующий раз или сбросить свою резервную фразу."
 
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
-msgstr "Управляйте своими учётными записями и доступом к приложениям. Все настройки — в одном месте."
+msgstr "Управляйте доступом к приложениям через ваши Internet Identity. Все настройки — в одном месте."
 
 msgid "Manage your Internet Identity"
 msgstr "Управление вашим Internet Identity"
