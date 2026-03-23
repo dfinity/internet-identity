@@ -38,7 +38,7 @@ msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becom
 msgstr "<0>Интеграция с Google, Apple и Microsoft:</0> Хотя ключи доступа становятся всё более зрелой технологией, они пока не стали привычными для всех. Мы заметили, что 50% пользователей не завершают регистрацию, — это говорит о необходимости альтернативных способов входа. Чтобы сделать Internet Identity доступным для ещё более широкой аудитории, мы добавили вход через Google, Apple и Microsoft."
 
 msgid "<0>Learn more</0> about passkeys"
-msgstr "<0>Узнайте больше</0> о ключах доступа"
+msgstr "<0>Что такое</0> ключ доступа?"
 
 msgid "<0>Never</0> enter a code from another source."
 msgstr "<0>Никогда</0> не вводите код из другого источника."
@@ -98,7 +98,7 @@ msgid "Add or remove the ways you can sign in with your identity."
 msgstr "Добавляйте или удаляйте способы входа с помощью вашей идентификации."
 
 msgid "Advanced identity management"
-msgstr "Расширенное управление идентификацией"
+msgstr "Контроль над доступом"
 
 msgid "Are you sure?"
 msgstr "Вы уверены?"
@@ -119,7 +119,7 @@ msgid "Authorize new device"
 msgstr "Авторизовать новое устройство"
 
 msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
-msgstr "Прежде чем начать, найдите уединенное место и приготовьте свою резервную фразу. Держите ее в секрете, чтобы защитить свою идентификацию."
+msgstr "Подготовьте резервную фразу и держите её в секрете. Убедитесь, что никто не видит ваш экран."
 
 msgid "Before you continue"
 msgstr "Прежде чем продолжить"
@@ -158,7 +158,7 @@ msgid "Choose method"
 msgstr "Выберите способ"
 
 msgid "Choose method to continue"
-msgstr "Выберите способ для продолжения"
+msgstr "Выберите способ входа"
 
 msgid "Clear all"
 msgstr "Очистить все"
@@ -209,19 +209,19 @@ msgid "Continue with {name}"
 msgstr "Продолжить с {name}"
 
 msgid "Continue with passkey"
-msgstr "Продолжить с ключом доступа"
+msgstr "Войти с ключом доступа"
 
 msgid "Create account"
 msgstr "Создать аккаунт"
 
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
-msgstr "Создайте идентификацию с помощью ключа доступа, используя биометрию или ключ безопасности. Ваши данные никогда не покидают ваше устройство."
+msgstr "Входите с помощью биометрии или ключа безопасности (Passkey). Данные остаются на вашем устройстве."
 
 msgid "Create identity"
-msgstr "Создать идентификацию"
+msgstr "Создать"
 
 msgid "Create new identity"
-msgstr "Создать новую идентификацию"
+msgstr "Создать ключ доступа"
 
 msgid "Create passkey"
 msgstr "Создать ключ доступа"
@@ -254,7 +254,7 @@ msgid "Default"
 msgstr "По умолчанию"
 
 msgid "Discoverable passkeys"
-msgstr "Доступные для обнаружения ключи"
+msgstr "Вход без паролей"
 
 msgid "Dismiss"
 msgstr "Отклонить"
@@ -263,7 +263,7 @@ msgid "Do you want to continue?"
 msgstr "Хотите продолжить?"
 
 msgid "Easy access"
-msgstr "Легкий доступ"
+msgstr "Простой вход"
 
 msgid "Edit {name}"
 msgstr "Редактировать {name}"
@@ -294,7 +294,7 @@ msgstr "Всё, что нужно знать об Internet Identity — ваше
 
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
-msgstr "Испытайте"
+msgstr "Попробуйте"
 
 msgid "Export JSON"
 msgstr "Экспортировать JSON"
@@ -309,13 +309,13 @@ msgid "For example, user A logs into Internet Identity with their Google account
 msgstr "Например, пользователь А входит в Internet Identity через свой аккаунт Google «A@gmail.com», а затем использует Internet Identity для аутентификации в приложении Z. Google никогда не узнает, что пользователь вошёл в приложение Z через Internet Identity. Приложение Z тоже не узнает, что пользователь А использовал Google для входа в Internet Identity."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
-msgstr "Забудьте о запоминании сложных имен пользователей и паролей. С ключами доступа вы просто выбираете свое имя для входа — быстро, безопасно и без лишних хлопот."
+msgstr "Не нужно придумывать и запоминать логины и пароли. Используйте ключ доступа — это быстрее и безопаснее."
 
 msgid "Full control"
 msgstr "Полный контроль"
 
 msgid "Full Ownership"
-msgstr "Полное владение"
+msgstr "Полный контроль"
 
 msgid "Generating code..."
 msgstr "Генерация кода..."
@@ -324,7 +324,7 @@ msgid "Generating phrase..."
 msgstr "Генерация фразы..."
 
 msgid "Get started"
-msgstr "Начать"
+msgstr "Начать восстановление"
 
 msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
 msgstr "Дайте вашему идентификатору понятное, простое и запоминающееся имя, которое вы легко узнаете."
@@ -420,7 +420,7 @@ msgid "Interaction canceled. Please try again."
 msgstr "Взаимодействие отменено. Пожалуйста, попробуйте снова."
 
 msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
-msgstr "Internet Identity <0>не</0> сохраняет ваши биометрические данные. Они остаются на вашем устройстве. Ваш идентификатор действует как менеджер безопасных ключей доступа."
+msgstr "Internet Identity <0>не</0> хранит ваши биометрические данные — они остаются на устройстве. Идентификатор управляет ключами доступа."
 
 msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
 msgstr "Internet Identity 2.0 содержит множество улучшений для более удобной работы:"
@@ -534,10 +534,10 @@ msgid "Lookup identity"
 msgstr "Поиск идентификатора"
 
 msgid "Lost access to your identity?"
-msgstr "Потеряли доступ к своему идентификатору?"
+msgstr "Не можете войти?"
 
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
-msgstr "Сделайте регистрацию и вход простыми с помощью Google, Apple или Microsoft. Привычный вход с повышенной конфиденциальностью."
+msgstr "Войдите с помощью Google, Apple или Microsoft — без лишних шагов. Быстро и безопасно."
 
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "Убедитесь, что никто не видит, что на вашем экране или что вы пишете."
@@ -546,7 +546,7 @@ msgid "Make sure to add a new access method so that you can sign in next time or
 msgstr "Обязательно добавьте новый метод доступа, чтобы вы могли войти в систему в следующий раз или сбросить свою резервную фразу."
 
 msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
-msgstr "Управляйте своими учётными записями и контролируйте доступ к приложениям и сайтам через панель управления. Изучите расширенные функции для дополнительной настройки и защиты."
+msgstr "Управляйте своими учётными записями и доступом к приложениям. Все настройки — в одном месте."
 
 msgid "Manage your Internet Identity"
 msgstr "Управление вашим Internet Identity"
@@ -582,7 +582,7 @@ msgid "Name account"
 msgstr "Назвать аккаунт"
 
 msgid "Name your identity"
-msgstr "Назовите ваш идентификатор"
+msgstr "Придумайте имя"
 
 msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
 msgstr "Никакие данные о том, в какие приложения вы входите с помощью Internet Identity, не передаются Google, Microsoft или Apple."
@@ -642,7 +642,7 @@ msgid "Passkey testing"
 msgstr "Тестирование ключа доступа"
 
 msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
-msgstr "Ключи доступа — это безопасный и простой способ входа без использования паролей. Они хранятся в вашем менеджере паролей (Google Password Manager, iCloud Keychain, 1Password и т. д.) и могут быть защищены вашим отпечатком пальца, лицом или кодом устройства."
+msgstr "Ключи доступа (Passkeys) — это безопасный и простой способ входа без использования паролей. Они хранятся в вашем менеджере паролей (Google Password Manager, iCloud Keychain, 1Password и т. д.) и могут быть защищены вашим отпечатком пальца, лицом или кодом устройства."
 
 msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
 msgstr "Ключи доступа устойчивы к фишингу, их трудно украсть, и они могут синхронизироваться между вашими устройствами через таких провайдеров, как Google, Apple или Microsoft. <0>Узнайте больше.</0>"
@@ -660,7 +660,7 @@ msgid "Passkeys use cryptographic keys stored on your device for secure, passwor
 msgstr "Ключи доступа используют криптографические ключи, хранящиеся на вашем устройстве, для безопасного входа без пароля с помощью Face ID, Touch ID или ключа безопасности. Ваши данные никогда не передаются."
 
 msgid "Password-free"
-msgstr "Без пароля"
+msgstr "Без паролей"
 
 msgid "Pick something recognizable, like your name"
 msgstr "Выберите что-то узнаваемое, например, ваше имя"
@@ -672,13 +672,13 @@ msgid "Powered by"
 msgstr "Разработано"
 
 msgid "Real Privacy"
-msgstr "Настоящая конфиденциальность"
+msgstr "Настоящую конфиденциальность"
 
 msgid "Recover"
-msgstr "Восстановить"
+msgstr "Восстановить доступ"
 
 msgid "Recover your identity"
-msgstr "Восстановить вашу идентификацию"
+msgstr "Восстановить доступ"
 
 msgid "Recovery phrase"
 msgstr "Резервная фраза"
@@ -792,7 +792,7 @@ msgid "Sign in there."
 msgstr "Войти там."
 
 msgid "Sign in using familiar methods"
-msgstr "Войти, используя привычные методы"
+msgstr "Вход через знакомые сервисы"
 
 msgid "Sign in with another identity"
 msgstr "Войти с другой идентификацией"
@@ -807,7 +807,7 @@ msgid "Signing in securely"
 msgstr "Безопасный вход"
 
 msgid "Simplify your sign-in"
-msgstr "Упростите ваш вход"
+msgstr "Новый способ входа"
 
 msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
@@ -824,7 +824,7 @@ msgid "Start over"
 msgstr "Начать заново"
 
 msgid "Still have an identity number?"
-msgstr "Все еще есть номер идентификации?"
+msgstr "Есть старый ID?"
 
 msgid "Still using an identity number?"
 msgstr "Все еще используете номер идентификации?"
@@ -1019,7 +1019,7 @@ msgid "Use a device that already holds your identity to scan or open the URL. Th
 msgstr "Используйте устройство, которое уже содержит вашу учетную запись, чтобы отсканировать или открыть URL. Это свяжет вашу учетную запись с этим устройством."
 
 msgid "Use existing identity"
-msgstr "Использовать существующую учетную запись"
+msgstr "Уже есть аккаунт? Войти"
 
 msgid "Verify"
 msgstr "Проверить"
@@ -1094,7 +1094,7 @@ msgid "Wrong domain was set. Please try again."
 msgstr "Был установлен неправильный домен. Пожалуйста, попробуйте снова."
 
 msgid "You <0>cannot</0> rename this once it is set."
-msgstr "Вы <0>не можете</0> переименовать это после того, как оно установлено."
+msgstr "Имя <0>нельзя</0> изменить позже."
 
 msgid "You already have a {name} account linked"
 msgstr "У вас уже есть связанный аккаунт {name}"
