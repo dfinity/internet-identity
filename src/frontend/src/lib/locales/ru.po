@@ -38,7 +38,7 @@ msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becom
 msgstr "<0>Интеграция с Google, Apple и Microsoft:</0> Хотя ключи доступа становятся всё более зрелой технологией, они пока не стали привычными для всех. Мы заметили, что 50% пользователей не завершают регистрацию, — это говорит о необходимости альтернативных способов входа. Чтобы сделать Internet Identity доступным для ещё более широкой аудитории, мы добавили вход через Google, Apple и Microsoft."
 
 msgid "<0>Learn more</0> about passkeys"
-msgstr "<0>Что такое</0> ключ доступа?"
+msgstr "<0>Узнайте больше</0> о ключах доступа"
 
 msgid "<0>Never</0> enter a code from another source."
 msgstr "<0>Никогда</0> не вводите код из другого источника."
