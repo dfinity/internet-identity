@@ -215,7 +215,7 @@ msgid "Create account"
 msgstr "Создать аккаунт"
 
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
-msgstr "Входите с помощью биометрии или ключа безопасности (Passkey). Данные остаются на вашем устройстве."
+msgstr "Создайте ключ доступа (Passkey) через биометрию или ключ безопасности. Ваши данные никуда не передаются."
 
 msgid "Create identity"
 msgstr "Создать"
