@@ -678,7 +678,7 @@ msgid "Recover"
 msgstr "Восстановить доступ"
 
 msgid "Recover your identity"
-msgstr "Восстановить доступ"
+msgstr "Восстановить доступ к вашей Internet Identity"
 
 msgid "Recovery phrase"
 msgstr "Резервная фраза"
