@@ -8,5 +8,6 @@
     fetch_root_key = null;
     analytics_config = null;
     dummy_auth = null;
+    dev_csp = opt true;
   },
 )

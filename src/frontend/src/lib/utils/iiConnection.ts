@@ -62,6 +62,7 @@ import {
   WebauthnAuthenticationEvents,
 } from "./analytics/webauthnAuthenticationFunnel";
 import { HARDWARE_KEY_TEST } from "$lib/state/featureFlags";
+import { frontendCanisterConfig } from "$lib/globals";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -625,7 +626,7 @@ export class Connection {
 
     const shouldFetchRootKey =
       features.FETCH_ROOT_KEY ||
-      (this.canisterConfig.fetch_root_key[0] ?? false);
+      (frontendCanisterConfig.fetch_root_key[0] ?? false);
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),

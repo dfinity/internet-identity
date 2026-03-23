@@ -49,7 +49,7 @@
   <Avatar size="sm">
     <UserIcon class="size-5" />
   </Avatar>
-  <div class="flex flex-col text-left text-sm">
+  <div class="flex flex-col text-start text-sm">
     <div class="text-text-primary font-semibold">
       {identityInfo.name[0]}
     </div>

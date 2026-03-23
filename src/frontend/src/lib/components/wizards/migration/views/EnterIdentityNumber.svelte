@@ -8,7 +8,7 @@
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { getPrimaryOrigin, parentIFrameOrigin } from "$lib/globals";
+  import { getPrimaryOrigin } from "$lib/globals";
 
   interface Props {
     onSubmit: (
@@ -19,11 +19,9 @@
 
   const primaryOrigin = getPrimaryOrigin();
   const selfServiceOrigin =
-    parentIFrameOrigin !== undefined
-      ? parentIFrameOrigin
-      : window.location.origin !== primaryOrigin
-        ? window.location.origin
-        : "https://identity.ic0.app";
+    window.location.origin !== primaryOrigin
+      ? window.location.origin
+      : "https://identity.ic0.app";
 
   let { onSubmit }: Props = $props();
 

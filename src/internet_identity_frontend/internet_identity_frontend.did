@@ -54,6 +54,7 @@ type InternetIdentityFrontendInit = record {
     fetch_root_key : opt bool;
     analytics_config : opt opt AnalyticsConfig;
     dummy_auth : opt opt DummyAuthConfig;
+    dev_csp : opt bool;
 };
 
 service : (InternetIdentityFrontendInit) -> {

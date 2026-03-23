@@ -16,8 +16,8 @@ fn should_init_default() {
     assert_eq!(
         api::config(&env, canister_id).unwrap().captcha_config,
         Some(CaptchaConfig {
-            max_unsolved_captchas: 500,
-            captcha_trigger: Static(CaptchaEnabled)
+            max_unsolved_captchas: 50,
+            captcha_trigger: Static(CaptchaDisabled)
         })
     );
 }

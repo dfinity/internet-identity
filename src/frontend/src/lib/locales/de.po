@@ -294,7 +294,7 @@ msgstr "Alles, was Sie über Internet Identity wissen müssen – Ihre private, 
 
 msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
 msgid "Experience"
-msgstr "Erleben"
+msgstr "Erleben Sie"
 
 msgid "Export JSON"
 msgstr "JSON exportieren"
@@ -597,7 +597,7 @@ msgid "No recovery phrase"
 msgstr "Keine Wiederherstellungsphrase"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
-msgstr "Nein. Ihr Face ID oder Fingerabdruck wird nur verwendet, um Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten werden niemals mit Internet Identity oder anderen Websites oder Apps geteilt."
+msgstr "Keine Sorge. Face ID oder Ihr Fingerabdruck dienen lediglich dazu, Ihren Passkey zu erstellen oder zu entsperren. Ihre biometrischen Daten verlassen dabei nie Ihr Gerät und werden nicht mit Internet Identity oder Dritten geteilt."
 
 msgid "NordPass has been confirmed to be incompatible."
 msgstr "Es wurde bestätigt, dass NordPass inkompatibel ist."
@@ -768,7 +768,7 @@ msgid "Scan the above QR code with your <0>new device</0> or enter the URL manua
 msgstr "Scannen Sie den obigen QR-Code mit Ihrem <0>neuen Gerät</0> oder geben Sie die URL manuell ein."
 
 msgid "Seamless Access"
-msgstr "Nahtloser Zugriff"
+msgstr "Nahtlosen Zugriff"
 
 msgid "See how many access methods are within your identity and manage your recovery phrase."
 msgstr "Sehen Sie, wie viele Zugriffsmethoden Ihre Identität hat, und verwalten Sie Ihre Wiederherstellungsphrase."

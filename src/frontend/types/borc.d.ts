@@ -11,10 +11,10 @@ declare module "borc" {
       tags: Record<number, (val: any) => any>;
     });
 
-    decodeFirst(input: ArrayBuffer): any;
+    decodeFirst(input: Uint8Array): any;
   }
 
-  export function decodeFirst(input: ArrayBuffer): any;
+  export function decodeFirst(input: Uint8Array): any;
 
   export function encode(o: any): Uint8Array;
 

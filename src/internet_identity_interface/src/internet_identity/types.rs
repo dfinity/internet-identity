@@ -219,44 +219,11 @@ pub struct InternetIdentityFrontendArgs {
     pub fetch_root_key: Option<bool>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,
-}
-
-impl From<InternetIdentityFrontendArgs> for InternetIdentityInit {
-    fn from(value: InternetIdentityFrontendArgs) -> Self {
-        let InternetIdentityFrontendArgs {
-            backend_canister_id,
-            backend_origin,
-            fetch_root_key,
-            analytics_config,
-            dummy_auth,
-            related_origins,
-        } = value;
-
-        Self {
-            backend_canister_id: Some(backend_canister_id),
-            backend_origin: Some(backend_origin),
-
-            fetch_root_key,
-            analytics_config,
-            dummy_auth,
-            related_origins,
-
-            // This config field is pulled in the frontend from the backend
-            openid_configs: None,
-
-            // Config fields not used by the frontend
-            canister_creation_cycles_cost: None,
-            assigned_user_number_range: None,
-            archive_config: None,
-            register_rate_limit: None,
-
-            // Deprecated config fields
-            enable_dapps_explorer: None,
-            captcha_config: None,
-            is_production: None,
-            new_flow_origins: None,
-        }
-    }
+    /// Weakens the Content Security Policy to facilitate local development over HTTP.
+    /// When enabled:
+    /// * allows accessing II using http instead of https
+    /// * allows II to connect to localhost on both http and https
+    pub dev_csp: Option<bool>,
 }
 
 /// Config fields that are synchronized between the frontend and backend.
@@ -297,7 +264,6 @@ pub struct InternetIdentityInit {
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
-    pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<Option<DummyAuthConfig>>,

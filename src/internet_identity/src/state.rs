@@ -26,8 +26,8 @@ mod temp_keys;
 
 /// Default captcha config
 pub const DEFAULT_CAPTCHA_CONFIG: CaptchaConfig = CaptchaConfig {
-    max_unsolved_captchas: 500,
-    captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+    max_unsolved_captchas: 50,
+    captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
 };
 
 /// Default registration rate limit config.
@@ -122,7 +122,6 @@ pub struct PersistentState {
     // If it is `none`, then the 24h window starts from the newest entry in the event_data
     // BTreeMap minus 24h.
     pub event_stats_24h_start: Option<EventKey>,
-    pub fetch_root_key: Option<bool>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
     pub dummy_auth: Option<DummyAuthConfig>,
@@ -144,7 +143,6 @@ impl Default for PersistentState {
             openid_configs: None,
             analytics_config: None,
             event_stats_24h_start: None,
-            fetch_root_key: None,
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,

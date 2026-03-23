@@ -37,7 +37,6 @@ pub struct StorablePersistentState {
     new_flow_origins: Option<Vec<String>>,
     openid_configs: Option<Vec<OpenIdConfig>>,
     analytics_config: Option<AnalyticsConfig>,
-    fetch_root_key: Option<bool>,
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,
     dummy_auth: Option<DummyAuthConfig>,
@@ -82,7 +81,6 @@ impl From<PersistentState> for StorablePersistentState {
             new_flow_origins: s.new_flow_origins,
             openid_configs: s.openid_configs,
             analytics_config: s.analytics_config,
-            fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
@@ -105,7 +103,6 @@ impl From<StorablePersistentState> for PersistentState {
             openid_configs: s.openid_configs,
             analytics_config: s.analytics_config,
             event_stats_24h_start: s.event_stats_24h_start,
-            fetch_root_key: s.fetch_root_key,
             enable_dapps_explorer: s.enable_dapps_explorer,
             is_production: s.is_production,
             dummy_auth: s.dummy_auth,
@@ -149,20 +146,19 @@ mod tests {
             max_inflight_captchas: 0,
             event_stats_24h_start: None,
             captcha_config: Some(CaptchaConfig {
-                max_unsolved_captchas: 500,
-                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+                max_unsolved_captchas: 50,
+                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
             }),
             related_origins: None,
             new_flow_origins: None,
             openid_configs: None,
             analytics_config: None,
-            fetch_root_key: None,
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
         };
 
-        assert_eq!(StorablePersistentState::default(), expected_defaults);
+        pretty_assertions::assert_eq!(StorablePersistentState::default(), expected_defaults);
 
         let expected_defaults = PersistentState {
             archive_state: ArchiveState::default(),
@@ -175,19 +171,18 @@ mod tests {
             domain_active_anchor_stats: ActivityStats::new(test_time),
             active_authn_method_stats: ActivityStats::new(test_time),
             captcha_config: CaptchaConfig {
-                max_unsolved_captchas: 500,
-                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+                max_unsolved_captchas: 50,
+                captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
             },
             related_origins: None,
             new_flow_origins: None,
             openid_configs: None,
             event_stats_24h_start: None,
             analytics_config: None,
-            fetch_root_key: None,
             enable_dapps_explorer: None,
             is_production: None,
             dummy_auth: None,
         };
-        assert_eq!(PersistentState::default(), expected_defaults);
+        pretty_assertions::assert_eq!(PersistentState::default(), expected_defaults);
     }
 }
