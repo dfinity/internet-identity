@@ -821,12 +821,17 @@ create_forum_post() {
   local release_body
   release_body=$(gh release view "$TAG_NAME" --repo dfinity/internet-identity --json body -q '.body')
 
-  # Build the intro line
+  # Build the intro line with links to the NNS dashboard
+  local NNS_PROPOSAL_URL="https://dashboard.internetcomputer.org/proposal"
   local proposals_text
-  if [ "${#proposal_nums[@]}" -eq 1 ]; then
-    proposals_text="Proposal ${proposal_nums[0]}"
+  local linked_nums=()
+  for num in "${proposal_nums[@]}"; do
+    linked_nums+=("[${num}](${NNS_PROPOSAL_URL}/${num})")
+  done
+  if [ "${#linked_nums[@]}" -eq 1 ]; then
+    proposals_text="Proposal ${linked_nums[0]}"
   else
-    proposals_text="Proposals $(IFS=' and '; echo "${proposal_nums[*]}")"
+    proposals_text="Proposals $(IFS=' and '; echo "${linked_nums[*]}")"
   fi
 
   # Replace the default "This is Internet Identity release ..." line with the proposals version
