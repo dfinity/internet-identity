@@ -5,14 +5,16 @@ import { II_URL } from "../../utils";
 test.describe("Manage identities", () => {
   test.use({
     identityConfig: {
-      createIdentities: [{ name: "Alice" }, { name: "Bob" }],
+      createIdentities: [{ name: "Alice" }, { name: "Bob" }, { name: "Carol" }],
     },
   });
 
   test.beforeEach(
     async ({ page, managePage, identities, signInWithIdentity }) => {
-      // Sign in with both identities to populate the switcher
+      // Sign in with all identities to populate the switcher
       await page.goto(II_URL);
+      await signInWithIdentity(page, identities[2].identityNumber);
+      await managePage.signOut((c) => c.keepIdentity());
       await signInWithIdentity(page, identities[1].identityNumber);
       await managePage.signOut((c) => c.keepIdentity());
       await signInWithIdentity(page, identities[0].identityNumber);
@@ -69,7 +71,7 @@ test.describe("Manage identities", () => {
     // Dismiss the toast
     await page.getByRole("button", { name: "Close" }).click();
 
-    // Open switcher and verify identity is gone
+    // Open switcher and verify identity is gone from the manage dialog
     await managePage.openIdentitySwitcher(async (switcher) => {
       await switcher.manageIdentities(async (dialog) => {
         await dialog.assertIdentityHidden(identities[1].name);
@@ -107,11 +109,10 @@ test.describe("Sign out confirmation", () => {
       await confirmation.keepIdentity();
     });
 
-    // Identity should still be in the switcher
-    await page.getByRole("button", { name: "Switch identity" }).click();
+    // Identity should still appear on the landing page header
     await expect(
-      page.getByRole("button", { name: identities[0].name }),
-    ).toBeVisible();
+      page.getByRole("button", { name: "Switch identity" }),
+    ).toContainText(identities[0].name);
   });
 
   test("sign out and remove from device", async ({
