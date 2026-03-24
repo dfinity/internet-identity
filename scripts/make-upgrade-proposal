@@ -841,10 +841,8 @@ create_forum_post() {
 * Try it out on staging: https://beta.id.ai
 * Testing application: https://try.id.ai"
 
-  # Discourse API: category 32 = internet-identity under Developers
-  # The "Governance > NNS proposal discussion" category is not publicly accessible;
-  # historically II proposals are posted to the internet-identity category.
-  local category_id=32
+  # Discourse API: category 76 = Governance > NNS proposal discussions
+  local category_id=76
   local tags='["internet-identity", "nns", "Application-canister-mgmt"]'
 
   if [ -z "${DISCOURSE_API_KEY:-}" ]; then
