@@ -33,7 +33,7 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
                     ),
                     ("Content-Length".to_string(), body.len().to_string()),
                 ];
-                headers.append(&mut security_headers(vec![], None));
+                headers.append(&mut security_headers(None));
                 HttpResponse {
                     status_code: 200,
                     headers,
@@ -43,7 +43,7 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
             }
             Err(err) => HttpResponse {
                 status_code: 500,
-                headers: security_headers(vec![], None),
+                headers: security_headers(None),
                 body: ByteBuf::from(format!("Failed to encode metrics: {err}")),
                 upgrade: None,
             },
@@ -57,7 +57,7 @@ fn http_get_request(url: String, certificate_version: Option<u16>) -> HttpRespon
             },
             None => HttpResponse {
                 status_code: 404,
-                headers: security_headers(vec![], None),
+                headers: security_headers(None),
                 body: ByteBuf::from(format!("Asset {probably_an_asset} not found.")),
                 upgrade: None,
             },
@@ -95,10 +95,7 @@ pub fn http_request(req: HttpRequest) -> HttpResponse {
 /// iFrame policies, etc.).
 ///
 /// Integrity hashes for scripts must be specified.
-pub fn security_headers(
-    integrity_hashes: Vec<String>,
-    maybe_related_origins: Option<Vec<String>>,
-) -> Vec<HeaderField> {
+pub fn security_headers(maybe_related_origins: Option<Vec<String>>) -> Vec<HeaderField> {
     // Allow related origins to create/get WebAuthn credentials from one another
     let public_key_credentials_create_get = maybe_related_origins
         .clone()
@@ -118,11 +115,12 @@ pub fn security_headers(
         // Reduces risk of drive-by downloads and serves as defense against MIME confusion attacks
         ("X-Content-Type-Options".to_string(), "nosniff".to_string()),
         // Content-Security-Policy (CSP)
-        // Comprehensive policy to prevent XSS attacks and data injection
-        // See content_security_policy_header() function for detailed explanation
+        // Blocks all resource loading (scripts, styles, images, fonts, frames, etc.)
+        // If any HTML is ever rendered, nothing executes
+        // Effectively neutralizes most XSS risks
         (
             "Content-Security-Policy".to_string(),
-            content_security_policy_header(integrity_hashes, maybe_related_origins),
+            "default-src 'none';".to_string(),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -192,97 +190,6 @@ pub fn security_headers(
             .to_string(),
         ),
     ]
-}
-
-/// Full content security policy delivered via HTTP response header.
-///
-/// CSP directives explained:
-///
-/// default-src 'none':
-///   Default policy for all resource types - deny everything by default
-///
-/// connect-src 'self' https::
-///   Allow network requests to same origin and any HTTPS endpoint
-///   - 'self': fetch JS bundles from same origin
-///   - https://icp-api.io: official IC HTTP API domain for canister calls
-///   - https://*.icp0.io: HTTP fetches for /.well-known/ii-alternative-origins
-///   - https://*.ic0.app: legacy domain support for alternative origins
-///
-/// img-src 'self' data: https://*.googleusercontent.com:
-///   Allow images from same origin, data URIs, and Google profile pictures
-///
-/// script-src with 'strict-dynamic':
-///   - 'strict-dynamic': Only scripts with listed hashes can load, transitively loaded scripts inherit permission
-///   - 'unsafe-eval': Required for WebAssembly modules used by agent-js for BLS signature validation
-///   - 'unsafe-inline' https:: Backwards compatibility fallback (ignored by modern browsers)
-///
-/// base-uri 'none':
-///   Prevents injection of <base> tags that could redirect relative URLs
-///
-/// form-action 'none':
-///   Prevents forms from being submitted anywhere (II doesn't use forms)
-///
-/// style-src 'self' 'unsafe-inline':
-///   Allow stylesheets from same origin and inline styles
-///   'unsafe-inline' needed due to how styles are currently handled in the app
-///
-/// font-src 'self':
-///   Allow fonts only from same origin
-///
-/// frame-ancestors and frame-src:
-///   Control embedding - allow self and related origins for cross-domain WebAuthn
-///
-/// upgrade-insecure-requests (production only):
-///   Automatically upgrade HTTP requests to HTTPS (omitted in dev for localhost)
-fn content_security_policy_header(
-    integrity_hashes: Vec<String>,
-    maybe_related_origins: Option<Vec<String>>,
-) -> String {
-    // Always include 'strict-dynamic', but only include integrity hashes if there are some
-    // (i.e. by default deny scripts and only allow whitelist)
-    let strict_dynamic = if integrity_hashes.is_empty() {
-        "'strict-dynamic'".to_string()
-    } else {
-        format!(
-            "'strict-dynamic' {}",
-            integrity_hashes
-                .into_iter()
-                .map(|x| format!("'{x}'"))
-                .collect::<Vec<String>>()
-                .join(" ")
-        )
-    };
-
-    let connect_src = "'self' https:";
-
-    // Allow connecting via http for development purposes
-    #[cfg(feature = "dev_csp")]
-    let connect_src = format!("{connect_src} http:");
-
-    // Allow related origins to embed one another for cross-domain WebAuthn
-    let frame_src = maybe_related_origins
-        .unwrap_or_default()
-        .iter()
-        .fold("'self'".to_string(), |acc, origin| acc + " " + origin);
-
-    let csp = format!(
-        "default-src 'none';\
-         connect-src {connect_src};\
-         img-src 'self' data: https://*.googleusercontent.com;\
-         script-src {strict_dynamic} 'unsafe-inline' 'unsafe-eval' https:;\
-         base-uri 'none';\
-         form-action 'none';\
-         style-src 'self' 'unsafe-inline';\
-         style-src-elem 'self' 'unsafe-inline';\
-         font-src 'self';\
-         frame-ancestors {frame_src};\
-         frame-src {frame_src};"
-    );
-    // For production builds, upgrade all HTTP connections to HTTPS
-    // Omitted in dev builds to allow localhost development
-    #[cfg(not(feature = "dev_csp"))]
-    let csp = format!("{csp}upgrade-insecure-requests;");
-    csp
 }
 
 /// Read an asset from memory, returning the associated HTTP code, content and full list of
