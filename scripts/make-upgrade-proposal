@@ -797,6 +797,114 @@ tag_proposal() {
   fi
 }
 
+create_forum_post() {
+  local upgrade_type="$(checklist_must_get 'Upgrade type')"
+  local git_commit
+  git_commit=$(git rev-parse "$TAG_NAME")
+
+  # Collect proposal numbers for the title
+  local proposal_nums=()
+  if should_upgrade_backend "$upgrade_type"; then
+    local be_num
+    be_num=$(checklist_must_get "Backend proposal number")
+    proposal_nums+=("$be_num")
+  fi
+  if should_upgrade_frontend "$upgrade_type"; then
+    local fe_num
+    fe_num=$(checklist_must_get "Frontend proposal number")
+    proposal_nums+=("$fe_num")
+  fi
+
+  local title_proposals
+  title_proposals=$(IFS=', '; echo "${proposal_nums[*]}")
+  local title="Proposal(s) ${title_proposals} to upgrade II"
+
+  # Fetch release body from GitHub
+  local release_body
+  release_body=$(gh release view "$TAG_NAME" --repo dfinity/internet-identity --json body -q '.body')
+
+  # Build the intro line
+  local proposals_text
+  if [ "${#proposal_nums[@]}" -eq 1 ]; then
+    proposals_text="Proposal ${proposal_nums[0]}"
+  else
+    proposals_text="Proposals $(IFS=' and '; echo "${proposal_nums[*]}")"
+  fi
+
+  # Replace the default "This is Internet Identity release ..." line with the proposals version
+  local body
+  body=$(echo "$release_body" | sed "s|This is Internet Identity release \(.*\) for commit \(.*\)\.|${proposals_text} to upgrade Internet Identity to \1 for commit \2.|")
+
+  # Append staging and testing links
+  body="${body}
+
+* Try it out on staging: https://beta.id.ai
+* Testing application: https://try.id.ai"
+
+  # Discourse API: category 32 = internet-identity under Developers
+  # The "Governance > NNS proposal discussion" category is not publicly accessible;
+  # historically II proposals are posted to the internet-identity category.
+  local category_id=32
+  local tags='["internet-identity", "nns", "Application-canister-mgmt"]'
+
+  if [ -z "${DISCOURSE_API_KEY:-}" ]; then
+    echo "Error: DISCOURSE_API_KEY environment variable is not set." >&2
+    echo "Create an API key at https://forum.dfinity.org/admin/api/keys" >&2
+    exit 1
+  fi
+  if [ -z "${DISCOURSE_API_USERNAME:-}" ]; then
+    echo "Error: DISCOURSE_API_USERNAME environment variable is not set." >&2
+    exit 1
+  fi
+
+  echo ""
+  echo "=== Forum Post Preview ==="
+  echo "Title: $title"
+  echo "Category ID: $category_id"
+  echo "Tags: $tags"
+  echo "---"
+  echo "$body"
+  echo "==="
+  echo ""
+
+  read -rp "Proceed with creating the forum post? [y/N]: " confirm </dev/tty
+  if [[ ! "$confirm" =~ ^[Yy] ]]; then
+    echo "Aborted by user." >&2
+    exit 1
+  fi
+
+  local payload
+  payload=$(jq -n \
+    --arg title "$title" \
+    --arg raw "$body" \
+    --argjson category "$category_id" \
+    --argjson tags "$tags" \
+    '{title: $title, raw: $raw, category: $category, tags: $tags}')
+
+  local response
+  response=$(curl --connect-timeout 10 --max-time 30 -sf \
+    -X POST "https://forum.dfinity.org/posts.json" \
+    -H "Content-Type: application/json" \
+    -H "Api-Key: ${DISCOURSE_API_KEY}" \
+    -H "Api-Username: ${DISCOURSE_API_USERNAME}" \
+    -d "$payload")
+
+  local topic_id topic_slug
+  topic_id=$(echo "$response" | jq -r '.topic_id')
+  topic_slug=$(echo "$response" | jq -r '.topic_slug')
+
+  if [ -z "$topic_id" ] || [ "$topic_id" = "null" ]; then
+    echo "Error: Failed to create forum post." >&2
+    echo "Response: $response" >&2
+    exit 1
+  fi
+
+  local forum_url="https://forum.dfinity.org/t/${topic_slug}/${topic_id}"
+  echo ""
+  echo "Forum post created successfully!"
+  echo "$forum_url"
+}
+
 echo Checklist file: "$CHECKLIST_FILE"
 
 record "Start time" date +"%Y-%m-%d %H:%M:%S"
@@ -871,5 +979,6 @@ if should_upgrade_frontend "$UPGRADE_TYPE"; then
 fi
 
 confirm_cmd tag_proposal
+confirm_cmd create_forum_post
 confirm_manual "Invite Trusted Neurons" echo "Create a calendar invitation to the trusted neurons and identity team to vote on the proposal"
 
