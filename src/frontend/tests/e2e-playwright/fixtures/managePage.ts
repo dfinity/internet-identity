@@ -19,9 +19,7 @@ class ManagePage {
 
   async assertVisible() {
     await this.#page.waitForURL(
-      (url) =>
-        url.origin === II_URL &&
-        (url.pathname === "/manage" || url.pathname.startsWith("/manage/")),
+      (url) => url.origin === II_URL && url.pathname === "/manage",
     );
     await expect(
       this.#page.getByRole("heading", { name: "Welcome" }),

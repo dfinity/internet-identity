@@ -1,7 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "../../fixtures";
 import {
-  createNewIdentityInII,
-  dummyAuth,
   getMessageText,
   II_URL,
   openIiTab,
@@ -18,9 +17,11 @@ test("Authorize ready message should be sent immediately", async ({ page }) => {
   await iiPage.close();
 });
 
-test("Should allow valid message", async ({ page }) => {
-  const auth = dummyAuth();
-
+test("Should allow valid message", async ({
+  page,
+  identities,
+  signInWithIdentity,
+}) => {
   await openTestAppWithII(page);
   const iiPage = await openIiTab(page);
 
@@ -29,7 +30,7 @@ test("Should allow valid message", async ({ page }) => {
   await page.locator("#validMessageBtn").click(); // message 2: authorize-client
 
   // Complete authentication in II popup
-  await createNewIdentityInII(iiPage, "Test User", auth);
+  await signInWithIdentity(iiPage, identities[0].identityNumber);
   await iiPage.getByRole("button", { name: "Continue", exact: true }).click();
 
   // Wait for success notification in II
