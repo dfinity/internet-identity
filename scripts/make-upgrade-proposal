@@ -815,7 +815,11 @@ create_forum_post() {
 
   local title_proposals
   title_proposals=$(IFS=', '; echo "${proposal_nums[*]}")
-  local title="Proposal(s) ${title_proposals} to upgrade II"
+  local title_prefix="Proposal"
+  if [ "${#proposal_nums[@]}" -gt 1 ]; then
+    title_prefix="Proposals"
+  fi
+  local title="${title_prefix} ${title_proposals} to upgrade II"
 
   # Fetch release body from GitHub
   local release_body
