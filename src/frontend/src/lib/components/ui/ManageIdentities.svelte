@@ -111,9 +111,9 @@
       </div>
     </div>
 
-    <div class="flex flex-col">
+    <ul class="flex flex-col">
       {#each identities as identity, i}
-        <div class="flex items-center gap-3 py-3">
+        <li class="flex items-center gap-3 py-3">
           <IdentityListItem
             {identity}
             showCreatedAt={(passkeyNameCounts.get(identity.name) ?? 0) > 1}
@@ -146,12 +146,12 @@
               </button>
             </Tooltip>
           </div>
-        </div>
+        </li>
         {#if i < identities.length - 1}
           <div class="border-border-secondary border-t"></div>
         {/if}
       {/each}
-    </div>
+    </ul>
   </div>
 {/snippet}
 

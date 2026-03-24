@@ -50,7 +50,7 @@ class ManageIdentitiesDialog {
     name: string,
     fn: (confirmation: RemoveIdentityConfirmation) => Promise<T>,
   ): Promise<T> {
-    const row = this.#dialog.locator("div").filter({ hasText: name });
+    const row = this.#dialog.getByRole("listitem").filter({ hasText: name });
     await row.getByRole("button", { name: "Remove" }).click();
     await expect(
       this.#dialog.getByRole("heading", { name: "Remove from this device" }),
