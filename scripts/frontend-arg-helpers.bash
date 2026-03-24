@@ -56,20 +56,46 @@ build_frontend_install_arg() {
     echo "Configure install arguments (press Enter to keep each current value):"
 
     # Parse individual fields from the Candid text output.
+    # For multi-line nested values (analytics_config, related_origins), we extract
+    # everything from "field = " to the matching closing brace/semicolon.
+    parse_candid_field() {
+        local field="$1" config="$2"
+        # Try multi-line extraction: from "field = " to the line where braces balance
+        awk -v field="$field" '
+            BEGIN { found=0; depth=0; val="" }
+            !found && $0 ~ field" = " {
+                found=1
+                sub(".*"field" = ", "")
+                # Remove trailing semicolon if this is a single-line value
+            }
+            found {
+                val = (val == "" ? $0 : val "\n" $0)
+                depth += gsub(/[{(]/, "&")
+                depth -= gsub(/[})]/, "&")
+                if (depth <= 0) {
+                    # Remove trailing semicolon at the top level
+                    sub(/;[[:space:]]*$/, "", val)
+                    print val
+                    exit
+                }
+            }
+        ' <<< "$config"
+    }
+
     local current_backend_canister_id
-    current_backend_canister_id=$(echo "$raw_config" | grep 'backend_canister_id' | sed 's/.*= *//;s/ *;$//')
+    current_backend_canister_id=$(parse_candid_field "backend_canister_id" "$raw_config")
     local current_backend_origin
-    current_backend_origin=$(echo "$raw_config" | grep 'backend_origin' | sed 's/.*= *//;s/ *;$//')
+    current_backend_origin=$(parse_candid_field "backend_origin" "$raw_config")
     local current_related_origins
-    current_related_origins=$(echo "$raw_config" | sed -n '/related_origins/,/}/p' | tr '\n' ' ' | sed 's/.*= *//;s/ *;[[:space:]]*$//')
+    current_related_origins=$(parse_candid_field "related_origins" "$raw_config")
     local current_fetch_root_key
-    current_fetch_root_key=$(echo "$raw_config" | grep 'fetch_root_key' | sed 's/.*= *//;s/ *;$//')
+    current_fetch_root_key=$(parse_candid_field "fetch_root_key" "$raw_config")
     local current_analytics_config
-    current_analytics_config=$(echo "$raw_config" | grep 'analytics_config' | sed 's/.*= *//;s/ *;$//')
+    current_analytics_config=$(parse_candid_field "analytics_config" "$raw_config")
     local current_dummy_auth
-    current_dummy_auth=$(echo "$raw_config" | grep 'dummy_auth' | sed 's/.*= *//;s/ *;$//')
+    current_dummy_auth=$(parse_candid_field "dummy_auth" "$raw_config")
     local current_dev_csp
-    current_dev_csp=$(echo "$raw_config" | grep 'dev_csp' | sed 's/.*= *//;s/ *;$//')
+    current_dev_csp=$(parse_candid_field "dev_csp" "$raw_config")
 
     local val_backend_canister_id
     val_backend_canister_id=$(prompt_field "backend_canister_id" "$current_backend_canister_id")
