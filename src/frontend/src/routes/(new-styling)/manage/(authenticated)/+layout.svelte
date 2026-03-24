@@ -102,6 +102,27 @@
       duration: 4000,
     });
   };
+  const handleRemoveIdentity = (identityNumber: bigint) => {
+    const removedIdentity =
+      $lastUsedIdentitiesStore.identities[`${identityNumber}`];
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    isManageIdentitiesDialogOpen = false;
+    if (removedIdentity !== undefined) {
+      const identityName =
+        removedIdentity.name ?? `${removedIdentity.identityNumber}`;
+      toaster.create({
+        title: $t`Identity removed`,
+        description: $t`${identityName} has been removed from this device.`,
+        closable: true,
+        duration: 5000,
+        action: {
+          label: $t`Undo`,
+          onClick: () =>
+            lastUsedIdentitiesStore.restoreIdentity(removedIdentity),
+        },
+      });
+    }
+  };
   const handleSignOut = async () => {
     window.location.replace("/");
   };
@@ -441,9 +462,7 @@
     <ManageIdentities
       selected={$authenticatedStore.identityNumber}
       identities={lastUsedIdentities}
-      onRemoveIdentity={(identityNumber) => {
-        lastUsedIdentitiesStore.removeIdentity(identityNumber);
-      }}
+      onRemoveIdentity={handleRemoveIdentity}
     />
   </Dialog>
 {/if}

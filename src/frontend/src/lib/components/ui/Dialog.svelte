@@ -175,7 +175,7 @@
     <div class="flex flex-1 flex-col">
       <div
         bind:this={contentRef}
-        class="relative max-h-[var(--max-content-height)] overflow-y-auto"
+        class="relative overflow-y-auto max-sm:max-h-(--max-content-height) sm:max-h-[min(var(--max-content-height),48rem)]"
       >
         <div
           class={[

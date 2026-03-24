@@ -2,6 +2,8 @@
   import { normalizeProps, useMachine } from "@zag-js/svelte";
   import * as toast from "@zag-js/toast";
   import Alert from "$lib/components/ui/Alert.svelte";
+  import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { untrack } from "svelte";
 
   interface ToastProps {
     toast: toast.Options;
@@ -22,11 +24,39 @@
   const api = $derived(toast.connect(service, normalizeProps));
 
   const variant = $derived(api.type as OnlyLiterals<typeof api.type>);
+  const hasCountdown = untrack(
+    () => toastProps.action !== undefined && toastProps.duration !== undefined,
+  );
   let innerWidth = $state<number>(window.innerWidth);
   const mobile = $derived(innerWidth < 480);
+
+  let progress = $state(100);
+
+  if (hasCountdown) {
+    const duration = untrack(() => toastProps.duration!);
+    let runningTime = 0;
+    let lastTick = Date.now();
+
+    const tick = () => {
+      const now = Date.now();
+      if (!api.paused) {
+        runningTime += now - lastTick;
+      }
+      lastTick = now;
+      progress = Math.max(0, 100 - (runningTime / duration) * 100);
+      if (progress > 0) {
+        rafId = requestAnimationFrame(tick);
+      }
+    };
+    let rafId = requestAnimationFrame(tick);
+  }
 </script>
 
 <svelte:window bind:innerWidth />
+
+{#snippet countdownIcon()}
+  <ProgressRing value={progress} class="text-fg-brand-primary" />
+{/snippet}
 
 <div {...api.getRootProps()}>
   <Alert
@@ -35,12 +65,22 @@
     {variant}
     onClose={api.closable ? api.dismiss : undefined}
     direction={mobile ? "vertical" : "horizontal"}
+    icon={hasCountdown ? countdownIcon : undefined}
     class={[
       "shadow-lg not-dark:bg-clip-padding max-sm:w-[calc(100vw_-_2rem)] sm:w-100",
       "!border-black/[0.08]",
       "dark:!border-surface-dark-700",
     ]}
-  />
+  >
+    {#if toastProps.action}
+      <button
+        {...api.getActionTriggerProps()}
+        class="text-text-primary text-sm font-semibold hover:underline"
+      >
+        {toastProps.action.label}
+      </button>
+    {/if}
+  </Alert>
 </div>
 
 <style>

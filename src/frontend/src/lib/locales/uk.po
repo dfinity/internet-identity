@@ -265,6 +265,9 @@ msgstr "Ви хочете продовжити?"
 msgid "Easy access"
 msgstr "Легкий доступ"
 
+msgid "Edit"
+msgstr ""
+
 msgid "Edit {name}"
 msgstr "Редагувати {name}"
 
@@ -305,8 +308,8 @@ msgstr "FAQ та Підтримка"
 msgid "FAQs"
 msgstr "FAQ"
 
-msgid "For example, user A logs into Internet Identity with their Google account \u201cA@gmail.com\u201d and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
-msgstr "Наприклад, користувач A входить в Internet Identity зі свого облікового запису Google \u201cA@gmail.com\u201d, а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач автентифікований у застосунку Z, — лише в Internet Identity. Більше того, застосунок Z також ніколи не дізнається, що користувач A використовував Google для автентифікації свого користувача Internet Identity."
+msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
+msgstr ""
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Забудьте про запам'ятовування складних імен користувача та паролів. Завдяки ключам доступу ви просто обираєте своє ім'я для входу — швидко, безпечно та без проблем."
@@ -376,6 +379,9 @@ msgstr "Я несу відповідальність за свою фразу в
 
 msgid "I have written it down"
 msgstr "Я це записав(-ла)"
+
+msgid "Identities on this device"
+msgstr ""
 
 msgid "Identity already upgraded"
 msgstr "Ідентифікатор вже оновлено"
@@ -701,6 +707,12 @@ msgstr "Перенаправлення до застосунку"
 msgid "Remove"
 msgstr "Видалити"
 
+msgid "Remove from this device"
+msgstr ""
+
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr ""
+
 msgid "Remove passkey"
 msgstr "Видалити ключ доступу"
 
@@ -802,6 +814,12 @@ msgstr "Увійдіть за допомогою свого облікового
 
 msgid "Sign out"
 msgstr "Вийти"
+
+msgid "Sign out of identity to remove"
+msgstr ""
+
+msgid "Signed in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Безпечний вхід"
@@ -1101,6 +1119,12 @@ msgstr "Ви вже маєте пов'язаний обліковий запис
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Ви оновлюєте ID <0>{identityNumber}</0>"
+
+msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
+msgstr ""
+
+msgid "You can add it back anytime by signing in with the same passkey."
+msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Ви можете продовжити з <0>Використати існуючий ключ доступу</0> у процесі входу."

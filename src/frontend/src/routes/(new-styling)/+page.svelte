@@ -93,12 +93,30 @@
     });
   };
   const handleRemoveIdentity = (identityNumber: bigint) => {
+    const removedIdentity =
+      $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
     const nextIdentity = lastUsedIdentities.find(
       (identity) => identity.identityNumber !== identityNumber,
     );
     if (nextIdentity !== undefined) {
       lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
+    }
+    isManageIdentitiesDialogOpen = false;
+    if (removedIdentity !== undefined) {
+      const identityName =
+        removedIdentity.name ?? `${removedIdentity.identityNumber}`;
+      toaster.create({
+        title: $t`Identity removed`,
+        description: $t`${identityName} has been removed from this device.`,
+        closable: true,
+        duration: 5000,
+        action: {
+          label: $t`Undo`,
+          onClick: () =>
+            lastUsedIdentitiesStore.restoreIdentity(removedIdentity),
+        },
+      });
     }
   };
 
@@ -648,7 +666,7 @@
   </Popover>
 {/if}
 
-{#if isManageIdentitiesDialogOpen && selectedIdentity !== undefined}
+{#if isManageIdentitiesDialogOpen}
   <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
     <ManageIdentities
       identities={lastUsedIdentities}

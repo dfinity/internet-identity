@@ -380,6 +380,9 @@ msgstr "Sono responsabile della mia frase di recupero e, se smarrita, non può e
 msgid "I have written it down"
 msgstr "L'ho scritta"
 
+msgid "Identities on this device"
+msgstr ""
+
 msgid "Identity already upgraded"
 msgstr "Identità già aggiornata"
 
@@ -704,10 +707,10 @@ msgstr "Reindirizzamento all'app"
 msgid "Remove"
 msgstr "Rimuovi"
 
-msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgid "Remove from this device"
 msgstr ""
 
-msgid "Remove identity from this device"
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
 msgstr ""
 
 msgid "Remove passkey"
@@ -770,9 +773,6 @@ msgstr "Salva modifiche"
 msgid "Save your recovery phrase"
 msgstr "Salva la tua frase di recupero"
 
-msgid "Saved identities on this device"
-msgstr ""
-
 msgid "Saving changes..."
 msgstr "Salvataggio modifiche in corso..."
 
@@ -814,6 +814,9 @@ msgstr "Accedi con il tuo account {name} da qualsiasi dispositivo."
 
 msgid "Sign out"
 msgstr "Esci"
+
+msgid "Sign out of identity to remove"
+msgstr ""
 
 msgid "Signed in"
 msgstr ""
@@ -924,12 +927,6 @@ msgstr "Potrebbero volerci alcuni secondi"
 
 msgid "This passkey is no longer associated with any identity."
 msgstr "Questa passkey non è più associata ad alcuna identità."
-
-msgid "This removes the identity from this device only. Sign in again with the same {removingIdentityOpenIdProvider} account to restore it."
-msgstr ""
-
-msgid "This removes the identity from this device only. Sign in again with the same passkey to restore it."
-msgstr ""
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Questa YubiKey utilizza un firmware precedente (5.1) che è incompatibile."
@@ -1122,6 +1119,12 @@ msgstr "Hai già un account {name} collegato"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Stai aggiornando l'ID <0>{identityNumber}</0>"
+
+msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
+msgstr ""
+
+msgid "You can add it back anytime by signing in with the same passkey."
+msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Puoi continuare con <0>Usa Passkey esistente</0> nel processo di accesso."

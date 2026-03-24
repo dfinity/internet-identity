@@ -265,6 +265,9 @@ msgstr "Wilt u doorgaan?"
 msgid "Easy access"
 msgstr "Eenvoudige toegang"
 
+msgid "Edit"
+msgstr ""
+
 msgid "Edit {name}"
 msgstr "Bewerk {name}"
 
@@ -376,6 +379,9 @@ msgstr "Ik ben verantwoordelijk voor mijn herstelzin en deze kan niet worden opg
 
 msgid "I have written it down"
 msgstr "Ik heb het opgeschreven"
+
+msgid "Identities on this device"
+msgstr ""
 
 msgid "Identity already upgraded"
 msgstr "Identiteit al geüpgraded"
@@ -701,6 +707,12 @@ msgstr "Doorverwijzen naar de app"
 msgid "Remove"
 msgstr "Verwijderen"
 
+msgid "Remove from this device"
+msgstr ""
+
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr ""
+
 msgid "Remove passkey"
 msgstr "Passkey verwijderen"
 
@@ -802,6 +814,12 @@ msgstr "Log in met uw {name}-account vanaf elk apparaat."
 
 msgid "Sign out"
 msgstr "Uitloggen"
+
+msgid "Sign out of identity to remove"
+msgstr ""
+
+msgid "Signed in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Veilig inloggen"
@@ -1101,6 +1119,12 @@ msgstr "U heeft al een {name}-account gekoppeld"
 
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "U upgrade ID <0>{identityNumber}</0>"
+
+msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
+msgstr ""
+
+msgid "You can add it back anytime by signing in with the same passkey."
+msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "U kunt doorgaan met <0>Gebruik bestaande Passkey</0> in het inlogproces."

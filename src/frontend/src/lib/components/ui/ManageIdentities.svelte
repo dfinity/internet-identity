@@ -2,7 +2,7 @@
   import type { LastUsedIdentity } from "$lib/stores/last-used-identities.store";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { CircleMinusIcon, ListMinusIcon, PencilIcon } from "@lucide/svelte";
+  import { PencilIcon, Trash2Icon } from "@lucide/svelte";
   import { openIdName } from "$lib/utils/openID";
   import FeaturedIcon from "./FeaturedIcon.svelte";
   import IdentityListItem from "./IdentityListItem.svelte";
@@ -17,6 +17,7 @@
   let { selected, identities, onRemoveIdentity }: Props = $props();
 
   let removingIdentity = $state<LastUsedIdentity>();
+  let windowHeight = $state(window.innerHeight);
 
   const passkeyNameCounts = $derived.by(() => {
     const counts = new Map<string | undefined, number>();
@@ -50,7 +51,7 @@
   <div class="flex flex-col gap-8">
     <div class="flex flex-col gap-4">
       <FeaturedIcon size="lg">
-        <ListMinusIcon class="size-6" />
+        <Trash2Icon class="size-6" />
       </FeaturedIcon>
       <div class="flex flex-col gap-3">
         <h2 class="text-text-primary text-2xl font-medium">
@@ -131,7 +132,7 @@
               </span>
             {/if}
             <Tooltip
-              label={$t`Sign out of identity to remove`}
+              label={$t`Sign out to remove`}
               direction="left"
               hidden={identity.identityNumber !== selected}
               distance="0.25rem"
@@ -141,7 +142,7 @@
                 disabled={identity.identityNumber === selected}
                 class="btn btn-tertiary btn-icon size-8! shrink-0 rounded-full"
               >
-                <CircleMinusIcon class="size-5" />
+                <Trash2Icon class="size-5" />
                 <span>{$t`Remove`}</span>
               </button>
             </Tooltip>
@@ -154,6 +155,8 @@
     </div>
   </div>
 {/snippet}
+
+<svelte:window bind:innerHeight={windowHeight} />
 
 {#if removingIdentity !== undefined}
   {@render removeConfirmation(removingIdentity)}
