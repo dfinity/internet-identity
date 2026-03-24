@@ -365,6 +365,9 @@ prepare_staging_backend_argument() {
   echo "=== Filling init arguments for STAGING BACKEND canister (InternetIdentityInit) ==="
   echo ""
   didc_assist_ii_init > staging_args.txt
+  if [ ! -s staging_args.txt ]; then
+    echo "(null)" > staging_args.txt
+  fi
   didc_encode_ii_init staging_args.txt > staging_dfx_arg.bin
 }
 
@@ -500,6 +503,10 @@ prepare_production_backend_argument() {
   echo "=== Filling init arguments for PRODUCTION BACKEND canister (InternetIdentityInit) ==="
   echo ""
   didc_assist_ii_init > args.txt
+  # Default to (null) when the user declines the optional init arg
+  if [ ! -s args.txt ]; then
+    echo "(null)" > args.txt
+  fi
   didc_encode_ii_init args.txt > dfx_arg.bin
   # DFX raw arguments are encoded differently than ic-admin's --arg values (mainnet_arg.bin).
   xxd -r -p dfx_arg.bin > mainnet_arg.bin
