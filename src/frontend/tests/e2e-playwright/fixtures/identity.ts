@@ -343,11 +343,13 @@ export const test = base.extend<{
     use(async (page, identityNumber) => {
       const identity = getIdentityByNumber(identities, identityNumber);
 
-      // Remove any existing authenticator to avoid multiple authenticators on the same page
-      const existingAuthenticatorId = identity.authenticatorIds.get(page);
-      if (existingAuthenticatorId !== undefined) {
-        await removeVirtualAuthenticator(page, existingAuthenticatorId);
-        identity.authenticatorIds.delete(page);
+      // Remove any existing authenticators on this page to avoid conflicts
+      for (const identity of identities) {
+        const existingAuthenticatorId = identity.authenticatorIds.get(page);
+        if (existingAuthenticatorId !== undefined) {
+          await removeVirtualAuthenticator(page, existingAuthenticatorId);
+          identity.authenticatorIds.delete(page);
+        }
       }
 
       // Add virtual authenticator and populate it with the identity's credentials
