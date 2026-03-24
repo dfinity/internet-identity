@@ -31,17 +31,21 @@ prompt_field() {
 # -------------------------
 build_frontend_install_arg() {
     local canister_id="$1"
-    local config_url="https://${canister_id}.icp0.io/.config"
+    local primary_url="https://${canister_id}.icp0.io/.config"
+    local fallback_url="https://${canister_id}.ic0.app/.config"
 
     echo ""
-    echo "Fetching current frontend config from $config_url ..."
-    local raw_config
-    if ! raw_config=$(curl --connect-timeout 10 --max-time 30 -sfL "$config_url"); then
-        echo "Error: Could not fetch current config from $config_url" >&2
-        exit 1
-    fi
+    local raw_config=""
+    for config_url in "$primary_url" "$fallback_url"; do
+        echo "Fetching current frontend config from $config_url ..."
+        if raw_config=$(curl --connect-timeout 10 --max-time 30 -sfL "$config_url") && [ -n "$raw_config" ]; then
+            break
+        fi
+        echo "  Failed, trying next domain..." >&2
+        raw_config=""
+    done
     if [ -z "$raw_config" ]; then
-        echo "Error: Empty config response from $config_url" >&2
+        echo "Error: Could not fetch config from either $primary_url or $fallback_url" >&2
         exit 1
     fi
 
