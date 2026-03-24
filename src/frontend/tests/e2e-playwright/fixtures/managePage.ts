@@ -14,6 +14,9 @@ class ManagePage {
       .getByRole("group")
       .getByRole("button", { name: "Sign Out" })
       .click();
+    await this.#page
+      .getByRole("button", { name: "Sign out and keep identity" })
+      .click();
     await this.#page.waitForURL(II_URL); // Wait for redirect to landing page after sign out
   }
 

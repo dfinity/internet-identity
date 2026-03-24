@@ -15,6 +15,7 @@
   import { afterNavigate, goto } from "$app/navigation";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
   import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
+  import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
   import {
     authenticatedStore,
     authenticationStore,
@@ -123,7 +124,19 @@
       });
     }
   };
+  let isSignOutDialogOpen = $state(false);
   const handleSignOut = async () => {
+    isIdentityPopoverOpen = false;
+    isSignOutDialogOpen = true;
+  };
+  const handleConfirmSignOut = () => {
+    window.location.replace("/");
+  };
+  const handleConfirmSignOutAndRemove = () => {
+    const identity = $lastUsedIdentitiesStore.selected;
+    if (identity !== undefined) {
+      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
+    }
     window.location.replace("/");
   };
 
@@ -463,6 +476,16 @@
       selected={$authenticatedStore.identityNumber}
       identities={lastUsedIdentities}
       onRemoveIdentity={handleRemoveIdentity}
+    />
+  </Dialog>
+{/if}
+
+{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
+  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+    <SignOutConfirmation
+      identity={$lastUsedIdentitiesStore.selected}
+      onSignOut={handleConfirmSignOut}
+      onSignOutAndRemove={handleConfirmSignOutAndRemove}
     />
   </Dialog>
 {/if}
