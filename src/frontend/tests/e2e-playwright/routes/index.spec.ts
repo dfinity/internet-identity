@@ -290,7 +290,7 @@ test.describe("Last used identities listed", () => {
     await page.goto(II_URL);
     await signInWithIdentity(page, identities[0].identityNumber);
     await managePage.signOut();
-    await removeAuthenticatorForIdentity(page, identities[0].identityNumber);
+    await removeAuthenticatorForIdentity(identities[0].identityNumber);
 
     // Now sign up for a new identity
     await addVirtualAuthenticator(page);

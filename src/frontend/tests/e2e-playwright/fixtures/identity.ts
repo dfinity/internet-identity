@@ -28,7 +28,8 @@ interface Identity {
   identityNumber: bigint;
   name: string;
   credentials: Protocol.WebAuthn.Credential[];
-  authenticatorIds: WeakMap<Page, string>;
+  discoverableCredentialId: string | undefined;
+  authenticatorIds: Map<Page, string>;
 }
 
 const credentialCreateTrackingInstalled = new WeakSet<Page>();
@@ -281,13 +282,15 @@ export const test = base.extend<{
     identityNumber: bigint,
   ) => Promise<void>;
   removeAuthenticatorForIdentity: (
-    page: Page,
     identityNumber: bigint,
   ) => Promise<void>;
   setCredentialsForIdentity: (
-    page: Page,
     identityNumber: bigint,
     credentials: Protocol.WebAuthn.Credential[],
+  ) => Promise<void>;
+  setDiscoverableCredentialForIdentity: (
+    identityNumber: bigint,
+    credentialId: string,
   ) => Promise<void>;
 }>({
   identityConfig: {
@@ -327,8 +330,9 @@ export const test = base.extend<{
         canisterId,
         name,
         credentials,
+        discoverableCredentialId: credentials[0].credentialId,
         identityNumber,
-        authenticatorIds: new WeakMap(),
+        authenticatorIds: new Map(),
       });
     }
     return use(identities);
@@ -339,7 +343,7 @@ export const test = base.extend<{
       const wizard = new IdentityWizard(page);
       await wizard.signIn();
     }),
-  addAuthenticatorForIdentity: ({ identities }, use) =>
+  addAuthenticatorForIdentity: ({ identities, setCredentialsForIdentity }, use) =>
     use(async (page, identityNumber) => {
       const identity = getIdentityByNumber(identities, identityNumber);
 
@@ -355,63 +359,74 @@ export const test = base.extend<{
       // Add virtual authenticator and populate it with the identity's credentials
       const authenticatorId = await addVirtualAuthenticator(page);
       identity.authenticatorIds.set(page, authenticatorId);
-      for (const credential of identity.credentials) {
-        await addCredentialToVirtualAuthenticator(
-          page,
-          authenticatorId,
-          credential,
-        );
-      }
+      await setCredentialsForIdentity(identityNumber, identity.credentials);
 
       // Keep this identity synchronized with passkeys created in page code.
       await trackIdentityCredentialCreation(page, identity);
     }),
   removeAuthenticatorForIdentity: ({ identities }, use) =>
-    use(async (page, identityNumber) => {
+    use(async (identityNumber) => {
       const identity = getIdentityByNumber(identities, identityNumber);
-      const authenticatorId = identity.authenticatorIds.get(page);
-      if (authenticatorId === undefined) {
-        throw new Error(
-          `No authenticator found for identity ${identityNumber} on the provided page`,
-        );
+      for (const [page, authenticatorId] of identity.authenticatorIds) {
+        try {
+          await removeVirtualAuthenticator(page, authenticatorId);
+        } catch {
+          // Page may have been closed
+        }
+        identity.authenticatorIds.delete(page);
       }
-      await removeVirtualAuthenticator(page, authenticatorId);
-      identity.authenticatorIds.delete(page);
     }),
   setCredentialsForIdentity: ({ identities }, use) =>
-    use(async (page, identityNumber, credentials) => {
+    use(async (identityNumber, credentials) => {
       const identity = getIdentityByNumber(identities, identityNumber);
-      const authenticatorId = identity.authenticatorIds.get(page);
-      if (authenticatorId !== undefined) {
-        const existingCredentialIds = new Set(
-          identity.credentials.map((cred) => cred.credentialId),
-        );
-        const newCredentialIds = new Set(
-          credentials.map((cred) => cred.credentialId),
-        );
-        const credentialToRemove = identity.credentials.filter(
-          (existingCredential) =>
-            !newCredentialIds.has(existingCredential.credentialId),
-        );
-        const credentialToAdd = credentials.filter(
-          (newCredential) =>
-            !existingCredentialIds.has(newCredential.credentialId),
-        );
-        for (const credential of credentialToRemove) {
-          await removeCredentialFromVirtualAuthenticator(
-            page,
-            authenticatorId,
-            credential.credentialId,
-          );
-        }
-        for (const credential of credentialToAdd) {
-          await addCredentialToVirtualAuthenticator(
-            page,
-            authenticatorId,
-            credential,
-          );
-        }
+      // Update discoverable choice if the current one is no longer present
+      const hasDiscoverable = credentials.some(
+        (cred) =>
+          cred.credentialId === identity.discoverableCredentialId,
+      );
+      if (!hasDiscoverable) {
+        identity.discoverableCredentialId =
+          credentials[0]?.credentialId;
       }
       identity.credentials = credentials;
+
+      // Sync all authenticators for this identity
+      for (const [page, authenticatorId] of identity.authenticatorIds) {
+        try {
+          const existingCredentials =
+            await getCredentialsFromVirtualAuthenticator(
+              page,
+              authenticatorId,
+            );
+          for (const credential of existingCredentials) {
+            await removeCredentialFromVirtualAuthenticator(
+              page,
+              authenticatorId,
+              credential.credentialId,
+            );
+          }
+          for (const credential of credentials) {
+            await addCredentialToVirtualAuthenticator(
+              page,
+              authenticatorId,
+              {
+                ...credential,
+                isResidentCredential:
+                  credential.credentialId ===
+                  identity.discoverableCredentialId,
+              },
+            );
+          }
+        } catch {
+          // Page may have been closed; clean up stale reference
+          identity.authenticatorIds.delete(page);
+        }
+      }
+    }),
+  setDiscoverableCredentialForIdentity: ({ identities, setCredentialsForIdentity }, use) =>
+    use(async (identityNumber, credentialId) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+      identity.discoverableCredentialId = credentialId;
+      await setCredentialsForIdentity(identityNumber, identity.credentials);
     }),
 });
