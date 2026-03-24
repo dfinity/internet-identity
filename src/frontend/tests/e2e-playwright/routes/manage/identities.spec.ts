@@ -10,18 +10,11 @@ test.describe("Manage identities", () => {
   });
 
   test.beforeEach(
-    async ({
-      page,
-      managePage,
-      identities,
-      signInWithIdentity,
-      removeAuthenticatorForIdentity,
-    }) => {
+    async ({ page, managePage, identities, signInWithIdentity }) => {
       // Sign in with both identities to populate the switcher
       await page.goto(II_URL);
       await signInWithIdentity(page, identities[1].identityNumber);
       await managePage.signOut((c) => c.keepIdentity());
-      await removeAuthenticatorForIdentity(page, identities[1].identityNumber);
       await signInWithIdentity(page, identities[0].identityNumber);
       await managePage.assertVisible();
     },
