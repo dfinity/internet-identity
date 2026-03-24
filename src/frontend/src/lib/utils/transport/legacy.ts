@@ -11,6 +11,7 @@ import {
   AuthRequestCodec,
   DelegationParamsCodec,
   AuthResponseCodec,
+  OriginSchema,
 } from "$lib/utils/transport/utils";
 import {
   Delegation,
@@ -27,7 +28,7 @@ const REDIRECT_SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const OUTER_DELEGATION_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 const RedirectMessageSchema = z.object({
-  origin: z.url(),
+  origin: OriginSchema,
   data: z.unknown(),
 });
 
