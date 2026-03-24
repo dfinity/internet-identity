@@ -97,22 +97,35 @@ build_frontend_install_arg() {
     local current_dev_csp
     current_dev_csp=$(parse_candid_field "dev_csp" "$raw_config")
 
-    local val_backend_canister_id
-    val_backend_canister_id=$(prompt_field "backend_canister_id" "$current_backend_canister_id")
-    local val_backend_origin
-    val_backend_origin=$(prompt_field "backend_origin" "$current_backend_origin")
-    local val_related_origins
-    val_related_origins=$(prompt_field "related_origins" "$current_related_origins")
-    local val_fetch_root_key
-    val_fetch_root_key=$(prompt_field "fetch_root_key" "$current_fetch_root_key")
-    local val_analytics_config
-    val_analytics_config=$(prompt_field "analytics_config" "$current_analytics_config")
-    local val_dummy_auth
-    val_dummy_auth=$(prompt_field "dummy_auth" "$current_dummy_auth")
-    local val_dev_csp
-    val_dev_csp=$(prompt_field "dev_csp" "$current_dev_csp")
+    # All known fields with their defaults (null for missing fields)
+    local -a field_names=(backend_canister_id backend_origin related_origins fetch_root_key analytics_config dummy_auth dev_csp)
+    local -A current_values=(
+        [backend_canister_id]="$current_backend_canister_id"
+        [backend_origin]="$current_backend_origin"
+        [related_origins]="$current_related_origins"
+        [fetch_root_key]="$current_fetch_root_key"
+        [analytics_config]="$current_analytics_config"
+        [dummy_auth]="$current_dummy_auth"
+        [dev_csp]="$current_dev_csp"
+    )
 
-    FRONTEND_CANDID_ARG="(record { backend_canister_id = ${val_backend_canister_id}; backend_origin = ${val_backend_origin}; related_origins = ${val_related_origins}; fetch_root_key = ${val_fetch_root_key}; analytics_config = ${val_analytics_config}; dummy_auth = ${val_dummy_auth}; dev_csp = ${val_dev_csp} })"
+    # Prompt for each field, defaulting empty values to null
+    local -A final_values
+    for field in "${field_names[@]}"; do
+        local current="${current_values[$field]:-null}"
+        final_values[$field]=$(prompt_field "$field" "$current")
+    done
+
+    # Build the Candid record, including all fields
+    local record_fields=""
+    for field in "${field_names[@]}"; do
+        if [ -n "$record_fields" ]; then
+            record_fields+="; "
+        fi
+        record_fields+="${field} = ${final_values[$field]}"
+    done
+
+    FRONTEND_CANDID_ARG="(record { ${record_fields} })"
 
     echo ""
     echo "Install argument (Candid):"
