@@ -136,8 +136,6 @@ test.describe("Sign out confirmation", () => {
     });
 
     // No identities left — should see sign in button
-    await expect(
-      page.getByRole("button", { name: "Sign in" }),
-    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   });
 });

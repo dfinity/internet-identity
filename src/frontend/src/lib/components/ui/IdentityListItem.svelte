@@ -22,22 +22,17 @@
   >
     {#if "openid" in identity.authMethod && identity.authMethod.openid.metadata !== undefined}
       <span
-        >{getMetadataString(
-          identity.authMethod.openid.metadata,
-          "email",
-        ) ?? $t`Hidden email`}</span
+        >{getMetadataString(identity.authMethod.openid.metadata, "email") ??
+          $t`Hidden email`}</span
       >
     {:else}
       <span>
         {$t`Passkey`}
         {#if showCreatedAt && identity.createdAtMillis !== undefined}
           {" | "}
-          {$t`Created ${$formatRelative(
-            new Date(identity.createdAtMillis),
-            {
-              style: "long",
-            },
-          )}`}
+          {$t`Created ${$formatRelative(new Date(identity.createdAtMillis), {
+            style: "long",
+          })}`}
         {/if}
       </span>
     {/if}

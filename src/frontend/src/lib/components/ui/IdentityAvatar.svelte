@@ -24,7 +24,7 @@
 </script>
 
 <span class="relative">
-  <Avatar size={size}>
+  <Avatar {size}>
     <UserIcon class={size === "lg" ? "size-6" : "size-5"} />
   </Avatar>
   <AuthMethodBadge {logo} {size} />
