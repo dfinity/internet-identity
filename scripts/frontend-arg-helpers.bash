@@ -116,16 +116,18 @@ build_frontend_install_arg() {
         final_values[$field]=$(prompt_field "$field" "$current")
     done
 
-    # Build the Candid record, including all fields
+    # Build the Candid record with each top-level field on its own line
     local record_fields=""
     for field in "${field_names[@]}"; do
         if [ -n "$record_fields" ]; then
-            record_fields+="; "
+            record_fields+=$';\n'
         fi
-        record_fields+="${field} = ${final_values[$field]}"
+        record_fields+="  ${field} = ${final_values[$field]}"
     done
 
-    FRONTEND_CANDID_ARG="(record { ${record_fields} })"
+    FRONTEND_CANDID_ARG="(record {
+${record_fields};
+})"
 
     echo ""
     echo "Install argument (Candid):"
