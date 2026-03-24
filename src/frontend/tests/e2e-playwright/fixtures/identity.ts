@@ -281,9 +281,7 @@ export const test = base.extend<{
     page: Page,
     identityNumber: bigint,
   ) => Promise<void>;
-  removeAuthenticatorForIdentity: (
-    identityNumber: bigint,
-  ) => Promise<void>;
+  removeAuthenticatorForIdentity: (identityNumber: bigint) => Promise<void>;
   setCredentialsForIdentity: (
     identityNumber: bigint,
     credentials: Protocol.WebAuthn.Credential[],
@@ -343,7 +341,10 @@ export const test = base.extend<{
       const wizard = new IdentityWizard(page);
       await wizard.signIn();
     }),
-  addAuthenticatorForIdentity: ({ identities, setCredentialsForIdentity }, use) =>
+  addAuthenticatorForIdentity: (
+    { identities, setCredentialsForIdentity },
+    use,
+  ) =>
     use(async (page, identityNumber) => {
       const identity = getIdentityByNumber(identities, identityNumber);
 
@@ -381,12 +382,10 @@ export const test = base.extend<{
       const identity = getIdentityByNumber(identities, identityNumber);
       // Update discoverable choice if the current one is no longer present
       const hasDiscoverable = credentials.some(
-        (cred) =>
-          cred.credentialId === identity.discoverableCredentialId,
+        (cred) => cred.credentialId === identity.discoverableCredentialId,
       );
       if (!hasDiscoverable) {
-        identity.discoverableCredentialId =
-          credentials[0]?.credentialId;
+        identity.discoverableCredentialId = credentials[0]?.credentialId;
       }
       identity.credentials = credentials;
 
@@ -394,10 +393,7 @@ export const test = base.extend<{
       for (const [page, authenticatorId] of identity.authenticatorIds) {
         try {
           const existingCredentials =
-            await getCredentialsFromVirtualAuthenticator(
-              page,
-              authenticatorId,
-            );
+            await getCredentialsFromVirtualAuthenticator(page, authenticatorId);
           for (const credential of existingCredentials) {
             await removeCredentialFromVirtualAuthenticator(
               page,
@@ -406,16 +402,11 @@ export const test = base.extend<{
             );
           }
           for (const credential of credentials) {
-            await addCredentialToVirtualAuthenticator(
-              page,
-              authenticatorId,
-              {
-                ...credential,
-                isResidentCredential:
-                  credential.credentialId ===
-                  identity.discoverableCredentialId,
-              },
-            );
+            await addCredentialToVirtualAuthenticator(page, authenticatorId, {
+              ...credential,
+              isResidentCredential:
+                credential.credentialId === identity.discoverableCredentialId,
+            });
           }
         } catch {
           // Page may have been closed; clean up stale reference
@@ -423,7 +414,10 @@ export const test = base.extend<{
         }
       }
     }),
-  setDiscoverableCredentialForIdentity: ({ identities, setCredentialsForIdentity }, use) =>
+  setDiscoverableCredentialForIdentity: (
+    { identities, setCredentialsForIdentity },
+    use,
+  ) =>
     use(async (identityNumber, credentialId) => {
       const identity = getIdentityByNumber(identities, identityNumber);
       identity.discoverableCredentialId = credentialId;

@@ -45,14 +45,10 @@ test.describe("Dashboard Navigation", () => {
         await page.goto(II_URL);
         await signInWithIdentity(page, identities[1].identityNumber);
         await managePage.signOut();
-        await removeAuthenticatorForIdentity(
-          identities[1].identityNumber,
-        );
+        await removeAuthenticatorForIdentity(identities[1].identityNumber);
         await signInWithIdentity(page, identities[0].identityNumber);
         await managePage.signOut();
-        await removeAuthenticatorForIdentity(
-          identities[0].identityNumber,
-        );
+        await removeAuthenticatorForIdentity(identities[0].identityNumber);
       },
     );
 
