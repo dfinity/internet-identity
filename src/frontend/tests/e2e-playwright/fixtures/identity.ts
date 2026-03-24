@@ -349,11 +349,12 @@ export const test = base.extend<{
       const identity = getIdentityByNumber(identities, identityNumber);
 
       // Remove any existing authenticators on this page to avoid conflicts
-      for (const identity of identities) {
-        const existingAuthenticatorId = identity.authenticatorIds.get(page);
+      for (const otherIdentity of identities) {
+        const existingAuthenticatorId =
+          otherIdentity.authenticatorIds.get(page);
         if (existingAuthenticatorId !== undefined) {
           await removeVirtualAuthenticator(page, existingAuthenticatorId);
-          identity.authenticatorIds.delete(page);
+          otherIdentity.authenticatorIds.delete(page);
         }
       }
 
@@ -371,10 +372,15 @@ export const test = base.extend<{
       for (const [page, authenticatorId] of identity.authenticatorIds) {
         try {
           await removeVirtualAuthenticator(page, authenticatorId);
-        } catch {
-          // Page may have been closed
+        } catch (error) {
+          // Page may have been closed; only swallow errors in that case.
+          if (!page.isClosed()) {
+            throw error;
+          }
+        } finally {
+          // Ensure our internal map does not get out of sync.
+          identity.authenticatorIds.delete(page);
         }
-        identity.authenticatorIds.delete(page);
       }
     }),
   setCredentialsForIdentity: ({ identities }, use) =>
@@ -408,9 +414,14 @@ export const test = base.extend<{
                 credential.credentialId === identity.discoverableCredentialId,
             });
           }
-        } catch {
-          // Page may have been closed; clean up stale reference
-          identity.authenticatorIds.delete(page);
+        } catch (error) {
+          // Only ignore errors when the page has been closed; otherwise rethrow
+          if (page.isClosed()) {
+            // Page may have been closed; clean up stale reference
+            identity.authenticatorIds.delete(page);
+          } else {
+            throw error;
+          }
         }
       }
     }),
