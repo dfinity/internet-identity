@@ -113,7 +113,10 @@ build_frontend_install_arg() {
     local -A final_values
     for field in "${field_names[@]}"; do
         local current="${current_values[$field]:-null}"
-        final_values[$field]=$(prompt_field "$field" "$current")
+        local value
+        value=$(prompt_field "$field" "$current")
+        # Normalize empty input to null to avoid invalid Candid
+        final_values[$field]="${value:-null}"
     done
 
     # Build the Candid record with each top-level field on its own line

@@ -537,8 +537,8 @@ append_proposal_argument() {
     II_WASM_SHA=$(sha256sum "internet_identity.wasm.gz" | awk '{print $1}')
 
     # Remove previously appended sections (idempotent on re-run)
-    sed -i '' '/^## Backend Argument Verification/,$d' backend_proposal.md
-    sed -i '' '/^## Wasm Verification/,$d' backend_proposal.md
+    sed -i.bak '/^## Backend Argument Verification/,$d' backend_proposal.md && rm -f backend_proposal.md.bak
+    sed -i.bak '/^## Wasm Verification/,$d' backend_proposal.md && rm -f backend_proposal.md.bak
 
     cat >> backend_proposal.md << EOF
 
@@ -569,8 +569,8 @@ EOF
     FRONTEND_WASM_SHA=$(sha256sum "internet_identity_frontend.wasm.gz" | awk '{print $1}')
 
     # Remove previously appended sections (idempotent on re-run)
-    sed -i '' '/^## Frontend Argument Verification/,$d' frontend_proposal.md
-    sed -i '' '/^## Wasm Verification/,$d' frontend_proposal.md
+    sed -i.bak '/^## Frontend Argument Verification/,$d' frontend_proposal.md && rm -f frontend_proposal.md.bak
+    sed -i.bak '/^## Wasm Verification/,$d' frontend_proposal.md && rm -f frontend_proposal.md.bak
 
     cat >> frontend_proposal.md << EOF
 
