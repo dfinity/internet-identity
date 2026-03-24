@@ -22,6 +22,9 @@ msgstr "Utilisateur {0}"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} est passé à la nouvelle Internet Identity"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Vous avez atteint le maximum de # compte pour une seule application.} other {Vous avez atteint le maximum de # comptes pour une seule application.}}"
 
@@ -400,6 +403,9 @@ msgstr "Identité introuvable"
 
 msgid "Identity number"
 msgstr "Numéro d’identité"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Identité mise à niveau !"
@@ -815,7 +821,16 @@ msgstr "Se connecter avec votre compte {name} depuis n’importe quel appareil."
 msgid "Sign out"
 msgstr "Se déconnecter"
 
-msgid "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
 msgstr ""
 
 msgid "Signed in"
@@ -979,6 +994,9 @@ msgstr "Impossible de se connecter"
 msgid "Understanding Internet Identity"
 msgstr "Comprendre Internet Identity"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Erreur inattendue"
 
@@ -1128,6 +1146,9 @@ msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Vous pouvez continuer avec <0>Utiliser une passkey existante</0> dans le processus de connexion."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Vous pouvez maintenant récupérer votre identité, vérifiez que vous l’avez correctement enregistrée."

@@ -22,6 +22,9 @@ msgstr "Pengguna {0}"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} telah pindah ke Internet Identity baru"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
@@ -400,6 +403,9 @@ msgstr "Identitas tidak ditemukan"
 
 msgid "Identity number"
 msgstr "Nomor identitas"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Identitas ditingkatkan!"
@@ -815,7 +821,16 @@ msgstr "Masuk dengan akun {name} Anda dari perangkat mana pun."
 msgid "Sign out"
 msgstr "Keluar"
 
-msgid "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
 msgstr ""
 
 msgid "Signed in"
@@ -979,6 +994,9 @@ msgstr "Tidak dapat terhubung"
 msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Kesalahan tidak terduga"
 
@@ -1128,6 +1146,9 @@ msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Anda dapat memulihkan identitas Anda sekarang, verifikasi bahwa Anda menyimpannya dengan benar."

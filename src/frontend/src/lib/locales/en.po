@@ -22,6 +22,9 @@ msgstr "{0} user"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} has moved to the new Internet Identity"
 
+msgid "{identityName} has been removed from this device."
+msgstr "{identityName} has been removed from this device."
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 
@@ -400,6 +403,9 @@ msgstr "Identity not found"
 
 msgid "Identity number"
 msgstr "Identity number"
+
+msgid "Identity removed"
+msgstr "Identity removed"
 
 msgid "Identity upgraded!"
 msgstr "Identity upgraded!"
@@ -815,8 +821,17 @@ msgstr "Sign in with your {name} account from any device."
 msgid "Sign out"
 msgstr "Sign out"
 
-msgid "Sign out of identity to remove"
-msgstr "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr "Sign out and keep identity"
+
+msgid "Sign out and remove from device"
+msgstr "Sign out and remove from device"
+
+msgid "Sign out from this device"
+msgstr "Sign out from this device"
+
+msgid "Sign out to remove"
+msgstr "Sign out to remove"
 
 msgid "Signed in"
 msgstr "Signed in"
@@ -979,6 +994,9 @@ msgstr "Unable to connect"
 msgid "Understanding Internet Identity"
 msgstr "Understanding Internet Identity"
 
+msgid "Undo"
+msgstr "Undo"
+
 msgid "Unexpected error"
 msgstr "Unexpected error"
 
@@ -1128,6 +1146,9 @@ msgstr "You can add it back anytime by signing in with the same passkey."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "You can continue with <0>Use existing Passkey</0> in the login process."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "You can recover your identity now, verify you saved it correctly."

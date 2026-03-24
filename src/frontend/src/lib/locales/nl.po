@@ -22,6 +22,9 @@ msgstr "{0} gebruiker"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} is overgegaan naar de nieuwe Internet Identity"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {U heeft het maximum van # account voor één app bereikt.} other {U heeft het maximum van # accounts voor één app bereikt.}}"
 
@@ -400,6 +403,9 @@ msgstr "Identiteit niet gevonden"
 
 msgid "Identity number"
 msgstr "Identiteitsnummer"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Identiteit geüpgraded!"
@@ -815,7 +821,16 @@ msgstr "Log in met uw {name}-account vanaf elk apparaat."
 msgid "Sign out"
 msgstr "Uitloggen"
 
-msgid "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
 msgstr ""
 
 msgid "Signed in"
@@ -979,6 +994,9 @@ msgstr "Kon geen verbinding maken"
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity uitgelegd"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Onverwachte fout"
 
@@ -1128,6 +1146,9 @@ msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "U kunt doorgaan met <0>Gebruik bestaande Passkey</0> in het inlogproces."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "U kunt uw identiteit nu herstellen, verifieer of u het correct hebt opgeslagen."

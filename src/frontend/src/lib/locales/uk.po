@@ -22,6 +22,9 @@ msgstr "{0} користувач"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} перейшов до нової версії Internet Identity"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Ви досягли максимуму # облікового запису для одного застосунку.} few {Ви досягли максимуму # облікових записів для одного застосунку.} many {Ви досягли максимуму # облікових записів для одного застосунку.} other {Ви досягли максимуму # облікових записів для одного застосунку.}}"
 
@@ -400,6 +403,9 @@ msgstr "Ідентифікатор не знайдено"
 
 msgid "Identity number"
 msgstr "Номер ідентифікатора"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Ідентифікатор оновлено!"
@@ -815,7 +821,16 @@ msgstr "Увійдіть за допомогою свого облікового
 msgid "Sign out"
 msgstr "Вийти"
 
-msgid "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
 msgstr ""
 
 msgid "Signed in"
@@ -979,6 +994,9 @@ msgstr "Не вдалося підключитися"
 msgid "Understanding Internet Identity"
 msgstr "Знайомство з Internet Identity"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Несподівана помилка"
 
@@ -1128,6 +1146,9 @@ msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Ви можете продовжити з <0>Використати існуючий ключ доступу</0> у процесі входу."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Ви можете відновити свій ідентифікатор зараз, перевірте, чи ви зберегли його правильно."

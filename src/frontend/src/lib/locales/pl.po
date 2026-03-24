@@ -22,6 +22,9 @@ msgstr "{0} użytkownik"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} został przeniesiony do nowej tożsamości internetowej"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Osiągnąłeś/aś maksymalnie # konto dla pojedynczej aplikacji.} few {Osiągnąłeś/aś maksymalnie # konta dla pojedynczej aplikacji.} other {Osiągnąłeś/aś maksymalnie # kont dla pojedynczej aplikacji.}}"
 
@@ -400,6 +403,9 @@ msgstr "Nie znaleziono tożsamości"
 
 msgid "Identity number"
 msgstr "Numer tożsamości"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Tożsamość zaktualizowana!"
@@ -815,7 +821,16 @@ msgstr "Zaloguj się na swoje konto {name} z dowolnego urządzenia."
 msgid "Sign out"
 msgstr "Wyloguj się"
 
-msgid "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
 msgstr ""
 
 msgid "Signed in"
@@ -979,6 +994,9 @@ msgstr "Nie można połączyć"
 msgid "Understanding Internet Identity"
 msgstr "Zrozumienie Internet Identity"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Nieoczekiwany błąd"
 
@@ -1128,6 +1146,9 @@ msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Możesz kontynuować z <0>Użyj istniejącego klucza dostępu</0> w procesie logowania."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Możesz teraz odzyskać swoją tożsamość, zweryfikuj, czy zapisałeś ją poprawnie."

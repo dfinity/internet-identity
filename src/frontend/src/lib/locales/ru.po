@@ -22,6 +22,9 @@ msgstr "{0} пользователь"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Вы достигли максимума в # аккаунт для одного приложения.} other {Вы достигли максимума в # аккаунтов для одного приложения.}}"
 
@@ -400,6 +403,9 @@ msgstr "Идентификатор не найден"
 
 msgid "Identity number"
 msgstr "Номер идентификатора"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Идентификатор обновлен!"
@@ -815,7 +821,16 @@ msgstr "Войдите в свою учетную запись {name} с люб�
 msgid "Sign out"
 msgstr "Выйти"
 
-msgid "Sign out of identity to remove"
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
 msgstr ""
 
 msgid "Signed in"
@@ -979,6 +994,9 @@ msgstr "Не удалось подключиться"
 msgid "Understanding Internet Identity"
 msgstr "Знакомство с Internet Identity"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Непредвиденная ошибка"
 
@@ -1128,6 +1146,9 @@ msgstr ""
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Вы можете продолжить с <0>Использовать существующий ключ доступа</0> в процессе входа."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Вы можете восстановить свою идентификацию сейчас, проверьте, что сохранили ее правильно."
