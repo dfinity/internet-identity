@@ -853,8 +853,8 @@ create_forum_post() {
 
   # URL-encode title and body for the Discourse new-topic URL
   local encoded_title encoded_body
-  encoded_title=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$title'''))")
-  encoded_body=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read()))" <<< "$body")
+  encoded_title=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$title")
+  encoded_body=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$body")
 
   # category 76 = Governance > NNS proposal discussions
   local tags="internet-identity,nns,Application-canister-mgmt"
