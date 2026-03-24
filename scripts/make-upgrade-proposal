@@ -831,7 +831,7 @@ create_forum_post() {
   if [ "${#linked_nums[@]}" -eq 1 ]; then
     proposals_text="Proposal ${linked_nums[0]}"
   else
-    proposals_text="Proposals $(IFS=' and '; echo "${linked_nums[*]}")"
+    proposals_text="Proposals ${linked_nums[0]} and ${linked_nums[1]}"
   fi
 
   # Replace the default "This is Internet Identity release ..." line with the proposals version
@@ -841,7 +841,8 @@ create_forum_post() {
   # Append staging and testing links
   body="${body}
 
-* Try it out on staging: https://beta.id.ai
+## Try it out
+* Staging: https://beta.id.ai
 * Testing application: https://try.id.ai"
 
   # URL-encode title and body for the Discourse new-topic URL
