@@ -838,12 +838,14 @@ create_forum_post() {
   local body
   body=$(echo "$release_body" | sed "s|This is Internet Identity release \(.*\) for commit \(.*\)\.|${proposals_text} to upgrade Internet Identity to \1 for commit \2.|")
 
-  # Append staging and testing links
-  body="${body}
-
-## Try it out
-* Staging: https://beta.id.ai
-* Testing application: https://try.id.ai"
+  # Insert "Try it out" section right before "## What's Changed"
+  local try_it_out
+  try_it_out=$(printf '%s\n' \
+    '## Try it out' \
+    '* Staging: https://beta.id.ai' \
+    '* Testing application: https://try.id.ai' \
+    '')
+  body="${body//"## What"/"${try_it_out}## What"}"
 
   # URL-encode title and body for the Discourse new-topic URL
   local encoded_title encoded_body
