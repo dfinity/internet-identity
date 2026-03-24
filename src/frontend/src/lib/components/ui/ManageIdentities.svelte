@@ -17,7 +17,6 @@
   let { selected, identities, onRemoveIdentity }: Props = $props();
 
   let removingIdentity = $state<LastUsedIdentity>();
-  let windowHeight = $state(window.innerHeight);
 
   const passkeyNameCounts = $derived.by(() => {
     const counts = new Map<string | undefined, number>();
@@ -155,8 +154,6 @@
     </div>
   </div>
 {/snippet}
-
-<svelte:window bind:innerHeight={windowHeight} />
 
 {#if removingIdentity !== undefined}
   {@render removeConfirmation(removingIdentity)}
