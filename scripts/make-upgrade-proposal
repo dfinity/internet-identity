@@ -524,12 +524,28 @@ prepare_production_frontend_argument() {
 
 append_proposal_argument() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
-  
+  local git_commit
+  git_commit=$(git rev-parse "$TAG_NAME")
+
   if should_upgrade_backend "$upgrade_type"; then
-    # Get the arguments from the file
     ARGUMENTS="$(cat args.txt)"
-    
+    II_WASM_SHA=$(sha256sum "internet_identity.wasm.gz" | awk '{print $1}')
+
+    # Remove previously appended sections (idempotent on re-run)
+    sed -i '' '/^## Backend Argument Verification/,$d' backend_proposal.md
+    sed -i '' '/^## Wasm Verification/,$d' backend_proposal.md
+
     cat >> backend_proposal.md << EOF
+
+## Wasm Verification
+
+To build the wasm modules yourself and verify their hashes, run the following commands from the root of the [Internet Identity repository](https://github.com/dfinity/internet-identity):
+
+\`\`\`
+git pull  # to ensure you have the latest changes.
+git checkout ${git_commit}
+./scripts/verify-hash --ii-hash ${II_WASM_SHA}
+\`\`\`
 
 ## Backend Argument Verification
 
@@ -542,12 +558,26 @@ didc encode -d ./src/internet_identity/internet_identity.did -t '(opt InternetId
 The output should match the argument hash.
 EOF
   fi
-  
+
   if should_upgrade_frontend "$upgrade_type"; then
-    # Get the frontend arguments from the file
     FRONTEND_ARGUMENTS="$(cat frontend_args.txt)"
-    
+    FRONTEND_WASM_SHA=$(sha256sum "internet_identity_frontend.wasm.gz" | awk '{print $1}')
+
+    # Remove previously appended sections (idempotent on re-run)
+    sed -i '' '/^## Frontend Argument Verification/,$d' frontend_proposal.md
+    sed -i '' '/^## Wasm Verification/,$d' frontend_proposal.md
+
     cat >> frontend_proposal.md << EOF
+
+## Wasm Verification
+
+To build the wasm modules yourself and verify their hashes, run the following commands from the root of the [Internet Identity repository](https://github.com/dfinity/internet-identity):
+
+\`\`\`
+git pull  # to ensure you have the latest changes.
+git checkout ${git_commit}
+./scripts/verify-hash --iife-hash ${FRONTEND_WASM_SHA}
+\`\`\`
 
 ## Frontend Argument Verification
 
