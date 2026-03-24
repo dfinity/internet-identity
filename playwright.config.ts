@@ -59,5 +59,9 @@ export default defineConfig({
         },
       },
     },
+    {
+      name: "chrome-extension",
+      testDir: "./src/frontend/tests/e2e-playwright-chrome-extension",
+    },
   ],
 });
