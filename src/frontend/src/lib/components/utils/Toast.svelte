@@ -3,7 +3,7 @@
   import * as toast from "@zag-js/toast";
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
 
   interface ToastProps {
     toast: toast.Options;
@@ -32,10 +32,13 @@
 
   let progress = $state(100);
 
-  if (hasCountdown) {
+  onMount(() => {
+    if (!hasCountdown) return;
+
     const duration = untrack(() => toastProps.duration!);
     let runningTime = 0;
     let lastTick = Date.now();
+    let rafId: number;
 
     const tick = () => {
       const now = Date.now();
@@ -48,8 +51,10 @@
         rafId = requestAnimationFrame(tick);
       }
     };
-    let rafId = requestAnimationFrame(tick);
-  }
+    rafId = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(rafId);
+  });
 </script>
 
 <svelte:window bind:innerWidth />
