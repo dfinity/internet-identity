@@ -120,7 +120,7 @@ resolve_release_tag() {
   local commit
   commit=$(git rev-parse "$proposal_tag" 2>/dev/null) || { echo "$proposal_tag"; return; }
   local release_tag
-  release_tag=$(git tag --points-at "$commit" | grep "^release-" | head -1)
+  release_tag=$(git tag --points-at "$commit" | grep "^release-" | sort | head -1 || true)
   echo "${release_tag:-$proposal_tag}"
 }
 

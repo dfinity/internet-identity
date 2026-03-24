@@ -36,9 +36,12 @@ build_frontend_install_arg() {
     echo ""
     echo "Fetching current frontend config from $config_url ..."
     local raw_config
-    raw_config=$(curl -sfL "$config_url")
-    if [ -z "$raw_config" ]; then
+    if ! raw_config=$(curl --connect-timeout 10 --max-time 30 -sfL "$config_url"); then
         echo "Error: Could not fetch current config from $config_url" >&2
+        exit 1
+    fi
+    if [ -z "$raw_config" ]; then
+        echo "Error: Empty config response from $config_url" >&2
         exit 1
     fi
 
