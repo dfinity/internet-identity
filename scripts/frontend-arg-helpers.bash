@@ -44,17 +44,6 @@ build_frontend_install_arg() {
         echo "  Failed, trying next domain..." >&2
         raw_config=""
     done
-    if [ -z "$raw_config" ]; then
-        echo "Error: Could not fetch config from either $primary_url or $fallback_url" >&2
-        exit 1
-    fi
-
-    echo ""
-    echo "Current frontend config:"
-    echo "$raw_config"
-    echo ""
-    echo "Configure install arguments (press Enter to keep each current value):"
-
     # Parse individual fields from the Candid text output.
     # For multi-line nested values (analytics_config, related_origins), we extract
     # everything from "field = " to the matching closing brace/semicolon.
@@ -82,32 +71,47 @@ build_frontend_install_arg() {
         ' <<< "$config"
     }
 
-    local current_backend_canister_id
-    current_backend_canister_id=$(parse_candid_field "backend_canister_id" "$raw_config")
-    local current_backend_origin
-    current_backend_origin=$(parse_candid_field "backend_origin" "$raw_config")
-    local current_related_origins
-    current_related_origins=$(parse_candid_field "related_origins" "$raw_config")
-    local current_fetch_root_key
-    current_fetch_root_key=$(parse_candid_field "fetch_root_key" "$raw_config")
-    local current_analytics_config
-    current_analytics_config=$(parse_candid_field "analytics_config" "$raw_config")
-    local current_dummy_auth
-    current_dummy_auth=$(parse_candid_field "dummy_auth" "$raw_config")
-    local current_dev_csp
-    current_dev_csp=$(parse_candid_field "dev_csp" "$raw_config")
-
-    # All known fields with their defaults (null for missing fields)
+    # All known fields with their defaults (null for missing/new canisters)
     local -a field_names=(backend_canister_id backend_origin related_origins fetch_root_key analytics_config dummy_auth dev_csp)
     local -A current_values=(
-        [backend_canister_id]="$current_backend_canister_id"
-        [backend_origin]="$current_backend_origin"
-        [related_origins]="$current_related_origins"
-        [fetch_root_key]="$current_fetch_root_key"
-        [analytics_config]="$current_analytics_config"
-        [dummy_auth]="$current_dummy_auth"
-        [dev_csp]="$current_dev_csp"
+        [backend_canister_id]="null"
+        [backend_origin]="null"
+        [related_origins]="null"
+        [fetch_root_key]="null"
+        [analytics_config]="null"
+        [dummy_auth]="null"
+        [dev_csp]="null"
     )
+
+    if [ -z "$raw_config" ]; then
+        echo "" >&2
+        echo "Warning: Could not fetch config from:" >&2
+        echo "  - $primary_url" >&2
+        echo "  - $fallback_url" >&2
+        echo "The canister may not be installed yet, or there may be a network issue." >&2
+        echo "All fields will default to null. Please provide values for each field." >&2
+        read -r -p "Continue with null defaults? [Y/n]: " confirm </dev/tty >&2
+        if [[ "$confirm" =~ ^[Nn] ]]; then
+            echo "Aborted by user." >&2
+            exit 1
+        fi
+    else
+        echo ""
+        echo "Current frontend config:"
+        echo "$raw_config"
+
+        # Parse current values from the fetched config
+        for field in "${field_names[@]}"; do
+            local parsed
+            parsed=$(parse_candid_field "$field" "$raw_config")
+            if [ -n "$parsed" ]; then
+                current_values[$field]="$parsed"
+            fi
+        done
+    fi
+
+    echo ""
+    echo "Configure install arguments (press Enter to keep each current value):"
 
     # Prompt for each field, defaulting empty values to null
     local -A final_values
