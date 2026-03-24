@@ -45,16 +45,10 @@ test.describe("Dashboard Navigation", () => {
         await page.goto(II_URL);
         await signInWithIdentity(page, identities[1].identityNumber);
         await managePage.signOut();
-        await removeAuthenticatorForIdentity(
-          page,
-          identities[1].identityNumber,
-        );
+        await removeAuthenticatorForIdentity(identities[1].identityNumber);
         await signInWithIdentity(page, identities[0].identityNumber);
         await managePage.signOut();
-        await removeAuthenticatorForIdentity(
-          page,
-          identities[0].identityNumber,
-        );
+        await removeAuthenticatorForIdentity(identities[0].identityNumber);
       },
     );
 
@@ -89,7 +83,7 @@ test.describe("Dashboard Navigation", () => {
       await page.getByRole("link", { name: "Access and recovery" }).click();
 
       // Switch to second identity
-      await removeAuthenticatorForIdentity(page, identities[0].identityNumber);
+      await removeAuthenticatorForIdentity(identities[0].identityNumber);
       await addAuthenticatorForIdentity(page, identities[1].identityNumber);
       await page.getByRole("button", { name: "Switch identity" }).click();
       await page.getByRole("button", { name: identities[1].name }).click();
