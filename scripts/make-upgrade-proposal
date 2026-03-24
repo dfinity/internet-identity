@@ -10,6 +10,11 @@ set -euo pipefail
 SOURCE_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "$SOURCE_DIR/frontend-arg-helpers.bash"
 
+# Resolve the HTTPS remote URL for git operations that don't need SSH.
+# gh is authenticated via HTTPS, so this avoids SSH key prompts for
+# public read operations (fetch) and authenticated writes (push).
+REPO_HTTPS_URL="https://github.com/dfinity/internet-identity.git"
+
 print_help() {
   cat <<-EOF
 
@@ -779,7 +784,7 @@ tag_proposal() {
     backend_proposal_num=$(checklist_get "Backend proposal number")
     if [ "$backend_proposal_num" ]; then
       git tag -f "proposal-backend-$backend_proposal_num"
-      git push origin "proposal-backend-$backend_proposal_num"
+      git push "$REPO_HTTPS_URL" "proposal-backend-$backend_proposal_num"
     fi
   fi
   
@@ -787,7 +792,7 @@ tag_proposal() {
     frontend_proposal_num=$(checklist_get "Frontend proposal number")
     if [ "$frontend_proposal_num" ]; then
       git tag -f "proposal-frontend-$frontend_proposal_num"
-      git push origin "proposal-frontend-$frontend_proposal_num"
+      git push "$REPO_HTTPS_URL" "proposal-frontend-$frontend_proposal_num"
     fi
   fi
 }
@@ -805,10 +810,10 @@ UPGRADE_TYPE="$(checklist_must_get 'Upgrade type')"
 echo "Upgrade type: $UPGRADE_TYPE"
 echo ""
 
-confirm_cmd git fetch --tags --force
+confirm_cmd git fetch "$REPO_HTTPS_URL" --tags --force
 confirm_cmd git tag -f $TAG_NAME
 record "Release commit" git rev-parse $TAG_NAME
-record "New tag pushed" git push origin $TAG_NAME
+record "New tag pushed" git push "$REPO_HTTPS_URL" $TAG_NAME
 confirm_cmd wait_for_release
 confirm_manual "Review release page update" update_release_text
 
