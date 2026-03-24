@@ -799,8 +799,6 @@ tag_proposal() {
 
 create_forum_post() {
   local upgrade_type="$(checklist_must_get 'Upgrade type')"
-  local git_commit
-  git_commit=$(git rev-parse "$TAG_NAME")
 
   # Collect proposal numbers for the title
   local proposal_nums=()
@@ -841,66 +839,20 @@ create_forum_post() {
 * Try it out on staging: https://beta.id.ai
 * Testing application: https://try.id.ai"
 
-  # Discourse API: category 76 = Governance > NNS proposal discussions
-  local category_id=76
-  local tags='["internet-identity", "nns", "Application-canister-mgmt"]'
+  # URL-encode title and body for the Discourse new-topic URL
+  local encoded_title encoded_body
+  encoded_title=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$title'''))")
+  encoded_body=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read()))" <<< "$body")
 
-  if [ -z "${DISCOURSE_API_KEY:-}" ]; then
-    echo "Error: DISCOURSE_API_KEY environment variable is not set." >&2
-    echo "Create an API key at https://forum.dfinity.org/admin/api/keys" >&2
-    exit 1
-  fi
-  if [ -z "${DISCOURSE_API_USERNAME:-}" ]; then
-    echo "Error: DISCOURSE_API_USERNAME environment variable is not set." >&2
-    exit 1
-  fi
+  # category 76 = Governance > NNS proposal discussions
+  local tags="internet-identity,nns,Application-canister-mgmt"
+  local url="https://forum.dfinity.org/new-topic?title=${encoded_title}&body=${encoded_body}&category_id=76&tags=${tags}"
 
   echo ""
-  echo "=== Forum Post Preview ==="
-  echo "Title: $title"
-  echo "Category ID: $category_id"
-  echo "Tags: $tags"
-  echo "---"
-  echo "$body"
-  echo "==="
+  echo "Opening browser with pre-filled forum post..."
+  echo "Review the post in your browser, then click Create Topic."
   echo ""
-
-  read -rp "Proceed with creating the forum post? [y/N]: " confirm </dev/tty
-  if [[ ! "$confirm" =~ ^[Yy] ]]; then
-    echo "Aborted by user." >&2
-    exit 1
-  fi
-
-  local payload
-  payload=$(jq -n \
-    --arg title "$title" \
-    --arg raw "$body" \
-    --argjson category "$category_id" \
-    --argjson tags "$tags" \
-    '{title: $title, raw: $raw, category: $category, tags: $tags}')
-
-  local response
-  response=$(curl --connect-timeout 10 --max-time 30 -sf \
-    -X POST "https://forum.dfinity.org/posts.json" \
-    -H "Content-Type: application/json" \
-    -H "Api-Key: ${DISCOURSE_API_KEY}" \
-    -H "Api-Username: ${DISCOURSE_API_USERNAME}" \
-    -d "$payload")
-
-  local topic_id topic_slug
-  topic_id=$(echo "$response" | jq -r '.topic_id')
-  topic_slug=$(echo "$response" | jq -r '.topic_slug')
-
-  if [ -z "$topic_id" ] || [ "$topic_id" = "null" ]; then
-    echo "Error: Failed to create forum post." >&2
-    echo "Response: $response" >&2
-    exit 1
-  fi
-
-  local forum_url="https://forum.dfinity.org/t/${topic_slug}/${topic_id}"
-  echo ""
-  echo "Forum post created successfully!"
-  echo "$forum_url"
+  open "$url"
 }
 
 echo Checklist file: "$CHECKLIST_FILE"
@@ -977,6 +929,6 @@ if should_upgrade_frontend "$UPGRADE_TYPE"; then
 fi
 
 confirm_cmd tag_proposal
-confirm_cmd create_forum_post
+confirm_manual "Create forum post" create_forum_post
 confirm_manual "Invite Trusted Neurons" echo "Create a calendar invitation to the trusted neurons and identity team to vote on the proposal"
 
