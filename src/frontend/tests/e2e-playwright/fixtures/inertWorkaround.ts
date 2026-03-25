@@ -15,11 +15,14 @@ import { test as base } from "@playwright/test";
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.addInitScript(() => {
+      const MARKER = "data-inert-aria-hidden";
       const sync = (el: Element) => {
         if (el.hasAttribute("inert")) {
           el.setAttribute("aria-hidden", "true");
-        } else {
+          el.setAttribute(MARKER, "");
+        } else if (el.hasAttribute(MARKER)) {
           el.removeAttribute("aria-hidden");
+          el.removeAttribute(MARKER);
         }
       };
       new MutationObserver((mutations) => {
