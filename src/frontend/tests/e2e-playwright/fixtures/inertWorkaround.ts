@@ -12,31 +12,38 @@ import { test as base } from "@playwright/test";
  *
  * https://github.com/microsoft/playwright/issues/36938
  */
+const INIT_SCRIPT = `
+  const MARKER = "data-inert-aria-hidden";
+  const sync = (el) => {
+    if (el.hasAttribute("inert")) {
+      el.setAttribute("aria-hidden", "true");
+      el.setAttribute(MARKER, "");
+    } else if (el.hasAttribute(MARKER)) {
+      el.removeAttribute("aria-hidden");
+      el.removeAttribute(MARKER);
+    }
+  };
+  new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === "attributes" && m.target instanceof Element) {
+        sync(m.target);
+      }
+    }
+  }).observe(document, {
+    attributes: true,
+    attributeFilter: ["inert"],
+    subtree: true,
+  });
+`;
+
 export const test = base.extend({
-  page: async ({ page }, use) => {
-    await page.addInitScript(() => {
-      const MARKER = "data-inert-aria-hidden";
-      const sync = (el: Element) => {
-        if (el.hasAttribute("inert")) {
-          el.setAttribute("aria-hidden", "true");
-          el.setAttribute(MARKER, "");
-        } else if (el.hasAttribute(MARKER)) {
-          el.removeAttribute("aria-hidden");
-          el.removeAttribute(MARKER);
-        }
-      };
-      new MutationObserver((mutations) => {
-        for (const m of mutations) {
-          if (m.type === "attributes" && m.target instanceof Element) {
-            sync(m.target);
-          }
-        }
-      }).observe(document, {
-        attributes: true,
-        attributeFilter: ["inert"],
-        subtree: true,
-      });
-    });
-    await use(page);
+  browser: async ({ browser }, use) => {
+    const originalNewContext = browser.newContext.bind(browser);
+    browser.newContext = async (...args) => {
+      const context = await originalNewContext(...args);
+      await context.addInitScript(INIT_SCRIPT);
+      return context;
+    };
+    await use(browser);
   },
 });
