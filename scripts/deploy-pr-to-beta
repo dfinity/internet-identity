@@ -10,9 +10,9 @@ Usage: $0 [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANI
 Select which staging canister to upgrade and which end(s) to deploy.
 
 Options:
-  --staging-a, -sa        Use Staging A (fgte5-ciaaa-aaaad-aaatq-cai)
-  --staging-b, -sb        Use Staging B (jqajs-xiaaa-aaaad-aab5q-cai)
-  --staging-c, -sc        Use Staging C (y2aaj-miaaa-aaaad-aacxq-cai)
+  --staging-a, -sa        Use Staging A (backend: fgte5-ciaaa-aaaad-aaatq-cai, frontend: gjxif-ryaaa-aaaad-ae4ka-cai)
+  --staging-b, -sb        Use Staging B (backend: jqajs-xiaaa-aaaad-aab5q-cai, frontend: uhh2r-oyaaa-aaaad-agbva-cai)
+  --staging-c, -sc        Use Staging C (backend: y2aaj-miaaa-aaaad-aacxq-cai, frontend: uag4f-daaaa-aaaad-agbvq-cai)
   --staging <CANISTER_ID> Use the provided canister id
   --end <front|back>      Which end(s) to deploy (can be specified multiple times)
   -fe                     Shortcut for --end front
@@ -125,8 +125,8 @@ if [ "$DEPLOY_FRONT" = false ] && [ "$DEPLOY_BACK" = false ]; then
     exit 1
 fi
 
-if [ "$DEPLOY_FRONT" = true ] && [ "$STAGING_NAME" != "a" ]; then
-    echo "Error: Frontend deployment is not yet supported for Staging B, C, or custom canister IDs. Use --staging-a/-sa for frontend deployment." >&2
+if [ "$DEPLOY_FRONT" = true ] && [ "$STAGING_NAME" != "a" ] && [ "$STAGING_NAME" != "b" ] && [ "$STAGING_NAME" != "c" ]; then
+    echo "Error: Frontend deployment is only supported for Staging A, B, and C. Use --staging-a/-sa, --staging-b/-sb, or --staging-c/-sc." >&2
     exit 1
 fi
 
@@ -137,7 +137,14 @@ cd "$ROOT_DIR"
 REPO="dfinity/internet-identity"
 WORKFLOW_FILE="canister-tests.yml"
 WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
-FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai"
+
+# Map staging environment to its frontend canister ID
+case "$STAGING_NAME" in
+    a) FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai" ;;
+    b) FRONTEND_CANISTER_ID="uhh2r-oyaaa-aaaad-agbva-cai" ;;
+    c) FRONTEND_CANISTER_ID="uag4f-daaaa-aaaad-agbvq-cai" ;;
+    *) FRONTEND_CANISTER_ID="" ;;
+esac
 
 source "$SCRIPTS_DIR/frontend-arg-helpers.bash"
 
