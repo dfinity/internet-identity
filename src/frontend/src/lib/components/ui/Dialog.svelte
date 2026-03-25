@@ -42,13 +42,15 @@
     dialogRef.removeAttribute("data-visible");
   };
 
-  // Delay navigation until the dialog's |global outro has finished.
-  // The parent's {#if} destroys the component, the outro plays, and
+  // Delay navigation until the dialog's outro has finished. Setting
+  // isOpen to false triggers the {#if} block's |global outro, and
   // resolving the promise lets the navigation complete.
+  let isOpen = $state(true);
   let resolveOutro: (() => void) | undefined;
 
   onNavigate((navigation) => {
     if (navigation.to?.url.pathname === navigation.from?.url.pathname) return;
+    isOpen = false;
     return new Promise<void>((resolve) => {
       resolveOutro = resolve;
     });
@@ -154,6 +156,7 @@
   });
 </script>
 
+{#if isOpen}
 <dialog
   bind:this={dialogRef}
   oncancel={onCancel}
@@ -226,3 +229,4 @@
     </div>
   </div>
 </dialog>
+{/if}
