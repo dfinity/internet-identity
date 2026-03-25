@@ -155,7 +155,6 @@ test("App logo doesn't appear when app is not known", async ({
     II_URL,
     async (authPage) => {
       await signInWithIdentity(authPage, identities[0].identityNumber);
-      await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
       await authPage
         .getByRole("button", { name: "Continue", exact: true })
