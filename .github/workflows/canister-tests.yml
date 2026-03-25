@@ -502,6 +502,9 @@ jobs:
       matrix:
         device: ["desktop", "mobile"]
         shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
+        include:
+          - device: "chrome-extension"
+            shard: "1_1"
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
@@ -588,6 +591,10 @@ jobs:
           SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
+
+      - name: Build test app frontend (chrome extension)
+        if: matrix.device == 'chrome-extension'
+        run: npm run build --prefix demos/test-app
 
       - name: Run Playwright tests
         run: |

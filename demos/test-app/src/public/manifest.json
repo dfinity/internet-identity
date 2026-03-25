@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "II Test App",
+  "version": "1.0",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsO+O98URHgu2I7Zbpfc28nI0GU7t4smaMaG25MEeHSjzLW2khGsGrBAFZBWrZ910RDGdZqp+1fCn+rr86fT/ahd05EBWJPCZ2R1JtDGhju2Rf2kGGiHMctlUHgx+J3O1T1mL/iOfjhWQ8p26keeaL36Tfp3FI7gUL9GgZV/mwE5NssvlPnZZpGI5Zxdtrh8q2gMzvGuu5LLwEO2GXPy9l3ExcDlRax9CUVAB5oCVlWaF3Lrbz0BZa+Ak6nJ0UGownAk470FneWKcl3UdPSkAM9yhCxtWcnImJOnT/LA8wqkF6H6Wg43gUMGbBCug7VCbYL/+T26qYLQSGH7RW7oxqwIDAQAB",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}
