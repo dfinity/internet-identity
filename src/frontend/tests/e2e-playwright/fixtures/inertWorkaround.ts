@@ -16,8 +16,10 @@ const INIT_SCRIPT = `
   const MARKER = "data-inert-aria-hidden";
   const sync = (el) => {
     if (el.hasAttribute("inert")) {
+      if (!el.hasAttribute("aria-hidden")) {
+        el.setAttribute(MARKER, "");
+      }
       el.setAttribute("aria-hidden", "true");
-      el.setAttribute(MARKER, "");
     } else if (el.hasAttribute(MARKER)) {
       el.removeAttribute("aria-hidden");
       el.removeAttribute(MARKER);
