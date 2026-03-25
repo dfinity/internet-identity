@@ -38,6 +38,9 @@ const INIT_SCRIPT = `
 
 export const test = base.extend({
   browser: async ({ browser }, use) => {
+    for (const context of browser.contexts()) {
+      await context.addInitScript(INIT_SCRIPT);
+    }
     const originalNewContext = browser.newContext.bind(browser);
     browser.newContext = async (...args) => {
       const context = await originalNewContext(...args);
