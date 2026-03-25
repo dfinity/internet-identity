@@ -133,6 +133,11 @@ export const StringOrNumberToBigIntCodec = z.codec(
   },
 );
 
+/**
+ * Validates that a string is a valid origin with
+ * no path, query, or fragment. Accepts any URL
+ * scheme (e.g. http, https, chrome-extension).
+ */
 export const OriginSchema = z.string().refine(
   (value) => {
     try {
