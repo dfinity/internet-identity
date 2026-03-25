@@ -35,16 +35,13 @@ test.describe("Manage identities", () => {
       });
     });
 
-    // Toast should appear with undo
-    await expect(page.getByText("Identity removed")).toBeVisible();
-    await expect(
-      page.getByText(
-        `${identities[1].name} has been removed from this device.`,
-      ),
-    ).toBeVisible();
-
-    // Undo the removal
-    await page.getByRole("button", { name: "Undo" }).click();
+    // Wait for toast and undo the removal
+    const toast = page.getByRole("status");
+    await expect(toast).toContainText("Identity removed");
+    await expect(toast).toContainText(
+      `${identities[1].name} has been removed from this device.`,
+    );
+    await toast.getByRole("button", { name: "Undo" }).click();
 
     // Verify identity is back in the switcher
     await managePage.openIdentitySwitcher(async (switcher) => {
@@ -69,7 +66,12 @@ test.describe("Manage identities", () => {
     });
 
     // Dismiss the toast
-    await page.getByRole("button", { name: "Close" }).click();
+    const toast = page.getByRole("status");
+    await expect(toast).toContainText("Identity removed");
+    await expect(toast).toContainText(
+      `${identities[1].name} has been removed from this device.`,
+    );
+    await toast.getByRole("button", { name: "Close" }).click();
 
     // Open switcher and verify identity is gone from the manage dialog
     await managePage.openIdentitySwitcher(async (switcher) => {

@@ -60,11 +60,15 @@ class ManageIdentitiesDialog {
   }
 
   async assertIdentityVisible(name: string): Promise<void> {
-    await expect(this.#dialog.getByText(name)).toBeVisible();
+    await expect(
+      this.#dialog.getByRole("listitem").filter({ hasText: name }),
+    ).toBeVisible();
   }
 
   async assertIdentityHidden(name: string): Promise<void> {
-    await expect(this.#dialog.getByText(name)).toBeHidden();
+    await expect(
+      this.#dialog.getByRole("listitem").filter({ hasText: name }),
+    ).toBeHidden();
   }
 
   async close(): Promise<void> {
