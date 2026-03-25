@@ -4,7 +4,7 @@
   import type { ClassValue, HTMLAttributes } from "svelte/elements";
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
-  import { beforeNavigate, goto } from "$app/navigation";
+  import { onNavigate } from "$app/navigation";
 
   type Props = HTMLAttributes<HTMLDialogElement> & {
     onClose?: () => void;
@@ -42,23 +42,20 @@
     dialogRef.removeAttribute("data-visible");
   };
 
-  // When navigating while a dialog is open, cancel the navigation and
-  // let the dialog's |global outro transition play first. The parent's
-  // {#if} triggers component destruction, which fires the outro, and
-  // onoutroend resumes the navigation.
-  let pendingNavigationUrl: URL | undefined;
+  // Delay navigation until the dialog's |global outro has finished.
+  // The parent's {#if} destroys the component, the outro plays, and
+  // resolving the promise lets the navigation complete.
+  let resolveOutro: (() => void) | undefined;
 
-  beforeNavigate((navigation) => {
-    if (pendingNavigationUrl !== undefined) return;
-    if (navigation.willUnload) return;
-    pendingNavigationUrl = navigation.to?.url;
-    navigation.cancel();
+  onNavigate((navigation) => {
+    if (navigation.to?.url.pathname === navigation.from?.url.pathname) return;
+    return new Promise<void>((resolve) => {
+      resolveOutro = resolve;
+    });
   });
 
   const onOutroEnd = () => {
-    if (pendingNavigationUrl !== undefined) {
-      goto(pendingNavigationUrl);
-    }
+    resolveOutro?.();
   };
 
   onMount(() => {
