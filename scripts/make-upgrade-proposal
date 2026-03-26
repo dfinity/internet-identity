@@ -813,13 +813,25 @@ create_forum_post() {
     proposal_nums+=("$fe_num")
   fi
 
-  local title_proposals
-  title_proposals=$(IFS=', '; echo "${proposal_nums[*]}")
+  # Join proposal numbers with ", " (IFS only uses first char, so join manually)
+  local title_proposals="${proposal_nums[0]}"
+  for ((i=1; i<${#proposal_nums[@]}; i++)); do
+    title_proposals+=", ${proposal_nums[$i]}"
+  done
   local title_prefix="Proposal"
   if [ "${#proposal_nums[@]}" -gt 1 ]; then
     title_prefix="Proposals"
   fi
   local title="${title_prefix} ${title_proposals} to upgrade II"
+
+  if ! command -v gh &>/dev/null; then
+    echo "Error: 'gh' (GitHub CLI) is required but not installed." >&2
+    exit 1
+  fi
+  if ! command -v python3 &>/dev/null; then
+    echo "Error: 'python3' is required to URL-encode the forum post but was not found in PATH." >&2
+    exit 1
+  fi
 
   # Fetch release body from GitHub
   local release_body
@@ -849,7 +861,12 @@ create_forum_post() {
 * Testing application: https://try.id.ai
 
 "
-  body="${body//"## What"/"${try_it_out}## What"}"
+  local whats_changed_marker="## What's Changed"
+  if [[ "$body" != *"$whats_changed_marker"* ]]; then
+    echo "Error: could not find '## What's Changed' section in release body to insert 'Try it out' section." >&2
+    exit 1
+  fi
+  body="${body/$whats_changed_marker/${try_it_out}${whats_changed_marker}}"
 
   # URL-encode title and body for the Discourse new-topic URL
   local encoded_title encoded_body
@@ -864,7 +881,15 @@ create_forum_post() {
   echo "Opening browser with pre-filled forum post..."
   echo "Review the post in your browser, then click Create Topic."
   echo ""
-  open "$url"
+  if command -v open &>/dev/null; then
+    open "$url"
+  elif command -v xdg-open &>/dev/null; then
+    xdg-open "$url"
+  else
+    echo "Could not automatically open a browser."
+    echo "Please open the following URL in your browser:"
+    echo "$url"
+  fi
 }
 
 echo Checklist file: "$CHECKLIST_FILE"
