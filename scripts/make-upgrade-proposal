@@ -797,6 +797,101 @@ tag_proposal() {
   fi
 }
 
+create_forum_post() {
+  local upgrade_type="$(checklist_must_get 'Upgrade type')"
+
+  # Collect proposal numbers for the title
+  local proposal_nums=()
+  if should_upgrade_backend "$upgrade_type"; then
+    local be_num
+    be_num=$(checklist_must_get "Backend proposal number")
+    proposal_nums+=("$be_num")
+  fi
+  if should_upgrade_frontend "$upgrade_type"; then
+    local fe_num
+    fe_num=$(checklist_must_get "Frontend proposal number")
+    proposal_nums+=("$fe_num")
+  fi
+
+  # Join proposal numbers with ", " (IFS only uses first char, so join manually)
+  local title_proposals="${proposal_nums[0]}"
+  for ((i=1; i<${#proposal_nums[@]}; i++)); do
+    title_proposals+=", ${proposal_nums[$i]}"
+  done
+  local title_prefix="Proposal"
+  if [ "${#proposal_nums[@]}" -gt 1 ]; then
+    title_prefix="Proposals"
+  fi
+  local title="${title_prefix} ${title_proposals} to upgrade II"
+
+  if ! command -v gh &>/dev/null; then
+    echo "Error: 'gh' (GitHub CLI) is required but not installed." >&2
+    exit 1
+  fi
+  if ! command -v python3 &>/dev/null; then
+    echo "Error: 'python3' is required to URL-encode the forum post but was not found in PATH." >&2
+    exit 1
+  fi
+
+  # Fetch release body from GitHub
+  local release_body
+  release_body=$(gh release view "$TAG_NAME" --repo dfinity/internet-identity --json body -q '.body')
+
+  # Build the intro line with links to the NNS dashboard
+  local NNS_PROPOSAL_URL="https://dashboard.internetcomputer.org/proposal"
+  local proposals_text
+  local linked_nums=()
+  for num in "${proposal_nums[@]}"; do
+    linked_nums+=("[${num}](${NNS_PROPOSAL_URL}/${num})")
+  done
+  if [ "${#linked_nums[@]}" -eq 1 ]; then
+    proposals_text="Proposal ${linked_nums[0]}"
+  else
+    proposals_text="Proposals ${linked_nums[0]} and ${linked_nums[1]}"
+  fi
+
+  # Replace the default "This is Internet Identity release ..." line with the proposals version
+  local body
+  body=$(echo "$release_body" | sed "s|This is Internet Identity release \(.*\) for commit \(.*\)\.|${proposals_text} to upgrade Internet Identity to \1 for commit \2.|")
+
+  # Insert "Try it out" section right before "## What's Changed"
+  local try_it_out
+  try_it_out="## Try it out
+* Staging: https://beta.id.ai
+* Testing application: https://try.id.ai
+
+"
+  local whats_changed_marker="## What's Changed"
+  if [[ "$body" != *"$whats_changed_marker"* ]]; then
+    echo "Error: could not find '## What's Changed' section in release body to insert 'Try it out' section." >&2
+    exit 1
+  fi
+  body="${body/$whats_changed_marker/${try_it_out}${whats_changed_marker}}"
+
+  # URL-encode title and body for the Discourse new-topic URL
+  local encoded_title encoded_body
+  encoded_title=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$title")
+  encoded_body=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip()))" <<< "$body")
+
+  # category 76 = Governance > NNS proposal discussions
+  local tags="internet-identity,nns,Application-canister-mgmt"
+  local url="https://forum.dfinity.org/new-topic?title=${encoded_title}&body=${encoded_body}&category_id=76&tags=${tags}"
+
+  echo ""
+  echo "Opening browser with pre-filled forum post..."
+  echo "Review the post in your browser, then click Create Topic."
+  echo ""
+  if command -v open &>/dev/null; then
+    open "$url"
+  elif command -v xdg-open &>/dev/null; then
+    xdg-open "$url"
+  else
+    echo "Could not automatically open a browser."
+    echo "Please open the following URL in your browser:"
+    echo "$url"
+  fi
+}
+
 echo Checklist file: "$CHECKLIST_FILE"
 
 record "Start time" date +"%Y-%m-%d %H:%M:%S"
@@ -871,5 +966,6 @@ if should_upgrade_frontend "$UPGRADE_TYPE"; then
 fi
 
 confirm_cmd tag_proposal
+confirm_manual "Create forum post" create_forum_post
 confirm_manual "Invite Trusted Neurons" echo "Create a calendar invitation to the trusted neurons and identity team to vote on the proposal"
 
