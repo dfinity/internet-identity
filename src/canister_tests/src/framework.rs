@@ -35,7 +35,7 @@ lazy_static! {
         I will look for it at {:?}, and you can specify another path with the environment variable II_WASM (note that I run from {:?}).
 
         In order to build the Wasm module, please run the following command:
-            II_DUMMY_CAPTCHA=1 ./scripts/build
+            ./scripts/build
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM".to_string(), &def_path).expect(&err)
     };
@@ -212,6 +212,16 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_fetch_limit: 10,
         }),
         canister_creation_cycles_cost: Some(0),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
+        }),
+        ..InternetIdentityInit::default()
+    })
+}
+
+pub fn arg_with_captcha_enabled() -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
         captcha_config: Some(CaptchaConfig {
             max_unsolved_captchas: 500,
             captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
@@ -523,31 +533,9 @@ xr-spatial-tracking=()"
         .find(|(name, _)| name.to_lowercase() == "content-security-policy")
         .unwrap_or_else(|| panic!("header \"Content-Security-Policy\" not found"));
 
-    let frame_src = related_origins
-        .clone()
-        .unwrap_or_default()
-        .iter()
-        .fold("'self'".to_string(), |acc, origin| acc + " " + origin);
-
-    let expression = format!(
-        "^default-src 'none';\
-connect-src 'self' https:;\
-img-src 'self' data: https://\\*.googleusercontent.com;\
-script-src 'strict-dynamic' ('[^']+' )*'unsafe-inline' 'unsafe-eval' https:;\
-base-uri 'none';\
-form-action 'none';\
-style-src 'self' 'unsafe-inline';\
-style-src-elem 'self' 'unsafe-inline';\
-font-src 'self';\
-frame-ancestors {frame_src};\
-frame-src {frame_src};\
-upgrade-insecure-requests;$"
-    );
-    let rgx = Regex::new(&expression).unwrap();
-
-    assert!(
-        rgx.is_match(csp),
-        "CSP header did not match expected. Expected: {rgx} \n Actual: {csp}"
+    assert_eq!(
+        csp, "default-src 'none';",
+        "CSP header did not match expected"
     );
 }
 

@@ -56,14 +56,3 @@ pretty_assertions.workspace = true
 ic-response-verification.workspace = true
 flate2 = "1.0"
 getrandom = "0.2"
-
-
-[features]
-# the dummy_captcha feature which ensures the captcha string is always "a"
-# (needed for tests)
-dummy_captcha = []
-# The dev_csp feature weakens the CSP in oder to facilitate development with a locally deployed II instance.
-# In particular, this allows
-# * accessing II using http instead of https
-# * II to connect to localhost both on http and https, which is useful when developint a vc issuer
-dev_csp = []

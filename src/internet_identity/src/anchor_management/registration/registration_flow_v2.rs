@@ -77,7 +77,7 @@ pub async fn identity_registration_start() -> Result<IdRegNextStepResult, IdRegS
     Ok(next_step_result)
 }
 
-fn captcha_required() -> bool {
+pub fn captcha_required() -> bool {
     let captcha_config = state::persistent_state(|ps| ps.captcha_config.clone());
     match captcha_config.captcha_trigger {
         CaptchaTrigger::Static(static_trigger) => match static_trigger {

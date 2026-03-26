@@ -58,7 +58,7 @@ fi
 if [ "$NO_BUILD" = false ]; then
   echo "Building Internet Identity and Archive..."
   # Build II
-  II_FETCH_ROOT_KEY=1 II_DUMMY_CAPTCHA=1 ./scripts/build --internet-identity
+  II_FETCH_ROOT_KEY=1 ./scripts/build --internet-identity
 
   # Build Archive
   ./scripts/build --archive

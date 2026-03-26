@@ -90,22 +90,8 @@ pub fn random_string<T: RngCore>(rng: &mut T, n: usize) -> String {
     String::from_utf8_lossy(&chars).to_string()
 }
 
-#[cfg(feature = "dummy_captcha")]
-pub fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
-    let mut captcha = captcha::new_captcha_with(rng, CAPTCHA_FONT.clone());
-    let captcha = captcha.set_charset(&vec!['a']).add_chars(1).view(96, 48);
-
-    let resp = match captcha.as_base64() {
-        Some(png_base64) => Base64(png_base64),
-        None => trap("Could not get base64 of captcha"),
-    };
-
-    return (resp, captcha.chars_as_string());
-}
-
 const CAPTCHA_LENGTH: usize = 5;
 
-#[cfg(not(feature = "dummy_captcha"))]
 pub fn create_captcha<T: RngCore>(rng: T) -> (Base64, String) {
     use captcha::filters::Wave;
 
