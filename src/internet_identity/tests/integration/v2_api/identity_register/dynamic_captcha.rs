@@ -52,8 +52,13 @@ fn should_require_captcha_above_threshold_rate() {
     }
 
     // Switch to dynamic captcha config now that base rate data is established
-    upgrade_ii_canister_with_arg(&env, canister_id, II_WASM.clone(), arg_with_dynamic_captcha())
-        .expect("upgrade failed");
+    upgrade_ii_canister_with_arg(
+        &env,
+        canister_id,
+        II_WASM.clone(),
+        arg_with_dynamic_captcha(),
+    )
+    .expect("upgrade failed");
 
     // Double the rate of registrations to one per second
     // The 20% threshold rate should allow 2 registrations before the captcha kicks in
