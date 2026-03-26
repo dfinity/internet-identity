@@ -267,6 +267,12 @@
     }
     100% {
       stroke-dashoffset: -100;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chase-stroke {
+      animation: none;
     }
   }
+</style>
 </style>
