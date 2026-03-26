@@ -6,10 +6,10 @@ use canister_tests::framework::{
     arg_with_dynamic_captcha, env, install_ii_canister_with_arg, test_principal,
     upgrade_ii_canister_with_arg, II_WASM,
 };
+use internet_identity_interface::internet_identity::types::RegistrationFlowNextStep;
 use internet_identity_interface::internet_identity::types::{
     CaptchaConfig, CaptchaTrigger, InternetIdentityInit,
 };
-use internet_identity_interface::internet_identity::types::RegistrationFlowNextStep;
 use std::time::Duration;
 
 #[test]
