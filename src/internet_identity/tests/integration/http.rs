@@ -338,7 +338,8 @@ fn metrics_last_upgrade_timestamp_should_update_after_upgrade() -> Result<(), Re
 #[test]
 fn metrics_inflight_challenges() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_canister(&env, II_WASM.clone());
+    let canister_id =
+        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_enabled());
 
     let metrics = get_metrics(&env, canister_id);
     let (challenge_count, _) = parse_metric(&metrics, "internet_identity_inflight_challenges");
