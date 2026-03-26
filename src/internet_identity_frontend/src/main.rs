@@ -8,9 +8,7 @@ use ic_cdk::{init, post_upgrade};
 use ic_cdk_macros::query;
 use ic_http_certification::{HeaderField, HttpCertificationTree, HttpRequest, HttpResponse};
 use include_dir::{include_dir, Dir};
-use internet_identity_interface::internet_identity::types::{
-    InternetIdentityFrontendArgs, InternetIdentityInit,
-};
+use internet_identity_interface::internet_identity::types::InternetIdentityFrontendArgs;
 use serde_json::json;
 use sha2::Digest;
 use std::io::Read;
@@ -38,8 +36,9 @@ fn post_upgrade(args: InternetIdentityFrontendArgs) {
 fn certify_all_assets(args: InternetIdentityFrontendArgs) {
     let static_assets = get_static_assets(&args);
     let related_origins = args.related_origins.as_ref();
+    let dev_csp = args.dev_csp.unwrap_or(false);
 
-    // 2. Extract integrity hashes for inline scripts from HTML files
+    // Extract integrity hashes for inline scripts from HTML files
     let integrity_hashes = static_assets
         .iter()
         .filter(|asset| asset.content_type == ContentType::HTML)
@@ -84,6 +83,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         headers: get_asset_headers(
                             integrity_hashes.clone(),
                             related_origins,
+                            dev_csp,
                             vec![(
                                 "cache-control".to_string(),
                                 NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
@@ -120,6 +120,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
                         headers: get_asset_headers(
                             integrity_hashes.clone(),
                             related_origins,
+                            dev_csp,
                             vec![headers],
                         ),
                         fallback_for: vec![],
@@ -144,6 +145,7 @@ fn certify_all_assets(args: InternetIdentityFrontendArgs) {
 fn get_asset_headers(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
+    dev_csp: bool,
     additional_headers: Vec<HeaderField>,
 ) -> Vec<HeaderField> {
     let credentials_allowlist = if let Some(related_origins) = related_origins {
@@ -176,7 +178,7 @@ fn get_asset_headers(
         // Comprehensive policy to prevent XSS attacks and data injection
         (
             "Content-Security-Policy".to_string(),
-            get_content_security_policy(integrity_hashes, related_origins),
+            get_content_security_policy(integrity_hashes, related_origins, dev_csp),
         ),
         // Strict-Transport-Security (HSTS)
         // Forces browsers to use HTTPS for all future requests to this domain
@@ -269,6 +271,13 @@ fn get_asset_headers(
 ///   Allow fonts only from same origin
 ///
 /// frame-ancestors 'self' <related_origins...>:
+/// connect-src:
+///   In production, `connect-src 'self' https:` allows connections to the same origin
+///   and to HTTPS endpoints only. When `dev_csp` is enabled (development mode),
+///   `http:` is also allowed (`connect-src 'self' https: http:`) to support local
+///   development. Allowing `http:` weakens transport security and must not be used
+///   in production.
+///
 ///   Control embedding - allow same origin and configured related origins
 ///
 /// frame-src 'self' <related_origins...>:
@@ -279,12 +288,14 @@ fn get_asset_headers(
 fn get_content_security_policy(
     integrity_hashes: Vec<String>,
     related_origins: Option<&Vec<String>>,
+    dev_csp: bool,
 ) -> String {
-    let connect_src = "'self' https:";
-
-    // Allow connecting via http for development purposes
-    #[cfg(feature = "dev_csp")]
-    let connect_src = format!("{connect_src} http:");
+    let connect_src = if dev_csp {
+        // Allow connecting via http for development purposes
+        "'self' https: http:".to_string()
+    } else {
+        "'self' https:".to_string()
+    };
 
     // Build script-src with integrity hashes if provided
     let script_src = if integrity_hashes.is_empty() {
@@ -326,10 +337,11 @@ fn get_content_security_policy(
 
     // For production builds, upgrade all HTTP connections to HTTPS
     // Omitted in dev builds to allow localhost development
-    #[cfg(not(feature = "dev_csp"))]
-    let csp = format!("{csp}upgrade-insecure-requests;");
-
-    csp
+    if !dev_csp {
+        format!("{csp}upgrade-insecure-requests;")
+    } else {
+        csp
+    }
 }
 
 /// Gets the static assets with HTML fixup and well-known endpoints
@@ -406,8 +418,6 @@ fn fixup_html(html: &str, config: &InternetIdentityFrontendArgs) -> String {
     );
 
     // Encode config to base64-encoded Candid to avoid JSON escaping issues.
-    // For backward compatibility, we use the same struct as before the II canister split.
-    let config = InternetIdentityInit::from(config.clone());
     let encoded_config = BASE64.encode(Encode!(&config).unwrap());
 
     // The backend canister ID is now included in the config, but we also set data-canister-id for backward compatibility.
@@ -454,7 +464,8 @@ candid::export_service!();
 fn main() {}
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use super::get_content_security_policy;
     use crate::__export_service;
     use candid_parser::utils::{service_equal, CandidSource};
     use std::path::Path;
@@ -471,5 +482,36 @@ mod test {
         .unwrap_or_else(|e| {
             panic!("the canister code interface is not equal to the did file: {e:?}")
         });
+    }
+
+    #[test]
+    fn csp_differs_between_dev_and_prod_for_connect_src_and_upgrade_insecure_requests() {
+        // Dev CSP: allow http: in connect-src and omit upgrade-insecure-requests
+        let dev_csp = get_content_security_policy(Vec::new(), None, true);
+
+        assert!(
+            dev_csp.contains("connect-src 'self' https: http:"),
+            "dev CSP should allow http: in connect-src, got: {dev_csp}"
+        );
+        assert!(
+            !dev_csp.contains("upgrade-insecure-requests;"),
+            "dev CSP should not include upgrade-insecure-requests, got: {dev_csp}"
+        );
+
+        // Prod CSP: disallow http: in connect-src and include upgrade-insecure-requests
+        let prod_csp = get_content_security_policy(Vec::new(), None, false);
+
+        assert!(
+            prod_csp.contains("connect-src 'self' https:"),
+            "prod CSP should allow https: in connect-src, got: {prod_csp}"
+        );
+        assert!(
+            !prod_csp.contains("connect-src 'self' https: http:"),
+            "prod CSP should not allow http: in connect-src, got: {prod_csp}"
+        );
+        assert!(
+            prod_csp.contains("upgrade-insecure-requests;"),
+            "prod CSP should include upgrade-insecure-requests, got: {prod_csp}"
+        );
     }
 }

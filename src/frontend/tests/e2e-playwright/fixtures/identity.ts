@@ -1,23 +1,16 @@
 import { Page, test as base, expect } from "@playwright/test";
-import { dummyAuth, DummyAuthFn, getRandomIndex, II_URL } from "../utils";
-import { Actor, type ActorSubclass, HttpAgent } from "@icp-sdk/core/agent";
-import type { _SERVICE } from "$lib/generated/internet_identity_types";
-import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
-import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
-import { Agent } from "undici";
+import {
+  addCredentialToVirtualAuthenticator,
+  addVirtualAuthenticator,
+  createActorForCredential,
+  fromBase64,
+  getCredentialsFromVirtualAuthenticator,
+  II_URL,
+  removeCredentialFromVirtualAuthenticator,
+  removeVirtualAuthenticator,
+} from "../utils";
 import { Principal } from "@icp-sdk/core/principal";
-
-// Fetch that's compatible with Vite server's self-signed certs
-const insecureAgent = new Agent({
-  connect: {
-    rejectUnauthorized: false,
-  },
-});
-const insecureFetch: typeof fetch = (url, options = {}) =>
-  fetch(url, {
-    dispatcher: insecureAgent,
-    ...options,
-  } as RequestInit);
+import Protocol from "devtools-protocol";
 
 export const DEFAULT_HOST = "https://localhost:5173"; // Vite dev server
 export const DEFAULT_NAME = "Test User";
@@ -26,40 +19,204 @@ export type IdentityConfig = {
   host?: string;
   createIdentities: Array<{
     name: string;
-    generateDummyAuthIndex?: () => bigint;
   }>;
 };
 
 interface Identity {
+  host: string;
   canisterId: Principal;
   identityNumber: bigint;
   name: string;
-  dummyAuthIndex: bigint;
+  credentials: Protocol.WebAuthn.Credential[];
+  discoverableCredentialId: string | undefined;
+  authenticatorIds: Map<Page, string>;
 }
 
-class IdentityWizard {
+const credentialCreateTrackingInstalled = new WeakSet<Page>();
+const trackedIdentityByPage = new WeakMap<Page, Identity>();
+const CREDENTIAL_CREATE_HOOK = "__iiOnCredentialCreate";
+const CREDENTIAL_CREATE_HOOK_FLAG = "__iiCredentialCreateHookInstalled";
+
+/**
+ * Patches `navigator.credentials.create` in the browser page so tests can react
+ * when a new passkey is created and mirror it into the virtual authenticator.
+ *
+ * The patch also constrains passkey creation to ES256 (`alg: -7`), i.e. ECDSA
+ * on P-256, so created credentials match fixture expectations.
+ */
+const installCredentialCreateOverride = ({
+  hookName,
+  installedFlag,
+}: {
+  hookName: string;
+  installedFlag: string;
+}) => {
+  const global = window as typeof window & Record<string, unknown>;
+
+  if (global[installedFlag] === true) {
+    return;
+  }
+
+  const credentialsContainer = navigator.credentials;
+  if (
+    credentialsContainer === undefined ||
+    typeof credentialsContainer.create !== "function"
+  ) {
+    return;
+  }
+
+  const originalCreate = credentialsContainer.create.bind(credentialsContainer);
+  credentialsContainer.create = async (...args) => {
+    const createArgs = [...args] as [CredentialCreationOptions?];
+    const [options] = createArgs;
+    if (options?.publicKey !== undefined) {
+      createArgs[0] = {
+        ...options,
+        publicKey: {
+          ...options.publicKey,
+          pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        },
+      };
+    }
+
+    const result = await originalCreate(...createArgs);
+    const hook = (window as unknown as Record<string, () => Promise<void>>)[
+      hookName
+    ];
+    if (typeof hook === "function") {
+      await hook();
+    }
+    return result;
+  };
+
+  global[installedFlag] = true;
+};
+
+/**
+ * Installs the credential-create hook in the currently loaded document when
+ * the page points at Internet Identity. Safe to call repeatedly.
+ */
+const installCredentialCreateOverrideOnCurrentDocument = async (
+  page: Page,
+): Promise<void> => {
+  try {
+    if (new URL(page.url()).origin !== new URL(II_URL).origin) {
+      return;
+    }
+  } catch {
+    return;
+  }
+
+  try {
+    await page.evaluate(installCredentialCreateOverride, {
+      hookName: CREDENTIAL_CREATE_HOOK,
+      installedFlag: CREDENTIAL_CREATE_HOOK_FLAG,
+    });
+  } catch {
+    // Navigations can replace the execution context while the listener runs.
+  }
+};
+
+/**
+ * Refreshes fixture credentials from the authenticator currently tracked for
+ * the binding source page. If the authenticator is no longer valid, tracking
+ * is cleared.
+ */
+const refreshTrackedIdentityCredentials = async (source: {
+  page?: Page;
+}): Promise<void> => {
+  const page = source.page;
+  if (page === undefined) {
+    return;
+  }
+
+  const identity = trackedIdentityByPage.get(page);
+  if (identity === undefined) {
+    return;
+  }
+  const authenticatorId = identity.authenticatorIds.get(page);
+  if (authenticatorId === undefined) {
+    return;
+  }
+
+  try {
+    // Add any new credentials created since the last refresh to the fixture identity.
+    const newCredentials = await getCredentialsFromVirtualAuthenticator(
+      page,
+      authenticatorId,
+    );
+    const credentialIds = new Set(
+      identity.credentials.map((credential) => credential.credentialId),
+    );
+    identity.credentials = [
+      ...identity.credentials,
+      ...newCredentials.filter(
+        (credential) => !credentialIds.has(credential.credentialId),
+      ),
+    ];
+  } catch {
+    // The page hook can outlive the authenticator it was tracking.
+    trackedIdentityByPage.delete(page);
+  }
+};
+
+/**
+ * Tracks passkeys created on this page for the given identity and ensures the
+ * browser-side credential-create override stays installed across navigations.
+ */
+const trackIdentityCredentialCreation = async (
+  page: Page,
+  identity: Identity,
+): Promise<void> => {
+  trackedIdentityByPage.set(page, identity);
+
+  if (credentialCreateTrackingInstalled.has(page)) {
+    return;
+  }
+
+  await page.exposeBinding(
+    CREDENTIAL_CREATE_HOOK,
+    refreshTrackedIdentityCredentials,
+  );
+
+  // Install for future navigations and current document.
+  await page.addInitScript(installCredentialCreateOverride, {
+    hookName: CREDENTIAL_CREATE_HOOK,
+    installedFlag: CREDENTIAL_CREATE_HOOK_FLAG,
+  });
+  page.on("framenavigated", (frame) => {
+    if (frame !== page.mainFrame()) {
+      return;
+    }
+    void installCredentialCreateOverrideOnCurrentDocument(page);
+  });
+
+  await installCredentialCreateOverrideOnCurrentDocument(page);
+
+  credentialCreateTrackingInstalled.add(page);
+};
+
+export class IdentityWizard {
   #page: Page;
 
   constructor(page: Page) {
     this.#page = page;
   }
 
-  async signIn(auth: DummyAuthFn): Promise<void> {
+  async signIn(): Promise<void> {
     await this.#goto();
-    auth(this.#page);
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Use existing identity" }).click();
     await expect(dialog).toBeHidden();
   }
 
-  async signUp(auth: DummyAuthFn, name: string): Promise<void> {
+  async signUp(name: string): Promise<void> {
     await this.#goto();
     const dialog = this.#page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Create new identity" }).click();
     await this.#page.getByLabel("Identity name").fill(name);
-    auth(this.#page);
     await this.#page.getByRole("button", { name: "Create identity" }).click();
     await expect(dialog).toBeHidden();
   }
@@ -69,149 +226,212 @@ class IdentityWizard {
    * of buttons in order (if visible) to get to the intended view from any page.
    */
   async #goto(): Promise<void> {
-    // Wait for any of the buttons we need to click to show up
-    const buttons = [
-      "Sign in",
-      "Switch identity",
-      "Add another identity",
-      "Continue with passkey",
-    ];
-    await this.#page
-      .getByRole("button", { name: new RegExp(buttons.join("|")) })
-      .first()
-      .waitFor();
-    // If continue with passkey button is already visible,
-    // e.g. after /login redirect we only need to click that.
-    const continueWithPasskeyButton = this.#page.getByRole("button", {
+    const signInLocator = this.#page.getByRole("button", {
+      name: "Sign in",
+    });
+    const switchIdentityLocator = this.#page.getByRole("button", {
+      name: "Switch identity",
+    });
+    const addAnotherIdentityLocator = this.#page.getByRole("button", {
+      name: "Add another identity",
+    });
+    const continueWithPasskeyLocator = this.#page.getByRole("button", {
       name: "Continue with passkey",
     });
-    if (await continueWithPasskeyButton.isVisible()) {
-      await continueWithPasskeyButton.click();
+    await signInLocator
+      .or(switchIdentityLocator)
+      .or(continueWithPasskeyLocator)
+      .first()
+      .waitFor();
+
+    // Either continue to passkey flow immediately
+    if (await continueWithPasskeyLocator.isVisible()) {
+      await continueWithPasskeyLocator.click();
       return;
     }
-    // Else click all buttons in order (if visible)
-    for (const button of buttons) {
-      const locator = this.#page.getByRole("button", { name: button });
-      if (await locator.isVisible()) {
-        await locator.click();
-      }
+    // Or go first trough identity switcher/sign in if necessary
+    if (await switchIdentityLocator.isVisible()) {
+      await switchIdentityLocator.click();
+      await addAnotherIdentityLocator.click();
+    } else if (await signInLocator.isVisible()) {
+      await signInLocator.click();
     }
+    await continueWithPasskeyLocator.click();
   }
 }
 
-export const toSeed = (dummyAuthIndex: bigint): Uint8Array => {
-  // Same implementation as found in `DiscoverableDummyIdentity`
-  const buffer = new ArrayBuffer(32);
-  const view = new DataView(buffer);
-  view.setBigUint64(0, dummyAuthIndex);
-  return new Uint8Array(buffer);
+const getIdentityByNumber = (
+  identities: Identity[],
+  identityNumber: bigint,
+): Identity => {
+  const identity = identities.find(
+    (identity) => identity.identityNumber === identityNumber,
+  );
+  if (identity === undefined) {
+    throw new Error(`Identity with number ${identityNumber} not found`);
+  }
+  return identity;
 };
-
-const createActor = async (
-  host: string,
-  canisterId: Principal,
-  dummyAuthIndex: bigint,
-): Promise<ActorSubclass<_SERVICE>> =>
-  Actor.createActor<_SERVICE>(internet_identity_idl, {
-    agent: await HttpAgent.create({
-      host,
-      shouldFetchRootKey: true,
-      verifyQuerySignatures: false,
-      fetch: insecureFetch,
-      identity: Ed25519KeyIdentity.generate(toSeed(dummyAuthIndex)),
-    }),
-    canisterId,
-  });
 
 export const test = base.extend<{
   identityConfig: IdentityConfig;
   identities: Identity[];
   signInWithIdentity: (page: Page, identityNumber: bigint) => Promise<void>;
-  actorForIdentity: (
+  addAuthenticatorForIdentity: (
+    page: Page,
     identityNumber: bigint,
-  ) => Promise<ActorSubclass<_SERVICE>>;
-  replaceAuthForIdentity: (
+  ) => Promise<void>;
+  removeAuthenticatorForIdentity: (identityNumber: bigint) => Promise<void>;
+  setCredentialsForIdentity: (
     identityNumber: bigint,
-    newDummyAuthIndex: bigint,
-  ) => void;
+    credentials: Protocol.WebAuthn.Credential[],
+  ) => Promise<void>;
+  setDiscoverableCredentialForIdentity: (
+    identityNumber: bigint,
+    credentialId: string,
+  ) => Promise<void>;
 }>({
   identityConfig: {
-    createIdentities: [
-      {
-        name: DEFAULT_NAME,
-        generateDummyAuthIndex: getRandomIndex,
-      },
-    ],
+    createIdentities: [{ name: DEFAULT_NAME }],
   },
-  identities: async ({ browser, identityConfig }, use) =>
-    use(
-      await Promise.all(
-        identityConfig.createIdentities.map(
-          async ({ name, generateDummyAuthIndex = getRandomIndex }) => {
-            const dummyAuthIndex = generateDummyAuthIndex();
-            const context = await browser.newContext();
-            const page = await context.newPage();
-            await page.goto(II_URL);
-            const element = (await page.$("[data-canister-id]"))!;
-            const canisterId = Principal.fromText(
-              (await element.getAttribute("data-canister-id"))!,
-            );
-            const wizard = new IdentityWizard(page);
-            await wizard.signUp(dummyAuth(dummyAuthIndex), name);
-            await page.close();
-            await context.close();
-            const actor = await createActor(
-              identityConfig.host ?? DEFAULT_HOST,
-              canisterId,
-              dummyAuthIndex,
-            );
-            const [deviceKeyWithAnchor] = await actor.lookup_device_key(
-              toSeed(dummyAuthIndex),
-            );
-            const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
-            return {
-              canisterId,
-              name,
-              dummyAuthIndex,
-              identityNumber,
-            };
-          },
-        ),
-      ),
-    ),
-  signInWithIdentity: ({ identities }, use) =>
-    use(async (page: Page, identityNumber: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
+  identities: async ({ browser, identityConfig }, use) => {
+    const identities: Identity[] = [];
+    for (const { name } of identityConfig.createIdentities) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(II_URL);
+      const element = (await page.$("[data-canister-id]"))!;
+      const canisterId = Principal.fromText(
+        (await element.getAttribute("data-canister-id"))!,
       );
-      if (identity === undefined) {
-        throw new Error("Identity not found");
-      }
+      const authenticatorId = await addVirtualAuthenticator(page);
       const wizard = new IdentityWizard(page);
-      await wizard.signIn(dummyAuth(identity.dummyAuthIndex));
+      await wizard.signUp(name);
+      const credentials = await getCredentialsFromVirtualAuthenticator(
+        page,
+        authenticatorId,
+      );
+      await page.close();
+      await context.close();
+      const host = identityConfig.host ?? DEFAULT_HOST;
+      const actor = await createActorForCredential(
+        host,
+        canisterId,
+        credentials[0],
+      );
+      const [deviceKeyWithAnchor] = await actor.lookup_device_key(
+        fromBase64(credentials[0].credentialId),
+      );
+      const { anchor_number: identityNumber } = deviceKeyWithAnchor!;
+      identities.push({
+        host,
+        canisterId,
+        name,
+        credentials,
+        discoverableCredentialId: credentials[0].credentialId,
+        identityNumber,
+        authenticatorIds: new Map(),
+      });
+    }
+    return use(identities);
+  },
+  signInWithIdentity: ({ addAuthenticatorForIdentity }, use) =>
+    use(async (page, identityNumber) => {
+      await addAuthenticatorForIdentity(page, identityNumber);
+      const wizard = new IdentityWizard(page);
+      await wizard.signIn();
     }),
-  actorForIdentity: ({ identityConfig, identities }, use) =>
-    use((identityNumber: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
-      );
-      if (identity === undefined) {
-        throw new Error("Identity not found");
+  addAuthenticatorForIdentity: (
+    { identities, setCredentialsForIdentity },
+    use,
+  ) =>
+    use(async (page, identityNumber) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+
+      // Remove any existing authenticators on this page to avoid conflicts
+      for (const otherIdentity of identities) {
+        const existingAuthenticatorId =
+          otherIdentity.authenticatorIds.get(page);
+        if (existingAuthenticatorId !== undefined) {
+          await removeVirtualAuthenticator(page, existingAuthenticatorId);
+          otherIdentity.authenticatorIds.delete(page);
+        }
       }
-      return createActor(
-        identityConfig.host ?? DEFAULT_HOST,
-        identity.canisterId,
-        identity.dummyAuthIndex,
-      );
+
+      // Add virtual authenticator and populate it with the identity's credentials
+      const authenticatorId = await addVirtualAuthenticator(page);
+      identity.authenticatorIds.set(page, authenticatorId);
+      await setCredentialsForIdentity(identityNumber, identity.credentials);
+
+      // Keep this identity synchronized with passkeys created in page code.
+      await trackIdentityCredentialCreation(page, identity);
     }),
-  replaceAuthForIdentity: ({ identities }, use) =>
-    use((identityNumber: bigint, newDummyAuthIndex: bigint) => {
-      const identity = identities.find(
-        (identity) => identity.identityNumber === identityNumber,
-      );
-      if (identity === undefined) {
-        throw new Error("Identity not found");
+  removeAuthenticatorForIdentity: ({ identities }, use) =>
+    use(async (identityNumber) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+      for (const [page, authenticatorId] of identity.authenticatorIds) {
+        try {
+          await removeVirtualAuthenticator(page, authenticatorId);
+        } catch (error) {
+          // Page may have been closed; only swallow errors in that case.
+          if (!page.isClosed()) {
+            throw error;
+          }
+        } finally {
+          // Ensure our internal map does not get out of sync.
+          identity.authenticatorIds.delete(page);
+        }
       }
-      identity.dummyAuthIndex = newDummyAuthIndex;
+    }),
+  setCredentialsForIdentity: ({ identities }, use) =>
+    use(async (identityNumber, credentials) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+      // Update discoverable choice if the current one is no longer present
+      const hasDiscoverable = credentials.some(
+        (cred) => cred.credentialId === identity.discoverableCredentialId,
+      );
+      if (!hasDiscoverable) {
+        identity.discoverableCredentialId = credentials[0]?.credentialId;
+      }
+      identity.credentials = credentials;
+
+      // Sync all authenticators for this identity
+      for (const [page, authenticatorId] of identity.authenticatorIds) {
+        try {
+          const existingCredentials =
+            await getCredentialsFromVirtualAuthenticator(page, authenticatorId);
+          for (const credential of existingCredentials) {
+            await removeCredentialFromVirtualAuthenticator(
+              page,
+              authenticatorId,
+              credential.credentialId,
+            );
+          }
+          for (const credential of credentials) {
+            await addCredentialToVirtualAuthenticator(page, authenticatorId, {
+              ...credential,
+              isResidentCredential:
+                credential.credentialId === identity.discoverableCredentialId,
+            });
+          }
+        } catch (error) {
+          // Only ignore errors when the page has been closed; otherwise rethrow
+          if (page.isClosed()) {
+            // Page may have been closed; clean up stale reference
+            identity.authenticatorIds.delete(page);
+          } else {
+            throw error;
+          }
+        }
+      }
+    }),
+  setDiscoverableCredentialForIdentity: (
+    { identities, setCredentialsForIdentity },
+    use,
+  ) =>
+    use(async (identityNumber, credentialId) => {
+      const identity = getIdentityByNumber(identities, identityNumber);
+      identity.discoverableCredentialId = credentialId;
+      await setCredentialsForIdentity(identityNumber, identity.credentials);
     }),
 });

@@ -27,7 +27,7 @@ describe("findWebAuthnFlows", () => {
     origin: string | undefined,
   ): CredentialData => ({
     pubkey: new Uint8Array(32),
-    credentialId: new ArrayBuffer(16),
+    credentialId: new Uint8Array(16),
     origin,
   });
 

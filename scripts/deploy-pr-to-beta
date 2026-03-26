@@ -10,9 +10,9 @@ Usage: $0 [--staging-a|-sa | --staging-b|-sb | --staging-c|-sc | --staging <CANI
 Select which staging canister to upgrade and which end(s) to deploy.
 
 Options:
-  --staging-a, -sa        Use Staging A (fgte5-ciaaa-aaaad-aaatq-cai)
-  --staging-b, -sb        Use Staging B (jqajs-xiaaa-aaaad-aab5q-cai)
-  --staging-c, -sc        Use Staging C (y2aaj-miaaa-aaaad-aacxq-cai)
+  --staging-a, -sa        Use Staging A (backend: fgte5-ciaaa-aaaad-aaatq-cai, frontend: gjxif-ryaaa-aaaad-ae4ka-cai)
+  --staging-b, -sb        Use Staging B (backend: jqajs-xiaaa-aaaad-aab5q-cai, frontend: uhh2r-oyaaa-aaaad-agbva-cai)
+  --staging-c, -sc        Use Staging C (backend: y2aaj-miaaa-aaaad-aacxq-cai, frontend: uag4f-daaaa-aaaad-agbvq-cai)
   --staging <CANISTER_ID> Use the provided canister id
   --end <front|back>      Which end(s) to deploy (can be specified multiple times)
   -fe                     Shortcut for --end front
@@ -125,8 +125,8 @@ if [ "$DEPLOY_FRONT" = false ] && [ "$DEPLOY_BACK" = false ]; then
     exit 1
 fi
 
-if [ "$DEPLOY_FRONT" = true ] && [ "$STAGING_NAME" != "a" ]; then
-    echo "Error: Frontend deployment is not yet supported for Staging B, C, or custom canister IDs. Use --staging-a/-sa for frontend deployment." >&2
+if [ "$DEPLOY_FRONT" = true ] && [ "$STAGING_NAME" != "a" ] && [ "$STAGING_NAME" != "b" ] && [ "$STAGING_NAME" != "c" ]; then
+    echo "Error: Frontend deployment is only supported for Staging A, B, and C. Use --staging-a/-sa, --staging-b/-sb, or --staging-c/-sc." >&2
     exit 1
 fi
 
@@ -137,107 +137,16 @@ cd "$ROOT_DIR"
 REPO="dfinity/internet-identity"
 WORKFLOW_FILE="canister-tests.yml"
 WALLET_CANISTER_ID="cvthj-wyaaa-aaaad-aaaaq-cai"
-FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai"
 
-# -------------------------
-# Prompt for a single Candid field value.
-# Usage: prompt_field <field_label> <current_value>
-# Prints the (possibly updated) value to stdout.
-# -------------------------
-prompt_field() {
-    local label="$1"
-    local current="$2"
-    echo "" >&2
-    echo "  $label = $current" >&2
-    read -r -p "  Keep current value? [Y/n]: " answer </dev/tty >&2
-    if [[ "$answer" =~ ^[Nn] ]]; then
-        read -r -p "  Enter new value for $label: " new_value </dev/tty >&2
-        echo "$new_value"
-    else
-        echo "$current"
-    fi
-}
+# Map staging environment to its frontend canister ID
+case "$STAGING_NAME" in
+    a) FRONTEND_CANISTER_ID="gjxif-ryaaa-aaaad-ae4ka-cai" ;;
+    b) FRONTEND_CANISTER_ID="uhh2r-oyaaa-aaaad-agbva-cai" ;;
+    c) FRONTEND_CANISTER_ID="uag4f-daaaa-aaaad-agbvq-cai" ;;
+    *) FRONTEND_CANISTER_ID="" ;;
+esac
 
-# -------------------------
-# Build InternetIdentityFrontendInit Candid argument interactively.
-# Fetches current config from the canister, then prompts field-by-field.
-# Sets FRONTEND_INSTALL_ARG with the resulting Candid record.
-# -------------------------
-build_frontend_install_arg() {
-    local canister_id="$1"
-    local config_url="https://${canister_id}.icp0.io/.config"
-
-    echo ""
-    echo "Fetching current frontend config from $config_url ..."
-    local raw_config
-    raw_config=$(curl -sfL "$config_url")
-    if [ -z "$raw_config" ]; then
-        echo "Error: Could not fetch current config from $config_url" >&2
-        exit 1
-    fi
-
-    echo ""
-    echo "Current frontend config:"
-    echo "$raw_config"
-    echo ""
-    echo "Configure install arguments (press Enter to keep each current value):"
-
-    # Parse individual fields from the Candid text output.
-    # We use grep + sed to extract the value portion after "field_name = ".
-    local current_backend_canister_id
-    current_backend_canister_id=$(echo "$raw_config" | grep 'backend_canister_id' | sed 's/.*= *//;s/ *;$//')
-    local current_backend_origin
-    current_backend_origin=$(echo "$raw_config" | grep 'backend_origin' | sed 's/.*= *//;s/ *;$//')
-    local current_related_origins
-    current_related_origins=$(echo "$raw_config" | sed -n '/related_origins/,/}/p' | tr '\n' ' ' | sed 's/.*= *//;s/ *;[[:space:]]*$//')
-    local current_fetch_root_key
-    current_fetch_root_key=$(echo "$raw_config" | grep 'fetch_root_key' | sed 's/.*= *//;s/ *;$//')
-    local current_analytics_config
-    current_analytics_config=$(echo "$raw_config" | grep 'analytics_config' | sed 's/.*= *//;s/ *;$//')
-    local current_dummy_auth
-    current_dummy_auth=$(echo "$raw_config" | grep 'dummy_auth' | sed 's/.*= *//;s/ *;$//')
-
-    local val_backend_canister_id
-    val_backend_canister_id=$(prompt_field "backend_canister_id" "$current_backend_canister_id")
-    local val_backend_origin
-    val_backend_origin=$(prompt_field "backend_origin" "$current_backend_origin")
-    local val_related_origins
-    val_related_origins=$(prompt_field "related_origins" "$current_related_origins")
-    local val_fetch_root_key
-    val_fetch_root_key=$(prompt_field "fetch_root_key" "$current_fetch_root_key")
-    local val_analytics_config
-    val_analytics_config=$(prompt_field "analytics_config" "$current_analytics_config")
-    local val_dummy_auth
-    val_dummy_auth=$(prompt_field "dummy_auth" "$current_dummy_auth")
-
-    local candid_arg="(record { backend_canister_id = ${val_backend_canister_id}; backend_origin = ${val_backend_origin}; related_origins = ${val_related_origins}; fetch_root_key = ${val_fetch_root_key}; analytics_config = ${val_analytics_config}; dummy_auth = ${val_dummy_auth} })"
-
-    echo ""
-    echo "Install argument (Candid):"
-    echo "  $candid_arg"
-    echo ""
-
-    echo "Encoding argument with didc..."
-    local encoded
-    encoded=$(didc encode \
-        -d ./src/internet_identity_frontend/internet_identity_frontend.did \
-        -t '(InternetIdentityFrontendInit)' \
-        "$candid_arg")
-    if [ -z "$encoded" ]; then
-        echo "Error: didc encode failed" >&2
-        exit 1
-    fi
-
-    FRONTEND_INSTALL_ARG="$encoded"
-
-    echo "Encoded argument: $FRONTEND_INSTALL_ARG"
-    echo ""
-    read -r -p "Proceed with this argument? [Y/n]: " confirm </dev/tty
-    if [[ "$confirm" =~ ^[Nn] ]]; then
-        echo "Aborted by user." >&2
-        exit 1
-    fi
-}
+source "$SCRIPTS_DIR/frontend-arg-helpers.bash"
 
 # -------------------------
 # Prompt for frontend install args if deploying frontend

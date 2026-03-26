@@ -1,5 +1,5 @@
 import { expect, Locator, Page, test as base } from "@playwright/test";
-import { DummyAuthFn, II_URL } from "../utils";
+import { II_URL } from "../utils";
 
 export const DEFAULT_PASSKEY_NAME = "Unknown";
 
@@ -139,7 +139,7 @@ class AddDialog {
     this.#dialog = dialog;
   }
 
-  async passkey(auth: DummyAuthFn): Promise<void> {
+  async passkey(): Promise<void> {
     await this.#dialog
       .getByRole("button", { name: "Continue with passkey" })
       .click();
@@ -148,7 +148,6 @@ class AddDialog {
         name: /Add a passkey|Add another passkey/,
       }),
     ).toBeVisible();
-    auth(this.#dialog.page());
     await this.#dialog.getByRole("button", { name: "Create passkey" }).click();
   }
 

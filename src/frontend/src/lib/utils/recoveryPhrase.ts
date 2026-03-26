@@ -1,6 +1,6 @@
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { mnemonicToSeedSync, validateMnemonic, entropyToMnemonic } from "bip39";
-import { bytesToHex } from "@noble/hashes/utils";
+import { toHex } from "./utils";
 
 export const IC_DERIVATION_PATH = [44, 223, 0, 0, 0];
 
@@ -12,7 +12,7 @@ const HARDENED = 0x80000000;
  */
 export const generateMnemonic = (): string[] => {
   const entropy = globalThis.crypto.getRandomValues(new Uint8Array(32));
-  return entropyToMnemonic(bytesToHex(entropy)).split(" ");
+  return entropyToMnemonic(toHex(entropy)).split(" ");
 };
 
 /**
@@ -81,7 +81,11 @@ async function generateMasterKey(
     false,
     ["sign"],
   );
-  const h = await globalThis.crypto.subtle.sign("HMAC", key, seed);
+  const h = await globalThis.crypto.subtle.sign(
+    "HMAC",
+    key,
+    new Uint8Array(seed),
+  );
   const slipSeed = new Uint8Array(h.slice(0, 32));
   const chainCode = new Uint8Array(h.slice(32));
   return [slipSeed, chainCode];
@@ -96,7 +100,7 @@ async function derive(
   const data = new Uint8Array([0, ...parentKey, ...toBigEndianArray(i)]);
   const key = await globalThis.crypto.subtle.importKey(
     "raw",
-    parentChaincode,
+    new Uint8Array(parentChaincode),
     {
       name: "HMAC",
       hash: { name: "SHA-512" },

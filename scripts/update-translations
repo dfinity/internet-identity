@@ -6,14 +6,7 @@ cd "$SCRIPTS_DIR/.."
 
 # Directory containing .po files
 LOCALES_DIR="$PWD/src/frontend/src/lib/locales"
-MODEL="openai/gpt-5"
-MAX_PARALLEL="${MAX_PARALLEL:-2}"
-MAX_RETRIES="${MAX_RETRIES:-5}"
-INITIAL_BACKOFF_SECONDS="${INITIAL_BACKOFF_SECONDS:-3}"
-GITHUB_TOKEN="$(gh auth token)"
-
-INFERENCE_URL="https://models.github.ai/inference/chat/completions"
-echo "Using model: $MODEL"
+echo "Using Gemini CLI"
 
 INSTRUCTIONS="SYSTEM: You are a silent \`.po\` file translation bot.
 1.  You will receive a \`.po\` file with missing translations.
@@ -22,8 +15,10 @@ INSTRUCTIONS="SYSTEM: You are a silent \`.po\` file translation bot.
 4.  Ensure all variables (like {variable}) and tags (like <0>...</0>) are preserved in the translation.
 5.  Even if a language is RTL, you should still keep tags like <0>...</0> in the same order as in the source text, and not reverse them.
 6.  Apply the correct ICU plural categories required by the target language (e.g., one/other, one/few/many/other, or just other).
-7.  Your output must be *only* the plain text \`.po\` entries (from msgid ... to msgstr \"...\") that you have just translated.
-8.  DO NOT output any other text, greetings, explanations, or markdown. Your response must be *only* the plain text code snippet."
+7.  Lingui/ICU compliance: \`other\` is mandatory; additional categories are optional. If a target-language category is not explicitly present, ICU falls back to \`other\`.
+8.  If the source plural has fewer categories than the target language, add target-language categories when needed for natural grammar. It is acceptable to keep fewer categories (such as only \`one\` + \`other\`) when that remains grammatically natural.
+9.  Your output must be *only* the plain text \`.po\` entries (from msgid ... to msgstr \"...\") that you have just translated.
+10.  DO NOT output any other text, greetings, explanations, or markdown. Your response must be *only* the plain text code snippet."
 
 # Make sure .po files are up to date
 echo "Updating .po files with latest changes"
@@ -62,12 +57,13 @@ translate_po_file() {
   # Extract untranslated entries (msgstr is empty)
   local untranslated_entries
   untranslated_entries=$(echo "$without_header" | awk '
-                         BEGIN {entry=""}
+                         BEGIN {entry=""; count=0}
                          {
                            entry = entry $0 "\n"
                            if ($0 ~ /^msgstr /) {
-                             if ($0 == "msgstr \"\"") {
+                             if ($0 == "msgstr \"\"" && count < 100) {
                                printf "%s", entry
+                               count++
                              }
                              entry = ""
                            }
@@ -90,7 +86,7 @@ translate_po_file() {
                        }
                      ')
 
-  # Use GitHub Models API (via gh CLI token) to translate missing translations
+  # Use Gemini CLI to translate missing translations
   echo -e "\nTranslating file: $po_filename"
   local prompt
   prompt="$INSTRUCTIONS
@@ -101,73 +97,11 @@ $translated_snippet
 Entries to translate:
 $untranslated_entries"
 
-  local request_payload
-  request_payload=$(jq -n --arg sys "$INSTRUCTIONS" --arg user "$prompt" --arg model "$MODEL" \
-    '{model:$model,messages:[{role:"system",content:$sys},{role:"user",content:$user}]}')
-
-  local response
-  local api_error
-  local attempt=1
-  local backoff_seconds="$INITIAL_BACKOFF_SECONDS"
-
-  while true; do
-    local curl_output
-    local http_code
-    curl_output=$(curl -sS -w $'\n%{http_code}' "$INFERENCE_URL" \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer $GITHUB_TOKEN" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      -H "Content-Type: application/json" \
-      -d "$request_payload")
-
-    http_code="${curl_output##*$'\n'}"
-    response="${curl_output%$'\n'*}"
-
-    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-      local response_snippet
-      response_snippet=$(echo "$response" | head -c 300 | tr '\n' ' ')
-      if [[ "$response_snippet" == *"Too many requests"* ]] && (( attempt < MAX_RETRIES )); then
-        echo "Rate limited translating $po_filename (attempt $attempt/$MAX_RETRIES). Retrying in ${backoff_seconds}s..." >&2
-        sleep "$backoff_seconds"
-        backoff_seconds=$((backoff_seconds * 2))
-        attempt=$((attempt + 1))
-        continue
-      fi
-      echo "Failed translating $po_filename with model '$MODEL': non-JSON response from API (HTTP $http_code): $response_snippet" >&2
-      return 1
-    fi
-
-    api_error=$(echo "$response" | jq -r '.error.message // empty')
-    if [[ "$http_code" == "429" || "$api_error" == *"Too many requests"* || "$api_error" == *"rate limit"* ]]; then
-      if (( attempt < MAX_RETRIES )); then
-        echo "Rate limited translating $po_filename (attempt $attempt/$MAX_RETRIES). Retrying in ${backoff_seconds}s..." >&2
-        sleep "$backoff_seconds"
-        backoff_seconds=$((backoff_seconds * 2))
-        attempt=$((attempt + 1))
-        continue
-      fi
-    fi
-
-    if [[ -n "$api_error" ]]; then
-      echo "Failed translating $po_filename with model '$MODEL': $api_error" >&2
-      return 1
-    fi
-
-    break
-  done
-
   local translated_entries
-  translated_entries=$(echo "$response" | jq -r '
-    (.choices[0].message.content // empty) as $content
-    | if ($content | type) == "string" then $content
-      elif ($content | type) == "array" then
-        [ $content[]? | select(.type == "text") | .text ] | join("")
-      else ""
-      end
-  ')
+  translated_entries=$(npx -y @google/gemini-cli -m gemini-2.5-flash-lite -p "$prompt")
 
   if [[ -z "${translated_entries//[[:space:]]/}" ]]; then
-    echo "Failed translating $po_filename with model '$MODEL': empty response content" >&2
+    echo "Failed translating $po_filename with Gemini CLI: empty response content" >&2
     return 1
   fi
 
@@ -197,18 +131,12 @@ $untranslated_entries"
   echo "$merged_content" > "$po_file"
 }
 
-# Loop through all .po files and translate in parallel
+# Loop through all .po files and translate sequentially
 for po_file in "$LOCALES_DIR"/*.po; do
   if [[ -f "$po_file" ]]; then
-    while (( $(jobs -rp | wc -l | tr -d ' ') >= MAX_PARALLEL )); do
-      wait -n
-    done
-    translate_po_file "$po_file" &
+    translate_po_file "$po_file"
   fi
 done
-
-# Wait for all background translation jobs to finish
-wait
 
 # Make sure .po files are cleaned up after adding the translations
 echo -e "\nCleaning up .po files with latest translations"

@@ -3,16 +3,13 @@
 // This file describes which assets are used and how (content, content type and content encoding).
 use crate::http::security_headers;
 use crate::state;
-use asset_util::{collect_assets, Asset, CertifiedAssets, ContentEncoding, ContentType};
+use asset_util::{Asset, CertifiedAssets, ContentEncoding, ContentType};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 use candid::Encode;
-use ic_cdk::api;
-use include_dir::{include_dir, Dir};
 use internet_identity_interface::internet_identity::types::{
     InternetIdentityInit, InternetIdentitySynchronizedConfig,
 };
-use serde_json::json;
 use sha2::Digest;
 
 // used both in init and post_upgrade
@@ -42,54 +39,18 @@ pub fn init_assets(config: &InternetIdentityInit) {
     });
 }
 
-// Fix up HTML pages, by injecting canister ID and canister config
-fn fixup_html(html: &str, config: &InternetIdentityInit) -> String {
-    let canister_id = api::id();
-    // Encoding to JSON might cause issues with html character escaping,
-    // base64 avoids all the potential issues around that.
-    //
-    // Also, the serde json implementation will likely generate a different output than
-    // @dfinity/candid (e.g. bigint), which means it won't match the types anymore.
-    //
-    // So to avoid all these issues, we send the raw candid to the frontend,
-    // then the frontend decodes it just like a canister call response.
-    let encoded_config = BASE64.encode(Encode!(&config).unwrap());
-    html.replace(
-        r#"<body "#,
-        &format!(
-            r#"<body data-canister-id="{canister_id}" data-canister-config="{encoded_config}" "#
-        ),
-    )
-}
-
-static ASSET_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../../dist");
-
 // Gets the static assets. All static assets are prepared only once (like injecting the canister ID).
 pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
-    // Instead of passing a `html_transformer`, iter over assets and use `fixup_html`
-    // directly so that it has access to the `config` reference within scope.
-    let mut assets: Vec<Asset> = collect_assets(&ASSET_DIR, None)
-        .into_iter()
-        .map(|mut asset| {
-            if asset.content_type == ContentType::HTML {
-                asset.content = fixup_html(std::str::from_utf8(&asset.content).unwrap(), config)
-                    .as_bytes()
-                    .to_vec();
-            }
-            asset
-        })
-        .collect();
-
     // Required to make the synchronized config available to the II frontend canister.
     // The synchronized config is the part of `InternetIdentityInit` that is needed for both the II backend and frontend.
-    assets.push(Asset {
+    let mut assets = vec![Asset {
         url_path: "/.config.did.bin".to_string(),
         content: Encode!(&InternetIdentitySynchronizedConfig::from(config)).unwrap(),
         encoding: ContentEncoding::Identity,
         content_type: ContentType::OCTETSTREAM,
-    });
+    }];
 
-    // Required to make II available on the identity.internetcomputer.org domain.
+    // Required to make II available on custom domains (e.g. backend.id.ai).
     // See https://internetcomputer.org/docs/current/developer-docs/production/custom-domain/#custom-domains-on-the-boundary-nodes
     assets.push(Asset {
         url_path: "/.well-known/ic-domains".to_string(),
@@ -106,21 +67,6 @@ pub fn get_static_assets(config: &InternetIdentityInit) -> Vec<Asset> {
         content_type: ContentType::OCTETSTREAM,
     });
 
-    if let Some(related_origins) = &config.related_origins {
-        // Required to share passkeys with the different domains. Maximum of 5 labels.
-        // See https://web.dev/articles/webauthn-related-origin-requests#step_2_set_up_your_well-knownwebauthn_json_file_in_site-1
-        let content = json!({
-            "origins": related_origins,
-        })
-        .to_string()
-        .into_bytes();
-        assets.push(Asset {
-            url_path: "/.well-known/webauthn".to_string(),
-            content,
-            encoding: ContentEncoding::Identity,
-            content_type: ContentType::JSON,
-        });
-    }
     assets
 }
 

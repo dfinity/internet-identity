@@ -30,9 +30,6 @@ For more information, see [What is Internet Identity?](https://internetcomputer.
   - [Architecture Overview](#architecture-overview)
   - [Building with Docker](#building-with-docker)
   - [Integration with Internet Identity](#integration-with-internet-identity)
-- [Build Features and Flavors](#build-features-and-flavors)
-  - [Features](#features)
-  - [Flavors](#flavors)
 - [Stable Memory Compatibility](#stable-memory-compatibility)
 - [Getting Help](#getting-help)
 - [Links](#links)
@@ -102,9 +99,7 @@ $ ./scripts/docker-build
 
 The [`Dockerfile`](./Dockerfile) specifies build instructions for Internet Identity. Building the `Dockerfile` will result in a scratch container that contains the Wasm module at `/internet_identity.wasm.gz`.
 
-> 💡 The build can be customized with [build features](#build-features-and-flavors).
-
-We recommend using the [`docker-build`](./scripts/docker-build) script. It simplifies the usage of [build features](#build-features-and-flavors) and extracts the Wasm module from the final scratch container.
+We recommend using the [`docker-build`](./scripts/docker-build) script. It extracts the Wasm module from the final scratch container.
 
 > 💡 You can find instructions for building the code without Docker in the [HACKING] document.
 
@@ -113,51 +108,6 @@ We recommend using the [`docker-build`](./scripts/docker-build) script. It simpl
 The [`using-dev-build`](./demos/using-dev-build) demo shows a documented example project that integrates Internet Identity. For more, please refer to the [Client Authentication Protocol section](https://internetcomputer.org/docs/current/references/ii-spec#client-authentication-protocol) of the [Internet Identity Specification][spec] to integration Internet Identity in your app from scratch. For a just-add-water approach using the [agent-js](https://github.com/dfinity/agent-js) library (also used by `using-dev-build`), check out Kyle Peacock's [blogpost](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/).
 
 If you're interested in the infrastructure of how to get the Internet Identity canister and how to test it within your app, check out [`using-dev-build`](./demos/using-dev-build), which uses the Internet Identity development canister.
-
-## Build Features and Flavors
-
-The Internet Identity build can be customized to include [features](#features) that are
-useful when developing and testing. We provide pre-built [flavors](#flavors)
-of Internet Identity that include different sets of features.
-
-### Features
-
-These options can be used both when building [with docker](#building-with-docker) and
-[without docker][hacking]. The features are enabled by setting the corresponding
-environment variable to `1`. Any other string, as well as not setting the
-environment variable, will disable the feature.
-
-For instance:
-
-```bash
-$ II_FETCH_ROOT_KEY=1 dfx build
-$ II_DUMMY_CAPTCHA=1 II_DUMMY_AUTH=1 ./scripts/docker-build
-```
-
-⚠️ These options should only ever be used during development as they effectively poke security holes in Internet Identity
-
-The features are described below:
-
-<!-- NOTE: If you add a feature here, add it to 'features.ts' in the frontend
-codebase too, even if the feature only impacts the canister code and not the
-frontend. -->
-
-| Environment variable | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `II_FETCH_ROOT_KEY`  | When enabled, this instructs the frontend code to fetch the "root key" from the replica.<br/>The Internet Computer (https://ic0.app) uses a private key to sign responses. This private key not being available locally, the (local) replica generates its own. This option effectively tells the Internet Identity frontend to fetch the public key from the replica it connects to. When this option is _not_ enabled, the Internet Identity frontend code will use the (hard coded) public key of the Internet Computer. |
-| `II_DUMMY_CAPTCHA`   | When enabled, the CAPTCHA challenge (sent by the canister code to the frontend code) is always the known string `"a"`. This is useful for automated testing.                                                                                                                                                                                                                                                                                                                                                                |
-| `II_DUMMY_AUTH`      | When enabled, the frontend code will use a known, stable private key for registering anchors and authenticating. This means that all anchors will have the same public key(s). In particular this bypasses the WebAuthn flows (TouchID, Windows Hello, etc), which simplifies automated testing.                                                                                                                                                                                                                            |
-| `II_DEV_CSP`         | When enabled, the content security policy is weakend to allow connections to II using HTTP and allow II to connect via http in order to facilitate development.                                                                                                                                                                                                                                                                                                                                                             |
-
-### Flavors
-
-We offer some pre-built Wasm modules that contain flavors, i.e. sets of features targeting a particular use case. Flavors can be downloaded from the table below for the latest release or from the [release page](https://github.com/dfinity/internet-identity/releases) for a particular release.
-
-| Flavor      | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------: |
-| Production  | This is the production build deployed to https://identity.internetcomputer.org. Includes none of the build features.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz) |
-| Test        | This flavor is used by Internet Identity's test suite. It fully supports authentication but uses a known CAPTCHA value for test automation. Includes the following features: <br/><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li></ul>                                                                                                                                                                                                                                                                                                                                                                                           |    [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz)    |
-| Development | This flavor contains a version of Internet Identity that effectively performs no checks. It can be useful for external developers who want to integrate Internet Identity in their project and care about the general Internet Identity authentication flow, without wanting to deal with authentication and, in particular, WebAuthentication. Includes the following features: <br/><ul><li><code>II_FETCH_ROOT_KEY</code></li><li><code>II_DUMMY_CAPTCHA</code></li><li><code>II_DUMMY_AUTH</code></li><li><code>II_DEV_CSP</code></li></ul><br/>See the [`using-dev-build`](demos/using-dev-build/README.md) project for an example on how to use this flavor. |    [💾](https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz)     |
 
 ## Stable Memory Compatibility
 

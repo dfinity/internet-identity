@@ -308,17 +308,19 @@
     <div class="flex flex-1 flex-col gap-5">
       <div class="flex flex-col gap-3">
         <p
-          class="text-text-tertiary text-center text-xs md:text-left md:text-sm"
+          class="text-text-tertiary text-center text-xs md:text-start md:text-sm"
         >
           {$t`Understanding Internet Identity`}
         </p>
         <p
-          class="text-text-primary text-center text-3xl font-semibold md:text-left md:text-4xl"
+          class="text-text-primary text-center text-3xl font-semibold md:text-start md:text-4xl"
         >
           {$t`FAQs`}
         </p>
       </div>
-      <p class="text-text-tertiary text-center text-sm md:text-left md:text-lg">
+      <p
+        class="text-text-tertiary text-center text-sm md:text-start md:text-lg"
+      >
         <Trans>
           Everything you need to know about Internet Identity, your private,
           secure, and easy way to log in to apps on the Internet Computer.
@@ -555,10 +557,9 @@
               </span>
               While passkeys are becoming more mature, they are not yet mainstream
               for everyone. We've observed a 50% drop-off rate in our registration
-              flow, indicating a need for alternative authentication methods. To
-              make Internet Identity accessible to an even wider audience, we've
-              integrated with Google, Apple and Microsoft as alternative authentication
-              options.
+              flow, indicating a need for alternative authentication methods. To make
+              Internet Identity accessible to an even wider audience, we've integrated
+              with Google, Apple and Microsoft as alternative authentication options.
             </Trans>
           </li>
         </ul>

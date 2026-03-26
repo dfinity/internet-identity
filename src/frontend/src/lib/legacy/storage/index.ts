@@ -358,7 +358,11 @@ const computePrincipalDigest = async ({
   const buff = concatUint8Arrays([principal, principalLen]);
 
   // Create the digest
-  const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
+  const digestBytes = await crypto.subtle.sign(
+    "HMAC",
+    hasher,
+    new Uint8Array(buff),
+  );
   return arrayBufferToBase64(digestBytes);
 };
 
@@ -398,7 +402,11 @@ const computeOriginDigest = async ({
   const buff = concatUint8Arrays([origin, originLen]);
 
   // Create the digest
-  const digestBytes = await crypto.subtle.sign("HMAC", hasher, buff);
+  const digestBytes = await crypto.subtle.sign(
+    "HMAC",
+    hasher,
+    new Uint8Array(buff),
+  );
   return arrayBufferToBase64(digestBytes);
 };
 

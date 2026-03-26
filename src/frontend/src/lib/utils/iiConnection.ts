@@ -62,6 +62,7 @@ import {
   WebauthnAuthenticationEvents,
 } from "./analytics/webauthnAuthenticationFunnel";
 import { HARDWARE_KEY_TEST } from "$lib/state/featureFlags";
+import { frontendCanisterConfig } from "$lib/globals";
 
 /*
  * A (dummy) identity that always uses the same keypair. The secret key is
@@ -72,7 +73,7 @@ export class DummyIdentity
   extends Ed25519KeyIdentity
   implements IIWebAuthnIdentity
 {
-  public rawId: ArrayBuffer;
+  public rawId: Uint8Array;
 
   public constructor() {
     const key = Ed25519KeyIdentity.generate(new Uint8Array(32));
@@ -141,7 +142,7 @@ export type { ChallengeResult } from "$lib/generated/internet_identity_types";
  * alternate implementations (such as the dummy identity).
  */
 export interface IIWebAuthnIdentity extends SignIdentity {
-  rawId: ArrayBuffer;
+  rawId: Uint8Array;
   aaguid?: Uint8Array;
 
   getAuthenticatorAttachment(): AuthenticatorAttachment | undefined;
@@ -500,6 +501,7 @@ export class Connection {
           e,
           "unknown error",
         )}, ${await diagnosticInfo()}`,
+        { cause: e },
       );
     }
 
@@ -624,7 +626,7 @@ export class Connection {
 
     const shouldFetchRootKey =
       features.FETCH_ROOT_KEY ||
-      (this.canisterConfig.fetch_root_key[0] ?? false);
+      (frontendCanisterConfig.fetch_root_key[0] ?? false);
     const agent = await HttpAgent.create({
       identity,
       host: inferHost(),

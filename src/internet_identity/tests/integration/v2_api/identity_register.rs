@@ -93,13 +93,15 @@ fn should_not_exceed_configured_identity_range() {
     create_identity_with_authn_method(&env, canister_id, &sample_webauthn_authn_method(1));
 
     let flow_principal = test_principal(0);
-    api_v2::identity_registration_start(&env, canister_id, flow_principal)
+    let result = api_v2::identity_registration_start(&env, canister_id, flow_principal)
         .expect("API call failed")
         .expect("registration start failed");
 
-    api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
-        .expect("API call failed")
-        .expect("check_captcha failed");
+    if let RegistrationFlowNextStep::CheckCaptcha { .. } = result.next_step {
+        api_v2::check_captcha(&env, canister_id, flow_principal, "a".to_string())
+            .expect("API call failed")
+            .expect("check_captcha failed");
+    }
 
     let observed = api_v2::identity_registration_finish(
         &env,

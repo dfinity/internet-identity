@@ -24,7 +24,7 @@ export default ts.config(
     },
   },
   {
-    files: ["**/*.svelte"],
+    files: ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js"],
 
     languageOptions: {
       parserOptions: {
@@ -35,7 +35,7 @@ export default ts.config(
   {
     languageOptions: {
       parserOptions: {
-        project: ["./tsconfig.json"],
+        project: ["./tsconfig.eslint.json"],
       },
     },
   },
@@ -55,9 +55,11 @@ export default ts.config(
       ],
       "require-await": ["error"],
       "@typescript-eslint/no-floating-promises": ["error"],
+      // @see https://github.com/sveltejs/eslint-plugin-svelte/issues/1353
+      "svelte/no-navigation-without-resolve": "off",
     },
   },
   {
-    ignores: ["src/frontend/src/lib/generated/*", "src/showcase/.astro/*"],
+    ignores: ["src/frontend/src/lib/generated/*"],
   },
 );

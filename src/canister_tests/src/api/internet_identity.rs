@@ -493,3 +493,20 @@ pub fn get_attributes(
 
 /// A "compatibility" module for the previous version of II to handle API changes.
 pub mod compat {}
+
+pub fn count_passkeys(env: &PocketIc, canister_id: CanisterId) -> Result<u64, RejectResponse> {
+    query_candid(env, canister_id, "count_passkeys", ()).map(|(x,)| x)
+}
+
+pub fn list_anchor_migration_current_batch_id(
+    env: &PocketIc,
+    canister_id: CanisterId,
+) -> Result<u64, RejectResponse> {
+    query_candid(
+        env,
+        canister_id,
+        "list_anchor_migration_current_batch_id",
+        (),
+    )
+    .map(|(x,)| x)
+}

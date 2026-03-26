@@ -1,7 +1,7 @@
 import { DROP_WAVE_ANIMATION } from "$lib/components/backgrounds/constants";
 import type { FlairAnimationOptions } from "$lib/components/backgrounds/FlairCanvas";
 
-type TriggerFunction = (opts: FlairAnimationOptions) => Promise<void>;
+export type TriggerFunction = (opts: FlairAnimationOptions) => Promise<void>;
 
 class AnimationDispatcher {
   #triggerFunction: TriggerFunction | null = null;

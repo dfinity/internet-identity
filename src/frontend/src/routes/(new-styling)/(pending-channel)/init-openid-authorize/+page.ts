@@ -1,10 +1,10 @@
 import { redirect } from "@sveltejs/kit";
-import { canisterConfig } from "$lib/globals";
+import { backendCanisterConfig } from "$lib/globals";
 import { PageLoad } from "./$types";
 
 export const load: PageLoad = ({ url }) => {
   const issuer = url.searchParams.get("openid");
-  const config = canisterConfig.openid_configs[0]?.find(
+  const config = backendCanisterConfig.openid_configs[0]?.find(
     (config) => issuer !== undefined && config.issuer === issuer,
   );
   if (config === undefined) {

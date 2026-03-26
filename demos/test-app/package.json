@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@icp-sdk/core": "*",
+    "@icp-sdk/core": "^4.2.3",
     "@slide-computer/signer": "^4.2.0",
     "@slide-computer/signer-web": "^4.2.0",
     "@noble/hashes": "*",
@@ -21,12 +21,11 @@
   "devDependencies": {
     "@dfinity/internet-identity-vc-api": "*",
     "@dfinity/internet-identity-vite-plugins": "*",
-    "@icp-sdk/core": "^4.2.3",
     "@types/react": "^18.2.38",
     "@types/react-dom": "^18.2.17",
-    "@vitejs/plugin-react": "^4.2.0",
+    "@vitejs/plugin-react": "^5.1.4",
     "typescript": "5.2.2",
-    "vite": "^6.4.1",
-    "vite-plugin-node-polyfills": "^0.23.0"
+    "vite": "^7.3.1",
+    "vite-plugin-node-polyfills": "^0.25.0"
   }
 }

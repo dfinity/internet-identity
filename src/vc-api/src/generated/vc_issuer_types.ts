@@ -1,14 +1,10 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export type ArgumentValue = { 'Int' : number } |
   { 'String' : string };
 /**
- * Candid interface of the example VC issuer canister.
- * The interface contains both the functionality required by the VC-spec
- * (https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md)
- * and additional APIs for configuring the canister and using it for testing.
  * Specification of a requested credential.
  */
 export interface CredentialSpec {
@@ -33,9 +29,6 @@ export interface GetCredentialRequest {
   'prepared_context' : [] | [Uint8Array | number[]],
   'credential_spec' : CredentialSpec,
 }
-/**
- * Options related to HTTP handling
- */
 export type HeaderField = [string, string];
 export interface HttpRequest {
   'url' : string,
@@ -124,13 +117,6 @@ export interface IssuerConfig {
   'frontend_hostname' : string,
 }
 /**
- * Types for requesting issuance of a credential.
- * The issuance proceeds in two steps:
- * - `prepare_credential`, and
- * - `get_credential`
- * where the split of work between the two steps depends on the specifics of the issuer,
- * and the second second step returns the actual credential (if any).
- * The two steps can use `prepared_context`-value to transfer information between them.
  * Types for `prepare_credential`.
  */
 export interface PrepareCredentialRequest {

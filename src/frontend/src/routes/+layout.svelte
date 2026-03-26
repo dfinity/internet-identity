@@ -1,6 +1,6 @@
 <script lang="ts">
   import { analytics, initAnalytics } from "$lib/utils/analytics/analytics";
-  import { canisterConfig, getPrimaryOrigin } from "$lib/globals";
+  import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
   import { onMount } from "svelte";
   import { page } from "$app/state";
 
@@ -57,7 +57,7 @@
     });
 
     // Initialize analytics
-    initAnalytics(canisterConfig.analytics_config[0]?.[0]);
+    initAnalytics(frontendCanisterConfig.analytics_config[0]?.[0]);
   });
 </script>
 

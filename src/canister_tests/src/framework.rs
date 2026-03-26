@@ -84,6 +84,20 @@ lazy_static! {
         get_wasm_path("ARCHIVE_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
 
+    /** The gzipped Wasm module for the current II frontend build, i.e. the one we're testing */
+    pub static ref II_FRONTEND_WASM: Vec<u8> = {
+        let def_path = path::PathBuf::from("..").join("..").join("internet_identity_frontend.wasm.gz");
+        let err = format!("
+        Could not find Internet Identity Frontend Wasm module for current build.
+
+        I will look for it at {:?}, and you can specify another path with the environment variable II_FRONTEND_WASM (note that I run from {:?}).
+
+        In order to build the Wasm module, please run the following command:
+            ./scripts/build --frontend
+        ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
+        get_wasm_path("II_FRONTEND_WASM".to_string(), &def_path).expect(&err)
+    };
+
     /** Empty WASM module (without any pre- and post-upgrade hooks. Useful to initialize a canister before loading a stable memory backup. */
     pub static ref EMPTY_WASM: Vec<u8> = vec![0, 0x61, 0x73, 0x6D, 1, 0, 0, 0];
 }
@@ -177,6 +191,18 @@ pub fn install_ii_canister_with_arg_and_cycles(
     canister_id
 }
 
+pub fn install_ii_frontend_canister(
+    env: &PocketIc,
+    wasm: Vec<u8>,
+    arg: InternetIdentityFrontendArgs,
+) -> CanisterId {
+    let bytes =
+        candid::encode_one(arg).expect("error encoding II frontend installation arg as candid");
+    let canister_id = env.create_canister();
+    env.install_canister(canister_id, wasm, bytes, None);
+    canister_id
+}
+
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
@@ -186,6 +212,10 @@ pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
             entries_fetch_limit: 10,
         }),
         canister_creation_cycles_cost: Some(0),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaEnabled),
+        }),
         ..InternetIdentityInit::default()
     })
 }

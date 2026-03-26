@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "PO-Revision-Date: \n"
-"Last-Translator: \n"
-"Language-Team: \n"
+"Last-Translator: Muhammad Umar\n"
+"Language-Team: Muhammad Abdullah, Muhammad Umar\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "{0} logo"
@@ -20,7 +20,7 @@ msgid "{0} user"
 msgstr "{0} صارف"
 
 msgid "{application} has moved to the new Internet Identity"
-msgstr "{application} نئی Internet Identity پر منتقل ہو گیا ہے"
+msgstr "{application} نئی Internet Identity پر منتقل ہو گئی ہے"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹ کی حد تک پہنچ چکے ہیں۔} other {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹس کی حد تک پہنچ چکے ہیں۔}}"
@@ -122,13 +122,13 @@ msgid "Before getting started, find a private place and have your recovery phras
 msgstr "شروع کرنے سے پہلے کسی نجی جگہ پر جائیں اور اپنا ریکوری فریز تیار رکھیں۔ اپنی شناخت کے تحفظ کے لیے اسے خفیہ رکھیں۔"
 
 msgid "Before you continue"
-msgstr "جاری رکھنے سے پہلے"
+msgstr "آگے بڑھنے سے پہلے"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
 msgstr "اس فیچر کو فعال کر کے، آپ ایک ہی ایپ کے لیے ایک سے زیادہ اکاؤنٹ بنا سکتے ہیں۔ اکاؤنٹس کے درمیان آسانی سے سوئچ کریں (مثلاً کام، ذاتی، یا ڈیمو)۔"
 
 msgid "Can't find your identity?"
-msgstr "اپنی شناخت نہیں مل رہی؟"
+msgstr "کیا آپ کو اپنی شناخت نہیں مل رہی؟"
 
 msgid "Cancel"
 msgstr "منسوخ کریں"
@@ -137,7 +137,7 @@ msgid "CAPTCHA characters"
 msgstr "CAPTCHA حروف"
 
 msgid "Characters are case-sensitive"
-msgstr "حروف بڑے اور چھوٹے (case-sensitive) ہوتے ہیں"
+msgstr "حروف بڑے اور چھوٹے ہونے کے لحاظ سے حساس ہوتے ہیں"
 
 msgid "Check out the other domains:"
 msgstr "دیگر ڈومینز دیکھیں:"
@@ -215,7 +215,7 @@ msgid "Create account"
 msgstr "اکاؤنٹ بنائیں"
 
 msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
-msgstr "بایومیٹرکس یا سیکیورٹی کی کا استعمال کرتے ہوئے پاس کی کے ساتھ ایک شناخت بنائیں۔ آپ کا ڈیٹا کبھی بھی آپ کے آلے سے باہر نہیں جاتا۔"
+msgstr "بایومیٹرکس یا سیکیورٹی کلید استعمال کرتے ہوئے پاس کی کے ساتھ اپنی شناخت بنائیں۔ آپ کا ڈیٹا کبھی بھی آپ کے آلے سے باہر نہیں جاتا۔"
 
 msgid "Create identity"
 msgstr "شناخت بنائیں"
@@ -254,7 +254,7 @@ msgid "Default"
 msgstr "ڈیفالٹ"
 
 msgid "Discoverable passkeys"
-msgstr "دریافت پذیر پاس کیز"
+msgstr "قابلِ دریافت پاس کیز"
 
 msgid "Dismiss"
 msgstr "رد کریں"
@@ -357,7 +357,7 @@ msgid "Home"
 msgstr "ہوم"
 
 msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
-msgstr "Google، Microsoft اور Apple کی انٹیگریشنز Internet Identity کے ساتھ کیسے کام کرتی ہیں؟"
+msgstr "گوگل، مائیکروسافٹ اور ایپل کے انضمام Internet Identity کے ساتھ کیسے کام کرتے ہیں؟"
 
 msgid "How do passkeys work?"
 msgstr "پاس کیز کیسے کام کرتی ہیں؟"
@@ -372,7 +372,7 @@ msgid "I Acknowledge"
 msgstr "میں اقرار کرتا ہوں"
 
 msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
-msgstr "میں اپنے ریکوری فریز کا ذمہ دار ہوں اور گم ہو جانے کی صورت میں اسے Internet Identity سے دوبارہ حاصل نہیں کیا جا سکتا۔"
+msgstr "میں اپنی ریکوری فریز کا خود ذمہ دار ہوں، اور اگر یہ ضائع ہو جائے تو Internet Identity اسے دوبارہ فراہم نہیں کر سکتی۔"
 
 msgid "I have written it down"
 msgstr "میں نے اسے لکھ لیا ہے"
@@ -429,7 +429,7 @@ msgid "Internet Identity is an authentication system for applications running on
 msgstr "Internet Identity <0>Internet Computer</0> پر چلنے والی ایپلی کیشنز کے لیے ایک توثیقی نظام ہے۔ روایتی یوزرنیم اور پاس ورڈز کے بجائے، یہ <1>پاس کیز</1> کے ذریعے بنائی گئی کیز یا Google، Microsoft یا Apple جیسے دیگر توثیقی نظام استعمال کرتی ہے۔"
 
 msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
-msgstr "Internet Identity اتنی ہی محفوظ ہے جتنے وہ تصدیقی طریقے جو یہ استعمال کرتی ہے — جیسے Google، Apple، Microsoft یا پاس کیز۔ یعنی یہ جدید ترین سیکیورٹی پر مبنی ہے۔ جب آپ پاس کیز منتخب کرتے ہیں تو رسائی آپ کے آلے کے ان لاک طریقے (Face ID یا فنگرپرنٹ) سے محفوظ ہوتی ہے، جس سے یہ اتنا ہی آسان ہو جاتا ہے جتنا اپنا فون ان لاک کرنا۔"
+msgstr "Internet Identity اتنی ہی محفوظ ہے جتنے وہ تصدیقی طریقے جو یہ استعمال کرتی ہے — جیسے Google، Apple، Microsoft یا پاس کیز۔ یعنی یہ جدید ترین سیکیورٹی پر مبنی ہے۔ جب آپ پاس کیز منتخب کرتے ہیں تو رسائی آپ کے آلے کے ان لاک طریقے (چہرے کی شناخت یا فنگرپرنٹ) سے محفوظ ہوتی ہے، جس سے یہ اتنا ہی آسان ہو جاتا ہے جتنا اپنا فون ان لاک کرنا۔"
 
 msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
 msgstr "Internet Identity محفوظ طور پر سائن اِن کرنے اور پاس کیز کے ذریعے ایپس سے منسلک ہونے کے لیے استعمال ہوتی ہے۔"
@@ -447,22 +447,22 @@ msgid "Internet Identity then bridges the authentication with those providers wi
 msgstr "اس کے بعد Internet Identity ان فراہم کنندگان کی تصدیق کو Internet Computer کے ساتھ جوڑتی ہے۔ ان سروسز میں سے کسی ایک کے ذریعے تصدیق کر کے، Internet Identity اس بات کی توثیق کر سکتی ہے کہ آپ واقعی وہی ہیں، اور پھر Internet Computer پر چلنے والی ایپلیکیشنز کے لیے ایک الگ تصدیق تخلیق کرتی ہے۔"
 
 msgid "Invalid code link"
-msgstr "ناجائز کوڈ لنک"
+msgstr "غلط کوڈ لنک"
 
 msgid "Invalid code. Please check and try again."
-msgstr "ناجائز کوڈ۔ براہ کرم چیک کریں اور دوبارہ کوشش کریں۔"
+msgstr "غلط کوڈ۔ براہِ کرم چیک کریں اور دوبارہ کوشش کریں"
 
 msgid "Invalid recovery phrase"
-msgstr "ناجائز ریکوری فریز"
+msgstr "غلط ریکوری فریز"
 
 msgid "Invalid request"
-msgstr "ناجائز درخواست"
+msgstr "غلط درخواست"
 
 msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
-msgstr "کیا میرا Face ID یا فنگر پرنٹ Internet Identity میں محفوظ ہوتا ہے؟"
+msgstr "کیا میری چہرے کی شناخت یا فنگر پرنٹ Internet Identity میں محفوظ ہوتا ہے؟"
 
 msgid "It can be used at any time to recover your identity."
-msgstr "اسے کسی بھی وقت اپنی شناخت بازیافت کرنے کے لیے استعمال کیا جا سکتا ہے۔"
+msgstr "اسے کسی بھی وقت آپ کی شناخت بحال کرنے کے لیے استعمال کیا جا سکتا ہے"
 
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
 msgstr "ایسا لگتا ہے کہ آپ سوشل ایپ سے سائن اِن کرنے کی کوشش کر رہے ہیں۔ جاری رکھنے کے لیے ان اقدامات پر عمل کریں:"
@@ -471,7 +471,7 @@ msgid "It looks like you're trying to sign in from inside an app (such as X, Tel
 msgstr "ایسا لگتا ہے کہ آپ کسی ایپ (جیسے X، Telegram، یا Instagram) کے اندر سے سائن اِن کرنے کی کوشش کر رہے ہیں۔ اس ایپ کا بلٹ ان براؤزر معاون نہیں ہے۔"
 
 msgid "It seems like an invalid authentication request was received."
-msgstr "ایسا لگتا ہے کہ ایک ناجائز تصدیقی درخواست موصول ہوئی ہے۔"
+msgstr "ایسا لگتا ہے کہ ایک غلط تصدیق کی درخواست موصول ہوئی ہے"
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "ایسا لگتا ہے کہ سروس کے ساتھ رابطہ قائم نہیں ہو سکا۔ دوسرا براؤزر آزمائیں؛ اگر مسئلہ برقرار رہے تو سپورٹ سے رابطہ کریں۔"
@@ -492,7 +492,7 @@ msgid "Keep linked"
 msgstr "منسلک رکھیں"
 
 msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
-msgstr "فزیکل کی (physical key) پر رکھا گیا ہے۔ معاون آلات پر ٹیپ یا داخل کر کے تصدیق کریں۔"
+msgstr "یہ ایک فزیکل کی (Physical Key) پر محفوظ ہوتی ہے۔ سپورٹڈ ڈیوائسز پر اسے ٹیپ یا داخل (Insert) کر کے تصدیق کی جاتی ہے۔"
 
 msgid "Label it by use (e.g. 'Work' or 'Demo')."
 msgstr "اسے استعمال کے مطابق لیبل کریں (مثلاً 'کام' یا 'ڈیمو')۔"
@@ -510,7 +510,7 @@ msgid "Ledger has been confirmed to be incompatible."
 msgstr "Ledger کے غیر ہم آہنگ ہونے کی تصدیق ہو گئی ہے۔"
 
 msgid "Legacy"
-msgstr "پرانا (Legacy)"
+msgstr "پرانی"
 
 msgid "Let's get started"
 msgstr "آئیے شروع کرتے ہیں"
@@ -537,7 +537,7 @@ msgid "Lost access to your identity?"
 msgstr "اپنی شناخت تک رسائی کھو دی؟"
 
 msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
-msgstr "Google، Apple یا Microsoft کے ساتھ سائن اپ اور سائن اِن کو آسان بنائیں۔ وہی لاگ اِن طریقہ جس سے آپ واقف ہیں، مزید رازداری کے ساتھ۔"
+msgstr "گوگل، ایپل، یا مائیکروسافٹ کے ساتھ سائن اپ اور لاگ ان آسان بنائیں۔ وہی لاگ ان جسے آپ جانتے ہیں، اب زیادہ پرائیویسی کے ساتھ۔"
 
 msgid "Make sure no one can see what's on your screen or what you are writing."
 msgstr "اس بات کو یقینی بنائیں کہ کوئی بھی آپ کی سکرین یا آپ کی تحریر نہ دیکھ سکے۔"
@@ -597,7 +597,7 @@ msgid "No recovery phrase"
 msgstr "کوئی ریکوری فریز نہیں"
 
 msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
-msgstr "نہیں۔ آپ کا Face ID یا فنگرپرنٹ صرف آپ کی پاس کی بنانے یا اسے ان لاک کرنے کے لیے استعمال ہوتا ہے۔ آپ کا بایومیٹرک ڈیٹا کبھی بھی Internet Identity یا آپ کی استعمال کردہ کسی ویب سائٹ یا ایپ کے ساتھ شیئر نہیں ہوتا۔"
+msgstr "نہیں۔ آپ کی چہرے کی شناخت یا فنگر پرنٹ صرف پاس کی بنانے یا اسے اَن لاک کرنے کے لیے استعمال ہوتی ہے۔ آپ کا بایومیٹرک ڈیٹا کبھی بھی Internet Identity یا کسی بھی ایسی ویب سائٹ یا ایپ کے ساتھ شیئر نہیں کیا جاتا جسے آپ استعمال کرتے ہیں۔"
 
 msgid "NordPass has been confirmed to be incompatible."
 msgstr "NordPass کے غیر ہم آہنگ ہونے کی تصدیق ہو گئی ہے۔"
@@ -645,7 +645,7 @@ msgid "Passkeys are a secure and easy way to sign in without using passwords. Th
 msgstr "پاس کیز بغیر پاس ورڈ استعمال کیے سائن اِن کرنے کا ایک محفوظ اور آسان طریقہ ہیں۔ یہ آپ کے پاس ورڈ مینیجر (Google Password Manager، iCloud Keychain، 1Password وغیرہ) میں محفوظ ہوتی ہیں اور آپ کے فنگرپرنٹ، چہرے یا آلے کے کوڈ سے محفوظ کی جا سکتی ہیں۔"
 
 msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
-msgstr "پاس کیز فِشنگ کے خلاف مزاحمت کرتی ہیں، چوری کرنا مشکل ہوتی ہیں، اور Google، Apple یا Microsoft جیسے فراہم کنندگان کے ذریعے آپ کی ڈیوائسز میں ہم آہنگ ہو سکتی ہیں۔ <0>مزید جانیں۔</0>"
+msgstr "پاس کیز فشنگ کے خطرے سے محفوظ، چوری کے لیے مشکل، اور گوگل، ایپل، یا مائیکروسافٹ جیسے فراہم کنندگان کے ذریعے آپ کے تمام ڈیوائسز میں ہم آہنگ کی جا سکتی ہیں۔ <0>مزید جانیں۔</0>"
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
 msgstr "اس آلے یا براؤزر پر پاس کیز دستیاب نہیں ہیں۔ براہ کرم جاری رکھنے کے لیے رسائی کا کوئی دوسرا طریقہ منتخب کریں۔"
@@ -654,10 +654,10 @@ msgid "Passkeys are unavailable on this device or browser. Please choose another
 msgstr "اس آلے یا براؤزر پر پاس کیز دستیاب نہیں ہیں۔ براہ کرم جاری رکھنے کے لیے سائن اِن کا کوئی دوسرا طریقہ منتخب کریں۔"
 
 msgid "Passkeys not available here"
-msgstr "پاس کیز یہاں دستیاب نہیں ہیں"
+msgstr "پاس کیز اس آلے پر دستیاب نہیں ہیں"
 
 msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
-msgstr "پاس کیز آپ کے آلے پر محفوظ کرپٹوگرافک کلیدیں استعمال کرتی ہیں تاکہ Face ID، Touch ID، یا سیکیورٹی کی کے ذریعے محفوظ اور پاس ورڈ کے بغیر سائن اِن کیا جا سکے۔ آپ کا ڈیٹا کبھی بھی شیئر نہیں کیا جاتا۔"
+msgstr "پاس کیز آپ کے آلے میں محفوظ چابیاں استعمال کرتی ہیں تاکہ چہرہ، انگلی کی شناخت، یا حفاظتی چابی کے ذریعے محفوظ اور بغیر پاسورڈ کے لاگ ان کیا جا سکے۔ آپ کا ڈیٹا کبھی بھی شیئر نہیں ہوتا۔"
 
 msgid "Password-free"
 msgstr "پاس ورڈ کے بغیر"
@@ -669,7 +669,7 @@ msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1
 msgstr "براہِ کرم اپنے <0>موجودہ ڈیوائس</0> پر واپس جائیں اور دوبارہ کوشش کرنے کے لیے <1>دوبارہ شروع کریں</1> منتخب کریں۔"
 
 msgid "Powered by"
-msgstr "زیر اہتمام"
+msgstr "بذریعہ"
 
 msgid "Real Privacy"
 msgstr "حقیقی رازداری"
@@ -809,9 +809,11 @@ msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "کچھ غلط ہے!"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
 msgstr "کچھ غلط ہو گیا"
 
@@ -831,19 +833,19 @@ msgid "Store it safely"
 msgstr "اسے محفوظ طریقے سے سٹور کریں"
 
 msgid "Stored and usable only in {0} on the {1} device it was created on."
-msgstr "صرف {0} میں اس {1} آلے پر محفوظ اور قابل استعمال ہے جس پر یہ بنایا گیا تھا۔"
+msgstr "یہ صرف {1} ڈیوائس پر {0} میں محفوظ ہے اور صرف اسی ڈیوائس پر استعمال کیا جا سکتا ہے جس پر یہ بنایا گیا تھا۔"
 
 msgid "Stored and usable only in {0} on the device it was created on."
-msgstr "صرف {0} میں اس آلے پر محفوظ اور قابل استعمال ہے جس پر یہ بنایا گیا تھا۔"
+msgstr "یہ صرف اسی ڈیوائس پر {0} میں محفوظ اور استعمال کے قابل ہے جس پر اسے بنایا گیا تھا۔"
 
 msgid "Stored and usable only on the {0} device it was created on."
 msgstr "صرف اس {0} آلے پر محفوظ اور قابل استعمال ہے جس پر یہ بنایا گیا تھا۔"
 
 msgid "Stored in your {0} account and synced across your {1} devices."
-msgstr "آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے {1} آلات پر ہم آہنگ (synced) ہے۔"
+msgstr "یہ آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے {1} ڈیوائسز میں ہم آہنگ کیا جاتا ہے۔"
 
 msgid "Stored in your {0} account and synced across your devices."
-msgstr "آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے آلات پر ہم آہنگ (synced) ہے۔"
+msgstr "یہ آپ کے {0} اکاؤنٹ میں محفوظ ہے اور آپ کے تمام ڈیوائسز میں ہم آہنگ کیا جاتا ہے۔"
 
 msgid "Stored securely on your device, in your password manager, or on a security key."
 msgstr "آپ کے آلے، پاس ورڈ مینیجر، یا سیکیورٹی کی پر محفوظ طریقے سے سٹور کیا گیا ہے۔"
@@ -888,7 +890,7 @@ msgid "The passkey could not be identified, support unknown."
 msgstr "پاس کی کی شناخت نہیں ہو سکی، سپورٹ نامعلوم ہے۔"
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
-msgstr "فریز درست درج کیا گیا تھا لیکن یہ Internet Identity کے علاوہ کسی اور پراڈکٹ سے متعلق ہے۔"
+msgstr "فریز درست درج کی گئی ہے، لیکن یہ Internet Identity کے بجائے کسی اور پروڈکٹ سے متعلق ہے۔"
 
 msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
 msgstr "ایپلیکیشن کے ساتھ منسلک ہونے میں مسئلہ پیش آیا۔ دوسرا براؤزر آزمائیں؛ اگر مسئلہ برقرار رہے تو ڈویلپر سے رابطہ کریں۔"
@@ -900,7 +902,7 @@ msgid "This identity has already been upgraded to the new experience."
 msgstr "یہ شناخت پہلے ہی نئے تجربے پر اپ گریڈ ہو چکی ہے۔"
 
 msgid "This legacy passkey is no longer usable and should be removed."
-msgstr "یہ پرانی (legacy) پاس کی اب قابل استعمال نہیں ہے اور اسے ہٹا دینا چاہیے۔"
+msgstr "یہ پرانی پاس کی اب قابل استعمال نہیں ہے اور اسے ہٹا دینا چاہیے"
 
 msgid "This may take a few seconds"
 msgstr "اس میں کچھ سیکنڈ لگ سکتے ہیں"
@@ -909,22 +911,22 @@ msgid "This passkey is no longer associated with any identity."
 msgstr "یہ پاس کی اب کسی شناخت سے منسلک نہیں ہے۔"
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
-msgstr "اس YubiKey کا فرم ویئر (5.1) پرانا ہے جو غیر ہم آہنگ ہے۔"
+msgstr "اس YubiKey کا فرم ویئر پرانا (5.1) ہے اور یہ اس سسٹم کے ساتھ مطابقت نہیں رکھتا۔"
 
 msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
-msgstr "اس YubiKey کا فرم ویئر (5.2 - 5.4) پرانا ہے جو شاید غیر ہم آہنگ ہو۔"
+msgstr "اس YubiKey میں پرانے فرم ویئر (5.2 - 5.4) ہیں جو کہ غیر موافق ہوسکتے ہیں"
 
 msgid "This YubiKey has older firmware (5.2) that might be incompatible."
-msgstr "اس YubiKey کا فرم ویئر (5.2) پرانا ہے جو شاید غیر ہم آہنگ ہو۔"
+msgstr "اس YubiKey میں پرانا فرم ویئر (5.2) ہے جو شاید مطابقت نہیں رکھتا"
 
 msgid "This YubiKey has older firmware (5.4) that might be incompatible."
-msgstr "اس YubiKey کا فرم ویئر (5.4) پرانا ہے جو شاید غیر ہم آہنگ ہو۔"
+msgstr "اس YubiKey میں پرانا فرم ویئر (5.4) ہے جو شاید مطابقت نہیں رکھتا"
 
 msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
-msgstr "اس YubiKey کا فرم ویئر (5.5 - 5.6) پرانا ہے جو شاید غیر ہم آہنگ ہو۔"
+msgstr "اس YubiKey میں پرانے فرم ویئر (5.5 - 5.6) ہیں جو کہ غیر موافق ہوسکتے ہیں"
 
 msgid "This YubiKey has older firmware (5.6) that might be incompatible."
-msgstr "اس YubiKey کا فرم ویئر (5.6) پرانا ہے جو شاید غیر ہم آہنگ ہو۔"
+msgstr "اس YubiKey میں پرانا فرم ویئر (5.6) ہے جو شاید مطابقت نہیں رکھتا"
 
 msgid "To confirm it's you, enter below code on your <0>existing device</0>."
 msgstr "یہ تصدیق کرنے کے لیے کہ یہ آپ ہیں، اپنی <0>موجودہ ڈیوائس</0> پر نیچے دیا گیا کوڈ درج کریں۔"
@@ -987,7 +989,7 @@ msgid "Unsupported"
 msgstr "غیر معاون"
 
 msgid "Unsupported Browser"
-msgstr "غیر معاون براؤزر"
+msgstr "آپ کا براؤزر اس سروس کو سپورٹ نہیں کرتا"
 
 msgid "Unverified origin"
 msgstr "غیر تصدیق شدہ اوریجن"
@@ -1047,7 +1049,7 @@ msgid "Warning"
 msgstr "انتباہ"
 
 msgid "We didn't recognize that activation code."
-msgstr "ہمیں وہ ایکٹیویشن کوڈ نہیں پہچانا۔"
+msgstr "درج کیا گیا ایکٹیویشن کوڈ درست یا قابلِ شناخت نہیں ہے"
 
 msgid "Welcome, {name}!"
 msgstr "خوش آمدید، {name}!"
@@ -1077,7 +1079,7 @@ msgid "With passkeys, you can now use your fingerprint, face, or screen lock to 
 msgstr "پاس کیز کے ساتھ، اب آپ اپنی فنگرپرنٹ، چہرہ، یا سکرین لاک کا استعمال کر سکتے ہیں تاکہ جلدی اور محفوظ طریقے سے تصدیق کر سکیں کہ یہ واقعی آپ ہی ہیں۔"
 
 msgid "with your Internet Identity"
-msgstr "آپ کی Internet Identity کے ساتھ"
+msgstr "اپنی Internet Identity کے ذریعے"
 
 msgid "Word {position}"
 msgstr "لفظ {position}"
@@ -1119,7 +1121,7 @@ msgid "You no longer need to remember your identity number and can use your fing
 msgstr "اب آپ کو اپنا شناختی نمبر یاد رکھنے کی ضرورت نہیں ہے اور اس کے بجائے آپ فنگرپرنٹ، چہرہ یا سکرین لاک استعمال کر سکتے ہیں۔"
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
-msgstr "آپ اپنا ریکوری فریز دیکھنے والے ہیں، جسے Internet Identity محفوظ نہیں کرتی اور اسی لیے گم ہونے کی صورت میں اسے دوبارہ حاصل نہیں کیا جا سکتا، لہذا اسے آف لائن محفوظ رکھیں۔"
+msgstr "آپ اب اپنی ریکوری فریز دیکھنے والے ہیں۔ Internet Identity اسے محفوظ نہیں رکھتی، اس لیے اگر یہ گم ہو جائے تو دوبارہ حاصل نہیں کی جا سکتی۔ لہٰذا اسے آف لائن محفوظ رکھیں"
 
 msgid "You're about to sign in on a <0>new device</0>."
 msgstr "آپ ایک <0>نئی ڈیوائس</0> پر سائن اِن کرنے والے ہیں۔"
@@ -1128,7 +1130,7 @@ msgid "You're about to sign in."
 msgstr "آپ سائن اِن کرنے والے ہیں۔"
 
 msgid "You're about to unlink your {name} account."
-msgstr "آپ اپنا {name} اکاؤنٹ ان لنک کرنے والے ہیں۔"
+msgstr "آپ اپنے {name} اکاؤنٹ کا لنک ختم کرنے والے ہیں"
 
 msgid "You're all set. Your identity has been created."
 msgstr "سب تیار ہے۔ آپ کی شناخت بن گئی ہے۔"

@@ -10,8 +10,8 @@ import { DelegationChain, DelegationIdentity } from "@icp-sdk/core/identity";
 import { Session } from "$lib/stores/session.store";
 import { features } from "$lib/legacy/features";
 import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity";
-import { canisterConfig } from "$lib/globals";
-import { bytesToHex } from "@noble/hashes/utils";
+import { frontendCanisterConfig } from "$lib/globals";
+import { toHex } from "../utils";
 
 export class CredentialNotFound extends Error {
   constructor() {
@@ -43,7 +43,8 @@ export const authenticateWithPasskey = async ({
     canisterId,
   });
   const dummyAuth =
-    features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined;
+    features.DUMMY_AUTH ||
+    frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined;
   let identityNumber: bigint;
   const passkeyIdentity = dummyAuth
     ? DiscoverableDummyIdentity.useExisting()
@@ -63,7 +64,7 @@ export const authenticateWithPasskey = async ({
             // To help debug, log the credential id
             console.error(error);
             console.error(
-              `Error looking up device key ${bytesToHex(new Uint8Array(result.rawId))}`,
+              `Error looking up device key ${toHex(new Uint8Array(result.rawId))}`,
             );
             throw error;
           }
@@ -71,9 +72,7 @@ export const authenticateWithPasskey = async ({
       });
   if (dummyAuth) {
     identityNumber = (
-      await actor.lookup_device_key(
-        new Uint8Array(passkeyIdentity.getCredentialId()!),
-      )
+      await actor.lookup_device_key(passkeyIdentity.getCredentialId()!)
     )[0]!.anchor_number;
   }
   const delegation = await DelegationChain.create(
@@ -91,6 +90,6 @@ export const authenticateWithPasskey = async ({
   return {
     identity,
     identityNumber,
-    credentialId: new Uint8Array(passkeyIdentity.getCredentialId()!),
+    credentialId: passkeyIdentity.getCredentialId()!,
   };
 };

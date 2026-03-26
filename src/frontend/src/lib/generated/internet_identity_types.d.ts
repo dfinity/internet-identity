@@ -1,6 +1,6 @@
-import type { Principal } from '@dfinity/principal';
-import type { ActorMethod } from '@dfinity/agent';
-import type { IDL } from '@dfinity/candid';
+import type { Principal } from '@icp-sdk/core/principal';
+import type { ActorMethod } from '@icp-sdk/core/agent';
+import type { IDL } from '@icp-sdk/core/candid';
 
 export type Aaguid = Uint8Array | number[];
 export type AccountDelegationError = { 'NoSuchDelegation' : null } |
@@ -704,10 +704,6 @@ export type IdentityPropertiesReplaceError = {
  * enable/disable status (e.g. `opt null` disables a feature while `null` leaves it untouched).
  */
 export interface InternetIdentityInit {
-  /**
-   * Configuration to fetch root key or not from frontend assets
-   */
-  'fetch_root_key' : [] | [boolean],
   /**
    * Configuration to set the canister as production mode.
    * For now, this is used only to show or hide the banner.

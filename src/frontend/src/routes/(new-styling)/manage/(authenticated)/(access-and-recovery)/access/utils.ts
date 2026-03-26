@@ -3,8 +3,8 @@ import type {
   IdentityInfo,
   OpenIdCredential,
 } from "$lib/generated/internet_identity_types";
-import { bytesToHex } from "@noble/hashes/utils";
 import { Authenticated } from "$lib/stores/authentication.store";
+import { toHex } from "$lib/utils/utils";
 
 export type AccessMethod =
   | { passkey: AuthnMethodData }
@@ -62,7 +62,7 @@ export const toKey = (accessMethod: AccessMethod): string => {
     "passkey" in accessMethod &&
     "WebAuthn" in accessMethod.passkey.authn_method
   ) {
-    return bytesToHex(
+    return toHex(
       new Uint8Array(accessMethod.passkey.authn_method.WebAuthn.credential_id),
     );
   }
@@ -85,8 +85,8 @@ export const isCurrentAccessMethod = (
     "WebAuthn" in accessMethod.passkey.authn_method
   ) {
     return (
-      bytesToHex(authenticated.authMethod.passkey.credentialId) ===
-      bytesToHex(
+      toHex(authenticated.authMethod.passkey.credentialId) ===
+      toHex(
         new Uint8Array(
           accessMethod.passkey.authn_method.WebAuthn.credential_id,
         ),

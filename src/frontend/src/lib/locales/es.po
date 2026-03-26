@@ -9,8 +9,8 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "PO-Revision-Date: \n"
-"Last-Translator: \n"
-"Language-Team: \n"
+"Last-Translator: Llorenç Muntaner Perello\n"
+"Language-Team: Llorenç Muntaner Perello\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 msgid "{0} logo"
@@ -809,9 +809,11 @@ msgstr "Iniciando sesión de forma segura"
 msgid "Simplify your sign-in"
 msgstr "Simplifica tu inicio de sesión"
 
+msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
-msgstr "¡Algo salió mal!"
+msgstr "¡Algo va mal!"
 
+msgctxt "Fallback error message when an unexpected error is caught"
 msgid "Something went wrong"
 msgstr "Algo salió mal"
 

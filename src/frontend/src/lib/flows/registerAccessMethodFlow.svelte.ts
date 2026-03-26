@@ -1,4 +1,4 @@
-import { anonymousActor, canisterConfig } from "$lib/globals";
+import { anonymousActor, frontendCanisterConfig } from "$lib/globals";
 import { secureRandomId, throwCanisterError, waitFor } from "$lib/utils/utils";
 import { passkeyAuthnMethodData } from "$lib/utils/authnMethodData";
 import { authenticateWithSession } from "$lib/utils/authentication";
@@ -10,6 +10,7 @@ import { DiscoverableDummyIdentity } from "$lib/utils/discoverableDummyIdentity"
 import { DiscoverablePasskeyIdentity } from "$lib/utils/discoverablePasskeyIdentity";
 import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
 import { nanosToMillis } from "$lib/utils/time";
+import { SvelteDate, SvelteURL } from "svelte/reactivity";
 
 const POLL_INTERVAL = 3000; // Should be frequent enough
 
@@ -42,14 +43,14 @@ export class RegisterAccessMethodFlow {
   waitForExistingDevice = async (existingRegistrationId?: string) => {
     const registrationId = existingRegistrationId ?? secureRandomId(5);
     if (existingRegistrationId === undefined) {
-      this.#existingDeviceLink = new URL(
+      this.#existingDeviceLink = new SvelteURL(
         `/activate#${registrationId}`,
         window.location.origin,
       );
     }
     this.#view = "continueFromExistingDevice";
 
-    const expiration = new Date(Date.now() + 300000).getTime(); // 5 min
+    const expiration = new SvelteDate(Date.now() + 300000).getTime(); // 5 min
     while (Date.now() < expiration) {
       const identityNumber = (
         await anonymousActor.lookup_by_registration_mode_id(registrationId)
@@ -98,7 +99,8 @@ export class RegisterAccessMethodFlow {
     }
     const name = this.#identityName ?? this.#identityNumber.toString(10);
     const passkeyIdentity =
-      features.DUMMY_AUTH || canisterConfig.dummy_auth[0]?.[0] !== undefined
+      features.DUMMY_AUTH ||
+      frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
         ? await DiscoverableDummyIdentity.createNew(name)
         : await DiscoverablePasskeyIdentity.createNew(name);
     const credentialId = passkeyIdentity.getCredentialId();

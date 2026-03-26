@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
   import AuthPanel from "$lib/components/layout/AuthPanel.svelte";
-  import { fly, scale } from "svelte/transition";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import MigrationIllustration from "$lib/components/illustrations/MigrationIllustration.svelte";
   import { XIcon } from "@lucide/svelte";
@@ -17,15 +16,12 @@
 
   const { children }: LayoutProps = $props();
 
-  let animationWrapperRef = $state<HTMLElement>();
   let isUpgradeCollapsed = $state(
     localStorage.getItem("ii-guided-upgrade-collapsed") === "true" ||
       $MIN_GUIDED_UPGRADE,
   );
   let upgradePanelHeight = $state<number>(224);
   let isUpgrading = $state(false);
-
-  const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -137,44 +133,19 @@
 {/snippet}
 
 <div class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100">
-  {#if selectedIdentity !== undefined}
-    {#key selectedIdentity.identityNumber}
-      <div
-        bind:this={animationWrapperRef}
-        class="relative col-start-1 row-start-1 flex flex-col gap-5"
-        in:fly={{ duration: 300, y: 60, delay: 200 }}
-        out:scale={{ duration: 500, start: 0.9 }}
-        onoutrostart={() =>
-          animationWrapperRef?.setAttribute("aria-hidden", "true")}
-      >
-        {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
-          {@render upgradePanel()}
-        {/if}
-        <AuthPanel
-          class={[
-            "z-1",
-            $GUIDED_UPGRADE && isUpgradeCollapsed && "rounded-t-none",
-          ]}
-        >
-          {@render children()}
-        </AuthPanel>
-      </div>
-    {/key}
-  {:else}
-    <div class="relative col-start-1 row-start-1 flex flex-col gap-5">
-      {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
-        {@render upgradePanel()}
-      {/if}
-      <AuthPanel
-        class={[
-          "z-1",
-          ($GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE) &&
-            isUpgradeCollapsed &&
-            "rounded-t-none",
-        ]}
-      >
-        {@render children()}
-      </AuthPanel>
-    </div>
-  {/if}
+  <div class="relative col-start-1 row-start-1 flex flex-col gap-5">
+    {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
+      {@render upgradePanel()}
+    {/if}
+    <AuthPanel
+      class={[
+        "z-1",
+        ($GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE) &&
+          isUpgradeCollapsed &&
+          "rounded-t-none",
+      ]}
+    >
+      {@render children()}
+    </AuthPanel>
+  </div>
 </div>

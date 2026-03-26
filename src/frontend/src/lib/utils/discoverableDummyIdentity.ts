@@ -1,10 +1,10 @@
 import { PublicKey, type Signature } from "@icp-sdk/core/agent";
 import { Ed25519KeyIdentity } from "@icp-sdk/core/identity";
 import { DiscoverablePasskeyIdentity } from "./discoverablePasskeyIdentity";
-import { canisterConfig } from "$lib/globals";
+import { frontendCanisterConfig } from "$lib/globals";
 
 const getSeedIndex = (): bigint => {
-  if (canisterConfig.dummy_auth[0]?.[0]?.prompt_for_index === true) {
+  if (frontendCanisterConfig.dummy_auth[0]?.[0]?.prompt_for_index === true) {
     const value = prompt("Enter seed index", "0")?.trim();
     if (value === undefined) {
       // We need to create the same error as WebAuthn for the E2E to behave the same.
@@ -49,7 +49,7 @@ export class DiscoverableDummyIdentity extends DiscoverablePasskeyIdentity {
     return this.#identity.getPublicKey();
   }
 
-  getCredentialId(): ArrayBuffer | undefined {
+  getCredentialId(): Uint8Array | undefined {
     return this.#credentialId;
   }
 

@@ -4,7 +4,7 @@ import type {
 } from "$lib/generated/internet_identity_types";
 import { DerEncodedPublicKey } from "@icp-sdk/core/agent";
 
-export type CredentialId = ArrayBuffer;
+export type CredentialId = Uint8Array;
 export type CredentialData = {
   pubkey: DerEncodedPublicKey;
   credentialId: CredentialId;
@@ -12,7 +12,7 @@ export type CredentialData = {
 };
 
 const derFromPubkey = (pubkey: DeviceKey): DerEncodedPublicKey =>
-  new Uint8Array(pubkey).buffer as DerEncodedPublicKey;
+  new Uint8Array(pubkey) as DerEncodedPublicKey;
 
 export const convertToValidCredentialData = (
   device: Omit<DeviceData, "alias">,
@@ -30,7 +30,7 @@ export const convertToValidCredentialData = (
     return;
   }
   return {
-    credentialId: Buffer.from(device.credential_id[0]),
+    credentialId: new Uint8Array(device.credential_id[0]),
     pubkey: derFromPubkey(device.pubkey),
     origin: device.origin[0],
   };

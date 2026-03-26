@@ -56,7 +56,6 @@ const DEFAULT_INIT: InternetIdentityInit = {
       "https://identity.icp0.io",
     ],
   ],
-  fetch_root_key: [],
   enable_dapps_explorer: [],
   is_production: [],
   new_flow_origins: [],
@@ -104,10 +103,10 @@ describe("Connection.login", () => {
         const mockIdentity = {
           getPublicKey: () => {
             return {
-              toDer: () => new ArrayBuffer(0) as DerEncodedPublicKey,
-              toRaw: () => new ArrayBuffer(0),
-              rawKey: () => new ArrayBuffer(0),
-              derKey: () => new ArrayBuffer(0) as DerEncodedPublicKey,
+              toDer: () => new Uint8Array(0) as DerEncodedPublicKey,
+              toRaw: () => new Uint8Array(0),
+              rawKey: () => new Uint8Array(0),
+              derKey: () => new Uint8Array(0) as DerEncodedPublicKey,
             };
           },
         } as unknown as WebAuthnIdentity;
@@ -126,7 +125,7 @@ describe("Connection.login", () => {
               throw new DOMException("Error test", "NotAllowedError");
             }
             this._actualIdentity = mockIdentity;
-            return Promise.resolve(new ArrayBuffer(0) as Signature);
+            return Promise.resolve(new Uint8Array(0) as Signature);
           }
         }
 
@@ -590,7 +589,7 @@ describe("Connection.login", () => {
     const alias = "alias";
     const keyType = { platform: null };
     const purpose = { authentication: null };
-    const newPublicKey = new ArrayBuffer(0) as DerEncodedPublicKey;
+    const newPublicKey = new Uint8Array(0) as DerEncodedPublicKey;
     const protection = { protected: null };
 
     it("passes origin if origin less than 50 characters", async () => {

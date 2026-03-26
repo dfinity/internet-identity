@@ -60,6 +60,10 @@ impl<M: Memory + Clone> Storage<M> {
             // Save this value for future invocations.
             ANCHOR_MIGRATION_LAST_ANCHOR_ID.replace(Some(last_anchor_id));
 
+            // Note: clearing of `lookup_anchor_with_passkey_pubkey_hash_memory`
+            // (key type changed from [u8; 32] to Principal) is now done
+            // synchronously in `run_post_upgrade_migrations`.
+
             last_anchor_id
         };
 
@@ -79,11 +83,11 @@ impl<M: Memory + Clone> Storage<M> {
         // anchors within this entire batch failed to migrate.
         let mut batch_did_not_fail_completely = false;
 
-        // This is where the index migration happens. For each anchor in the batch, read it
-        // from storage and write it back, which updates the indices.
+        // force-sync the passkey pubkey index with empty previous data so that all current
+        // entries get added to that index (even if the StorableAnchor already existed).
         for anchor_number in begin..=end {
-            let anchor = match self.read(anchor_number) {
-                Ok(anchor) => anchor,
+            match self.force_sync_passkey_pubkey_index(anchor_number) {
+                Ok(_) => {}
                 Err(StorageError::AnchorNotFound { .. }) => {
                     ic_cdk::println!("Marking {} as <DUMMY ANCHOR>", anchor_number);
 
@@ -97,19 +101,18 @@ impl<M: Memory + Clone> Storage<M> {
                     // data in the future. Safe to unwrap while the name is shorter than
                     // `MAX_NAME_LENGTH` bytes.
                     anchor.set_name(Some("<DUMMY ANCHOR>".to_string())).unwrap();
-                    anchor
-                }
-                Err(err) => {
-                    let err = format!("r#{}:{:?}", anchor_number, err);
-                    errors.push(err);
-                    continue;
-                }
-            };
 
-            match self.write(anchor) {
-                Ok(_) => (),
+                    match self.write(anchor) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            let err = format!("w#{}:{:?}", anchor_number, err);
+                            errors.push(err);
+                            continue;
+                        }
+                    }
+                }
                 Err(err) => {
-                    let err = format!("w#{}:{:?}", anchor_number, err);
+                    let err = format!("idx#{}:{:?}", anchor_number, err);
                     errors.push(err);
                     continue;
                 }
@@ -225,6 +228,12 @@ mod sync_anchor_indices_tests {
         storage.write(a2.clone()).unwrap();
         storage.write(a3.clone()).unwrap();
 
+        // Clear the passkey pubkey hash index to simulate the state before the
+        // migration (StorableAnchors exist but the index is empty).
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .clear_new();
+
         const BATCH_SIZE: u64 = 3;
 
         reset_migration_state();
@@ -232,28 +241,28 @@ mod sync_anchor_indices_tests {
         // Run migration
         storage.sync_anchor_indices(0, BATCH_SIZE);
 
-        // Check that recovery phrase principals are indexed for anchors 1 and 3
-        let principal_1 = Principal::self_authenticating(pubkey(1));
-        let principal_2 = Principal::self_authenticating(pubkey(2));
-        let principal_3 = Principal::self_authenticating(pubkey(3));
+        // Check that passkey pubkey principals are indexed for anchors 2 and 3
+        let passkey_principal_2 = Principal::self_authenticating(pubkey(2));
+        let passkey_principal_4 = Principal::self_authenticating(pubkey(4));
+        let passkey_principal_1 = Principal::self_authenticating(pubkey(1));
 
         assert_eq!(
             storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_1),
-            Some(1)
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_2),
+            Some(2)
         );
         assert_eq!(
             storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_3),
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_4),
             Some(3)
         );
-        // Anchor 2 has no recovery device, so nothing indexed for its pubkey
+        // Anchor 1 only has a recovery phrase, no passkey
         assert_eq!(
             storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_2),
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_1),
             None
         );
 
@@ -278,8 +287,10 @@ mod sync_anchor_indices_tests {
         storage.write(a2.clone()).unwrap();
         storage.write(a3.clone()).unwrap();
 
+        // Clear the passkey pubkey hash index to simulate the state before the
+        // migration (StorableAnchors exist but the index is empty).
         storage
-            .lookup_anchor_with_recovery_phrase_principal_memory
+            .lookup_anchor_with_passkey_pubkey_hash_memory
             .clear_new();
 
         // Not all anchors will fit into the first batch
@@ -290,29 +301,21 @@ mod sync_anchor_indices_tests {
         // Run migration (1)
         storage.sync_anchor_indices(0, BATCH_SIZE);
 
-        // Check that recovery phrase principals are indexed for anchors 1 and 3
-        let principal_1 = Principal::self_authenticating(pubkey(1));
-        let principal_2 = Principal::self_authenticating(pubkey(2));
-        let principal_3 = Principal::self_authenticating(pubkey(3));
+        // Check passkey pubkey principal index: anchors 1 and 2 are in the first batch
+        let passkey_principal_2 = Principal::self_authenticating(pubkey(2));
+        let passkey_principal_4 = Principal::self_authenticating(pubkey(4));
 
         assert_eq!(
             storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_1),
-            Some(1)
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_2),
+            Some(2)
         );
-        // Anchor 2 has no recovery device, so nothing indexed for its pubkey
+        // Anchor 3's passkey not migrated yet
         assert_eq!(
             storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_2),
-            None
-        );
-        // Anchor 3 not migrated yet
-        assert_eq!(
-            storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_3),
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_4),
             None
         );
 
@@ -322,8 +325,8 @@ mod sync_anchor_indices_tests {
         // Now anchor 3 should be migrated
         assert_eq!(
             storage
-                .lookup_anchor_with_recovery_phrase_principal_memory
-                .get(&principal_3),
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_4),
             Some(3)
         );
 
@@ -344,6 +347,90 @@ mod sync_anchor_indices_tests {
 
         // Run migration
         storage.sync_anchor_indices(0, BATCH_SIZE);
+
+        assert_migration_completed(vec![]);
+    }
+
+    /// Regression test: the previous migration used `read()` + `write()`, which relies on
+    /// diff-based index syncing. When a `StorableAnchor` already existed in `stable_anchor_memory`
+    /// (written by a prior `write()` call), re-writing the same data produced an empty diff,
+    /// so no entries were added to `lookup_anchor_with_passkey_pubkey_hash_memory`.
+    /// This was the root cause of the index being nearly empty after a seemingly successful migration.
+    #[test]
+    fn regression_populates_passkey_index_when_storable_anchor_already_exists() {
+        let mut storage = Storage::new((1, 9), DefaultMemoryImpl::default());
+
+        // Create anchors with passkey devices and write them to storage.
+        // This populates `stable_anchor_memory` (the StorableAnchor entries).
+        let mut a1 = storage.allocate_anchor(111).unwrap();
+        let mut a2 = storage.allocate_anchor(222).unwrap();
+
+        a1.add_device(other_device(pubkey(10))).unwrap();
+        a2.add_device(other_device(pubkey(20))).unwrap();
+        a2.add_device(recovery_phrase(pubkey(30))).unwrap();
+
+        storage.write(a1).unwrap();
+        storage.write(a2).unwrap();
+
+        // At this point, `stable_anchor_memory` has StorableAnchor entries for both anchors
+        // AND the indices are populated (because `write()` synced them).
+        // Verify the indices are populated as a sanity check.
+        let passkey_principal_10 = Principal::self_authenticating(pubkey(10));
+        let passkey_principal_20 = Principal::self_authenticating(pubkey(20));
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_10),
+            Some(1)
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_20),
+            Some(2)
+        );
+
+        // Now clear ONLY the passkey pubkey hash index (not stable_anchor_memory) to
+        // simulate the real production scenario: StorableAnchors already exist, but the
+        // passkey pubkey hash index was introduced later and is empty.
+        storage
+            .lookup_anchor_with_passkey_pubkey_hash_memory
+            .clear_new();
+
+        // Confirm indices are now empty.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_10),
+            None
+        );
+        assert_eq!(
+            storage.lookup_anchor_with_passkey_pubkey_hash_memory.len(),
+            0
+        );
+
+        // Run the migration. The bug was that with the old read+write approach, the migration
+        // would see previous == current (both from stable_anchor_memory) and produce an empty
+        // diff, leaving the index unpopulated.
+        const BATCH_SIZE: u64 = 10;
+        reset_migration_state();
+        storage.sync_anchor_indices(0, BATCH_SIZE);
+
+        // After the fix (force_sync_passkey_pubkey_index), the indices must be fully populated.
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_10),
+            Some(1),
+            "passkey pubkey principal index should be populated for anchor 1 even though StorableAnchor already existed"
+        );
+        assert_eq!(
+            storage
+                .lookup_anchor_with_passkey_pubkey_hash_memory
+                .get(&passkey_principal_20),
+            Some(2),
+            "passkey pubkey principal index should be populated for anchor 2 even though StorableAnchor already existed"
+        );
 
         assert_migration_completed(vec![]);
     }

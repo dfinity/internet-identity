@@ -375,7 +375,13 @@ jobs:
 
   canister-tests-run:
     runs-on: ${{ matrix.os }}
-    needs: [canister-tests-build, cached-build, docker-build-archive]
+    needs:
+      [
+        canister-tests-build,
+        cached-build,
+        docker-build-archive,
+        docker-build-internet_identity_frontend,
+      ]
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -408,6 +414,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: archive.wasm.gz
+          path: .
+
+      - name: "Download II frontend wasm"
+        uses: actions/download-artifact@v4
+        with:
+          name: internet_identity_frontend.wasm.gz
           path: .
 
       - name: Run PocketIc
@@ -488,15 +500,17 @@ jobs:
     needs: [cached-build, test-app-build]
     strategy:
       matrix:
-        canister: ["single", "split"] # single = the regular setup with one canister, split = the setup with a separate frontend canister
         device: ["desktop", "mobile"]
         shard: ["1_6", "2_6", "3_6", "4_6", "5_6", "6_6"]
+        include:
+          - device: "chrome-extension"
+            shard: "1_1"
       # Make sure that one failing test does not cancel all other matrix jobs
       fail-fast: false
 
     env:
       # Suffix used for tagging artifacts
-      artifact_suffix: next-${{ matrix.canister }}-${{ matrix.device }}-${{ matrix.shard }}
+      artifact_suffix: next-${{ matrix.device }}-${{ matrix.shard }}
       # OpenID provider instance ports (see /src/test_openid_provider)
       openid_providers: "11105 11106"
     steps:
@@ -566,23 +580,25 @@ jobs:
       - name: Deploy canisters
         run: |
           # NOTE: dfx install will run the postinstall scripts from dfx.json
-          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; dummy_auth = opt opt record { prompt_for_index = true }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
-          if [ "${{ matrix.canister == 'split' }}" = "true" ]; then
-            II_CANISTER_ID=$(dfx canister id internet_identity)
-            dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; dummy_auth = opt opt record { prompt_for_index = true } })"
-          fi
+          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          II_CANISTER_ID=$(dfx canister id internet_identity)
+          dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true })"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server
         id: dev-server-start
         run: |
-          SEPARATE_FRONTEND_CANISTER=${{ matrix.canister == 'split' && 1 || 0 }} TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
+          SEPARATE_FRONTEND_CANISTER=1 TLS_DEV_SERVER=1 NO_HOT_RELOAD=1 npm run dev | tee -a > dev-server-logs.txt &
           dev_server_pid=$!
           echo "dev_server_pid=$dev_server_pid" >> "$GITHUB_OUTPUT"
 
+      - name: Build test app frontend (chrome extension)
+        if: matrix.device == 'chrome-extension'
+        run: npm run build --prefix demos/test-app
+
       - name: Run Playwright tests
         run: |
-          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /)
+          npx playwright test --project ${{ matrix.device }} --workers 1 --shard=$(tr <<<'${{ matrix.shard }}' -s _ /) --reporter=line,html
 
       - name: Stop dfx
         if: ${{ always() }}
@@ -813,12 +829,8 @@ jobs:
         with:
           assets: |
             internet_identity_production.wasm.gz
-            internet_identity_dev.wasm.gz
-            internet_identity_test.wasm.gz
             internet_identity_frontend.wasm.gz
             archive.wasm.gz
-            vc_demo_issuer.wasm.gz
-          production_asset: internet_identity_production.wasm.gz
           changelog: ${{ steps.changelog.outputs.result }}
           workflow_jobs: ${{ steps.pipeline-jobs.outputs.result }}
 
