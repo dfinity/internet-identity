@@ -766,8 +766,10 @@ fn should_report_registration_rates() -> Result<(), RejectResponse> {
                 // High threshold to avoid triggering captcha during the test,
                 // since the dummy_captcha feature has been removed and real captchas
                 // cannot be solved in tests.
+                // With current_rate_sampling_interval_s=10 and reference_rate_sampling_interval_s=100,
+                // the current_rate/reference_rate ratio is ~10x, so threshold_pct must be >= 900.
                 captcha_trigger: CaptchaTrigger::Dynamic {
-                    threshold_pct: 500,
+                    threshold_pct: 1000,
                     current_rate_sampling_interval_s: 10,
                     reference_rate_sampling_interval_s: 100,
                 },
@@ -826,7 +828,7 @@ fn should_report_registration_rates() -> Result<(), RejectResponse> {
     assert_metric_approx(
         &metrics,
         "internet_identity_registrations_per_second{type=\"captcha_threshold_rate\"}",
-        2.4,
+        4.4,
         0.1,
     );
     Ok(())
