@@ -156,13 +156,15 @@ if [ "$DEPLOY_FRONT" = true ]; then
     build_frontend_install_arg "$FRONTEND_CANISTER_ID"
 fi
 
-# Build the list of (artifact, canister, required_job) tuples to deploy
+# Build the list of (artifact, canister, job_pattern, job_filter) tuples to deploy.
+# job_pattern and job_filter are substrings matched against the job name, so the script
+# is resilient to changes in matrix keys/order or GitHub's display-name formatting.
 DEPLOYMENTS=()
 if [ "$DEPLOY_BACK" = true ]; then
-    DEPLOYMENTS+=("internet_identity_production.wasm.gz:$STAGING_CANISTER_ID:docker-build-ii (internet_identity_production.wasm.gz, 0, 0, 0, 0)")
+    DEPLOYMENTS+=("internet_identity_production.wasm.gz:$STAGING_CANISTER_ID:docker-build-ii:internet_identity_production.wasm.gz")
 fi
 if [ "$DEPLOY_FRONT" = true ]; then
-    DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID:docker-build-internet_identity_frontend")
+    DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID:docker-build-internet_identity_frontend:docker-build-internet_identity_frontend")
 fi
 
 # -------------------------
@@ -215,39 +217,75 @@ fi
 
 echo "Found workflow run ID: $RUN_ID"
 
-# Fetch all jobs for this run (paginate up to 200)
+# Fetch all jobs for this run, paginating to collect every page.
 echo "Fetching jobs for workflow run..."
-JOBS_JSON=$(curl -sf -H "$AUTH_HEADER" \
-    "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100")
+JOBS_JSON='{"jobs":[]}'
+PAGE=1
+while true; do
+    PAGE_JSON=$(curl -sf -H "$AUTH_HEADER" \
+        "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100&page=$PAGE")
+    PAGE_COUNT=$(echo "$PAGE_JSON" | jq '.jobs | length')
+    if [ "$PAGE_COUNT" -eq 0 ]; then
+        break
+    fi
+    JOBS_JSON=$(jq -s '{ jobs: (.[0].jobs + .[1].jobs) }' \
+        <(echo "$JOBS_JSON") <(echo "$PAGE_JSON"))
+    if [ "$PAGE_COUNT" -lt 100 ]; then
+        break
+    fi
+    PAGE=$((PAGE + 1))
+done
+
+TOTAL_JOBS=$(echo "$JOBS_JSON" | jq '.jobs | length')
+echo "Fetched $TOTAL_JOBS jobs."
 
 for tuple in "${DEPLOYMENTS[@]}"; do
     ARTIFACT_NAME="${tuple%%:*}"
     remainder="${tuple#*:}"
     CANISTER_ID="${remainder%%:*}"
-    REQUIRED_JOB="${remainder#*:}"
+    remainder="${remainder#*:}"
+    JOB_PATTERN="${remainder%%:*}"
+    JOB_FILTER="${remainder#*:}"
     ZIP_FILE="$ARTIFACT_NAME.zip"
 
     echo ""
     echo "=== Deploying $ARTIFACT_NAME to canister $CANISTER_ID ==="
 
-    # Verify the required job has completed successfully
-    JOB_STATUS=$(echo "$JOBS_JSON" | jq -r --arg JOB "$REQUIRED_JOB" '
-        .jobs[] | select(.name == $JOB) | .conclusion
+    # Find matching jobs by substring (resilient to matrix key/order changes)
+    MATCHING_JOBS=$(echo "$JOBS_JSON" | jq -c \
+        --arg PAT "$JOB_PATTERN" --arg FIL "$JOB_FILTER" '
+        .jobs | map(select(.name | contains($PAT) and contains($FIL)))
     ')
+    MATCH_COUNT=$(echo "$MATCHING_JOBS" | jq 'length')
 
-    if [ -z "$JOB_STATUS" ] || [ "$JOB_STATUS" = "null" ]; then
-        echo "Error: Required job not found: '$REQUIRED_JOB'"
+    if [ "$MATCH_COUNT" -eq 0 ]; then
+        echo "Error: No job matching '$JOB_PATTERN' + '$JOB_FILTER' found."
         echo "Available jobs:"
         echo "$JOBS_JSON" | jq -r '.jobs[] | "  - \(.name) (\(.status)/\(.conclusion))"'
         exit 1
     fi
 
-    if [ "$JOB_STATUS" != "success" ]; then
-        echo "Error: Required job '$REQUIRED_JOB' has not succeeded (status: $JOB_STATUS)"
+    if [ "$MATCH_COUNT" -gt 1 ]; then
+        echo "Error: Multiple jobs match '$JOB_PATTERN' + '$JOB_FILTER':"
+        echo "$MATCHING_JOBS" | jq -r '.[] | "  - \(.name) (\(.status)/\(.conclusion))"'
         exit 1
     fi
 
-    echo "Required job '$REQUIRED_JOB' succeeded."
+    JOB_NAME=$(echo "$MATCHING_JOBS" | jq -r '.[0].name')
+    JOB_STATE=$(echo "$MATCHING_JOBS" | jq -r '.[0].status')
+    JOB_CONCLUSION=$(echo "$MATCHING_JOBS" | jq -r '.[0].conclusion')
+
+    if [ "$JOB_STATE" = "queued" ] || [ "$JOB_STATE" = "in_progress" ]; then
+        echo "Error: Required job '$JOB_NAME' has not completed yet (status: $JOB_STATE)"
+        exit 1
+    fi
+
+    if [ "$JOB_CONCLUSION" != "success" ]; then
+        echo "Error: Required job '$JOB_NAME' did not succeed (conclusion: $JOB_CONCLUSION)"
+        exit 1
+    fi
+
+    echo "Required job '$JOB_NAME' succeeded."
 
     echo "Fetching artifact list..."
     ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
