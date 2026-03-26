@@ -143,7 +143,8 @@ fn should_not_register_non_recovery_device_as_protected() -> Result<(), RejectRe
 #[test]
 fn should_not_allow_wrong_captcha() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id =
+        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_enabled());
 
     let challenge = api::create_challenge(&env, canister_id)?;
     let result = api::register(
@@ -166,7 +167,8 @@ fn should_not_allow_wrong_captcha() -> Result<(), RejectResponse> {
 #[test]
 fn should_not_allow_expired_captcha() -> Result<(), RejectResponse> {
     let env = env();
-    let canister_id = install_ii_with_archive(&env, None, None);
+    let canister_id =
+        install_ii_canister_with_arg(&env, II_WASM.clone(), arg_with_captcha_enabled());
 
     let challenge = api::create_challenge(&env, canister_id)?;
     env.advance_time(Duration::from_secs(301)); // one second longer than captcha validity

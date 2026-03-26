@@ -928,6 +928,7 @@ jobs:
       - name: Build test flavor (frontend)
         env:
           II_FETCH_ROOT_KEY: 1
+          II_DUMMY_CAPTCHA: 1
           II_DUMMY_AUTH: 0
         run: ./scripts/build --frontend
 

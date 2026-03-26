@@ -68,8 +68,10 @@ pub fn register(
 ) -> RegisterResponse {
     rate_limit::process_rate_limit()
         .unwrap_or_else(|_| trap("rate limit reached, try again later"));
-    if let Err(()) = captcha::check_challenge(challenge_result) {
-        return RegisterResponse::BadChallenge;
+    if registration_flow_v2::captcha_required() {
+        if let Err(()) = captcha::check_challenge(challenge_result) {
+            return RegisterResponse::BadChallenge;
+        }
     }
 
     let device = Device::from(device_data);
