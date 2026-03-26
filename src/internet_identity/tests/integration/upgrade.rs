@@ -9,7 +9,6 @@ use pocket_ic::ErrorCode::CanisterCalledTrap;
 use pocket_ic::RejectResponse;
 use regex::Regex;
 
-
 /// Basic upgrade test.
 #[test]
 fn ii_upgrade_works() -> Result<(), RejectResponse> {
@@ -144,4 +143,3 @@ fn should_not_allow_user_range_exceeding_capacity() {
             .unwrap(),
     );
 }
-

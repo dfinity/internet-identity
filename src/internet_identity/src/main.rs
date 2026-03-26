@@ -620,7 +620,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
-
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
