@@ -32,7 +32,7 @@ test.describe("Access methods", () => {
     expect(newCredential).toBeDefined();
 
     // Verify we can still sign in with the existing passkey
-    await setCredentialsForIdentity(page, identities[0].identityNumber, [
+    await setCredentialsForIdentity(identities[0].identityNumber, [
       existingCredential,
     ]);
     await managePage.signOut();
@@ -42,7 +42,7 @@ test.describe("Access methods", () => {
 
     // Verify we can now also sign in with the new passkey
     await managePage.signOut();
-    await setCredentialsForIdentity(page, identities[0].identityNumber, [
+    await setCredentialsForIdentity(identities[0].identityNumber, [
       newCredential,
     ]);
     await manageAccessPage.goto();
@@ -132,7 +132,6 @@ test.describe("Access methods", () => {
 
       // Remove the credential corresponding to the removed passkey
       await setCredentialsForIdentity(
-        page,
         identities[0].identityNumber,
         identities[0].credentials.slice(1),
       );
