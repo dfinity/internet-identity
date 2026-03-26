@@ -703,9 +703,9 @@ dry_run_proposal() {
       --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
       --dry-run \
       --summary-file ./backend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short HEAD)"
+      --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")"
   fi
-  
+
   if should_upgrade_frontend "$upgrade_type"; then
     echo "=== Dry run for Frontend Proposal ==="
     curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
@@ -725,7 +725,7 @@ dry_run_proposal() {
       --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
       --dry-run \
       --summary-file ./frontend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short HEAD)"
+      --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")"
   fi
 }
 
@@ -752,9 +752,9 @@ make_proposal() {
       --arg mainnet_arg.bin \
       --arg-sha256 "$(compute_sha256sum_for_args args.txt)" \
       --summary-file ./backend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short HEAD)"
+      --proposal-title "Upgrade Internet Identity Backend Canister to $(git rev-parse --short "$TAG_NAME")"
   fi
-  
+
   if should_upgrade_frontend "$upgrade_type"; then
     echo "=== Creating Frontend Proposal ==="
     curl -fsSL https://github.com/dfinity/internet-identity/releases/download/$TAG_NAME/internet_identity_frontend.wasm.gz -o internet_identity_frontend-$TAG_NAME.wasm.gz
@@ -773,7 +773,7 @@ make_proposal() {
       --arg mainnet_frontend_arg.bin \
       --arg-sha256 "$(compute_sha256sum_for_frontend_args frontend_args.txt)" \
       --summary-file ./frontend_proposal.md \
-      --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short HEAD)"
+      --proposal-title "Upgrade Internet Identity Frontend Canister to $(git rev-parse --short "$TAG_NAME")"
   fi
 }
 
