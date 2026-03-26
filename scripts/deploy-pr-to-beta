@@ -156,13 +156,13 @@ if [ "$DEPLOY_FRONT" = true ]; then
     build_frontend_install_arg "$FRONTEND_CANISTER_ID"
 fi
 
-# Build the list of (artifact, canister) pairs to deploy
+# Build the list of (artifact, canister, required_job) tuples to deploy
 DEPLOYMENTS=()
 if [ "$DEPLOY_BACK" = true ]; then
-    DEPLOYMENTS+=("internet_identity_production.wasm.gz:$STAGING_CANISTER_ID")
+    DEPLOYMENTS+=("internet_identity_production.wasm.gz:$STAGING_CANISTER_ID:docker-build-ii (internet_identity_production.wasm.gz, 0, 0, 0, 0)")
 fi
 if [ "$DEPLOY_FRONT" = true ]; then
-    DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID")
+    DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID:docker-build-internet_identity_frontend")
 fi
 
 # -------------------------
@@ -195,14 +195,13 @@ AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
 
 echo "Fetching workflow runs for PR #$PR_NUMBER..."
 
-# Fetch workflow runs for this PR + workflow file, push events, 100 per page
+# Fetch the most recent workflow run for this PR (regardless of overall conclusion)
 RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
     "https://api.github.com/repos/$REPO/actions/runs?event=push&per_page=100" \
     | jq -r --arg PR "$PR_NUMBER" --arg WF "$WORKFLOW_FILE" '
         [.workflow_runs[]
             | select(.pull_requests[]?.number == ($PR|tonumber))
             | select(.path == (".github/workflows/" + $WF))
-            | select(.status == "completed" and .conclusion == "success")
         ]
         | sort_by(.run_number)
         | reverse
@@ -216,13 +215,39 @@ fi
 
 echo "Found workflow run ID: $RUN_ID"
 
-for pair in "${DEPLOYMENTS[@]}"; do
-    ARTIFACT_NAME="${pair%%:*}"
-    CANISTER_ID="${pair##*:}"
+# Fetch all jobs for this run (paginate up to 200)
+echo "Fetching jobs for workflow run..."
+JOBS_JSON=$(curl -sf -H "$AUTH_HEADER" \
+    "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100")
+
+for tuple in "${DEPLOYMENTS[@]}"; do
+    ARTIFACT_NAME="${tuple%%:*}"
+    remainder="${tuple#*:}"
+    CANISTER_ID="${remainder%%:*}"
+    REQUIRED_JOB="${remainder#*:}"
     ZIP_FILE="$ARTIFACT_NAME.zip"
 
     echo ""
     echo "=== Deploying $ARTIFACT_NAME to canister $CANISTER_ID ==="
+
+    # Verify the required job has completed successfully
+    JOB_STATUS=$(echo "$JOBS_JSON" | jq -r --arg JOB "$REQUIRED_JOB" '
+        .jobs[] | select(.name == $JOB) | .conclusion
+    ')
+
+    if [ -z "$JOB_STATUS" ] || [ "$JOB_STATUS" = "null" ]; then
+        echo "Error: Required job not found: '$REQUIRED_JOB'"
+        echo "Available jobs:"
+        echo "$JOBS_JSON" | jq -r '.jobs[] | "  - \(.name) (\(.status)/\(.conclusion))"'
+        exit 1
+    fi
+
+    if [ "$JOB_STATUS" != "success" ]; then
+        echo "Error: Required job '$REQUIRED_JOB' has not succeeded (status: $JOB_STATUS)"
+        exit 1
+    fi
+
+    echo "Required job '$REQUIRED_JOB' succeeded."
 
     echo "Fetching artifact list..."
     ARTIFACT_URL=$(curl -sf -H "$AUTH_HEADER" \
