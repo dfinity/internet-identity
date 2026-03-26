@@ -533,31 +533,9 @@ xr-spatial-tracking=()"
         .find(|(name, _)| name.to_lowercase() == "content-security-policy")
         .unwrap_or_else(|| panic!("header \"Content-Security-Policy\" not found"));
 
-    let frame_src = related_origins
-        .clone()
-        .unwrap_or_default()
-        .iter()
-        .fold("'self'".to_string(), |acc, origin| acc + " " + origin);
-
-    let expression = format!(
-        "^default-src 'none';\
-connect-src 'self' https:;\
-img-src 'self' data: https://\\*.googleusercontent.com;\
-script-src 'strict-dynamic' ('[^']+' )*'unsafe-inline' 'unsafe-eval' https:;\
-base-uri 'none';\
-form-action 'none';\
-style-src 'self' 'unsafe-inline';\
-style-src-elem 'self' 'unsafe-inline';\
-font-src 'self';\
-frame-ancestors {frame_src};\
-frame-src {frame_src};\
-upgrade-insecure-requests;$"
-    );
-    let rgx = Regex::new(&expression).unwrap();
-
-    assert!(
-        rgx.is_match(csp),
-        "CSP header did not match expected. Expected: {rgx} \n Actual: {csp}"
+    assert_eq!(
+        csp, "default-src 'none';",
+        "CSP header did not match expected"
     );
 }
 
