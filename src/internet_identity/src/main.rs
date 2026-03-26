@@ -13,7 +13,7 @@ use ic_canister_sig_creation::signature_map::LABEL_SIG;
 use ic_cdk::api::{caller, set_certified_data, trap};
 use ic_cdk::call;
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
-use ic_cdk_timers::TimerId;
+
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
@@ -30,9 +30,7 @@ use internet_identity_interface::internet_identity::types::vc_mvp::{
 };
 use internet_identity_interface::internet_identity::types::*;
 use serde_bytes::ByteBuf;
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::time::Duration;
 use storage::account::{AccountDelegationError, PrepareAccountDelegation};
 use storage::{Salt, Storage};
 
@@ -48,7 +46,7 @@ mod conversions;
 mod delegation;
 mod http;
 mod ii_domain;
-mod migrations;
+
 mod openid;
 mod state;
 mod stats;
@@ -71,47 +69,6 @@ const INTERNETCOMPUTER_ORG_DOMAIN: &str = "identity.internetcomputer.org";
 const INTERNETCOMPUTER_ORG_ORIGIN: &str = "https://identity.internetcomputer.org";
 const ID_AI_DOMAIN: &str = "id.ai";
 const ID_AI_ORIGIN: &str = "https://id.ai";
-
-/// Batch dispatch frequency to minimize the chance of DoS.
-pub(crate) const ANCHOR_MIGRATION_BATCH_BACKOFF_SECONDS: Duration = Duration::from_secs(1);
-
-/// Number of anchors to process in one batch during the anchor migration.
-pub(crate) const ANCHOR_MIGRATION_BATCH_SIZE: u64 = 2000;
-
-thread_local! {
-    // TODO: Remove this state after the data migration is complete.
-    pub(crate) static ANCHOR_MIGRATION_BATCH_ID: RefCell<u64> = const { RefCell::new(0) };
-    pub(crate) static ANCHOR_MIGRATION_ERRORS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
-    pub(crate) static ANCHOR_MIGRATION_LAST_ANCHOR_ID: RefCell<Option<u64>> = const { RefCell::new(None) };
-
-    static TIMER_ID: RefCell<Option<TimerId>> = const { RefCell::new(None) };
-}
-
-/// Temporary function to list migration errors.
-///
-/// Can be called to retrieve any errors that occurred during the anchor migration.
-#[update(hidden = true)]
-fn list_anchor_migration_errors() -> Vec<String> {
-    ANCHOR_MIGRATION_ERRORS.with_borrow(|errors| errors.clone())
-}
-
-/// Temporary function to fetch the current migration batch id.
-///
-/// Can be called to retrieve the current batch id of the ongoing data anchor migration.
-///
-/// The special value `u64::MAX` indicates that the migration is complete.
-#[query(hidden = true)]
-fn list_anchor_migration_current_batch_id() -> u64 {
-    ANCHOR_MIGRATION_BATCH_ID.with_borrow(|id| *id)
-}
-
-/// Temporary function to count migrated passkeys.
-///
-/// Can be called to retrieve the number of passkeys indexed so far.
-#[query(hidden = true)]
-fn count_passkeys() -> u64 {
-    state::storage_borrow(|storage| storage.lookup_anchor_with_passkey_pubkey_hash_memory.len())
-}
 
 #[update]
 async fn init_salt() {
@@ -644,44 +601,10 @@ fn init(maybe_arg: Option<InternetIdentityInit>) {
 #[post_upgrade]
 fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     state::init_from_stable_memory();
-    // Run synchronous one-time migrations (e.g. clearing incompatible indices)
-    // before any other code can access the storage.
-    state::storage_borrow_mut(|storage| storage.run_post_upgrade_migrations());
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
 
     initialize(maybe_arg);
-}
-
-async fn run_periodic_tasks() {
-    state::storage_borrow_mut(|storage| {
-        let now_nanos = ic_cdk::api::time();
-        storage.sync_anchor_indices(now_nanos, ANCHOR_MIGRATION_BATCH_SIZE);
-    });
-
-    if ANCHOR_MIGRATION_BATCH_ID.with(|id| *id.borrow()) == u64::MAX {
-        // Migration complete, clear timer.
-        TIMER_ID.with_borrow_mut(|saved_timer_id| {
-            if let Some(saved_timer_id) = *saved_timer_id {
-                ic_cdk_timers::clear_timer(saved_timer_id);
-            }
-            *saved_timer_id = None;
-        });
-    }
-}
-
-fn init_timers() {
-    let new_timer_id =
-        ic_cdk_timers::set_timer_interval(ANCHOR_MIGRATION_BATCH_BACKOFF_SECONDS, || {
-            ic_cdk::spawn(run_periodic_tasks())
-        });
-
-    TIMER_ID.with_borrow_mut(|saved_timer_id| {
-        if let Some(saved_timer_id) = *saved_timer_id {
-            ic_cdk_timers::clear_timer(saved_timer_id);
-        }
-        saved_timer_id.replace(new_timer_id);
-    });
 }
 
 fn initialize(maybe_arg: Option<InternetIdentityInit>) {
@@ -698,8 +621,6 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
         openid::setup(openid_configs);
     }
 
-    // TODO: Remove the data migration.
-    init_timers();
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
