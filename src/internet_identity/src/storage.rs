@@ -708,30 +708,6 @@ impl<M: Memory + Clone> Storage<M> {
         Ok(())
     }
 
-    /// Force-sync the passkey pubkey index for an anchor by reading its current `StorableAnchor`
-    /// and syncing indices with empty previous data. This is intended for data migrations
-    /// where the `StorableAnchor` already exists in `stable_anchor_memory` but the index
-    /// was not yet populated.
-    pub(crate) fn force_sync_passkey_pubkey_index(
-        &mut self,
-        anchor_number: AnchorNumber,
-    ) -> Result<(), StorageError> {
-        let storable_anchor = self
-            .stable_anchor_memory
-            .get(&anchor_number)
-            .ok_or(StorageError::AnchorNotFound { anchor_number })?;
-
-        let current_passkey_credentials = storable_anchor.passkey_credentials.unwrap_or_default();
-
-        self.sync_anchor_with_passkey_pubkey_index(
-            anchor_number,
-            &[],
-            &current_passkey_credentials,
-        );
-
-        Ok(())
-    }
-
     /// Reads the data of the specified anchor from stable memory.
     pub fn read(&self, anchor_number: AnchorNumber) -> Result<Anchor, StorageError> {
         // These values are no longer used for reading, but we keep the check for consistency.
@@ -1851,17 +1827,6 @@ impl<M: Memory + Clone> Storage<M> {
 
     pub fn version(&self) -> u8 {
         self.header.version
-    }
-
-    /// Runs one-time migrations that must complete synchronously during post_upgrade.
-    ///
-    /// This method is idempotent: `clear_new()` on an already-cleared BTreeMap is a no-op.
-    pub fn run_post_upgrade_migrations(&mut self) {
-        // The passkey pubkey hash index key type changed from [u8; 32] (SHA-256
-        // hash) to Principal. Clear the old index so that the timer-based
-        // migration can repopulate it with the new key type.
-        self.lookup_anchor_with_passkey_pubkey_hash_memory
-            .clear_new();
     }
 
     pub fn memory_sizes(&self) -> HashMap<String, u64> {
