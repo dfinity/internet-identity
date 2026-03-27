@@ -1,7 +1,8 @@
-// Candid interface of the example VC issuer canister.
-// The interface contains both the functionality required by the VC-spec
-// (https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md)
-// and additional APIs for configuring the canister and using it for testing.
+// Candid interface for a VC issuer canister, as specified in
+// https://github.com/dfinity/internet-identity/blob/main/docs/vc-spec.md
+//
+// This is the standard interface that any VC issuer must implement.
+// It does NOT include demo/test-specific methods.
 
 // Specification of a requested credential.
 type CredentialSpec = record {
@@ -78,58 +79,10 @@ type DerivationOriginError = variant {
   UnsupportedOrigin : text;
 };
 
-// Configuration specific to this issuer.
-type IssuerConfig = record {
-    // Root of trust for checking canister signatures.
-    ic_root_key_der : opt blob;
-    // List of canister ids that are allowed to provide id alias credentials.
-    idp_canister_ids : vec principal;
-    // The derivation origin to be used by the issuer.
-    derivation_origin : text;
-    // Frontend hostname be used by the issuer.
-    frontend_hostname : text;
-};
-
-// Options related to HTTP handling
-
-type HeaderField = record {
-    text;
-    text;
-};
-
-type HttpRequest = record {
-    method: text;
-    url: text;
-    headers: vec HeaderField;
-    body: blob;
-    certificate_version: opt nat16;
-};
-
-type HttpResponse = record {
-    status_code: nat16;
-    headers: vec HeaderField;
-    body: blob;
-};
-
-service: (opt IssuerConfig) -> {
+service: {
     // VC-flow API.
     vc_consent_message : (Icrc21VcConsentMessageRequest) -> (variant { Ok : Icrc21ConsentInfo; Err : Icrc21Error;});
     prepare_credential : (PrepareCredentialRequest) -> (variant { Ok : PreparedCredentialData; Err : IssueCredentialError;});
     get_credential : (GetCredentialRequest) -> (variant { Ok : IssuedCredentialData; Err : IssueCredentialError;}) query;
     derivation_origin : (DerivationOriginRequest) -> (variant {Ok: DerivationOriginData; Err: DerivationOriginError});
-
-    // Configure the issuer (e.g. set the root key), used for deployment/testing.
-    configure: (IssuerConfig) -> ();
-    set_derivation_origin: (frontend_hostname: text, derivation_origin: text) -> ();
-    // Sets the content of the alternative origins file.
-    set_alternative_origins: (alternative_origins: text) -> ();
-
-    // API for obtaining information about users, for testing only.
-    // In a real-world issuer the data acquisition functionality should be more elaborate and authenticated.
-    add_employee : (principal) -> (text);
-    add_graduate : (principal) -> (text);
-    add_adult : (principal) -> (text);
-
-    // Serve the app
-    http_request: (request: HttpRequest) -> (HttpResponse) query;
 }

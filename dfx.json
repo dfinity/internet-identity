@@ -24,10 +24,9 @@
     },
     "issuer": {
       "type": "custom",
-      "candid": "demos/vc_issuer/vc_demo_issuer.did",
-      "wasm": "demos/vc_issuer/vc_demo_issuer.wasm.gz",
-      "build": "demos/vc_issuer/build.sh",
-      "post_install": "bash -c 'demos/vc_issuer/provision'",
+      "candid": "src/vc-api/vc_issuer.did",
+      "wasm": "vc_demo_issuer.wasm.gz",
+      "build": "echo 'Download vc_demo_issuer.wasm.gz from https://github.com/dfinity/demo_vc_issuer/releases'",
       "dependencies": ["internet_identity"]
     }
   },

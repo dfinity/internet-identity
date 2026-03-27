@@ -20,12 +20,6 @@ jobs:
           rustup component add rustfmt
           cargo fmt
 
-      - name: Cargo fmt VC Issuer
-        working-directory: demos/vc_issuer
-        run: |
-          rustup component add rustfmt
-          cargo fmt
-
       - name: Commit Formatting changes
         uses: EndBug/add-and-commit@v9
         # We don't want to commit formatting changes to main
@@ -54,20 +48,6 @@ jobs:
           cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
           cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
 
-      - name: Cargo clippy VC Issuer
-        working-directory: demos/vc_issuer
-        # We run clippy twice (once without tests), so that it accurately reports dead code in the non-test configuration.
-        # `manual_range_contains` is disabled because a >= x && a < y reads more clearly than (x..y).contains(a) and
-        # there are additional caveats for floating point numbers (https://github.com/rust-lang/rust-clippy/issues/6455)
-        run: |
-          # dummy assets
-          mkdir -p dist
-          touch dist/index.{html,css,js}
-          touch dist/index2.js
-
-          cargo clippy -- -D clippy::all -D warnings -A clippy::manual_range_contains
-          cargo clippy --tests --benches -- -D clippy::all -D warnings -A clippy::manual_range_contains
-
   check-lockfile:
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +57,4 @@ jobs:
         # fails if lockfile is out of date
         # https://users.rust-lang.org/t/check-if-the-cargo-lock-is-up-to-date-without-building-anything/91048/5
       - name: Cargo Lockfile Check
-        run: cargo update --workspace --locked
-      - name: Cargo Issuer Lockfile Check
-        working-directory: demos/vc_issuer
         run: cargo update --workspace --locked

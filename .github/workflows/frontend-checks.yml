@@ -21,10 +21,7 @@ jobs:
         run: npm run format-check
       - uses: ./.github/actions/setup-didc
       - name: Generate type interfaces
-        run: |
-          npm run generate
-          cd demos/vc_issuer
-          npm run generate
+        run: npm run generate
       - name: Check for dapp logos
         run: |
           while read -r logo
@@ -42,6 +39,5 @@ jobs:
         with:
           add: |
             src/frontend/generated
-            demos/vc_issuer/app/generated
           default_author: github_actions
           message: "🤖 npm run generate auto-update"

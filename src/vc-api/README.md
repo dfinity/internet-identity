@@ -1,6 +1,6 @@
 # VC Issuer API
 
-A small TypeScript library with type & [zod](https://zod.dev) definitions for the [issuer API](../../demos/vc_issuer/README.md).
+A small TypeScript library with type & [zod](https://zod.dev) definitions for the [issuer API](https://github.com/dfinity/demo_vc_issuer).
 
 ## Usage
 

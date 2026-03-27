@@ -173,14 +173,12 @@ This will produce `./internet_identity.wasm.gz`.
 
 ## Attribute Sharing / Verifiable Credentials
 
-To experiment with Attribute Sharing / Verifiable Credentials feature, one can start a demo VC-issuer by running
+The demo VC issuer has been moved to its own repository: [dfinity/demo_vc_issuer](https://github.com/dfinity/demo_vc_issuer).
+To use it locally, download the `vc_demo_issuer.wasm.gz` from a release and place it in the project root, then run:
 
 ```bash
 dfx deploy issuer
 ```
-
-This will deploy also `internet_identity`, and provision the issuer for the testing environment.
-See [VC issuer documentation](./demos/vc_issuer/README.md) for details.
 
 Our [`test-app`](./demos/test-app) offers a simple relying party functionality and can be deployed using
 
