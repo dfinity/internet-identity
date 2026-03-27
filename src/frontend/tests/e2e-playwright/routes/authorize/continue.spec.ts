@@ -3,7 +3,6 @@ import { test } from "../../fixtures";
 import {
   authorize,
   authorizeWithUrl,
-  TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   II_URL,
   addVirtualAuthenticator,
