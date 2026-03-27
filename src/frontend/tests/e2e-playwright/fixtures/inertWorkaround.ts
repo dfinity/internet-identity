@@ -1,0 +1,54 @@
+import { test as base } from "@playwright/test";
+
+/**
+ * Playwright does not exclude `inert` elements from its accessibility
+ * tree, causing role-based locators to match elements that should be
+ * hidden. Svelte's transition system relies heavily on `inert` while
+ * elements are transitioning in or out, which leads to flaky strict
+ * mode violations without this workaround.
+ *
+ * This global fixture injects a MutationObserver that syncs the
+ * `inert` attribute to `aria-hidden`, which Playwright does respect.
+ *
+ * https://github.com/microsoft/playwright/issues/36938
+ */
+const INIT_SCRIPT = `
+  const MARKER = "data-inert-aria-hidden";
+  const sync = (el) => {
+    if (el.hasAttribute("inert")) {
+      if (!el.hasAttribute("aria-hidden")) {
+        el.setAttribute(MARKER, "");
+      }
+      el.setAttribute("aria-hidden", "true");
+    } else if (el.hasAttribute(MARKER)) {
+      el.removeAttribute("aria-hidden");
+      el.removeAttribute(MARKER);
+    }
+  };
+  new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === "attributes" && m.target instanceof Element) {
+        sync(m.target);
+      }
+    }
+  }).observe(document, {
+    attributes: true,
+    attributeFilter: ["inert"],
+    subtree: true,
+  });
+`;
+
+export const test = base.extend({
+  browser: async ({ browser }, use) => {
+    for (const context of browser.contexts()) {
+      await context.addInitScript(INIT_SCRIPT);
+    }
+    const originalNewContext = browser.newContext.bind(browser);
+    browser.newContext = async (...args) => {
+      const context = await originalNewContext(...args);
+      await context.addInitScript(INIT_SCRIPT);
+      return context;
+    };
+    await use(browser);
+  },
+});

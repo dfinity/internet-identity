@@ -8,6 +8,7 @@
   } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+  import { t } from "$lib/stores/locale.store";
 
   type Props = HTMLAttributes<HTMLDivElement> & {
     title: string;
@@ -15,6 +16,7 @@
     variant?: "info" | "success" | "warning" | "error" | "loading";
     direction?: "horizontal" | "vertical";
     onClose?: () => void;
+    icon?: import("svelte").Snippet;
   };
 
   const {
@@ -25,6 +27,7 @@
     variant = "info",
     direction = "vertical",
     onClose,
+    icon,
     ...props
   }: Props = $props();
 </script>
@@ -37,7 +40,9 @@
   ]}
 >
   <div class={[direction === "horizontal" && "row-span-2"]}>
-    {#if variant === "info"}
+    {#if icon}
+      {@render icon()}
+    {:else if variant === "info"}
       <InfoIcon class="text-fg-brand-primary size-5" />
     {:else if variant === "success"}
       <CircleCheckIcon class="text-fg-success-primary size-5" />
@@ -50,18 +55,16 @@
     {/if}
   </div>
   {#if onClose !== undefined}
-    <Button
+    <button
       onclick={onClose}
-      variant="tertiary"
-      size="sm"
-      iconOnly
       class={[
-        "col-start-3 -m-2 !rounded-full",
+        "btn btn-tertiary text-text-secondary btn-sm btn-icon col-start-3 -m-2 rounded-lg",
         direction === "horizontal" && "row-span-2",
       ]}
     >
-      <XIcon class="size-5" />
-    </Button>
+      <XIcon class=" size-5" />
+      <span>{$t`Close`}</span>
+    </button>
   {/if}
   <div
     class={[
@@ -78,7 +81,7 @@
     {#if description !== undefined || children !== undefined}
       <div class="flex flex-col gap-3">
         {#if description !== undefined}
-          <div class="text-text-tertiary text-sm font-medium">
+          <div class="text-text-tertiary text-sm">
             {description}
           </div>
         {/if}
