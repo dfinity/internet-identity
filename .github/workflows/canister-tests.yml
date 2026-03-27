@@ -1,7 +1,6 @@
-# This describes all the tests we run on the canister code (various builds,
+# This describes all the tests we run on the canister code (docker builds,
 # integration tests, e2e tests). The canister code is built in docker and the
-# wasm is then reused by subsequent build steps. We build various flavors of
-# the code, see `docker-build-...` for more info.
+# wasm is then reused by subsequent build steps.
 name: Canister tests
 
 on:
@@ -34,21 +33,13 @@ jobs:
           outputs: type=cacheonly
           target: deps
 
-  docker-build-ii:
+  # The production Internet Identity backend build
+  docker-build-internet_identity:
+    # NOTE: the display name must contain the asset filename so that the release
+    # action can map assets to job IDs (see .github/actions/release/run.sh).
+    name: docker-build-internet_identity (internet_identity_production.wasm.gz)
     runs-on: ubuntu-latest
     needs: docker-build-base
-    strategy:
-      # NOTE: the 'name' in the matrix should match the asset filename, because it is used in
-      # .github/actions/release to figure out the job ID.
-      #
-      # NOTE: if you modify the flavors, update the #flavors table in README.md
-      matrix:
-        include:
-          # The production build
-          - name: internet_identity_production.wasm.gz
-            II_FETCH_ROOT_KEY: 0
-            II_DUMMY_AUTH: 0
-
     steps:
       - uses: actions/checkout@v4
 
@@ -62,30 +53,28 @@ jobs:
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build ${{ matrix.name }}
+      - name: Build internet_identity_production.wasm.gz
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
           build-args: |
-            II_FETCH_ROOT_KEY=${{ matrix.II_FETCH_ROOT_KEY }}
-            II_DUMMY_AUTH=${{ matrix.II_DUMMY_AUTH }}
             II_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha,scope=cached-stage
           # Exports the artefacts from the final stage
           outputs: ./out
           target: scratch_internet_identity
 
-      - run: mv out/internet_identity.wasm.gz ${{ matrix.name }}
-      - run: sha256sum ${{ matrix.name }}
-      - name: "Upload ${{ matrix.name }}"
+      - run: mv out/internet_identity.wasm.gz internet_identity_production.wasm.gz
+      - run: sha256sum internet_identity_production.wasm.gz
+      - name: "Upload internet_identity_production.wasm.gz"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
-          name: ${{ matrix.name }}
+          name: internet_identity_production.wasm.gz
           # path is the name used as the file to upload and the name of the
           # file when downloaded
-          path: ${{ matrix.name }}
+          path: internet_identity_production.wasm.gz
 
   docker-build-archive:
     runs-on: ubuntu-latest
@@ -172,7 +161,7 @@ jobs:
 
   wasm-size:
     runs-on: ubuntu-latest
-    needs: docker-build-ii
+    needs: docker-build-internet_identity
     steps:
       - uses: actions/checkout@v4
       - name: "Download wasm"
@@ -257,7 +246,7 @@ jobs:
 
   vc-issuer-test:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, vc_demo_issuer-build]
+    needs: [docker-build-internet_identity, vc_demo_issuer-build]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -371,7 +360,7 @@ jobs:
     needs:
       [
         canister-tests-build,
-        docker-build-ii,
+        docker-build-internet_identity,
         docker-build-archive,
         docker-build-internet_identity_frontend,
       ]
@@ -425,7 +414,7 @@ jobs:
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
 
           # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
@@ -437,7 +426,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [docker-build-ii, docker-build-archive]
+    needs: [docker-build-internet_identity, docker-build-archive]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -490,7 +479,7 @@ jobs:
 
   e2e-playwright:
     runs-on: ubuntu-latest
-    needs: [docker-build-ii, docker-build-internet_identity_frontend, test-app-build]
+    needs: [docker-build-internet_identity, docker-build-internet_identity_frontend, test-app-build]
     strategy:
       matrix:
         device: ["desktop", "mobile"]
@@ -631,7 +620,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/release-')
     needs:
       [
-        docker-build-ii,
+        docker-build-internet_identity,
         docker-build-archive,
         test-app-build,
         vc_demo_issuer-build,
@@ -720,7 +709,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       [
-        docker-build-ii,
+        docker-build-internet_identity,
         docker-build-archive,
         docker-build-internet_identity_frontend,
         vc_demo_issuer-build,
