@@ -40,6 +40,7 @@
   import { sessionStore } from "$lib/stores/session.store";
   import Popover from "$lib/components/ui/Popover.svelte";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
@@ -50,6 +51,7 @@
   let next = $state("/manage");
   let isAuthDialogOpen = $state(false);
   let isIdentityPopoverOpen = $state(false);
+  let isManageIdentitiesDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let identityButtonRef = $state<HTMLButtonElement>();
 
@@ -89,6 +91,33 @@
       title: $t`You're all set. Your identity has been created.`,
       duration: 2000,
     });
+  };
+  const handleRemoveIdentity = (identityNumber: bigint) => {
+    const removedIdentity =
+      $lastUsedIdentitiesStore.identities[`${identityNumber}`];
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    const nextIdentity = lastUsedIdentities.find(
+      (identity) => identity.identityNumber !== identityNumber,
+    );
+    if (nextIdentity !== undefined) {
+      lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
+    }
+    isManageIdentitiesDialogOpen = false;
+    if (removedIdentity !== undefined) {
+      const identityName =
+        removedIdentity.name ?? `${removedIdentity.identityNumber}`;
+      toaster.create({
+        title: $t`Identity removed`,
+        description: $t`${identityName} has been removed from this device.`,
+        closable: true,
+        duration: 5000,
+        action: {
+          label: $t`Undo`,
+          onClick: () =>
+            lastUsedIdentitiesStore.restoreIdentity(removedIdentity),
+        },
+      });
+    }
   };
 
   let triggerAnimation =
@@ -612,7 +641,7 @@
     direction="down"
     align="end"
     distance="0.75rem"
-    class="!bg-bg-primary"
+    class="bg-bg-primary!"
   >
     <IdentitySwitcher
       selected={selectedIdentity.identityNumber}
@@ -623,6 +652,10 @@
         isAuthDialogOpen = true;
       }}
       onManageIdentity={() => handleSignIn(selectedIdentity.identityNumber)}
+      onManageIdentities={() => {
+        isIdentityPopoverOpen = false;
+        isManageIdentitiesDialogOpen = true;
+      }}
       onError={(error) => {
         isIdentityPopoverOpen = false;
         isAuthenticating = false;
@@ -631,6 +664,15 @@
       onClose={() => (isIdentityPopoverOpen = false)}
     />
   </Popover>
+{/if}
+
+{#if isManageIdentitiesDialogOpen}
+  <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
+    <ManageIdentities
+      identities={lastUsedIdentities}
+      onRemoveIdentity={handleRemoveIdentity}
+    />
+  </Dialog>
 {/if}
 
 <style>

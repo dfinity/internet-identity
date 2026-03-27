@@ -15,6 +15,7 @@
   import { goto } from "$app/navigation";
   import { toaster } from "$lib/components/utils/toaster";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
   import Popover from "$lib/components/ui/Popover.svelte";
   import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
@@ -46,6 +47,7 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isManageIdentitiesDialogOpen = $state(false);
 
   const handleSignIn = async (identityNumber: bigint) => {
     isAuthenticating = true;
@@ -71,6 +73,27 @@
   const handleUpgrade = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
     await goto("/authorize/upgrade-success");
+  };
+  const handleRemoveIdentity = (identityNumber: bigint) => {
+    const removedIdentity =
+      $lastUsedIdentitiesStore.identities[`${identityNumber}`];
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    isManageIdentitiesDialogOpen = false;
+    if (removedIdentity !== undefined) {
+      const identityName =
+        removedIdentity.name ?? `${removedIdentity.identityNumber}`;
+      toaster.create({
+        title: $t`Identity removed`,
+        description: $t`${identityName} has been removed from this device.`,
+        closable: true,
+        duration: 5000,
+        action: {
+          label: $t`Undo`,
+          onClick: () =>
+            lastUsedIdentitiesStore.restoreIdentity(removedIdentity),
+        },
+      });
+    }
   };
   const authorizeDefault = async () => {
     try {
@@ -153,6 +176,10 @@
               isIdentityPopoverOpen = false;
               window.open("/manage", "_blank");
             }}
+            onManageIdentities={() => {
+              isIdentityPopoverOpen = false;
+              isManageIdentitiesDialogOpen = true;
+            }}
             onError={(error) => {
               isIdentityPopoverOpen = false;
               handleError(error);
@@ -224,3 +251,12 @@
   <Footer />
   <div class="h-[env(safe-area-inset-bottom)]"></div>
 </div>
+
+{#if isManageIdentitiesDialogOpen}
+  <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
+    <ManageIdentities
+      identities={lastUsedIdentities}
+      onRemoveIdentity={handleRemoveIdentity}
+    />
+  </Dialog>
+{/if}

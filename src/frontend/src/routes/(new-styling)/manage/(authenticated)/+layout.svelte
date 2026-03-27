@@ -14,6 +14,8 @@
   import { page } from "$app/state";
   import { afterNavigate, goto } from "$app/navigation";
   import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
+  import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
   import {
     authenticatedStore,
     authenticationStore,
@@ -48,6 +50,7 @@
   let isIdentityPopoverOpen = $state(false);
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
+  let isManageIdentitiesDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
   let isRecoveryPhraseSetUpDismissed = $state(false);
 
@@ -100,7 +103,40 @@
       duration: 4000,
     });
   };
+  const handleRemoveIdentity = (identityNumber: bigint) => {
+    const removedIdentity =
+      $lastUsedIdentitiesStore.identities[`${identityNumber}`];
+    lastUsedIdentitiesStore.removeIdentity(identityNumber);
+    isManageIdentitiesDialogOpen = false;
+    if (removedIdentity !== undefined) {
+      const identityName =
+        removedIdentity.name ?? `${removedIdentity.identityNumber}`;
+      toaster.create({
+        title: $t`Identity removed`,
+        description: $t`${identityName} has been removed from this device.`,
+        closable: true,
+        duration: 5000,
+        action: {
+          label: $t`Undo`,
+          onClick: () =>
+            lastUsedIdentitiesStore.restoreIdentity(removedIdentity),
+        },
+      });
+    }
+  };
+  let isSignOutDialogOpen = $state(false);
   const handleSignOut = async () => {
+    isIdentityPopoverOpen = false;
+    isSignOutDialogOpen = true;
+  };
+  const handleConfirmSignOut = () => {
+    window.location.replace("/");
+  };
+  const handleConfirmSignOutAndRemove = () => {
+    const identity = $lastUsedIdentitiesStore.selected;
+    if (identity !== undefined) {
+      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
+    }
     window.location.replace("/");
   };
 
@@ -381,6 +417,10 @@
         isAuthenticating = false;
         handleError(error);
       }}
+      onManageIdentities={() => {
+        isIdentityPopoverOpen = false;
+        isManageIdentitiesDialogOpen = true;
+      }}
       onClose={() => (isIdentityPopoverOpen = false)}
       onSignOut={handleSignOut}
     />
@@ -426,6 +466,26 @@
         isLanguageDialogOpen = false;
         localeStore.setOrReset(value);
       }}
+    />
+  </Dialog>
+{/if}
+
+{#if isManageIdentitiesDialogOpen}
+  <Dialog onClose={() => (isManageIdentitiesDialogOpen = false)}>
+    <ManageIdentities
+      selected={$authenticatedStore.identityNumber}
+      identities={lastUsedIdentities}
+      onRemoveIdentity={handleRemoveIdentity}
+    />
+  </Dialog>
+{/if}
+
+{#if isSignOutDialogOpen && $lastUsedIdentitiesStore.selected !== undefined}
+  <Dialog onClose={() => (isSignOutDialogOpen = false)}>
+    <SignOutConfirmation
+      identity={$lastUsedIdentitiesStore.selected}
+      onSignOut={handleConfirmSignOut}
+      onSignOutAndRemove={handleConfirmSignOutAndRemove}
     />
   </Dialog>
 {/if}
