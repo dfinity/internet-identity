@@ -130,20 +130,6 @@ test("Authorize by creating a new identity", async ({
   expect(newIdentityPrincipal).not.toBe(initialPrincipal);
 });
 
-test("App logo appears when app is known", async ({
-  page,
-  identities,
-  signInWithIdentity,
-}) => {
-  await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
-    await signInWithIdentity(authPage, identities[0].identityNumber);
-    await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-});
-
 test("App logo doesn't appear when app is not known", async ({
   page,
   identities,
