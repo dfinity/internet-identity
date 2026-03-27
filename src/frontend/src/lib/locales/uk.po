@@ -305,8 +305,8 @@ msgstr "FAQ та Підтримка"
 msgid "FAQs"
 msgstr "FAQ"
 
-msgid "For example, user A logs into Internet Identity with their Google account \u201cA@gmail.com\u201d and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
-msgstr "Наприклад, користувач A входить в Internet Identity зі свого облікового запису Google \u201cA@gmail.com\u201d, а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач автентифікований у застосунку Z, — лише в Internet Identity. Більше того, застосунок Z також ніколи не дізнається, що користувач A використовував Google для автентифікації свого користувача Internet Identity."
+msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
+msgstr "Наприклад, користувач A входить в Internet Identity зі свого облікового запису Google \\u201cA@gmail.com\\u201d, а потім використовує Internet Identity для автентифікації в застосунку Z. Google ніколи не дізнається, що користувач автентифікований у застосунку Z, — лише в Internet Identity. Більше того, застосунок Z також ніколи не дізнається, що користувач A використовував Google для автентифікації свого користувача Internet Identity."
 
 msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
 msgstr "Забудьте про запам'ятовування складних імен користувача та паролів. Завдяки ключам доступу ви просто обираєте своє ім'я для входу — швидко, безпечно та без проблем."
