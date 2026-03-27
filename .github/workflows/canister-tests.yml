@@ -400,7 +400,10 @@ jobs:
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
+          # TODO: Switch to internet_identity_production.wasm.gz after the first release that includes
+          # the captcha_required() guard in the v1 register endpoint (the current latest release's
+          # production wasm has a hardcoded captcha check that ignores the init arg).
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
 
           # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
