@@ -49,18 +49,6 @@ jobs:
             II_FETCH_ROOT_KEY: 0
             II_DUMMY_AUTH: 0
 
-          # No captcha and fetching the root key, used in (our) tests, backend and
-          # e2e.
-          - name: internet_identity_test.wasm.gz
-            II_FETCH_ROOT_KEY: 1
-            II_DUMMY_AUTH: 0
-
-          # Everything disabled, used by third party developers who only care
-          # about the login flow
-          - name: internet_identity_dev.wasm.gz
-            II_FETCH_ROOT_KEY: 1
-            II_DUMMY_AUTH: 1
-
     steps:
       - uses: actions/checkout@v4
 
@@ -274,9 +262,9 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_test.wasm.gz
+          name: internet_identity_production.wasm.gz
           path: .
-      - run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
+      - run: mv internet_identity_production.wasm.gz internet_identity.wasm.gz
       - name: Install PocketIC server
         uses: dfinity/pocketic@main
         with:
@@ -398,7 +386,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_test_cached.wasm.gz
+          name: internet_identity_production_cached.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -419,11 +407,11 @@ jobs:
 
       - name: Run Tests
         run: |
-          mv internet_identity_test.wasm.gz internet_identity.wasm.gz
+          mv internet_identity_production.wasm.gz internet_identity.wasm.gz
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
 
           # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
@@ -450,7 +438,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_test_cached.wasm.gz
+          name: internet_identity_production_cached.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -460,7 +448,7 @@ jobs:
           path: .
 
       - name: Move wasms
-        run: mv internet_identity_test.wasm.gz internet_identity.wasm.gz
+        run: mv internet_identity_production.wasm.gz internet_identity.wasm.gz
 
       - name: Create dummy assets
         run: |
@@ -539,7 +527,7 @@ jobs:
       - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_test_cached.wasm.gz
+          name: internet_identity_production_cached.wasm.gz
           path: .
 
       - name: "Download II frontend wasm"
@@ -571,7 +559,7 @@ jobs:
       - name: Deploy canisters
         run: |
           # NOTE: dfx install will run the postinstall scripts from dfx.json
-          dfx canister install internet_identity --wasm internet_identity_test.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          dfx canister install internet_identity --wasm internet_identity_production.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           II_CANISTER_ID=$(dfx canister id internet_identity)
           dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true })"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
@@ -727,18 +715,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: "Download test build"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_test.wasm.gz
-          path: .
-
-      - name: "Download dev build"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_dev.wasm.gz
-          path: .
-
       - name: "Download production build"
         uses: actions/download-artifact@v4
         with:
@@ -844,8 +820,6 @@ jobs:
             -- \
             internet_identity_production.wasm.gz \
             internet_identity_production.wasm.gz.sha256 \
-            internet_identity_dev.wasm.gz \
-            internet_identity_test.wasm.gz \
             internet_identity_frontend.wasm.gz \
             src/internet_identity/internet_identity.did \
             archive.wasm.gz \
@@ -926,9 +900,9 @@ jobs:
       # a Clean Install
       - run: npm ci --no-audit --no-fund
 
-      - name: Build test flavor
+      - name: Build production flavor
         env:
-          II_FETCH_ROOT_KEY: 1
+          II_FETCH_ROOT_KEY: 0
           II_DUMMY_AUTH: 0
         run: ./scripts/build
 
@@ -939,15 +913,15 @@ jobs:
           II_DUMMY_AUTH: 0
         run: ./scripts/build --frontend
 
-      - run: mv internet_identity.wasm.gz internet_identity_test.wasm.gz
-      - name: "Upload test build"
+      - run: mv internet_identity.wasm.gz internet_identity_production.wasm.gz
+      - name: "Upload production build"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
-          name: internet_identity_test_cached.wasm.gz
+          name: internet_identity_production_cached.wasm.gz
           # path is the name used as the file to upload and the name of the
           # file when downloaded
-          path: internet_identity_test.wasm.gz
+          path: internet_identity_production.wasm.gz
 
       - run: mv internet_identity_frontend.wasm.gz internet_identity_frontend_test.wasm.gz
       - name: "Upload test build"
@@ -968,15 +942,15 @@ jobs:
       - name: "Download docker build"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_test.wasm.gz
+          name: internet_identity_production.wasm.gz
           path: .
-      - run: mv internet_identity_test.wasm.gz docker.wasm.gz
+      - run: mv internet_identity_production.wasm.gz docker.wasm.gz
       - name: "Download native cached build"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_test_cached.wasm.gz
+          name: internet_identity_production_cached.wasm.gz
           path: .
-      - run: mv internet_identity_test.wasm.gz native.wasm.gz
+      - run: mv internet_identity_production.wasm.gz native.wasm.gz
       - run: |
           native_sha256=$(shasum -a 256 ./native.wasm.gz | cut -d ' ' -f1)
           docker_sha256=$(shasum -a 256 ./docker.wasm.gz | cut -d ' ' -f1)
