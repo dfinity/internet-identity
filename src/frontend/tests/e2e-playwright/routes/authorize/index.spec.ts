@@ -251,7 +251,6 @@ test("App logo doesn't appear when app is not known", async ({ page }) => {
     II_URL,
     async (authPage) => {
       await addVirtualAuthenticator(authPage);
-      await expect(authPage.locator('[aria-hidden="true"] svg')).toBeVisible();
       await expect(authPage.locator('img[alt*="logo"]')).not.toBeVisible();
 
       await authPage

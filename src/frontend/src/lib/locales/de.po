@@ -22,6 +22,9 @@ msgstr "{0}-Benutzer"
 msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} ist zur neuen Internet Identity umgezogen"
 
+msgid "{identityName} has been removed from this device."
+msgstr ""
+
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Sie haben das Maximum von # Konto für eine einzelne App erreicht.} other {Sie haben das Maximum von # Konten für eine einzelne App erreicht.}}"
 
@@ -265,6 +268,9 @@ msgstr "Möchten Sie fortfahren?"
 msgid "Easy access"
 msgstr "Einfacher Zugang"
 
+msgid "Edit"
+msgstr ""
+
 msgid "Edit {name}"
 msgstr "{name} bearbeiten"
 
@@ -377,6 +383,9 @@ msgstr "Ich bin für meine Wiederherstellungsphrase verantwortlich; bei Verlust 
 msgid "I have written it down"
 msgstr "Ich habe sie aufgeschrieben"
 
+msgid "Identities on this device"
+msgstr ""
+
 msgid "Identity already upgraded"
 msgstr "Identität bereits aktualisiert"
 
@@ -394,6 +403,9 @@ msgstr "Identität nicht gefunden"
 
 msgid "Identity number"
 msgstr "Identitätsnummer"
+
+msgid "Identity removed"
+msgstr ""
 
 msgid "Identity upgraded!"
 msgstr "Identität aktualisiert!"
@@ -701,6 +713,12 @@ msgstr "Weiterleitung zur App..."
 msgid "Remove"
 msgstr "Entfernen"
 
+msgid "Remove from this device"
+msgstr ""
+
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr ""
+
 msgid "Remove passkey"
 msgstr "Passkey entfernen"
 
@@ -802,6 +820,21 @@ msgstr "Melden Sie sich von jedem Gerät aus mit Ihrem {name}-Konto an."
 
 msgid "Sign out"
 msgstr "Abmelden"
+
+msgid "Sign out and keep identity"
+msgstr ""
+
+msgid "Sign out and remove from device"
+msgstr ""
+
+msgid "Sign out from this device"
+msgstr ""
+
+msgid "Sign out to remove"
+msgstr ""
+
+msgid "Signed in"
+msgstr ""
 
 msgid "Signing in securely"
 msgstr "Sichere Anmeldung"
@@ -961,6 +994,9 @@ msgstr "Verbindung nicht möglich"
 msgid "Understanding Internet Identity"
 msgstr "Internet Identity verstehen"
 
+msgid "Undo"
+msgstr ""
+
 msgid "Unexpected error"
 msgstr "Unerwarteter Fehler"
 
@@ -1102,8 +1138,17 @@ msgstr "Sie haben bereits ein {name}-Konto verknüpft"
 msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Sie aktualisieren die ID <0>{identityNumber}</0>"
 
+msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
+msgstr ""
+
+msgid "You can add it back anytime by signing in with the same passkey."
+msgstr ""
+
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Sie können im Anmeldeprozess mit <0>Bestehenden Passkey verwenden</0> fortfahren."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr ""
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Sie können Ihre Identität jetzt wiederherstellen; verifizieren Sie, dass Sie sie korrekt gespeichert haben."

@@ -237,12 +237,6 @@
 {/if}
 
 <style>
-  .popover {
-    transition-property: overlay, display;
-    transition-duration: 0.16s;
-    transition-behavior: allow-discrete;
-  }
-
   .popover > div {
     opacity: 0;
     transform: scale(0.95);
@@ -255,6 +249,11 @@
     opacity: 1;
     transform: scale(1);
     transition-duration: 0.2s;
+  }
+
+  .popover[inert] > div {
+    opacity: 0;
+    transform: scale(0.95);
   }
 
   @starting-style {
