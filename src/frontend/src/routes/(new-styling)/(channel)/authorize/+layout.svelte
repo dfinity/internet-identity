@@ -75,9 +75,27 @@
     await goto("/authorize/upgrade-success");
   };
   const handleRemoveIdentity = (identityNumber: bigint) => {
+    // If the removed identity is currently selected,
+    // switch to the next available one in the list.
+    //
+    // The last identity cannot be removed, so there will
+    // always be at least one next identity available.
+    const isCurrent = selectedIdentity?.identityNumber === identityNumber;
+    if (isCurrent) {
+      const nextIdentity = lastUsedIdentities.find(
+        (identity) => identity.identityNumber !== identityNumber,
+      );
+      if (nextIdentity !== undefined) {
+        lastUsedIdentitiesStore.selectIdentity(nextIdentity.identityNumber);
+      }
+    }
+
+    // Now we can remove it safely
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
     lastUsedIdentitiesStore.removeIdentity(identityNumber);
+
+    // Hide manage identities dialog and show toaster with undo option
     isManageIdentitiesDialogOpen = false;
     if (removedIdentity !== undefined) {
       const identityName =
@@ -89,8 +107,16 @@
         duration: 5000,
         action: {
           label: $t`Undo`,
-          onClick: () =>
-            lastUsedIdentitiesStore.restoreIdentity(removedIdentity),
+          onClick: () => {
+            // Restore removed identity
+            lastUsedIdentitiesStore.restoreIdentity(removedIdentity);
+            // Switch to it if it was current
+            if (isCurrent) {
+              lastUsedIdentitiesStore.selectIdentity(
+                removedIdentity.identityNumber,
+              );
+            }
+          },
         },
       });
     }
