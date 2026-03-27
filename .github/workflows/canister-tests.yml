@@ -400,11 +400,7 @@ jobs:
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
-          # NOTE: The previous release still published a test flavor wasm. The test flavor has captcha
-          # disabled in the v1 register endpoint, which is needed for these upgrade tests.
-          # Once a release is made from this branch (which includes the captcha_required() guard in the
-          # v1 register endpoint), future runs can switch to downloading the production wasm here.
-          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+          curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
           curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/archive.wasm.gz -o archive_previous.wasm.gz
 
           # We are using --partition hash instead of count, because it makes sure that the tests partition is stable across runs
@@ -554,7 +550,7 @@ jobs:
           # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_production.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           II_CANISTER_ID=$(dfx canister id internet_identity)
-          dfx canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true })"
+          dfx canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dummy_auth = opt opt record { prompt_for_index = true } })"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server

@@ -64,7 +64,7 @@ lazy_static! {
         I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
-            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };

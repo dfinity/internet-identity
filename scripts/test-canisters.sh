@@ -35,11 +35,7 @@ if [ -f "./$PREVIOUS_II_WASM_PATH" ]; then
   echo "Using previous II wasm."
 else
   echo "Downloading previous II wasm."
-  # NOTE: The previous release still published a test flavor wasm. The test flavor has captcha
-  # disabled in the v1 register endpoint, which is needed for upgrade tests.
-  # Once a release is made that includes the captcha_required() guard in the v1 register
-  # endpoint, this can switch to downloading the production wasm.
-  curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o ${PREVIOUS_II_WASM_PATH}
+  curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o ${PREVIOUS_II_WASM_PATH}
 fi
 
 if [ -f "./$PREVIOUS_ARCHIVE_WASM_PATH" ]; then
