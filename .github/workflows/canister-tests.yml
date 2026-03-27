@@ -357,7 +357,7 @@ jobs:
     needs:
       [
         canister-tests-build,
-        cached-build,
+        docker-build-ii,
         docker-build-archive,
         docker-build-internet_identity_frontend,
       ]
@@ -386,7 +386,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production_cached.wasm.gz
+          name: internet_identity_production.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -423,7 +423,7 @@ jobs:
           RUST_BACKTRACE: 1
 
   test-canisters-script:
-    needs: [cached-build, docker-build-archive]
+    needs: [docker-build-ii, docker-build-archive]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -438,7 +438,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production_cached.wasm.gz
+          name: internet_identity_production.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -476,7 +476,7 @@ jobs:
 
   e2e-playwright:
     runs-on: ubuntu-latest
-    needs: [cached-build, test-app-build]
+    needs: [docker-build-ii, docker-build-internet_identity_frontend, test-app-build]
     strategy:
       matrix:
         device: ["desktop", "mobile"]
@@ -527,13 +527,13 @@ jobs:
       - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production_cached.wasm.gz
+          name: internet_identity_production.wasm.gz
           path: .
 
       - name: "Download II frontend wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_frontend_test_cached.wasm.gz
+          name: internet_identity_frontend.wasm.gz
           path: .
 
       - name: "Download test app wasm"
@@ -561,7 +561,7 @@ jobs:
           # NOTE: dfx install will run the postinstall scripts from dfx.json
           dfx canister install internet_identity --wasm internet_identity_production.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           II_CANISTER_ID=$(dfx canister id internet_identity)
-          dfx canister install internet_identity_frontend --wasm internet_identity_frontend_test.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true })"
+          dfx canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true })"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
 
       - name: Run dev server
@@ -877,150 +877,6 @@ jobs:
         with:
           WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           MESSAGE: "Release creation failed: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-  # A native, fast cached build. We use the produced test assets to run the canister & e2e tests.
-  # The asset's checksum is compared against that of the (slower) docker build.
-  cached-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            ~/.cargo
-            target
-          key: ${{ runner.os }}-cached-build-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', '.node-version', 'package-lock.json') }}
-
-      - uses: ./.github/actions/bootstrap
-      - uses: ./.github/actions/setup-node
-
-      # run the build
-      # NOTE: npm ci is only ~2s slower than an offline install (npm i --offline), so we use npm ci to have
-      # a Clean Install
-      - run: npm ci --no-audit --no-fund
-
-      - name: Build production flavor
-        env:
-          II_FETCH_ROOT_KEY: 0
-          II_DUMMY_AUTH: 0
-        run: ./scripts/build
-
-      - name: Build test flavor (frontend)
-        env:
-          II_FETCH_ROOT_KEY: 1
-          II_DUMMY_CAPTCHA: 1
-          II_DUMMY_AUTH: 0
-        run: ./scripts/build --frontend
-
-      - run: mv internet_identity.wasm.gz internet_identity_production.wasm.gz
-      - name: "Upload production build"
-        uses: actions/upload-artifact@v4
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: internet_identity_production_cached.wasm.gz
-          # path is the name used as the file to upload and the name of the
-          # file when downloaded
-          path: internet_identity_production.wasm.gz
-
-      - run: mv internet_identity_frontend.wasm.gz internet_identity_frontend_test.wasm.gz
-      - name: "Upload test build"
-        uses: actions/upload-artifact@v4
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: internet_identity_frontend_test_cached.wasm.gz
-          # path is the name used as the file to upload and the name of the
-          # file when downloaded
-          path: internet_identity_frontend_test.wasm.gz
-
-  # Make sure that the asset we're testing is the same as that produced by the (slower) docker builds
-  cached-build-check:
-    runs-on: ubuntu-latest
-    needs: [docker-build-ii, cached-build]
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Download docker build"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_production.wasm.gz
-          path: .
-      - run: mv internet_identity_production.wasm.gz docker.wasm.gz
-      - name: "Download native cached build"
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_production_cached.wasm.gz
-          path: .
-      - run: mv internet_identity_production.wasm.gz native.wasm.gz
-      - run: |
-          native_sha256=$(shasum -a 256 ./native.wasm.gz | cut -d ' ' -f1)
-          docker_sha256=$(shasum -a 256 ./docker.wasm.gz | cut -d ' ' -f1)
-          echo "shas: native '$native_sha256', docker '$docker_sha256'"
-          if [ "$native_sha256" == "$docker_sha256" ]
-          then
-            echo output sha256 matches expected
-          else
-            echo "sha mismatch"
-            exit 1
-          fi
-
-  clean-build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        # On main, we run the checks across all platforms. On other branches, in order to speed up checks (on PRs) we skip most platforms
-        # (in particular the slow macos builds). A single ubuntu build is not long and gives us some signal.
-        # XXX: GHA does not support proper if/else so we implement a workaround: https://github.com/actions/runner/issues/409
-        # XXX: GHA fails if we return the matrix object directly, so we have to pretend it's JSON
-        os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04", "macos-13", "macos-14" ]') || fromJson('[ "ubuntu-22.04" ]') }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/check-build
-      - run: mv internet_identity.wasm.gz internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-      - name: "Upload clean build"
-        uses: actions/upload-artifact@v4
-        with:
-          # name is the name used to display and retrieve the artifact
-          name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-          # path is the name used as the file to upload and the name of the
-          # file when downloaded
-          path: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-
-  verify-clean-build-hash:
-    needs: ["clean-build", "docker-build-ii"]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        # On main, we run the hash check across all platforms where the non-dockerized build is reproducible (i.e. not mac-os).
-        # On other branches, in order to speed up checks (on PRs) we skip most platforms. A single ubuntu build is not long and gives us some signal.
-        # XXX: GHA does not support proper if/else so we implement a workaround: https://github.com/actions/runner/issues/409
-        # XXX: GHA fails if we return the matrix object directly, so we have to pretend it's JSON
-        os: ${{ github.ref == 'refs/heads/main' && fromJson('[ "ubuntu-22.04", "ubuntu-20.04"]') || fromJson('[ "ubuntu-22.04" ]') }}
-    steps:
-      - name: Download internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_clean_build_${{ matrix.os }}.wasm.gz
-          path: .
-
-      - name: Download internet_identity_production.wasm.gz
-        uses: actions/download-artifact@v4
-        with:
-          name: internet_identity_production.wasm.gz
-          path: .
-
-      - name: Check hashes
-        run: |
-          clean_build_sha256=$(shasum -a 256 ./internet_identity_clean_build_${{ matrix.os }}.wasm.gz | cut -d ' ' -f1)
-          echo got clean build sha "$clean_build_sha256"
-          prod_build_sha256=$(shasum -a 256 ./internet_identity_production.wasm.gz | cut -d ' ' -f1)
-          echo got prod build sha "$prod_build_sha256"
-          if [ "$clean_build_sha256" == "$prod_build_sha256" ]
-          then
-            echo output clean build sha256 matches prod build sha256
-          else
-            echo "sha mismatch: clean build '$clean_build_sha256' /= prod build '$prod_build_sha256'"
-            exit 1
-          fi
 
   # interface-compatibility:
   #   runs-on: ubuntu-latest
