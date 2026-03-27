@@ -23,7 +23,7 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
 
 msgid "{identityName} has been removed from this device."
-msgstr ""
+msgstr "Identity {identityName} была удалена с этого устройства."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Вы достигли максимума в # аккаунт для одного приложения.} other {Вы достигли максимума в # аккаунтов для одного приложения.}}"
