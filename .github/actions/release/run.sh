@@ -53,10 +53,10 @@ do
     # For each asset, find the ID of the job that created the asset and find the step that
     # printed the asset's checksum (will be linked in the notes)
     #
-    # XXX: Unfortunately GitHub actions doesn't give us a way to find out the Job ID explicitely.
-    # Instead, we find the job name that includes "$filename" without the .wasm or .wasm.gz extension and assume that's the Job ID.
-    # This works because our jobs contain the filename without extension
-    # (either added manually or by build matrix which takes in the filename as argument and adds it to the job name).
+    # XXX: Unfortunately GitHub actions doesn't give us a way to find out the Job ID explicitly.
+    # Instead, we find the job name that includes "$filename" and assume that's the Job ID.
+    # We try matching the full filename first (for matrix jobs), then fall back to the stem
+    # (for non-matrix jobs like docker-build-archive).
     # https://github.community/t/get-action-job-id/17365/7
     if [ -z "${INPUT_WORKFLOW_JOBS:-}" ]
     then
@@ -64,8 +64,11 @@ do
         html_url="https://example.com"
         step="step"
     else
-        job_id=$(jq -cMr --arg search_string "${filename%%.*}" \
-                '.[] | select(.name | contains($search_string)) | .id'\
+        # Try matching by full filename first (for matrix jobs that include the
+        # full filename), then fall back to matching by stem (for non-matrix jobs
+        # like docker-build-archive).
+        job_id=$(jq -cMr --arg full "$filename" --arg stem "${filename%%.*}" \
+                '. as $jobs | [$jobs[] | select(.name | contains($full))] | if length > 0 then .[0].id else ($jobs | map(select(.name | contains($stem))) | .[0].id) end' \
                 <<< "$INPUT_WORKFLOW_JOBS")
                         >&2 echo "Found job id: $job_id"
 

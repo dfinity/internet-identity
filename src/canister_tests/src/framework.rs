@@ -167,7 +167,7 @@ pub fn env() -> PocketIc {
 }
 
 pub fn install_ii_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
-    install_ii_canister_with_arg(env, wasm, None)
+    install_ii_canister_with_arg(env, wasm, arg_with_captcha_disabled())
 }
 
 pub fn install_ii_canister_with_arg(
@@ -203,6 +203,19 @@ pub fn install_ii_frontend_canister(
     canister_id
 }
 
+/// Returns a default init argument with captcha disabled.
+/// This is the base for most test init arguments since the production wasm
+/// has captcha enabled by default.
+pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
+        }),
+        ..InternetIdentityInit::default()
+    })
+}
+
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
@@ -233,6 +246,10 @@ pub fn arg_with_captcha_enabled() -> Option<InternetIdentityInit> {
 pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         register_rate_limit: Some(rate_limit),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
+        }),
         ..InternetIdentityInit::default()
     })
 }
@@ -242,6 +259,10 @@ pub fn arg_with_anchor_range(
 ) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         assigned_user_number_range: Some(anchor_range),
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
+        }),
         ..InternetIdentityInit::default()
     })
 }

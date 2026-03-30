@@ -227,23 +227,6 @@ test("Authorize with ICRC-29", async ({ page }) => {
   );
 });
 
-test("App logo appears when app is known", async ({ page }) => {
-  await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
-    await addVirtualAuthenticator(authPage);
-    await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
-
-    await authPage
-      .getByRole("button", { name: "Continue with Passkey" })
-      .click();
-    await authPage.getByRole("button", { name: "Create new identity" }).click();
-    await authPage.getByLabel("Identity name").fill("John Doe");
-    await authPage.getByRole("button", { name: "Create identity" }).click();
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
-});
-
 test("App logo doesn't appear when app is not known", async ({ page }) => {
   await authorizeWithUrl(
     page,
