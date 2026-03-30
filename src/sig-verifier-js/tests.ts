@@ -118,7 +118,8 @@ const delegationFixtures: DelegationFixture[] = [
         {
           delegation: {
             expiration: "18a3bc48afe67bc1",
-            pubkey: "3059301306072a8648ce3d020106082a8648ce3d03010703420004bca93d",
+            pubkey:
+              "3059301306072a8648ce3d020106082a8648ce3d03010703420004bca93d",
           },
         },
       ],
@@ -155,7 +156,9 @@ test.each(delegationFixtures)(
         f.iiCanisterId,
         IC_ROOT_PUBLIC_KEY_RAW,
       );
-    expect(call).toThrow(expect.stringContaining("does not match the challenge"));
+    expect(call).toThrow(
+      expect.stringContaining("does not match the challenge"),
+    );
   },
 );
 
