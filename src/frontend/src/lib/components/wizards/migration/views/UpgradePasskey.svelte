@@ -84,6 +84,7 @@
         ? $t`Maximum length is 64 characters.`
         : undefined}
       aria-label={$t`Identity name`}
+      inputClass="input-noscroll"
     >
       {#snippet hint()}
         <Trans>You <b>cannot</b> rename this once it is set.</Trans>
