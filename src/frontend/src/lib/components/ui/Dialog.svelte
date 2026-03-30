@@ -26,7 +26,7 @@
   }: Props = $props();
 
   let dialogRef = $state<HTMLDialogElement | null>();
-  let contentRef = $state<HTMLDivElement | null>();
+
   let onCancel = (e: Event): void => {
     e.preventDefault();
     onClose?.();
@@ -46,117 +46,127 @@
   // isOpen to false triggers the {#if} block's |global outro, and
   // resolving the promise lets the navigation complete.
   let isOpen = $state(true);
-  let resolveOutro: (() => void) | undefined;
+  let resolveNavigation: (() => void) | undefined;
 
   onNavigate((navigation) => {
     if (navigation.to?.url.pathname === navigation.from?.url.pathname) return;
     isOpen = false;
     return new Promise<void>((resolve) => {
-      resolveOutro = resolve;
+      resolveNavigation = resolve;
     });
   });
 
-  const onOutroEnd = () => {
-    resolveOutro?.();
+  const completeNavigation = () => {
+    resolveNavigation?.();
   };
 
-  onMount(() => {
-    dialogRef?.showModal();
-    dialogRef?.setAttribute("data-visible", "true");
+  const setupVirtualKeyboardApi = (): (() => void) => {
+    const { virtualKeyboard } = navigator as Navigator & {
+      virtualKeyboard: { overlaysContent: boolean };
+    };
+    virtualKeyboard.overlaysContent = true;
+    return () => {
+      virtualKeyboard.overlaysContent = false;
+    };
+  };
 
-    // Use the virtualKeyboard API to intentionally render the software keyboard
-    // on top of the page, we manually adjust the dialog positioning for it.
-    //
-    // If the API is not supported (e.g. iOS) polyfill it with visualViewport.
-    let visualViewportResizeTimeout: ReturnType<typeof setTimeout>;
+  const setupVisualViewportFallback = (): (() => void) => {
+    let debounceTimeout: ReturnType<typeof setTimeout>;
     const updateKeyboardInset = () => {
+      const keyboardHeight = Math.max(
+        window.innerHeight - window.visualViewport!.height,
+        0,
+      );
       dialogRef?.style.setProperty(
         "--keyboard-inset-height",
-        `${Math.max(window.innerHeight - window.visualViewport!.height, 0)}px`,
+        `${keyboardHeight}px`,
       );
       dialogRef?.style.setProperty(
         "--max-content-height",
         `${window.visualViewport!.height}px`,
       );
     };
-    const updateKeyboardInsetDebounced = () => {
-      clearTimeout(visualViewportResizeTimeout);
-      visualViewportResizeTimeout = setTimeout(updateKeyboardInset, 100);
+    const updateDebounced = () => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(updateKeyboardInset, 100);
     };
-    if ("virtualKeyboard" in navigator) {
-      (
-        navigator.virtualKeyboard as { overlaysContent: boolean }
-      ).overlaysContent = true;
-    } else {
-      updateKeyboardInset();
-      window.visualViewport?.addEventListener(
-        "resize",
-        updateKeyboardInsetDebounced,
-      );
-      window.visualViewport?.addEventListener(
-        "scroll",
-        updateKeyboardInsetDebounced,
-      );
-    }
+
+    updateKeyboardInset();
+    window.visualViewport?.addEventListener("resize", updateDebounced);
+    window.visualViewport?.addEventListener("scroll", updateDebounced);
+
     return () => {
-      if ("virtualKeyboard" in navigator) {
-        (
-          navigator.virtualKeyboard as { overlaysContent: boolean }
-        ).overlaysContent = false;
-      } else {
-        window.visualViewport?.removeEventListener(
-          "resize",
-          updateKeyboardInsetDebounced,
-        );
-        window.visualViewport?.removeEventListener(
-          "scroll",
-          updateKeyboardInsetDebounced,
-        );
-      }
+      window.visualViewport?.removeEventListener("resize", updateDebounced);
+      window.visualViewport?.removeEventListener("scroll", updateDebounced);
     };
+  };
+
+  onMount(() => {
+    dialogRef?.showModal();
+    dialogRef?.setAttribute("data-visible", "true");
+
+    // Keep the dialog above the software keyboard when it opens:
+    // - Most browsers: the VirtualKeyboard API handles this natively.
+    // - Safari/iOS: no API, so we measure the keyboard height ourselves
+    //   and update the dialog's CSS variables to match.
+    return "virtualKeyboard" in navigator
+      ? setupVirtualKeyboardApi()
+      : setupVisualViewportFallback();
   });
 </script>
 
+<!--
+  Renders as a centered dialog on sm+ and a bottom sheet on mobile.
+  On both layouts, spacer elements push the content above the software
+  keyboard and safe-area insets.
+-->
 {#if isOpen}
   <dialog
     bind:this={dialogRef}
     oncancel={onCancel}
     closedby={closeOnOutsideClick ? "any" : "none"}
     class={[
-      // Layout base/dialog/bottomsheet
+      // Base: transparent overlay container, touch-none so only the
+      // scrollable content area (touch-pan-y) responds to gestures.
       "fixed flex min-h-max max-w-full touch-none flex-col bg-transparent outline-none",
+      // Dialog (sm+): centered with fixed width
       "sm:m-auto sm:w-100",
+      // Bottom sheet (mobile): pinned to bottom, full width
       "max-sm:top-auto max-sm:bottom-0 max-sm:w-full",
-      // Backdrop base/visible
+      // Backdrop: fades in via data-visible attribute
       "backdrop:bg-bg-overlay backdrop:opacity-0 backdrop:transition-opacity backdrop:duration-200",
       backdrop && "data-visible:backdrop:opacity-80",
     ]}
     style="--keyboard-inset-height: env(keyboard-inset-height);--max-content-height: calc(100dvh - var(--keyboard-inset-height))"
     transition:transitionFn|global
     onoutrostart={fadeOutBackDrop}
-    onoutroend={onOutroEnd}
+    onoutroend={completeNavigation}
     {...props}
   >
     <div
       class={[
-        // Container base/dialog/bottomsheet
-        "bg-bg-primary_alt border-border-secondary relative flex flex-col overflow-hidden dark:sm:border",
-        "min-h-max sm:m-auto sm:w-100 sm:rounded-2xl",
+        // Base: card surface with clipped overflow
+        "bg-bg-primary_alt border-border-secondary relative flex flex-col overflow-hidden",
+        // Dialog (sm+): centered card with border and full rounding
+        "min-h-max sm:m-auto sm:w-100 sm:rounded-2xl dark:sm:border",
+        // Bottom sheet (mobile): full width, only top corners rounded
         "w-full rounded-t-2xl",
         className,
       ]}
     >
-      <!-- Non-interactive element to render dark-mode bottom sheet border gradient -->
+      <!-- Faux border gradient, visible only on dark-mode bottom sheet.
+           Uses a mask to clip the gradient to just the border area. -->
       <div
         class={[
           "from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-1 hidden h-24 rounded-t-2xl bg-linear-to-b to-transparent p-px max-sm:dark:block",
-          // Use a mask to only show the gradient on the border area, and prevent it from overlapping with the dialog content.
           "mask-exclude! [mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)]",
         ]}
       ></div>
       <div class="flex flex-1 flex-col">
+        <!-- Scrollable content area. overscroll-contain prevents scroll
+             chaining to the page; touch-pan-y re-enables native vertical
+             scroll (the dialog itself is touch-none). -->
         <div
-          bind:this={contentRef}
           class="relative touch-pan-y overflow-y-auto overscroll-contain max-sm:max-h-(--max-content-height) sm:max-h-[min(var(--max-content-height),48rem)]"
         >
           <div
@@ -177,16 +187,15 @@
             {/if}
           </div>
         </div>
-        <!-- Element that pushes bottom sheet away from mobile keyboard or gesture navigation -->
+        <!-- Bottom sheet spacer: keyboard + safe area (hidden on sm+) -->
         <div class="flex sm:hidden">
           <div class="h-(--keyboard-inset-height)"></div>
           <div class="h-[env(safe-area-inset-bottom)]"></div>
         </div>
       </div>
-      <!-- Element that pushes dialog away from mobile keyboard or gesture navigation -->
+      <!-- Dialog spacer: keyboard + safe area (hidden on mobile) -->
       <div class="flex max-sm:hidden">
         <div class="h-(--keyboard-inset-height)"></div>
-        <!-- <div class="h-[env(keyboard-inset-height)]"></div> -->
         <div class="h-[env(safe-area-inset-bottom)]"></div>
       </div>
     </div>
