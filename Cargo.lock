@@ -1752,12 +1752,12 @@ dependencies = [
 
 [[package]]
 name = "ic-signature-verification"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9de5065430a9b1a61934f7e4a65474a7a11658db84a8b5b0c42baced6c33752"
+checksum = "f0e8f6b8a33244df75bddeef3ef1255552de517785f462a090ba218cf2abd93c"
 dependencies = [
  "ic-canister-sig-creation",
- "ic-certification 2.6.0",
+ "ic-certification 3.0.3",
  "ic-verify-bls-signature 0.6.0",
  "ic_principal",
  "serde",
@@ -3769,7 +3769,7 @@ dependencies = [
  "candid",
  "hex",
  "ic-canister-sig-creation",
- "ic-signature-verification 0.2.0",
+ "ic-signature-verification 0.3.0",
  "serde",
  "serde_json",
  "wasm-bindgen",
