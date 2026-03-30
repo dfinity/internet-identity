@@ -83,46 +83,12 @@
       clearTimeout(visualViewportResizeTimeout);
       visualViewportResizeTimeout = setTimeout(updateKeyboardInset, 100);
     };
-    updateKeyboardInset();
-    // If the API is not supported (e.g. iOS), prevent page scrolling
-    // and implement custom touch scroll handlers for dialog content.
-    const preventScroll = (event: TouchEvent) => {
-      event.preventDefault();
-    };
-    const findScrollableParent = (
-      target: HTMLElement,
-    ): HTMLElement | undefined => {
-      let scrollableParent = target;
-      while (scrollableParent && scrollableParent !== contentRef) {
-        if (scrollableParent === contentRef) {
-          break;
-        }
-        if (scrollableParent.scrollHeight > scrollableParent.clientHeight) {
-          return scrollableParent;
-        }
-        scrollableParent = scrollableParent.parentElement as HTMLElement;
-      }
-      return contentRef ?? undefined;
-    };
-    let lastY = 0;
-    const touchScrollStart = (event: TouchEvent) => {
-      lastY = event.touches[0].clientY;
-    };
-    const touchScrollMove = (event: TouchEvent) => {
-      const scrollTarget = findScrollableParent(event.target as HTMLElement);
-      const y = event.touches[0].clientY;
-      const dy = y - lastY;
-      lastY = y;
-      scrollTarget?.scrollTo({
-        top: scrollTarget.scrollTop - dy,
-        behavior: "instant",
-      });
-    };
     if ("virtualKeyboard" in navigator) {
       (
         navigator.virtualKeyboard as { overlaysContent: boolean }
       ).overlaysContent = true;
     } else {
+      updateKeyboardInset();
       window.visualViewport?.addEventListener(
         "resize",
         updateKeyboardInsetDebounced,
@@ -131,15 +97,6 @@
         "scroll",
         updateKeyboardInsetDebounced,
       );
-      document.documentElement.addEventListener("touchmove", preventScroll, {
-        passive: false,
-      });
-      contentRef?.addEventListener("touchstart", touchScrollStart, {
-        passive: false,
-      });
-      contentRef?.addEventListener("touchmove", touchScrollMove, {
-        passive: false,
-      });
     }
     return () => {
       if ("virtualKeyboard" in navigator) {
@@ -155,12 +112,6 @@
           "scroll",
           updateKeyboardInsetDebounced,
         );
-        document.documentElement.removeEventListener(
-          "touchmove",
-          preventScroll,
-        );
-        contentRef?.removeEventListener("touchstart", touchScrollStart);
-        contentRef?.removeEventListener("touchmove", touchScrollMove);
       }
     };
   });
@@ -173,7 +124,7 @@
     closedby={closeOnOutsideClick ? "any" : "none"}
     class={[
       // Layout base/dialog/bottomsheet
-      "fixed flex min-h-max max-w-full flex-col bg-transparent outline-none",
+      "fixed flex min-h-max max-w-full touch-none flex-col bg-transparent outline-none",
       "sm:m-auto sm:w-100",
       "max-sm:top-auto max-sm:bottom-0 max-sm:w-full",
       // Backdrop base/visible
@@ -206,7 +157,7 @@
       <div class="flex flex-1 flex-col">
         <div
           bind:this={contentRef}
-          class="relative overflow-y-auto max-sm:max-h-(--max-content-height) sm:max-h-[min(var(--max-content-height),48rem)]"
+          class="relative touch-pan-y overflow-y-auto overscroll-contain max-sm:max-h-(--max-content-height) sm:max-h-[min(var(--max-content-height),48rem)]"
         >
           <div
             class={[
@@ -235,6 +186,7 @@
       <!-- Element that pushes dialog away from mobile keyboard or gesture navigation -->
       <div class="flex max-sm:hidden">
         <div class="h-(--keyboard-inset-height)"></div>
+        <!-- <div class="h-[env(keyboard-inset-height)]"></div> -->
         <div class="h-[env(safe-area-inset-bottom)]"></div>
       </div>
     </div>
