@@ -82,9 +82,11 @@
   const selectedIdentityNumber = $derived(
     $lastUsedIdentitiesStore.selected!.identityNumber,
   );
-  // Initialize the flow every time the identity changes
+  // Re-initialize the flow and reset state when the identity changes.
   $effect(() => {
     authLastUsedFlow.init([selectedIdentityNumber]);
+    isMultipleAccountsEnabled = false;
+    defaultAccountNumber = null;
   });
 
   const authorize = async (
