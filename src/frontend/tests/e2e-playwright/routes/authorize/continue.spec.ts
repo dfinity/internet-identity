@@ -69,6 +69,30 @@ test.describe("multiple identities", () => {
     expect(principal).not.toBe(otherPrincipal);
   });
 
+  test("Multiple accounts state resets when switching identity", async ({
+    page,
+    identities,
+    signInWithIdentity,
+  }) => {
+    await authorize(page, async (authPage) => {
+      // Sign in with identity 0 and enable multiple accounts
+      await signInWithIdentity(authPage, identities[0].identityNumber);
+      await authPage
+        .getByRole("switch", { name: "Enable multiple accounts" })
+        .setChecked(true);
+
+      // Switch to identity 1 and verify toggle is reset
+      await authPage.getByRole("button", { name: "Switch identity" }).click();
+      await authPage.getByRole("button", { name: identities[1].name }).click();
+      await expect(
+        authPage.getByRole("switch", { name: "Enable multiple accounts" }),
+      ).not.toBeChecked();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+  });
+
   test("Authorize by signing in with a different passkey", async ({
     page,
     identities,
