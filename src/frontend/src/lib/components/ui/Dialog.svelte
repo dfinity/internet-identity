@@ -25,8 +25,8 @@
     ...props
   }: Props = $props();
 
-  let dialogRef: HTMLDialogElement;
-  let contentRef: HTMLDivElement;
+  let dialogRef = $state<HTMLDialogElement | null>();
+  let contentRef = $state<HTMLDivElement | null>();
   let onCancel = (e: Event): void => {
     e.preventDefault();
     onClose?.();
@@ -39,7 +39,7 @@
   );
 
   const fadeOutBackDrop = () => {
-    dialogRef.removeAttribute("data-visible");
+    dialogRef?.removeAttribute("data-visible");
   };
 
   // Delay navigation until the dialog's outro has finished. Setting
@@ -61,8 +61,8 @@
   };
 
   onMount(() => {
-    dialogRef.showModal();
-    dialogRef.setAttribute("data-visible", "true");
+    dialogRef?.showModal();
+    dialogRef?.setAttribute("data-visible", "true");
 
     // Use the virtualKeyboard API to intentionally render the software keyboard
     // on top of the page, we manually adjust the dialog positioning for it.
@@ -70,11 +70,11 @@
     // If the API is not supported (e.g. iOS) polyfill it with visualViewport.
     let visualViewportResizeTimeout: ReturnType<typeof setTimeout>;
     const updateKeyboardInset = () => {
-      dialogRef.style.setProperty(
+      dialogRef?.style.setProperty(
         "--keyboard-inset-height",
         `${Math.max(window.innerHeight - window.visualViewport!.height, 0)}px`,
       );
-      dialogRef.style.setProperty(
+      dialogRef?.style.setProperty(
         "--max-content-height",
         `${window.visualViewport!.height}px`,
       );
@@ -89,7 +89,9 @@
     const preventScroll = (event: TouchEvent) => {
       event.preventDefault();
     };
-    const findScrollableParent = (target: HTMLElement): HTMLElement => {
+    const findScrollableParent = (
+      target: HTMLElement,
+    ): HTMLElement | undefined => {
       let scrollableParent = target;
       while (scrollableParent && scrollableParent !== contentRef) {
         if (scrollableParent === contentRef) {
@@ -100,7 +102,7 @@
         }
         scrollableParent = scrollableParent.parentElement as HTMLElement;
       }
-      return contentRef;
+      return contentRef ?? undefined;
     };
     let lastY = 0;
     const touchScrollStart = (event: TouchEvent) => {
@@ -111,7 +113,7 @@
       const y = event.touches[0].clientY;
       const dy = y - lastY;
       lastY = y;
-      scrollTarget.scrollTo({
+      scrollTarget?.scrollTo({
         top: scrollTarget.scrollTop - dy,
         behavior: "instant",
       });
@@ -132,10 +134,10 @@
       document.documentElement.addEventListener("touchmove", preventScroll, {
         passive: false,
       });
-      contentRef.addEventListener("touchstart", touchScrollStart, {
+      contentRef?.addEventListener("touchstart", touchScrollStart, {
         passive: false,
       });
-      contentRef.addEventListener("touchmove", touchScrollMove, {
+      contentRef?.addEventListener("touchmove", touchScrollMove, {
         passive: false,
       });
     }
@@ -157,8 +159,8 @@
           "touchmove",
           preventScroll,
         );
-        contentRef.removeEventListener("touchstart", touchScrollStart);
-        contentRef.removeEventListener("touchmove", touchScrollMove);
+        contentRef?.removeEventListener("touchstart", touchScrollStart);
+        contentRef?.removeEventListener("touchmove", touchScrollMove);
       }
     };
   });
@@ -196,7 +198,7 @@
       <!-- Non-interactive element to render dark-mode bottom sheet border gradient -->
       <div
         class={[
-          "from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-1 hidden h-24 rounded-t-2xl bg-linear-to-b to-transparent p-[1px] max-sm:dark:block",
+          "from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-1 hidden h-24 rounded-t-2xl bg-linear-to-b to-transparent p-px max-sm:dark:block",
           // Use a mask to only show the gradient on the border area, and prevent it from overlapping with the dialog content.
           "mask-exclude! [mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)]",
         ]}
