@@ -82,8 +82,7 @@ test.describe("multiple identities", () => {
         .setChecked(true);
 
       // Switch to identity 1 and verify toggle is reset
-      await authPage.getByRole("button", { name: "Switch identity" }).click();
-      await authPage.getByRole("button", { name: identities[1].name }).click();
+      await signInWithIdentity(authPage, identities[1].identityNumber);
       await expect(
         authPage.getByRole("switch", { name: "Enable multiple accounts" }),
       ).not.toBeChecked();
