@@ -23,10 +23,10 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "приложение {application} переехало на новую версию Internet Identity"
 
 msgid "{identityName} has been removed from this device."
-msgstr "Identity {identityName} была удалена с этого устройства."
+msgstr "Идентификатор {identityName} был удален с этого устройства."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
-msgstr "{MAX_ACCOUNTS, plural, one {Вы достигли максимума в # аккаунт для одного приложения.} other {Вы достигли максимума в # аккаунтов для одного приложения.}}"
+msgstr "{MAX_ACCOUNTS, plural, one {Вы достигли максимума — # аккаунт для одного приложения.} few {Вы достигли максимума — # аккаунта для одного приложения.} many {Вы достигли максимума — # аккаунтов для одного приложения.} other {Вы достигли максимума — # аккаунтов для одного приложения.}}"
 
 msgid "{name} account"
 msgstr "{name} аккаунт"
@@ -53,7 +53,7 @@ msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as t
 msgstr "<0>Бесшовная интеграция ключей доступа:</0> Мы продолжаем делать ставку на ключи доступа как на будущее безопасной аутентификации. Internet Identity 2.0 использует новейшие стандарты для повышения безопасности и удобства."
 
 msgid "A way to regain access to your identity if you ever lose it."
-msgstr "Способ восстановить доступ к вашей идентификации, если вы ее потеряете."
+msgstr "Способ восстановить доступ к вашему идентификатору, если вы его потеряете."
 
 msgid "Access and recovery"
 msgstr "Доступ и восстановление"
@@ -68,13 +68,13 @@ msgid "Activate"
 msgstr "Активировать"
 
 msgid "Activate it so that you can recover your identity at any time."
-msgstr "Активируйте его, чтобы вы могли восстановить свою идентификацию в любое время."
+msgstr "Активируйте её, чтобы вы могли восстановить свой идентификатор в любое время."
 
 msgid "Activate recovery to remove"
-msgstr "Активировать восстановление для удаления"
+msgstr "Чтобы удалить, сначала активируйте резервную фразу"
 
 msgid "Activate your recovery phrase so that you can recover your identity at any point."
-msgstr "Активируйте вашу резервную фразу, чтобы вы могли восстановить свою идентификацию в любой момент."
+msgstr "Активируйте вашу резервную фразу, чтобы вы могли восстановить свой идентификатор в любой момент."
 
 msgid "Add a passkey"
 msgstr "Добавить ключ доступа"
@@ -86,7 +86,7 @@ msgid "Add another account"
 msgstr "Добавить другой аккаунт"
 
 msgid "Add another identity"
-msgstr "Добавить другую идентификацию"
+msgstr "Добавить другой идентификатор"
 
 msgid "Add another passkey"
 msgstr "Добавить другой ключ доступа"
@@ -95,10 +95,10 @@ msgid "Add another way to sign in with a passkey or third-party account for secu
 msgstr "Добавьте еще один способ входа с помощью ключа доступа или стороннего аккаунта для безопасного доступа."
 
 msgid "Add new"
-msgstr "Добавить новое"
+msgstr "Добавить новый способ"
 
 msgid "Add or remove the ways you can sign in with your identity."
-msgstr "Добавляйте или удаляйте способы входа с помощью вашей идентификации."
+msgstr "Добавляйте или удаляйте способы входа для вашего идентификатора."
 
 msgid "Advanced identity management"
 msgstr "Контроль над доступом"
@@ -128,10 +128,10 @@ msgid "Before you continue"
 msgstr "Прежде чем продолжить"
 
 msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
-msgstr "Включив эту функцию, вы можете создавать более одного аккаунта для одного приложения. Легко переключайтесь между аккаунтами (например, рабочим, личным или демонстрационным)."
+msgstr "Включив эту функцию, вы сможете создавать несколько аккаунтов для одного приложения и легко переключаться между ними (например, рабочий, личный или демонстрационный)."
 
 msgid "Can't find your identity?"
-msgstr "Не можете найти свою идентификацию?"
+msgstr "Не можете найти свой идентификатор?"
 
 msgid "Cancel"
 msgstr "Отмена"
@@ -149,7 +149,7 @@ msgid "Checking recovery phrase"
 msgstr "Проверка резервной фразы"
 
 msgid "Checking your order"
-msgstr "Проверка вашего заказа"
+msgstr "Проверка порядка слов"
 
 msgid "Choose an account"
 msgstr "Выберите аккаунт"
@@ -239,7 +239,7 @@ msgid "Creating account..."
 msgstr "Создание аккаунта..."
 
 msgid "Creating identity..."
-msgstr "Создание идентификации..."
+msgstr "Создание идентификатора..."
 
 msgid "Creating passkey..."
 msgstr "Создание ключа доступа..."
@@ -284,7 +284,7 @@ msgid "Encountered an internal error while processing the request."
 msgstr "При обработке запроса произошла внутренняя ошибка."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
-msgstr "Введите имя для вашей идентификации, чтобы завершить обновление. После установки его нельзя будет изменить."
+msgstr "Введите имя для вашего идентификатора, чтобы завершить обновление. После сохранения его нельзя будет изменить."
 
 msgid "Enter characters"
 msgstr "Введите символы"
@@ -369,7 +369,7 @@ msgid "How do passkeys work?"
 msgstr "Как работают ключи доступа?"
 
 msgid "How does Internet Identity compare to other Web3 authentication tools?"
-msgstr "Как Internet Identity сравнивается с другими инструментами аутентификации Web3?"
+msgstr "Чем Internet Identity отличается от других инструментов аутентификации Web3?"
 
 msgid "How to stay secure"
 msgstr "Как оставаться в безопасности"
@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "Я записал(а) это"
 
 msgid "Identities on this device"
-msgstr "Список identity на этом устройстве"
+msgstr "Список идентификаторов на этом устройстве"
 
 msgid "Identity already upgraded"
 msgstr "Идентификатор уже обновлен"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "Номер идентификатора"
 
 msgid "Identity removed"
-msgstr "Identity удалена"
+msgstr "Идентификатор удален"
 
 msgid "Identity upgraded!"
 msgstr "Идентификатор обновлен!"
@@ -474,7 +474,7 @@ msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
 msgstr "Хранятся ли мои Face ID или отпечаток пальца в Internet Identity?"
 
 msgid "It can be used at any time to recover your identity."
-msgstr "Его можно использовать в любое время для восстановления вашей идентификации."
+msgstr "Её можно использовать в любое время для восстановления вашего идентификатора."
 
 msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
 msgstr "Похоже, вы пытаетесь войти через социальное приложение. Выполните следующие шаги, чтобы продолжить:"
@@ -498,7 +498,7 @@ msgid "It won't be removed from your device or password manager."
 msgstr "Он не будет удален с вашего устройства или из менеджера паролей."
 
 msgid "Keep it secret"
-msgstr "Держите это в секрете"
+msgstr "Держите её в секрете"
 
 msgid "Keep linked"
 msgstr "Сохранить связь"
@@ -714,10 +714,10 @@ msgid "Remove"
 msgstr "Удалить"
 
 msgid "Remove from this device"
-msgstr "Убрать с этого устройства"
+msgstr "Удалить с этого устройства"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr "Уберите identity с этого устройства. Вы сможете добавить их потом снова."
+msgstr "Удалите неиспользуемые идентификаторы. Их можно вернуть в любой момент, снова выполнив вход."
 
 msgid "Remove passkey"
 msgstr "Удалить ключ доступа"
@@ -741,7 +741,7 @@ msgid "Rename this account"
 msgstr "Переименовать этот аккаунт"
 
 msgid "Replace it anytime"
-msgstr "Замените его в любое время"
+msgstr "Замените её в любое время"
 
 msgid "Requires unlocking before it can be reset."
 msgstr "Требует разблокировки перед сбросом."
@@ -789,7 +789,7 @@ msgid "Seamless Access"
 msgstr "Бесшовный доступ"
 
 msgid "See how many access methods are within your identity and manage your recovery phrase."
-msgstr "Посмотрите, сколько способов доступа имеется в вашей идентификации, и управляйте своей резервной фразой."
+msgstr "Посмотрите, сколько способов доступа имеется у вашего идентификатора, и управляйте своей резервной фразой."
 
 msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgstr "Выберите <0>Открыть в Safari</0> или <1>Открыть в Chrome</1>."
@@ -813,7 +813,7 @@ msgid "Sign in using familiar methods"
 msgstr "Вход через знакомые сервисы"
 
 msgid "Sign in with another identity"
-msgstr "Войти с другой идентификацией"
+msgstr "Войти с другим идентификатором"
 
 msgid "Sign in with your {name} account from any device."
 msgstr "Войдите в свою учетную запись {name} с любого устройства."
@@ -822,16 +822,16 @@ msgid "Sign out"
 msgstr "Выйти"
 
 msgid "Sign out and keep identity"
-msgstr "Выйти, запомнив эту identity"
+msgstr "Выйти, сохранив идентификатор на этом устройстве"
 
 msgid "Sign out and remove from device"
-msgstr "Выйти и убрать эту identity с устройства"
+msgstr "Выйти и удалить этот идентификатор с устройства"
 
 msgid "Sign out from this device"
 msgstr "Выйти с этого устройства"
 
 msgid "Sign out to remove"
-msgstr "Выйти и убрать"
+msgstr "Выйти и удалить"
 
 msgid "Signed in"
 msgstr "Вы зашли"
@@ -887,7 +887,7 @@ msgid "Submit"
 msgstr "Отправить"
 
 msgid "Successfully restored access to your identity"
-msgstr "Доступ к вашей идентификации успешно восстановлен"
+msgstr "Доступ к вашему идентификатору успешно восстановлен"
 
 msgid "Support"
 msgstr "Поддержка"
@@ -896,7 +896,7 @@ msgid "Supported"
 msgstr "Поддерживается"
 
 msgid "Switch identity"
-msgstr "Сменить идентификацию"
+msgstr "Сменить идентификатор"
 
 msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
 msgstr "Нажмите на <0>адресную строку</0> и <1>откройте в браузере</1>."
@@ -917,10 +917,10 @@ msgid "The <0>new device</0> is preparing to continue."
 msgstr "Ваше <0>новое устройство</0> готовится продолжить."
 
 msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
-msgstr "Интеграция с Google, Microsoft и Apple использует стандартный протокол аутентификации OpenID. Это тот же протокол, который другие приложения используют для входа через Google."
+msgstr "Интеграция с Google, Microsoft и Apple использует стандартный протокол аутентификации OpenID. Это тот же протокол, который стоит за кнопками «Войти через Google» в других приложениях."
 
 msgid "The passkey could not be identified, support unknown."
-msgstr "Ключ доступа не был идентифицирован, поддержка неизвестна."
+msgstr "Ключ доступа не был идентифицирован, совместимость неизвестна."
 
 msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
 msgstr "Фраза была введена правильно, но принадлежит продукту, отличному от Internet Identity."
@@ -932,7 +932,7 @@ msgid "This app has moved to the new Internet Identity"
 msgstr "Это приложение переехало на новую версию Internet Identity"
 
 msgid "This identity has already been upgraded to the new experience."
-msgstr "Эта учетная запись уже была обновлена до нового интерфейса."
+msgstr "Этот идентификатор уже был обновлен до нового интерфейса."
 
 msgid "This legacy passkey is no longer usable and should be removed."
 msgstr "Этот устаревший ключ доступа больше не может быть использован и должен быть удален."
@@ -941,7 +941,7 @@ msgid "This may take a few seconds"
 msgstr "Это может занять несколько секунд."
 
 msgid "This passkey is no longer associated with any identity."
-msgstr "Этот ключ доступа больше не связан ни с какой учетной записью."
+msgstr "Этот ключ доступа больше не связан ни с одним идентификатором."
 
 msgid "This YubiKey has older firmware (5.1) that's incompatible."
 msgstr "Этот YubiKey имеет старую прошивку (5.1), которая несовместима."
@@ -971,7 +971,7 @@ msgid "to continue with this app"
 msgstr "чтобы продолжить с этим приложением"
 
 msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
-msgstr "Чтобы продолжить, создайте ключ доступа для защиты вашей учетной записи и упрощения будущих входов."
+msgstr "Чтобы продолжить, создайте ключ доступа для защиты вашей учётной записи и упрощения будущих входов."
 
 msgid "To continue:"
 msgstr "Чтобы продолжить:"
@@ -1004,7 +1004,7 @@ msgid "Unknown"
 msgstr "Неизвестно"
 
 msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
-msgstr "В отличие от многих систем аутентификации Web3, требующих ручного подтверждения каждого действия, Internet Identity создаёт отдельную сессию для каждого приложения. Это обеспечивает и безопасность, и удобство — без повторных подтверждений, — при этом каждая сессия имеет собственную изолированную идентификацию."
+msgstr "В отличие от многих систем аутентификации Web3, требующих ручного подтверждения каждого действия, Internet Identity создаёт отдельную сессию для каждого приложения. Это обеспечивает и безопасность, и удобство — без повторных подтверждений, — при этом каждая сессия имеет собственный изолированный идентификатор."
 
 msgid "Unlink"
 msgstr "Отключить"
@@ -1040,19 +1040,19 @@ msgid "Upgrade completed successfully"
 msgstr "Обновление успешно завершено"
 
 msgid "Upgrade identity"
-msgstr "Обновить учетную запись"
+msgstr "Обновить идентификатор"
 
 msgid "Upgrade your existing identity to the new experience in a two steps."
-msgstr "Обновите вашу существующую учетную запись до нового интерфейса в два шага."
+msgstr "Обновите ваш существующий идентификатор до нового интерфейса в два шага."
 
 msgid "Upgrade your identity"
-msgstr "Обновить вашу учетную запись"
+msgstr "Обновить ваш идентификатор"
 
 msgid "Upgrading identity..."
-msgstr "Обновление учетной записи..."
+msgstr "Обновление идентификатора..."
 
 msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
-msgstr "Используйте устройство, которое уже содержит вашу учетную запись, чтобы отсканировать или открыть URL. Это свяжет вашу учетную запись с этим устройством."
+msgstr "Используйте устройство, которое уже содержит вашу учётную запись, чтобы отсканировать или открыть URL. Это свяжет вашу учётную запись с этим устройством."
 
 msgid "Use existing identity"
 msgstr "Уже есть аккаунт? Войти"
@@ -1061,7 +1061,7 @@ msgid "Verify"
 msgstr "Проверить"
 
 msgid "Verify recovery to remove"
-msgstr "Подтвердить восстановление для удаления"
+msgstr "Чтобы удалить, сначала подтвердите резервную фразу"
 
 msgid "Verify you are human"
 msgstr "Подтвердите, что вы человек"
@@ -1073,7 +1073,7 @@ msgid "Verifying..."
 msgstr "Проверка..."
 
 msgid "View your last used identities"
-msgstr "Просмотреть ваши последние использованные учетные записи"
+msgstr "Просмотреть ваши последние использованные учётные записи"
 
 msgid "Waiting for your existing device"
 msgstr "Ожидание вашего существующего устройства"
@@ -1139,22 +1139,22 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Вы обновляете ID <0>{identityNumber}</0>"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr "Всегда можно вернуть, снова зайдя через {openIdProvider}"
+msgstr "Идентификатор можно вернуть в любой момент, снова войдя с тем же аккаунтом {openIdProvider}."
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr "Всегда можно вернуть, снова зайдя через ключ доступа"
+msgstr "Идентификатор можно вернуть в любой момент, снова войдя с тем же ключом доступа."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Вы можете продолжить с <0>Использовать существующий ключ доступа</0> в процессе входа."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "Вы можете выйти, сохранив свои данные для более быстрого входа в следующий раз, или полностью убрать их с этого устройства."
+msgstr "Вы можете выйти, сохранив идентификатор на устройстве для быстрого входа в следующий раз, или полностью удалить его с этого устройства."
 
 msgid "You can recover your identity now, verify you saved it correctly."
-msgstr "Вы можете восстановить свою идентификацию сейчас, проверьте, что сохранили ее правильно."
+msgstr "Ваша резервная фраза готова к использованию. Проверьте, что записали её верно."
 
 msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
-msgstr "Вы можете сбросить свою резервную фразу в любое время. Это сохранит вашу идентификацию в безопасности, если она когда-либо будет раскрыта."
+msgstr "Вы можете сбросить свою резервную фразу в любое время — это защитит ваш идентификатор, если фраза окажется скомпрометирована."
 
 msgid "You have reached the maximum number of passkeys"
 msgstr "Вы достигли максимального количества ключей доступа"
@@ -1163,10 +1163,10 @@ msgid "You may close this page."
 msgstr "Вы можете закрыть эту страницу."
 
 msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
-msgstr "Больше не нужно запоминать номер — теперь можно использовать отпечаток пальца, лицо или блокировку экрана."
+msgstr "Больше не нужно запоминать номер идентификатора — теперь можно использовать отпечаток пальца, лицо или блокировку экрана."
 
 msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
-msgstr "Сейчас вы увидите свою резервную фразу. Internet Identity её не хранит и не сможет восстановить в случае потери, поэтому сохраните её в безопасном месте офлайн."
+msgstr "Сейчас вы увидите свою резервную фразу. Internet Identity её не хранит — при потере восстановить доступ будет невозможно. Сохраните фразу в безопасном месте офлайн."
 
 msgid "You're about to sign in on a <0>new device</0>."
 msgstr "Вы собираетесь войти на <0>новом устройстве</0>."
@@ -1178,7 +1178,7 @@ msgid "You're about to unlink your {name} account."
 msgstr "Вы собираетесь отключить ваш аккаунт {name}."
 
 msgid "You're all set. Your identity has been created."
-msgstr "Все готово. Ваша идентификация создана."
+msgstr "Все готово. Ваш идентификатор создан."
 
 msgid "You're all set. Your passkey has been registered."
 msgstr "Все готово. Ваш ключ доступа зарегистрирован."
@@ -1187,10 +1187,10 @@ msgid "You're signing in as <0>{name}</0>."
 msgstr "Вы входите как <0>{name}</0>."
 
 msgid "Your identity and sign-in methods at a glance."
-msgstr "Ваша учётная запись и способы входа — всё в одном месте."
+msgstr "Ваш идентификатор и способы входа — всё в одном месте."
 
 msgid "Your identity name is currently not editable. It is only ever visible to you."
-msgstr "Имя учётной записи сейчас нельзя изменить. Оно видно только вам."
+msgstr "Имя идентификатора пока нельзя изменить. Оно видно только вам."
 
 msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
 msgstr "Резервная фраза даёт полный контроль над вашей учётной записью. Никогда никому её не сообщайте и вводите только на официальном сайте."
