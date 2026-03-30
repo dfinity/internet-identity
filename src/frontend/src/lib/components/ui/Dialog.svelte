@@ -70,18 +70,20 @@
     // If the API is not supported (e.g. iOS) polyfill it with visualViewport.
     let visualViewportResizeTimeout: ReturnType<typeof setTimeout>;
     const updateKeyboardInset = () => {
-      clearTimeout(visualViewportResizeTimeout);
-      visualViewportResizeTimeout = setTimeout(() => {
-        dialogRef.style.setProperty(
-          "--keyboard-inset-height",
-          `${Math.max(window.innerHeight - window.visualViewport!.height, 0)}px`,
-        );
-        dialogRef.style.setProperty(
-          "--max-content-height",
-          `${window.visualViewport!.height}px`,
-        );
-      }, 100);
+      dialogRef.style.setProperty(
+        "--keyboard-inset-height",
+        `${Math.max(window.innerHeight - window.visualViewport!.height, 0)}px`,
+      );
+      dialogRef.style.setProperty(
+        "--max-content-height",
+        `${window.visualViewport!.height}px`,
+      );
     };
+    const updateKeyboardInsetDebounced = () => {
+      clearTimeout(visualViewportResizeTimeout);
+      visualViewportResizeTimeout = setTimeout(updateKeyboardInset, 100);
+    };
+    updateKeyboardInset();
     // If the API is not supported (e.g. iOS), prevent page scrolling
     // and implement custom touch scroll handlers for dialog content.
     const preventScroll = (event: TouchEvent) => {
@@ -119,8 +121,14 @@
         navigator.virtualKeyboard as { overlaysContent: boolean }
       ).overlaysContent = true;
     } else {
-      window.visualViewport?.addEventListener("resize", updateKeyboardInset);
-      window.visualViewport?.addEventListener("scroll", updateKeyboardInset);
+      window.visualViewport?.addEventListener(
+        "resize",
+        updateKeyboardInsetDebounced,
+      );
+      window.visualViewport?.addEventListener(
+        "scroll",
+        updateKeyboardInsetDebounced,
+      );
       document.documentElement.addEventListener("touchmove", preventScroll, {
         passive: false,
       });
@@ -139,11 +147,11 @@
       } else {
         window.visualViewport?.removeEventListener(
           "resize",
-          updateKeyboardInset,
+          updateKeyboardInsetDebounced,
         );
         window.visualViewport?.removeEventListener(
           "scroll",
-          updateKeyboardInset,
+          updateKeyboardInsetDebounced,
         );
         document.documentElement.removeEventListener(
           "touchmove",
@@ -168,7 +176,7 @@
       "max-sm:top-auto max-sm:bottom-0 max-sm:w-full",
       // Backdrop base/visible
       "backdrop:bg-bg-overlay backdrop:opacity-0 backdrop:transition-opacity backdrop:duration-200",
-      backdrop && "[&[data-visible]]:backdrop:opacity-80",
+      backdrop && "data-visible:backdrop:opacity-80",
     ]}
     style="--keyboard-inset-height: env(keyboard-inset-height);--max-content-height: calc(100dvh - var(--keyboard-inset-height))"
     transition:transitionFn|global
@@ -188,9 +196,9 @@
       <!-- Non-interactive element to render dark-mode bottom sheet border gradient -->
       <div
         class={[
-          "from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-1 hidden h-24 rounded-t-2xl bg-gradient-to-b to-transparent p-[1px] max-sm:dark:block",
+          "from-border-secondary pointer-events-none absolute top-0 right-0 left-0 z-1 hidden h-24 rounded-t-2xl bg-linear-to-b to-transparent p-[1px] max-sm:dark:block",
           // Use a mask to only show the gradient on the border area, and prevent it from overlapping with the dialog content.
-          "![mask-composite:exclude] [mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)]",
+          "mask-exclude! [mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)]",
         ]}
       ></div>
       <div class="flex flex-1 flex-col">
@@ -207,7 +215,7 @@
             {@render children?.()}
             {#if showCloseButton && onClose !== undefined}
               <button
-                class="btn btn-tertiary btn-lg btn-icon absolute end-2 top-2 z-2 !rounded-full"
+                class="btn btn-tertiary btn-lg btn-icon absolute inset-e-2 top-2 z-2 rounded-full!"
                 onclick={onClose}
                 aria-label={$t`Close`}
               >
@@ -218,13 +226,13 @@
         </div>
         <!-- Element that pushes bottom sheet away from mobile keyboard or gesture navigation -->
         <div class="flex sm:hidden">
-          <div class="h-[var(--keyboard-inset-height)]"></div>
+          <div class="h-(--keyboard-inset-height)"></div>
           <div class="h-[env(safe-area-inset-bottom)]"></div>
         </div>
       </div>
       <!-- Element that pushes dialog away from mobile keyboard or gesture navigation -->
       <div class="flex max-sm:hidden">
-        <div class="h-[var(--keyboard-inset-height)]"></div>
+        <div class="h-(--keyboard-inset-height)"></div>
         <div class="h-[env(safe-area-inset-bottom)]"></div>
       </div>
     </div>
