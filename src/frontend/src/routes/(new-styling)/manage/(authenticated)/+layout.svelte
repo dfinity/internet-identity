@@ -168,10 +168,13 @@
       isReauthDialogOpen = true;
       return;
     }
-    const forceTimer = setTimeout(() => {
-      observer.disconnect();
-      isReauthDialogOpen = true;
-    }, Math.max(0, expiryMs - Date.now()));
+    const forceTimer = setTimeout(
+      () => {
+        observer.disconnect();
+        isReauthDialogOpen = true;
+      },
+      Math.max(0, expiryMs - Date.now()),
+    );
     const observer = new MutationObserver(() => {
       if (document.querySelector("dialog[open]") === null) {
         clearTimeout(forceTimer);

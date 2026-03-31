@@ -34,9 +34,7 @@
         {$t`Session timed out`}
       </h2>
       <p class="text-text-tertiary text-base">
-        <Trans>
-          Sign in again to continue where you left off.
-        </Trans>
+        <Trans>Sign in again to continue where you left off.</Trans>
       </p>
     </div>
   </div>
