@@ -75,19 +75,22 @@
   );
 
   const handleSignIn = async (identityNumber: bigint) => {
-    isAuthenticating = true;
-    if ($authenticationStore?.identityNumber !== identityNumber) {
-      // Sign in if not authenticated with this identity yet
-      sessionStore.reset();
-      await authLastUsedFlow.authenticate(
-        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
-      );
+    try {
+      isAuthenticating = true;
+      if ($authenticationStore?.identityNumber !== identityNumber) {
+        // Sign in if not authenticated with this identity yet
+        sessionStore.reset();
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+        );
+      }
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
+      await goto("/manage", { replaceState: true, invalidateAll: true });
+    } finally {
+      isIdentityPopoverOpen = false;
+      isAuthDialogOpen = false;
+      isAuthenticating = false;
     }
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await goto("/manage", { replaceState: true, invalidateAll: true });
-    isIdentityPopoverOpen = false;
-    isAuthDialogOpen = false;
-    isAuthenticating = false;
   };
   const handleSignUp = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
