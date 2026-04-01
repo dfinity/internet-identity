@@ -64,7 +64,7 @@ lazy_static! {
         I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
-            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
@@ -244,27 +244,17 @@ pub fn arg_with_captcha_enabled() -> Option<InternetIdentityInit> {
 }
 
 pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdentityInit> {
-    Some(InternetIdentityInit {
-        register_rate_limit: Some(rate_limit),
-        captcha_config: Some(CaptchaConfig {
-            max_unsolved_captchas: 500,
-            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
-        }),
-        ..InternetIdentityInit::default()
-    })
+    let mut arg = arg_with_captcha_disabled().unwrap();
+    arg.register_rate_limit = Some(rate_limit);
+    Some(arg)
 }
 
 pub fn arg_with_anchor_range(
     anchor_range: (AnchorNumber, AnchorNumber),
 ) -> Option<InternetIdentityInit> {
-    Some(InternetIdentityInit {
-        assigned_user_number_range: Some(anchor_range),
-        captcha_config: Some(CaptchaConfig {
-            max_unsolved_captchas: 500,
-            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
-        }),
-        ..InternetIdentityInit::default()
-    })
+    let mut arg = arg_with_captcha_disabled().unwrap();
+    arg.assigned_user_number_range = Some(anchor_range);
+    Some(arg)
 }
 
 pub fn arg_with_dynamic_captcha() -> Option<InternetIdentityInit> {

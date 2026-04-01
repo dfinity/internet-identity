@@ -68,7 +68,7 @@ do
         # full filename), then fall back to matching by stem (for non-matrix jobs
         # like docker-build-archive).
         job_id=$(jq -cMr --arg full "$filename" --arg stem "${filename%%.*}" \
-                '. as $jobs | [$jobs[] | select(.name | contains($full))] | if length > 0 then .[0].id else ($jobs | map(select(.name | contains($stem))) | .[0].id) end' \
+                '. as $jobs | [$jobs[] | select(.name | contains($full))] | if length > 0 then .[0].id else ($jobs | map(select(.name | contains($stem))) | if length > 0 then .[0].id else error("no job found for \($full) / \($stem)") end) end' \
                 <<< "$INPUT_WORKFLOW_JOBS")
                         >&2 echo "Found job id: $job_id"
 
