@@ -131,6 +131,9 @@
         },
       });
     }
+
+    // Cleanup locked identity since it's no longer needed
+    lockedRecoveryPhraseIdentity = undefined;
   };
   const handleCancel = () => {
     showRecoveryPhraseSetup = undefined;
