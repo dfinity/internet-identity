@@ -21,6 +21,7 @@ pub type AccountNumber = u64;
 
 mod api_v2;
 pub mod attributes;
+pub mod icrc3;
 pub mod openid;
 pub mod vc_mvp;
 

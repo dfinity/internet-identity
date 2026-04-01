@@ -914,6 +914,74 @@ type GetAttributesError = variant {
     GetAccountError : GetAccountError;
 };
 
+// ICRC-3 attribute sharing types
+// ==============================
+
+type Icrc3Value = variant {
+    Nat : nat;
+    Int : int;
+    Blob : blob;
+    Text : text;
+    Array : vec Icrc3Value;
+    Map : vec record { text; Icrc3Value };
+};
+
+type PrepareIcrc3AttributeRequest = record {
+    // Identity for which the attributes should be prepared.
+    identity_number : IdentityNumber;
+
+    // Origin of the relying party in the attribute sharing flow.
+    origin : FrontendHostname;
+
+    // II account for the relying party.
+    account_number : opt AccountNumber;
+
+    // The attributes to be prepared: keys and values.
+    attributes : vec record { text; blob };
+};
+
+type PrepareIcrc3AttributeResponse = record {
+    // Candid-encoded ICRC-3 Value map. Pass this to get_icrc3_attributes.
+    message : blob;
+};
+
+type PrepareIcrc3AttributeError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+    GetAccountError : GetAccountError;
+    AttributeMismatch : record {
+        problems : vec text;
+    };
+};
+
+type GetIcrc3AttributeRequest = record {
+    // Identity for which the attributes were prepared.
+    identity_number : IdentityNumber;
+
+    // Origin of the relying party in the attribute sharing flow.
+    origin : FrontendHostname;
+
+    // II account for the relying party.
+    account_number : opt AccountNumber;
+
+    // The message blob from PrepareIcrc3AttributeResponse.
+    message : blob;
+};
+
+type GetIcrc3AttributeResponse = record {
+    signature : blob;
+};
+
+type GetIcrc3AttributeError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+    GetAccountError : GetAccountError;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -1030,6 +1098,11 @@ service : (opt InternetIdentityInit) -> {
     // ==========================
     prepare_attributes : (PrepareAttributeRequest) -> (variant { Ok : PrepareAttributeResponse; Err : PrepareAttributeError });
     get_attributes : (GetAttributesRequest) -> (variant { Ok : CertifiedAttributes; Err : GetAttributesError }) query;
+
+    // ICRC-3 Attribute sharing protocol
+    // ==================================
+    prepare_icrc3_attributes : (PrepareIcrc3AttributeRequest) -> (variant { Ok : PrepareIcrc3AttributeResponse; Err : PrepareIcrc3AttributeError });
+    get_icrc3_attributes : (GetIcrc3AttributeRequest) -> (variant { Ok : GetIcrc3AttributeResponse; Err : GetIcrc3AttributeError }) query;
 
     // Old Verifiable Credentials API
     // ==============================

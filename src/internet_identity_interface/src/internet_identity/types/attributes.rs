@@ -425,6 +425,168 @@ pub enum GetAttributesError {
     GetAccountError(GetAccountError),
 }
 
+// ==================== ICRC-3 attribute sharing types ====================
+
+/// Maximum size of the ICRC-3 message blob (Candid-encoded ICRC-3 Value map).
+pub const ICRC3_MESSAGE_MAX_BYTES: usize = MAX_ATTRIBUTES_PER_REQUEST * ATTRIBUTE_VALUE_MAX_BYTES;
+
+#[derive(CandidType, Debug, Deserialize)]
+pub struct PrepareIcrc3AttributeRequest {
+    pub identity_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub attributes: Vec<(String, Vec<u8>)>,
+}
+
+#[derive(Debug)]
+pub struct ValidatedPrepareIcrc3AttributeRequest {
+    pub identity_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub attributes: BTreeMap<Option<AttributeScope>, BTreeSet<Attribute>>,
+}
+
+impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeRequest {
+    type Error = PrepareIcrc3AttributeError;
+
+    fn try_from(value: PrepareIcrc3AttributeRequest) -> Result<Self, Self::Error> {
+        let PrepareIcrc3AttributeRequest {
+            identity_number,
+            origin,
+            account_number,
+            attributes: unparsed_attributes,
+        } = value;
+
+        let mut problems = Vec::new();
+
+        if origin.len() > FRONTEND_HOSTNAME_MAX_BYTES {
+            problems.push(format!(
+                "Frontend hostname length {} exceeds limit of {} bytes",
+                origin.len(),
+                FRONTEND_HOSTNAME_MAX_BYTES
+            ));
+        }
+
+        if unparsed_attributes.len() > MAX_ATTRIBUTES_PER_REQUEST {
+            problems.push(format!(
+                "Number of attributes {} exceeds limit of {}",
+                unparsed_attributes.len(),
+                MAX_ATTRIBUTES_PER_REQUEST
+            ));
+        }
+
+        let mut attributes = BTreeMap::new();
+
+        for unparsed_attribute in unparsed_attributes {
+            let attribute: Attribute = match unparsed_attribute.try_into() {
+                Ok(attr) => attr,
+                Err(err) => {
+                    problems.push(err);
+                    continue;
+                }
+            };
+            attributes
+                .entry(attribute.key.scope.clone())
+                .or_insert_with(BTreeSet::new)
+                .insert(attribute);
+        }
+
+        if !problems.is_empty() {
+            return Err(PrepareIcrc3AttributeError::ValidationError { problems });
+        }
+
+        Ok(Self {
+            identity_number,
+            origin,
+            account_number,
+            attributes,
+        })
+    }
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct PrepareIcrc3AttributeResponse {
+    pub message: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
+pub enum PrepareIcrc3AttributeError {
+    ValidationError { problems: Vec<String> },
+    AuthorizationError(Principal),
+    GetAccountError(GetAccountError),
+    AttributeMismatch { problems: Vec<String> },
+}
+
+#[derive(CandidType, Debug, Deserialize)]
+pub struct GetIcrc3AttributeRequest {
+    pub identity_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub message: Vec<u8>,
+}
+
+#[derive(Debug)]
+pub struct ValidatedGetIcrc3AttributeRequest {
+    pub identity_number: AnchorNumber,
+    pub origin: FrontendHostname,
+    pub account_number: Option<AccountNumber>,
+    pub message: Vec<u8>,
+}
+
+impl TryFrom<GetIcrc3AttributeRequest> for ValidatedGetIcrc3AttributeRequest {
+    type Error = GetIcrc3AttributeError;
+
+    fn try_from(value: GetIcrc3AttributeRequest) -> Result<Self, Self::Error> {
+        let GetIcrc3AttributeRequest {
+            identity_number,
+            origin,
+            account_number,
+            message,
+        } = value;
+
+        let mut problems = Vec::new();
+
+        if origin.len() > FRONTEND_HOSTNAME_MAX_BYTES {
+            problems.push(format!(
+                "Frontend hostname length {} exceeds limit of {} bytes",
+                origin.len(),
+                FRONTEND_HOSTNAME_MAX_BYTES
+            ));
+        }
+
+        if message.len() > ICRC3_MESSAGE_MAX_BYTES {
+            problems.push(format!(
+                "Message length {} exceeds limit of {} bytes",
+                message.len(),
+                ICRC3_MESSAGE_MAX_BYTES
+            ));
+        }
+
+        if !problems.is_empty() {
+            return Err(GetIcrc3AttributeError::ValidationError { problems });
+        }
+
+        Ok(Self {
+            identity_number,
+            origin,
+            account_number,
+            message,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, CandidType, Serialize, Deserialize)]
+pub struct GetIcrc3AttributeResponse {
+    pub signature: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq, CandidType, Serialize, Deserialize)]
+pub enum GetIcrc3AttributeError {
+    ValidationError { problems: Vec<String> },
+    AuthorizationError(Principal),
+    GetAccountError(GetAccountError),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

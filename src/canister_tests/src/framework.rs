@@ -699,6 +699,28 @@ pub fn verify_attribute(
     .expect("attribute signature invalid");
 }
 
+pub fn verify_icrc3_attributes(
+    env: &PocketIc,
+    user_key: UserKey,
+    message: &[u8],
+    signature: &[u8],
+    root_key: &[u8],
+) {
+    const DOMAIN_SEPARATOR: &[u8] = b"ii-icrc3-request-attributes";
+
+    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
+    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    msg.extend_from_slice(message);
+
+    env.verify_canister_signature(
+        msg,
+        signature.to_vec(),
+        user_key.into_vec(),
+        root_key.to_vec(),
+    )
+    .expect("ICRC-3 attribute signature invalid");
+}
+
 pub fn verify_id_alias_credential_via_env(
     env: &PocketIc,
     canister_sig_pk_der: CanisterSigPublicKeyDer,

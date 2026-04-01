@@ -9,8 +9,9 @@ use ic_representation_independent_hash::{representation_independent_hash, Value}
 use internet_identity_interface::internet_identity::types::{
     attributes::{
         Attribute, AttributeKey, AttributeName, AttributeScope, CertifiedAttribute,
-        CertifiedAttributes,
+        CertifiedAttributes, GetIcrc3AttributeResponse, PrepareIcrc3AttributeError,
     },
+    icrc3::Icrc3Value,
     Timestamp,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -225,6 +226,143 @@ fn add_attribute_signature(sigs: &mut SignatureMap, seed: &[u8], message: &[u8])
         message,
     };
     sigs.add_signature(&inputs);
+}
+
+// ==================== ICRC-3 attribute sharing ====================
+
+/// Domain separator for ICRC-3 attribute certification signatures.
+const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ii-icrc3-request-attributes";
+
+/// Builds a Candid-encoded ICRC-3 Value map from the given attributes.
+/// Keys are attribute key strings, values are `Icrc3Value::Blob(attribute_value)`.
+fn icrc3_attribute_message(attributes: &BTreeSet<Attribute>) -> Vec<u8> {
+    let map_entries: Vec<(String, Icrc3Value)> = attributes
+        .iter()
+        .map(|attr| (attr.key.to_string(), Icrc3Value::Blob(attr.value.clone())))
+        .collect();
+
+    let value = Icrc3Value::Map(map_entries);
+    candid::Encode!(&value).expect("Candid encoding of ICRC-3 value should not fail")
+}
+
+impl Anchor {
+    /// Validates that provided attribute values match stored credential values,
+    /// builds the Candid-encoded ICRC-3 message, signs it, and returns the message blob.
+    pub fn prepare_icrc3_attributes(
+        &self,
+        attributes: BTreeMap<Option<AttributeScope>, BTreeSet<Attribute>>,
+        account: Account,
+    ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
+        let mut validated_attributes = BTreeSet::new();
+        let mut problems = Vec::new();
+
+        for (scope, requested_attrs) in &attributes {
+            match scope {
+                Some(AttributeScope::OpenId { issuer }) => {
+                    // Find the credential matching this issuer
+                    let credential = self.openid_credentials.iter().find(|c| {
+                        c.config_issuer().as_deref() == Some(issuer.as_str())
+                    });
+
+                    let Some(credential) = credential else {
+                        problems.push(format!(
+                            "No credential found for issuer: {}",
+                            issuer
+                        ));
+                        continue;
+                    };
+
+                    for attr in requested_attrs {
+                        let stored_value = match attr.key.attribute_name {
+                            AttributeName::Email => credential.get_email(),
+                            AttributeName::Name => credential.get_name(),
+                            AttributeName::VerifiedEmail => credential.get_verified_email(),
+                        };
+
+                        match stored_value {
+                            Some(stored) if stored.as_bytes() == attr.value.as_slice() => {
+                                validated_attributes.insert(Attribute {
+                                    key: AttributeKey {
+                                        scope: attr.key.scope.clone(),
+                                        attribute_name: attr.key.attribute_name,
+                                    },
+                                    value: attr.value.clone(),
+                                });
+                            }
+                            Some(stored) => {
+                                problems.push(format!(
+                                    "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
+                                    attr.key,
+                                    stored.len()
+                                ));
+                            }
+                            None => {
+                                problems.push(format!(
+                                    "Attribute {} not available for issuer {}",
+                                    attr.key.attribute_name, issuer
+                                ));
+                            }
+                        }
+                    }
+                }
+                None => {
+                    for attr in requested_attrs {
+                        problems.push(format!(
+                            "Attribute {} has no scope; only scoped attributes are supported",
+                            attr.key
+                        ));
+                    }
+                }
+                _ => {
+                    problems.push(format!(
+                        "Unsupported attribute scope: {:?}",
+                        scope
+                    ));
+                }
+            }
+        }
+
+        if !problems.is_empty() {
+            return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
+        }
+
+        let message = icrc3_attribute_message(&validated_attributes);
+
+        let seed = account.calculate_seed();
+        state::signature_map_mut(|sigs| {
+            let inputs = CanisterSigInputs {
+                domain: ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+                seed: &seed,
+                message: &message,
+            };
+            sigs.add_signature(&inputs);
+        });
+
+        update_root_hash();
+
+        Ok(message)
+    }
+
+    /// Looks up the single ICRC-3 attribute signature for the given message blob.
+    pub fn get_icrc3_attributes(
+        &self,
+        account: Account,
+        message: &[u8],
+    ) -> GetIcrc3AttributeResponse {
+        let seed = account.calculate_seed();
+
+        let signature = state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+                seed: &seed,
+                message,
+            };
+            sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
+                .expect("ICRC-3 attribute signature not found")
+        });
+
+        GetIcrc3AttributeResponse { signature }
+    }
 }
 
 #[cfg(test)]
