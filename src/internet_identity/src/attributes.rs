@@ -236,13 +236,15 @@ const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ii-icrc3-request-attribut
 /// Builds a Candid-encoded ICRC-3 Value map from the given attributes.
 /// Keys are attribute key strings, values are `Icrc3Value::Blob(attribute_value)`.
 fn icrc3_attribute_message(attributes: &BTreeSet<Attribute>) -> Vec<u8> {
+    use candid::Encode;
+
     let map_entries: Vec<(String, Icrc3Value)> = attributes
         .iter()
         .map(|attr| (attr.key.to_string(), Icrc3Value::Blob(attr.value.clone())))
         .collect();
 
     let value = Icrc3Value::Map(map_entries);
-    candid::Encode!(&value).expect("Candid encoding of ICRC-3 value should not fail")
+    Encode!(&value).expect("Candid encoding of ICRC-3 value should not fail")
 }
 
 impl Anchor {
@@ -310,9 +312,6 @@ impl Anchor {
                             attr.key
                         ));
                     }
-                }
-                _ => {
-                    problems.push(format!("Unsupported attribute scope: {:?}", scope));
                 }
             }
         }
