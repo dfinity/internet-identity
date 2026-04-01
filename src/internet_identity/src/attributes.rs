@@ -260,15 +260,13 @@ impl Anchor {
             match scope {
                 Some(AttributeScope::OpenId { issuer }) => {
                     // Find the credential matching this issuer
-                    let credential = self.openid_credentials.iter().find(|c| {
-                        c.config_issuer().as_deref() == Some(issuer.as_str())
-                    });
+                    let credential = self
+                        .openid_credentials
+                        .iter()
+                        .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()));
 
                     let Some(credential) = credential else {
-                        problems.push(format!(
-                            "No credential found for issuer: {}",
-                            issuer
-                        ));
+                        problems.push(format!("No credential found for issuer: {}", issuer));
                         continue;
                     };
 
@@ -314,10 +312,7 @@ impl Anchor {
                     }
                 }
                 _ => {
-                    problems.push(format!(
-                        "Unsupported attribute scope: {:?}",
-                        scope
-                    ));
+                    problems.push(format!("Unsupported attribute scope: {:?}", scope));
                 }
             }
         }

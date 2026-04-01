@@ -20,9 +20,8 @@ use internet_identity_interface::internet_identity::types::attributes::{
     CertifiedAttributes, GetAttributesError, GetAttributesRequest, GetIcrc3AttributeError,
     GetIcrc3AttributeRequest, GetIcrc3AttributeResponse, PrepareAttributeError,
     PrepareAttributeRequest, PrepareAttributeResponse, PrepareIcrc3AttributeError,
-    PrepareIcrc3AttributeRequest, PrepareIcrc3AttributeResponse,
-    ValidatedGetIcrc3AttributeRequest, ValidatedPrepareAttributeRequest,
-    ValidatedPrepareIcrc3AttributeRequest,
+    PrepareIcrc3AttributeRequest, PrepareIcrc3AttributeResponse, ValidatedGetIcrc3AttributeRequest,
+    ValidatedPrepareAttributeRequest, ValidatedPrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,

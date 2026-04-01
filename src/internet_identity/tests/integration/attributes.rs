@@ -523,14 +523,10 @@ fn should_get_icrc3_certified_attributes() {
         message: prepare_response.message.clone(),
     };
 
-    let get_response = api::get_icrc3_attributes(
-        &env,
-        ii_backend_canister_id,
-        test_principal,
-        get_request,
-    )
-    .expect("failed to call get_icrc3_attributes")
-    .expect("get_icrc3_attributes error");
+    let get_response =
+        api::get_icrc3_attributes(&env, ii_backend_canister_id, test_principal, get_request)
+            .expect("failed to call get_icrc3_attributes")
+            .expect("get_icrc3_attributes error");
 
     // Check that signature is non-empty and has CBOR prefix
     assert!(!get_response.signature.is_empty());

@@ -520,20 +520,10 @@ pub fn get_icrc3_attributes(
     sender: Principal,
     request: types::attributes::GetIcrc3AttributeRequest,
 ) -> Result<
-    Result<
-        types::attributes::GetIcrc3AttributeResponse,
-        types::attributes::GetIcrc3AttributeError,
-    >,
+    Result<types::attributes::GetIcrc3AttributeResponse, types::attributes::GetIcrc3AttributeError>,
     RejectResponse,
 > {
-    query_candid_as(
-        env,
-        canister_id,
-        sender,
-        "get_icrc3_attributes",
-        (request,),
-    )
-    .map(|(x,)| x)
+    query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
 }
 
 /// A "compatibility" module for the previous version of II to handle API changes.
