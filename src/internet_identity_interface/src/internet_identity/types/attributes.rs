@@ -21,6 +21,17 @@ pub enum AttributeName {
     VerifiedEmail,
 }
 
+impl AttributeName {
+    /// Returns all known attribute name variants.
+    pub const fn all() -> &'static [AttributeName] {
+        &[
+            AttributeName::Email,
+            AttributeName::Name,
+            AttributeName::VerifiedEmail,
+        ]
+    }
+}
+
 impl TryFrom<&str> for AttributeName {
     type Error = String;
 
@@ -710,7 +721,7 @@ impl TryFrom<ListAvailableAttributesRequest> for ValidatedListAvailableAttribute
                         MAX_ATTRIBUTES_PER_REQUEST
                     ));
                 }
-                let mut parsed = Vec::with_capacity(keys.len());
+                let mut parsed = Vec::with_capacity(keys.len().min(MAX_ATTRIBUTES_PER_REQUEST));
                 for key in keys {
                     match AttributeKey::try_from(key) {
                         Ok(k) => parsed.push(k),

@@ -526,16 +526,15 @@ pub fn get_icrc3_attributes(
     query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
 }
 
-#[allow(clippy::type_complexity)]
+pub type ListAvailableAttributesResult =
+    Result<Vec<(String, Vec<u8>)>, types::attributes::ListAvailableAttributesError>;
+
 pub fn list_available_attributes(
     env: &PocketIc,
     canister_id: CanisterId,
     sender: Principal,
     request: types::attributes::ListAvailableAttributesRequest,
-) -> Result<
-    Result<Vec<(String, Vec<u8>)>, types::attributes::ListAvailableAttributesError>,
-    RejectResponse,
-> {
+) -> Result<ListAvailableAttributesResult, RejectResponse> {
     query_candid_as(
         env,
         canister_id,

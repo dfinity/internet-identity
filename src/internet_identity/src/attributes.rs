@@ -388,22 +388,16 @@ impl Anchor {
         &self,
         requested: Option<Vec<AttributeKey>>,
     ) -> Vec<(String, Vec<u8>)> {
-        let all_names = [
-            AttributeName::Email,
-            AttributeName::Name,
-            AttributeName::VerifiedEmail,
-        ];
+        let all_attribute_names = AttributeName::all();
         let mut result = BTreeMap::new();
 
         for credential in &self.openid_credentials {
             let Some(issuer) = credential.config_issuer() else {
                 continue;
             };
-            let scope = AttributeScope::OpenId {
-                issuer: issuer.clone(),
-            };
+            let scope = AttributeScope::OpenId { issuer };
 
-            for &attr_name in &all_names {
+            for &attr_name in all_attribute_names {
                 let value = match attr_name {
                     AttributeName::Email => credential.get_email(),
                     AttributeName::Name => credential.get_name(),
@@ -422,11 +416,10 @@ impl Anchor {
                 };
 
                 if matches {
-                    let key = AttributeKey {
-                        scope: Some(scope.clone()),
-                        attribute_name: attr_name,
-                    };
-                    result.insert(key.to_string(), value.into_bytes());
+                    let key_str = format!("{}:{}", scope, attr_name);
+                    result
+                        .entry(key_str)
+                        .or_insert_with(|| value.into_bytes());
                 }
             }
         }
