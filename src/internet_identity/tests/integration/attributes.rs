@@ -6,7 +6,7 @@ use canister_tests::framework::*;
 use ic_canister_sig_creation::extract_raw_canister_sig_pk_from_der;
 use internet_identity_interface::internet_identity::types::attributes::{
     AttributeSpec, CertifiedAttribute, CertifiedAttributes, GetAttributesRequest,
-    GetIcrc3AttributeRequest, GetIcrc3AttributeError, PrepareAttributeRequest,
+    GetIcrc3AttributeError, GetIcrc3AttributeRequest, PrepareAttributeRequest,
     PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::{
@@ -569,9 +569,9 @@ fn should_get_icrc3_certified_attributes() {
 /// Sets up an environment with a Google OpenID credential and returns all context needed for tests.
 fn setup_icrc3_test_env() -> (
     PocketIc,
-    Principal,  // ii_backend_canister_id
-    Principal,  // test_principal
-    u64,        // identity_number
+    Principal, // ii_backend_canister_id
+    Principal, // test_principal
+    u64,       // identity_number
 ) {
     let env = env();
     #[allow(unused_variables)]
@@ -660,8 +660,11 @@ fn should_certify_icrc3_attributes_without_value_check() {
 
     // Decode the message to verify it contains the stored values
     let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
-        candid::Decode!(&prepare_response.message, internet_identity_interface::internet_identity::types::icrc3::Icrc3Value)
-            .expect("failed to decode ICRC-3 value");
+        candid::Decode!(
+            &prepare_response.message,
+            internet_identity_interface::internet_identity::types::icrc3::Icrc3Value
+        )
+        .expect("failed to decode ICRC-3 value");
 
     match icrc3_value {
         internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
@@ -720,15 +723,26 @@ fn should_certify_icrc3_attributes_with_omit_scope() {
 
     // Decode the message — keys should be just "email" and "name", not scoped
     let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
-        candid::Decode!(&prepare_response.message, internet_identity_interface::internet_identity::types::icrc3::Icrc3Value)
-            .expect("failed to decode ICRC-3 value");
+        candid::Decode!(
+            &prepare_response.message,
+            internet_identity_interface::internet_identity::types::icrc3::Icrc3Value
+        )
+        .expect("failed to decode ICRC-3 value");
 
     match icrc3_value {
         internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
             assert_eq!(entries.len(), 2);
             let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
-            assert!(keys.contains(&"email"), "Expected 'email' key, got {:?}", keys);
-            assert!(keys.contains(&"name"), "Expected 'name' key, got {:?}", keys);
+            assert!(
+                keys.contains(&"email"),
+                "Expected 'email' key, got {:?}",
+                keys
+            );
+            assert!(
+                keys.contains(&"name"),
+                "Expected 'name' key, got {:?}",
+                keys
+            );
             // Verify that the full scoped key is NOT present
             assert!(
                 !keys.iter().any(|k| k.contains("openid:")),
@@ -809,15 +823,22 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
             .expect("prepare_icrc3_attributes error");
 
     let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
-        candid::Decode!(&prepare_response.message, internet_identity_interface::internet_identity::types::icrc3::Icrc3Value)
-            .expect("failed to decode ICRC-3 value");
+        candid::Decode!(
+            &prepare_response.message,
+            internet_identity_interface::internet_identity::types::icrc3::Icrc3Value
+        )
+        .expect("failed to decode ICRC-3 value");
 
     match icrc3_value {
         internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
             assert_eq!(entries.len(), 2);
             let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
             // email should have scope omitted
-            assert!(keys.contains(&"email"), "Expected unscoped 'email' key, got {:?}", keys);
+            assert!(
+                keys.contains(&"email"),
+                "Expected unscoped 'email' key, got {:?}",
+                keys
+            );
             // name should have full scope
             assert!(
                 keys.contains(&"openid:https://accounts.google.com:name"),
@@ -845,9 +866,8 @@ fn should_reject_icrc3_attributes_with_wrong_value() {
         }],
     };
 
-    let result =
-        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-            .expect("failed to call prepare_icrc3_attributes");
+    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+        .expect("failed to call prepare_icrc3_attributes");
 
     match result {
         Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -886,9 +906,8 @@ fn should_reject_icrc3_attributes_with_correct_and_wrong_value() {
         ],
     };
 
-    let result =
-        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-            .expect("failed to call prepare_icrc3_attributes");
+    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+        .expect("failed to call prepare_icrc3_attributes");
 
     match result {
         Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -998,9 +1017,8 @@ fn should_reject_icrc3_attributes_for_unknown_issuer() {
         }],
     };
 
-    let result =
-        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-            .expect("failed to call prepare_icrc3_attributes");
+    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+        .expect("failed to call prepare_icrc3_attributes");
 
     match result {
         Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
@@ -1031,9 +1049,8 @@ fn should_reject_icrc3_attributes_without_scope() {
         }],
     };
 
-    let result =
-        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-            .expect("failed to call prepare_icrc3_attributes");
+    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+        .expect("failed to call prepare_icrc3_attributes");
 
     match result {
         Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {

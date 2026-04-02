@@ -1472,11 +1472,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
-                        attributes: vec![make_spec(
-                            "openid:https://google.com:email",
-                            None,
-                            false,
-                        )],
+                        attributes: vec![make_spec("openid:https://google.com:email", None, false)],
                     },
                     1,
                 ),
@@ -1486,11 +1482,7 @@ mod tests {
                         identity_number: 123,
                         origin: "example.com".to_string(),
                         account_number: None,
-                        attributes: vec![make_spec(
-                            "openid:https://google.com:email",
-                            None,
-                            true,
-                        )],
+                        attributes: vec![make_spec("openid:https://google.com:email", None, true)],
                     },
                     1,
                 ),
@@ -1579,11 +1571,7 @@ mod tests {
             let long_origin = "x".repeat(FRONTEND_HOSTNAME_MAX_BYTES + 1);
             let long_value = vec![0u8; ATTRIBUTE_VALUE_MAX_BYTES + 1];
 
-            let test_cases: Vec<(
-                &str,
-                PrepareIcrc3AttributeRequest,
-                Vec<String>,
-            )> = vec![
+            let test_cases: Vec<(&str, PrepareIcrc3AttributeRequest, Vec<String>)> = vec![
                 (
                     "origin too long",
                     PrepareIcrc3AttributeRequest {
@@ -1673,7 +1661,8 @@ mod tests {
                             );
                         } else {
                             pretty_assert_eq!(
-                                problems, expected_problems,
+                                problems,
+                                expected_problems,
                                 "Failed test case: {}",
                                 label
                             );
@@ -1722,11 +1711,7 @@ mod tests {
 
             for (label, input) in test_cases {
                 let validated = ValidatedGetIcrc3AttributeRequest::try_from(input).expect(label);
-                assert!(
-                    validated.identity_number > 0,
-                    "Failed test case: {}",
-                    label
-                );
+                assert!(validated.identity_number > 0, "Failed test case: {}", label);
             }
         }
 
@@ -1791,7 +1776,8 @@ mod tests {
                 match err {
                     GetIcrc3AttributeError::ValidationError { problems } => {
                         pretty_assert_eq!(
-                            problems, expected_problems,
+                            problems,
+                            expected_problems,
                             "Failed test case: {}",
                             label
                         );
