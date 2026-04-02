@@ -4,6 +4,7 @@
   import { UserCheckIcon } from "@lucide/svelte";
   import FeaturedIcon from "./FeaturedIcon.svelte";
   import ProgressRing from "./ProgressRing.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   type Props = {
     onReauthenticate: () => Promise<void>;
@@ -13,11 +14,16 @@
   let { onReauthenticate, onSignOut }: Props = $props();
 
   let isReauthenticating = $state(false);
+  let isCancelled = $state(false);
 
   const handleReauthenticate = async () => {
     try {
       isReauthenticating = true;
+      isCancelled = false;
       await onReauthenticate();
+    } catch {
+      isCancelled = true;
+      setTimeout(() => (isCancelled = false), 4000);
     } finally {
       isReauthenticating = false;
     }
@@ -40,18 +46,24 @@
   </div>
 
   <div class="flex flex-col gap-3">
-    <button
-      onclick={handleReauthenticate}
-      class="btn w-full"
-      disabled={isReauthenticating}
+    <Tooltip
+      label={$t`Interaction canceled. Please try again.`}
+      hidden={!isCancelled}
+      manual
     >
-      {#if isReauthenticating}
-        <ProgressRing />
-        <span>{$t`Signing in...`}</span>
-      {:else}
-        <span>{$t`Sign in`}</span>
-      {/if}
-    </button>
+      <button
+        onclick={handleReauthenticate}
+        class="btn w-full"
+        disabled={isReauthenticating}
+      >
+        {#if isReauthenticating}
+          <ProgressRing />
+          <span>{$t`Signing in...`}</span>
+        {:else}
+          <span>{$t`Sign in`}</span>
+        {/if}
+      </button>
+    </Tooltip>
     <button
       onclick={onSignOut}
       class="btn btn-tertiary w-full"

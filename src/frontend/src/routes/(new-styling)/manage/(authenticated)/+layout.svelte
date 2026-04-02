@@ -163,6 +163,8 @@
 
   const REAUTH_BUFFER_MS = 5 * 60 * 1000;
 
+  let reauthCleanup: (() => void) | undefined;
+
   const showReauthDialog = (expiryMs: number) => {
     if (document.querySelector("dialog[open]") === null) {
       isReauthDialogOpen = true;
@@ -171,6 +173,7 @@
     const forceTimer = setTimeout(
       () => {
         observer.disconnect();
+        reauthCleanup = undefined;
         isReauthDialogOpen = true;
       },
       Math.max(0, expiryMs - Date.now()),
@@ -179,6 +182,7 @@
       if (document.querySelector("dialog[open]") === null) {
         clearTimeout(forceTimer);
         observer.disconnect();
+        reauthCleanup = undefined;
         isReauthDialogOpen = true;
       }
     });
@@ -188,6 +192,10 @@
       attributes: true,
       attributeFilter: ["open"],
     });
+    reauthCleanup = () => {
+      clearTimeout(forceTimer);
+      observer.disconnect();
+    };
   };
 
   const handleReauthenticate = async () => {
@@ -236,7 +244,11 @@
     }
     const delay = Math.max(0, earliest - REAUTH_BUFFER_MS - Date.now());
     const timer = setTimeout(() => showReauthDialog(earliest), delay);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      reauthCleanup?.();
+      reauthCleanup = undefined;
+    };
   });
 </script>
 
