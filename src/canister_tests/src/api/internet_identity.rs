@@ -526,6 +526,7 @@ pub fn get_icrc3_attributes(
     query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
 }
 
+#[allow(clippy::type_complexity)]
 pub fn list_available_attributes(
     env: &PocketIc,
     canister_id: CanisterId,
