@@ -1650,7 +1650,8 @@ mod tests {
             let unscoped_msg = icrc3_attribute_message(&unscoped_pairs);
 
             pretty_assert_ne!(
-                scoped_msg, unscoped_msg,
+                scoped_msg,
+                unscoped_msg,
                 "Messages with different key scoping should differ"
             );
         }

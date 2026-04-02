@@ -720,4 +720,3 @@ fn should_return_no_such_signature_for_unknown_message() {
 
     assert_eq!(result, Err(GetIcrc3AttributeError::NoSuchSignature));
 }
-
