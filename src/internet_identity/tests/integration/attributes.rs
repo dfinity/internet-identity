@@ -667,7 +667,7 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
 
     match icrc3_value {
         internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
-            assert_eq!(entries.len(), 2);
+            assert_eq!(entries.len(), 3);
             let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
             // email should have scope omitted
             assert!(
@@ -679,6 +679,12 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
             assert!(
                 keys.contains(&"openid:https://accounts.google.com:name"),
                 "Expected scoped 'name' key, got {:?}",
+                keys
+            );
+            // nonce should be included
+            assert!(
+                keys.contains(&"implicit:nonce"),
+                "Expected 'implicit:nonce' key, got {:?}",
                 keys
             );
         }
