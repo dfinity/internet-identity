@@ -801,5 +801,9 @@ fn should_list_all_available_attributes() {
         "Expected name attribute, got {:?}",
         keys
     );
-    assert!(result.len() >= 2, "Expected at least 2 attributes, got {}", result.len());
+    assert!(
+        result.len() >= 2,
+        "Expected at least 2 attributes, got {}",
+        result.len()
+    );
 }

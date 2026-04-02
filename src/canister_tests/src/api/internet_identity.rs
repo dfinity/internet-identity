@@ -532,10 +532,7 @@ pub fn list_available_attributes(
     sender: Principal,
     request: types::attributes::ListAvailableAttributesRequest,
 ) -> Result<
-    Result<
-        Vec<(String, Vec<u8>)>,
-        types::attributes::ListAvailableAttributesError,
-    >,
+    Result<Vec<(String, Vec<u8>)>, types::attributes::ListAvailableAttributesError>,
     RejectResponse,
 > {
     query_candid_as(

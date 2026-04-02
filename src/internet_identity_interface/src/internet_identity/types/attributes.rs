@@ -1914,9 +1914,7 @@ mod tests {
             // Scoped key
             let req = ListAvailableAttributesRequest {
                 identity_number: 10000,
-                attributes: Some(vec![
-                    "openid:https://accounts.google.com:email".to_string(),
-                ]),
+                attributes: Some(vec!["openid:https://accounts.google.com:email".to_string()]),
             };
             let validated = ValidatedListAvailableAttributesRequest::try_from(req).unwrap();
             let attrs = validated.attributes.unwrap();

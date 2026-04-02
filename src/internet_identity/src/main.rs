@@ -18,12 +18,12 @@ use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
     CertifiedAttributes, GetAttributesError, GetAttributesRequest, GetIcrc3AttributeError,
-    GetIcrc3AttributeRequest, GetIcrc3AttributeResponse, PrepareAttributeError,
-    PrepareAttributeRequest, PrepareAttributeResponse, PrepareIcrc3AttributeError,
-    ListAvailableAttributesError, ListAvailableAttributesRequest,
-    PrepareIcrc3AttributeRequest, PrepareIcrc3AttributeResponse,
-    ValidatedGetIcrc3AttributeRequest, ValidatedListAvailableAttributesRequest,
-    ValidatedPrepareAttributeRequest, ValidatedPrepareIcrc3AttributeRequest,
+    GetIcrc3AttributeRequest, GetIcrc3AttributeResponse, ListAvailableAttributesError,
+    ListAvailableAttributesRequest, PrepareAttributeError, PrepareAttributeRequest,
+    PrepareAttributeResponse, PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
+    PrepareIcrc3AttributeResponse, ValidatedGetIcrc3AttributeRequest,
+    ValidatedListAvailableAttributesRequest, ValidatedPrepareAttributeRequest,
+    ValidatedPrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
