@@ -417,9 +417,7 @@ impl Anchor {
 
                 if matches {
                     let key_str = format!("{}:{}", scope, attr_name);
-                    result
-                        .entry(key_str)
-                        .or_insert_with(|| value.into_bytes());
+                    result.entry(key_str).or_insert_with(|| value.into_bytes());
                 }
             }
         }
