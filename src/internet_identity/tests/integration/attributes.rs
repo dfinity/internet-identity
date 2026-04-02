@@ -658,6 +658,8 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
         nonce: nonce.clone(),
     };
 
+    let time_before_prepare = env.get_time().as_nanos_since_unix_epoch();
+
     let prepare_response =
         api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
             .expect("failed to call prepare_icrc3_attributes")
@@ -702,21 +704,16 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 Icrc3Value::Blob(origin.as_bytes().to_vec()),
                 "Origin value does not match"
             );
-            // issued_at_timestamp_ns should be included
+            // issued_at_timestamp_ns should match the canister time at issuance
             let timestamp_entry = entries
                 .iter()
                 .find(|(k, _)| k == "implicit:issued_at_timestamp_ns")
                 .expect("Expected 'implicit:issued_at_timestamp_ns' key in message map");
-            match &timestamp_entry.1 {
-                Icrc3Value::Blob(bytes) => {
-                    let timestamp_str =
-                        std::str::from_utf8(bytes).expect("timestamp should be valid UTF-8");
-                    timestamp_str
-                        .parse::<u64>()
-                        .expect("timestamp should be a valid u64");
-                }
-                other => panic!("Expected Blob for timestamp, got {:?}", other),
-            }
+            assert_eq!(
+                timestamp_entry.1,
+                Icrc3Value::Blob(time_before_prepare.to_string().into_bytes()),
+                "Timestamp should match canister time at issuance"
+            );
         }
         other => panic!("Expected Map, got {:?}", other),
     }
