@@ -312,13 +312,17 @@ impl Anchor {
                         spec.key.to_string()
                     };
 
-                    if certified_pairs.contains_key(&certified_key) {
-                        problems.push(format!(
-                            "Duplicate certified attribute key '{}' derived from spec {}",
-                            certified_key, spec.key
-                        ));
-                    } else {
-                        certified_pairs.insert(certified_key, stored.into_bytes());
+                    match certified_pairs.entry(certified_key) {
+                        std::collections::btree_map::Entry::Occupied(entry) => {
+                            problems.push(format!(
+                                "Duplicate certified attribute key '{}' derived from spec {}",
+                                entry.key(),
+                                spec.key
+                            ));
+                        }
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            entry.insert(stored.into_bytes());
+                        }
                     }
                 }
                 None => {
