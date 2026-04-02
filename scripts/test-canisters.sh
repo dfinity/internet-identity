@@ -35,7 +35,7 @@ if [ -f "./$PREVIOUS_II_WASM_PATH" ]; then
   echo "Using previous II wasm."
 else
   echo "Downloading previous II wasm."
-curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o ${PREVIOUS_II_WASM_PATH}
+  curl -sSL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o ${PREVIOUS_II_WASM_PATH}
 fi
 
 if [ -f "./$PREVIOUS_ARCHIVE_WASM_PATH" ]; then
@@ -58,7 +58,7 @@ fi
 if [ "$NO_BUILD" = false ]; then
   echo "Building Internet Identity and Archive..."
   # Build II
-  II_FETCH_ROOT_KEY=1 ./scripts/build --internet-identity
+  ./scripts/build --internet-identity
 
   # Build Archive
   ./scripts/build --archive

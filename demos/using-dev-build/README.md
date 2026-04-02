@@ -2,7 +2,7 @@
 
 # Integrating with Internet Identity
 
-This guide shows how to integrate and test a project with Internet Identity. The complete code example can be found [here](https://github.com/dfinity/internet-identity/tree/main/demos/using-dev-build). It uses the development [build flavor](https://github.com/dfinity/internet-identity/blob/main/README.md#build-features-and-flavors) of Internet Identity and the [agent-js](https://github.com/dfinity/agent-js) library.
+This guide shows how to integrate and test a project with Internet Identity. The complete code example can be found [here](https://github.com/dfinity/internet-identity/tree/main/demos/using-dev-build). It uses the production build of Internet Identity and the [agent-js](https://github.com/dfinity/agent-js) library.
 
 This is a standalone project that you can copy to your own project.
 
@@ -26,7 +26,7 @@ $ dfx deploy --no-wallet
 
 At this point, the replica (for all practical matters, a local version of the Internet Computer) is running and three canisters have been deployed:
 
-- `internet_identity`: The development version of Internet Identity (downloaded from the [latest release](https://github.com/dfinity/internet-identity/releases/latest), see [`dfx.json`](./dfx.json)).
+- `internet_identity`: The production version of Internet Identity (downloaded from the [latest release](https://github.com/dfinity/internet-identity/releases/latest), see [`dfx.json`](./dfx.json)).
 - `webapp`: A tiny webapp that calls out to the `internet_identity` canister for authentication, and that then calls the `whoami` canister (see below) to show that the identity is valid. You'll find the source of the webapp in [`index.html`](./webapp/index.html) and [`index.ts`](./webapp/index.ts).
 - `whoami`: A simple canister that checks that calls are authenticated, and that returns the "principal of the caller". The implementation is terribly simple:
   ```motoko
@@ -48,7 +48,8 @@ This section explains how to add Internet Identity to your (local) project. Add 
 "internet_identity": {
   "type": "custom",
   "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz",
+  "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
   "remote": {
     "id": {
       "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
@@ -59,7 +60,7 @@ This section explains how to add Internet Identity to your (local) project. Add 
 
 The `remote` property makes sure that your project will _not_ create a copy of Internet Identity on the IC when deploying to production.
 
-> Note: The wasm URL points to the [dev build](https://github.com/dfinity/internet-identity#flavors) of Internet Identity. It is recommended to use the dev build locally because it has modifications that make test automation easy.
+> Note: The wasm URL points to the production build of Internet Identity. Captcha is disabled via the `init_arg` in `dfx.json` to make local test automation easy.
 
 ### Using the Auth-Client Library To Log In With Internet Identity
 

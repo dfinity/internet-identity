@@ -13,36 +13,38 @@
   } from "@lucide/svelte";
   import { page } from "$app/state";
   import { afterNavigate, goto } from "$app/navigation";
-  import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
-  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
-  import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
+  import { onMount } from "svelte";
+  import { analytics } from "$lib/utils/analytics/analytics";
   import {
     authenticatedStore,
     authenticationStore,
   } from "$lib/stores/authentication.store";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import Popover from "$lib/components/ui/Popover.svelte";
-  import { toaster } from "$lib/components/utils/toaster";
-  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
-  import { handleError } from "$lib/components/utils/error";
-  import Dialog from "$lib/components/ui/Dialog.svelte";
-  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
   import { sessionStore } from "$lib/stores/session.store";
   import { locales, localeStore, t } from "$lib/stores/locale.store";
+  import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
+  import { handleError } from "$lib/components/utils/error";
+  import { toaster } from "$lib/components/utils/toaster";
+  import { getMetadataString } from "$lib/utils/openID";
+  import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
+  import { Trans } from "$lib/components/locale";
+  import type { LayoutProps } from "./$types";
+  import Dialog from "$lib/components/ui/Dialog.svelte";
+  import Popover from "$lib/components/ui/Popover.svelte";
   import Logo from "$lib/components/ui/Logo.svelte";
   import NavItem from "$lib/components/ui/NavItem.svelte";
-  import { SOURCE_CODE_URL, SUPPORT_URL } from "$lib/config";
-  import type { LayoutProps } from "./$types";
-  import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
   import Avatar from "$lib/components/ui/Avatar.svelte";
-  import { Trans } from "$lib/components/locale";
-  import { getMetadataString } from "$lib/utils/openID";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { analytics } from "$lib/utils/analytics/analytics";
-  import { onMount } from "svelte";
+  import IdentitySwitcher from "$lib/components/ui/IdentitySwitcher.svelte";
+  import ManageIdentities from "$lib/components/ui/ManageIdentities.svelte";
+  import SignOutConfirmation from "$lib/components/ui/SignOutConfirmation.svelte";
+  import ReauthPrompt from "$lib/components/ui/ReauthPrompt.svelte";
+  import AuthWizard from "$lib/components/wizards/auth/AuthWizard.svelte";
+  import ChooseLanguage from "$lib/components/views/ChooseLanguage.svelte";
+
+  // --- Props & state ---
 
   const { children, data }: LayoutProps = $props();
-
   const authLastUsedFlow = new AuthLastUsedFlow();
 
   let identityButtonRef = $state<HTMLElement>();
@@ -51,14 +53,19 @@
   let isAuthDialogOpen = $state(false);
   let isAuthenticating = $state(false);
   let isManageIdentitiesDialogOpen = $state(false);
+  let isSignOutDialogOpen = $state(false);
   let isLanguageDialogOpen = $state(false);
   let isRecoveryPhraseSetUpDismissed = $state(false);
+  let isReauthDialogOpen = $state(false);
+
+  // --- Derived ---
 
   const lastUsedIdentities = $derived(
     Object.values($lastUsedIdentitiesStore.identities).sort(
       (a, b) => b.lastUsedTimestampMillis - a.lastUsedTimestampMillis,
     ),
   );
+
   let recoveryPhraseStatus: "missing" | "unverified" | "verified" = $derived.by(
     () => {
       const value = data.identityInfo.authn_methods.find(
@@ -74,10 +81,11 @@
     },
   );
 
+  // --- Sign in / sign up / upgrade ---
+
   const handleSignIn = async (identityNumber: bigint) => {
     isAuthenticating = true;
     if ($authenticationStore?.identityNumber !== identityNumber) {
-      // Sign in if not authenticated with this identity yet
       sessionStore.reset();
       await authLastUsedFlow.authenticate(
         $lastUsedIdentitiesStore.identities[`${identityNumber}`],
@@ -89,6 +97,7 @@
     isAuthDialogOpen = false;
     isAuthenticating = false;
   };
+
   const handleSignUp = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
     toaster.success({
@@ -96,6 +105,7 @@
       duration: 2000,
     });
   };
+
   const handleUpgrade = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
     toaster.success({
@@ -103,6 +113,28 @@
       duration: 4000,
     });
   };
+
+  // --- Sign out ---
+
+  const handleSignOut = async () => {
+    isIdentityPopoverOpen = false;
+    isSignOutDialogOpen = true;
+  };
+
+  const handleConfirmSignOut = () => {
+    window.location.replace("/");
+  };
+
+  const handleConfirmSignOutAndRemove = () => {
+    const identity = $lastUsedIdentitiesStore.selected;
+    if (identity !== undefined) {
+      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
+    }
+    window.location.replace("/");
+  };
+
+  // --- Manage identities ---
+
   const handleRemoveIdentity = (identityNumber: bigint) => {
     const removedIdentity =
       $lastUsedIdentitiesStore.identities[`${identityNumber}`];
@@ -124,21 +156,70 @@
       });
     }
   };
-  let isSignOutDialogOpen = $state(false);
-  const handleSignOut = async () => {
-    isIdentityPopoverOpen = false;
-    isSignOutDialogOpen = true;
-  };
-  const handleConfirmSignOut = () => {
-    window.location.replace("/");
-  };
-  const handleConfirmSignOutAndRemove = () => {
-    const identity = $lastUsedIdentitiesStore.selected;
-    if (identity !== undefined) {
-      lastUsedIdentitiesStore.removeIdentity(identity.identityNumber);
+
+  // --- Session re-authentication ---
+  // Shows the re-auth dialog 5 min before delegation expiry.
+  // If another dialog is open, waits for it to close — but force-shows at expiry.
+
+  const REAUTH_BUFFER_MS = 5 * 60 * 1000;
+
+  let reauthCleanup: (() => void) | undefined;
+
+  const showReauthDialog = (expiryMs: number) => {
+    if (document.querySelector("dialog[open]") === null) {
+      isReauthDialogOpen = true;
+      return;
     }
-    window.location.replace("/");
+    const forceTimer = setTimeout(
+      () => {
+        observer.disconnect();
+        reauthCleanup = undefined;
+        isReauthDialogOpen = true;
+      },
+      Math.max(0, expiryMs - Date.now()),
+    );
+    const observer = new MutationObserver(() => {
+      if (document.querySelector("dialog[open]") === null) {
+        clearTimeout(forceTimer);
+        observer.disconnect();
+        reauthCleanup = undefined;
+        isReauthDialogOpen = true;
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["open"],
+    });
+    reauthCleanup = () => {
+      clearTimeout(forceTimer);
+      observer.disconnect();
+    };
   };
+
+  const handleReauthenticate = async () => {
+    const { identityNumber } = $authenticatedStore;
+    const lastUsedIdentity =
+      $lastUsedIdentitiesStore.identities[`${identityNumber}`];
+    if (lastUsedIdentity === undefined) {
+      handleConfirmSignOut();
+      return;
+    }
+    sessionStore.reset();
+    await authLastUsedFlow.authenticate(lastUsedIdentity);
+    isReauthDialogOpen = false;
+  };
+
+  // --- Effects & lifecycle ---
+
+  onMount(() => {
+    analytics.pageView();
+  });
+
+  afterNavigate(() => {
+    isMobileSidebarOpen = false;
+  });
 
   // Pre-fetch passkey credential ids
   $effect(() =>
@@ -147,14 +228,27 @@
     ),
   );
 
-  // Hide mobile sidebar on navigation
-  afterNavigate(() => {
-    isMobileSidebarOpen = false;
-  });
-
-  // Track page view for dashboard
-  onMount(() => {
-    analytics.pageView();
+  // Re-authentication timer
+  $effect(() => {
+    const authenticated = $authenticationStore;
+    if (authenticated === undefined) {
+      return;
+    }
+    let earliest = Infinity;
+    for (const { delegation } of authenticated.identity.getDelegation()
+      .delegations) {
+      const expiryMs = Number(delegation.expiration / BigInt(1_000_000));
+      if (expiryMs < earliest) {
+        earliest = expiryMs;
+      }
+    }
+    const delay = Math.max(0, earliest - REAUTH_BUFFER_MS - Date.now());
+    const timer = setTimeout(() => showReauthDialog(earliest), delay);
+    return () => {
+      clearTimeout(timer);
+      reauthCleanup?.();
+      reauthCleanup = undefined;
+    };
   });
 </script>
 
@@ -486,6 +580,15 @@
       identity={$lastUsedIdentitiesStore.selected}
       onSignOut={handleConfirmSignOut}
       onSignOutAndRemove={handleConfirmSignOutAndRemove}
+    />
+  </Dialog>
+{/if}
+
+{#if isReauthDialogOpen}
+  <Dialog>
+    <ReauthPrompt
+      onReauthenticate={handleReauthenticate}
+      onSignOut={handleConfirmSignOut}
     />
   </Dialog>
 {/if}

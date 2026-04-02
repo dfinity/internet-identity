@@ -1,4 +1,4 @@
-import { features } from "$lib/legacy/features";
+import { frontendCanisterConfig } from "$lib/globals";
 // The list of dapps. This is derived from https://github.com/dfinity/portal:
 // * Only dapps using II are used
 // * All relevant logos are copied to II's assets
@@ -70,9 +70,9 @@ export class KnownDapp {
 export const getDapps = (): KnownDapp[] => {
   const dapps = [...dappsJson].map((dapp) => new KnownDapp(dapp));
 
-  // XXX: Piggy back on the DUMMY_CAPTCHA feature to assume this is a test build
-  // and add test data
-  if (features.DUMMY_CAPTCHA) {
+  // Use the frontend canister config to detect a test environment
+  // (fetch_root_key is only enabled in non-production deployments)
+  if (frontendCanisterConfig.fetch_root_key[0] === true) {
     // The dapp used in tests
     const nnsDappLogo = dapps.find((dapp) => dapp.descr.name === "NNS Dapp");
     dapps.push(

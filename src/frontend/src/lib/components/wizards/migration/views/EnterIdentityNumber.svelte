@@ -82,6 +82,7 @@
     spellcheck="false"
     aria-label={$t`Identity number`}
     class="mb-4"
+    inputClass="input-noscroll"
   />
   <Tooltip
     label={isWrongDomain

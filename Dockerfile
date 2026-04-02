@@ -78,10 +78,6 @@ COPY . .
 # The version baked in
 ARG II_VERSION=
 
-# The features, see README
-ARG II_FETCH_ROOT_KEY=
-ARG II_DUMMY_AUTH=
-
 RUN touch src/*/src/lib.rs
 RUN npm ci
 
