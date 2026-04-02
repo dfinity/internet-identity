@@ -476,12 +476,15 @@ pub struct ValidatedAttributeSpec {
     pub omit_scope: bool,
 }
 
+pub const ICRC3_NONCE_BYTES: usize = 32;
+
 #[derive(CandidType, Debug, Deserialize)]
 pub struct PrepareIcrc3AttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub attributes: Vec<AttributeSpec>,
+    pub nonce: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -490,6 +493,7 @@ pub struct ValidatedPrepareIcrc3AttributeRequest {
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
     pub attributes: Vec<ValidatedAttributeSpec>,
+    pub nonce: Vec<u8>,
 }
 
 impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeRequest {
@@ -501,9 +505,18 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
             origin,
             account_number,
             attributes: unparsed_attributes,
+            nonce,
         } = value;
 
         let mut problems = Vec::new();
+
+        if nonce.len() != ICRC3_NONCE_BYTES {
+            problems.push(format!(
+                "Nonce must be exactly {} bytes, got {}",
+                ICRC3_NONCE_BYTES,
+                nonce.len()
+            ));
+        }
 
         if origin.len() > FRONTEND_HOSTNAME_MAX_BYTES {
             problems.push(format!(
@@ -559,6 +572,7 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
             origin,
             account_number,
             attributes,
+            nonce,
         })
     }
 }
@@ -1463,6 +1477,7 @@ mod tests {
                             Some(b"user@example.com"),
                             false,
                         )],
+                        nonce: vec![0u8; 32],
                     },
                     1,
                 ),
@@ -1473,6 +1488,7 @@ mod tests {
                         origin: "example.com".to_string(),
                         account_number: None,
                         attributes: vec![make_spec("openid:https://google.com:email", None, false)],
+                        nonce: vec![0u8; 32],
                     },
                     1,
                 ),
@@ -1483,6 +1499,7 @@ mod tests {
                         origin: "example.com".to_string(),
                         account_number: None,
                         attributes: vec![make_spec("openid:https://google.com:email", None, true)],
+                        nonce: vec![0u8; 32],
                     },
                     1,
                 ),
@@ -1500,6 +1517,7 @@ mod tests {
                             ),
                             make_spec("openid:https://google.com:name", None, false),
                         ],
+                        nonce: vec![0u8; 32],
                     },
                     2,
                 ),
@@ -1510,6 +1528,7 @@ mod tests {
                         origin: "example.com".to_string(),
                         account_number: None,
                         attributes: vec![],
+                        nonce: vec![0u8; 32],
                     },
                     0,
                 ),
@@ -1537,6 +1556,7 @@ mod tests {
                     make_spec("openid:https://google.com:email", None, true),
                     make_spec("openid:https://google.com:name", None, false),
                 ],
+                nonce: vec![0u8; 32],
             };
             let validated = ValidatedPrepareIcrc3AttributeRequest::try_from(request).unwrap();
             assert!(validated.attributes[0].omit_scope);
@@ -1557,6 +1577,7 @@ mod tests {
                     ),
                     make_spec("openid:https://google.com:name", None, false),
                 ],
+                nonce: vec![0u8; 32],
             };
             let validated = ValidatedPrepareIcrc3AttributeRequest::try_from(request).unwrap();
             pretty_assert_eq!(
@@ -1579,6 +1600,7 @@ mod tests {
                         origin: long_origin.clone(),
                         account_number: None,
                         attributes: vec![],
+                        nonce: vec![0u8; 32],
                     },
                     vec![format!(
                         "Frontend hostname length {} exceeds limit of {} bytes",
@@ -1595,6 +1617,7 @@ mod tests {
                         attributes: (0..=MAX_ATTRIBUTES_PER_REQUEST)
                             .map(|_| make_spec("openid:https://google.com:email", None, false))
                             .collect(),
+                        nonce: vec![0u8; 32],
                     },
                     vec![format!(
                         "Number of attributes {} exceeds limit of {}",
@@ -1609,6 +1632,7 @@ mod tests {
                         origin: "example.com".to_string(),
                         account_number: None,
                         attributes: vec![make_spec("invalid_key", None, false)],
+                        nonce: vec![0u8; 32],
                     },
                     vec!["Unknown attribute: invalid_key".to_string()],
                 ),
@@ -1623,6 +1647,7 @@ mod tests {
                             value: Some(long_value.clone()),
                             omit_scope: false,
                         }],
+                        nonce: vec![0u8; 32],
                     },
                     vec![format!(
                         "Attribute value length {} exceeds limit of {} bytes",
@@ -1637,6 +1662,7 @@ mod tests {
                         origin: long_origin.clone(),
                         account_number: None,
                         attributes: vec![make_spec("bad_key", None, false)],
+                        nonce: vec![0u8; 32],
                     },
                     vec![
                         format!(

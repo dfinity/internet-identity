@@ -502,6 +502,7 @@ fn should_get_icrc3_certified_attributes() {
                 omit_scope: false,
             },
         ],
+        nonce: vec![0u8; 32],
     };
 
     let prepare_response = api::prepare_icrc3_attributes(
@@ -649,6 +650,7 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 omit_scope: false,
             },
         ],
+        nonce: vec![0u8; 32],
     };
 
     let prepare_response =
@@ -699,6 +701,7 @@ fn should_return_no_such_signature_for_unknown_message() {
             value: None,
             omit_scope: false,
         }],
+        nonce: vec![0u8; 32],
     };
 
     api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)

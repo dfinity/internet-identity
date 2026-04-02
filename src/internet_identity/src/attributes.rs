@@ -260,6 +260,7 @@ impl Anchor {
     pub fn prepare_icrc3_attributes(
         &self,
         attribute_specs: Vec<ValidatedAttributeSpec>,
+        nonce: Vec<u8>,
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs = BTreeMap::new();
@@ -325,6 +326,8 @@ impl Anchor {
         if !problems.is_empty() {
             return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
         }
+
+        certified_pairs.insert("implicit:nonce".to_string(), nonce);
 
         let message = icrc3_attribute_message(&certified_pairs);
 
@@ -1549,6 +1552,7 @@ mod tests {
                     google_spec(AttributeName::Email, Some(b"user@example.com"), false), // correct
                     google_spec(AttributeName::Name, Some(b"Wrong Name"), false),        // wrong
                 ],
+                vec![0u8; 32],
                 account,
             );
 
@@ -1583,6 +1587,7 @@ mod tests {
                     value: None,
                     omit_scope: false,
                 }],
+                vec![0u8; 32],
                 account,
             );
 
@@ -1613,6 +1618,7 @@ mod tests {
                     value: None,
                     omit_scope: false,
                 }],
+                vec![0u8; 32],
                 account,
             );
 

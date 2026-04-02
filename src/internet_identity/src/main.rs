@@ -1335,6 +1335,7 @@ mod attribute_sharing {
             origin,
             account_number,
             attributes,
+            nonce,
         } = request.try_into()?;
 
         let (anchor, _) =
@@ -1347,7 +1348,7 @@ mod attribute_sharing {
 
         state::ensure_salt_set().await;
 
-        let message = anchor.prepare_icrc3_attributes(attributes, account)?;
+        let message = anchor.prepare_icrc3_attributes(attributes, nonce, account)?;
 
         Ok(PrepareIcrc3AttributeResponse { message })
     }
