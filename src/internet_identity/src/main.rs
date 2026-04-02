@@ -1343,12 +1343,20 @@ mod attribute_sharing {
                 PrepareIcrc3AttributeError::AuthorizationError(principal)
             })?;
 
-        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
-            .map_err(PrepareIcrc3AttributeError::GetAccountError)?;
+        let account =
+            get_account_for_origin(anchor.anchor_number(), origin.clone(), account_number)
+                .map_err(PrepareIcrc3AttributeError::GetAccountError)?;
 
         state::ensure_salt_set().await;
 
-        let message = anchor.prepare_icrc3_attributes(attributes, nonce, account)?;
+        let issued_at_timestamp_ns = ic_cdk::api::time();
+        let message = anchor.prepare_icrc3_attributes(
+            attributes,
+            nonce,
+            origin,
+            issued_at_timestamp_ns,
+            account,
+        )?;
 
         Ok(PrepareIcrc3AttributeResponse { message })
     }

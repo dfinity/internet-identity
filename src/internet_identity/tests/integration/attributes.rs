@@ -668,7 +668,7 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
 
     match &icrc3_value {
         Icrc3Value::Map(entries) => {
-            assert_eq!(entries.len(), 3);
+            assert_eq!(entries.len(), 5);
             let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
             // email should have scope omitted
             assert!(
@@ -692,6 +692,31 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 Icrc3Value::Blob(nonce.clone()),
                 "Nonce value in certified message does not match the provided nonce"
             );
+            // origin should be included
+            let origin_entry = entries
+                .iter()
+                .find(|(k, _)| k == "implicit:origin")
+                .expect("Expected 'implicit:origin' key in message map");
+            assert_eq!(
+                origin_entry.1,
+                Icrc3Value::Blob(origin.as_bytes().to_vec()),
+                "Origin value does not match"
+            );
+            // issued_at_timestamp_ns should be included
+            let timestamp_entry = entries
+                .iter()
+                .find(|(k, _)| k == "implicit:issued_at_timestamp_ns")
+                .expect("Expected 'implicit:issued_at_timestamp_ns' key in message map");
+            match &timestamp_entry.1 {
+                Icrc3Value::Blob(bytes) => {
+                    let timestamp_str = std::str::from_utf8(bytes)
+                        .expect("timestamp should be valid UTF-8");
+                    timestamp_str
+                        .parse::<u64>()
+                        .expect("timestamp should be a valid u64");
+                }
+                other => panic!("Expected Blob for timestamp, got {:?}", other),
+            }
         }
         other => panic!("Expected Map, got {:?}", other),
     }

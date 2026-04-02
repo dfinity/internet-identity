@@ -261,6 +261,8 @@ impl Anchor {
         &self,
         attribute_specs: Vec<ValidatedAttributeSpec>,
         nonce: Vec<u8>,
+        origin: String,
+        issued_at_timestamp_ns: u64,
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs = BTreeMap::new();
@@ -339,6 +341,11 @@ impl Anchor {
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), nonce);
+        certified_pairs.insert("implicit:origin".to_string(), origin.into_bytes());
+        certified_pairs.insert(
+            "implicit:issued_at_timestamp_ns".to_string(),
+            issued_at_timestamp_ns.to_string().into_bytes(),
+        );
 
         let message = icrc3_attribute_message(&certified_pairs);
 
@@ -1564,6 +1571,8 @@ mod tests {
                     google_spec(AttributeName::Name, Some(b"Wrong Name"), false),        // wrong
                 ],
                 vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
                 account,
             );
 
@@ -1599,6 +1608,8 @@ mod tests {
                     omit_scope: false,
                 }],
                 vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
                 account,
             );
 
@@ -1630,6 +1641,8 @@ mod tests {
                     omit_scope: false,
                 }],
                 vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
                 account,
             );
 
@@ -1658,6 +1671,8 @@ mod tests {
                     google_spec(AttributeName::Email, None, true),
                 ],
                 vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
                 account,
             );
 
