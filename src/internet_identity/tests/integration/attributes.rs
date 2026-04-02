@@ -685,38 +685,6 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
 }
 
 #[test]
-fn should_reject_icrc3_attributes_with_wrong_value() {
-    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
-    let origin = "https://some-dapp.com";
-
-    let prepare_request = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![AttributeSpec {
-            key: "openid:https://accounts.google.com:email".into(),
-            value: Some(b"wrong@example.com".to_vec()),
-            omit_scope: false,
-        }],
-    };
-
-    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-        .expect("failed to call prepare_icrc3_attributes");
-
-    match result {
-        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-            assert_eq!(problems.len(), 1);
-            assert!(
-                problems[0].contains("value mismatch"),
-                "Expected value mismatch error, got: {}",
-                problems[0]
-            );
-        }
-        other => panic!("Expected AttributeMismatch error, got {:?}", other),
-    }
-}
-
-#[test]
 fn should_reject_icrc3_attributes_with_correct_and_wrong_value() {
     let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
     let origin = "https://some-dapp.com";
