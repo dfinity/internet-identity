@@ -312,7 +312,14 @@ impl Anchor {
                         spec.key.to_string()
                     };
 
-                    certified_pairs.insert(certified_key, stored.into_bytes());
+                    if certified_pairs.contains_key(&certified_key) {
+                        problems.push(format!(
+                            "Duplicate certified attribute key '{}' derived from spec {}",
+                            certified_key, spec.key
+                        ));
+                    } else {
+                        certified_pairs.insert(certified_key, stored.into_bytes());
+                    }
                 }
                 None => {
                     problems.push(format!(
@@ -1627,6 +1634,34 @@ mod tests {
                     assert!(
                         problems[0].contains("no scope"),
                         "Expected 'no scope' error, got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_duplicate_certified_keys() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            // Two specs that both resolve to certified key "email" due to omit_scope=true
+            let result = anchor.prepare_icrc3_attributes(
+                vec![
+                    google_spec(AttributeName::Email, None, true),
+                    google_spec(AttributeName::Email, None, true),
+                ],
+                vec![0u8; 32],
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("Duplicate certified attribute key"),
+                        "Expected duplicate key error, got: {}",
                         problems[0]
                     );
                 }

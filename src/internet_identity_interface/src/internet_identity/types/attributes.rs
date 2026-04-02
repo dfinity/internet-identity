@@ -427,12 +427,31 @@ pub enum GetAttributesError {
 
 // ==================== ICRC-3 attribute sharing types ====================
 
+/// Maximum length (in bytes) of an `AttributeName` when rendered as a string.
+///
+/// Currently, this is the length of `"VerifiedEmail"`, the longest variant.
+/// If new, longer variants are added to `AttributeName`, this constant must be
+/// updated accordingly.
+pub const ATTRIBUTE_NAME_MAX_BYTES: usize = "VerifiedEmail".len();
+
+/// Additional bytes added when an attribute name is scoped as an OpenID-style
+/// key of the form: `"openid:" + <issuer> + ":" + <attribute_name>`.
+///
+/// This includes:
+///  * the `"openid:"` prefix,
+///  * one separator `":"` between the issuer and the attribute name,
+///  * the attribute name itself (bounded by `ATTRIBUTE_NAME_MAX_BYTES`).
+pub const OPENID_ATTRIBUTE_KEY_OVERHEAD_BYTES: usize =
+    "openid:".len() + 1 + ATTRIBUTE_NAME_MAX_BYTES;
+
 /// Maximum size of an attribute key in the ICRC-3 message.
 ///
-/// Attribute keys may include issuer strings, which are already bounded by
-/// `OPENID_ISSUER_MAX_BYTES`, so we reuse that limit here to derive a safe
-/// upper bound for the encoded message size.
-pub const ICRC3_ATTRIBUTE_KEY_MAX_BYTES: usize = OPENID_ISSUER_MAX_BYTES;
+/// Attribute keys may include issuer strings (bounded by
+/// `OPENID_ISSUER_MAX_BYTES`) and additional OpenID scoping overhead
+/// (`"openid:"` prefix, separators, and the attribute name). This constant
+/// provides a true upper bound for fully-scoped attribute keys.
+pub const ICRC3_ATTRIBUTE_KEY_MAX_BYTES: usize =
+    OPENID_ISSUER_MAX_BYTES + OPENID_ATTRIBUTE_KEY_OVERHEAD_BYTES;
 
 /// Approximate Candid encoding overhead per attribute (length prefixes,
 /// type information, variants, etc.). This is a conservative upper bound:
