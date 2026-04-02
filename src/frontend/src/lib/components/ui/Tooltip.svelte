@@ -32,8 +32,8 @@
     ...restProps
   }: Props = $props();
 
-  let wrapperRef = $state<HTMLElement>();
-  let tooltipRef = $state<HTMLElement>();
+  let wrapperRef = $state<HTMLElement | null>();
+  let tooltipRef = $state<HTMLElement | null>();
   let isTooltipVisible = $state(manual ? !hidden : false);
 
   const getInlineAlign = (value: Align): Align => {
@@ -63,7 +63,12 @@
     }
     let tracking = true;
     const track = () => {
-      if (anchorRef !== undefined && tooltipRef !== undefined) {
+      if (
+        anchorRef !== undefined &&
+        anchorRef !== null &&
+        tooltipRef !== undefined &&
+        tooltipRef !== null
+      ) {
         const inlineAlign = getInlineAlign(align);
         const anchorRect = anchorRef.getBoundingClientRect();
         const tooltipRect = tooltipRef.getBoundingClientRect();

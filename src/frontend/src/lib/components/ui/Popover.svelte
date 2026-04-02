@@ -7,7 +7,7 @@
   type Align = "start" | "center" | "end";
 
   type Props = HTMLAttributes<HTMLElement> & {
-    anchor?: HTMLElement;
+    anchor?: HTMLElement | null;
     onClose?: () => void;
     direction?: Direction;
     align?: Align;
@@ -31,7 +31,7 @@
 
   const MOBILE_BREAKPOINT = 480;
 
-  let popoverRef = $state<HTMLElement>();
+  let popoverRef = $state<HTMLElement | null>();
   let windowWidth = $state(window.innerWidth);
 
   const getInlineAlign = (align: Align): Align => {
@@ -54,7 +54,12 @@
     let tracking = true;
 
     const track = () => {
-      if (anchorRef !== undefined && popoverRef !== undefined) {
+      if (
+        anchorRef !== undefined &&
+        anchorRef !== null &&
+        popoverRef !== undefined &&
+        popoverRef !== null
+      ) {
         const anchorRect = anchorRef.getBoundingClientRect();
         const popoverRect = popoverRef.getBoundingClientRect();
 

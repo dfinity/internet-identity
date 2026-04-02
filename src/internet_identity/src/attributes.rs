@@ -9,8 +9,10 @@ use ic_representation_independent_hash::{representation_independent_hash, Value}
 use internet_identity_interface::internet_identity::types::{
     attributes::{
         Attribute, AttributeKey, AttributeName, AttributeScope, CertifiedAttribute,
-        CertifiedAttributes,
+        CertifiedAttributes, GetIcrc3AttributeError, GetIcrc3AttributeResponse,
+        PrepareIcrc3AttributeError, ValidatedAttributeSpec,
     },
+    icrc3::Icrc3Value,
     Timestamp,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -225,6 +227,156 @@ fn add_attribute_signature(sigs: &mut SignatureMap, seed: &[u8], message: &[u8])
         message,
     };
     sigs.add_signature(&inputs);
+}
+
+// ==================== ICRC-3 attribute sharing ====================
+
+/// Domain separator for ICRC-3 attribute certification signatures.
+const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ic-request-auth-info";
+
+/// Builds a Candid-encoded ICRC-3 Value map from certified key-value pairs.
+/// The pairs are (certified_key, value) where certified_key may have scope omitted.
+fn icrc3_attribute_message(certified_pairs: &BTreeMap<String, Vec<u8>>) -> Vec<u8> {
+    use candid::Encode;
+
+    let map_entries: Vec<(String, Icrc3Value)> = certified_pairs
+        .iter()
+        .map(|(key, value)| (key.clone(), Icrc3Value::Blob(value.clone())))
+        .collect();
+
+    let value = Icrc3Value::Map(map_entries);
+    Encode!(&value).expect("Candid encoding of ICRC-3 value should not fail")
+}
+
+impl Anchor {
+    /// Resolves attribute specs against stored credentials, builds the Candid-encoded
+    /// ICRC-3 message, signs it, and returns the message blob.
+    ///
+    /// For each `ValidatedAttributeSpec`:
+    /// - Looks up the stored value from the matching OpenID credential.
+    /// - If `spec.value` is `Some`, validates it matches the stored value.
+    /// - Computes the certified key: if `omit_scope` is true, uses just the attribute name
+    ///   (e.g., `"email"`); otherwise uses the full key (e.g., `"openid:https://...:email"`).
+    pub fn prepare_icrc3_attributes(
+        &self,
+        attribute_specs: Vec<ValidatedAttributeSpec>,
+        nonce: Vec<u8>,
+        account: Account,
+    ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
+        let mut certified_pairs = BTreeMap::new();
+        let mut problems = Vec::new();
+
+        for spec in &attribute_specs {
+            match &spec.key.scope {
+                Some(AttributeScope::OpenId { issuer }) => {
+                    let credential = self
+                        .openid_credentials
+                        .iter()
+                        .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()));
+
+                    let Some(credential) = credential else {
+                        problems.push(format!("No credential found for issuer: {}", issuer));
+                        continue;
+                    };
+
+                    let stored_value = match spec.key.attribute_name {
+                        AttributeName::Email => credential.get_email(),
+                        AttributeName::Name => credential.get_name(),
+                        AttributeName::VerifiedEmail => credential.get_verified_email(),
+                    };
+
+                    let Some(stored) = stored_value else {
+                        problems.push(format!(
+                            "Attribute {} not available for issuer {}",
+                            spec.key.attribute_name, issuer
+                        ));
+                        continue;
+                    };
+
+                    // If a value was provided, validate it matches.
+                    if let Some(ref expected_value) = spec.value {
+                        if expected_value.as_slice() != stored.as_bytes() {
+                            problems.push(format!(
+                                "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
+                                spec.key,
+                                stored.len()
+                            ));
+                            continue;
+                        }
+                    }
+
+                    // Compute the certified key.
+                    let certified_key = if spec.omit_scope {
+                        spec.key.attribute_name.to_string()
+                    } else {
+                        spec.key.to_string()
+                    };
+
+                    match certified_pairs.entry(certified_key) {
+                        std::collections::btree_map::Entry::Occupied(entry) => {
+                            problems.push(format!(
+                                "Duplicate certified attribute key '{}' derived from spec {}",
+                                entry.key(),
+                                spec.key
+                            ));
+                        }
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            entry.insert(stored.into_bytes());
+                        }
+                    }
+                }
+                None => {
+                    problems.push(format!(
+                        "Attribute {} has no scope; only scoped attributes are supported",
+                        spec.key
+                    ));
+                }
+            }
+        }
+
+        if !problems.is_empty() {
+            return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
+        }
+
+        certified_pairs.insert("implicit:nonce".to_string(), nonce);
+
+        let message = icrc3_attribute_message(&certified_pairs);
+
+        let seed = account.calculate_seed();
+        state::signature_map_mut(|sigs| {
+            let inputs = CanisterSigInputs {
+                domain: ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+                seed: &seed,
+                message: &message,
+            };
+            sigs.add_signature(&inputs);
+        });
+
+        update_root_hash();
+
+        Ok(message)
+    }
+
+    /// Looks up the single ICRC-3 attribute signature for the given message blob.
+    pub fn get_icrc3_attributes(
+        &self,
+        account: Account,
+        message: &[u8],
+    ) -> Result<GetIcrc3AttributeResponse, GetIcrc3AttributeError> {
+        let seed = account.calculate_seed();
+
+        let signature = state::assets_and_signatures(|certified_assets, sigs| {
+            let inputs = CanisterSigInputs {
+                domain: ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN,
+                seed: &seed,
+                message,
+            };
+            sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
+        })
+        .map_err(|_| GetIcrc3AttributeError::NoSuchSignature)?;
+
+        Ok(GetIcrc3AttributeResponse { signature })
+    }
 }
 
 #[cfg(test)]
@@ -1337,6 +1489,248 @@ mod tests {
                 .expect("credential key should be present");
             pretty_assert_eq!(attrs.len(), 1, "email attribute should be returned");
             pretty_assert_eq!(String::from_utf8_lossy(&attrs[0].value), "user@outlook.com",);
+        }
+    }
+
+    mod prepare_icrc3_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::{
+            OpenIdConfig, OpenIdEmailVerificationScheme,
+        };
+
+        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+
+        fn setup_google_provider() {
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Google".to_string(),
+                logo: String::new(),
+                issuer: GOOGLE_ISSUER.to_string(),
+                client_id: "test-client-id".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: Some(OpenIdEmailVerificationScheme::Google),
+            }]);
+        }
+
+        fn google_anchor() -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = vec![OpenIdCredential {
+                iss: GOOGLE_ISSUER.to_string(),
+                sub: "google-user-123".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::from([
+                    (
+                        "email".to_string(),
+                        MetadataEntryV2::String("user@example.com".to_string()),
+                    ),
+                    (
+                        "name".to_string(),
+                        MetadataEntryV2::String("Example User".to_string()),
+                    ),
+                ]),
+            }];
+            anchor
+        }
+
+        fn google_spec(
+            attr: AttributeName,
+            value: Option<&[u8]>,
+            omit_scope: bool,
+        ) -> ValidatedAttributeSpec {
+            ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: GOOGLE_ISSUER.to_string(),
+                    }),
+                    attribute_name: attr,
+                },
+                value: value.map(|v| v.to_vec()),
+                omit_scope,
+            }
+        }
+
+        #[test]
+        fn should_reject_value_mismatch() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![
+                    google_spec(AttributeName::Email, Some(b"user@example.com"), false), // correct
+                    google_spec(AttributeName::Name, Some(b"Wrong Name"), false),        // wrong
+                ],
+                vec![0u8; 32],
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    pretty_assert_eq!(problems.len(), 1);
+                    assert!(
+                        problems[0].contains("value mismatch"),
+                        "Expected value mismatch error, got: {}",
+                        problems[0]
+                    );
+                    assert!(problems[0].contains("name"), "Error should mention 'name'");
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_unknown_issuer() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![ValidatedAttributeSpec {
+                    key: AttributeKey {
+                        scope: Some(AttributeScope::OpenId {
+                            issuer: "https://unknown-issuer.com".to_string(),
+                        }),
+                        attribute_name: AttributeName::Email,
+                    },
+                    value: None,
+                    omit_scope: false,
+                }],
+                vec![0u8; 32],
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("No credential found"),
+                        "Expected 'No credential found', got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_scopeless_attribute() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![ValidatedAttributeSpec {
+                    key: AttributeKey {
+                        scope: None,
+                        attribute_name: AttributeName::Email,
+                    },
+                    value: None,
+                    omit_scope: false,
+                }],
+                vec![0u8; 32],
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("no scope"),
+                        "Expected 'no scope' error, got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_duplicate_certified_keys() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            // Two specs that both resolve to certified key "email" due to omit_scope=true
+            let result = anchor.prepare_icrc3_attributes(
+                vec![
+                    google_spec(AttributeName::Email, None, true),
+                    google_spec(AttributeName::Email, None, true),
+                ],
+                vec![0u8; 32],
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("Duplicate certified attribute key"),
+                        "Expected duplicate key error, got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+    }
+
+    mod icrc3_attribute_message_tests {
+        use super::*;
+        use candid::Decode;
+
+        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+
+        #[test]
+        fn should_produce_different_messages_for_different_omit_scope() {
+            let mut scoped_pairs = BTreeMap::new();
+            scoped_pairs.insert(
+                format!("openid:{}:email", GOOGLE_ISSUER),
+                "user@example.com".as_bytes().to_vec(),
+            );
+
+            let mut unscoped_pairs = BTreeMap::new();
+            unscoped_pairs.insert("email".to_string(), "user@example.com".as_bytes().to_vec());
+
+            let scoped_msg = icrc3_attribute_message(&scoped_pairs);
+            let unscoped_msg = icrc3_attribute_message(&unscoped_pairs);
+
+            pretty_assert_ne!(
+                scoped_msg,
+                unscoped_msg,
+                "Messages with different key scoping should differ"
+            );
+        }
+
+        #[test]
+        fn should_produce_deterministic_encoding() {
+            let mut pairs = BTreeMap::new();
+            pairs.insert("email".to_string(), "user@example.com".as_bytes().to_vec());
+            pairs.insert("name".to_string(), "Example User".as_bytes().to_vec());
+
+            let msg1 = icrc3_attribute_message(&pairs);
+            let msg2 = icrc3_attribute_message(&pairs);
+            pretty_assert_eq!(msg1, msg2, "Same input should produce identical encoding");
+        }
+
+        #[test]
+        fn should_produce_decodable_icrc3_value() {
+            let mut pairs = BTreeMap::new();
+            pairs.insert("email".to_string(), "user@example.com".as_bytes().to_vec());
+            pairs.insert("name".to_string(), "Example User".as_bytes().to_vec());
+
+            let msg = icrc3_attribute_message(&pairs);
+            let decoded: Icrc3Value =
+                Decode!(&msg, Icrc3Value).expect("should decode as Icrc3Value");
+
+            match decoded {
+                Icrc3Value::Map(entries) => {
+                    pretty_assert_eq!(entries.len(), 2);
+                    // BTreeMap ordering: email < name
+                    pretty_assert_eq!(entries[0].0, "email");
+                    pretty_assert_eq!(entries[1].0, "name");
+                }
+                other => panic!("Expected Map, got {:?}", other),
+            }
         }
     }
 }

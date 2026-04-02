@@ -491,5 +491,40 @@ pub fn get_attributes(
     query_candid_as(env, canister_id, sender, "get_attributes", (request,)).map(|(x,)| x)
 }
 
+pub fn prepare_icrc3_attributes(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::PrepareIcrc3AttributeRequest,
+) -> Result<
+    Result<
+        types::attributes::PrepareIcrc3AttributeResponse,
+        types::attributes::PrepareIcrc3AttributeError,
+    >,
+    RejectResponse,
+> {
+    call_candid_as(
+        env,
+        canister_id,
+        RawEffectivePrincipal::None,
+        sender,
+        "prepare_icrc3_attributes",
+        (request,),
+    )
+    .map(|(x,)| x)
+}
+
+pub fn get_icrc3_attributes(
+    env: &PocketIc,
+    canister_id: CanisterId,
+    sender: Principal,
+    request: types::attributes::GetIcrc3AttributeRequest,
+) -> Result<
+    Result<types::attributes::GetIcrc3AttributeResponse, types::attributes::GetIcrc3AttributeError>,
+    RejectResponse,
+> {
+    query_candid_as(env, canister_id, sender, "get_icrc3_attributes", (request,)).map(|(x,)| x)
+}
+
 /// A "compatibility" module for the previous version of II to handle API changes.
 pub mod compat {}

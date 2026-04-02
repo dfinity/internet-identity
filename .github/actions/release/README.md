@@ -10,8 +10,7 @@ To try the action locally, run the following:
 $ # The list of files for which we compute the sha256
 $ # (those file must exist, though they don't need to have meaningful content)
 $ export INPUT_ASSETS='internet_identity_production.wasm.gz
-internet_identity_dev.wasm.gz
-internet_identity_test.wasm.gz
+internet_identity_frontend.wasm.gz
 archive.wasm.gz'
 $ export RELEASE_TAG=release-2023-08-11 # Does not need to exist
 # If you want to test the CI links to the sha256sum steps, also provide a valid INPUT_WORKFLOW_JOBS
