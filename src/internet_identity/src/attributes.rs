@@ -9,8 +9,8 @@ use ic_representation_independent_hash::{representation_independent_hash, Value}
 use internet_identity_interface::internet_identity::types::{
     attributes::{
         Attribute, AttributeKey, AttributeName, AttributeScope, CertifiedAttribute,
-        CertifiedAttributes, GetIcrc3AttributeResponse, PrepareIcrc3AttributeError,
-        ValidatedAttributeSpec,
+        CertifiedAttributes, GetIcrc3AttributeError, GetIcrc3AttributeResponse,
+        PrepareIcrc3AttributeError, ValidatedAttributeSpec,
     },
     icrc3::Icrc3Value,
     Timestamp,
@@ -348,7 +348,7 @@ impl Anchor {
         &self,
         account: Account,
         message: &[u8],
-    ) -> GetIcrc3AttributeResponse {
+    ) -> Result<GetIcrc3AttributeResponse, GetIcrc3AttributeError> {
         let seed = account.calculate_seed();
 
         let signature = state::assets_and_signatures(|certified_assets, sigs| {
@@ -358,10 +358,10 @@ impl Anchor {
                 message,
             };
             sigs.get_signature_as_cbor(&inputs, Some(certified_assets.root_hash()))
-                .expect("ICRC-3 attribute signature not found")
-        });
+        })
+        .map_err(|_| GetIcrc3AttributeError::NoSuchSignature)?;
 
-        GetIcrc3AttributeResponse { signature }
+        Ok(GetIcrc3AttributeResponse { signature })
     }
 }
 

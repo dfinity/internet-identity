@@ -1371,7 +1371,7 @@ mod attribute_sharing {
         let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
             .map_err(GetIcrc3AttributeError::GetAccountError)?;
 
-        let response = anchor.get_icrc3_attributes(account, &message);
+        let response = anchor.get_icrc3_attributes(account, &message)?;
 
         Ok(response)
     }

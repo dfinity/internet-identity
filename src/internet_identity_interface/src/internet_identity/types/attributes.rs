@@ -427,8 +427,35 @@ pub enum GetAttributesError {
 
 // ==================== ICRC-3 attribute sharing types ====================
 
+/// Maximum size of an attribute key in the ICRC-3 message.
+///
+/// Attribute keys may include issuer strings, which are already bounded by
+/// `OPENID_ISSUER_MAX_BYTES`, so we reuse that limit here to derive a safe
+/// upper bound for the encoded message size.
+pub const ICRC3_ATTRIBUTE_KEY_MAX_BYTES: usize = OPENID_ISSUER_MAX_BYTES;
+
+/// Approximate Candid encoding overhead per attribute (length prefixes,
+/// type information, variants, etc.). This is a conservative upper bound:
+/// it does not need to be tight, only large enough so that
+/// `ICRC3_MESSAGE_MAX_BYTES` is a sound limit.
+pub const ICRC3_ATTRIBUTE_CANDID_OVERHEAD_BYTES: usize = 128;
+
+/// Approximate Candid encoding overhead for the whole ICRC-3 message map
+/// (type table, map header, etc.).
+pub const ICRC3_MESSAGE_CANDID_OVERHEAD_BYTES: usize = 1024;
+
 /// Maximum size of the ICRC-3 message blob (Candid-encoded ICRC-3 Value map).
-pub const ICRC3_MESSAGE_MAX_BYTES: usize = MAX_ATTRIBUTES_PER_REQUEST * ATTRIBUTE_VALUE_MAX_BYTES;
+///
+/// This bound accounts for:
+///  * up to `MAX_ATTRIBUTES_PER_REQUEST` attributes
+///  * each attribute's key (up to `ICRC3_ATTRIBUTE_KEY_MAX_BYTES` bytes)
+///  * each attribute's value (up to `ATTRIBUTE_VALUE_MAX_BYTES` bytes)
+///  * per-attribute and per-message Candid encoding overhead.
+pub const ICRC3_MESSAGE_MAX_BYTES: usize = ICRC3_MESSAGE_CANDID_OVERHEAD_BYTES
+    + MAX_ATTRIBUTES_PER_REQUEST
+        * (ICRC3_ATTRIBUTE_KEY_MAX_BYTES
+            + ATTRIBUTE_VALUE_MAX_BYTES
+            + ICRC3_ATTRIBUTE_CANDID_OVERHEAD_BYTES);
 
 /// A specification of an attribute to be certified.
 #[derive(CandidType, Debug, Deserialize, Clone)]
@@ -536,7 +563,7 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
     }
 }
 
-#[derive(CandidType, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, CandidType, Serialize, Deserialize)]
 pub struct PrepareIcrc3AttributeResponse {
     pub message: Vec<u8>,
 }
@@ -617,6 +644,7 @@ pub enum GetIcrc3AttributeError {
     ValidationError { problems: Vec<String> },
     AuthorizationError(Principal),
     GetAccountError(GetAccountError),
+    NoSuchSignature,
 }
 
 #[cfg(test)]
@@ -1399,6 +1427,371 @@ mod tests {
                         pretty_assert_eq!(
                             problems,
                             expected_problems,
+                            "Failed test case: {}",
+                            label
+                        );
+                    }
+                    other => panic!("Expected validation error for {}, got {:?}", label, other),
+                }
+            }
+        }
+    }
+
+    // ICRC-3 Validation Tests
+    mod validated_prepare_icrc3_attribute_request_tests {
+        use super::*;
+
+        fn make_spec(key: &str, value: Option<&[u8]>, omit_scope: bool) -> AttributeSpec {
+            AttributeSpec {
+                key: key.to_string(),
+                value: value.map(|v| v.to_vec()),
+                omit_scope,
+            }
+        }
+
+        #[test]
+        fn test_valid_requests() {
+            let test_cases = vec![
+                (
+                    "single attribute with value",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: vec![make_spec(
+                            "openid:https://google.com:email",
+                            Some(b"user@example.com"),
+                            false,
+                        )],
+                    },
+                    1,
+                ),
+                (
+                    "attribute without value",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: vec![make_spec(
+                            "openid:https://google.com:email",
+                            None,
+                            false,
+                        )],
+                    },
+                    1,
+                ),
+                (
+                    "attribute with omit_scope",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: vec![make_spec(
+                            "openid:https://google.com:email",
+                            None,
+                            true,
+                        )],
+                    },
+                    1,
+                ),
+                (
+                    "multiple attributes mixed options",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: Some(42),
+                        attributes: vec![
+                            make_spec(
+                                "openid:https://google.com:email",
+                                Some(b"user@example.com"),
+                                true,
+                            ),
+                            make_spec("openid:https://google.com:name", None, false),
+                        ],
+                    },
+                    2,
+                ),
+                (
+                    "empty attributes",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: vec![],
+                    },
+                    0,
+                ),
+            ];
+
+            for (label, input, expected_count) in test_cases {
+                let validated =
+                    ValidatedPrepareIcrc3AttributeRequest::try_from(input).expect(label);
+                pretty_assert_eq!(
+                    validated.attributes.len(),
+                    expected_count,
+                    "Failed test case: {}",
+                    label
+                );
+            }
+        }
+
+        #[test]
+        fn test_omit_scope_preserved() {
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "example.com".to_string(),
+                account_number: None,
+                attributes: vec![
+                    make_spec("openid:https://google.com:email", None, true),
+                    make_spec("openid:https://google.com:name", None, false),
+                ],
+            };
+            let validated = ValidatedPrepareIcrc3AttributeRequest::try_from(request).unwrap();
+            assert!(validated.attributes[0].omit_scope);
+            assert!(!validated.attributes[1].omit_scope);
+        }
+
+        #[test]
+        fn test_value_preserved() {
+            let request = PrepareIcrc3AttributeRequest {
+                identity_number: 123,
+                origin: "example.com".to_string(),
+                account_number: None,
+                attributes: vec![
+                    make_spec(
+                        "openid:https://google.com:email",
+                        Some(b"user@example.com"),
+                        false,
+                    ),
+                    make_spec("openid:https://google.com:name", None, false),
+                ],
+            };
+            let validated = ValidatedPrepareIcrc3AttributeRequest::try_from(request).unwrap();
+            pretty_assert_eq!(
+                validated.attributes[0].value,
+                Some(b"user@example.com".to_vec())
+            );
+            pretty_assert_eq!(validated.attributes[1].value, None);
+        }
+
+        #[test]
+        fn test_invalid_requests() {
+            let long_origin = "x".repeat(FRONTEND_HOSTNAME_MAX_BYTES + 1);
+            let long_value = vec![0u8; ATTRIBUTE_VALUE_MAX_BYTES + 1];
+
+            let test_cases: Vec<(
+                &str,
+                PrepareIcrc3AttributeRequest,
+                Vec<String>,
+            )> = vec![
+                (
+                    "origin too long",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: long_origin.clone(),
+                        account_number: None,
+                        attributes: vec![],
+                    },
+                    vec![format!(
+                        "Frontend hostname length {} exceeds limit of {} bytes",
+                        long_origin.len(),
+                        FRONTEND_HOSTNAME_MAX_BYTES
+                    )],
+                ),
+                (
+                    "too many attributes",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: (0..=MAX_ATTRIBUTES_PER_REQUEST)
+                            .map(|_| make_spec("openid:https://google.com:email", None, false))
+                            .collect(),
+                    },
+                    vec![format!(
+                        "Number of attributes {} exceeds limit of {}",
+                        MAX_ATTRIBUTES_PER_REQUEST + 1,
+                        MAX_ATTRIBUTES_PER_REQUEST
+                    )],
+                ),
+                (
+                    "invalid attribute key",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: vec![make_spec("invalid_key", None, false)],
+                    },
+                    vec!["Unknown attribute: invalid_key".to_string()],
+                ),
+                (
+                    "value too long",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        attributes: vec![AttributeSpec {
+                            key: "openid:https://google.com:email".to_string(),
+                            value: Some(long_value.clone()),
+                            omit_scope: false,
+                        }],
+                    },
+                    vec![format!(
+                        "Attribute value length {} exceeds limit of {} bytes",
+                        long_value.len(),
+                        ATTRIBUTE_VALUE_MAX_BYTES
+                    )],
+                ),
+                (
+                    "multiple errors combined",
+                    PrepareIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: long_origin.clone(),
+                        account_number: None,
+                        attributes: vec![make_spec("bad_key", None, false)],
+                    },
+                    vec![
+                        format!(
+                            "Frontend hostname length {} exceeds limit of {} bytes",
+                            long_origin.len(),
+                            FRONTEND_HOSTNAME_MAX_BYTES
+                        ),
+                        "Unknown attribute: bad_key".to_string(),
+                    ],
+                ),
+            ];
+
+            for (label, input, expected_problems) in test_cases {
+                let err = ValidatedPrepareIcrc3AttributeRequest::try_from(input).unwrap_err();
+                match err {
+                    PrepareIcrc3AttributeError::ValidationError { problems } => {
+                        if label == "too many attributes" {
+                            assert!(
+                                problems.iter().any(|p| p == &expected_problems[0]),
+                                "Failed test case: {}",
+                                label
+                            );
+                        } else {
+                            pretty_assert_eq!(
+                                problems, expected_problems,
+                                "Failed test case: {}",
+                                label
+                            );
+                        }
+                    }
+                    other => panic!("Expected validation error for {}, got {:?}", label, other),
+                }
+            }
+        }
+    }
+
+    mod validated_get_icrc3_attribute_request_tests {
+        use super::*;
+
+        #[test]
+        fn test_valid_requests() {
+            let test_cases = vec![
+                (
+                    "normal request",
+                    GetIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        message: vec![1, 2, 3],
+                    },
+                ),
+                (
+                    "with account number",
+                    GetIcrc3AttributeRequest {
+                        identity_number: 456,
+                        origin: "app.example.com".to_string(),
+                        account_number: Some(7),
+                        message: vec![0; 1000],
+                    },
+                ),
+                (
+                    "empty message",
+                    GetIcrc3AttributeRequest {
+                        identity_number: 789,
+                        origin: "test.com".to_string(),
+                        account_number: None,
+                        message: vec![],
+                    },
+                ),
+            ];
+
+            for (label, input) in test_cases {
+                let validated = ValidatedGetIcrc3AttributeRequest::try_from(input).expect(label);
+                assert!(
+                    validated.identity_number > 0,
+                    "Failed test case: {}",
+                    label
+                );
+            }
+        }
+
+        #[test]
+        fn test_invalid_requests() {
+            let long_origin = "x".repeat(FRONTEND_HOSTNAME_MAX_BYTES + 1);
+
+            let test_cases = vec![
+                (
+                    "origin too long",
+                    GetIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: long_origin.clone(),
+                        account_number: None,
+                        message: vec![1, 2, 3],
+                    },
+                    vec![format!(
+                        "Frontend hostname length {} exceeds limit of {} bytes",
+                        long_origin.len(),
+                        FRONTEND_HOSTNAME_MAX_BYTES
+                    )],
+                ),
+                (
+                    "message too large",
+                    GetIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: "example.com".to_string(),
+                        account_number: None,
+                        message: vec![0; ICRC3_MESSAGE_MAX_BYTES + 1],
+                    },
+                    vec![format!(
+                        "Message length {} exceeds limit of {} bytes",
+                        ICRC3_MESSAGE_MAX_BYTES + 1,
+                        ICRC3_MESSAGE_MAX_BYTES
+                    )],
+                ),
+                (
+                    "both errors combined",
+                    GetIcrc3AttributeRequest {
+                        identity_number: 123,
+                        origin: long_origin.clone(),
+                        account_number: None,
+                        message: vec![0; ICRC3_MESSAGE_MAX_BYTES + 1],
+                    },
+                    vec![
+                        format!(
+                            "Frontend hostname length {} exceeds limit of {} bytes",
+                            long_origin.len(),
+                            FRONTEND_HOSTNAME_MAX_BYTES
+                        ),
+                        format!(
+                            "Message length {} exceeds limit of {} bytes",
+                            ICRC3_MESSAGE_MAX_BYTES + 1,
+                            ICRC3_MESSAGE_MAX_BYTES
+                        ),
+                    ],
+                ),
+            ];
+
+            for (label, input, expected_problems) in test_cases {
+                let err = ValidatedGetIcrc3AttributeRequest::try_from(input).unwrap_err();
+                match err {
+                    GetIcrc3AttributeError::ValidationError { problems } => {
+                        pretty_assert_eq!(
+                            problems, expected_problems,
                             "Failed test case: {}",
                             label
                         );

@@ -1,12 +1,13 @@
 //! Tests related to prepare_attributes and get_attributes II canister calls.
 
-use candid::Principal;
+use candid::{Decode, Principal};
 use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
 use ic_canister_sig_creation::extract_raw_canister_sig_pk_from_der;
 use internet_identity_interface::internet_identity::types::attributes::{
     AttributeSpec, CertifiedAttribute, CertifiedAttributes, GetAttributesRequest,
-    GetIcrc3AttributeRequest, PrepareAttributeRequest, PrepareIcrc3AttributeRequest,
+    GetIcrc3AttributeRequest, GetIcrc3AttributeError, PrepareAttributeRequest,
+    PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::{
     GetDelegationResponse, OpenIdConfig, SignedDelegation,
@@ -563,4 +564,485 @@ fn should_get_icrc3_certified_attributes() {
         &get_response.signature,
         &root_key,
     );
+}
+
+/// Sets up an environment with a Google OpenID credential and returns all context needed for tests.
+fn setup_icrc3_test_env() -> (
+    PocketIc,
+    Principal,  // ii_backend_canister_id
+    Principal,  // test_principal
+    u64,        // identity_number
+) {
+    let env = env();
+    #[allow(unused_variables)]
+    let (jwt, salt, claims, test_time, test_principal, test_authn_method) =
+        crate::openid::openid_google_test_data();
+
+    let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+    init_args.openid_configs = Some(vec![OpenIdConfig {
+        name: "Google".into(),
+        logo: "logo".into(),
+        issuer: "https://accounts.google.com".into(),
+        client_id: "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com"
+            .into(),
+        jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+        auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+        auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+        fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+        email_verification: None,
+    }]);
+
+    let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(init_args),
+        1_000_000_000_000_000,
+    );
+    crate::openid::mock_google_certs_response(&env);
+    deploy_archive_via_ii(&env, ii_backend_canister_id);
+
+    let identity_number =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method(
+            &env,
+            ii_backend_canister_id,
+            &test_authn_method,
+        );
+
+    let time_to_advance = Duration::from_millis(test_time) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    api::openid_credential_add(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )
+    .expect("failed to add openid credential")
+    .expect("openid_credential_add error");
+
+    env.advance_time(Duration::from_secs(15));
+
+    (env, ii_backend_canister_id, test_principal, identity_number)
+}
+
+#[test]
+fn should_certify_icrc3_attributes_without_value_check() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // Prepare with value = None — should use stored value without validation
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: false,
+            },
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:name".into(),
+                value: None,
+                omit_scope: false,
+            },
+        ],
+    };
+
+    let prepare_response =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes")
+            .expect("prepare_icrc3_attributes error");
+
+    assert!(!prepare_response.message.is_empty());
+
+    // Decode the message to verify it contains the stored values
+    let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
+        candid::Decode!(&prepare_response.message, internet_identity_interface::internet_identity::types::icrc3::Icrc3Value)
+            .expect("failed to decode ICRC-3 value");
+
+    match icrc3_value {
+        internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
+            assert_eq!(entries.len(), 2);
+            // BTreeMap ordering: email comes before name
+            assert_eq!(entries[0].0, "openid:https://accounts.google.com:email");
+            assert_eq!(entries[1].0, "openid:https://accounts.google.com:name");
+        }
+        other => panic!("Expected Map, got {:?}", other),
+    }
+
+    // Get signature
+    env.advance_time(Duration::from_secs(5));
+    let get_request = GetIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        message: prepare_response.message.clone(),
+    };
+
+    let get_response = api::get_icrc3_attributes(&env, canister_id, principal, get_request)
+        .expect("failed to call get_icrc3_attributes")
+        .expect("get_icrc3_attributes error");
+
+    assert!(!get_response.signature.is_empty());
+}
+
+#[test]
+fn should_certify_icrc3_attributes_with_omit_scope() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // Prepare with omit_scope = true
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: true,
+            },
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:name".into(),
+                value: None,
+                omit_scope: true,
+            },
+        ],
+    };
+
+    let prepare_response =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes")
+            .expect("prepare_icrc3_attributes error");
+
+    // Decode the message — keys should be just "email" and "name", not scoped
+    let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
+        candid::Decode!(&prepare_response.message, internet_identity_interface::internet_identity::types::icrc3::Icrc3Value)
+            .expect("failed to decode ICRC-3 value");
+
+    match icrc3_value {
+        internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
+            assert_eq!(entries.len(), 2);
+            let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+            assert!(keys.contains(&"email"), "Expected 'email' key, got {:?}", keys);
+            assert!(keys.contains(&"name"), "Expected 'name' key, got {:?}", keys);
+            // Verify that the full scoped key is NOT present
+            assert!(
+                !keys.iter().any(|k| k.contains("openid:")),
+                "Keys should not contain scope prefix when omit_scope=true, got {:?}",
+                keys
+            );
+        }
+        other => panic!("Expected Map, got {:?}", other),
+    }
+
+    // Verify the signature round-trip works
+    env.advance_time(Duration::from_secs(5));
+    let get_request = GetIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        message: prepare_response.message.clone(),
+    };
+
+    let get_response = api::get_icrc3_attributes(&env, canister_id, principal, get_request)
+        .expect("failed to call get_icrc3_attributes")
+        .expect("get_icrc3_attributes error");
+
+    assert!(!get_response.signature.is_empty());
+
+    // Verify signature cryptographically
+    let session_public_key = ByteBuf::from("session public key");
+    env.advance_time(Duration::from_secs(35));
+    let (canister_sig_key, _) = api::prepare_delegation(
+        &env,
+        canister_id,
+        principal,
+        identity_number,
+        origin,
+        &session_public_key,
+        None,
+    )
+    .unwrap();
+    env.advance_time(Duration::from_secs(5));
+
+    let root_key = env.root_key().unwrap();
+    verify_icrc3_attributes(
+        &env,
+        canister_sig_key,
+        &prepare_response.message,
+        &get_response.signature,
+        &root_key,
+    );
+}
+
+#[test]
+fn should_certify_icrc3_attributes_mixed_omit_scope() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // Mix: email with omit_scope=true, name with omit_scope=false
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: true,
+            },
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:name".into(),
+                value: None,
+                omit_scope: false,
+            },
+        ],
+    };
+
+    let prepare_response =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes")
+            .expect("prepare_icrc3_attributes error");
+
+    let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
+        candid::Decode!(&prepare_response.message, internet_identity_interface::internet_identity::types::icrc3::Icrc3Value)
+            .expect("failed to decode ICRC-3 value");
+
+    match icrc3_value {
+        internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
+            assert_eq!(entries.len(), 2);
+            let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+            // email should have scope omitted
+            assert!(keys.contains(&"email"), "Expected unscoped 'email' key, got {:?}", keys);
+            // name should have full scope
+            assert!(
+                keys.contains(&"openid:https://accounts.google.com:name"),
+                "Expected scoped 'name' key, got {:?}",
+                keys
+            );
+        }
+        other => panic!("Expected Map, got {:?}", other),
+    }
+}
+
+#[test]
+fn should_reject_icrc3_attributes_with_wrong_value() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![AttributeSpec {
+            key: "openid:https://accounts.google.com:email".into(),
+            value: Some(b"wrong@example.com".to_vec()),
+            omit_scope: false,
+        }],
+    };
+
+    let result =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes");
+
+    match result {
+        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+            assert_eq!(problems.len(), 1);
+            assert!(
+                problems[0].contains("value mismatch"),
+                "Expected value mismatch error, got: {}",
+                problems[0]
+            );
+        }
+        other => panic!("Expected AttributeMismatch error, got {:?}", other),
+    }
+}
+
+#[test]
+fn should_reject_icrc3_attributes_with_correct_and_wrong_value() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // One correct value, one wrong value
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: Some(b"andri.schatz@dfinity.org".to_vec()), // correct
+                omit_scope: false,
+            },
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:name".into(),
+                value: Some(b"Wrong Name".to_vec()), // wrong
+                omit_scope: false,
+            },
+        ],
+    };
+
+    let result =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes");
+
+    match result {
+        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+            assert_eq!(problems.len(), 1);
+            assert!(problems[0].contains("name"));
+        }
+        other => panic!("Expected AttributeMismatch error, got {:?}", other),
+    }
+}
+
+#[test]
+fn should_return_no_such_signature_for_unknown_message() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // First prepare a valid message so the account exists
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![AttributeSpec {
+            key: "openid:https://accounts.google.com:email".into(),
+            value: None,
+            omit_scope: false,
+        }],
+    };
+
+    api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+        .expect("failed to call prepare_icrc3_attributes")
+        .expect("prepare_icrc3_attributes error");
+
+    env.advance_time(Duration::from_secs(5));
+
+    // Try to get signature for a message that was never prepared
+    let get_request = GetIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        message: vec![1, 2, 3, 4, 5], // bogus message
+    };
+
+    let result = api::get_icrc3_attributes(&env, canister_id, principal, get_request)
+        .expect("failed to call get_icrc3_attributes");
+
+    assert_eq!(result, Err(GetIcrc3AttributeError::NoSuchSignature));
+}
+
+#[test]
+fn should_produce_different_messages_for_different_omit_scope() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // Prepare with omit_scope = false
+    let prepare_scoped = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![AttributeSpec {
+            key: "openid:https://accounts.google.com:email".into(),
+            value: None,
+            omit_scope: false,
+        }],
+    };
+
+    let response_scoped =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_scoped)
+            .expect("failed to call prepare_icrc3_attributes")
+            .expect("prepare_icrc3_attributes error");
+
+    // Prepare with omit_scope = true
+    let prepare_unscoped = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![AttributeSpec {
+            key: "openid:https://accounts.google.com:email".into(),
+            value: None,
+            omit_scope: true,
+        }],
+    };
+
+    let response_unscoped =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_unscoped)
+            .expect("failed to call prepare_icrc3_attributes")
+            .expect("prepare_icrc3_attributes error");
+
+    // The messages should be different because the keys in the ICRC-3 map differ
+    assert_ne!(
+        response_scoped.message, response_unscoped.message,
+        "Messages with different omit_scope settings should differ"
+    );
+}
+
+#[test]
+fn should_reject_icrc3_attributes_for_unknown_issuer() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![AttributeSpec {
+            key: "openid:https://unknown-issuer.com:email".into(),
+            value: None,
+            omit_scope: false,
+        }],
+    };
+
+    let result =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes");
+
+    match result {
+        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+            assert!(
+                problems[0].contains("No credential found"),
+                "Expected 'No credential found' error, got: {}",
+                problems[0]
+            );
+        }
+        other => panic!("Expected AttributeMismatch error, got {:?}", other),
+    }
+}
+
+#[test]
+fn should_reject_icrc3_attributes_without_scope() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // Attribute without a scope (just "email" instead of "openid:...:email")
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![AttributeSpec {
+            key: "email".into(),
+            value: None,
+            omit_scope: false,
+        }],
+    };
+
+    let result =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes");
+
+    match result {
+        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+            assert!(
+                problems[0].contains("no scope"),
+                "Expected 'no scope' error, got: {}",
+                problems[0]
+            );
+        }
+        other => panic!("Expected AttributeMismatch error, got {:?}", other),
+    }
 }
