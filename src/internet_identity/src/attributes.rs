@@ -10,6 +10,7 @@ use internet_identity_interface::internet_identity::types::{
     attributes::{
         Attribute, AttributeKey, AttributeName, AttributeScope, CertifiedAttribute,
         CertifiedAttributes, GetIcrc3AttributeResponse, PrepareIcrc3AttributeError,
+        ValidatedAttributeSpec,
     },
     icrc3::Icrc3Value,
     Timestamp,
@@ -233,14 +234,14 @@ fn add_attribute_signature(sigs: &mut SignatureMap, seed: &[u8], message: &[u8])
 /// Domain separator for ICRC-3 attribute certification signatures.
 const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ii-icrc3-request-attributes";
 
-/// Builds a Candid-encoded ICRC-3 Value map from the given attributes.
-/// Keys are attribute key strings, values are `Icrc3Value::Blob(attribute_value)`.
-fn icrc3_attribute_message(attributes: &BTreeSet<Attribute>) -> Vec<u8> {
+/// Builds a Candid-encoded ICRC-3 Value map from certified key-value pairs.
+/// The pairs are (certified_key, value) where certified_key may have scope omitted.
+fn icrc3_attribute_message(certified_pairs: &BTreeMap<String, Vec<u8>>) -> Vec<u8> {
     use candid::Encode;
 
-    let map_entries: Vec<(String, Icrc3Value)> = attributes
+    let map_entries: Vec<(String, Icrc3Value)> = certified_pairs
         .iter()
-        .map(|attr| (attr.key.to_string(), Icrc3Value::Blob(attr.value.clone())))
+        .map(|(key, value)| (key.clone(), Icrc3Value::Blob(value.clone())))
         .collect();
 
     let value = Icrc3Value::Map(map_entries);
@@ -248,20 +249,25 @@ fn icrc3_attribute_message(attributes: &BTreeSet<Attribute>) -> Vec<u8> {
 }
 
 impl Anchor {
-    /// Validates that provided attribute values match stored credential values,
-    /// builds the Candid-encoded ICRC-3 message, signs it, and returns the message blob.
+    /// Resolves attribute specs against stored credentials, builds the Candid-encoded
+    /// ICRC-3 message, signs it, and returns the message blob.
+    ///
+    /// For each `ValidatedAttributeSpec`:
+    /// - Looks up the stored value from the matching OpenID credential.
+    /// - If `spec.value` is `Some`, validates it matches the stored value.
+    /// - Computes the certified key: if `omit_scope` is true, uses just the attribute name
+    ///   (e.g., `"email"`); otherwise uses the full key (e.g., `"openid:https://...:email"`).
     pub fn prepare_icrc3_attributes(
         &self,
-        attributes: BTreeMap<Option<AttributeScope>, BTreeSet<Attribute>>,
+        attribute_specs: Vec<ValidatedAttributeSpec>,
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
-        let mut validated_attributes = BTreeSet::new();
+        let mut certified_pairs = BTreeMap::new();
         let mut problems = Vec::new();
 
-        for (scope, requested_attrs) in &attributes {
-            match scope {
+        for spec in &attribute_specs {
+            match &spec.key.scope {
                 Some(AttributeScope::OpenId { issuer }) => {
-                    // Find the credential matching this issuer
                     let credential = self
                         .openid_credentials
                         .iter()
@@ -272,46 +278,46 @@ impl Anchor {
                         continue;
                     };
 
-                    for attr in requested_attrs {
-                        let stored_value = match attr.key.attribute_name {
-                            AttributeName::Email => credential.get_email(),
-                            AttributeName::Name => credential.get_name(),
-                            AttributeName::VerifiedEmail => credential.get_verified_email(),
-                        };
+                    let stored_value = match spec.key.attribute_name {
+                        AttributeName::Email => credential.get_email(),
+                        AttributeName::Name => credential.get_name(),
+                        AttributeName::VerifiedEmail => credential.get_verified_email(),
+                    };
 
-                        match stored_value {
-                            Some(stored) if stored.as_bytes() == attr.value.as_slice() => {
-                                validated_attributes.insert(Attribute {
-                                    key: AttributeKey {
-                                        scope: attr.key.scope.clone(),
-                                        attribute_name: attr.key.attribute_name,
-                                    },
-                                    value: attr.value.clone(),
-                                });
-                            }
-                            Some(stored) => {
-                                problems.push(format!(
-                                    "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
-                                    attr.key,
-                                    stored.len()
-                                ));
-                            }
-                            None => {
-                                problems.push(format!(
-                                    "Attribute {} not available for issuer {}",
-                                    attr.key.attribute_name, issuer
-                                ));
-                            }
+                    let Some(stored) = stored_value else {
+                        problems.push(format!(
+                            "Attribute {} not available for issuer {}",
+                            spec.key.attribute_name, issuer
+                        ));
+                        continue;
+                    };
+
+                    // If a value was provided, validate it matches.
+                    if let Some(ref expected_value) = spec.value {
+                        if expected_value.as_slice() != stored.as_bytes() {
+                            problems.push(format!(
+                                "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
+                                spec.key,
+                                stored.len()
+                            ));
+                            continue;
                         }
                     }
+
+                    // Compute the certified key.
+                    let certified_key = if spec.omit_scope {
+                        spec.key.attribute_name.to_string()
+                    } else {
+                        spec.key.to_string()
+                    };
+
+                    certified_pairs.insert(certified_key, stored.into_bytes());
                 }
                 None => {
-                    for attr in requested_attrs {
-                        problems.push(format!(
-                            "Attribute {} has no scope; only scoped attributes are supported",
-                            attr.key
-                        ));
-                    }
+                    problems.push(format!(
+                        "Attribute {} has no scope; only scoped attributes are supported",
+                        spec.key
+                    ));
                 }
             }
         }
@@ -320,7 +326,7 @@ impl Anchor {
             return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
         }
 
-        let message = icrc3_attribute_message(&validated_attributes);
+        let message = icrc3_attribute_message(&certified_pairs);
 
         let seed = account.calculate_seed();
         state::signature_map_mut(|sigs| {

@@ -5,8 +5,8 @@ use canister_tests::api::internet_identity as api;
 use canister_tests::framework::*;
 use ic_canister_sig_creation::extract_raw_canister_sig_pk_from_der;
 use internet_identity_interface::internet_identity::types::attributes::{
-    CertifiedAttribute, CertifiedAttributes, GetAttributesRequest, GetIcrc3AttributeRequest,
-    PrepareAttributeRequest, PrepareIcrc3AttributeRequest,
+    AttributeSpec, CertifiedAttribute, CertifiedAttributes, GetAttributesRequest,
+    GetIcrc3AttributeRequest, PrepareAttributeRequest, PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::{
     GetDelegationResponse, OpenIdConfig, SignedDelegation,
@@ -490,14 +490,16 @@ fn should_get_icrc3_certified_attributes() {
         origin: origin.to_string(),
         account_number: None,
         attributes: vec![
-            (
-                "openid:https://accounts.google.com:email".into(),
-                b"andri.schatz@dfinity.org".to_vec(),
-            ),
-            (
-                "openid:https://accounts.google.com:name".into(),
-                b"Andri Schatz".to_vec(),
-            ),
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: Some(b"andri.schatz@dfinity.org".to_vec()),
+                omit_scope: false,
+            },
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:name".into(),
+                value: Some(b"Andri Schatz".to_vec()),
+                omit_scope: false,
+            },
         ],
     };
 

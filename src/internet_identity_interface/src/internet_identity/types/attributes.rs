@@ -171,7 +171,7 @@ impl TryFrom<&str> for AttributeScope {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize)]
 pub struct AttributeKey {
     /// E.g., `Some("openid:https://google.com")` in "openid:https://google.com:email" or `None` in "name".
     pub scope: Option<AttributeScope>,
@@ -430,12 +430,31 @@ pub enum GetAttributesError {
 /// Maximum size of the ICRC-3 message blob (Candid-encoded ICRC-3 Value map).
 pub const ICRC3_MESSAGE_MAX_BYTES: usize = MAX_ATTRIBUTES_PER_REQUEST * ATTRIBUTE_VALUE_MAX_BYTES;
 
+/// A specification of an attribute to be certified.
+#[derive(CandidType, Debug, Deserialize, Clone)]
+pub struct AttributeSpec {
+    /// `attribute_scope:attribute_name`, e.g. `openid:https://accounts.google.com:email`
+    pub key: String,
+    /// If set, only certify if the current value matches.
+    pub value: Option<Vec<u8>>,
+    /// Whether to omit the scope prefix in the certified attribute key.
+    pub omit_scope: bool,
+}
+
+/// Validated and parsed attribute spec for internal use.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ValidatedAttributeSpec {
+    pub key: AttributeKey,
+    pub value: Option<Vec<u8>>,
+    pub omit_scope: bool,
+}
+
 #[derive(CandidType, Debug, Deserialize)]
 pub struct PrepareIcrc3AttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub attributes: Vec<(String, Vec<u8>)>,
+    pub attributes: Vec<AttributeSpec>,
 }
 
 #[derive(Debug)]
@@ -443,7 +462,7 @@ pub struct ValidatedPrepareIcrc3AttributeRequest {
     pub identity_number: AnchorNumber,
     pub origin: FrontendHostname,
     pub account_number: Option<AccountNumber>,
-    pub attributes: BTreeMap<Option<AttributeScope>, BTreeSet<Attribute>>,
+    pub attributes: Vec<ValidatedAttributeSpec>,
 }
 
 impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeRequest {
@@ -475,20 +494,33 @@ impl TryFrom<PrepareIcrc3AttributeRequest> for ValidatedPrepareIcrc3AttributeReq
             ));
         }
 
-        let mut attributes = BTreeMap::new();
+        let mut attributes = Vec::new();
 
-        for unparsed_attribute in unparsed_attributes {
-            let attribute: Attribute = match unparsed_attribute.try_into() {
-                Ok(attr) => attr,
+        for spec in unparsed_attributes {
+            let key = match AttributeKey::try_from(spec.key.clone()) {
+                Ok(key) => key,
                 Err(err) => {
                     problems.push(err);
                     continue;
                 }
             };
-            attributes
-                .entry(attribute.key.scope.clone())
-                .or_insert_with(BTreeSet::new)
-                .insert(attribute);
+
+            if let Some(ref value) = spec.value {
+                if value.len() > ATTRIBUTE_VALUE_MAX_BYTES {
+                    problems.push(format!(
+                        "Attribute value length {} exceeds limit of {} bytes",
+                        value.len(),
+                        ATTRIBUTE_VALUE_MAX_BYTES
+                    ));
+                    continue;
+                }
+            }
+
+            attributes.push(ValidatedAttributeSpec {
+                key,
+                value: spec.value,
+                omit_scope: spec.omit_scope,
+            });
         }
 
         if !problems.is_empty() {

@@ -926,6 +926,29 @@ type Icrc3Value = variant {
     Map : vec record { text; Icrc3Value };
 };
 
+// A specification of an attribute to be certified.
+type AttributeSpec = record {
+    // `attribute_scope:attribute_name`
+    //
+    // Example: `openid:https://accounts.google.com:email`
+    key : text;
+
+    // If `value` is set, this attribute should be certified only if it matches
+    // the current value. This enables the II frontend to request a certificate
+    // for a set of attributes that is guaranteed to be approved by the user.
+    value : opt blob;
+
+    // Whether the attribute scope should be omitted before certification.
+    // Certifying unscoped attributes is useful, e.g., when the user wants
+    // to share their preferred email without revealing which OpenID
+    // provider they use with II.
+    //
+    // Examples (e.g., `key = "openid:https://accounts.google.com:email"`):
+    // 1. If `omit_scope = true`, then the certified attribute key is `email`.
+    // 2. Otherwise, the certified attribute key is literally the value of `key`.
+    omit_scope : bool;
+};
+
 type PrepareIcrc3AttributeRequest = record {
     // Identity for which the attributes should be prepared.
     identity_number : IdentityNumber;
@@ -936,8 +959,8 @@ type PrepareIcrc3AttributeRequest = record {
     // II account for the relying party.
     account_number : opt AccountNumber;
 
-    // The attributes to be prepared: keys and values.
-    attributes : vec record { text; blob };
+    // The attributes to be certified.
+    attributes : vec AttributeSpec;
 };
 
 type PrepareIcrc3AttributeResponse = record {
