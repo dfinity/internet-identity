@@ -6,8 +6,8 @@ use canister_tests::framework::*;
 use ic_canister_sig_creation::extract_raw_canister_sig_pk_from_der;
 use internet_identity_interface::internet_identity::types::attributes::{
     AttributeSpec, CertifiedAttribute, CertifiedAttributes, GetAttributesRequest,
-    GetIcrc3AttributeError, GetIcrc3AttributeRequest, PrepareAttributeRequest,
-    PrepareIcrc3AttributeRequest,
+    GetIcrc3AttributeError, GetIcrc3AttributeRequest, ListAvailableAttributesRequest,
+    PrepareAttributeRequest, PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::{
     GetDelegationResponse, OpenIdConfig, SignedDelegation,
@@ -774,4 +774,32 @@ fn should_return_no_such_signature_for_unknown_message() {
         .expect("failed to call get_icrc3_attributes");
 
     assert_eq!(result, Err(GetIcrc3AttributeError::NoSuchSignature));
+}
+
+#[test]
+fn should_list_all_available_attributes() {
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+
+    let request = ListAvailableAttributesRequest {
+        identity_number,
+        attributes: None,
+    };
+
+    let result = api::list_available_attributes(&env, canister_id, principal, request)
+        .expect("failed to call list_available_attributes")
+        .expect("list_available_attributes error");
+
+    // The test setup creates a Google OpenID credential with email and name
+    let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
+    assert!(
+        keys.contains(&"openid:https://accounts.google.com:email"),
+        "Expected email attribute, got {:?}",
+        keys
+    );
+    assert!(
+        keys.contains(&"openid:https://accounts.google.com:name"),
+        "Expected name attribute, got {:?}",
+        keys
+    );
+    assert!(result.len() >= 2, "Expected at least 2 attributes, got {}", result.len());
 }

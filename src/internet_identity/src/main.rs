@@ -20,7 +20,9 @@ use internet_identity_interface::internet_identity::types::attributes::{
     CertifiedAttributes, GetAttributesError, GetAttributesRequest, GetIcrc3AttributeError,
     GetIcrc3AttributeRequest, GetIcrc3AttributeResponse, PrepareAttributeError,
     PrepareAttributeRequest, PrepareAttributeResponse, PrepareIcrc3AttributeError,
-    PrepareIcrc3AttributeRequest, PrepareIcrc3AttributeResponse, ValidatedGetIcrc3AttributeRequest,
+    ListAvailableAttributesError, ListAvailableAttributesRequest,
+    PrepareIcrc3AttributeRequest, PrepareIcrc3AttributeResponse,
+    ValidatedGetIcrc3AttributeRequest, ValidatedListAvailableAttributesRequest,
     ValidatedPrepareAttributeRequest, ValidatedPrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
@@ -1375,6 +1377,23 @@ mod attribute_sharing {
         let response = anchor.get_icrc3_attributes(account, &message)?;
 
         Ok(response)
+    }
+
+    #[query]
+    fn list_available_attributes(
+        request: ListAvailableAttributesRequest,
+    ) -> Result<Vec<(String, Vec<u8>)>, ListAvailableAttributesError> {
+        let ValidatedListAvailableAttributesRequest {
+            identity_number,
+            attributes,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                ListAvailableAttributesError::AuthorizationError(principal)
+            })?;
+
+        Ok(anchor.list_available_attributes(attributes))
     }
 }
 

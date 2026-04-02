@@ -377,6 +377,62 @@ impl Anchor {
 
         Ok(GetIcrc3AttributeResponse { signature })
     }
+
+    /// Lists available attribute key/value pairs from stored OpenID credentials.
+    ///
+    /// If `requested` is `None`, returns all available attributes.
+    /// If `requested` is `Some(keys)`, returns only attributes matching the given keys.
+    /// Unscoped keys (e.g., `"email"`) match all scopes; scoped keys match exactly.
+    /// Response keys are always fully scoped.
+    pub fn list_available_attributes(
+        &self,
+        requested: Option<Vec<AttributeKey>>,
+    ) -> Vec<(String, Vec<u8>)> {
+        let all_names = [
+            AttributeName::Email,
+            AttributeName::Name,
+            AttributeName::VerifiedEmail,
+        ];
+        let mut result = BTreeMap::new();
+
+        for credential in &self.openid_credentials {
+            let Some(issuer) = credential.config_issuer() else {
+                continue;
+            };
+            let scope = AttributeScope::OpenId {
+                issuer: issuer.clone(),
+            };
+
+            for &attr_name in &all_names {
+                let value = match attr_name {
+                    AttributeName::Email => credential.get_email(),
+                    AttributeName::Name => credential.get_name(),
+                    AttributeName::VerifiedEmail => credential.get_verified_email(),
+                };
+                let Some(value) = value else {
+                    continue;
+                };
+
+                let matches = match &requested {
+                    None => true,
+                    Some(keys) => keys.iter().any(|k| {
+                        k.attribute_name == attr_name
+                            && (k.scope.is_none() || k.scope.as_ref() == Some(&scope))
+                    }),
+                };
+
+                if matches {
+                    let key = AttributeKey {
+                        scope: Some(scope.clone()),
+                        attribute_name: attr_name,
+                    };
+                    result.insert(key.to_string(), value.into_bytes());
+                }
+            }
+        }
+
+        result.into_iter().collect()
+    }
 }
 
 #[cfg(test)]
@@ -1731,6 +1787,137 @@ mod tests {
                 }
                 other => panic!("Expected Map, got {:?}", other),
             }
+        }
+    }
+
+    mod list_available_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::{
+            OpenIdConfig, OpenIdEmailVerificationScheme,
+        };
+
+        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+
+        fn setup_google_provider() {
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Google".to_string(),
+                logo: String::new(),
+                issuer: GOOGLE_ISSUER.to_string(),
+                client_id: "test-client-id".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: Some(OpenIdEmailVerificationScheme::Google),
+            }]);
+        }
+
+        fn google_anchor() -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = vec![OpenIdCredential {
+                iss: GOOGLE_ISSUER.to_string(),
+                sub: "google-user-123".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::from([
+                    (
+                        "email".to_string(),
+                        MetadataEntryV2::String("user@example.com".to_string()),
+                    ),
+                    (
+                        "name".to_string(),
+                        MetadataEntryV2::String("Example User".to_string()),
+                    ),
+                ]),
+            }];
+            anchor
+        }
+
+        #[test]
+        fn should_return_all_attributes_when_none() {
+            setup_google_provider();
+            let anchor = google_anchor();
+
+            let result = anchor.list_available_attributes(None);
+
+            // Should have email and name (verified_email requires email_verified=true in metadata)
+            pretty_assert_eq!(result.len(), 2);
+            let keys: Vec<&str> = result.iter().map(|(k, _)| k.as_str()).collect();
+            assert!(keys.contains(&format!("openid:{}:email", GOOGLE_ISSUER).as_str()));
+            assert!(keys.contains(&format!("openid:{}:name", GOOGLE_ISSUER).as_str()));
+        }
+
+        #[test]
+        fn should_filter_by_scoped_key() {
+            setup_google_provider();
+            let anchor = google_anchor();
+
+            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
+                scope: Some(AttributeScope::OpenId {
+                    issuer: GOOGLE_ISSUER.to_string(),
+                }),
+                attribute_name: AttributeName::Email,
+            }]));
+
+            pretty_assert_eq!(result.len(), 1);
+            pretty_assert_eq!(result[0].0, format!("openid:{}:email", GOOGLE_ISSUER));
+            pretty_assert_eq!(result[0].1, b"user@example.com");
+        }
+
+        #[test]
+        fn should_filter_by_unscoped_key() {
+            setup_google_provider();
+            let anchor = google_anchor();
+
+            // "email" without scope should match all scopes
+            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
+                scope: None,
+                attribute_name: AttributeName::Email,
+            }]));
+
+            pretty_assert_eq!(result.len(), 1);
+            pretty_assert_eq!(result[0].0, format!("openid:{}:email", GOOGLE_ISSUER));
+            pretty_assert_eq!(result[0].1, b"user@example.com");
+        }
+
+        #[test]
+        fn should_return_empty_for_missing_attribute() {
+            setup_google_provider();
+            let anchor = google_anchor();
+
+            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
+                scope: Some(AttributeScope::OpenId {
+                    issuer: GOOGLE_ISSUER.to_string(),
+                }),
+                attribute_name: AttributeName::VerifiedEmail,
+            }]));
+
+            // verified_email is not available because email_verified is not "true" in metadata
+            pretty_assert_eq!(result.len(), 0);
+        }
+
+        #[test]
+        fn should_return_empty_for_no_credentials() {
+            setup_google_provider();
+            let anchor = Anchor::new(ANCHOR_NUMBER, 0); // no credentials
+
+            let result = anchor.list_available_attributes(None);
+            pretty_assert_eq!(result.len(), 0);
+        }
+
+        #[test]
+        fn should_return_empty_for_wrong_issuer() {
+            setup_google_provider();
+            let anchor = google_anchor();
+
+            let result = anchor.list_available_attributes(Some(vec![AttributeKey {
+                scope: Some(AttributeScope::OpenId {
+                    issuer: "https://unknown-issuer.com".to_string(),
+                }),
+                attribute_name: AttributeName::Email,
+            }]));
+
+            pretty_assert_eq!(result.len(), 0);
         }
     }
 }

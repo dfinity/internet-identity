@@ -1013,6 +1013,27 @@ type GetIcrc3AttributeError = variant {
     NoSuchSignature;
 };
 
+// List available attributes
+type ListAvailableAttributesRequest = record {
+    // Identity for which available attributes should be listed.
+    identity_number : IdentityNumber;
+
+    // Optional list of attribute keys to filter by.
+    // Each key is either a fully-scoped key (e.g., "openid:https://accounts.google.com:email")
+    // or an unscoped attribute name (e.g., "email") which matches all scopes.
+    // If not provided, all available attributes are returned.
+    attributes : opt vec text;
+};
+
+type ListAvailableAttributesResponse = vec record { text; blob };
+
+type ListAvailableAttributesError = variant {
+    ValidationError : record {
+        problems : vec text;
+    };
+    AuthorizationError : principal;
+};
+
 service : (opt InternetIdentityInit) -> {
     // Legacy identity management API
     // ==============================
@@ -1134,6 +1155,7 @@ service : (opt InternetIdentityInit) -> {
     // ==================================
     prepare_icrc3_attributes : (PrepareIcrc3AttributeRequest) -> (variant { Ok : PrepareIcrc3AttributeResponse; Err : PrepareIcrc3AttributeError });
     get_icrc3_attributes : (GetIcrc3AttributeRequest) -> (variant { Ok : GetIcrc3AttributeResponse; Err : GetIcrc3AttributeError }) query;
+    list_available_attributes : (ListAvailableAttributesRequest) -> (variant { Ok : ListAvailableAttributesResponse; Err : ListAvailableAttributesError }) query;
 
     // Old Verifiable Credentials API
     // ==============================
