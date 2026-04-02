@@ -1897,6 +1897,16 @@ mod tests {
         }
 
         #[test]
+        fn should_return_empty_for_empty_filter() {
+            setup_google_provider();
+            let anchor = google_anchor();
+
+            // Some(vec![]) means "filter by these keys" with no keys → nothing matches
+            let result = anchor.list_available_attributes(Some(vec![]));
+            pretty_assert_eq!(result.len(), 0);
+        }
+
+        #[test]
         fn should_return_empty_for_wrong_issuer() {
             setup_google_provider();
             let anchor = google_anchor();
