@@ -73,8 +73,9 @@
   const setupVisualViewportFallback = (): (() => void) => {
     let debounceTimeout: ReturnType<typeof setTimeout>;
     const updateKeyboardInset = () => {
+      if (window.visualViewport === null) return;
       const keyboardHeight = Math.max(
-        window.innerHeight - window.visualViewport!.height,
+        window.innerHeight - window.visualViewport.height,
         0,
       );
       dialogRef?.style.setProperty(
@@ -83,7 +84,7 @@
       );
       dialogRef?.style.setProperty(
         "--max-content-height",
-        `${window.visualViewport!.height}px`,
+        `${window.visualViewport.height}px`,
       );
     };
     const updateDebounced = () => {
