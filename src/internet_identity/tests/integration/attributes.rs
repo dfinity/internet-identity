@@ -720,7 +720,9 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                     assert!(
                         ts >= time_before && ts <= time_after,
                         "Timestamp {} should be between {} and {}",
-                        ts, time_before, time_after
+                        ts,
+                        time_before,
+                        time_after
                     );
                 }
                 other => panic!("Expected Blob for timestamp, got {:?}", other),
