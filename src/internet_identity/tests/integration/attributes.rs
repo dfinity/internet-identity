@@ -707,10 +707,9 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
         message: prepare_response.message.clone(),
     };
 
-    let get_response =
-        api::get_icrc3_attributes(&env, canister_id, principal, get_request)
-            .expect("failed to call get_icrc3_attributes")
-            .expect("get_icrc3_attributes error");
+    let get_response = api::get_icrc3_attributes(&env, canister_id, principal, get_request)
+        .expect("failed to call get_icrc3_attributes")
+        .expect("get_icrc3_attributes error");
 
     let session_public_key = ByteBuf::from("session public key");
 
