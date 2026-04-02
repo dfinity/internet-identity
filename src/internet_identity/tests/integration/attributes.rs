@@ -7,7 +7,7 @@ use ic_canister_sig_creation::extract_raw_canister_sig_pk_from_der;
 use internet_identity_interface::internet_identity::types::attributes::{
     AttributeSpec, CertifiedAttribute, CertifiedAttributes, GetAttributesRequest,
     GetIcrc3AttributeError, GetIcrc3AttributeRequest, PrepareAttributeRequest,
-    PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
+    PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::{
     GetDelegationResponse, OpenIdConfig, SignedDelegation,
@@ -685,42 +685,6 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
 }
 
 #[test]
-fn should_reject_icrc3_attributes_with_correct_and_wrong_value() {
-    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
-    let origin = "https://some-dapp.com";
-
-    // One correct value, one wrong value
-    let prepare_request = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![
-            AttributeSpec {
-                key: "openid:https://accounts.google.com:email".into(),
-                value: Some(b"andri.schatz@dfinity.org".to_vec()), // correct
-                omit_scope: false,
-            },
-            AttributeSpec {
-                key: "openid:https://accounts.google.com:name".into(),
-                value: Some(b"Wrong Name".to_vec()), // wrong
-                omit_scope: false,
-            },
-        ],
-    };
-
-    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-        .expect("failed to call prepare_icrc3_attributes");
-
-    match result {
-        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-            assert_eq!(problems.len(), 1);
-            assert!(problems[0].contains("name"));
-        }
-        other => panic!("Expected AttributeMismatch error, got {:?}", other),
-    }
-}
-
-#[test]
 fn should_return_no_such_signature_for_unknown_message() {
     let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
     let origin = "https://some-dapp.com";
@@ -757,111 +721,3 @@ fn should_return_no_such_signature_for_unknown_message() {
     assert_eq!(result, Err(GetIcrc3AttributeError::NoSuchSignature));
 }
 
-#[test]
-fn should_produce_different_messages_for_different_omit_scope() {
-    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
-    let origin = "https://some-dapp.com";
-
-    // Prepare with omit_scope = false
-    let prepare_scoped = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![AttributeSpec {
-            key: "openid:https://accounts.google.com:email".into(),
-            value: None,
-            omit_scope: false,
-        }],
-    };
-
-    let response_scoped =
-        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_scoped)
-            .expect("failed to call prepare_icrc3_attributes")
-            .expect("prepare_icrc3_attributes error");
-
-    // Prepare with omit_scope = true
-    let prepare_unscoped = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![AttributeSpec {
-            key: "openid:https://accounts.google.com:email".into(),
-            value: None,
-            omit_scope: true,
-        }],
-    };
-
-    let response_unscoped =
-        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_unscoped)
-            .expect("failed to call prepare_icrc3_attributes")
-            .expect("prepare_icrc3_attributes error");
-
-    // The messages should be different because the keys in the ICRC-3 map differ
-    assert_ne!(
-        response_scoped.message, response_unscoped.message,
-        "Messages with different omit_scope settings should differ"
-    );
-}
-
-#[test]
-fn should_reject_icrc3_attributes_for_unknown_issuer() {
-    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
-    let origin = "https://some-dapp.com";
-
-    let prepare_request = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![AttributeSpec {
-            key: "openid:https://unknown-issuer.com:email".into(),
-            value: None,
-            omit_scope: false,
-        }],
-    };
-
-    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-        .expect("failed to call prepare_icrc3_attributes");
-
-    match result {
-        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-            assert!(
-                problems[0].contains("No credential found"),
-                "Expected 'No credential found' error, got: {}",
-                problems[0]
-            );
-        }
-        other => panic!("Expected AttributeMismatch error, got {:?}", other),
-    }
-}
-
-#[test]
-fn should_reject_icrc3_attributes_without_scope() {
-    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
-    let origin = "https://some-dapp.com";
-
-    // Attribute without a scope (just "email" instead of "openid:...:email")
-    let prepare_request = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![AttributeSpec {
-            key: "email".into(),
-            value: None,
-            omit_scope: false,
-        }],
-    };
-
-    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-        .expect("failed to call prepare_icrc3_attributes");
-
-    match result {
-        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-            assert!(
-                problems[0].contains("no scope"),
-                "Expected 'no scope' error, got: {}",
-                problems[0]
-            );
-        }
-        other => panic!("Expected AttributeMismatch error, got {:?}", other),
-    }
-}
