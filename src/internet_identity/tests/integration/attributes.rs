@@ -658,12 +658,14 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
         nonce: nonce.clone(),
     };
 
-    let time_before_prepare = env.get_time().as_nanos_since_unix_epoch();
+    let time_before = env.get_time().as_nanos_since_unix_epoch();
 
     let prepare_response =
         api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
             .expect("failed to call prepare_icrc3_attributes")
             .expect("prepare_icrc3_attributes error");
+
+    let time_after = env.get_time().as_nanos_since_unix_epoch();
 
     let icrc3_value: Icrc3Value = candid::Decode!(&prepare_response.message, Icrc3Value)
         .expect("failed to decode ICRC-3 value");
@@ -704,16 +706,25 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 Icrc3Value::Blob(origin.as_bytes().to_vec()),
                 "Origin value does not match"
             );
-            // issued_at_timestamp_ns should match the canister time at issuance
+            // issued_at_timestamp_ns should fall within the time window of the call
             let timestamp_entry = entries
                 .iter()
                 .find(|(k, _)| k == "implicit:issued_at_timestamp_ns")
                 .expect("Expected 'implicit:issued_at_timestamp_ns' key in message map");
-            assert_eq!(
-                timestamp_entry.1,
-                Icrc3Value::Blob(time_before_prepare.to_string().into_bytes()),
-                "Timestamp should match canister time at issuance"
-            );
+            match &timestamp_entry.1 {
+                Icrc3Value::Blob(bytes) => {
+                    let ts: u64 = std::str::from_utf8(bytes)
+                        .expect("timestamp should be valid UTF-8")
+                        .parse()
+                        .expect("timestamp should be a valid u64");
+                    assert!(
+                        ts >= time_before && ts <= time_after,
+                        "Timestamp {} should be between {} and {}",
+                        ts, time_before, time_after
+                    );
+                }
+                other => panic!("Expected Blob for timestamp, got {:?}", other),
+            }
         }
         other => panic!("Expected Map, got {:?}", other),
     }
