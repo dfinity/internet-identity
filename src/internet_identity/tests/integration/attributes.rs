@@ -630,8 +630,13 @@ fn setup_icrc3_test_env() -> (
 
 #[test]
 fn should_certify_icrc3_attributes_mixed_omit_scope() {
+    use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+
     let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
     let origin = "https://some-dapp.com";
+
+    let nonce = hex::decode("5f87b8f041d8e1121d5a7d0360a02213e4b7b3b44b25d0c7f070c7e2b694b29c")
+        .expect("failed to decode nonce hex");
 
     // Mix: email with omit_scope=true, name with omit_scope=false
     let prepare_request = PrepareIcrc3AttributeRequest {
@@ -650,7 +655,7 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 omit_scope: false,
             },
         ],
-        nonce: vec![0u8; 32],
+        nonce: nonce.clone(),
     };
 
     let prepare_response =
@@ -658,15 +663,11 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
             .expect("failed to call prepare_icrc3_attributes")
             .expect("prepare_icrc3_attributes error");
 
-    let icrc3_value: internet_identity_interface::internet_identity::types::icrc3::Icrc3Value =
-        candid::Decode!(
-            &prepare_response.message,
-            internet_identity_interface::internet_identity::types::icrc3::Icrc3Value
-        )
+    let icrc3_value: Icrc3Value = candid::Decode!(&prepare_response.message, Icrc3Value)
         .expect("failed to decode ICRC-3 value");
 
-    match icrc3_value {
-        internet_identity_interface::internet_identity::types::icrc3::Icrc3Value::Map(entries) => {
+    match &icrc3_value {
+        Icrc3Value::Map(entries) => {
             assert_eq!(entries.len(), 3);
             let keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
             // email should have scope omitted
@@ -681,15 +682,61 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 "Expected scoped 'name' key, got {:?}",
                 keys
             );
-            // nonce should be included
-            assert!(
-                keys.contains(&"implicit:nonce"),
-                "Expected 'implicit:nonce' key, got {:?}",
-                keys
+            // nonce should be included with the expected value
+            let nonce_entry = entries
+                .iter()
+                .find(|(k, _)| k == "implicit:nonce")
+                .expect("Expected 'implicit:nonce' key in message map");
+            assert_eq!(
+                nonce_entry.1,
+                Icrc3Value::Blob(nonce.clone()),
+                "Nonce value in certified message does not match the provided nonce"
             );
         }
         other => panic!("Expected Map, got {:?}", other),
     }
+
+    // Verify the signature over the message containing the nonce
+
+    env.advance_time(Duration::from_secs(5));
+
+    let get_request = GetIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        message: prepare_response.message.clone(),
+    };
+
+    let get_response =
+        api::get_icrc3_attributes(&env, canister_id, principal, get_request)
+            .expect("failed to call get_icrc3_attributes")
+            .expect("get_icrc3_attributes error");
+
+    let session_public_key = ByteBuf::from("session public key");
+
+    env.advance_time(Duration::from_secs(35));
+
+    let (canister_sig_key, _expiration) = api::prepare_delegation(
+        &env,
+        canister_id,
+        principal,
+        identity_number,
+        origin,
+        &session_public_key,
+        None,
+    )
+    .unwrap();
+
+    env.advance_time(Duration::from_secs(5));
+
+    let root_key = env.root_key().unwrap();
+    verify_icrc3_attributes(
+        &env,
+        canister_sig_key,
+        &prepare_response.message,
+        &get_response.signature,
+        &root_key,
+    );
 }
 
 #[test]
