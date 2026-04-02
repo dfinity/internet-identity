@@ -709,8 +709,8 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 .expect("Expected 'implicit:issued_at_timestamp_ns' key in message map");
             match &timestamp_entry.1 {
                 Icrc3Value::Blob(bytes) => {
-                    let timestamp_str = std::str::from_utf8(bytes)
-                        .expect("timestamp should be valid UTF-8");
+                    let timestamp_str =
+                        std::str::from_utf8(bytes).expect("timestamp should be valid UTF-8");
                     timestamp_str
                         .parse::<u64>()
                         .expect("timestamp should be a valid u64");
