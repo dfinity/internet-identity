@@ -706,7 +706,7 @@ pub fn verify_icrc3_attributes(
     signature: &[u8],
     root_key: &[u8],
 ) {
-    const DOMAIN_SEPARATOR: &[u8] = b"ii-icrc3-request-attributes";
+    const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-info";
 
     let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
     msg.extend_from_slice(DOMAIN_SEPARATOR);
