@@ -797,6 +797,9 @@ msgstr "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
 msgid "Select each word in the correct order:"
 msgstr "Select each word in the correct order:"
 
+msgid "Session timed out"
+msgstr "Session timed out"
+
 msgid "Set as default sign-in"
 msgstr "Set as default sign-in"
 
@@ -805,6 +808,9 @@ msgstr "Show all"
 
 msgid "Sign in"
 msgstr "Sign in"
+
+msgid "Sign in again to continue where you left off."
+msgstr "Sign in again to continue where you left off."
 
 msgid "Sign in there."
 msgstr "Sign in there."
@@ -838,6 +844,9 @@ msgstr "Signed in"
 
 msgid "Signing in securely"
 msgstr "Signing in securely"
+
+msgid "Signing in..."
+msgstr "Signing in..."
 
 msgid "Simplify your sign-in"
 msgstr "Simplify your sign-in"

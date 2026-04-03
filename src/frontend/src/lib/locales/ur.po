@@ -797,6 +797,9 @@ msgstr "<0>Safari میں کھولیں</0> یا <1>Chrome میں کھولیں</1>
 msgid "Select each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں منتخب کریں:"
 
+msgid "Session timed out"
+msgstr ""
+
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
 
@@ -805,6 +808,9 @@ msgstr "سب دکھائیں"
 
 msgid "Sign in"
 msgstr "سائن اِن"
+
+msgid "Sign in again to continue where you left off."
+msgstr ""
 
 msgid "Sign in there."
 msgstr "وہاں سائن اِن کریں۔"
@@ -838,6 +844,9 @@ msgstr ""
 
 msgid "Signing in securely"
 msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
+
+msgid "Signing in..."
+msgstr ""
 
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
