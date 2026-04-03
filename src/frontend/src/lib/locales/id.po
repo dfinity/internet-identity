@@ -23,7 +23,7 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} telah pindah ke Internet Identity baru"
 
 msgid "{identityName} has been removed from this device."
-msgstr ""
+msgstr "{identityName} telah dihapus dari perangkat ini."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
@@ -269,7 +269,7 @@ msgid "Easy access"
 msgstr "Akses mudah"
 
 msgid "Edit"
-msgstr ""
+msgstr "Edit"
 
 msgid "Edit {name}"
 msgstr "Edit {name}"
@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "Saya sudah mencatatnya"
 
 msgid "Identities on this device"
-msgstr ""
+msgstr "Identitas di perangkat ini"
 
 msgid "Identity already upgraded"
 msgstr "Identitas sudah ditingkatkan"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "Nomor identitas"
 
 msgid "Identity removed"
-msgstr ""
+msgstr "Identitas dihapus"
 
 msgid "Identity upgraded!"
 msgstr "Identitas ditingkatkan!"
@@ -714,10 +714,10 @@ msgid "Remove"
 msgstr "Hapus"
 
 msgid "Remove from this device"
-msgstr ""
+msgstr "Hapus dari perangkat ini"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr ""
+msgstr "Hapus identitas yang tidak Anda gunakan. Anda dapat menambahkannya kembali kapan saja dengan masuk lagi."
 
 msgid "Remove passkey"
 msgstr "Hapus passkey"
@@ -797,6 +797,9 @@ msgstr "Pilih <0>Buka di Safari</0> atau <1>Buka di Chrome</1>."
 msgid "Select each word in the correct order:"
 msgstr "Pilih setiap kata dalam urutan yang benar:"
 
+msgid "Session timed out"
+msgstr ""
+
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
 
@@ -805,6 +808,9 @@ msgstr "Tampilkan semua"
 
 msgid "Sign in"
 msgstr "Masuk"
+
+msgid "Sign in again to continue where you left off."
+msgstr ""
 
 msgid "Sign in there."
 msgstr "Masuk di sana."
@@ -822,22 +828,25 @@ msgid "Sign out"
 msgstr "Keluar"
 
 msgid "Sign out and keep identity"
-msgstr ""
+msgstr "Keluar dan simpan identitas"
 
 msgid "Sign out and remove from device"
-msgstr ""
+msgstr "Keluar dan hapus dari perangkat"
 
 msgid "Sign out from this device"
-msgstr ""
+msgstr "Keluar dari perangkat ini"
 
 msgid "Sign out to remove"
-msgstr ""
+msgstr "Keluar untuk menghapus"
 
 msgid "Signed in"
-msgstr ""
+msgstr "Sudah masuk"
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
+
+msgid "Signing in..."
+msgstr ""
 
 msgid "Simplify your sign-in"
 msgstr "Sederhanakan proses masuk Anda"
@@ -995,7 +1004,7 @@ msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
 
 msgid "Undo"
-msgstr ""
+msgstr "Urungkan"
 
 msgid "Unexpected error"
 msgstr "Kesalahan tidak terduga"
@@ -1139,16 +1148,16 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Anda sedang meningkatkan ID <0>{identityNumber}</0>"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr ""
+msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan akun {openIdProvider} yang sama."
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr ""
+msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan passkey yang sama."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr ""
+msgstr "Anda dapat keluar dan menyimpan identitas Anda untuk login lebih cepat di lain waktu, atau menghapusnya sepenuhnya dari perangkat ini."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Anda dapat memulihkan identitas Anda sekarang, verifikasi bahwa Anda menyimpannya dengan benar."
