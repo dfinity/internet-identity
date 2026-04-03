@@ -798,7 +798,7 @@ msgid "Select each word in the correct order:"
 msgstr "Pilih setiap kata dalam urutan yang benar:"
 
 msgid "Session timed out"
-msgstr ""
+msgstr "Sesi berakhir"
 
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
@@ -810,7 +810,7 @@ msgid "Sign in"
 msgstr "Masuk"
 
 msgid "Sign in again to continue where you left off."
-msgstr ""
+msgstr "Masuk lagi untuk melanjutkan dari tempat Anda berhenti."
 
 msgid "Sign in there."
 msgstr "Masuk di sana."
@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "Masuk dengan aman"
 
 msgid "Signing in..."
-msgstr ""
+msgstr "Sedang masuk..."
 
 msgid "Simplify your sign-in"
 msgstr "Sederhanakan proses masuk Anda"
@@ -1157,7 +1157,7 @@ msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "Anda dapat keluar dan menyimpan identitas untuk login lebih cepat di lain waktu, atau menghapusnya sepenuhnya dari perangkat ini."
+msgstr "Anda dapat keluar dan menyimpan identitas Anda untuk login lebih cepat di lain waktu, atau menghapusnya sepenuhnya dari perangkat ini."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Anda dapat memulihkan identitas Anda sekarang, verifikasi bahwa Anda menyimpannya dengan benar."
