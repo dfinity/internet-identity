@@ -719,10 +719,10 @@ pub fn verify_icrc3_attributes(
 ) {
     /// Signature domain for IC sender info as specified in the IC interface specification:
     /// https://internetcomputer.org/docs/current/references/ic-interface-spec/#request-call-http-call
-    const DELEGATION_SIG_DOMAIN: &[u8] = b"ic-sender-info";
+    const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ic-sender-info";
 
-    let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
-    msg.extend_from_slice(DOMAIN_SEPARATOR);
+    let mut msg: Vec<u8> = Vec::from([(ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN.len() as u8)]);
+    msg.extend_from_slice(ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN);
     msg.extend_from_slice(message);
 
     env.verify_canister_signature(
