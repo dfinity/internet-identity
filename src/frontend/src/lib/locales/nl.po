@@ -837,7 +837,7 @@ msgid "Sign out from this device"
 msgstr "Uitloggen van dit apparaat"
 
 msgid "Sign out to remove"
-msgstr "Uitloggen om te verwijderen"
+msgstr "Log uit om te verwijderen"
 
 msgid "Signed in"
 msgstr "Ingelogd"
