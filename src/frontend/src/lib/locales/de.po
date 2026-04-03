@@ -798,7 +798,7 @@ msgid "Select each word in the correct order:"
 msgstr "Wählen Sie jedes Wort in der richtigen Reihenfolge aus:"
 
 msgid "Session timed out"
-msgstr ""
+msgstr "Sitzung abgelaufen"
 
 msgid "Set as default sign-in"
 msgstr "Als Standardanmeldung festlegen"
@@ -810,7 +810,7 @@ msgid "Sign in"
 msgstr "Anmelden"
 
 msgid "Sign in again to continue where you left off."
-msgstr ""
+msgstr "Melden Sie sich erneut an, um dort fortzufahren, wo Sie aufgehört haben."
 
 msgid "Sign in there."
 msgstr "Melden Sie sich dort an."
@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "Sichere Anmeldung"
 
 msgid "Signing in..."
-msgstr ""
+msgstr "Anmeldung..."
 
 msgid "Simplify your sign-in"
 msgstr "Vereinfachen Sie Ihre Anmeldung"
