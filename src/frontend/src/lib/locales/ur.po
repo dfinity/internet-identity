@@ -23,7 +23,7 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} نئی Internet Identity پر منتقل ہو گئی ہے"
 
 msgid "{identityName} has been removed from this device."
-msgstr ""
+msgstr "{identityName} کو اس ڈیوائس سے ہٹا دیا گیا ہے۔"
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹ کی حد تک پہنچ چکے ہیں۔} other {آپ ایک ایپ کے لیے زیادہ سے زیادہ # اکاؤنٹس کی حد تک پہنچ چکے ہیں۔}}"
@@ -269,7 +269,7 @@ msgid "Easy access"
 msgstr "آسان رسائی"
 
 msgid "Edit"
-msgstr ""
+msgstr "ترمیم"
 
 msgid "Edit {name}"
 msgstr "{name} میں ترمیم کریں"
@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "میں نے اسے لکھ لیا ہے"
 
 msgid "Identities on this device"
-msgstr ""
+msgstr "اس ڈیوائس پر موجود شناختیں"
 
 msgid "Identity already upgraded"
 msgstr "شناخت پہلے ہی اپ گریڈ ہو چکی ہے"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "شناختی نمبر"
 
 msgid "Identity removed"
-msgstr ""
+msgstr "شناخت ہٹا دی گئی"
 
 msgid "Identity upgraded!"
 msgstr "شناخت اپ گریڈ ہو گئی!"
@@ -714,10 +714,10 @@ msgid "Remove"
 msgstr "ہٹائیں"
 
 msgid "Remove from this device"
-msgstr ""
+msgstr "اس ڈیوائس سے ہٹائیں"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr ""
+msgstr "غیر استعمال شدہ شناختیں ہٹائیں۔ آپ دوبارہ سائن اِن کر کے انہیں کسی بھی وقت واپس شامل کر سکتے ہیں۔"
 
 msgid "Remove passkey"
 msgstr "پاس کی ہٹائیں"
@@ -797,6 +797,9 @@ msgstr "<0>Safari میں کھولیں</0> یا <1>Chrome میں کھولیں</1>
 msgid "Select each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں منتخب کریں:"
 
+msgid "Session timed out"
+msgstr ""
+
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
 
@@ -805,6 +808,9 @@ msgstr "سب دکھائیں"
 
 msgid "Sign in"
 msgstr "سائن اِن"
+
+msgid "Sign in again to continue where you left off."
+msgstr ""
 
 msgid "Sign in there."
 msgstr "وہاں سائن اِن کریں۔"
@@ -822,22 +828,25 @@ msgid "Sign out"
 msgstr "سائن آؤٹ"
 
 msgid "Sign out and keep identity"
-msgstr ""
+msgstr "سائن آؤٹ کریں اور شناخت رکھیں"
 
 msgid "Sign out and remove from device"
-msgstr ""
+msgstr "سائن آؤٹ کریں اور ڈیوائس سے ہٹائیں"
 
 msgid "Sign out from this device"
-msgstr ""
+msgstr "اس ڈیوائس سے سائن آؤٹ کریں"
 
 msgid "Sign out to remove"
-msgstr ""
+msgstr "ہٹانے کے لیے سائن آؤٹ کریں"
 
 msgid "Signed in"
-msgstr ""
+msgstr "سائن اِن شدہ"
 
 msgid "Signing in securely"
 msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
+
+msgid "Signing in..."
+msgstr ""
 
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
@@ -995,7 +1004,7 @@ msgid "Understanding Internet Identity"
 msgstr "Internet Identity کو سمجھیں"
 
 msgid "Undo"
-msgstr ""
+msgstr "واپس کریں"
 
 msgid "Unexpected error"
 msgstr "غیر متوقع خرابی"
@@ -1139,16 +1148,16 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "آپ ID <0>{identityNumber}</0> کو اپ گریڈ کر رہے ہیں"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr ""
+msgstr "آپ اسی {openIdProvider} اکاؤنٹ سے دوبارہ سائن اِن کر کے اسے کسی بھی وقت واپس شامل کر سکتے ہیں۔"
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr ""
+msgstr "آپ اسی پاس کی سے دوبارہ سائن اِن کر کے اسے کسی بھی وقت واپس شامل کر سکتے ہیں۔"
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "آپ سائن اِن کے عمل میں <0>موجودہ پاس کی استعمال کریں</0> کے ساتھ جاری رکھ سکتے ہیں۔"
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr ""
+msgstr "آپ سائن آؤٹ کر کے اپنی شناخت محفوظ رکھ سکتے ہیں تاکہ اگلی بار تیزی سے سائن اِن ہو سکے، یا اسے اس ڈیوائس سے مکمل طور پر ہٹا سکتے ہیں۔"
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "اب آپ اپنی شناخت بازیافت کر سکتے ہیں، تصدیق کریں کہ آپ نے اسے درست طریقے سے محفوظ کیا ہے۔"
