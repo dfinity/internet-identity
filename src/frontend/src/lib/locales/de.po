@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "Sichere Anmeldung"
 
 msgid "Signing in..."
-msgstr "Anmeldung..."
+msgstr "Anmeldung läuft..."
 
 msgid "Simplify your sign-in"
 msgstr "Vereinfachen Sie Ihre Anmeldung"
