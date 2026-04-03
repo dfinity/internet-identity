@@ -831,7 +831,7 @@ msgid "Sign out and keep identity"
 msgstr "Uitloggen en identiteit bewaren"
 
 msgid "Sign out and remove from device"
-msgstr "Uitloggen en verwijderen van apparaat"
+msgstr "Uitloggen en verwijderen van dit apparaat"
 
 msgid "Sign out from this device"
 msgstr "Uitloggen van dit apparaat"
