@@ -23,7 +23,7 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} si è spostata sulla nuova Internet Identity"
 
 msgid "{identityName} has been removed from this device."
-msgstr ""
+msgstr "{identityName} è stata rimossa da questo dispositivo."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Hai raggiunto il limite massimo di # account per una singola app.} other {Hai raggiunto il limite massimo di # account per una singola app.}}"
@@ -269,7 +269,7 @@ msgid "Easy access"
 msgstr "Accesso facile"
 
 msgid "Edit"
-msgstr ""
+msgstr "Modifica"
 
 msgid "Edit {name}"
 msgstr "Modifica {name}"
@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "L'ho scritta"
 
 msgid "Identities on this device"
-msgstr ""
+msgstr "Identità su questo dispositivo"
 
 msgid "Identity already upgraded"
 msgstr "Identità già aggiornata"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "Numero di identità"
 
 msgid "Identity removed"
-msgstr ""
+msgstr "Identità rimossa"
 
 msgid "Identity upgraded!"
 msgstr "Identità aggiornata!"
@@ -714,10 +714,10 @@ msgid "Remove"
 msgstr "Rimuovi"
 
 msgid "Remove from this device"
-msgstr ""
+msgstr "Rimuovi da questo dispositivo"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr ""
+msgstr "Rimuovi le identità che non utilizzi. Puoi aggiungerle di nuovo in qualsiasi momento effettuando nuovamente l'accesso."
 
 msgid "Remove passkey"
 msgstr "Rimuovi passkey"
@@ -797,6 +797,9 @@ msgstr "Seleziona <0>Apri in Safari</0> o <1>Apri in Chrome</1>."
 msgid "Select each word in the correct order:"
 msgstr "Seleziona ogni parola nell'ordine corretto:"
 
+msgid "Session timed out"
+msgstr "Sessione scaduta"
+
 msgid "Set as default sign-in"
 msgstr "Imposta come accesso predefinito"
 
@@ -805,6 +808,9 @@ msgstr "Mostra tutto"
 
 msgid "Sign in"
 msgstr "Accedi"
+
+msgid "Sign in again to continue where you left off."
+msgstr "Accedi di nuovo per riprendere da dove avevi interrotto."
 
 msgid "Sign in there."
 msgstr "Accedi lì."
@@ -822,22 +828,25 @@ msgid "Sign out"
 msgstr "Esci"
 
 msgid "Sign out and keep identity"
-msgstr ""
+msgstr "Esci e mantieni l'identità"
 
 msgid "Sign out and remove from device"
-msgstr ""
+msgstr "Esci e rimuovi dal dispositivo"
 
 msgid "Sign out from this device"
-msgstr ""
+msgstr "Esci da questo dispositivo"
 
 msgid "Sign out to remove"
-msgstr ""
+msgstr "Esci per rimuovere"
 
 msgid "Signed in"
-msgstr ""
+msgstr "Accesso effettuato"
 
 msgid "Signing in securely"
 msgstr "Accesso sicuro in corso"
+
+msgid "Signing in..."
+msgstr "Accesso in corso..."
 
 msgid "Simplify your sign-in"
 msgstr "Semplifica il tuo accesso"
@@ -995,7 +1004,7 @@ msgid "Understanding Internet Identity"
 msgstr "Capire Internet Identity"
 
 msgid "Undo"
-msgstr ""
+msgstr "Annulla"
 
 msgid "Unexpected error"
 msgstr "Errore imprevisto"
@@ -1139,16 +1148,16 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Stai aggiornando l'ID <0>{identityNumber}</0>"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr ""
+msgstr "Puoi aggiungerla di nuovo in qualsiasi momento accedendo con lo stesso account {openIdProvider}."
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr ""
+msgstr "Puoi aggiungerla di nuovo in qualsiasi momento accedendo con la stessa passkey."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Puoi continuare con <0>Usa Passkey esistente</0> nel processo di accesso."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr ""
+msgstr "Puoi uscire e mantenere la tua identità salvata per un accesso più veloce la prossima volta, oppure rimuoverla completamente da questo dispositivo."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Puoi recuperare la tua identità ora, verifica di averla salvata correttamente."

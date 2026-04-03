@@ -231,8 +231,9 @@ fn add_attribute_signature(sigs: &mut SignatureMap, seed: &[u8], message: &[u8])
 
 // ==================== ICRC-3 attribute sharing ====================
 
-/// Domain separator for ICRC-3 attribute certification signatures.
-const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ic-request-auth-info";
+/// Signature domain for IC sender info as specified in the IC interface specification:
+/// https://internetcomputer.org/docs/current/references/ic-interface-spec/#request-call-http-call
+pub const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ic-sender-info";
 
 /// Builds a Candid-encoded ICRC-3 Value map from certified key-value pairs.
 /// The pairs are (certified_key, value) where certified_key may have scope omitted.
