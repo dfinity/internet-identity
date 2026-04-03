@@ -25,7 +25,7 @@ msgstr "{application} telah pindah ke Internet Identity baru"
 msgid "{identityName} has been removed from this device."
 msgstr "{identityName} telah dihapus dari perangkat ini"
 
-msgid "{MAX_ACCOUNTS, plurar, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
+msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
 msgid "{name} account"
