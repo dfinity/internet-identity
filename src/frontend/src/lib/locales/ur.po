@@ -798,7 +798,7 @@ msgid "Select each word in the correct order:"
 msgstr "ہر لفظ درست ترتیب میں منتخب کریں:"
 
 msgid "Session timed out"
-msgstr ""
+msgstr "سیشن کا وقت ختم ہو گیا"
 
 msgid "Set as default sign-in"
 msgstr "ڈیفالٹ سائن اِن کے طور پر سیٹ کریں"
@@ -810,7 +810,7 @@ msgid "Sign in"
 msgstr "سائن اِن"
 
 msgid "Sign in again to continue where you left off."
-msgstr ""
+msgstr "جہاں آپ نے چھوڑا تھا وہاں سے جاری رکھنے کے لیے دوبارہ سائن اِن کریں۔"
 
 msgid "Sign in there."
 msgstr "وہاں سائن اِن کریں۔"
@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
 
 msgid "Signing in..."
-msgstr ""
+msgstr "سائن اِن ہو رہا ہے..."
 
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
