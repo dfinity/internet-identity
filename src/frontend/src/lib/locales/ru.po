@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "Я записал(а) это"
 
 msgid "Identities on this device"
-msgstr "Список identity на этом устройстве"
+msgstr "Учётные записи на этом устройстве"
 
 msgid "Identity already upgraded"
 msgstr "Учётная запись уже обновлена"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "Номер учётной записи"
 
 msgid "Identity removed"
-msgstr "Identity удалена"
+msgstr "Учётная запись удалена"
 
 msgid "Identity upgraded!"
 msgstr "Учётная запись обновлена!"
@@ -819,7 +819,7 @@ msgid "Sign in using familiar methods"
 msgstr "Вход через знакомые сервисы"
 
 msgid "Sign in with another identity"
-msgstr "Войти с другой идентификацией"
+msgstr "Войти с другой учётной записью"
 
 msgid "Sign in with your {name} account from any device."
 msgstr "Войдите в свой аккаунт {name} с любого устройства."
