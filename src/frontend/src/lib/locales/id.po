@@ -23,9 +23,9 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} telah pindah ke Internet Identity baru"
 
 msgid "{identityName} has been removed from this device."
-msgstr ""
+msgstr "{identityName} telah dihapus dari perangkat ini"
 
-msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
+msgid "{MAX_ACCOUNTS, plurar, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, other {Anda telah mencapai batas maksimum # akun untuk satu aplikasi.}}"
 
 msgid "{name} account"
@@ -38,7 +38,7 @@ msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a f
 msgstr "<0>Antarmuka yang Sepenuhnya Didesain Ulang:</0> Kami memberikan Internet Identity tampilan baru yang modern. Desain baru ini intuitif dan lebih mudah dinavigasi, sehingga pengalaman pengguna menjadi lebih lancar."
 
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
-msgstr "<0>Integrasi Google, Apple, dan Microsoft:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami melihat tingkat putus registrasi sebesar 50%, menunjukkan kebutuhan akan metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami telah berintegrasi dengan Google, Apple, dan Microsoft sebagai opsi autentikasi alternatif."
+msgstr "<0>Integrasi Google, Apple, dan Microsoft:</0> Meskipun passkey semakin matang, mereka belum menjadi standar untuk semua orang. Kami mencatat tingkat pengunduran diri sebesar 50%, menunjukkan perlunya metode autentikasi alternatif. Untuk membuat Internet Identity dapat diakses oleh audiens yang lebih luas, kami telah mengintegrasikan layanan Google, Apple, dan Microsoft sebagai opsi autentikasi alternatif."
 
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>Pelajari lebih lanjut</0> tentang passkey"
