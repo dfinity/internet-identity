@@ -645,7 +645,7 @@ pub fn verify_delegation(
     signed_delegation: &SignedDelegation,
     root_key: &[u8],
 ) {
-    const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-delegation";
+    const DOMAIN_SEPARATOR: &[u8] = b"ic-sender-info";
 
     // The signed message is a signature domain separator
     // followed by the representation independent hash of a map with entries
