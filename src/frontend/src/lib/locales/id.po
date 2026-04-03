@@ -269,7 +269,7 @@ msgid "Easy access"
 msgstr "Akses mudah"
 
 msgid "Edit"
-msgstr ""
+msgstr "Edit"
 
 msgid "Edit {name}"
 msgstr "Edit {name}"
@@ -284,7 +284,7 @@ msgid "Encountered an internal error while processing the request."
 msgstr "Terjadi kesalahan internal saat memproses permintaan."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
-msgstr "Masukkan nama untuk identitas Anda untuk menyelesaikan peningkatan. Setelah diatur, nama tidak dapat diubah nanti."
+msgstr "Masukkan nama untuk identitas Anda untuk menyelesaikan peningkatan. Setelah ditetapkan, nama tersebut tidak dapat diubah nanti."
 
 msgid "Enter characters"
 msgstr "Masukkan karakter"
@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "Saya sudah mencatatnya"
 
 msgid "Identities on this device"
-msgstr ""
+msgstr "Identitas pada perangkat ini"
 
 msgid "Identity already upgraded"
 msgstr "Identitas sudah ditingkatkan"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "Nomor identitas"
 
 msgid "Identity removed"
-msgstr ""
+msgstr "Identitas dihapus"
 
 msgid "Identity upgraded!"
 msgstr "Identitas ditingkatkan!"
@@ -480,13 +480,13 @@ msgid "It looks like you're trying to sign in from a social app. Follow these st
 msgstr "Tampaknya Anda mencoba masuk dari aplikasi sosial. Ikuti langkah-langkah ini untuk melanjutkan:"
 
 msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
-msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Peramban bawaan aplikasi ini tidak didukung."
+msgstr "Tampaknya Anda mencoba masuk dari dalam aplikasi (seperti X, Telegram, atau Instagram). Browser bawaan aplikasi ini tidak didukung."
 
 msgid "It seems like an invalid authentication request was received."
 msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
-msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
+msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba browser lain; jika masalah berlanjut, hubungi dukungan."
 
 msgid "It seems like the connection with the service could not be re-established."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat disambungkan kembali."
@@ -627,10 +627,10 @@ msgid "Only enter the code from that device if you initiated this process <0>you
 msgstr "Masukkan kode dari perangkat itu hanya jika Anda yang memulai proses ini <0>sendiri</0>."
 
 msgid "Open in browser"
-msgstr "Buka di peramban"
+msgstr "Buka di browser"
 
 msgid "Open in browser to continue"
-msgstr "Buka di peramban untuk melanjutkan"
+msgstr "Buka di browser untuk melanjutkan"
 
 msgid "Open menu"
 msgstr "Buka menu"
@@ -660,10 +660,10 @@ msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your 
 msgstr "Passkey tahan phishing, sulit dicuri, dan dapat disinkronkan di perangkat Anda melalui penyedia seperti Google, Apple, atau Microsoft. <0>Pelajari lebih lanjut.</0>"
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
-msgstr "Passkey tidak tersedia di perangkat atau peramban ini. Silakan pilih metode akses lain untuk melanjutkan."
+msgstr "Passkey tidak tersedia di perangkat atau browser ini. Silakan pilih metode akses lain untuk melanjutkan."
 
 msgid "Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue."
-msgstr "Passkey tidak tersedia di perangkat atau peramban ini. Silakan pilih metode masuk lain untuk melanjutkan."
+msgstr "Passkey tidak tersedia di perangkat atau browser ini. Silakan pilih metode masuk lain untuk melanjutkan."
 
 msgid "Passkeys not available here"
 msgstr "Passkey tidak tersedia di sini"
@@ -714,10 +714,10 @@ msgid "Remove"
 msgstr "Hapus"
 
 msgid "Remove from this device"
-msgstr ""
+msgstr "Hapus dari perangkat ini"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr ""
+msgstr "Hapus akun yang tidak Anda gunakan. Anda dapat menambahkannya kembali kapan saja dengan masuk kembali."
 
 msgid "Remove passkey"
 msgstr "Hapus passkey"
@@ -822,19 +822,19 @@ msgid "Sign out"
 msgstr "Keluar"
 
 msgid "Sign out and keep identity"
-msgstr ""
+msgstr "Keluar dan pertahankan identitas"
 
 msgid "Sign out and remove from device"
-msgstr ""
+msgstr "Keluar dan hapus dari perangkat"
 
 msgid "Sign out from this device"
-msgstr ""
+msgstr "Keluar dari perangkat ini"
 
 msgid "Sign out to remove"
-msgstr ""
+msgstr "Keluar untuk menghapus"
 
 msgid "Signed in"
-msgstr ""
+msgstr "Masuk"
 
 msgid "Signing in securely"
 msgstr "Masuk dengan aman"
@@ -995,7 +995,7 @@ msgid "Understanding Internet Identity"
 msgstr "Memahami Internet Identity"
 
 msgid "Undo"
-msgstr ""
+msgstr "Batal"
 
 msgid "Unexpected error"
 msgstr "Kesalahan tidak terduga"
@@ -1058,16 +1058,16 @@ msgid "Use existing identity"
 msgstr "Gunakan identitas yang ada"
 
 msgid "Verify"
-msgstr "Verifikasi"
+msgstr "Memverifikasi"
 
 msgid "Verify recovery to remove"
-msgstr "Verifikasi pemulihan untuk menghapus"
+msgstr "Memverifikasi pemulihan untuk menghapus"
 
 msgid "Verify you are human"
-msgstr "Verifikasi bahwa Anda manusia"
+msgstr "Memverifikasi bahwa Anda manusia"
 
 msgid "Verify your recovery phrase"
-msgstr "Verifikasi frasa pemulihan Anda"
+msgstr "Memverifikasi frasa pemulihan Anda"
 
 msgid "Verifying..."
 msgstr "Memverifikasi..."
@@ -1139,16 +1139,16 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Anda sedang meningkatkan ID <0>{identityNumber}</0>"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr ""
+msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan akun {openIdProvider} yang sama."
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr ""
+msgstr "Anda dapat menambahkannya kembali kapan saja dengan masuk menggunakan passkey yang sama."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Anda dapat melanjutkan dengan <0>Gunakan Passkey yang ada</0> dalam proses masuk."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr ""
+msgstr "Anda dapat keluar dan menyimpan identitas Anda untuk masuk lebih cepat di lain waktu, atau menghapusnya sepenuhnya dari perangkat ini."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Anda dapat memulihkan identitas Anda sekarang, verifikasi bahwa Anda menyimpannya dengan benar."
