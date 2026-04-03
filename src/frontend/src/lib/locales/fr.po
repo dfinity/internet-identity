@@ -717,7 +717,7 @@ msgid "Remove from this device"
 msgstr "Supprimer de cet appareil"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr "Supprimez les identités que vous n'utilisez pas. Vous pouvez les rajouter à tout moment en vous reconnectant."
+msgstr "Supprimez les identités que vous n\\u2019utilisez pas. Vous pouvez les rajouter à tout moment en vous reconnectant."
 
 msgid "Remove passkey"
 msgstr "Supprimer la passkey"
@@ -798,7 +798,7 @@ msgid "Select each word in the correct order:"
 msgstr "Sélectionnez chaque mot dans le bon ordre :"
 
 msgid "Session timed out"
-msgstr ""
+msgstr "Session expirée"
 
 msgid "Set as default sign-in"
 msgstr "Définir comme connexion par défaut"
@@ -810,7 +810,7 @@ msgid "Sign in"
 msgstr "Se connecter"
 
 msgid "Sign in again to continue where you left off."
-msgstr ""
+msgstr "Reconnectez-vous pour reprendre là où vous vous étiez arrêté."
 
 msgid "Sign in there."
 msgstr "Se connecter ici."
@@ -831,7 +831,7 @@ msgid "Sign out and keep identity"
 msgstr "Se déconnecter et conserver l'identité"
 
 msgid "Sign out and remove from device"
-msgstr "Se déconnecter et supprimer de l'appareil"
+msgstr "Se déconnecter et supprimer de l\\u2019appareil"
 
 msgid "Sign out from this device"
 msgstr "Se déconnecter de cet appareil"
@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "Connexion sécurisée"
 
 msgid "Signing in..."
-msgstr ""
+msgstr "Connexion..."
 
 msgid "Simplify your sign-in"
 msgstr "Simplifiez votre connexion"
