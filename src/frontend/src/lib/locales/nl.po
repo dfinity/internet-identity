@@ -797,6 +797,9 @@ msgstr "Selecteer <0>Openen in Safari</0> of <1>Openen in Chrome</1>."
 msgid "Select each word in the correct order:"
 msgstr "Selecteer elk woord in de juiste volgorde:"
 
+msgid "Session timed out"
+msgstr ""
+
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
 
@@ -805,6 +808,9 @@ msgstr "Alles tonen"
 
 msgid "Sign in"
 msgstr "Inloggen"
+
+msgid "Sign in again to continue where you left off."
+msgstr ""
 
 msgid "Sign in there."
 msgstr "Log daar in."
@@ -838,6 +844,9 @@ msgstr ""
 
 msgid "Signing in securely"
 msgstr "Veilig inloggen"
+
+msgid "Signing in..."
+msgstr ""
 
 msgid "Simplify your sign-in"
 msgstr "Vereenvoudig het inloggen"
