@@ -798,7 +798,7 @@ msgid "Select each word in the correct order:"
 msgstr "Pilih setiap kata dalam urutan yang benar:"
 
 msgid "Session timed out"
-msgstr "Sesi berakhir"
+msgstr "Sesi telah habis"
 
 msgid "Set as default sign-in"
 msgstr "Atur sebagai metode masuk default"
@@ -810,7 +810,7 @@ msgid "Sign in"
 msgstr "Masuk"
 
 msgid "Sign in again to continue where you left off."
-msgstr "Masuk lagi untuk melanjutkan dari tempat Anda berhenti."
+msgstr "Masuk kembali untuk melanjutkan dari tempat terakhir Anda tinggalkan."
 
 msgid "Sign in there."
 msgstr "Masuk di sana."
@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "Masuk dengan aman"
 
 msgid "Signing in..."
-msgstr "Sedang masuk..."
+msgstr "Masuk..."
 
 msgid "Simplify your sign-in"
 msgstr "Sederhanakan proses masuk Anda"
