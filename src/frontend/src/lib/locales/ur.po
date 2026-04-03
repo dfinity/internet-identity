@@ -810,7 +810,7 @@ msgid "Sign in"
 msgstr "سائن اِن"
 
 msgid "Sign in again to continue where you left off."
-msgstr "جہاں آپ نے چھوڑا تھا وہاں سے جاری رکھنے کے لیے دوبارہ سائن اِن کریں۔"
+msgstr "جہاں آپ نے چھوڑا تھا وہاں سے جاری رکھنے کے لیے دوبارہ سائن ان کریں۔"
 
 msgid "Sign in there."
 msgstr "وہاں سائن اِن کریں۔"
@@ -846,7 +846,7 @@ msgid "Signing in securely"
 msgstr "محفوظ طریقے سے سائن اِن کیا جا رہا ہے"
 
 msgid "Signing in..."
-msgstr "سائن اِن ہو رہا ہے..."
+msgstr "سائن ان ہو رہا ہے..."
 
 msgid "Simplify your sign-in"
 msgstr "اپنا سائن اِن آسان بنائیں"
