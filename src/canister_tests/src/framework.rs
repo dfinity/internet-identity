@@ -645,7 +645,7 @@ pub fn verify_delegation(
     signed_delegation: &SignedDelegation,
     root_key: &[u8],
 ) {
-    const DOMAIN_SEPARATOR: &[u8] = b"ic-sender-info";
+    const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-delegation";
 
     // The signed message is a signature domain separator
     // followed by the representation independent hash of a map with entries
@@ -717,7 +717,9 @@ pub fn verify_icrc3_attributes(
     signature: &[u8],
     root_key: &[u8],
 ) {
-    const DOMAIN_SEPARATOR: &[u8] = b"ic-request-auth-info";
+    /// Signature domain for IC sender info as specified in the IC interface specification:
+    /// https://internetcomputer.org/docs/current/references/ic-interface-spec/#request-call-http-call
+    const DELEGATION_SIG_DOMAIN: &[u8] = b"ic-sender-info";
 
     let mut msg: Vec<u8> = Vec::from([(DOMAIN_SEPARATOR.len() as u8)]);
     msg.extend_from_slice(DOMAIN_SEPARATOR);
