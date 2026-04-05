@@ -37,7 +37,7 @@ jobs:
   docker-build-internet_identity:
     # NOTE: the display name must contain the asset filename so that the release
     # action can map assets to job IDs (see .github/actions/release/run.sh).
-    name: docker-build-internet_identity (internet_identity_production.wasm.gz)
+    name: docker-build-internet_identity (internet_identity_backend.wasm.gz)
     runs-on: ubuntu-latest
     needs: docker-build-base
     steps:
@@ -53,7 +53,7 @@ jobs:
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build internet_identity_production.wasm.gz
+      - name: Build internet_identity_backend.wasm.gz
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -65,16 +65,16 @@ jobs:
           outputs: ./out
           target: scratch_internet_identity
 
-      - run: mv out/internet_identity.wasm.gz internet_identity_production.wasm.gz
-      - run: sha256sum internet_identity_production.wasm.gz
-      - name: "Upload internet_identity_production.wasm.gz"
+      - run: mv out/internet_identity.wasm.gz internet_identity_backend.wasm.gz
+      - run: sha256sum internet_identity_backend.wasm.gz
+      - name: "Upload internet_identity_backend.wasm.gz"
         uses: actions/upload-artifact@v4
         with:
           # name is the name used to display and retrieve the artifact
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           # path is the name used as the file to upload and the name of the
           # file when downloaded
-          path: internet_identity_production.wasm.gz
+          path: internet_identity_backend.wasm.gz
 
   docker-build-archive:
     runs-on: ubuntu-latest
@@ -153,12 +153,12 @@ jobs:
       - name: "Download wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
       - id: record-size
         uses: ./.github/actions/file-size
         with:
-          file: internet_identity_production.wasm.gz
+          file: internet_identity_backend.wasm.gz
           save: ${{ github.ref == 'refs/heads/main' }}
       - name: "Check canister size"
         run: |
@@ -251,9 +251,9 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
-      - run: mv internet_identity_production.wasm.gz internet_identity.wasm.gz
+      - run: mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
       - name: Install PocketIC server
         uses: dfinity/pocketic@main
         with:
@@ -375,7 +375,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -396,7 +396,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          mv internet_identity_production.wasm.gz internet_identity.wasm.gz
+          mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
           # NOTE: Here we download changing assets (i.e. the latest release) meaning that in some rare cases (after a new release)
           # PRs that used to be green may become red (if the new release broke something). While this is not CI best practice, it's
           # a relatively small price to pay to make sure PRs are always tested against the latest release.
@@ -427,7 +427,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -437,7 +437,7 @@ jobs:
           path: .
 
       - name: Move wasms
-        run: mv internet_identity_production.wasm.gz internet_identity.wasm.gz
+        run: mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
 
       - name: Create dummy assets
         run: |
@@ -516,7 +516,7 @@ jobs:
       - name: "Download II backend wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download II frontend wasm"
@@ -548,7 +548,7 @@ jobs:
       - name: Deploy canisters
         run: |
           # NOTE: dfx install will run the postinstall scripts from dfx.json
-          dfx canister install internet_identity --wasm internet_identity_production.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
+          dfx canister install internet_identity --wasm internet_identity_backend.wasm.gz --argument "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant { CaptchaDisabled }}}; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; new_flow_origins = opt vec { \"https://id.ai\" }; openid_configs = opt vec { ${{ steps.openid-configs.outputs.OPENID_CONFIGS }} } })"
           II_CANISTER_ID=$(dfx canister id internet_identity)
           dfx canister install internet_identity_frontend --wasm internet_identity_frontend.wasm.gz --argument "(record { backend_canister_id = principal \"$II_CANISTER_ID\"; backend_origin = \"https://backend.id.ai\"; related_origins = opt vec { \"https://id.ai\"; \"https://identity.ic0.app\"; \"https://identity.internetcomputer.org\" }; fetch_root_key = opt true; dev_csp = opt true })"
           dfx canister install test_app --wasm demos/test-app/test_app.wasm
@@ -619,7 +619,7 @@ jobs:
       - name: "Download II wasm"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive wasm"
@@ -645,7 +645,7 @@ jobs:
           sha=$(shasum -a 256 ./archive.wasm.gz | cut -d ' ' -f1 | sed 's/../\\&/g')
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
             --argument "(opt record {archive_config = record { module_hash = blob \"$sha\"; entries_buffer_limit = 10000:nat64; entries_fetch_limit = 1000:nat16; polling_interval_ns = 60000000000:nat64}; canister_creation_cycles_cost = opt (1000000000000:nat64); })" \
-            --wasm internet_identity_production.wasm.gz \
+            --wasm internet_identity_backend.wasm.gz \
             y2aaj-miaaa-aaaad-aacxq-cai
 
       - name: "Download test app wasm"
@@ -704,10 +704,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: "Download production build"
+      - name: "Download backend build"
         uses: actions/download-artifact@v4
         with:
-          name: internet_identity_production.wasm.gz
+          name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive"
@@ -784,7 +784,7 @@ jobs:
         id: prepare-release
         with:
           assets: |
-            internet_identity_production.wasm.gz
+            internet_identity_backend.wasm.gz
             internet_identity_frontend.wasm.gz
             archive.wasm.gz
           changelog: ${{ steps.changelog.outputs.result }}
@@ -793,12 +793,24 @@ jobs:
       - name: Release notes
         run: cat ${{ steps.prepare-release.outputs.notes-file }}
 
+      # Create backward-compatible copies of the backend wasm
+      - name: Create backward-compatible copies
+        run: |
+          cp internet_identity_backend.wasm.gz internet_identity_production.wasm.gz
+          cp internet_identity_backend.wasm.gz internet_identity_dev.wasm.gz
+
       # Create a sha file for dfx pull, referenced by the metadata set in the build
       - name: Create sha for dfx pull
         run: |
           shasum -a 256 \
+            ./internet_identity_backend.wasm.gz > \
+            ./internet_identity_backend.wasm.gz.sha256
+          shasum -a 256 \
             ./internet_identity_production.wasm.gz > \
             ./internet_identity_production.wasm.gz.sha256
+          shasum -a 256 \
+            ./internet_identity_dev.wasm.gz > \
+            ./internet_identity_dev.wasm.gz.sha256
           shasum -a 256 \
             ./internet_identity_frontend.wasm.gz > \
             ./internet_identity_frontend.wasm.gz.sha256
@@ -810,8 +822,12 @@ jobs:
             --tag ${{ github.ref }} \
             --notes-file ${{ steps.prepare-release.outputs.notes-file }} \
             -- \
+            internet_identity_backend.wasm.gz \
+            internet_identity_backend.wasm.gz.sha256 \
             internet_identity_production.wasm.gz \
             internet_identity_production.wasm.gz.sha256 \
+            internet_identity_dev.wasm.gz \
+            internet_identity_dev.wasm.gz.sha256 \
             internet_identity_frontend.wasm.gz \
             internet_identity_frontend.wasm.gz.sha256 \
             src/internet_identity/internet_identity.did \
