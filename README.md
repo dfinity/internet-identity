@@ -13,15 +13,15 @@
 
 ---
 
-Internet Identity is an authentication service for the [Internet Computer][ic]. It is the authentication system that allows hundreds of thousands of users to log in to Dapps like [Distrikt], [DSCVR] and more.
+Internet Identity is an authentication and identity service for the [Internet Computer][ic]. It enables hundreds of thousands of users to securely log in to dapps such as [OISY](https://oisy.com), [Caffeine](https://caffeine.ai), [NNS Dapp](https://nns.internetcomputer.org), [OpenChat](https://oc.app), and [many more](https://identity.internetcomputer.org).
 
 Internet Identity is:
 
-- **Simple**: It uses some of the [WebAuthn] API to allow users to register and authenticate without passwords, using TouchID, FaceID, Windows Hello, and more.
-- **Flexible**: Integrating Internet Identity in a Dapp (or even Web 2 app) is as simple as opening the Internet Identity's HTTP interface, https://identity.internetcomputer.org, in a new tab. No need to interact with the canister smart contract directly.
-- **Secure**: Different identities are issued for each app a user authenticates to and cannot be linked back to the user.
+- **Simple**: Uses [passkeys][webauthn] (TouchID, FaceID, Windows Hello, security keys) for passwordless registration and authentication. Users can also sign in with their Google, Apple, or Microsoft account via [OpenID Connect](https://openid.net/developers/how-connect-works/).
+- **Flexible**: Integrating Internet Identity is as simple as using the [agent-js](https://github.com/dfinity/agent-js) library or the ICRC authentication standards. No need to interact with the canister smart contract directly.
+- **Secure**: A unique identity (principal) is derived for each app a user authenticates to, preventing cross-app tracking. Cryptographic material never leaves the user's device.
 
-For more information, see [What is Internet Identity?](https://internetcomputer.org/docs/current/tokenomics/identity-auth/what-is-ic-identity) on [internetcomputer.org](https://internetcomputer.org).
+For more information, see the [Internet Identity documentation](https://internetcomputer.org/docs/current/developer-docs/integrations/internet-identity/) on [internetcomputer.org](https://internetcomputer.org).
 
 ### Table of Contents
 
@@ -30,7 +30,10 @@ For more information, see [What is Internet Identity?](https://internetcomputer.
   - [Architecture Overview](#architecture-overview)
   - [Building with Docker](#building-with-docker)
   - [Integration with Internet Identity](#integration-with-internet-identity)
+- [Key Features](#key-features)
+- [Technology Stack](#technology-stack)
 - [Stable Memory Compatibility](#stable-memory-compatibility)
+- [Contributing](#contributing)
 - [Getting Help](#getting-help)
 - [Links](#links)
 
@@ -78,16 +81,15 @@ Internet Identity is an authentication service for the [Internet Computer][ic]. 
 
 ![Architecture](./ii-architecture.png) <!-- this is an excalidraw.com image, source is ii-architecture.excalidraw -->
 
-Internet Identity runs as a single canister which both serves the frontend application code, and handles the requests sent by the frontend application code.
+Internet Identity consists of two canisters: a **backend canister** that manages user data and authentication logic, and a stateless **frontend canister** that serves the web application assets.
 
-> 💡 The canister (backend) interface is specified by the [internet_identity.did](./src/internet_identity/internet_identity.did) [candid] interface. The (backend) canister code is located in [`src/internet_identity`](./src/internet_identity), and the frontend application code (served by the canister through the `http_request` method) is located in [`src/frontend`](./src/frontend).
+> 💡 The backend interface is specified by the [internet_identity.did](./src/internet_identity/internet_identity.did) [candid] interface. The backend canister code is located in [`src/internet_identity`](./src/internet_identity), and the frontend application code is located in [`src/frontend`](./src/frontend).
 
 The Internet Identity authentication service works indirectly by issuing "delegations" on the user's behalf; basically attestations signed with some private cryptographic material owned by the user. The private cryptographic material never leaves the user's device. The Internet Identity frontend application uses the [WebAuthn] API to first create the private cryptographic material, and then the [WebAuthn] API is used again to sign delegations.
 
-For information on how Internet Identity works in more detail, please refer to the following:
+> Note: The architecture diagram above shows the core delegation flow. See the [specification][spec] for the full architecture.
 
-- [Internet Identity presentation 📼](https://youtu.be/oxEr8UzGeBo), streamed during the Genesis Event
-- [Internet Identity Specification][spec], the official Internet Identity Specification
+For more details, please refer to the [Internet Identity Specification][spec].
 
 ### Building with Docker
 
@@ -105,9 +107,21 @@ We recommend using the [`docker-build`](./scripts/docker-build) script. It extra
 
 ### Integration with Internet Identity
 
-The [`using-dev-build`](./demos/using-dev-build) demo shows a documented example project that integrates Internet Identity. For more, please refer to the [Client Authentication Protocol section](https://internetcomputer.org/docs/current/references/ii-spec#client-authentication-protocol) of the [Internet Identity Specification][spec] to integration Internet Identity in your app from scratch. For a just-add-water approach using the [agent-js](https://github.com/dfinity/agent-js) library (also used by `using-dev-build`), check out Kyle Peacock's [blogpost](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/).
+The [`using-dev-build`](./demos/using-dev-build) demo shows a minimal example project that integrates Internet Identity using [agent-js](https://github.com/dfinity/agent-js). For the full integration protocol, refer to the [Client Authentication Protocol section](https://internetcomputer.org/docs/current/references/ii-spec#client-authentication-protocol) of the [Internet Identity Specification][spec].
 
-If you're interested in the infrastructure of how to get the Internet Identity canister and how to test it within your app, check out [`using-dev-build`](./demos/using-dev-build), which uses the Internet Identity development canister.
+## Key Features
+
+- **Passkey Authentication**: Passwordless login using WebAuthn-compatible authenticators (TouchID, FaceID, Windows Hello, security keys).
+- **OpenID Connect**: Users can register and authenticate using their Google, Apple, or Microsoft account as an alternative to passkeys.
+- **Multiple Accounts**: Users can create and manage multiple identities (accounts) per application.
+- **Discoverable Passkeys**: Support for resident/discoverable credentials that enable sign-in without entering an identity number.
+
+## Technology Stack
+
+- **Backend**: Rust canister running on the Internet Computer
+- **Frontend**: [SvelteKit](https://kit.svelte.dev/) + TypeScript, built with Vite
+- **Authentication**: WebAuthn / passkeys, OpenID Connect (Google, Apple, Microsoft)
+- **Specification**: [Internet Identity Spec][spec]
 
 ## Stable Memory Compatibility
 
@@ -116,6 +130,10 @@ Internet Identity requires data in stable memory to have a specific layout in or
 If on upgrade II traps with the message `stable memory layout version ... is no longer supported` then the stable memory layout has changed and is no longer compatible.
 
 The easiest way to address this is to reinstall the canister (thus wiping stable memory). A canister can be reinstalled by executing `dfx deploy <canister> --mode reinstall`.
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on how to get started. For development setup and build instructions, refer to [HACKING.md](./HACKING.md).
 
 ## Getting Help
 
@@ -128,14 +146,9 @@ We're here to help! Here are some ways you can reach out for help if you get stu
 ## Links
 
 - [Internet Identity Specification][spec], the official Internet Identity Specification
-- [Integration with Internet Identity](http://kyle-peacock.com/blog/dfinity/integrating-internet-identity/) by Kyle Peacock
-- [What is Internet Identity?](https://internetcomputer.org/docs/current/tokenomics/identity-auth/what-is-ic-identity) on [internetcomputer.org](https://internetcomputer.org)
-- [Internet Identity presentation 📼](https://youtu.be/oxEr8UzGeBo) on YouTube, streamed during the Genesis Event
-- [Excalidraw](https://excalidraw.com), used to make diagrams
+- [Internet Identity Documentation](https://internetcomputer.org/docs/current/developer-docs/integrations/internet-identity/) on [internetcomputer.org](https://internetcomputer.org)
 
-[distrikt]: https://distrikt.io
 [webauthn]: https://webauthn.guide
-[dscvr]: https://dscvr.one
 [hacking]: ./HACKING.md#running-locally
 [ic]: https://internetcomputer.org
 [spec]: https://internetcomputer.org/docs/current/references/ii-spec
