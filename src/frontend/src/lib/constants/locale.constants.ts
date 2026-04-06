@@ -9,6 +9,7 @@ export const availableLocales = [
   "it",
   "pl",
   "ru",
+  "sk",
   "uk",
   "ur",
 ];
@@ -24,6 +25,7 @@ export const enabledLocales = [
   "it",
   "pl",
   "ru",
+  "sk",
   "uk",
   "ur",
 ];
