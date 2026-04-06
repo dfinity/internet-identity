@@ -1,0 +1,1211 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2025-10-10 11:46+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: sk\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
+
+msgid "{0} logo"
+msgstr "Logo {0}"
+
+msgid "{0} user"
+msgstr "Používateľ {0}"
+
+msgid "{application} has moved to the new Internet Identity"
+msgstr "{application} prešla na novú Internet Identity"
+
+msgid "{identityName} has been removed from this device."
+msgstr "{identityName} bola odstránená z tohto zariadenia."
+
+msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
+msgstr "{MAX_ACCOUNTS, plural, one {Dosiahli ste maximum # účtu pre jednu aplikáciu.} few {Dosiahli ste maximum # účtov pre jednu aplikáciu.} other {Dosiahli ste maximum # účtov pre jednu aplikáciu.}}"
+
+msgid "{name} account"
+msgstr "Účet {name}"
+
+msgid "{num, plural, one {# Passkey} other {# Passkeys}}"
+msgstr "{num, plural, one {# prístupový kľúč} few {# prístupové kľúče} other {# prístupových kľúčov}}"
+
+msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a fresh, modern look and feel. The new design is intuitive and easier to navigate, ensuring a smoother user journey."
+msgstr "<0>Úplne prepracované rozhranie:</0> Internet Identity má nový, moderný vzhľad. Nový dizajn je intuitívny a jednoduchší na navigáciu, čo zaručuje plynulejšiu používateľskú skúsenosť."
+
+msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
+msgstr "<0>Integrácia s Google, Apple a Microsoft:</0> Hoci prístupové kľúče sú čoraz vyspelejšie, zatiaľ nie sú bežné pre všetkých. Zaznamenali sme 50 % mieru opustenia registračného procesu, čo naznačuje potrebu alternatívnych metód overovania. Aby bola Internet Identity prístupná ešte širšiemu publiku, integrovali sme Google, Apple a Microsoft ako alternatívne možnosti overenia."
+
+msgid "<0>Learn more</0> about passkeys"
+msgstr "<0>Zistite viac</0> o prístupových kľúčoch"
+
+msgid "<0>Never</0> enter a code from another source."
+msgstr "<0>Nikdy</0> nezadávajte kód z iného zdroja."
+
+msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
+msgstr "<0>Žiadne čísla identít:</0> Ako bolo vysvetlené vyššie, vyhľadateľné prístupové kľúče znamenajú, že si už nemusíte pamätať ani ukladať číslo identity. Prihlásenie je teraz jednoduchšie a plynulejšie."
+
+msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
+msgstr "<0>Bezproblémová integrácia prístupových kľúčov:</0> Naďalej považujeme prístupové kľúče za budúcnosť bezpečného overovania. Internet Identity 2.0 využíva najnovšie štandardy prístupových kľúčov pre vyššiu bezpečnosť a jednoduchosť používania."
+
+msgid "A way to regain access to your identity if you ever lose it."
+msgstr "Spôsob, ako znovu získať prístup k svojej identite, ak ju stratíte."
+
+msgid "Access and recovery"
+msgstr "Prístup a obnovenie"
+
+msgid "Access methods"
+msgstr "Metódy prístupu"
+
+msgid "Account name"
+msgstr "Názov účtu"
+
+msgid "Activate"
+msgstr "Aktivovať"
+
+msgid "Activate it so that you can recover your identity at any time."
+msgstr "Aktivujte ju, aby ste mohli svoju identitu kedykoľvek obnoviť."
+
+msgid "Activate recovery to remove"
+msgstr "Aktivujte obnovenie pre odstránenie"
+
+msgid "Activate your recovery phrase so that you can recover your identity at any point."
+msgstr "Aktivujte svoju frázu na obnovenie, aby ste mohli svoju identitu kedykoľvek obnoviť."
+
+msgid "Add a passkey"
+msgstr "Pridať prístupový kľúč"
+
+msgid "Add access method"
+msgstr "Pridať metódu prístupu"
+
+msgid "Add another account"
+msgstr "Pridať ďalší účet"
+
+msgid "Add another identity"
+msgstr "Pridať ďalšiu identitu"
+
+msgid "Add another passkey"
+msgstr "Pridať ďalší prístupový kľúč"
+
+msgid "Add another way to sign in with a passkey or third-party account for secure access."
+msgstr "Pridajte ďalší spôsob prihlásenia pomocou prístupového kľúča alebo účtu tretej strany pre bezpečný prístup."
+
+msgid "Add new"
+msgstr "Pridať nový"
+
+msgid "Add or remove the ways you can sign in with your identity."
+msgstr "Pridajte alebo odstráňte spôsoby prihlásenia k vašej identite."
+
+msgid "Advanced identity management"
+msgstr "Pokročilá správa identity"
+
+msgid "Are you sure?"
+msgstr "Ste si istí?"
+
+msgid "As you are currently signed in with this Account, you will be signed out."
+msgstr "Keďže ste momentálne prihlásení s týmto účtom, budete odhlásení."
+
+msgid "As you are currently signed in with this passkey, you will be signed out."
+msgstr "Keďže ste momentálne prihlásení s týmto prístupovým kľúčom, budete odhlásení."
+
+msgid "Authenticating..."
+msgstr "Overovanie..."
+
+msgid "Authentication successful"
+msgstr "Overenie úspešné"
+
+msgid "Authorize new device"
+msgstr "Autorizovať nové zariadenie"
+
+msgid "Before getting started, find a private place and have your recovery phrase ready. Keep it confidential to protect your identity."
+msgstr "Pred začatím si nájdite súkromné miesto a pripravte si frázu na obnovenie. Uchovajte ju v tajnosti, aby ste ochránili svoju identitu."
+
+msgid "Before you continue"
+msgstr "Skôr než budete pokračovať"
+
+msgid "By enabling this feature, you can create more than one account for a single app. Easily switch between accounts (e.g. work, personal, or demo)."
+msgstr "Zapnutím tejto funkcie môžete vytvoriť viac ako jeden účet pre jednu aplikáciu. Jednoducho prepínajte medzi účtami (napr. pracovný, osobný alebo demo)."
+
+msgid "Can't find your identity?"
+msgstr "Nemôžete nájsť svoju identitu?"
+
+msgid "Cancel"
+msgstr "Zrušiť"
+
+msgid "CAPTCHA characters"
+msgstr "Znaky CAPTCHA"
+
+msgid "Characters are case-sensitive"
+msgstr "Znaky rozlišujú veľké a malé písmená"
+
+msgid "Check out the other domains:"
+msgstr "Pozrite si ďalšie domény:"
+
+msgid "Checking recovery phrase"
+msgstr "Kontrola frázy na obnovenie"
+
+msgid "Checking your order"
+msgstr "Kontrola vašej objednávky"
+
+msgid "Choose an account"
+msgstr "Vyberte účet"
+
+msgid "choose language to continue"
+msgstr "vyberte jazyk pre pokračovanie"
+
+msgid "Choose method"
+msgstr "Vyberte metódu"
+
+msgid "Choose method to continue"
+msgstr "Vyberte metódu pre pokračovanie"
+
+msgid "Clear all"
+msgstr "Vymazať všetko"
+
+msgid "Click to reveal"
+msgstr "Kliknutím zobrazíte"
+
+msgid "Close"
+msgstr "Zavrieť"
+
+msgid "Close menu"
+msgstr "Zavrieť ponuku"
+
+msgid "Code copied to clipboard"
+msgstr "Kód skopírovaný do schránky"
+
+msgid "Complete set-up"
+msgstr "Dokončiť nastavenie"
+
+msgid "Confirm sign-in"
+msgstr "Potvrdiť prihlásenie"
+
+msgid "Confirm this device"
+msgstr "Potvrdiť toto zariadenie"
+
+msgid "Confirm your sign-in"
+msgstr "Potvrďte svoje prihlásenie"
+
+msgid "Confirmation code"
+msgstr "Potvrdzovací kód"
+
+msgid "Confirming..."
+msgstr "Potvrdzovanie..."
+
+msgid "Connection closed"
+msgstr "Pripojenie ukončené"
+
+msgid "Continue"
+msgstr "Pokračovať"
+
+msgid "Continue on another device"
+msgstr "Pokračovať na inom zariadení"
+
+msgid "Continue on your new device"
+msgstr "Pokračujte na svojom novom zariadení"
+
+msgid "Continue with {name}"
+msgstr "Pokračovať s {name}"
+
+msgid "Continue with passkey"
+msgstr "Pokračovať s prístupovým kľúčom"
+
+msgid "Create account"
+msgstr "Vytvoriť účet"
+
+msgid "Create an identity with a passkey, using biometrics or a security key. Your data never leaves your device."
+msgstr "Vytvorte identitu s prístupovým kľúčom pomocou biometrie alebo bezpečnostného kľúča. Vaše údaje nikdy neopustia vaše zariadenie."
+
+msgid "Create identity"
+msgstr "Vytvoriť identitu"
+
+msgid "Create new identity"
+msgstr "Vytvoriť novú identitu"
+
+msgid "Create passkey"
+msgstr "Vytvoriť prístupový kľúč"
+
+msgid "Created {0}"
+msgstr "Vytvorené {0}"
+
+msgid "Created {date}"
+msgstr "Vytvorené {date}"
+
+msgid "Creating account..."
+msgstr "Vytváranie účtu..."
+
+msgid "Creating identity..."
+msgstr "Vytváranie identity..."
+
+msgid "Creating passkey..."
+msgstr "Vytváranie prístupového kľúča..."
+
+msgid "Currently signed in with this account"
+msgstr "Momentálne prihlásení s týmto účtom"
+
+msgid "Currently signed in with this passkey"
+msgstr "Momentálne prihlásení s týmto prístupovým kľúčom"
+
+msgid "Dashlane has been confirmed to be incompatible."
+msgstr "Dashlane bol potvrdený ako nekompatibilný."
+
+msgid "Default"
+msgstr "Predvolené"
+
+msgid "Discoverable passkeys"
+msgstr "Vyhľadateľné prístupové kľúče"
+
+msgid "Dismiss"
+msgstr "Zavrieť"
+
+msgid "Do you want to continue?"
+msgstr "Chcete pokračovať?"
+
+msgid "Easy access"
+msgstr "Jednoduchý prístup"
+
+msgid "Edit"
+msgstr "Upraviť"
+
+msgid "Edit {name}"
+msgstr "Upraviť {name}"
+
+msgid "Edit account"
+msgstr "Upraviť účet"
+
+msgid "Enable multiple accounts"
+msgstr "Povoliť viacero účtov"
+
+msgid "Encountered an internal error while processing the request."
+msgstr "Pri spracovaní požiadavky došlo k internej chybe."
+
+msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
+msgstr "Zadajte názov svojej identity na dokončenie aktualizácie. Po nastavení ho nebude možné neskôr zmeniť."
+
+msgid "Enter characters"
+msgstr "Zadajte znaky"
+
+msgid "Enter each word in the correct order:"
+msgstr "Zadajte každé slovo v správnom poradí:"
+
+msgid "Enter recovery phrase"
+msgstr "Zadajte frázu na obnovenie"
+
+msgid "Everything you need to know about Internet Identity, your private, secure, and easy way to log in to apps on the Internet Computer."
+msgstr "Všetko, čo potrebujete vedieť o Internet Identity — vašom súkromnom, bezpečnom a jednoduchom spôsobe prihlásenia do aplikácií na Internet Computer."
+
+msgctxt "Used as an action word inviting the reader to try or feel something, e.g. Experience Real Privacy"
+msgid "Experience"
+msgstr "Objavte"
+
+msgid "Export JSON"
+msgstr "Exportovať JSON"
+
+msgid "FAQ & Support"
+msgstr "Časté otázky a podpora"
+
+msgid "FAQs"
+msgstr "Časté otázky"
+
+msgid "For example, user A logs into Internet Identity with their Google account “A@gmail.com” and then uses Internet Identity to authenticate in application Z. Google will never know that the user is authenticated in application Z, only with Internet Identity. Moreover, application Z will also never know that user A used Google to authenticate their Internet Identity user."
+msgstr "Napríklad používateľ A sa prihlási do Internet Identity pomocou svojho Google účtu „A@gmail.com“ a potom použije Internet Identity na overenie v aplikácii Z. Google sa nikdy nedozvie, že je používateľ overený v aplikácii Z, iba v Internet Identity. Rovnako aplikácia Z sa nikdy nedozvie, že používateľ A použil Google na overenie svojho používateľa Internet Identity."
+
+msgid "Forget about remembering complicated usernames and passwords. With passkeys, you simply pick your name to log in — quick, safe, and hassle-free."
+msgstr "Zabudnite na zapamätávanie zložitých mien a hesiel. S prístupovými kľúčmi si jednoducho vyberiete svoje meno na prihlásenie — rýchlo, bezpečne a bez starostí."
+
+msgid "Full control"
+msgstr "Plná kontrola"
+
+msgid "Full Ownership"
+msgstr "Plné vlastníctvo"
+
+msgid "Generating code..."
+msgstr "Generovanie kódu..."
+
+msgid "Generating phrase..."
+msgstr "Generovanie frázy..."
+
+msgid "Get started"
+msgstr "Začať"
+
+msgid "Give your identity a clear, simple, and memorable name you'll easily recognize."
+msgstr "Dajte svojej identite jasný, jednoduchý a zapamätateľný názov, ktorý ľahko spoznáte."
+
+msgid "Give your passkey a memorable name to help you identify it."
+msgstr "Dajte svojmu prístupovému kľúču zapamätateľný názov, aby ste ho ľahko identifikovali."
+
+msgid "Go to the app"
+msgstr "Prejsť do aplikácie"
+
+msgid "Go to the app - (<0>{countdown}</0>)"
+msgstr "Prejsť do aplikácie – (<0>{countdown}</0>)"
+
+msgid "Has not been used yet"
+msgstr "Ešte nebol použitý"
+
+msgid "Help & FAQ"
+msgstr "Pomoc a časté otázky"
+
+msgid "Here is the identity that is linked to your recovery phrase. Continue to access it and add another access method if required."
+msgstr "Tu je identita prepojená s vašou frázou na obnovenie. Pokračujte pre prístup k nej a v prípade potreby pridajte ďalšiu metódu prístupu."
+
+msgid "Hidden email"
+msgstr "Skrytý e-mail"
+
+msgid "Hide all"
+msgstr "Skryť všetko"
+
+msgid "Home"
+msgstr "Domov"
+
+msgid "How do Google, Microsoft and Apple integrations work with Internet Identity?"
+msgstr "Ako funguje integrácia Google, Microsoft a Apple s Internet Identity?"
+
+msgid "How do passkeys work?"
+msgstr "Ako fungujú prístupové kľúče?"
+
+msgid "How does Internet Identity compare to other Web3 authentication tools?"
+msgstr "Ako sa Internet Identity porovnáva s inými nástrojmi na overovanie vo Web3?"
+
+msgid "How to stay secure"
+msgstr "Ako zostať v bezpečí"
+
+msgid "I Acknowledge"
+msgstr "Beriem na vedomie"
+
+msgid "I am responsible for my recovery phrase and it cannot be retrieved from Internet Identity if lost."
+msgstr "Som zodpovedný za svoju frázu na obnovenie a v prípade straty ju nie je možné získať z Internet Identity."
+
+msgid "I have written it down"
+msgstr "Zapísal som si ju"
+
+msgid "Identities on this device"
+msgstr "Identity na tomto zariadení"
+
+msgid "Identity already upgraded"
+msgstr "Identita už bola aktualizovaná"
+
+msgid "Identity found"
+msgstr "Identita nájdená"
+
+msgid "Identity list"
+msgstr "Zoznam identít"
+
+msgid "Identity name"
+msgstr "Názov identity"
+
+msgid "Identity not found"
+msgstr "Identita nenájdená"
+
+msgid "Identity number"
+msgstr "Číslo identity"
+
+msgid "Identity removed"
+msgstr "Identita odstránená"
+
+msgid "Identity upgraded!"
+msgstr "Identita aktualizovaná!"
+
+msgid "If you proceed, you will no longer be able to sign-in to your identity or dapps using your {name} account."
+msgstr "Ak budete pokračovať, už sa nebudete môcť prihlásiť k svojej identite ani dappom pomocou účtu {name}."
+
+msgid "In use on another account."
+msgstr "Používa sa v inom účte."
+
+msgid "Incorrect recovery phrase. Please try again."
+msgstr "Nesprávna fráza na obnovenie. Skúste to znova."
+
+msgid "Incorrect spelling"
+msgstr "Nesprávny pravopis"
+
+msgid "Incorrect word order. Review and try again."
+msgstr "Nesprávne poradie slov. Skontrolujte a skúste znova."
+
+msgid "Incorrect. Try again with the new code."
+msgstr "Nesprávne. Skúste to znova s novým kódom."
+
+msgid "Interaction canceled. Please try again."
+msgstr "Interakcia zrušená. Skúste to znova."
+
+msgid "Internet Identity <0>does not</0> store your biometric data. It stays on your device. Your identity acts as a secure passkey manager."
+msgstr "Internet Identity vaše biometrické údaje <0>neukladá</0>. Zostávajú na vašom zariadení. Vaša identita funguje ako bezpečný správca prístupových kľúčov."
+
+msgid "Internet Identity 2.0 brings a host of improvements designed to enhance your experience:"
+msgstr "Internet Identity 2.0 prináša množstvo vylepšení navrhnutých na zlepšenie vášho zážitku:"
+
+msgid "Internet Identity is an authentication system for applications running on the <0>Internet Computer</0>. Instead of traditional usernames and passwords, it uses keys created via <1>passkeys</1> or other authentication systems like Google, Microsoft or Apple."
+msgstr "Internet Identity je overovací systém pre aplikácie bežiace na <0>Internet Computer</0>. Namiesto tradičných mien a hesiel používa kľúče vytvorené pomocou <1>prístupových kľúčov</1> alebo iných overovacích systémov ako Google, Microsoft alebo Apple."
+
+msgid "Internet Identity is as secure as the authentication methods it uses — like Google, Apple, Microsoft, or Passkeys. That means it's built on state-of-the-art security. When you choose Passkeys, access is protected by your device's unlock method (Face ID or fingerprint), making it as simple as unlocking your phone."
+msgstr "Internet Identity je rovnako bezpečná ako overovacie metódy, ktoré používa — ako Google, Apple, Microsoft alebo prístupové kľúče. To znamená, že je postavená na najmodernejšom zabezpečení. Keď zvolíte prístupové kľúče, prístup je chránený metódou odomknutia vášho zariadenia (Face ID alebo odtlačok prsta), takže je to také jednoduché ako odomknutie telefónu."
+
+msgid "Internet Identity is used to sign in securely and connect to apps with passkeys."
+msgstr "Internet Identity sa používa na bezpečné prihlásenie a pripojenie k aplikáciám pomocou prístupových kľúčov."
+
+msgid "Internet Identity lets you access apps and services securely, without creating passwords, sharing personal data, or giving up control."
+msgstr "Internet Identity vám umožňuje bezpečne pristupovať k aplikáciám a službám bez vytvárania hesiel, zdieľania osobných údajov alebo straty kontroly."
+
+msgid "Internet Identity never shares your personal data, like your email, with apps or websites. Instead, it creates a unique pseudonym for you in each app. Every app gets a different one, so they can't track you across services. All of this happens automatically in the background — you don't need to manage anything."
+msgstr "Internet Identity nikdy nezdieľa vaše osobné údaje, ako napríklad e-mail, s aplikáciami ani webovými stránkami. Namiesto toho vytvára jedinečný pseudonym pre vás v každej aplikácii. Každá aplikácia dostane iný, takže vás nemôžu sledovať naprieč službami. Toto všetko prebieha automaticky na pozadí — nemusíte nič spravovať."
+
+msgid "Internet Identity number"
+msgstr "Číslo Internet Identity"
+
+msgid "Internet Identity then bridges the authentication with those providers with the Internet Computer. By authenticating with one of those services, Internet Identity can ensure that you are who you are, and then create another authentication for the applications that run on Internet Computer."
+msgstr "Internet Identity potom prepája overenie s týmito poskytovateľmi s Internet Computer. Overením cez jednu z týchto služieb môže Internet Identity zabezpečiť, že ste to vy, a potom vytvoriť ďalšie overenie pre aplikácie bežiace na Internet Computer."
+
+msgid "Invalid code link"
+msgstr "Neplatný odkaz s kódom"
+
+msgid "Invalid code. Please check and try again."
+msgstr "Neplatný kód. Skontrolujte a skúste znova."
+
+msgid "Invalid recovery phrase"
+msgstr "Neplatná fráza na obnovenie"
+
+msgid "Invalid request"
+msgstr "Neplatná požiadavka"
+
+msgid "Is my Face ID or Fingerprint stored in Internet Identity?"
+msgstr "Je moje Face ID alebo odtlačok prsta uložený v Internet Identity?"
+
+msgid "It can be used at any time to recover your identity."
+msgstr "Dá sa kedykoľvek použiť na obnovenie vašej identity."
+
+msgid "It looks like you're trying to sign in from a social app. Follow these steps to continue:"
+msgstr "Zdá sa, že sa pokúšate prihlásiť zo sociálnej aplikácie. Postupujte podľa týchto krokov:"
+
+msgid "It looks like you're trying to sign in from inside an app (such as X, Telegram, or Instagram). This app's built-in browser is not supported."
+msgstr "Zdá sa, že sa pokúšate prihlásiť z vnútorného prehliadača aplikácie (napr. X, Telegram alebo Instagram). Vstavaný prehliadač tejto aplikácie nie je podporovaný."
+
+msgid "It seems like an invalid authentication request was received."
+msgstr "Zdá sa, že bola prijatá neplatná požiadavka na overenie."
+
+msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
+msgstr "Zdá sa, že pripojenie k službe sa nepodarilo nadviazať. Skúste iný prehliadač; ak problém pretrváva, kontaktujte podporu."
+
+msgid "It seems like the connection with the service could not be re-established."
+msgstr "Zdá sa, že pripojenie k službe sa nepodarilo obnoviť."
+
+msgid "It seems like the request could not be processed."
+msgstr "Zdá sa, že požiadavku sa nepodarilo spracovať."
+
+msgid "It won't be removed from your device or password manager."
+msgstr "Nebude odstránený z vášho zariadenia ani správcu hesiel."
+
+msgid "Keep it secret"
+msgstr "Uchovajte ju v tajnosti"
+
+msgid "Keep linked"
+msgstr "Ponechať prepojené"
+
+msgid "Kept on a physical key. Authenticate on supported devices via tap/insert."
+msgstr "Uložený na fyzickom kľúči. Overenie na podporovaných zariadeniach priložením alebo vložením."
+
+msgid "Label it by use (e.g. 'Work' or 'Demo')."
+msgstr "Pomenujte ho podľa použitia (napr. „Práca“ alebo „Demo“)."
+
+msgid "Language"
+msgstr "Jazyk"
+
+msgid "Last used"
+msgstr "Naposledy použité"
+
+msgid "Learn how to open links in your browser"
+msgstr "Zistite, ako otvárať odkazy vo vašom prehliadači"
+
+msgid "Ledger has been confirmed to be incompatible."
+msgstr "Ledger bol potvrdený ako nekompatibilný."
+
+msgid "Legacy"
+msgstr "Staršia verzia"
+
+msgid "Let's get started"
+msgstr "Poďme na to"
+
+msgid "Limit reached"
+msgstr "Dosiahnutý limit"
+
+msgid "Link copied to clipboard"
+msgstr "Odkaz skopírovaný do schránky"
+
+msgid "Locked legacy recovery phrase"
+msgstr "Zamknutá staršia fráza na obnovenie"
+
+msgid "Long-press the link that opened this page."
+msgstr "Dlho podržte odkaz, ktorý otvoril túto stránku."
+
+msgid "Lookup by passkey"
+msgstr "Vyhľadať podľa prístupového kľúča"
+
+msgid "Lookup identity"
+msgstr "Vyhľadať identitu"
+
+msgid "Lost access to your identity?"
+msgstr "Stratili ste prístup k svojej identite?"
+
+msgid "Make sign-up and sign-in simple with Google, Apple, or Microsoft. The login you know with enhanced privacy."
+msgstr "Zjednodušte registráciu a prihlásenie cez Google, Apple alebo Microsoft. Prihlásenie, ktoré poznáte, s vylepšeným súkromím."
+
+msgid "Make sure no one can see what's on your screen or what you are writing."
+msgstr "Uistite sa, že nikto nevidí, čo máte na obrazovke ani čo píšete."
+
+msgid "Make sure to add a new access method so that you can sign in next time or reset your recovery phrase."
+msgstr "Nezabudnite pridať novú metódu prístupu, aby ste sa mohli prihlásiť nabudúce alebo resetovať frázu na obnovenie."
+
+msgid "Manage your identities and stay in control of your apps and websites with your dashboard. Explore Pro Features to further customize and secure your experience."
+msgstr "Spravujte svoje identity a udržujte kontrolu nad svojimi aplikáciami a webovými stránkami pomocou nástenky. Preskúmajte Pro funkcie na ďalšie prispôsobenie a zabezpečenie."
+
+msgid "Manage your Internet Identity"
+msgstr "Spravujte svoju Internet Identity"
+
+msgid "Maximum length is 32 characters."
+msgstr "Maximálna dĺžka je 32 znakov."
+
+msgid "Maximum length is 64 characters."
+msgstr "Maximálna dĺžka je 64 znakov."
+
+msgid "More information about multiple accounts"
+msgstr "Viac informácií o viacerých účtoch"
+
+msgid "More options"
+msgstr "Ďalšie možnosti"
+
+msgid "Multiple accounts"
+msgstr "Viacero účtov"
+
+msgid "My {application} account"
+msgstr "Môj účet {application}"
+
+msgid "My account"
+msgstr "Môj účet"
+
+msgid "My identity"
+msgstr "Moja identita"
+
+msgid "n/a"
+msgstr "nedostupné"
+
+msgid "Name account"
+msgstr "Pomenovať účet"
+
+msgid "Name your identity"
+msgstr "Pomenujte svoju identitu"
+
+msgid "No data is shared with Google, Microsoft or Apple on which applications you log in with Internet Identity."
+msgstr "S Google, Microsoft ani Apple sa nezdieľajú žiadne údaje o tom, do ktorých aplikácií sa prihlasujete cez Internet Identity."
+
+msgid "No identity found"
+msgstr "Žiadna identita nenájdená"
+
+msgid "No passkey tests yet"
+msgstr "Zatiaľ žiadne testy prístupových kľúčov"
+
+msgid "No recovery phrase"
+msgstr "Žiadna fráza na obnovenie"
+
+msgid "No. Your face ID or fingerprint is only used to create or unlock your passkey. Your biometric data is never shared with Internet Identity or with any websites or apps you use."
+msgstr "Nie. Vaše Face ID alebo odtlačok prsta sa používajú iba na vytvorenie alebo odomknutie prístupového kľúča. Vaše biometrické údaje sa nikdy nezdieľajú s Internet Identity ani so žiadnymi webovými stránkami alebo aplikáciami, ktoré používate."
+
+msgid "NordPass has been confirmed to be incompatible."
+msgstr "NordPass bol potvrdený ako nekompatibilný."
+
+msgid "Not upgraded"
+msgstr "Neaktualizované"
+
+msgid "Number of access methods"
+msgstr "Počet metód prístupu"
+
+msgid "One or more words are wrong or out of order."
+msgstr "Jedno alebo viac slov je nesprávnych alebo v nesprávnom poradí."
+
+msgid "Only enter the code from that device if you initiated this process <0>yourself</0>."
+msgstr "Zadajte kód z daného zariadenia iba ak ste tento proces začali <0>vy sami</0>."
+
+msgid "Open in browser"
+msgstr "Otvoriť v prehliadači"
+
+msgid "Open in browser to continue"
+msgstr "Pre pokračovanie otvorte v prehliadači"
+
+msgid "Open menu"
+msgstr "Otvoriť ponuku"
+
+msgid "Pairing link"
+msgstr "Odkaz na párovanie"
+
+msgid "Passkey"
+msgstr "Prístupový kľúč"
+
+msgid "Passkey ({0})"
+msgstr "Prístupový kľúč ({0})"
+
+msgid "Passkey has been registered from another device."
+msgstr "Prístupový kľúč bol zaregistrovaný z iného zariadenia."
+
+msgid "Passkey name"
+msgstr "Názov prístupového kľúča"
+
+msgid "Passkey testing"
+msgstr "Testovanie prístupového kľúča"
+
+msgid "Passkeys are a secure and easy way to sign in without using passwords. They're stored on your password manager (Google Password Manager, iCloud Keychain, 1Password, etc) and can be protected by your fingerprint, face, or device code."
+msgstr "Prístupové kľúče sú bezpečný a jednoduchý spôsob prihlásenia bez hesiel. Ukladajú sa do správcu hesiel (Google Password Manager, iCloud Keychain, 1Password atď.) a môžu byť chránené odtlačkom prsta, tvárou alebo kódom zariadenia."
+
+msgid "Passkeys are phishing-resistant, hard to steal, and can sync across your devices through providers like Google, Apple, or Microsoft. <0>Learn more.</0>"
+msgstr "Prístupové kľúče sú odolné voči phishingu, ťažko sa kradnú a dajú sa synchronizovať medzi zariadeniami cez poskytovateľov ako Google, Apple alebo Microsoft. <0>Zistite viac.</0>"
+
+msgid "Passkeys are unavailable on this device or browser. Please choose another access method to continue."
+msgstr "Prístupové kľúče nie sú na tomto zariadení alebo prehliadači dostupné. Vyberte inú metódu prístupu pre pokračovanie."
+
+msgid "Passkeys are unavailable on this device or browser. Please choose another sign-in method to continue."
+msgstr "Prístupové kľúče nie sú na tomto zariadení alebo prehliadači dostupné. Vyberte iný spôsob prihlásenia pre pokračovanie."
+
+msgid "Passkeys not available here"
+msgstr "Prístupové kľúče tu nie sú dostupné"
+
+msgid "Passkeys use cryptographic keys stored on your device for secure, password-free sign-ins with Face ID, Touch ID, or a security key. Your data is never shared."
+msgstr "Prístupové kľúče využívajú kryptografické kľúče uložené na vašom zariadení pre bezpečné prihlásenie bez hesla pomocou Face ID, Touch ID alebo bezpečnostného kľúča. Vaše údaje sa nikdy nezdieľajú."
+
+msgid "Password-free"
+msgstr "Bez hesla"
+
+msgid "Pick something recognizable, like your name"
+msgstr "Zvoľte niečo rozpoznateľné, napríklad vaše meno"
+
+msgid "Please go back to your <0>existing device</0> and choose <1>Start over</1> to try again."
+msgstr "Vráťte sa na svoje <0>existujúce zariadenie</0> a zvoľte <1>Začať odznova</1> pre ďalší pokus."
+
+msgid "Powered by"
+msgstr "Založené na"
+
+msgid "Real Privacy"
+msgstr "Skutočné súkromie"
+
+msgid "Recover"
+msgstr "Obnoviť"
+
+msgid "Recover your identity"
+msgstr "Obnovte svoju identitu"
+
+msgid "Recovery phrase"
+msgstr "Fráza na obnovenie"
+
+msgid "Recovery phrase activated"
+msgstr "Fráza na obnovenie aktivovaná"
+
+msgid "Recovery phrase not activated"
+msgstr "Fráza na obnovenie nie je aktivovaná"
+
+msgid "Recovery phrase not verified"
+msgstr "Fráza na obnovenie nie je overená"
+
+msgid "Recovery phrase set"
+msgstr "Fráza na obnovenie nastavená"
+
+msgid "Redirecting to the app"
+msgstr "Presmerovanie do aplikácie"
+
+msgid "Remove"
+msgstr "Odstrániť"
+
+msgid "Remove from this device"
+msgstr "Odstrániť z tohto zariadenia"
+
+msgid "Remove identities you don't use. You can add them back anytime by signing in again."
+msgstr "Odstráňte identity, ktoré nepoužívate. Kedykoľvek ich môžete pridať späť opätovným prihlásením."
+
+msgid "Remove passkey"
+msgstr "Odstrániť prístupový kľúč"
+
+msgid "Removing passkey..."
+msgstr "Odstraňovanie prístupového kľúča..."
+
+msgid "Removing this passkey means you won't be able to use it to sign in anymore. You can always add a new one later."
+msgstr "Odstránenie tohto prístupového kľúča znamená, že ho už nebudete môcť použiť na prihlásenie. Nový si môžete kedykoľvek pridať neskôr."
+
+msgid "Rename"
+msgstr "Premenovať"
+
+msgid "Rename or make this your default sign-in"
+msgstr "Premenovať alebo nastaviť ako predvolené prihlásenie"
+
+msgid "Rename passkey"
+msgstr "Premenovať prístupový kľúč"
+
+msgid "Rename this account"
+msgstr "Premenovať tento účet"
+
+msgid "Replace it anytime"
+msgstr "Kedykoľvek ju nahraďte"
+
+msgid "Requires unlocking before it can be reset."
+msgstr "Pred resetovaním vyžaduje odomknutie."
+
+msgid "Reset"
+msgstr "Resetovať"
+
+msgid "Reset your recovery phrase?"
+msgstr "Resetovať frázu na obnovenie?"
+
+msgid "Resetting recovery phrase..."
+msgstr "Resetovanie frázy na obnovenie..."
+
+msgid "Resetting will invalidate your current recovery phrase, leaving only the new one usable."
+msgstr "Resetovanie zneplatní vašu aktuálnu frázu na obnovenie, použiteľná zostane iba nová."
+
+msgid "Retry"
+msgstr "Skúsiť znova"
+
+msgid "Return to app"
+msgstr "Späť do aplikácie"
+
+msgid "Return to application"
+msgstr "Späť do aplikácie"
+
+msgid "Right now"
+msgstr "Práve teraz"
+
+msgid "Run a passkey test to see results"
+msgstr "Spustite test prístupového kľúča pre zobrazenie výsledkov"
+
+msgid "Save changes"
+msgstr "Uložiť zmeny"
+
+msgid "Save your recovery phrase"
+msgstr "Uložte si frázu na obnovenie"
+
+msgid "Saving changes..."
+msgstr "Ukladanie zmien..."
+
+msgid "Scan the above QR code with your <0>new device</0> or enter the URL manually."
+msgstr "Naskenujte vyššie uvedený QR kód svojím <0>novým zariadením</0> alebo zadajte URL adresu manuálne."
+
+msgid "Seamless Access"
+msgstr "Bezproblémový prístup"
+
+msgid "See how many access methods are within your identity and manage your recovery phrase."
+msgstr "Pozrite si, koľko metód prístupu máte v rámci svojej identity, a spravujte svoju frázu na obnovenie."
+
+msgid "Select <0>Open in Safari</0> or <1>Open in Chrome</1>."
+msgstr "Vyberte <0>Otvoriť v Safari</0> alebo <1>Otvoriť v Chrome</1>."
+
+msgid "Select each word in the correct order:"
+msgstr "Vyberte každé slovo v správnom poradí:"
+
+msgid "Session timed out"
+msgstr "Relácia vypršala"
+
+msgid "Set as default sign-in"
+msgstr "Nastaviť ako predvolené prihlásenie"
+
+msgid "Show all"
+msgstr "Zobraziť všetko"
+
+msgid "Sign in"
+msgstr "Prihlásiť sa"
+
+msgid "Sign in again to continue where you left off."
+msgstr "Prihláste sa znova, aby ste pokračovali tam, kde ste skončili."
+
+msgid "Sign in there."
+msgstr "Prihláste sa tam."
+
+msgid "Sign in using familiar methods"
+msgstr "Prihláste sa známymi metódami"
+
+msgid "Sign in with another identity"
+msgstr "Prihlásiť sa s inou identitou"
+
+msgid "Sign in with your {name} account from any device."
+msgstr "Prihláste sa svojím účtom {name} z akéhokoľvek zariadenia."
+
+msgid "Sign out"
+msgstr "Odhlásiť sa"
+
+msgid "Sign out and keep identity"
+msgstr "Odhlásiť sa a ponechať identitu"
+
+msgid "Sign out and remove from device"
+msgstr "Odhlásiť sa a odstrániť zo zariadenia"
+
+msgid "Sign out from this device"
+msgstr "Odhlásiť sa z tohto zariadenia"
+
+msgid "Sign out to remove"
+msgstr "Odhláste sa pre odstránenie"
+
+msgid "Signed in"
+msgstr "Prihlásení"
+
+msgid "Signing in securely"
+msgstr "Bezpečné prihlasovanie"
+
+msgid "Signing in..."
+msgstr "Prihlasovanie..."
+
+msgid "Simplify your sign-in"
+msgstr "Zjednodušte si prihlásenie"
+
+msgctxt "The user entered an incorrect value during a verification step"
+msgid "Something is wrong!"
+msgstr "Niečo nie je v poriadku!"
+
+msgctxt "Fallback error message when an unexpected error is caught"
+msgid "Something went wrong"
+msgstr "Niečo sa pokazilo"
+
+msgid "Source code"
+msgstr "Zdrojový kód"
+
+msgid "Start over"
+msgstr "Začať odznova"
+
+msgid "Still have an identity number?"
+msgstr "Stále máte číslo identity?"
+
+msgid "Still using an identity number?"
+msgstr "Stále používate číslo identity?"
+
+msgid "Store it safely"
+msgstr "Bezpečne ju uložte"
+
+msgid "Stored and usable only in {0} on the {1} device it was created on."
+msgstr "Uložený a použiteľný iba v {0} na zariadení {1}, na ktorom bol vytvorený."
+
+msgid "Stored and usable only in {0} on the device it was created on."
+msgstr "Uložený a použiteľný iba v {0} na zariadení, na ktorom bol vytvorený."
+
+msgid "Stored and usable only on the {0} device it was created on."
+msgstr "Uložený a použiteľný iba na zariadení {0}, na ktorom bol vytvorený."
+
+msgid "Stored in your {0} account and synced across your {1} devices."
+msgstr "Uložený vo vašom účte {0} a synchronizovaný medzi vašimi zariadeniami {1}."
+
+msgid "Stored in your {0} account and synced across your devices."
+msgstr "Uložený vo vašom účte {0} a synchronizovaný medzi vašimi zariadeniami."
+
+msgid "Stored securely on your device, in your password manager, or on a security key."
+msgstr "Bezpečne uložený na vašom zariadení, v správcovi hesiel alebo na bezpečnostnom kľúči."
+
+msgid "Submit"
+msgstr "Odoslať"
+
+msgid "Successfully restored access to your identity"
+msgstr "Prístup k vašej identite bol úspešne obnovený"
+
+msgid "Support"
+msgstr "Podpora"
+
+msgid "Supported"
+msgstr "Podporované"
+
+msgid "Switch identity"
+msgstr "Prepnúť identitu"
+
+msgid "Tap on the <0>address bar</0> and <1>open in browser</1>."
+msgstr "Klepnite na <0>panel s adresou</0> a <1>otvorte v prehliadači</1>."
+
+msgid "Tap on the highlighted <0>back</0> button."
+msgstr "Klepnite na zvýraznené tlačidlo <0>späť</0>."
+
+msgid "Test passkey support"
+msgstr "Testovať podporu prístupového kľúča"
+
+msgid "Test passkey support and view authenticator details"
+msgstr "Testovať podporu prístupového kľúča a zobraziť podrobnosti autentifikátora"
+
+msgid "The <0>existing device</0> is preparing to continue."
+msgstr "<0>Existujúce zariadenie</0> sa pripravuje na pokračovanie."
+
+msgid "The <0>new device</0> is preparing to continue."
+msgstr "<0>Nové zariadenie</0> sa pripravuje na pokračovanie."
+
+msgid "The integration with Google, Microsoft and Apple uses a standard authentication protocol called OpenID. This is the same protocol that other applications use to log in with Google."
+msgstr "Integrácia s Google, Microsoft a Apple používa štandardný overovací protokol nazývaný OpenID. Je to rovnaký protokol, ktorý používajú ostatné aplikácie na prihlásenie cez Google."
+
+msgid "The passkey could not be identified, support unknown."
+msgstr "Prístupový kľúč sa nepodarilo identifikovať, podpora neznáma."
+
+msgid "The phrase was entered correctly but belongs to a product other than Internet Identity."
+msgstr "Fráza bola zadaná správne, ale patrí k inému produktu ako Internet Identity."
+
+msgid "There was an issue connecting with the application. Try a different browser; if the issue persists, contact the developer."
+msgstr "Vyskytol sa problém s pripojením k aplikácii. Skúste iný prehliadač; ak problém pretrváva, kontaktujte vývojára."
+
+msgid "This app has moved to the new Internet Identity"
+msgstr "Táto aplikácia prešla na novú Internet Identity"
+
+msgid "This identity has already been upgraded to the new experience."
+msgstr "Táto identita už bola aktualizovaná na nový zážitok."
+
+msgid "This legacy passkey is no longer usable and should be removed."
+msgstr "Tento starší prístupový kľúč sa už nedá použiť a mal by byť odstránený."
+
+msgid "This may take a few seconds"
+msgstr "Toto môže trvať niekoľko sekúnd"
+
+msgid "This passkey is no longer associated with any identity."
+msgstr "Tento prístupový kľúč už nie je priradený k žiadnej identite."
+
+msgid "This YubiKey has older firmware (5.1) that's incompatible."
+msgstr "Tento YubiKey má starší firmvér (5.1), ktorý je nekompatibilný."
+
+msgid "This YubiKey has older firmware (5.2 - 5.4) that might be incompatible."
+msgstr "Tento YubiKey má starší firmvér (5.2 – 5.4), ktorý môže byť nekompatibilný."
+
+msgid "This YubiKey has older firmware (5.2) that might be incompatible."
+msgstr "Tento YubiKey má starší firmvér (5.2), ktorý môže byť nekompatibilný."
+
+msgid "This YubiKey has older firmware (5.4) that might be incompatible."
+msgstr "Tento YubiKey má starší firmvér (5.4), ktorý môže byť nekompatibilný."
+
+msgid "This YubiKey has older firmware (5.5 - 5.6) that might be incompatible."
+msgstr "Tento YubiKey má starší firmvér (5.5 – 5.6), ktorý môže byť nekompatibilný."
+
+msgid "This YubiKey has older firmware (5.6) that might be incompatible."
+msgstr "Tento YubiKey má starší firmvér (5.6), ktorý môže byť nekompatibilný."
+
+msgid "To confirm it's you, enter below code on your <0>existing device</0>."
+msgstr "Na potvrdenie, že ste to vy, zadajte nižšie uvedený kód na svojom <0>existujúcom zariadení</0>."
+
+msgid "to continue with <0>{application}</0>"
+msgstr "pre pokračovanie s <0>{application}</0>"
+
+msgid "to continue with this app"
+msgstr "pre pokračovanie s touto aplikáciou"
+
+msgid "To continue, create a passkey to secure your identity and simplify future sign-ins."
+msgstr "Pre pokračovanie vytvorte prístupový kľúč na zabezpečenie vašej identity a zjednodušenie budúcich prihlásení."
+
+msgid "To continue:"
+msgstr "Pre pokračovanie:"
+
+msgid "To finish setting up your passkey, follow the instructions shown on your <0>new device</0>."
+msgstr "Na dokončenie nastavenia prístupového kľúča postupujte podľa pokynov zobrazených na vašom <0>novom zariadení</0>."
+
+msgid "Type each word in the correct order:"
+msgstr "Napíšte každé slovo v správnom poradí:"
+
+msgid "Type the characters exactly as shown below"
+msgstr "Zadajte znaky presne tak, ako sú zobrazené nižšie"
+
+msgid "Unable to complete setup"
+msgstr "Nastavenie sa nepodarilo dokončiť"
+
+msgid "Unable to connect"
+msgstr "Nepodarilo sa pripojiť"
+
+msgid "Understanding Internet Identity"
+msgstr "Pochopenie Internet Identity"
+
+msgid "Undo"
+msgstr "Späť"
+
+msgid "Unexpected error"
+msgstr "Neočakávaná chyba"
+
+msgid "Unknown"
+msgstr "Neznáme"
+
+msgid "Unlike many Web3 auth systems that require manual signing for every action, Internet Identity creates authenticated sessions per application. This delivers both security and convenience—no repeated signing—while still giving each session its own identity."
+msgstr "Na rozdiel od mnohých overovacích systémov Web3, ktoré vyžadujú manuálne podpisovanie pre každú akciu, Internet Identity vytvára overené relácie pre každú aplikáciu. To prináša bezpečnosť aj pohodlie — bez opakovaného podpisovania — pričom každá relácia má svoju vlastnú identitu."
+
+msgid "Unlink"
+msgstr "Odpojiť"
+
+msgid "Unlink {name} account"
+msgstr "Odpojiť účet {name}"
+
+msgid "Unlinking {name} account..."
+msgstr "Odpájanie účtu {name}..."
+
+msgid "Unlock and reset"
+msgstr "Odomknúť a resetovať"
+
+msgid "Unlock to continue"
+msgstr "Odomknite pre pokračovanie"
+
+msgid "Unsupported"
+msgstr "Nepodporované"
+
+msgid "Unsupported Browser"
+msgstr "Nepodporovaný prehliadač"
+
+msgid "Unverified origin"
+msgstr "Neoverený pôvod"
+
+msgid "Upgrade"
+msgstr "Aktualizovať"
+
+msgid "Upgrade again"
+msgstr "Aktualizovať znova"
+
+msgid "Upgrade completed successfully"
+msgstr "Aktualizácia úspešne dokončená"
+
+msgid "Upgrade identity"
+msgstr "Aktualizovať identitu"
+
+msgid "Upgrade your existing identity to the new experience in a two steps."
+msgstr "Aktualizujte svoju existujúcu identitu na nový zážitok v dvoch krokoch."
+
+msgid "Upgrade your identity"
+msgstr "Aktualizujte svoju identitu"
+
+msgid "Upgrading identity..."
+msgstr "Aktualizácia identity..."
+
+msgid "Use a device that already holds your identity to scan or open the URL. This will link your identity to this device."
+msgstr "Použite zariadenie, ktoré už obsahuje vašu identitu, na naskenovanie alebo otvorenie URL adresy. Tým sa prepojí vaša identita s týmto zariadením."
+
+msgid "Use existing identity"
+msgstr "Použiť existujúcu identitu"
+
+msgid "Verify"
+msgstr "Overiť"
+
+msgid "Verify recovery to remove"
+msgstr "Overte obnovenie pre odstránenie"
+
+msgid "Verify you are human"
+msgstr "Overte, že ste človek"
+
+msgid "Verify your recovery phrase"
+msgstr "Overte svoju frázu na obnovenie"
+
+msgid "Verifying..."
+msgstr "Overovanie..."
+
+msgid "View your last used identities"
+msgstr "Zobraziť naposledy použité identity"
+
+msgid "Waiting for your existing device"
+msgstr "Čakanie na vaše existujúce zariadenie"
+
+msgid "Waiting for your new device"
+msgstr "Čakanie na vaše nové zariadenie"
+
+msgid "Warning"
+msgstr "Upozornenie"
+
+msgid "We didn't recognize that activation code."
+msgstr "Tento aktivačný kód sme nerozpoznali."
+
+msgid "Welcome, {name}!"
+msgstr "Vitajte, {name}!"
+
+msgid "What are passkeys?"
+msgstr "Čo sú prístupové kľúče?"
+
+msgid "What is Internet Identity?"
+msgstr "Čo je Internet Identity?"
+
+msgid "What makes Internet Identity privacy-preserving?"
+msgstr "Vďaka čomu Internet Identity chráni súkromie?"
+
+msgid "What makes Internet Identity secure & easy to use?"
+msgstr "Vďaka čomu je Internet Identity bezpečná a jednoduchá na používanie?"
+
+msgid "What's new in Internet Identity 2.0?"
+msgstr "Čo je nové v Internet Identity 2.0?"
+
+msgid "What's your name?"
+msgstr "Ako sa voláte?"
+
+msgid "When you create a passkey, your device makes two matching keys. One stays safely on your device, and the other goes to the app or service. They work together to confirm it's you — without ever sharing your personal info or a password."
+msgstr "Keď vytvoríte prístupový kľúč, vaše zariadenie vytvorí dva párové kľúče. Jeden zostane bezpečne na vašom zariadení a druhý ide do aplikácie alebo služby. Spolupracujú na potvrdení, že ste to vy — bez zdieľania vašich osobných údajov alebo hesla."
+
+msgid "With passkeys, you can now use your fingerprint, face, or screen lock to quickly and securely confirm it's really you."
+msgstr "S prístupovými kľúčmi teraz môžete použiť odtlačok prsta, tvár alebo zámok obrazovky na rýchle a bezpečné potvrdenie, že ste to naozaj vy."
+
+msgid "with your Internet Identity"
+msgstr "s vašou Internet Identity"
+
+msgid "Word {position}"
+msgstr "Slovo {position}"
+
+msgid "Write down all 24 words correctly and keep them offline. Do not store them in the cloud or on devices."
+msgstr "Zapíšte si všetkých 24 slov správne a uchovajte ich offline. Neukladajte ich v cloude ani na zariadeniach."
+
+msgid "Write down your recovery phrase in order and verify it afterwards. Store it safely and do not share it. Losing it means you will lose access."
+msgstr "Zapíšte si frázu na obnovenie v správnom poradí a následne ju overte. Bezpečne ju uložte a nezdieľajte. Jej strata znamená stratu prístupu."
+
+msgid "Wrong domain was set. Please try again."
+msgstr "Bola nastavená nesprávna doména. Skúste to znova."
+
+msgid "You <0>cannot</0> rename this once it is set."
+msgstr "Po nastavení ho <0>nie je možné</0> premenovať."
+
+msgid "You already have a {name} account linked"
+msgstr "Už máte prepojený účet {name}"
+
+msgid "You are upgrading ID <0>{identityNumber}</0>"
+msgstr "Aktualizujete ID <0>{identityNumber}</0>"
+
+msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
+msgstr "Kedykoľvek ho môžete pridať späť prihlásením sa s rovnakým účtom {openIdProvider}."
+
+msgid "You can add it back anytime by signing in with the same passkey."
+msgstr "Kedykoľvek ho môžete pridať späť prihlásením sa s rovnakým prístupovým kľúčom."
+
+msgid "You can continue with <0>Use existing Passkey</0> in the login process."
+msgstr "Môžete pokračovať voľbou <0>Použiť existujúci prístupový kľúč</0> v procese prihlásenia."
+
+msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
+msgstr "Môžete sa odhlásiť a ponechať identitu uloženú pre rýchlejšie prihlásenie nabudúce, alebo ju úplne odstrániť z tohto zariadenia."
+
+msgid "You can recover your identity now, verify you saved it correctly."
+msgstr "Teraz môžete obnoviť svoju identitu. Overte, že ste si ju správne uložili."
+
+msgid "You can reset your recovery phrase at any time. This keeps your identity secure if it is ever exposed."
+msgstr "Frázu na obnovenie môžete kedykoľvek resetovať. To udrží vašu identitu v bezpečí, ak by bola niekedy odhalená."
+
+msgid "You have reached the maximum number of passkeys"
+msgstr "Dosiahli ste maximálny počet prístupových kľúčov"
+
+msgid "You may close this page."
+msgstr "Túto stránku môžete zavrieť."
+
+msgid "You no longer need to remember your identity number and can use your fingerprint, face or screen lock instead."
+msgstr "Už si nemusíte pamätať číslo identity a namiesto toho môžete použiť odtlačok prsta, tvár alebo zámok obrazovky."
+
+msgid "You're about to see your recovery phrase, which Internet Identity doesn't store and thus can't be retrieved if lost, so keep it safe offline."
+msgstr "Chystáte sa zobraziť svoju frázu na obnovenie, ktorú Internet Identity neukladá, a preto ju v prípade straty nie je možné získať späť. Uchovajte ju bezpečne offline."
+
+msgid "You're about to sign in on a <0>new device</0>."
+msgstr "Chystáte sa prihlásiť na <0>novom zariadení</0>."
+
+msgid "You're about to sign in."
+msgstr "Chystáte sa prihlásiť."
+
+msgid "You're about to unlink your {name} account."
+msgstr "Chystáte sa odpojiť svoj účet {name}."
+
+msgid "You're all set. Your identity has been created."
+msgstr "Všetko je pripravené. Vaša identita bola vytvorená."
+
+msgid "You're all set. Your passkey has been registered."
+msgstr "Všetko je pripravené. Váš prístupový kľúč bol zaregistrovaný."
+
+msgid "You're signing in as <0>{name}</0>."
+msgstr "Prihlasujete sa ako <0>{name}</0>."
+
+msgid "Your identity and sign-in methods at a glance."
+msgstr "Vaša identita a metódy prihlásenia na prvý pohľad."
+
+msgid "Your identity name is currently not editable. It is only ever visible to you."
+msgstr "Názov vašej identity momentálne nie je možné upravovať. Je viditeľný iba pre vás."
+
+msgid "Your recovery phrase gives full control over your identity. Never share it and only use it on the official website."
+msgstr "Fráza na obnovenie dáva plnú kontrolu nad vašou identitou. Nikdy ju nezdieľajte a používajte ju iba na oficiálnej webovej stránke."
+
+msgid "Your recovery phrase is active, verify you saved it correctly."
+msgstr "Vaša fráza na obnovenie je aktívna. Overte, že ste si ju správne uložili."
+
+msgid "Your recovery phrase is now active and can be reset anytime."
+msgstr "Vaša fráza na obnovenie je teraz aktívna a dá sa kedykoľvek resetovať."
