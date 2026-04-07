@@ -717,7 +717,7 @@ msgid "Remove from this device"
 msgstr "Supprimer de cet appareil"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr "Supprimez les identités que vous n\’utilisez pas. Vous pouvez les rajouter à tout moment en vous reconnectant."
+msgstr "Supprimez les identités que vous n’utilisez pas. Vous pouvez les rajouter à tout moment en vous reconnectant."
 
 msgid "Remove passkey"
 msgstr "Supprimer la passkey"
@@ -831,7 +831,7 @@ msgid "Sign out and keep identity"
 msgstr "Se déconnecter et conserver l’identité"
 
 msgid "Sign out and remove from device"
-msgstr "Se déconnecter et supprimer de l\’appareil"
+msgstr "Se déconnecter et supprimer de l’appareil"
 
 msgid "Sign out from this device"
 msgstr "Se déconnecter de cet appareil"

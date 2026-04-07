@@ -717,7 +717,7 @@ msgid "Remove from this device"
 msgstr "Verwijderen van dit apparaat"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr "Verwijder identiteiten die u niet gebruikt. U kunt ze altijd weer toevoegen door opnieuw in te loggen."
+msgstr "Verwijder identiteiten die u niet gebruikt. U kunt ze op elk moment weer toevoegen door opnieuw in te loggen."
 
 msgid "Remove passkey"
 msgstr "Passkey verwijderen"
@@ -798,7 +798,7 @@ msgid "Select each word in the correct order:"
 msgstr "Selecteer elk woord in de juiste volgorde:"
 
 msgid "Session timed out"
-msgstr "Sessie is verlopen"
+msgstr "Sessie verlopen"
 
 msgid "Set as default sign-in"
 msgstr "Instellen als standaard inlogmethode"
@@ -1148,16 +1148,16 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "U upgrade ID <0>{identityNumber}</0>"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr "U kunt deze altijd weer toevoegen door in te loggen met hetzelfde {openIdProvider}-account."
+msgstr "U kunt het op elk moment weer toevoegen door in te loggen met hetzelfde {openIdProvider}-account."
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr "U kunt deze altijd weer toevoegen door in te loggen met dezelfde passkey."
+msgstr "U kunt het op elk moment weer toevoegen door in te loggen met dezelfde passkey."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "U kunt doorgaan met <0>Gebruik bestaande Passkey</0> in het inlogproces."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr "U kunt uitloggen en uw identiteit bewaren om de volgende keer sneller in te loggen, of deze volledig van dit apparaat verwijderen."
+msgstr "U kunt uitloggen en uw identiteit bewaren voor sneller inloggen de volgende keer, of deze volledig verwijderen van dit apparaat."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "U kunt uw identiteit nu herstellen, verifieer of u het correct hebt opgeslagen."
