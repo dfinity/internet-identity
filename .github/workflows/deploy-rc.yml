@@ -23,7 +23,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Find all artifacts for the production build, and filter for non-expired main artifacts
+            // Find all artifacts for the backend build, and filter for non-expired main artifacts
             const allArtifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,

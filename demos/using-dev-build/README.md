@@ -48,7 +48,7 @@ This section explains how to add Internet Identity to your (local) project. Add 
 "internet_identity": {
   "type": "custom",
   "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_backend.wasm.gz",
+  "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz",
   "init_arg": "(opt record { captcha_config = opt record { max_unsolved_captchas= 50:nat64; captcha_trigger = variant {Static = variant {CaptchaDisabled}}}})",
   "remote": {
     "id": {
