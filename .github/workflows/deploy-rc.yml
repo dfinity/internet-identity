@@ -17,10 +17,10 @@ jobs:
       testnet_app_canister_id: jlfvx-nqaaa-aaaad-aab7a-cai
       wallet_canister_id: cvthj-wyaaa-aaaad-aaaaq-cai
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: "Download build for Release Candidate"
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             // Find all artifacts for the backend build, and filter for non-expired main artifacts

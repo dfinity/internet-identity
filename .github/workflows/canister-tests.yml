@@ -15,16 +15,16 @@ jobs:
   docker-build-base:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       # We use buildx and its GitHub Actions caching support `type=gha`. For
       # more information, see
       # https://github.com/docker/build-push-action/issues/539
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build base Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: Dockerfile
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-base
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Infer version
         id: version
@@ -51,10 +51,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build internet_identity_backend.wasm.gz
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: Dockerfile
@@ -68,7 +68,7 @@ jobs:
       - run: mv out/internet_identity.wasm.gz internet_identity_backend.wasm.gz
       - run: sha256sum internet_identity_backend.wasm.gz
       - name: "Upload internet_identity_backend.wasm.gz"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # name is the name used to display and retrieve the artifact
           name: internet_identity_backend.wasm.gz
@@ -80,13 +80,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-base
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build Archive Canister
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: Dockerfile
@@ -98,7 +98,7 @@ jobs:
       - run: mv out/archive.wasm.gz archive.wasm.gz
       - run: sha256sum archive.wasm.gz
       - name: "Upload archive.wasm.gz"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # name is the name used to display and retrieve the artifact
           name: archive.wasm.gz
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-base
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Infer version
         id: version
@@ -120,10 +120,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build internet_identity_frontend.wasm.gz
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: Dockerfile
@@ -137,7 +137,7 @@ jobs:
       - run: mv out/internet_identity_frontend.wasm.gz internet_identity_frontend.wasm.gz
       - run: sha256sum internet_identity_frontend.wasm.gz
       - name: "Upload internet_identity_frontend.wasm.gz"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # name is the name used to display and retrieve the artifact
           name: internet_identity_frontend.wasm.gz
@@ -149,9 +149,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-internet_identity
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: "Download wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
@@ -175,8 +175,8 @@ jobs:
   vc_demo_issuer-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -192,7 +192,7 @@ jobs:
       - run: sha256sum vc_demo_issuer.wasm.gz
         working-directory: demos/vc_issuer
       - name: "Upload VC issuer"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # name is the name used to display and retrieve the artifact
           name: vc_demo_issuer.wasm.gz
@@ -203,8 +203,8 @@ jobs:
   test-app-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -218,7 +218,7 @@ jobs:
         working-directory: demos/test-app
         run: ./build.sh
       - name: "Upload test app"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # name is the name used to display and retrieve the artifact
           name: test_app.wasm
@@ -234,8 +234,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docker-build-internet_identity, vc_demo_issuer-build]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.cargo/registry
@@ -244,18 +244,18 @@ jobs:
           key: ${{ runner.os }}-cargo-vc-tests-${{ hashFiles('demos/vc_issuer/Cargo.lock', 'rust-toolchain.toml') }}
       - uses: ./.github/actions/bootstrap
       - name: "Download VC issuer wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: vc_demo_issuer.wasm.gz
           path: demos/vc_issuer
       - name: "Download II wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
       - run: mv internet_identity_backend.wasm.gz internet_identity.wasm.gz
       - name: Install PocketIC server
-        uses: dfinity/pocketic@main
+        uses: dfinity/pocketic@20c33db1aa87cc6ece50857ac632c37acf5e0322 # main
         with:
           pocket-ic-server-version: "9.0.3"
       - name: "Run VC issuer canister tests"
@@ -279,13 +279,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       # Attempt to restore the pre-built test binaries from cache.
       # The test binaries are only dependent on rust code, because the front-end code is bundled in the `wasm` file
       # that is loaded by the test binaries.
       # If the binary can be restored from cache, we skip the build step, including even setting up the toolchain etc.
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: cache-test-archive
         with:
           path: /tmp/test-archive
@@ -294,7 +294,7 @@ jobs:
       - uses: ./.github/actions/bootstrap
         if: steps.cache-test-archive.outputs.cache-hit != 'true'
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.cache-test-archive.outputs.cache-hit != 'true'
         with:
           path: |
@@ -333,7 +333,7 @@ jobs:
           mv /tmp/test-archive/canister-tests-${{ matrix.os }}.tar.zst .
 
       - name: "Upload canister test archive"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # name is the name used to display and retrieve the artifact
           name: canister-tests-${{ matrix.os }}.tar.zst
@@ -355,7 +355,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         partition: ["1/3", "2/3", "3/3"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Download nextest
         run: |
@@ -363,29 +363,29 @@ jobs:
           curl -LsSf https://get.nexte.st/latest/${{ matrix.os == 'macos-latest' && 'mac' || 'linux' }}  | tar zxf -
 
       - name: "Download nextest test archive"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: canister-tests-${{ matrix.os }}.tar.zst
           path: .
       - name: Install PocketIC server
-        uses: dfinity/pocketic@main
+        uses: dfinity/pocketic@20c33db1aa87cc6ece50857ac632c37acf5e0322 # main
         with:
           pocket-ic-server-version: "9.0.3"
 
       - name: "Download II wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: archive.wasm.gz
           path: .
 
       - name: "Download II frontend wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_frontend.wasm.gz
           path: .
@@ -415,8 +415,8 @@ jobs:
     needs: [docker-build-internet_identity, docker-build-archive]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: cache
         with:
           path: |
@@ -425,13 +425,13 @@ jobs:
           key: ${{ runner.os }}-test-canisters-script-${{ hashFiles('rust-toolchain.toml', 'Cargo.lock', '.node-version', 'package-lock.json') }}
 
       - name: "Download II wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: archive.wasm.gz
           path: .
@@ -482,7 +482,7 @@ jobs:
       # OpenID provider instance ports (see /src/test_openid_provider)
       openid_providers: "11105 11106"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: ./.github/actions/setup-node
 
       - name: Install npm deps
@@ -514,19 +514,19 @@ jobs:
         run: dfx start --background --artificial-delay 0
 
       - name: "Download II backend wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download II frontend wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_frontend.wasm.gz
           path: .
 
       - name: "Download test app wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: test_app.wasm
           path: demos/test-app
@@ -578,7 +578,7 @@ jobs:
 
       - name: Archive dev server logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: dev-server-logs-${{ env.artifact_suffix }}
           path: dev-server-logs.txt
@@ -586,7 +586,7 @@ jobs:
 
       - name: Archive playwright reports
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: playwright-report-${{ env.artifact_suffix }}
           path: playwright-report/
@@ -612,18 +612,18 @@ jobs:
         vc_demo_issuer-build,
       ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
       - name: "Download II wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: archive.wasm.gz
           path: .
@@ -649,7 +649,7 @@ jobs:
             y2aaj-miaaa-aaaad-aacxq-cai
 
       - name: "Download test app wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: test_app.wasm
           path: .
@@ -664,7 +664,7 @@ jobs:
             vt36r-2qaaa-aaaad-aad5a-cai
 
       - name: "Download VC issuer wasm"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: vc_demo_issuer.wasm.gz
           path: .
@@ -702,34 +702,34 @@ jobs:
       ]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: "Download backend build"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_backend.wasm.gz
           path: .
 
       - name: "Download archive"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: archive.wasm.gz
           path: .
 
       - name: "Download frontend"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: internet_identity_frontend.wasm.gz
           path: .
 
       - name: "Download issuer"
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: vc_demo_issuer.wasm.gz
           path: .
 
       - name: "Get GHA job IDs"
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         id: pipeline-jobs
         with:
           script: |
@@ -745,7 +745,7 @@ jobs:
               });
 
       - name: "Get latest release"
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         id: latest-release-tag
         with:
           result-encoding: string
@@ -757,7 +757,7 @@ jobs:
       # listing contributions since).
       # https://github.com/github/feedback/discussions/5975
       - name: "Generate CHANGELOG"
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         id: changelog
         with:
           result-encoding: string
@@ -840,7 +840,7 @@ jobs:
 
       # Create app token (needed to create pull request)
       - name: Create GitHub App Token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
         id: app-token
         with:
           app-id: ${{ vars.PR_AUTOMATION_BOT_PUBLIC_APP_ID }}
@@ -848,7 +848,7 @@ jobs:
 
       # Checkout project
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           token: ${{ steps.app-token.outputs.token }}
 
@@ -900,7 +900,7 @@ jobs:
   sig-verifier-js:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: ./.github/actions/setup-node
       - run: npm ci
       - name: Build sig-verifier
