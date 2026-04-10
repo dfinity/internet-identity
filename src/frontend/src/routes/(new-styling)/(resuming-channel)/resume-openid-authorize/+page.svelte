@@ -56,7 +56,9 @@
       const requestedKeys = icrc3Result.success ? icrc3Result.data.keys : [];
 
       if (needsConsentScreen(requestedKeys, issuer)) {
-        await goto("/authorize/consent");
+        const url = new URL("/authorize/consent", window.location.origin);
+        url.searchParams.set("issuer", issuer);
+        await goto(url);
         return;
       }
 

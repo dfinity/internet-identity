@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { authenticatedStore } from "$lib/stores/authentication.store";
+  import { page } from "$app/state";
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { t } from "$lib/stores/locale.store";
   import { handleError } from "$lib/components/utils/error";
@@ -62,8 +63,7 @@
     derivationOrigin?: string,
   ) => {
     try {
-      // TODO: get issuer from context if available (OpenID flow)
-      const issuer = undefined;
+      const issuer = page.url.searchParams.get("issuer") ?? undefined;
       const requestOrigin = $establishedChannelStore.origin;
 
       // Validate derivation origin the same way as authorization.store.ts
@@ -98,7 +98,7 @@
       const consentGroups = buildConsentGroups(
         requestedKeys,
         availableAttributes,
-        [], // TODO: pass metadata for provider names/logos
+        [],
         issuer,
       );
 
@@ -236,7 +236,6 @@
             <p class="text-text-secondary text-sm font-medium">
               {group.label}
             </p>
-            <!-- TODO: Replace with proper dropdown for multi-provider selection -->
             {#each group.options as option}
               <Checkbox
                 checked={checkedKeys.has(option.scopedKey)}
