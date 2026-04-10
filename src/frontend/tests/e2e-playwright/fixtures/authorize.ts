@@ -12,6 +12,7 @@ export type AuthorizeConfig = {
       openid?: string;
       attributes?: string[];
       useIcrc3Attributes?: boolean;
+      icrc3Nonce?: string;
     }
 );
 
@@ -67,6 +68,14 @@ export const test = base.extend<{
         await testAppPage
           .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
           .setChecked(true);
+      }
+      if (
+        "icrc3Nonce" in authorizeConfig &&
+        authorizeConfig.icrc3Nonce !== undefined
+      ) {
+        await testAppPage
+          .getByRole("textbox", { name: "ICRC-3 nonce (base64):" })
+          .fill(authorizeConfig.icrc3Nonce);
       }
       if (
         "attributes" in authorizeConfig &&

@@ -86,6 +86,7 @@ const useIcrc25El = document.getElementById("useIcrc25") as HTMLInputElement;
 const useIcrc3AttributesEl = document.getElementById(
   "useIcrc3Attributes",
 ) as HTMLInputElement;
+const icrc3NonceEl = document.getElementById("icrc3Nonce") as HTMLInputElement;
 const requestAttributesEl = document.getElementById(
   "requestAttributes",
 ) as HTMLInputElement;
@@ -337,6 +338,11 @@ const init = async () => {
         autoSelectionPrincipal,
         useIcrc25: useIcrc25El.checked,
         useIcrc3Attributes: useIcrc3AttributesEl.checked,
+        icrc3Nonce:
+          icrc3NonceEl.value.trim() !== ""
+            ? // @ts-ignore Not known in TS types yet but supported in all browsers
+              Uint8Array.fromBase64(icrc3NonceEl.value.trim())
+            : undefined,
         requestAttributes: requestAttributesEl.value
           .split("\n")
           .map((s) => s.trim())

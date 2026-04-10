@@ -5,7 +5,7 @@ import {
   ALTERNATE_OPENID_PORT,
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
-import { fromBase64, II_URL } from "../../utils";
+import { fromBase64, toBase64, II_URL } from "../../utils";
 
 type Icrc3Value =
   | { Nat: bigint }
@@ -142,6 +142,55 @@ test.describe("Authorize with direct OpenID", () => {
     });
 
     test("should return attributes", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
+  test.describe("with app-supplied nonce", () => {
+    const name = "John Doe";
+    const knownNonce = new Uint8Array(32).fill(42);
+    const knownNonceBase64 = toBase64(knownNonce);
+
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
+        icrc3Nonce: knownNonceBase64,
+        attributes: [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      const map = decodeIcrc3Map(authorizedIcrc3Attributes.data);
+
+      // Verify the nonce in the ICRC-3 map matches the one we supplied
+      expect(map["implicit:nonce"]).toHaveProperty("Blob");
+      const { Blob: nonceBlob } = map["implicit:nonce"] as {
+        Blob: number[];
+      };
+      expect(nonceBlob).toEqual(Array.from(knownNonce));
+    });
+
+    test("should include the app-supplied nonce", async ({
       authorizePage,
       signInWithOpenId,
       openIdUsers,
