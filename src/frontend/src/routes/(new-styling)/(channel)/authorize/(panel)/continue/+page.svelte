@@ -35,7 +35,6 @@
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import {
-    AttributesParamsSchema,
     DelegationResultSchema,
     Icrc3AttributesParamsSchema,
     type JsonRequest,
@@ -123,8 +122,7 @@
         (request: JsonRequest) => {
           if (
             request.id !== undefined &&
-            (request.method === "ii_attributes" ||
-              request.method === "ii-icrc3-attributes")
+            request.method === "ii-icrc3-attributes"
           ) {
             resolved = true;
             unsubscribe();
@@ -146,17 +144,8 @@
     if (pendingRequest === undefined) {
       return false;
     }
-    const legacyResult = AttributesParamsSchema.safeParse(
-      pendingRequest.params,
-    );
-    const icrc3Result = Icrc3AttributesParamsSchema.safeParse(
-      pendingRequest.params,
-    );
-    const requestedKeys = legacyResult.success
-      ? legacyResult.data.attributes
-      : icrc3Result.success
-        ? icrc3Result.data.keys
-        : [];
+    const result = Icrc3AttributesParamsSchema.safeParse(pendingRequest.params);
+    const requestedKeys = result.success ? result.data.keys : [];
 
     if (needsConsentScreen(requestedKeys)) {
       await goto("/authorize/consent");

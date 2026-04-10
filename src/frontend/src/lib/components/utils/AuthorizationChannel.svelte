@@ -49,8 +49,7 @@
       channel.addEventListener("request", (request) => {
         if (
           request.id === undefined ||
-          (request.method !== "ii_attributes" &&
-            request.method !== "ii-icrc3-attributes")
+          request.method !== "ii-icrc3-attributes"
         ) {
           return;
         }

@@ -42,36 +42,26 @@
 
   const createAttributesListener =
     (issuer: string) => async (request: JsonRequest) => {
-      if (
-        request.method !== "ii_attributes" &&
-        request.method !== "ii-icrc3-attributes"
-      ) {
+      if (request.method === "ii_attributes") {
+        await handleLegacyAttributes(issuer, request);
         return;
       }
 
-      // Parse requested keys to check if consent screen is needed
-      const legacyResult = AttributesParamsSchema.safeParse(request.params);
+      if (request.method !== "ii-icrc3-attributes") {
+        return;
+      }
+
+      // For ICRC-3: check if consent screen is needed
       const icrc3Result = Icrc3AttributesParamsSchema.safeParse(request.params);
-      const requestedKeys = legacyResult.success
-        ? legacyResult.data.attributes
-        : icrc3Result.success
-          ? icrc3Result.data.keys
-          : [];
+      const requestedKeys = icrc3Result.success ? icrc3Result.data.keys : [];
 
       if (needsConsentScreen(requestedKeys, issuer)) {
-        // Non-implicit attributes requested — redirect to consent page.
-        // The channel persists in the global store, so the consent page
-        // can re-attach a listener to pick up this request.
         await goto("/authorize/consent");
         return;
       }
 
       // All implicit — proceed without consent screen
-      if (request.method === "ii_attributes") {
-        await handleLegacyAttributes(issuer, request);
-      } else {
-        await handleIcrc3Attributes(issuer, request);
-      }
+      await handleIcrc3Attributes(issuer, request);
     };
 
   const handleLegacyAttributes = async (
