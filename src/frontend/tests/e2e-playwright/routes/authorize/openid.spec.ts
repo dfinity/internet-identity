@@ -190,7 +190,7 @@ test.describe("Authorize with direct OpenID", () => {
       const { Blob: nonceBlob } = map["implicit:nonce"] as {
         Blob: number[];
       };
-      expect(nonceBlob).toEqual(Array.from(knownNonce));
+      expect(Array.from(nonceBlob)).toEqual(Array.from(knownNonce));
     });
 
     test("should include the app-supplied nonce", async ({
