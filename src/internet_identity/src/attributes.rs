@@ -1597,10 +1597,7 @@ mod tests {
                         Icrc3Value::Text("user@example.com".to_string())
                     );
                     pretty_assert_eq!(entries[1].0, "name");
-                    pretty_assert_eq!(
-                        entries[1].1,
-                        Icrc3Value::Text("Example User".to_string())
-                    );
+                    pretty_assert_eq!(entries[1].1, Icrc3Value::Text("Example User".to_string()));
                 }
                 other => panic!("Expected Map, got {:?}", other),
             }

@@ -713,7 +713,11 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 .expect("Expected 'implicit:issued_at_timestamp_ns' key in message map");
             match &timestamp_entry.1 {
                 Icrc3Value::Nat(nat) => {
-                    let ts: u64 = nat.0.clone().try_into().expect("timestamp should fit in u64");
+                    let ts: u64 = nat
+                        .0
+                        .clone()
+                        .try_into()
+                        .expect("timestamp should fit in u64");
                     assert!(
                         ts >= time_before && ts <= time_after,
                         "Timestamp {} should be between {} and {}",
