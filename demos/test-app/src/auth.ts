@@ -133,9 +133,7 @@ export const authWithII = async ({
                 !("data" in response.result) ||
                 !("signature" in response.result)
               ) {
-                throw new Error(
-                  "ICRC-3 attributes response is missing data or signature",
-                );
+                return undefined;
               }
               return {
                 // @ts-ignore Not known in TS types yet but supported in all browsers

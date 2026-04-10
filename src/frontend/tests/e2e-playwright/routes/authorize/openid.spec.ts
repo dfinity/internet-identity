@@ -188,27 +188,13 @@ test.describe("Authorize with direct OpenID", () => {
       },
     );
 
+    // Unlike the legacy flow where prepare_attributes silently omits unavailable
+    // attributes, prepare_icrc3_attributes returns an error when any requested
+    // attribute doesn't exist. The delegation still succeeds, but no attributes
+    // are returned.
     test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
-      expect(authorizedIcrc3Attributes).toBeDefined();
-      if (authorizedIcrc3Attributes === undefined) {
-        return;
-      }
-
-      const blobEntries = decodeIcrc3BlobEntries(
-        authorizedIcrc3Attributes.data,
-      );
-      // Only the name from the default provider should be present via implicit consent.
-      expect(
-        blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
-      ).toBe(defaultName);
-      expect(
-        blobEntries[`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`],
-      ).toBeUndefined();
-      expect(blobEntries["favorite_food"]).toBeUndefined();
-      expect(
-        blobEntries[`openid:http://localhost:${ALTERNATE_OPENID_PORT}:name`],
-      ).toBeUndefined();
+      expect(authorizedIcrc3Attributes).toBeUndefined();
     });
 
     test("should omit attributes", async ({
