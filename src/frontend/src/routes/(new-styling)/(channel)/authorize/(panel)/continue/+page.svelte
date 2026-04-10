@@ -172,8 +172,6 @@
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
 
-      void redirectToConsentIfNeeded();
-
       const { identityNumber, actor } = $authenticationStore!;
       const { effectiveOrigin } = $authorizationContextStore;
       void triggerDropWaveAnimation();
@@ -185,6 +183,7 @@
               .then((account) => account.account_number[0])
           : defaultAccountNumber,
       );
+      await redirectToConsentIfNeeded();
     } catch (error) {
       handleError(error);
     } finally {
@@ -195,8 +194,8 @@
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
     try {
-      void redirectToConsentIfNeeded();
       await authorize(accountNumber);
+      await redirectToConsentIfNeeded();
     } catch (error) {
       handleError(error);
     }
