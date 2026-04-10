@@ -1,22 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    authorizationContextStore,
-    authorizationStore,
-  } from "$lib/stores/authorization.store";
-  import {
-    authenticationStore,
-    authenticatedStore,
-  } from "$lib/stores/authentication.store";
+  import { authorizationContextStore } from "$lib/stores/authorization.store";
+  import { authenticatedStore } from "$lib/stores/authentication.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { t } from "$lib/stores/locale.store";
   import { handleError } from "$lib/components/utils/error";
   import {
-    AttributesParamsSchema,
-    DelegationResultSchema,
     Icrc3AttributesParamsSchema,
-    INVALID_PARAMS_ERROR_CODE,
     type JsonRequest,
   } from "$lib/utils/transport/utils";
   import { throwCanisterError, retryFor } from "$lib/utils/utils";
@@ -44,8 +35,7 @@
   let checkedKeys = $state(new Set<string>());
   let pendingRequest = $state<{
     request: JsonRequest & { id: string | number };
-    protocol: "legacy" | "icrc3";
-    nonce?: string;
+    nonce: string;
     issuer?: string;
   } | null>(null);
 
@@ -55,29 +45,19 @@
     const unsubscribe = $establishedChannelStore.addEventListener(
       "request",
       async (request: JsonRequest) => {
-        if (request.id === undefined) {
+        if (
+          request.id === undefined ||
+          request.method !== "ii-icrc3-attributes"
+        ) {
           return;
         }
-
-        if (request.method === "ii_attributes") {
-          const result = AttributesParamsSchema.safeParse(request.params);
-          if (result.success) {
-            await handleAttributeRequest(
-              { ...request, id: request.id },
-              result.data.attributes,
-              "legacy",
-            );
-          }
-        } else if (request.method === "ii-icrc3-attributes") {
-          const result = Icrc3AttributesParamsSchema.safeParse(request.params);
-          if (result.success) {
-            await handleAttributeRequest(
-              { ...request, id: request.id },
-              result.data.keys,
-              "icrc3",
-              result.data.nonce,
-            );
-          }
+        const result = Icrc3AttributesParamsSchema.safeParse(request.params);
+        if (result.success) {
+          await handleAttributeRequest(
+            { ...request, id: request.id },
+            result.data.keys,
+            result.data.nonce,
+          );
         }
       },
     );
@@ -88,8 +68,7 @@
   const handleAttributeRequest = async (
     request: JsonRequest & { id: string | number },
     requestedKeys: string[],
-    protocol: "legacy" | "icrc3",
-    nonce?: string,
+    nonce: string,
   ) => {
     try {
       // TODO: get issuer from context if available (OpenID flow)
@@ -110,7 +89,7 @@
       );
 
       groups = consentGroups;
-      pendingRequest = { request, protocol, nonce, issuer };
+      pendingRequest = { request, nonce, issuer };
 
       // Pre-check implicit-consent attributes
       for (const group of consentGroups) {
@@ -131,14 +110,10 @@
     }
 
     const selectedKeys = Array.from(checkedKeys);
-    const { request, protocol, nonce } = pendingRequest;
+    const { request, nonce } = pendingRequest;
 
     try {
-      if (protocol === "legacy") {
-        await sendLegacyAttributeResponse(request, selectedKeys);
-      } else {
-        await sendIcrc3AttributeResponse(request, selectedKeys, nonce);
-      }
+      await sendIcrc3AttributeResponse(request, selectedKeys, nonce);
     } catch (error) {
       await $establishedChannelStore.send({
         jsonrpc: "2.0",
@@ -152,60 +127,11 @@
     }
   };
 
-  const sendLegacyAttributeResponse = async (
-    request: JsonRequest & { id: string | number },
-    selectedKeys: string[],
-  ) => {
-    const { attributes, issued_at_timestamp_ns } =
-      await $authenticatedStore.actor
-        .prepare_attributes({
-          origin: $authorizationContextStore.effectiveOrigin,
-          attribute_keys: selectedKeys,
-          account_number: [],
-          identity_number: $authenticatedStore.identityNumber,
-        })
-        .then(throwCanisterError);
-    const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
-      5,
-      () =>
-        $authenticatedStore.actor
-          .get_attributes({
-            origin: $authorizationContextStore.effectiveOrigin,
-            account_number: [],
-            identity_number: $authenticatedStore.identityNumber,
-            attributes,
-            issued_at_timestamp_ns,
-          })
-          .then(throwCanisterError),
-    );
-    await $establishedChannelStore.send({
-      jsonrpc: "2.0",
-      id: request.id,
-      result: {
-        attributes: Object.fromEntries(
-          certified_attributes.map((attribute) => [
-            attribute.key,
-            {
-              value: z.util.uint8ArrayToBase64(new Uint8Array(attribute.value)),
-              signature: z.util.uint8ArrayToBase64(
-                new Uint8Array(attribute.signature),
-              ),
-              expiration: expires_at_timestamp_ns.toString(),
-            },
-          ]),
-        ),
-      },
-    });
-  };
-
   const sendIcrc3AttributeResponse = async (
     request: JsonRequest & { id: string | number },
     selectedKeys: string[],
-    nonce?: string,
+    nonce: string,
   ) => {
-    if (nonce === undefined) {
-      return;
-    }
     const { message } = await $authenticatedStore.actor
       .prepare_icrc3_attributes({
         origin: $authorizationContextStore.effectiveOrigin,
