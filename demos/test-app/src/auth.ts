@@ -45,6 +45,7 @@ export const authWithII = async ({
   autoSelectionPrincipal,
   useIcrc25,
   requestAttributes,
+  useIcrc3Attributes,
 }: {
   url: string;
   maxTimeToLive?: bigint;
