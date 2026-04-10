@@ -46,6 +46,7 @@ export const authWithII = async ({
   useIcrc25,
   requestAttributes,
   useIcrc3Attributes,
+  icrc3Nonce,
 }: {
   url: string;
   maxTimeToLive?: bigint;
@@ -56,6 +57,7 @@ export const authWithII = async ({
   useIcrc25?: boolean;
   requestAttributes?: string[];
   useIcrc3Attributes?: boolean;
+  icrc3Nonce?: Uint8Array;
 }): Promise<{
   identity: DelegationIdentity;
   authnMethod: string;
@@ -111,7 +113,7 @@ export const authWithII = async ({
             })
         : Promise.resolve(undefined);
 
-    const nonce = crypto.getRandomValues(new Uint8Array(32));
+    const nonce = icrc3Nonce ?? crypto.getRandomValues(new Uint8Array(32));
     const icrc3AttributesPromise =
       hasAttributes && useIcrc3Attributes
         ? signer
