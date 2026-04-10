@@ -267,78 +267,51 @@ impl Anchor {
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs = BTreeMap::new();
-        let mut problems = Vec::new();
 
         for spec in &attribute_specs {
-            match &spec.key.scope {
-                Some(AttributeScope::OpenId { issuer }) => {
-                    let credential = self
-                        .openid_credentials
-                        .iter()
-                        .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()));
+            let Some(AttributeScope::OpenId { issuer }) = &spec.key.scope else {
+                // Only scoped attributes are supported; silently skip unscoped ones.
+                continue;
+            };
 
-                    let Some(credential) = credential else {
-                        problems.push(format!("No credential found for issuer: {}", issuer));
-                        continue;
-                    };
+            let Some(credential) = self
+                .openid_credentials
+                .iter()
+                .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()))
+            else {
+                continue;
+            };
 
-                    let stored_value = match spec.key.attribute_name {
-                        AttributeName::Email => credential.get_email(),
-                        AttributeName::Name => credential.get_name(),
-                        AttributeName::VerifiedEmail => credential.get_verified_email(),
-                    };
+            let stored_value = match spec.key.attribute_name {
+                AttributeName::Email => credential.get_email(),
+                AttributeName::Name => credential.get_name(),
+                AttributeName::VerifiedEmail => credential.get_verified_email(),
+            };
 
-                    let Some(stored) = stored_value else {
-                        problems.push(format!(
-                            "Attribute {} not available for issuer {}",
-                            spec.key.attribute_name, issuer
-                        ));
-                        continue;
-                    };
+            let Some(stored) = stored_value else {
+                continue;
+            };
 
-                    // If a value was provided, validate it matches.
-                    if let Some(ref expected_value) = spec.value {
-                        if expected_value.as_slice() != stored.as_bytes() {
-                            problems.push(format!(
-                                "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
-                                spec.key,
-                                stored.len()
-                            ));
-                            continue;
-                        }
-                    }
-
-                    // Compute the certified key.
-                    let certified_key = if spec.omit_scope {
-                        spec.key.attribute_name.to_string()
-                    } else {
-                        spec.key.to_string()
-                    };
-
-                    match certified_pairs.entry(certified_key) {
-                        std::collections::btree_map::Entry::Occupied(entry) => {
-                            problems.push(format!(
-                                "Duplicate certified attribute key '{}' derived from spec {}",
-                                entry.key(),
-                                spec.key
-                            ));
-                        }
-                        std::collections::btree_map::Entry::Vacant(entry) => {
-                            entry.insert(stored.into_bytes());
-                        }
-                    }
-                }
-                None => {
-                    problems.push(format!(
-                        "Attribute {} has no scope; only scoped attributes are supported",
-                        spec.key
-                    ));
+            // If a value was provided, validate it matches.
+            if let Some(ref expected_value) = spec.value {
+                if expected_value.as_slice() != stored.as_bytes() {
+                    continue;
                 }
             }
-        }
 
-        if !problems.is_empty() {
-            return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
+            // Compute the certified key.
+            let certified_key = if spec.omit_scope {
+                spec.key.attribute_name.to_string()
+            } else {
+                spec.key.to_string()
+            };
+
+            // Skip duplicates silently.
+            if let std::collections::btree_map::Entry::Vacant(entry) =
+                certified_pairs.entry(certified_key)
+            {
+                entry.insert(stored.into_bytes());
+            }
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), nonce);
@@ -1607,134 +1580,11 @@ mod tests {
             }
         }
 
-        #[test]
-        fn should_reject_value_mismatch() {
-            setup_google_provider();
-            let anchor = google_anchor();
-            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
-
-            let result = anchor.prepare_icrc3_attributes(
-                vec![
-                    google_spec(AttributeName::Email, Some(b"user@example.com"), false), // correct
-                    google_spec(AttributeName::Name, Some(b"Wrong Name"), false),        // wrong
-                ],
-                vec![0u8; 32],
-                "https://dapp.com".to_string(),
-                1_000_000_000,
-                account,
-            );
-
-            match result {
-                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-                    pretty_assert_eq!(problems.len(), 1);
-                    assert!(
-                        problems[0].contains("value mismatch"),
-                        "Expected value mismatch error, got: {}",
-                        problems[0]
-                    );
-                    assert!(problems[0].contains("name"), "Error should mention 'name'");
-                }
-                other => panic!("Expected AttributeMismatch, got {:?}", other),
-            }
-        }
-
-        #[test]
-        fn should_reject_unknown_issuer() {
-            setup_google_provider();
-            let anchor = google_anchor();
-            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
-
-            let result = anchor.prepare_icrc3_attributes(
-                vec![ValidatedAttributeSpec {
-                    key: AttributeKey {
-                        scope: Some(AttributeScope::OpenId {
-                            issuer: "https://unknown-issuer.com".to_string(),
-                        }),
-                        attribute_name: AttributeName::Email,
-                    },
-                    value: None,
-                    omit_scope: false,
-                }],
-                vec![0u8; 32],
-                "https://dapp.com".to_string(),
-                1_000_000_000,
-                account,
-            );
-
-            match result {
-                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-                    assert!(
-                        problems[0].contains("No credential found"),
-                        "Expected 'No credential found', got: {}",
-                        problems[0]
-                    );
-                }
-                other => panic!("Expected AttributeMismatch, got {:?}", other),
-            }
-        }
-
-        #[test]
-        fn should_reject_scopeless_attribute() {
-            setup_google_provider();
-            let anchor = google_anchor();
-            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
-
-            let result = anchor.prepare_icrc3_attributes(
-                vec![ValidatedAttributeSpec {
-                    key: AttributeKey {
-                        scope: None,
-                        attribute_name: AttributeName::Email,
-                    },
-                    value: None,
-                    omit_scope: false,
-                }],
-                vec![0u8; 32],
-                "https://dapp.com".to_string(),
-                1_000_000_000,
-                account,
-            );
-
-            match result {
-                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-                    assert!(
-                        problems[0].contains("no scope"),
-                        "Expected 'no scope' error, got: {}",
-                        problems[0]
-                    );
-                }
-                other => panic!("Expected AttributeMismatch, got {:?}", other),
-            }
-        }
-
-        #[test]
-        fn should_reject_duplicate_certified_keys() {
-            setup_google_provider();
-            let anchor = google_anchor();
-            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
-
-            // Two specs that both resolve to certified key "email" due to omit_scope=true
-            let result = anchor.prepare_icrc3_attributes(
-                vec![
-                    google_spec(AttributeName::Email, None, true),
-                    google_spec(AttributeName::Email, None, true),
-                ],
-                vec![0u8; 32],
-                "https://dapp.com".to_string(),
-                1_000_000_000,
-                account,
-            );
-
-            match result {
-                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-                    assert!(
-                        problems[0].contains("Duplicate certified attribute key"),
-                        "Expected duplicate key error, got: {}",
-                        problems[0]
-                    );
-                }
-                other => panic!("Expected AttributeMismatch, got {:?}", other),
-            }
-        }
+        // Silent omit behavior (value mismatch, unknown issuer, scopeless attributes,
+        // duplicate keys) is verified by the e2e tests in openid.spec.ts, which exercise
+        // the full canister signing flow. Unit tests for these cases were removed because
+        // prepare_icrc3_attributes now succeeds (signing the message) instead of returning
+        // an error, and the signing code requires a canister runtime.
     }
 
     mod icrc3_attribute_message_tests {
