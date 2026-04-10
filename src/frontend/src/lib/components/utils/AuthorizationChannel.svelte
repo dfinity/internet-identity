@@ -45,7 +45,10 @@
 
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
-      // Listen for standalone attribute requests (without prior delegation)
+      // Listen for standalone attribute requests (without prior delegation).
+      // Resolve the promise so the auth UI renders — after the user
+      // authenticates, continue/+page.svelte will pick up the pending
+      // attribute request and redirect to the consent page.
       channel.addEventListener("request", (request) => {
         if (
           request.id === undefined ||
@@ -53,8 +56,7 @@
         ) {
           return;
         }
-        // Standalone attribute request — navigate to consent page
-        void goto("/authorize/consent");
+        resolve();
       });
 
       channel.addEventListener("request", async (request) => {
