@@ -7,8 +7,16 @@ import {
 } from "../../fixtures/openid";
 import { II_URL } from "../../utils";
 
-const Icrc3Value: IDL.Type = IDL.Rec();
-(Icrc3Value as IDL.RecClass).fill(
+type Icrc3Value =
+  | { Nat: bigint }
+  | { Int: bigint }
+  | { Blob: number[] }
+  | { Text: string }
+  | { Array: Icrc3Value[] }
+  | { Map: [string, Icrc3Value][] };
+
+const Icrc3Value = IDL.Rec();
+Icrc3Value.fill(
   IDL.Variant({
     Nat: IDL.Nat,
     Int: IDL.Int,
@@ -201,13 +209,15 @@ test.describe("Authorize with direct OpenID", () => {
 
       // Decode the Candid-encoded ICRC-3 Value map.
       const dataBytes = Buffer.from(authorizedIcrc3Attributes.data, "base64");
-      const [decoded] = IDL.decode([Icrc3Value], dataBytes);
-      const map = (decoded as { Map: [string, { Blob: number[] }][] }).Map;
+      const decoded = IDL.decode([Icrc3Value], dataBytes)[0] as Icrc3Value;
+      const { Map: map } = decoded as Icrc3Value & {
+        Map: [string, Icrc3Value][];
+      };
       const entries = Object.fromEntries(
-        map.map(([key, value]) => [
-          key,
-          new TextDecoder().decode(new Uint8Array(value.Blob)),
-        ]),
+        map.map(([key, value]) => {
+          const { Blob: blob } = value as Icrc3Value & { Blob: number[] };
+          return [key, new TextDecoder().decode(new Uint8Array(blob))];
+        }),
       );
 
       expect(entries).toMatchObject({
