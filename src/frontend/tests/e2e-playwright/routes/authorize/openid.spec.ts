@@ -5,7 +5,7 @@ import {
   ALTERNATE_OPENID_PORT,
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
-import { fromBase64, toBase64, II_URL } from "../../utils";
+import { fromBase64, II_URL } from "../../utils";
 
 type Icrc3Value =
   | { Nat: bigint }
@@ -152,8 +152,7 @@ test.describe("Authorize with direct OpenID", () => {
 
   test.describe("with app-supplied nonce", () => {
     const name = "John Doe";
-    const knownNonce = new Uint8Array(32).fill(42);
-    const knownNonceBase64 = toBase64(knownNonce);
+    const knownNonce = crypto.getRandomValues(new Uint8Array(32));
 
     test.use({
       openIdConfig: {
@@ -168,7 +167,7 @@ test.describe("Authorize with direct OpenID", () => {
         protocol: "icrc25",
         openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
         useIcrc3Attributes: true,
-        icrc3Nonce: knownNonceBase64,
+        icrc3Nonce: knownNonce,
         attributes: [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`],
       },
     });
