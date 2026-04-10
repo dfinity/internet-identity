@@ -237,12 +237,12 @@ pub const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ic-sender-info";
 
 /// Builds a Candid-encoded ICRC-3 Value map from certified key-value pairs.
 /// The pairs are (certified_key, value) where certified_key may have scope omitted.
-fn icrc3_attribute_message(certified_pairs: &BTreeMap<String, Vec<u8>>) -> Vec<u8> {
+fn icrc3_attribute_message(certified_pairs: &BTreeMap<String, Icrc3Value>) -> Vec<u8> {
     use candid::Encode;
 
     let map_entries: Vec<(String, Icrc3Value)> = certified_pairs
         .iter()
-        .map(|(key, value)| (key.clone(), Icrc3Value::Blob(value.clone())))
+        .map(|(key, value)| (key.clone(), value.clone()))
         .collect();
 
     let value = Icrc3Value::Map(map_entries);
@@ -266,7 +266,7 @@ impl Anchor {
         issued_at_timestamp_ns: u64,
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
-        let mut certified_pairs = BTreeMap::new();
+        let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
 
         for spec in &attribute_specs {
             let Some(AttributeScope::OpenId { issuer }) = &spec.key.scope else {
@@ -310,15 +310,15 @@ impl Anchor {
             if let std::collections::btree_map::Entry::Vacant(entry) =
                 certified_pairs.entry(certified_key)
             {
-                entry.insert(stored.into_bytes());
+                entry.insert(Icrc3Value::Text(stored));
             }
         }
 
-        certified_pairs.insert("implicit:nonce".to_string(), nonce);
-        certified_pairs.insert("implicit:origin".to_string(), origin.into_bytes());
+        certified_pairs.insert("implicit:nonce".to_string(), Icrc3Value::Blob(nonce));
+        certified_pairs.insert("implicit:origin".to_string(), Icrc3Value::Text(origin));
         certified_pairs.insert(
             "implicit:issued_at_timestamp_ns".to_string(),
-            issued_at_timestamp_ns.to_string().into_bytes(),
+            Icrc3Value::Nat(candid::Nat::from(issued_at_timestamp_ns)),
         );
 
         let message = icrc3_attribute_message(&certified_pairs);
@@ -1535,11 +1535,14 @@ mod tests {
             let mut scoped_pairs = BTreeMap::new();
             scoped_pairs.insert(
                 format!("openid:{}:email", GOOGLE_ISSUER),
-                "user@example.com".as_bytes().to_vec(),
+                Icrc3Value::Text("user@example.com".to_string()),
             );
 
             let mut unscoped_pairs = BTreeMap::new();
-            unscoped_pairs.insert("email".to_string(), "user@example.com".as_bytes().to_vec());
+            unscoped_pairs.insert(
+                "email".to_string(),
+                Icrc3Value::Text("user@example.com".to_string()),
+            );
 
             let scoped_msg = icrc3_attribute_message(&scoped_pairs);
             let unscoped_msg = icrc3_attribute_message(&unscoped_pairs);
@@ -1554,8 +1557,14 @@ mod tests {
         #[test]
         fn should_produce_deterministic_encoding() {
             let mut pairs = BTreeMap::new();
-            pairs.insert("email".to_string(), "user@example.com".as_bytes().to_vec());
-            pairs.insert("name".to_string(), "Example User".as_bytes().to_vec());
+            pairs.insert(
+                "email".to_string(),
+                Icrc3Value::Text("user@example.com".to_string()),
+            );
+            pairs.insert(
+                "name".to_string(),
+                Icrc3Value::Text("Example User".to_string()),
+            );
 
             let msg1 = icrc3_attribute_message(&pairs);
             let msg2 = icrc3_attribute_message(&pairs);
@@ -1565,8 +1574,14 @@ mod tests {
         #[test]
         fn should_produce_decodable_icrc3_value() {
             let mut pairs = BTreeMap::new();
-            pairs.insert("email".to_string(), "user@example.com".as_bytes().to_vec());
-            pairs.insert("name".to_string(), "Example User".as_bytes().to_vec());
+            pairs.insert(
+                "email".to_string(),
+                Icrc3Value::Text("user@example.com".to_string()),
+            );
+            pairs.insert(
+                "name".to_string(),
+                Icrc3Value::Text("Example User".to_string()),
+            );
 
             let msg = icrc3_attribute_message(&pairs);
             let decoded: Icrc3Value =
@@ -1577,7 +1592,15 @@ mod tests {
                     pretty_assert_eq!(entries.len(), 2);
                     // BTreeMap ordering: email < name
                     pretty_assert_eq!(entries[0].0, "email");
+                    pretty_assert_eq!(
+                        entries[0].1,
+                        Icrc3Value::Text("user@example.com".to_string())
+                    );
                     pretty_assert_eq!(entries[1].0, "name");
+                    pretty_assert_eq!(
+                        entries[1].1,
+                        Icrc3Value::Text("Example User".to_string())
+                    );
                 }
                 other => panic!("Expected Map, got {:?}", other),
             }

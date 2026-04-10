@@ -696,27 +696,24 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                 Icrc3Value::Blob(nonce.clone()),
                 "Nonce value in certified message does not match the provided nonce"
             );
-            // origin should be included
+            // origin should be included as Text
             let origin_entry = entries
                 .iter()
                 .find(|(k, _)| k == "implicit:origin")
                 .expect("Expected 'implicit:origin' key in message map");
             assert_eq!(
                 origin_entry.1,
-                Icrc3Value::Blob(origin.as_bytes().to_vec()),
+                Icrc3Value::Text(origin.to_string()),
                 "Origin value does not match"
             );
-            // issued_at_timestamp_ns should fall within the time window of the call
+            // issued_at_timestamp_ns should be a Nat within the time window of the call
             let timestamp_entry = entries
                 .iter()
                 .find(|(k, _)| k == "implicit:issued_at_timestamp_ns")
                 .expect("Expected 'implicit:issued_at_timestamp_ns' key in message map");
             match &timestamp_entry.1 {
-                Icrc3Value::Blob(bytes) => {
-                    let ts: u64 = std::str::from_utf8(bytes)
-                        .expect("timestamp should be valid UTF-8")
-                        .parse()
-                        .expect("timestamp should be a valid u64");
+                Icrc3Value::Nat(nat) => {
+                    let ts: u64 = nat.0.clone().try_into().expect("timestamp should fit in u64");
                     assert!(
                         ts >= time_before && ts <= time_after,
                         "Timestamp {} should be between {} and {}",
@@ -725,7 +722,7 @@ fn should_certify_icrc3_attributes_mixed_omit_scope() {
                         time_after
                     );
                 }
-                other => panic!("Expected Blob for timestamp, got {:?}", other),
+                other => panic!("Expected Nat for timestamp, got {:?}", other),
             }
         }
         other => panic!("Expected Map, got {:?}", other),
