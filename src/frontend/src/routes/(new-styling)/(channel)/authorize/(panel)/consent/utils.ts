@@ -67,14 +67,12 @@ export const isImplicitConsentAttribute = (
   return IMPLICIT_CONSENT_ATTRIBUTES.includes(parsed.attributeName);
 };
 
-const ATTRIBUTE_LABELS: Record<string, string> = {
-  email: "Email address",
-  name: "Name",
-  verified_email: "Verified email",
-};
-
+/**
+ * Returns the raw attribute name. Label translation should happen
+ * in Svelte files using the locale store ($t).
+ */
 export const getAttributeLabel = (attributeName: string): string =>
-  ATTRIBUTE_LABELS[attributeName] ?? attributeName;
+  attributeName;
 
 /**
  * Whether the consent screen is needed for the given requested keys.

@@ -20,6 +20,14 @@
   import { ShieldCheckIcon } from "@lucide/svelte";
   import { buildConsentGroups, type ConsentGroup } from "./utils";
 
+  const attributeLabels: Record<string, () => string> = {
+    email: () => $t`Email address`,
+    name: () => $t`Name`,
+    verified_email: () => $t`Verified email`,
+  };
+  const translateLabel = (attributeName: string): string =>
+    attributeLabels[attributeName]?.() ?? attributeName;
+
   let groups = $state<ConsentGroup[]>([]);
   let checkedKeys = $state(new Set<string>());
   let pendingRequest = $state<{
@@ -227,14 +235,14 @@
           <Checkbox
             checked={checkedKeys.has(option.scopedKey)}
             onchange={() => toggleAttribute(option.scopedKey)}
-            label={group.label}
+            label={translateLabel(group.label)}
             hint={option.value}
           />
         {:else}
           <!-- Multiple options: show label + select -->
           <div class="flex flex-col gap-1">
             <p class="text-text-secondary text-sm font-medium">
-              {group.label}
+              {translateLabel(group.label)}
             </p>
             {#each group.options as option}
               <Checkbox
