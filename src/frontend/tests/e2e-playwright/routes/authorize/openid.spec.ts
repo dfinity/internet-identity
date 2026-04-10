@@ -1,10 +1,23 @@
 import { expect } from "@playwright/test";
+import { IDL } from "@icp-sdk/core/candid";
 import { test } from "../../fixtures";
 import {
   ALTERNATE_OPENID_PORT,
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
 import { II_URL } from "../../utils";
+
+const Icrc3Value: IDL.Type = IDL.Rec();
+(Icrc3Value as IDL.RecClass).fill(
+  IDL.Variant({
+    Nat: IDL.Nat,
+    Int: IDL.Int,
+    Blob: IDL.Vec(IDL.Nat8),
+    Text: IDL.Text,
+    Array: IDL.Vec(Icrc3Value),
+    Map: IDL.Vec(IDL.Tuple(IDL.Text, Icrc3Value)),
+  }),
+);
 
 test.describe("Authorize with direct OpenID", () => {
   test.describe("without any attributes", () => {
@@ -154,12 +167,15 @@ test.describe("Authorize with direct OpenID", () => {
   });
 
   test.describe("with ICRC-3 name and email attributes", () => {
+    const name = "John Doe";
+    const email = "john.doe@example.com";
+
     test.use({
       openIdConfig: {
         defaultPort: DEFAULT_OPENID_PORT,
         createUsers: [
           {
-            claims: { name: "John Doe", email: "john.doe@example.com" },
+            claims: { name, email },
           },
         ],
       },
@@ -177,10 +193,27 @@ test.describe("Authorize with direct OpenID", () => {
     test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
       expect(authorizedPrincipal?.isAnonymous()).toBe(false);
       expect(authorizedIcrc3Attributes).toBeDefined();
-      expect(typeof authorizedIcrc3Attributes?.data).toBe("string");
-      expect(typeof authorizedIcrc3Attributes?.signature).toBe("string");
-      expect(authorizedIcrc3Attributes?.data.length).toBeGreaterThan(0);
-      expect(authorizedIcrc3Attributes?.signature.length).toBeGreaterThan(0);
+      if (authorizedIcrc3Attributes === undefined) {
+        return;
+      }
+
+      expect(authorizedIcrc3Attributes.signature.length).toBeGreaterThan(0);
+
+      // Decode the Candid-encoded ICRC-3 Value map.
+      const dataBytes = Buffer.from(authorizedIcrc3Attributes.data, "base64");
+      const [decoded] = IDL.decode([Icrc3Value], dataBytes);
+      const map = (decoded as { Map: [string, { Blob: number[] }][] }).Map;
+      const entries = Object.fromEntries(
+        map.map(([key, value]) => [
+          key,
+          new TextDecoder().decode(new Uint8Array(value.Blob)),
+        ]),
+      );
+
+      expect(entries).toMatchObject({
+        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: name,
+        [`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`]: email,
+      });
     });
 
     test("should return ICRC-3 attributes", async ({
