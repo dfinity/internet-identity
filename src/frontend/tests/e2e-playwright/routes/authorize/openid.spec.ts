@@ -152,7 +152,11 @@ test.describe("Authorize with direct OpenID", () => {
 
   test.describe("with app-supplied nonce", () => {
     const name = "John Doe";
-    const knownNonce = crypto.getRandomValues(new Uint8Array(32));
+    // prettier-ignore
+    const knownNonce = new Uint8Array([
+      80, 48, 222, 48, 28, 157, 149, 134, 236, 61, 19, 71, 200, 105, 53, 187,
+      44, 126, 9, 241, 76, 103, 217, 148, 12, 55, 90, 181, 33, 208, 99, 7,
+    ]);
 
     test.use({
       openIdConfig: {
