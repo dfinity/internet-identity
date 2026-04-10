@@ -210,16 +210,21 @@ test.describe("Authorize with direct OpenID", () => {
       // Decode the Candid-encoded ICRC-3 Value map.
       const dataBytes = fromBase64(authorizedIcrc3Attributes.data);
       const { Map: map } = IDL.decode([Icrc3Value], dataBytes)[0] as {
-        Map: [string, { Blob: number[] }][];
+        Map: [string, Icrc3Value][];
       };
-      const entries = Object.fromEntries(
-        map.map(([key, { Blob: blob }]) => [
-          key,
-          new TextDecoder().decode(new Uint8Array(blob)),
-        ]),
+      const blobEntries = Object.fromEntries(
+        map
+          .filter(
+            (entry): entry is [string, { Blob: number[] }] =>
+              "Blob" in entry[1],
+          )
+          .map(([key, { Blob: blob }]) => [
+            key,
+            new TextDecoder().decode(new Uint8Array(blob)),
+          ]),
       );
 
-      expect(entries).toMatchObject({
+      expect(blobEntries).toMatchObject({
         [`openid:http://localhost:${DEFAULT_OPENID_PORT}:name`]: name,
         [`openid:http://localhost:${DEFAULT_OPENID_PORT}:email`]: email,
       });
