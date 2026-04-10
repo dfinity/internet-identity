@@ -5,7 +5,7 @@ import {
   ALTERNATE_OPENID_PORT,
   DEFAULT_OPENID_PORT,
 } from "../../fixtures/openid";
-import { II_URL } from "../../utils";
+import { fromBase64, II_URL } from "../../utils";
 
 type Icrc3Value =
   | { Nat: bigint }
@@ -208,7 +208,7 @@ test.describe("Authorize with direct OpenID", () => {
       expect(authorizedIcrc3Attributes.signature.length).toBeGreaterThan(0);
 
       // Decode the Candid-encoded ICRC-3 Value map.
-      const dataBytes = Buffer.from(authorizedIcrc3Attributes.data, "base64");
+      const dataBytes = fromBase64(authorizedIcrc3Attributes.data);
       const decoded = IDL.decode([Icrc3Value], dataBytes)[0] as Icrc3Value;
       const { Map: map } = decoded as Icrc3Value & {
         Map: [string, Icrc3Value][];
