@@ -45,6 +45,19 @@
 
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
+      // Listen for standalone attribute requests (without prior delegation)
+      channel.addEventListener("request", (request) => {
+        if (
+          request.id === undefined ||
+          (request.method !== "ii_attributes" &&
+            request.method !== "ii-icrc3-attributes")
+        ) {
+          return;
+        }
+        // Standalone attribute request — navigate to consent page
+        void goto("/authorize/consent");
+      });
+
       channel.addEventListener("request", async (request) => {
         if (
           request.id === undefined ||

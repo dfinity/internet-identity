@@ -34,7 +34,14 @@
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { DelegationResultSchema } from "$lib/utils/transport/utils";
+  import {
+    AttributesParamsSchema,
+    DelegationResultSchema,
+    Icrc3AttributesParamsSchema,
+    type JsonRequest,
+  } from "$lib/utils/transport/utils";
+  import { goto } from "$app/navigation";
+  import { needsConsentScreen } from "../consent/utils";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
@@ -101,12 +108,72 @@
       result,
     });
   };
+  /**
+   * Check if there is a pending attribute request on the channel.
+   * The pending request is emitted on listener attachment since no response
+   * has been sent yet.
+   */
+  const checkForPendingAttributeRequest = (): Promise<
+    JsonRequest | undefined
+  > =>
+    new Promise((resolve) => {
+      let resolved = false;
+      const unsubscribe = $establishedChannelStore.addEventListener(
+        "request",
+        (request: JsonRequest) => {
+          if (
+            request.id !== undefined &&
+            (request.method === "ii_attributes" ||
+              request.method === "ii-icrc3-attributes")
+          ) {
+            resolved = true;
+            unsubscribe();
+            resolve(request);
+          }
+        },
+      );
+      // Give it a tick to receive the pending request, then resolve with undefined
+      queueMicrotask(() => {
+        if (!resolved) {
+          unsubscribe();
+          resolve(undefined);
+        }
+      });
+    });
+
+  const redirectToConsentIfNeeded = async (): Promise<boolean> => {
+    const pendingRequest = await checkForPendingAttributeRequest();
+    if (pendingRequest === undefined) {
+      return false;
+    }
+    const legacyResult = AttributesParamsSchema.safeParse(
+      pendingRequest.params,
+    );
+    const icrc3Result = Icrc3AttributesParamsSchema.safeParse(
+      pendingRequest.params,
+    );
+    const requestedKeys = legacyResult.success
+      ? legacyResult.data.attributes
+      : icrc3Result.success
+        ? icrc3Result.data.keys
+        : [];
+
+    if (needsConsentScreen(requestedKeys)) {
+      await goto("/authorize/consent");
+      return true;
+    }
+    return false;
+  };
+
   const handleContinueDefault = async () => {
     try {
       isAuthenticatingDefault = true;
       if (!$isAuthenticatedStore) {
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
+
+      void redirectToConsentIfNeeded();
+
       const { identityNumber, actor } = $authenticationStore!;
       const { effectiveOrigin } = $authorizationContextStore;
       void triggerDropWaveAnimation();
@@ -128,6 +195,7 @@
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
     try {
+      void redirectToConsentIfNeeded();
       await authorize(accountNumber);
     } catch (error) {
       handleError(error);

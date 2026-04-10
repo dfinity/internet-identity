@@ -52,6 +52,12 @@ const scopes = [
   {
     method: "icrc34_delegation",
   },
+  {
+    method: "ii_attributes",
+  },
+  {
+    method: "ii-icrc3-attributes",
+  },
 ];
 
 const supportedStandardsListener =
