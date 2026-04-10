@@ -383,4 +383,5 @@ export const AttributesParamsSchema = z.object({
 export const Icrc3AttributesParamsSchema = z.object({
   keys: z.array(z.string()),
   nonce: z.base64(),
+  icrc95DerivationOrigin: z.optional(OriginSchema),
 });

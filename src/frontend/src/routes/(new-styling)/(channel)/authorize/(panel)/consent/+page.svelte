@@ -1,41 +1,30 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { authorizationContextStore } from "$lib/stores/authorization.store";
   import { authenticatedStore } from "$lib/stores/authentication.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { t } from "$lib/stores/locale.store";
   import { handleError } from "$lib/components/utils/error";
   import {
     Icrc3AttributesParamsSchema,
+    INVALID_PARAMS_ERROR_CODE,
     type JsonRequest,
   } from "$lib/utils/transport/utils";
   import { throwCanisterError, retryFor } from "$lib/utils/utils";
+  import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
+  import { remapToLegacyDomain } from "$lib/utils/iiConnection";
   import { z } from "zod";
   import Button from "$lib/components/ui/Button.svelte";
   import Checkbox from "$lib/components/ui/Checkbox.svelte";
-  import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { ShieldCheckIcon } from "@lucide/svelte";
-  import {
-    buildConsentGroups,
-    isImplicitConsentAttribute,
-    needsConsentScreen,
-    type ConsentGroup,
-  } from "./utils";
-
-  const dapps = getDapps();
-  const dapp = $derived(
-    dapps.find((dapp) =>
-      dapp.hasOrigin($authorizationContextStore.requestOrigin),
-    ),
-  );
+  import { buildConsentGroups, type ConsentGroup } from "./utils";
 
   let groups = $state<ConsentGroup[]>([]);
   let checkedKeys = $state(new Set<string>());
   let pendingRequest = $state<{
     request: JsonRequest & { id: string | number };
     nonce: string;
+    effectiveOrigin: string;
     issuer?: string;
   } | null>(null);
 
@@ -57,6 +46,7 @@
             { ...request, id: request.id },
             result.data.keys,
             result.data.nonce,
+            result.data.icrc95DerivationOrigin,
           );
         }
       },
@@ -69,10 +59,34 @@
     request: JsonRequest & { id: string | number },
     requestedKeys: string[],
     nonce: string,
+    derivationOrigin?: string,
   ) => {
     try {
       // TODO: get issuer from context if available (OpenID flow)
       const issuer = undefined;
+      const requestOrigin = $establishedChannelStore.origin;
+
+      // Validate derivation origin the same way as authorization.store.ts
+      if (derivationOrigin !== undefined) {
+        const validationResult = await validateDerivationOrigin({
+          requestOrigin,
+          derivationOrigin,
+        });
+        if (validationResult.result === "invalid") {
+          await $establishedChannelStore.send({
+            jsonrpc: "2.0",
+            id: request.id,
+            error: {
+              code: INVALID_PARAMS_ERROR_CODE,
+              message: "Unverified derivation origin",
+            },
+          });
+          return;
+        }
+      }
+      const reqEffectiveOrigin = remapToLegacyDomain(
+        derivationOrigin ?? requestOrigin,
+      );
 
       const availableAttributes = await $authenticatedStore.actor
         .list_available_attributes({
@@ -89,7 +103,12 @@
       );
 
       groups = consentGroups;
-      pendingRequest = { request, nonce, issuer };
+      pendingRequest = {
+        request,
+        nonce,
+        effectiveOrigin: reqEffectiveOrigin,
+        issuer,
+      };
 
       // Pre-check implicit-consent attributes
       for (const group of consentGroups) {
@@ -110,10 +129,10 @@
     }
 
     const selectedKeys = Array.from(checkedKeys);
-    const { request, nonce } = pendingRequest;
+    const { request, nonce, effectiveOrigin: reqOrigin } = pendingRequest;
 
     try {
-      await sendIcrc3AttributeResponse(request, selectedKeys, nonce);
+      await sendIcrc3AttributeResponse(request, selectedKeys, nonce, reqOrigin);
     } catch (error) {
       await $establishedChannelStore.send({
         jsonrpc: "2.0",
@@ -131,10 +150,11 @@
     request: JsonRequest & { id: string | number },
     selectedKeys: string[],
     nonce: string,
+    originForCanister: string,
   ) => {
     const { message } = await $authenticatedStore.actor
       .prepare_icrc3_attributes({
-        origin: $authorizationContextStore.effectiveOrigin,
+        origin: originForCanister,
         account_number: [],
         identity_number: $authenticatedStore.identityNumber,
         attributes: selectedKeys.map((key) => ({
@@ -148,7 +168,7 @@
     const { signature } = await retryFor(5, () =>
       $authenticatedStore.actor
         .get_icrc3_attributes({
-          origin: $authorizationContextStore.effectiveOrigin,
+          origin: originForCanister,
           account_number: [],
           identity_number: $authenticatedStore.identityNumber,
           message,
