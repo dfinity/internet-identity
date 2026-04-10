@@ -131,8 +131,112 @@
     }
 
     const selectedKeys = Array.from(checkedKeys);
-    // TODO: implement attribute response sending based on protocol
-    // For now, placeholder
+    const { request, protocol, nonce } = pendingRequest;
+
+    try {
+      if (protocol === "legacy") {
+        await sendLegacyAttributeResponse(request, selectedKeys);
+      } else {
+        await sendIcrc3AttributeResponse(request, selectedKeys, nonce);
+      }
+    } catch (error) {
+      await $establishedChannelStore.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: 1000,
+          message:
+            "Encountered an internal error while processing the request.",
+        },
+      });
+    }
+  };
+
+  const sendLegacyAttributeResponse = async (
+    request: JsonRequest & { id: string | number },
+    selectedKeys: string[],
+  ) => {
+    const { attributes, issued_at_timestamp_ns } =
+      await $authenticatedStore.actor
+        .prepare_attributes({
+          origin: $authorizationContextStore.effectiveOrigin,
+          attribute_keys: selectedKeys,
+          account_number: [],
+          identity_number: $authenticatedStore.identityNumber,
+        })
+        .then(throwCanisterError);
+    const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
+      5,
+      () =>
+        $authenticatedStore.actor
+          .get_attributes({
+            origin: $authorizationContextStore.effectiveOrigin,
+            account_number: [],
+            identity_number: $authenticatedStore.identityNumber,
+            attributes,
+            issued_at_timestamp_ns,
+          })
+          .then(throwCanisterError),
+    );
+    await $establishedChannelStore.send({
+      jsonrpc: "2.0",
+      id: request.id,
+      result: {
+        attributes: Object.fromEntries(
+          certified_attributes.map((attribute) => [
+            attribute.key,
+            {
+              value: z.util.uint8ArrayToBase64(new Uint8Array(attribute.value)),
+              signature: z.util.uint8ArrayToBase64(
+                new Uint8Array(attribute.signature),
+              ),
+              expiration: expires_at_timestamp_ns.toString(),
+            },
+          ]),
+        ),
+      },
+    });
+  };
+
+  const sendIcrc3AttributeResponse = async (
+    request: JsonRequest & { id: string | number },
+    selectedKeys: string[],
+    nonce?: string,
+  ) => {
+    if (nonce === undefined) {
+      return;
+    }
+    const { message } = await $authenticatedStore.actor
+      .prepare_icrc3_attributes({
+        origin: $authorizationContextStore.effectiveOrigin,
+        account_number: [],
+        identity_number: $authenticatedStore.identityNumber,
+        attributes: selectedKeys.map((key) => ({
+          key,
+          value: [],
+          omit_scope: false,
+        })),
+        nonce: z.util.base64ToUint8Array(nonce),
+      })
+      .then(throwCanisterError);
+    const { signature } = await retryFor(5, () =>
+      $authenticatedStore.actor
+        .get_icrc3_attributes({
+          origin: $authorizationContextStore.effectiveOrigin,
+          account_number: [],
+          identity_number: $authenticatedStore.identityNumber,
+          message,
+        })
+        .then(throwCanisterError),
+    );
+    await $establishedChannelStore.send({
+      jsonrpc: "2.0",
+      id: request.id,
+      result: {
+        data: z.util.uint8ArrayToBase64(new Uint8Array(message)),
+        signature: z.util.uint8ArrayToBase64(new Uint8Array(signature)),
+      },
+    });
   };
 
   const handleDenyAll = async () => {
