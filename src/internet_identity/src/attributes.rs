@@ -1520,71 +1520,9 @@ mod tests {
         }
     }
 
-    mod prepare_icrc3_attributes_tests {
-        use super::*;
-        use internet_identity_interface::internet_identity::types::{
-            OpenIdConfig, OpenIdEmailVerificationScheme,
-        };
-
-        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
-
-        fn setup_google_provider() {
-            crate::openid::setup(vec![OpenIdConfig {
-                name: "Google".to_string(),
-                logo: String::new(),
-                issuer: GOOGLE_ISSUER.to_string(),
-                client_id: "test-client-id".to_string(),
-                jwks_uri: String::new(),
-                auth_uri: String::new(),
-                auth_scope: vec![],
-                fedcm_uri: None,
-                email_verification: Some(OpenIdEmailVerificationScheme::Google),
-            }]);
-        }
-
-        fn google_anchor() -> Anchor {
-            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
-            anchor.openid_credentials = vec![OpenIdCredential {
-                iss: GOOGLE_ISSUER.to_string(),
-                sub: "google-user-123".to_string(),
-                aud: "test-client-id".to_string(),
-                last_usage_timestamp: None,
-                metadata: HashMap::from([
-                    (
-                        "email".to_string(),
-                        MetadataEntryV2::String("user@example.com".to_string()),
-                    ),
-                    (
-                        "name".to_string(),
-                        MetadataEntryV2::String("Example User".to_string()),
-                    ),
-                ]),
-            }];
-            anchor
-        }
-
-        fn google_spec(
-            attr: AttributeName,
-            value: Option<&[u8]>,
-            omit_scope: bool,
-        ) -> ValidatedAttributeSpec {
-            ValidatedAttributeSpec {
-                key: AttributeKey {
-                    scope: Some(AttributeScope::OpenId {
-                        issuer: GOOGLE_ISSUER.to_string(),
-                    }),
-                    attribute_name: attr,
-                },
-                value: value.map(|v| v.to_vec()),
-                omit_scope,
-            }
-        }
-
-        // Silent omit behavior (unavailable attributes, unknown issuers, value mismatches,
-        // scopeless attributes, duplicate keys) is verified by the integration test
-        // should_silently_omit_unavailable_icrc3_attributes, which exercises the full
-        // canister signing flow.
-    }
+    // Silent omit behavior for prepare_icrc3_attributes (unavailable attributes,
+    // unknown issuers, value mismatches, scopeless attributes, duplicate keys) is
+    // verified by the integration test should_silently_omit_unavailable_icrc3_attributes.
 
     mod icrc3_attribute_message_tests {
         use super::*;
