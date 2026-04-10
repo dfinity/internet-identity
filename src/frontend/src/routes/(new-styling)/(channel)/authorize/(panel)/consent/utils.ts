@@ -121,6 +121,14 @@ export interface ConsentGroup {
  * @param metadata OpenID metadata for resolving provider names/logos
  * @param issuer Optional issuer for marking implicit-consent attributes
  */
+// email and verified_email share the same value and are shown as a single
+// "email" consent entry in the UI.
+const EMAIL_GROUP_KEY = "email";
+const EMAIL_ATTRIBUTE_NAMES = new Set(["email", "verified_email"]);
+
+const groupKeyForAttribute = (attributeName: string): string =>
+  EMAIL_ATTRIBUTE_NAMES.has(attributeName) ? EMAIL_GROUP_KEY : attributeName;
+
 export const buildConsentGroups = (
   requestedKeys: string[],
   availableAttributes: [string, Uint8Array | number[]][],
@@ -131,20 +139,32 @@ export const buildConsentGroups = (
 
   for (const key of requestedKeys) {
     const parsed = parseAttributeKey(key);
-    const { attributeName } = parsed;
+    const groupKey = groupKeyForAttribute(parsed.attributeName);
 
-    if (!groups.has(attributeName)) {
-      groups.set(attributeName, {
-        attributeName,
-        label: getAttributeLabel(attributeName),
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        attributeName: groupKey,
+        label: getAttributeLabel(groupKey),
         options: [],
       });
     }
 
-    const group = groups.get(attributeName);
+    const group = groups.get(groupKey);
     if (group === undefined) {
       continue;
     }
+
+    // Skip if an option with the same value from the same provider already exists
+    // (happens when both email and verified_email are requested from the same provider).
+    const addOption = (option: ConsentAttribute) => {
+      const exists = group.options.some(
+        (o) =>
+          o.value === option.value && o.providerName === option.providerName,
+      );
+      if (!exists) {
+        group.options.push(option);
+      }
+    };
 
     if (parsed.scopeType !== undefined) {
       // Scoped key: find the matching available attribute
@@ -152,7 +172,7 @@ export const buildConsentGroups = (
       if (match !== undefined) {
         const value = new TextDecoder().decode(new Uint8Array(match[1]));
         const scopeValue = parsed.scopeValues[0];
-        group.options.push({
+        addOption({
           scopedKey: key,
           value,
           providerName:
@@ -168,15 +188,15 @@ export const buildConsentGroups = (
         });
       }
     } else {
-      // Unscoped key: find ALL available attributes with this attribute name
+      // Unscoped key: find ALL available attributes matching this group
       for (const [scopedKey, valueBytes] of availableAttributes) {
         const availableParsed = parseAttributeKey(scopedKey);
-        if (availableParsed.attributeName !== attributeName) {
+        if (groupKeyForAttribute(availableParsed.attributeName) !== groupKey) {
           continue;
         }
         const value = new TextDecoder().decode(new Uint8Array(valueBytes));
         const scopeValue = availableParsed.scopeValues[0];
-        group.options.push({
+        addOption({
           scopedKey,
           value,
           providerName:
@@ -192,6 +212,40 @@ export const buildConsentGroups = (
             isImplicitConsentAttribute(scopedKey, issuer),
         });
       }
+    }
+  }
+
+  // For the merged email group: if both email and verified_email were requested,
+  // only keep options where the value is available for ALL requested email-type names.
+  const emailGroup = groups.get(EMAIL_GROUP_KEY);
+  if (emailGroup !== undefined) {
+    const requestedEmailNames = requestedKeys
+      .map((k) => parseAttributeKey(k).attributeName)
+      .filter((name) => EMAIL_ATTRIBUTE_NAMES.has(name));
+    const uniqueRequestedEmailNames = new Set(requestedEmailNames);
+
+    if (uniqueRequestedEmailNames.size > 1) {
+      // Both email and verified_email requested — keep only values available for both
+      const availableByValue = new Map<string, Set<string>>();
+      for (const [scopedKey, valueBytes] of availableAttributes) {
+        const parsed = parseAttributeKey(scopedKey);
+        if (!EMAIL_ATTRIBUTE_NAMES.has(parsed.attributeName)) {
+          continue;
+        }
+        const value = new TextDecoder().decode(new Uint8Array(valueBytes));
+        const existing = availableByValue.get(value) ?? new Set();
+        existing.add(parsed.attributeName);
+        availableByValue.set(value, existing);
+      }
+      emailGroup.options = emailGroup.options.filter((option) => {
+        const namesForValue = availableByValue.get(option.value);
+        return (
+          namesForValue !== undefined &&
+          [...uniqueRequestedEmailNames].every((name) =>
+            namesForValue.has(name),
+          )
+        );
+      });
     }
   }
 
