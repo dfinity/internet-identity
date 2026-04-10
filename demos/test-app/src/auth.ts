@@ -30,6 +30,11 @@ export interface CertifiedAttribute {
   expiration: bigint;
 }
 
+export interface Icrc3Attributes {
+  data: Uint8Array;
+  signature: Uint8Array;
+}
+
 // Perform a sign in to II using parameters set in this app
 export const authWithII = async ({
   url: url_,
@@ -49,10 +54,12 @@ export const authWithII = async ({
   sessionIdentity: SignIdentity;
   useIcrc25?: boolean;
   requestAttributes?: string[];
+  useIcrc3Attributes?: boolean;
 }): Promise<{
   identity: DelegationIdentity;
   authnMethod: string;
   certifiedAttributes?: Record<string, CertifiedAttribute>;
+  icrc3Attributes?: Icrc3Attributes;
 }> => {
   // Authenticate with signer-js instead if we use the ICRC-25 protocol
   if (useIcrc25) {
@@ -62,14 +69,16 @@ export const authWithII = async ({
       derivationOrigin,
       autoCloseTransportChannel: false,
     });
-    const attributesRequestId = window.crypto.randomUUID();
-    const attributesPromise =
-      requestAttributes !== undefined && requestAttributes.length > 0
+    const hasAttributes =
+      requestAttributes !== undefined && requestAttributes.length > 0;
+
+    const legacyAttributesPromise =
+      hasAttributes && !useIcrc3Attributes
         ? signer
             .sendRequest({
               jsonrpc: "2.0",
               method: "ii_attributes",
-              id: attributesRequestId,
+              id: window.crypto.randomUUID(),
               params: {
                 attributes: requestAttributes,
               },
@@ -99,15 +108,53 @@ export const authWithII = async ({
                 ),
               );
             })
-        : Promise.resolve({});
+        : Promise.resolve(undefined);
+
+    const nonce = crypto.getRandomValues(new Uint8Array(32));
+    const icrc3AttributesPromise =
+      hasAttributes && useIcrc3Attributes
+        ? signer
+            .sendRequest({
+              jsonrpc: "2.0",
+              method: "ii-icrc3-attributes",
+              id: window.crypto.randomUUID(),
+              params: {
+                keys: requestAttributes,
+                // @ts-ignore Not known in TS types yet but supported in all browsers
+                nonce: nonce.toBase64(),
+              },
+            })
+            .then((response) => {
+              if (
+                !("result" in response) ||
+                typeof response.result !== "object" ||
+                response.result === null ||
+                !("data" in response.result) ||
+                !("signature" in response.result)
+              ) {
+                throw new Error(
+                  "ICRC-3 attributes response is missing data or signature",
+                );
+              }
+              return {
+                // @ts-ignore Not known in TS types yet but supported in all browsers
+                data: Uint8Array.fromBase64(response.result.data),
+                // @ts-ignore Not known in TS types yet but supported in all browsers
+                signature: Uint8Array.fromBase64(response.result.signature),
+              };
+            })
+        : Promise.resolve(undefined);
+
     const delegationPromise = signer.delegation({
       maxTimeToLive,
       publicKey: new Uint8Array(sessionIdentity.getPublicKey().toDer()),
     });
-    const [delegation, certifiedAttributes] = await Promise.all([
-      delegationPromise,
-      attributesPromise,
-    ]);
+    const [delegation, certifiedAttributes, icrc3Attributes] =
+      await Promise.all([
+        delegationPromise,
+        legacyAttributesPromise,
+        icrc3AttributesPromise,
+      ]);
     await signer.closeChannel();
     return {
       identity: DelegationIdentity.fromDelegation(
@@ -117,7 +164,8 @@ export const authWithII = async ({
         delegation as unknown as DelegationChain,
       ),
       authnMethod: "passkey",
-      certifiedAttributes,
+      certifiedAttributes: certifiedAttributes ?? undefined,
+      icrc3Attributes: icrc3Attributes ?? undefined,
     };
   }
 

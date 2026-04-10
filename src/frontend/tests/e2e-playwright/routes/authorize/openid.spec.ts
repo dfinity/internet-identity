@@ -153,6 +153,45 @@ test.describe("Authorize with direct OpenID", () => {
     });
   });
 
+  test.describe("with ICRC-3 name and email attributes", () => {
+    test.use({
+      openIdConfig: {
+        defaultPort: DEFAULT_OPENID_PORT,
+        createUsers: [
+          {
+            claims: { name: "John Doe", email: "john.doe@example.com" },
+          },
+        ],
+      },
+      authorizeConfig: {
+        protocol: "icrc25",
+        openid: `http://localhost:${DEFAULT_OPENID_PORT}`,
+        useIcrc3Attributes: true,
+        attributes: [
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:name`,
+          `openid:http://localhost:${DEFAULT_OPENID_PORT}:email`,
+        ],
+      },
+    });
+
+    test.afterEach(({ authorizedPrincipal, authorizedIcrc3Attributes }) => {
+      expect(authorizedPrincipal?.isAnonymous()).toBe(false);
+      expect(authorizedIcrc3Attributes).toBeDefined();
+      expect(typeof authorizedIcrc3Attributes?.data).toBe("string");
+      expect(typeof authorizedIcrc3Attributes?.signature).toBe("string");
+      expect(authorizedIcrc3Attributes?.data.length).toBeGreaterThan(0);
+      expect(authorizedIcrc3Attributes?.signature.length).toBeGreaterThan(0);
+    });
+
+    test("should return ICRC-3 attributes", async ({
+      authorizePage,
+      signInWithOpenId,
+      openIdUsers,
+    }) => {
+      await signInWithOpenId(authorizePage.page, openIdUsers[0].id);
+    });
+  });
+
   test.describe("with verified_email attribute", () => {
     const email = "john.doe@example.com";
 

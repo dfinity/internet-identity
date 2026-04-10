@@ -7,7 +7,12 @@ export type AuthorizeConfig = {
   protocol: "legacy" | "icrc25";
 } & (
   | { protocol: "legacy" }
-  | { protocol: "icrc25"; openid?: string; attributes?: string[] }
+  | {
+      protocol: "icrc25";
+      openid?: string;
+      attributes?: string[];
+      useIcrc3Attributes?: boolean;
+    }
 );
 
 class AuthorizePage {
@@ -27,6 +32,7 @@ export const test = base.extend<{
   authorizePage: AuthorizePage;
   authorizedPrincipal: Principal | undefined;
   authorizedAttributes: Record<string, string> | undefined;
+  authorizedIcrc3Attributes: { data: string; signature: string } | undefined;
 }>({
   authorizeConfig: undefined,
   authorizePage: async ({ page, authorizeConfig }, use) => {
@@ -54,6 +60,14 @@ export const test = base.extend<{
       await testAppPage
         .getByRole("checkbox", { name: "Use ICRC-25 protocol:" })
         .setChecked(true);
+      if (
+        "useIcrc3Attributes" in authorizeConfig &&
+        authorizeConfig.useIcrc3Attributes === true
+      ) {
+        await testAppPage
+          .getByRole("checkbox", { name: "Use ICRC-3 attributes:" })
+          .setChecked(true);
+      }
       if (
         "attributes" in authorizeConfig &&
         authorizeConfig.attributes !== undefined &&
@@ -113,5 +127,20 @@ export const test = base.extend<{
         }),
       ),
     );
+  },
+  authorizedIcrc3Attributes: async ({ page }, use) => {
+    const [testAppPage, authPage] = page.context().pages();
+    if (authPage !== undefined) {
+      await authPage.waitForEvent("close", { timeout: 15_000 });
+    }
+
+    const icrc3Attributes = await testAppPage
+      .locator("#icrc3Attributes")
+      .innerText();
+    if (icrc3Attributes === "") {
+      return use(undefined);
+    }
+
+    await use(JSON.parse(icrc3Attributes));
   },
 });
