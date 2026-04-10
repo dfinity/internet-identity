@@ -378,3 +378,9 @@ export type AuthResponse = z.output<typeof AuthResponseCodec>;
 export const AttributesParamsSchema = z.object({
   attributes: z.array(z.string()),
 });
+
+// Parameters schema for "ii-icrc3-attributes" request
+export const Icrc3AttributesParamsSchema = z.object({
+  keys: z.array(z.string()),
+  nonce: z.base64(),
+});

@@ -352,6 +352,21 @@ export const idlFactory = ({ IDL }) => {
     'no_such_delegation' : IDL.Null,
     'signed_delegation' : SignedDelegation,
   });
+  const GetIcrc3AttributeRequest = IDL.Record({
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'message' : IDL.Vec(IDL.Nat8),
+    'identity_number' : IdentityNumber,
+  });
+  const GetIcrc3AttributeResponse = IDL.Record({
+    'signature' : IDL.Vec(IDL.Nat8),
+  });
+  const GetIcrc3AttributeError = IDL.Variant({
+    'AuthorizationError' : IDL.Principal,
+    'NoSuchSignature' : IDL.Null,
+    'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
+    'GetAccountError' : GetAccountError,
+  });
   const GetIdAliasRequest = IDL.Record({
     'rp_id_alias_jwt' : IDL.Text,
     'issuer' : FrontendHostname,
@@ -442,6 +457,17 @@ export const idlFactory = ({ IDL }) => {
     'AlreadyInProgress' : IDL.Null,
     'RateLimitExceeded' : IDL.Null,
   });
+  const ListAvailableAttributesRequest = IDL.Record({
+    'attributes' : IDL.Opt(IDL.Vec(IDL.Text)),
+    'identity_number' : IdentityNumber,
+  });
+  const ListAvailableAttributesResponse = IDL.Vec(
+    IDL.Tuple(IDL.Text, IDL.Vec(IDL.Nat8))
+  );
+  const ListAvailableAttributesError = IDL.Variant({
+    'AuthorizationError' : IDL.Principal,
+    'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
+  });
   const DeviceKeyWithAnchor = IDL.Record({
     'pubkey' : DeviceKey,
     'anchor_number' : UserNumber,
@@ -496,6 +522,27 @@ export const idlFactory = ({ IDL }) => {
     'AuthorizationError' : IDL.Principal,
     'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
     'GetAccountError' : GetAccountError,
+  });
+  const AttributeSpec = IDL.Record({
+    'key' : IDL.Text,
+    'value' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+    'omit_scope' : IDL.Bool,
+  });
+  const PrepareIcrc3AttributeRequest = IDL.Record({
+    'origin' : FrontendHostname,
+    'account_number' : IDL.Opt(AccountNumber),
+    'attributes' : IDL.Vec(AttributeSpec),
+    'nonce' : IDL.Vec(IDL.Nat8),
+    'identity_number' : IdentityNumber,
+  });
+  const PrepareIcrc3AttributeResponse = IDL.Record({
+    'message' : IDL.Vec(IDL.Nat8),
+  });
+  const PrepareIcrc3AttributeError = IDL.Variant({
+    'AuthorizationError' : IDL.Principal,
+    'ValidationError' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
+    'GetAccountError' : GetAccountError,
+    'AttributeMismatch' : IDL.Record({ 'problems' : IDL.Vec(IDL.Text) }),
   });
   const PrepareIdAliasRequest = IDL.Record({
     'issuer' : FrontendHostname,
@@ -728,6 +775,16 @@ export const idlFactory = ({ IDL }) => {
         [GetDelegationResponse],
         ['query'],
       ),
+    'get_icrc3_attributes' : IDL.Func(
+        [GetIcrc3AttributeRequest],
+        [
+          IDL.Variant({
+            'Ok' : GetIcrc3AttributeResponse,
+            'Err' : GetIcrc3AttributeError,
+          }),
+        ],
+        ['query'],
+      ),
     'get_id_alias' : IDL.Func(
         [GetIdAliasRequest],
         [IDL.Variant({ 'Ok' : IdAliasCredentials, 'Err' : GetIdAliasError })],
@@ -780,6 +837,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'init_salt' : IDL.Func([], [], []),
+    'list_available_attributes' : IDL.Func(
+        [ListAvailableAttributesRequest],
+        [
+          IDL.Variant({
+            'Ok' : ListAvailableAttributesResponse,
+            'Err' : ListAvailableAttributesError,
+          }),
+        ],
+        ['query'],
+      ),
     'lookup' : IDL.Func([UserNumber], [IDL.Vec(DeviceData)], ['query']),
     'lookup_by_registration_mode_id' : IDL.Func(
         [RegistrationId],
@@ -860,6 +927,16 @@ export const idlFactory = ({ IDL }) => {
     'prepare_delegation' : IDL.Func(
         [UserNumber, FrontendHostname, SessionKey, IDL.Opt(IDL.Nat64)],
         [UserKey, Timestamp],
+        [],
+      ),
+    'prepare_icrc3_attributes' : IDL.Func(
+        [PrepareIcrc3AttributeRequest],
+        [
+          IDL.Variant({
+            'Ok' : PrepareIcrc3AttributeResponse,
+            'Err' : PrepareIcrc3AttributeError,
+          }),
+        ],
         [],
       ),
     'prepare_id_alias' : IDL.Func(
