@@ -27,7 +27,7 @@ Icrc3Value.fill(
   }),
 );
 
-function decodeIcrc3BlobEntries(base64Data: string): Record<string, string> {
+function decodeIcrc3TextEntries(base64Data: string): Record<string, string> {
   const dataBytes = fromBase64(base64Data);
   const { Map: map } = IDL.decode([Icrc3Value], dataBytes)[0] as {
     Map: [string, Icrc3Value][];
@@ -35,12 +35,9 @@ function decodeIcrc3BlobEntries(base64Data: string): Record<string, string> {
   return Object.fromEntries(
     map
       .filter(
-        (entry): entry is [string, { Blob: number[] }] => "Blob" in entry[1],
+        (entry): entry is [string, { Text: string }] => "Text" in entry[1],
       )
-      .map(([key, { Blob: blob }]) => [
-        key,
-        new TextDecoder().decode(new Uint8Array(blob)),
-      ]),
+      .map(([key, { Text: text }]) => [key, text]),
   );
 }
 
@@ -111,7 +108,7 @@ test.describe("Authorize with direct OpenID", () => {
 
       expect(authorizedIcrc3Attributes.signature.length).toBeGreaterThan(0);
 
-      const blobEntries = decodeIcrc3BlobEntries(
+      const blobEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
       expect(blobEntries).toMatchObject({
@@ -195,7 +192,7 @@ test.describe("Authorize with direct OpenID", () => {
         return;
       }
 
-      const blobEntries = decodeIcrc3BlobEntries(
+      const blobEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
       // Only the name from the default provider should be present via implicit consent.
@@ -249,7 +246,7 @@ test.describe("Authorize with direct OpenID", () => {
         return;
       }
 
-      const blobEntries = decodeIcrc3BlobEntries(
+      const blobEntries = decodeIcrc3TextEntries(
         authorizedIcrc3Attributes.data,
       );
       expect(
