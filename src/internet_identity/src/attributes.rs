@@ -1580,11 +1580,10 @@ mod tests {
             }
         }
 
-        // Silent omit behavior (value mismatch, unknown issuer, scopeless attributes,
-        // duplicate keys) is verified by the e2e tests in openid.spec.ts, which exercise
-        // the full canister signing flow. Unit tests for these cases were removed because
-        // prepare_icrc3_attributes now succeeds (signing the message) instead of returning
-        // an error, and the signing code requires a canister runtime.
+        // Silent omit behavior (unavailable attributes, unknown issuers, value mismatches,
+        // scopeless attributes, duplicate keys) is verified by the integration test
+        // should_silently_omit_unavailable_icrc3_attributes, which exercises the full
+        // canister signing flow.
     }
 
     mod icrc3_attribute_message_tests {

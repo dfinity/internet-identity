@@ -842,3 +842,77 @@ fn should_list_all_available_attributes() {
         result.len()
     );
 }
+
+#[test]
+fn should_silently_omit_unavailable_icrc3_attributes() {
+    use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+
+    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
+    let origin = "https://some-dapp.com";
+
+    // Request a mix: available email, unavailable verified_email, unknown issuer
+    let prepare_request = PrepareIcrc3AttributeRequest {
+        identity_number,
+        origin: origin.to_string(),
+        account_number: None,
+        attributes: vec![
+            // Available: should be included
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: false,
+            },
+            // The test user has no verified_email: should be silently omitted
+            AttributeSpec {
+                key: "openid:https://accounts.google.com:verified_email".into(),
+                value: None,
+                omit_scope: false,
+            },
+            // Unknown issuer: should be silently omitted
+            AttributeSpec {
+                key: "openid:https://unknown-issuer.com:email".into(),
+                value: None,
+                omit_scope: false,
+            },
+        ],
+        nonce: vec![0u8; 32],
+    };
+
+    let prepare_response =
+        api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+            .expect("failed to call prepare_icrc3_attributes")
+            .expect("should succeed with unavailable attributes silently omitted");
+
+    let icrc3_value: Icrc3Value = candid::Decode!(&prepare_response.message, Icrc3Value)
+        .expect("failed to decode ICRC-3 value");
+
+    let map = match icrc3_value {
+        Icrc3Value::Map(entries) => entries,
+        other => panic!("Expected Map, got {:?}", other),
+    };
+
+    let keys: Vec<&str> = map.iter().map(|(k, _)| k.as_str()).collect();
+
+    // Only the available email + 3 implicit entries should be present
+    assert!(
+        keys.contains(&"openid:https://accounts.google.com:email"),
+        "Expected available email attribute, got {:?}",
+        keys
+    );
+    assert!(
+        !keys.contains(&"openid:https://accounts.google.com:verified_email"),
+        "Unavailable verified_email should have been omitted, got {:?}",
+        keys
+    );
+    assert!(
+        !keys.contains(&"openid:https://unknown-issuer.com:email"),
+        "Unknown issuer attribute should have been omitted, got {:?}",
+        keys
+    );
+    assert_eq!(
+        map.len(),
+        4, // email + implicit:nonce + implicit:origin + implicit:issued_at_timestamp_ns
+        "Expected 4 entries (1 attribute + 3 implicit), got {:?}",
+        keys
+    );
+}
