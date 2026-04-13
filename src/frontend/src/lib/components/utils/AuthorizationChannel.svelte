@@ -45,19 +45,9 @@
 
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
-      // Listen for standalone attribute requests (without prior delegation).
-      // Resolve the promise so the auth UI renders — after the user
-      // authenticates, continue/+page.svelte will pick up the pending
-      // attribute request and redirect to the consent page.
-      channel.addEventListener("request", (request) => {
-        if (
-          request.id === undefined ||
-          request.method !== "ii-icrc3-attributes"
-        ) {
-          return;
-        }
-        resolve();
-      });
+      // TODO: Standalone attribute requests (ii-icrc3-attributes without prior
+      // icrc34_delegation) need a separate flow that doesn't depend on
+      // authorizationContextStore. This will be addressed in a follow-up.
 
       channel.addEventListener("request", async (request) => {
         if (
