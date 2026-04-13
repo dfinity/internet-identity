@@ -8,6 +8,10 @@
     INVALID_PARAMS_ERROR_CODE,
   } from "$lib/utils/transport/utils";
   import { authorizationStore } from "$lib/stores/authorization.store";
+  import {
+    resetIdleTimeout,
+    startIdleTimeout,
+  } from "$lib/stores/authorize-flow.store";
   import { z } from "zod";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import Button from "$lib/components/ui/Button.svelte";
@@ -45,17 +49,29 @@
 
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
-      // TODO: Standalone attribute requests (ii-icrc3-attributes without prior
-      // icrc34_delegation) need a separate flow that doesn't depend on
-      // authorizationContextStore. This will be addressed in a follow-up.
+      let resolved = false;
 
+      // When any recognized request arrives, reset the idle timeout
+      // so the flow stays active.
+      channel.addEventListener("request", (request) => {
+        if (request.id === undefined) {
+          return;
+        }
+        if (
+          request.method === "icrc34_delegation" ||
+          request.method === "ii-icrc3-attributes"
+        ) {
+          resetIdleTimeout();
+        }
+      });
+
+      // Handle delegation requests
       channel.addEventListener("request", async (request) => {
         if (
           request.id === undefined ||
           request.method !== "icrc34_delegation" ||
           $authorizationStore !== undefined
         ) {
-          // Ignore if it's a different method, or we're already processing
           return;
         }
         const result = DelegationParamsCodec.safeParse(request.params);
@@ -82,15 +98,33 @@
             request.id,
             result.data,
           );
-          resolve();
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
         } catch (error) {
-          console.error(error); // Log error to console
+          console.error(error);
           reject(
             new AuthorizeChannelError(
               $t`Unverified origin`,
               $t`It seems like the request could not be processed.`,
             ),
           );
+        }
+      });
+
+      // Handle standalone attribute requests (resolve auth UI if not already)
+      channel.addEventListener("request", (request) => {
+        if (
+          request.id === undefined ||
+          request.method !== "ii-icrc3-attributes"
+        ) {
+          return;
+        }
+        authorizationStore.setOrigin(channel.origin);
+        if (!resolved) {
+          resolved = true;
+          resolve();
         }
       });
     });
@@ -116,6 +150,10 @@
           // Don't authorize if we're only doing an initial handshake
           return;
         }
+        // Start the idle timeout after each response is sent.
+        channel.addEventListener("response", () => {
+          startIdleTimeout();
+        });
         // Replace promise when channel closes after it was established
         channel.addEventListener("close", () => {
           authorizePromise = Promise.reject(

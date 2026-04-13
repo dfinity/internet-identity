@@ -31,6 +31,7 @@
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { DelegationResultSchema } from "$lib/utils/transport/utils";
   import { establishedChannelStore } from "$lib/stores/channelStore";
+  import { authorizeFlowComplete } from "$lib/stores/authorize-flow.store";
 
   const { children }: LayoutProps = $props();
 
@@ -155,6 +156,7 @@
 
   // Track page view for authorization flow
   onMount(() => {
+    authorizeFlowComplete.set(false);
     analytics.pageView();
   });
 </script>
@@ -248,7 +250,7 @@
     {/if}
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
-    {#if $authorizationContextStore.isAuthenticating}
+    {#if $authorizeFlowComplete}
       {#await waitFor(10000)}
         <div class="flex flex-col items-center justify-center gap-4">
           <ProgressRing class="text-fg-primary size-14" />

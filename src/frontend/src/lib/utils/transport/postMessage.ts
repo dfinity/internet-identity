@@ -20,6 +20,7 @@ class PostMessageChannel implements Channel {
   #closed = false;
   #requests: JsonRequest[] = [];
   #requestListeners = new Set<(request: JsonRequest) => void>();
+  #responseListeners = new Set<(response: JsonResponse) => void>();
   #closeListeners = new Set<() => void>();
 
   constructor(origin: string, source: WindowProxy) {
@@ -54,6 +55,7 @@ class PostMessageChannel implements Channel {
     ...[event, listener]:
       | [event: "close", listener: () => void]
       | [event: "request", listener: (request: JsonRequest) => void]
+      | [event: "response", listener: (response: JsonResponse) => void]
   ): () => void {
     switch (event) {
       case "close":
@@ -69,6 +71,15 @@ class PostMessageChannel implements Channel {
           this.#requestListeners.delete(listener);
         };
       }
+      case "response":
+        this.#responseListeners.add(
+          listener as (response: JsonResponse) => void,
+        );
+        return () => {
+          this.#responseListeners.delete(
+            listener as (response: JsonResponse) => void,
+          );
+        };
     }
   }
 
@@ -76,11 +87,12 @@ class PostMessageChannel implements Channel {
     if (this.#closed) {
       throw new Error("Post message channel is closed");
     }
-    // Send response and remove request
+    // Send response, remove request, and notify response listeners
     this.#source.postMessage(response, this.#origin);
     this.#requests = this.#requests.filter(
       (request) => request.id !== response.id,
     );
+    this.#responseListeners.forEach((listener) => listener(response));
     return Promise.resolve();
   }
 

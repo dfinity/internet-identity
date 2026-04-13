@@ -206,6 +206,7 @@ class LegacyChannel implements Channel {
   #redirectOrigin?: string;
   #authRequest?: AuthRequest;
   #closeListeners = new Set<() => void>();
+  #responseListeners = new Set<(response: JsonResponse) => void>();
 
   constructor(
     origin: string,
@@ -230,10 +231,18 @@ class LegacyChannel implements Channel {
     ...[event, listener]:
       | [event: "close", listener: () => void]
       | [event: "request", listener: (request: JsonRequest) => void]
+      | [event: "response", listener: (response: JsonResponse) => void]
   ): () => void {
     if (event === "close") {
       this.#closeListeners.add(listener);
       return () => this.#closeListeners.delete(listener);
+    }
+    if (event === "response") {
+      this.#responseListeners.add(listener as (response: JsonResponse) => void);
+      return () =>
+        this.#responseListeners.delete(
+          listener as (response: JsonResponse) => void,
+        );
     }
     // Replay auth request if it didn't get a response yet
     const authRequest = this.#authRequest;
@@ -315,6 +324,7 @@ class LegacyChannel implements Channel {
     }
 
     window.opener.postMessage(data, this.#origin);
+    this.#responseListeners.forEach((listener) => listener(response));
     return Promise.resolve();
   }
 

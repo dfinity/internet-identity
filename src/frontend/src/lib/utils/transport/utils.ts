@@ -21,6 +21,10 @@ export interface Channel {
     event: "request",
     listener: (request: JsonRequest) => void,
   ): () => void;
+  addEventListener(
+    event: "response",
+    listener: (response: JsonResponse) => void,
+  ): () => void;
   send(response: JsonResponse): Promise<void>;
   close(): Promise<void>;
 }

@@ -14,11 +14,10 @@ import { DelegationChain } from "@icp-sdk/core/identity";
 import { AuthRequest, DelegationParams } from "$lib/utils/transport/utils";
 
 export type AuthorizationContext = {
-  authRequest: AuthRequest; // Additional details e.g. derivation origin
-  requestId: string | number; // The ID of the JSON RPC request
+  authRequest?: AuthRequest; // Present when delegation was requested
+  requestId?: string | number; // JSON RPC request ID for delegation
   requestOrigin: string; // Displayed to the user to identify the app
   effectiveOrigin: string; // Used for last used storage and delegations
-  isAuthenticating: boolean; // True if user is being redirect back to app
 };
 
 type AuthorizationStore = Readable<AuthorizationContext | undefined> & {
@@ -27,6 +26,7 @@ type AuthorizationStore = Readable<AuthorizationContext | undefined> & {
     requestId: string | number,
     params: DelegationParams,
   ) => Promise<void>;
+  setOrigin: (requestOrigin: string) => void;
   authorize: (
     accountNumber: Promise<bigint | undefined> | bigint | undefined,
     artificialDelay?: number,
@@ -60,16 +60,26 @@ export const authorizationStore: AuthorizationStore = {
       requestId,
       requestOrigin,
       effectiveOrigin,
-      isAuthenticating: false,
+    });
+  },
+  setOrigin: (requestOrigin) => {
+    // Set minimal context (just origin) if no context exists yet.
+    // Used for attributes-only flow where no delegation was requested.
+    if (get(internalStore) !== undefined) {
+      return;
+    }
+    internalStore.set({
+      requestOrigin,
+      effectiveOrigin: remapToLegacyDomain(requestOrigin),
     });
   },
   subscribe: (...args) => internalStore.subscribe(...args),
   authorize: async (accountNumberMaybePromise, artificialDelay) => {
     const context = get(authorizationContextStore);
-    internalStore.set({
-      ...context,
-      isAuthenticating: true,
-    });
+    if (context.authRequest === undefined || context.requestId === undefined) {
+      throw new Error("Cannot authorize without a delegation request");
+    }
+    const { authRequest, requestId } = context;
     const { identityNumber, actor } = get(authenticatedStore);
     const artificialDelayPromise = waitFor(
       features.DUMMY_AUTH ||
@@ -83,9 +93,9 @@ export const authorizationStore: AuthorizationStore = {
         identityNumber,
         context.effectiveOrigin,
         accountNumber !== undefined ? [accountNumber] : [],
-        context.authRequest.sessionPublicKey,
-        context.authRequest.maxTimeToLive !== undefined
-          ? [context.authRequest.maxTimeToLive]
+        authRequest.sessionPublicKey,
+        authRequest.maxTimeToLive !== undefined
+          ? [authRequest.maxTimeToLive]
           : [],
       )
       .then(throwCanisterError);
@@ -95,7 +105,7 @@ export const authorizationStore: AuthorizationStore = {
           identityNumber,
           context.effectiveOrigin,
           accountNumber !== undefined ? [accountNumber] : [],
-          context.authRequest.sessionPublicKey,
+          authRequest.sessionPublicKey,
           expiration,
         )
         .then(throwCanisterError)
@@ -108,7 +118,7 @@ export const authorizationStore: AuthorizationStore = {
         ),
     );
     await artificialDelayPromise;
-    return { requestId: context.requestId, delegationChain };
+    return { requestId, delegationChain };
   },
 };
 

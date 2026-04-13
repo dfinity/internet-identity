@@ -95,9 +95,18 @@
     defaultAccountNumber = null;
   });
 
-  const authorize = async (
+  /**
+   * Send the delegation if one was requested, then start the idle timeout.
+   * Skips delegation if only attributes were requested (no authRequest in context).
+   */
+  const sendDelegationIfRequested = async (
     accountNumber?: Promise<bigint | undefined> | bigint | undefined,
   ) => {
+    const context = $authorizationContextStore;
+    if (context.authRequest === undefined || context.requestId === undefined) {
+      // Attributes-only flow — no delegation to send.
+      return;
+    }
     const { requestId, delegationChain } =
       await authorizationStore.authorize(accountNumber);
     const result = DelegationResultSchema.encode(delegationChain);
@@ -107,48 +116,43 @@
       result,
     });
   };
-  /**
-   * Check if there is a pending attribute request on the channel.
-   * The pending request is emitted on listener attachment since no response
-   * has been sent yet.
-   */
-  const checkForPendingAttributeRequest = (): Promise<
-    JsonRequest | undefined
-  > =>
-    new Promise((resolve) => {
-      let result: JsonRequest | undefined;
-      const unsubscribe = $establishedChannelStore.addEventListener(
-        "request",
-        (request: JsonRequest) => {
-          if (
-            request.id !== undefined &&
-            request.method === "ii-icrc3-attributes"
-          ) {
-            result = request;
-          }
-        },
-      );
-      // The pending request is emitted synchronously during addEventListener,
-      // so by the next microtask we already have the result (or not).
-      queueMicrotask(() => {
-        unsubscribe();
-        resolve(result);
-      });
-    });
 
-  const redirectToConsentIfNeeded = async (): Promise<boolean> => {
-    const pendingRequest = await checkForPendingAttributeRequest();
+  /**
+   * Navigate to the consent page if there's a pending attribute request
+   * that needs explicit consent.
+   */
+  const navigateToConsentIfNeeded = async () => {
+    // Race a short timeout against the channel listener to detect a
+    // pending attribute request (emitted synchronously on attach).
+    const pendingRequest = await Promise.race([
+      new Promise<JsonRequest>((resolve) => {
+        $establishedChannelStore.addEventListener(
+          "request",
+          (request: JsonRequest) => {
+            if (
+              request.id !== undefined &&
+              request.method === "ii-icrc3-attributes"
+            ) {
+              resolve(request);
+            }
+          },
+        );
+      }),
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), 50),
+      ),
+    ]);
+
     if (pendingRequest === undefined) {
-      return false;
+      return;
     }
+
     const result = Icrc3AttributesParamsSchema.safeParse(pendingRequest.params);
     const requestedKeys = result.success ? result.data.keys : [];
 
     if (needsConsentScreen(requestedKeys)) {
       await goto("/authorize/consent");
-      return true;
     }
-    return false;
   };
 
   const handleContinueDefault = async () => {
@@ -161,7 +165,7 @@
       const { identityNumber, actor } = $authenticationStore!;
       const { effectiveOrigin } = $authorizationContextStore;
       void triggerDropWaveAnimation();
-      await authorize(
+      await sendDelegationIfRequested(
         defaultAccountNumber === null
           ? actor
               .get_default_account(identityNumber, effectiveOrigin)
@@ -169,7 +173,7 @@
               .then((account) => account.account_number[0])
           : defaultAccountNumber,
       );
-      await redirectToConsentIfNeeded();
+      await navigateToConsentIfNeeded();
     } catch (error) {
       handleError(error);
     } finally {
@@ -180,8 +184,8 @@
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
     try {
-      await authorize(accountNumber);
-      await redirectToConsentIfNeeded();
+      await sendDelegationIfRequested(accountNumber);
+      await navigateToConsentIfNeeded();
     } catch (error) {
       handleError(error);
     }
