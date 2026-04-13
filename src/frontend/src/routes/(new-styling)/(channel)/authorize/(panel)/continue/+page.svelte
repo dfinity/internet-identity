@@ -116,27 +116,23 @@
     JsonRequest | undefined
   > =>
     new Promise((resolve) => {
-      let resolved = false;
-      let unsubscribe: () => void;
-      unsubscribe = $establishedChannelStore.addEventListener(
+      let result: JsonRequest | undefined;
+      const unsubscribe = $establishedChannelStore.addEventListener(
         "request",
         (request: JsonRequest) => {
           if (
             request.id !== undefined &&
             request.method === "ii-icrc3-attributes"
           ) {
-            resolved = true;
-            unsubscribe();
-            resolve(request);
+            result = request;
           }
         },
       );
-      // Give it a tick to receive the pending request, then resolve with undefined
+      // The pending request is emitted synchronously during addEventListener,
+      // so by the next microtask we already have the result (or not).
       queueMicrotask(() => {
-        if (!resolved) {
-          unsubscribe();
-          resolve(undefined);
-        }
+        unsubscribe();
+        resolve(result);
       });
     });
 
