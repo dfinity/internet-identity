@@ -117,7 +117,8 @@
   > =>
     new Promise((resolve) => {
       let resolved = false;
-      const unsubscribe = $establishedChannelStore.addEventListener(
+      let unsubscribe: () => void;
+      unsubscribe = $establishedChannelStore.addEventListener(
         "request",
         (request: JsonRequest) => {
           if (
