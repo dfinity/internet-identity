@@ -163,6 +163,9 @@ msgstr "Choose method"
 msgid "Choose method to continue"
 msgstr "Choose method to continue"
 
+msgid "Choose which details you'd like to share"
+msgstr "Choose which details you'd like to share"
+
 msgid "Clear all"
 msgstr "Clear all"
 
@@ -256,6 +259,9 @@ msgstr "Dashlane has been confirmed to be incompatible."
 msgid "Default"
 msgstr "Default"
 
+msgid "Deny All"
+msgstr "Deny All"
+
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
@@ -276,6 +282,9 @@ msgstr "Edit {name}"
 
 msgid "Edit account"
 msgstr "Edit account"
+
+msgid "Email address"
+msgstr "Email address"
 
 msgid "Enable multiple accounts"
 msgstr "Enable multiple accounts"
@@ -590,6 +599,9 @@ msgstr "My identity"
 msgid "n/a"
 msgstr "n/a"
 
+msgid "Name"
+msgstr "Name"
+
 msgid "Name account"
 msgstr "Name account"
 
@@ -766,6 +778,9 @@ msgstr "Return to app"
 
 msgid "Return to application"
 msgstr "Return to application"
+
+msgid "Review Permissions"
+msgstr "Review Permissions"
 
 msgid "Right now"
 msgstr "Right now"
@@ -1065,6 +1080,9 @@ msgstr "Use a device that already holds your identity to scan or open the URL. T
 
 msgid "Use existing identity"
 msgstr "Use existing identity"
+
+msgid "Verified email"
+msgstr "Verified email"
 
 msgid "Verify"
 msgstr "Verify"

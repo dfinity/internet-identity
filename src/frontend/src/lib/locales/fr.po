@@ -163,6 +163,9 @@ msgstr "Choisissez une méthode"
 msgid "Choose method to continue"
 msgstr "Choisissez une méthode pour continuer"
 
+msgid "Choose which details you'd like to share"
+msgstr ""
+
 msgid "Clear all"
 msgstr "Tout effacer"
 
@@ -256,6 +259,9 @@ msgstr "Il a été confirmé que Dashlane est incompatible."
 msgid "Default"
 msgstr "Par défaut"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "Passkeys découvrables"
 
@@ -276,6 +282,9 @@ msgstr "Modifier {name}"
 
 msgid "Edit account"
 msgstr "Modifier le compte"
+
+msgid "Email address"
+msgstr ""
 
 msgid "Enable multiple accounts"
 msgstr "Activer plusieurs comptes"
@@ -590,6 +599,9 @@ msgstr "Mon identité"
 msgid "n/a"
 msgstr "n/d"
 
+msgid "Name"
+msgstr ""
+
 msgid "Name account"
 msgstr "Nommez le compte"
 
@@ -766,6 +778,9 @@ msgstr "Retour à l’application"
 
 msgid "Return to application"
 msgstr "Retour à l’application"
+
+msgid "Review Permissions"
+msgstr ""
 
 msgid "Right now"
 msgstr "À l’instant"
@@ -1065,6 +1080,9 @@ msgstr "Utilisez un appareil qui contient déjà votre identité pour scanner ou
 
 msgid "Use existing identity"
 msgstr "Utiliser une identité existante"
+
+msgid "Verified email"
+msgstr ""
 
 msgid "Verify"
 msgstr "Vérifier"

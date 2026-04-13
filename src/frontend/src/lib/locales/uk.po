@@ -163,6 +163,9 @@ msgstr "Виберіть метод"
 msgid "Choose method to continue"
 msgstr "Виберіть метод для продовження"
 
+msgid "Choose which details you'd like to share"
+msgstr ""
+
 msgid "Clear all"
 msgstr "Очистити все"
 
@@ -256,6 +259,9 @@ msgstr "Підтверджено, що Dashlane несумісний."
 msgid "Default"
 msgstr "За замовчуванням"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "Виявлювані ключі доступу"
 
@@ -276,6 +282,9 @@ msgstr "Редагувати {name}"
 
 msgid "Edit account"
 msgstr "Редагувати обліковий запис"
+
+msgid "Email address"
+msgstr ""
 
 msgid "Enable multiple accounts"
 msgstr "Увімкнути кілька облікових записів"
@@ -590,6 +599,9 @@ msgstr "Мій ідентифікатор"
 msgid "n/a"
 msgstr "н/д"
 
+msgid "Name"
+msgstr ""
+
 msgid "Name account"
 msgstr "Назвати обліковий запис"
 
@@ -766,6 +778,9 @@ msgstr "Повернутися до застосунку"
 
 msgid "Return to application"
 msgstr "Повернутися до застосунку"
+
+msgid "Review Permissions"
+msgstr ""
 
 msgid "Right now"
 msgstr "Зараз"
@@ -1065,6 +1080,9 @@ msgstr "Використовуйте пристрій, який вже має в
 
 msgid "Use existing identity"
 msgstr "Використати існуючий ідентифікатор"
+
+msgid "Verified email"
+msgstr ""
 
 msgid "Verify"
 msgstr "Перевірити"

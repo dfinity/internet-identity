@@ -163,6 +163,9 @@ msgstr "طریقہ منتخب کریں"
 msgid "Choose method to continue"
 msgstr "جاری رکھنے کے لیے طریقہ منتخب کریں"
 
+msgid "Choose which details you'd like to share"
+msgstr ""
+
 msgid "Clear all"
 msgstr "سب صاف کریں"
 
@@ -256,6 +259,9 @@ msgstr "Dashlane کے غیر ہم آہنگ ہونے کی تصدیق ہو گئی 
 msgid "Default"
 msgstr "ڈیفالٹ"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "قابلِ دریافت پاس کیز"
 
@@ -276,6 +282,9 @@ msgstr "{name} میں ترمیم کریں"
 
 msgid "Edit account"
 msgstr "اکاؤنٹ میں ترمیم کریں"
+
+msgid "Email address"
+msgstr ""
 
 msgid "Enable multiple accounts"
 msgstr "متعدد اکاؤنٹس فعال کریں"
@@ -590,6 +599,9 @@ msgstr "میری شناخت"
 msgid "n/a"
 msgstr "دستیاب نہیں"
 
+msgid "Name"
+msgstr ""
+
 msgid "Name account"
 msgstr "اکاؤنٹ کا نام رکھیں"
 
@@ -766,6 +778,9 @@ msgstr "ایپ پر واپس جائیں"
 
 msgid "Return to application"
 msgstr "ایپلی کیشن پر واپس جائیں"
+
+msgid "Review Permissions"
+msgstr ""
 
 msgid "Right now"
 msgstr "ابھی"
@@ -1065,6 +1080,9 @@ msgstr "یو آر ایل کو سکین کرنے یا کھولنے کے لیے ا
 
 msgid "Use existing identity"
 msgstr "موجودہ شناخت استعمال کریں"
+
+msgid "Verified email"
+msgstr ""
 
 msgid "Verify"
 msgstr "تصدیق کریں"

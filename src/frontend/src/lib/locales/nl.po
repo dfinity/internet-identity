@@ -163,6 +163,9 @@ msgstr "Kies methode"
 msgid "Choose method to continue"
 msgstr "Kies methode om door te gaan"
 
+msgid "Choose which details you'd like to share"
+msgstr ""
+
 msgid "Clear all"
 msgstr "Alles wissen"
 
@@ -256,6 +259,9 @@ msgstr "Dashlane is bevestigd als incompatibel."
 msgid "Default"
 msgstr "Standaard"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "Discoverable passkeys"
 
@@ -276,6 +282,9 @@ msgstr "Bewerk {name}"
 
 msgid "Edit account"
 msgstr "Account bewerken"
+
+msgid "Email address"
+msgstr ""
 
 msgid "Enable multiple accounts"
 msgstr "Meerdere accounts inschakelen"
@@ -590,6 +599,9 @@ msgstr "Mijn identiteit"
 msgid "n/a"
 msgstr "n.v.t."
 
+msgid "Name"
+msgstr ""
+
 msgid "Name account"
 msgstr "Accountnaam"
 
@@ -766,6 +778,9 @@ msgstr "Terug naar app"
 
 msgid "Return to application"
 msgstr "Terug naar applicatie"
+
+msgid "Review Permissions"
+msgstr ""
 
 msgid "Right now"
 msgstr "Op dit moment"
@@ -1065,6 +1080,9 @@ msgstr "Gebruik een apparaat dat uw identiteit al bevat om de URL te scannen of 
 
 msgid "Use existing identity"
 msgstr "Bestaande identiteit gebruiken"
+
+msgid "Verified email"
+msgstr ""
 
 msgid "Verify"
 msgstr "Verifiëren"

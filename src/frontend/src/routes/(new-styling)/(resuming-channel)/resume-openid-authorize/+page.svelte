@@ -28,8 +28,6 @@
   import { cubicOut } from "svelte/easing";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import Logo from "$lib/components/ui/Logo.svelte";
-  import { goto } from "$app/navigation";
-  import { needsConsentScreen } from "../../(channel)/authorize/(panel)/consent/utils";
 
   const dapps = getDapps();
   const dapp = $derived(
@@ -44,26 +42,10 @@
     (issuer: string) => async (request: JsonRequest) => {
       if (request.method === "ii_attributes") {
         await handleLegacyAttributes(issuer, request);
-        return;
+      } else if (request.method === "ii-icrc3-attributes") {
+        // TODO: add consent screen redirect for non-implicit attributes
+        await handleIcrc3Attributes(issuer, request);
       }
-
-      if (request.method !== "ii-icrc3-attributes") {
-        return;
-      }
-
-      // For ICRC-3: check if consent screen is needed
-      const icrc3Result = Icrc3AttributesParamsSchema.safeParse(request.params);
-      const requestedKeys = icrc3Result.success ? icrc3Result.data.keys : [];
-
-      if (needsConsentScreen(requestedKeys, issuer)) {
-        const url = new URL("/authorize/consent", window.location.origin);
-        url.searchParams.set("issuer", issuer);
-        await goto(url);
-        return;
-      }
-
-      // All implicit — proceed without consent screen
-      await handleIcrc3Attributes(issuer, request);
     };
 
   const handleLegacyAttributes = async (

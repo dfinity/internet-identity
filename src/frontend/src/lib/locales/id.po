@@ -163,6 +163,9 @@ msgstr "Pilih metode"
 msgid "Choose method to continue"
 msgstr "Pilih metode untuk melanjutkan"
 
+msgid "Choose which details you'd like to share"
+msgstr ""
+
 msgid "Clear all"
 msgstr "Hapus semua"
 
@@ -256,6 +259,9 @@ msgstr "Dashlane telah dikonfirmasi tidak kompatibel."
 msgid "Default"
 msgstr "Default"
 
+msgid "Deny All"
+msgstr ""
+
 msgid "Discoverable passkeys"
 msgstr "Passkey yang dapat ditemukan"
 
@@ -276,6 +282,9 @@ msgstr "Edit {name}"
 
 msgid "Edit account"
 msgstr "Edit akun"
+
+msgid "Email address"
+msgstr ""
 
 msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
@@ -590,6 +599,9 @@ msgstr "Identitas saya"
 msgid "n/a"
 msgstr "t/a"
 
+msgid "Name"
+msgstr ""
+
 msgid "Name account"
 msgstr "Beri nama akun"
 
@@ -766,6 +778,9 @@ msgstr "Kembali ke aplikasi"
 
 msgid "Return to application"
 msgstr "Kembali ke aplikasi"
+
+msgid "Review Permissions"
+msgstr ""
 
 msgid "Right now"
 msgstr "Saat ini"
@@ -1065,6 +1080,9 @@ msgstr "Gunakan perangkat yang sudah memiliki identitas Anda untuk memindai atau
 
 msgid "Use existing identity"
 msgstr "Gunakan identitas yang ada"
+
+msgid "Verified email"
+msgstr ""
 
 msgid "Verify"
 msgstr "Verifikasi"
