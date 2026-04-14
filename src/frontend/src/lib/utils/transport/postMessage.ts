@@ -9,7 +9,11 @@ import {
 import { HeartbeatServer } from "./heartBeat";
 
 const ESTABLISH_TIMEOUT_MS = 10000;
-const DISCONNECT_TIMEOUT_MS = 10000;
+// Chrome aggressively throttles timers in background tabs (up to 1 wake-up
+// per minute after 5 minutes hidden). A 30-second timeout gives the relying
+// party's ICRC-29 heartbeat enough margin to survive throttling while still
+// detecting genuine disconnects in a reasonable time frame.
+const DISCONNECT_TIMEOUT_MS = 30000;
 
 export class PostMessageUnsupportedError extends Error {}
 

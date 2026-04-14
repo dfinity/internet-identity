@@ -126,6 +126,11 @@
   };
   const authorizeDefault = async () => {
     try {
+      if ($establishedChannelStore.closed) {
+        throw new Error(
+          "Connection to the application was lost. Please try again.",
+        );
+      }
       const { identityNumber, actor } = $authenticationStore!;
       const { effectiveOrigin } = $authorizationContextStore;
       const accountNumber = actor
