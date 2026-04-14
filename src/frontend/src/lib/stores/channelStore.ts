@@ -111,9 +111,13 @@ const getTransports = (): Transport[] => {
 /** Resolves the next time `authenticationStore` holds a value. */
 const waitForAuthentication = (): Promise<Authenticated> =>
   new Promise((resolve) => {
+    let resolved = false;
     const unsubscribe = authenticationStore.subscribe((state) => {
-      if (state !== undefined) {
-        unsubscribe();
+      if (state !== undefined && !resolved) {
+        resolved = true;
+        // Defer unsubscribe to avoid calling it during the synchronous
+        // initial callback, before subscribe() has returned.
+        queueMicrotask(() => unsubscribe());
         resolve(state);
       }
     });
@@ -124,9 +128,11 @@ const waitForAuthorization = (): Promise<{
   accountNumber: bigint | undefined;
 }> =>
   new Promise((resolve) => {
+    let resolved = false;
     const unsubscribe = authorizationStore.subscribe((state) => {
-      if (state?.authorized === true) {
-        unsubscribe();
+      if (state?.authorized === true && !resolved) {
+        resolved = true;
+        queueMicrotask(() => unsubscribe());
         resolve({ accountNumber: state.accountNumber });
       }
     });
@@ -182,8 +188,6 @@ const handleDelegationRequest =
       return;
     }
 
-    channelIdleStore.set(false);
-
     const result = DelegationParamsCodec.safeParse(request.params);
     if (!result.success) {
       await channel.send({
@@ -229,7 +233,6 @@ const handleDelegationRequest =
       // Authorization is the commit point — the user may switch identities
       // freely before this. Once authorized, the UI is no longer needed.
       const { accountNumber } = await waitForAuthorization();
-      channelIdleStore.set(true);
 
       // Read the identity *after* authorization so we capture whichever
       // identity the user settled on (they may have switched mid-flow).
@@ -556,13 +559,6 @@ const handleIcrc3Attributes =
 
 /** Set when the channel encounters an unrecoverable error. */
 export const channelErrorStore = writable<ChannelError | undefined>();
-
-/**
- * `true` when there is no active request that needs user interaction.
- * The UI renders the authorization screen when `false`, and a "redirecting"
- * screen when `true`. Resets to `false` when a new request comes in.
- */
-export const channelIdleStore = writable(false);
 
 const channelInternalStore = writable<Channel | undefined>();
 
