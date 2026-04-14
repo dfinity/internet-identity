@@ -4,7 +4,6 @@
     authorizationContextStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
-  import { channelIdleStore } from "$lib/stores/channelStore";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -240,7 +239,7 @@
     {/if}
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
-    {#if $channelIdleStore}
+    {#if $authorizationContextStore.authorized}
       {#await waitFor(10000)}
         <div class="flex flex-col items-center justify-center gap-4">
           <ProgressRing class="text-fg-primary size-14" />
