@@ -19,7 +19,7 @@ use identity_jose::jws::{
     VerificationInput,
 };
 use internet_identity_interface::internet_identity::types::{
-    MetadataEntryV2, OpenIdConfig, OpenIdEmailVerificationScheme,
+    MetadataEntryV2, OidcConfig, OpenIdConfig, OpenIdEmailVerificationScheme,
 };
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
@@ -212,6 +212,295 @@ impl Provider {
             certs,
             email_verification: config.email_verification,
         }
+    }
+}
+
+/// OIDC provider that discovers its configuration from a discovery URL.
+/// Used with the new `OidcConfig` type.
+pub struct DiscoverableProvider {
+    client_id: Option<String>,
+    discovered_issuer: Rc<RefCell<Option<String>>>,
+    certs: Rc<RefCell<Vec<Jwk>>>,
+    email_verification: Option<OpenIdEmailVerificationScheme>,
+    #[allow(dead_code)] // Used for SSO config matching in follow-up work
+    config: OidcConfig,
+}
+
+impl OpenIdProvider for DiscoverableProvider {
+    fn issuer(&self) -> String {
+        self.discovered_issuer
+            .borrow()
+            .clone()
+            .unwrap_or_default()
+    }
+
+    fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
+        self.email_verification
+    }
+
+    fn verify(
+        &self,
+        jwt: &str,
+        salt: &[u8; 32],
+    ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
+        let issuer = self
+            .discovered_issuer
+            .borrow()
+            .clone()
+            .ok_or_else(|| {
+                OpenIDJWTVerificationError::GenericError(
+                    "Provider not yet initialized (discovery pending)".to_string(),
+                )
+            })?;
+        let client_id = self.client_id.as_ref().ok_or_else(|| {
+            OpenIDJWTVerificationError::GenericError(
+                "Provider client_id not yet available".to_string(),
+            )
+        })?;
+
+        // Decode JWT and decode claims
+        let validation_item = Decoder::new()
+            .decode_compact_serialization(jwt.as_bytes(), None)
+            .map_err(|_| {
+                OpenIDJWTVerificationError::GenericError("Unable to decode JWT".to_string())
+            })?;
+        let claims: Claims =
+            serde_json::from_slice(validation_item.claims()).map_err(|_| {
+                OpenIDJWTVerificationError::GenericError(
+                    "Unable to decode claims or expected claims are missing".to_string(),
+                )
+            })?;
+
+        // Verify claims against discovered issuer
+        verify_claims(&issuer, client_id, &claims, salt)?;
+
+        // Verify JWT signature
+        let kid = validation_item
+            .kid()
+            .ok_or(OpenIDJWTVerificationError::GenericError(
+                "JWT is missing kid".to_string(),
+            ))?;
+        let certs = self.certs.borrow();
+        let cert = certs
+            .iter()
+            .find(|cert| cert.kid().is_some_and(|v| v == kid))
+            .ok_or(OpenIDJWTVerificationError::GenericError(format!(
+                "Certificate not found for {kid}"
+            )))?;
+        validation_item
+            .verify(&JwsVerifierFn::from(verify_signature), cert)
+            .map_err(|_| {
+                OpenIDJWTVerificationError::GenericError("Invalid signature".to_string())
+            })?;
+
+        // Return credential with metadata
+        let mut metadata: HashMap<String, MetadataEntryV2> = HashMap::new();
+        if let Some(email) = claims.email {
+            metadata.insert("email".into(), MetadataEntryV2::String(email));
+        }
+        if let Some(email_verified) = claims.email_verified {
+            metadata.insert(
+                "email_verified".into(),
+                MetadataEntryV2::String(email_verified.into_string()),
+            );
+        }
+        if let Some(name) = claims.name {
+            metadata.insert("name".into(), MetadataEntryV2::String(name));
+        }
+        Ok(OpenIdCredential {
+            iss: claims.iss,
+            sub: claims.sub,
+            aud: claims.aud,
+            last_usage_timestamp: None,
+            metadata,
+        })
+    }
+}
+
+impl DiscoverableProvider {
+    pub fn create(config: OidcConfig) -> DiscoverableProvider {
+        let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
+        let discovered_issuer: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+
+        #[cfg(not(test))]
+        {
+            let certs_ref = Rc::clone(&certs);
+            let issuer_ref = Rc::clone(&discovered_issuer);
+            let discovery_url = config.discovery_url.clone();
+            schedule_fetch_discovery(discovery_url, issuer_ref, certs_ref, Some(0));
+        }
+
+        DiscoverableProvider {
+            client_id: config.client_id.clone(),
+            discovered_issuer,
+            certs,
+            email_verification: config.email_verification,
+            config,
+        }
+    }
+}
+
+/// Validates that the discovered issuer belongs to the same domain as the discovery URL.
+fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), String> {
+    let extract_host = |url: &str| -> Result<String, String> {
+        // Simple host extraction: find "://" then take until next "/" or end
+        let after_scheme = url
+            .find("://")
+            .map(|i| &url[i + 3..])
+            .ok_or_else(|| format!("Invalid URL: {url}"))?;
+        let host = after_scheme
+            .find('/')
+            .map(|i| &after_scheme[..i])
+            .unwrap_or(after_scheme);
+        Ok(host.to_lowercase())
+    };
+
+    let discovery_host = extract_host(discovery_url)?;
+    let issuer_host = extract_host(issuer)?;
+
+    if discovery_host != issuer_host {
+        return Err(format!(
+            "Issuer host '{issuer_host}' does not match discovery host '{discovery_host}'"
+        ));
+    }
+    Ok(())
+}
+
+// Interval for re-fetching OIDC discovery documents
+const FETCH_DISCOVERY_INTERVAL_SECONDS: u64 = 60 * 60; // 1 hour
+
+#[cfg(not(test))]
+const DISCOVERY_CALL_CYCLES: u128 = 30_000_000_000;
+
+#[cfg(not(test))]
+fn schedule_fetch_discovery(
+    discovery_url: String,
+    issuer_ref: Rc<RefCell<Option<String>>>,
+    certs_ref: Rc<RefCell<Vec<Jwk>>>,
+    delay: Option<u64>,
+) {
+    use ic_cdk::spawn;
+    use ic_cdk_timers::set_timer;
+    use std::time::Duration;
+
+    set_timer(
+        Duration::from_secs(delay.unwrap_or(FETCH_DISCOVERY_INTERVAL_SECONDS)),
+        move || {
+            spawn(async move {
+                let result = fetch_discovery(discovery_url.clone()).await;
+                let next_delay =
+                    compute_next_discovery_fetch_delay(&result, delay);
+                if let Ok(doc) = result {
+                    // Validate issuer domain
+                    if let Err(err) = validate_issuer_domain(&discovery_url, &doc.issuer) {
+                        ic_cdk::println!("Discovery issuer validation failed: {err}");
+                    } else {
+                        // Store discovered issuer
+                        issuer_ref.replace(Some(doc.issuer));
+
+                        // Start JWKS fetching if not already started
+                        let jwks_uri = doc.jwks_uri;
+                        if certs_ref.borrow().is_empty() {
+                            schedule_fetch_certs(
+                                jwks_uri,
+                                Rc::clone(&certs_ref),
+                                Some(0),
+                            );
+                        }
+                    }
+                }
+                schedule_fetch_discovery(
+                    discovery_url,
+                    issuer_ref,
+                    certs_ref,
+                    next_delay,
+                );
+            });
+        },
+    );
+}
+
+#[cfg(not(test))]
+async fn fetch_discovery(discovery_url: String) -> Result<DiscoveryDocument, String> {
+    use ic_cdk::api::management_canister::http_request::{
+        http_request_with_closure, CanisterHttpRequestArgument, HttpMethod,
+    };
+
+    let request = CanisterHttpRequestArgument {
+        url: discovery_url,
+        method: HttpMethod::GET,
+        body: None,
+        max_response_bytes: None,
+        transform: None,
+        headers: vec![
+            HttpHeader {
+                name: "Accept".into(),
+                value: "application/json".into(),
+            },
+            HttpHeader {
+                name: "User-Agent".into(),
+                value: "internet_identity_canister".into(),
+            },
+        ],
+    };
+
+    let (response,) =
+        http_request_with_closure(request, DISCOVERY_CALL_CYCLES, transform_discovery)
+            .await
+            .map_err(|(_, err)| err)?;
+
+    serde_json::from_slice::<DiscoveryDocument>(response.body.as_slice())
+        .map_err(|_| "Invalid discovery JSON".into())
+}
+
+/// Transform function for OIDC discovery responses.
+/// Re-serializes deterministically for consensus across subnet nodes.
+#[allow(clippy::needless_pass_by_value)]
+fn transform_discovery(response: HttpResponse) -> HttpResponse {
+    if response.status != HTTP_STATUS_OK {
+        trap("Invalid discovery response status")
+    }
+
+    let doc: serde_json::Value = serde_json::from_slice(response.body.as_slice())
+        .unwrap_or_else(|_| trap("Invalid discovery JSON"));
+
+    let body =
+        serde_json::to_vec(&doc).unwrap_or_else(|_| trap("Failed to re-serialize discovery JSON"));
+
+    HttpResponse {
+        status: Nat::from(HTTP_STATUS_OK),
+        headers: vec![],
+        body,
+    }
+}
+
+/// OIDC discovery document fields we need.
+#[derive(serde::Deserialize, Clone)]
+struct DiscoveryDocument {
+    issuer: String,
+    #[allow(dead_code)]
+    authorization_endpoint: String,
+    jwks_uri: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    scopes_supported: Vec<String>,
+}
+
+fn compute_next_discovery_fetch_delay<T, E>(
+    result: &Result<T, E>,
+    current_delay: Option<u64>,
+) -> Option<u64> {
+    const MIN_DELAY_SECONDS: u64 = 60;
+    const MAX_DELAY_SECONDS: u64 = FETCH_DISCOVERY_INTERVAL_SECONDS;
+    const BACKOFF_MULTIPLIER: u64 = 2;
+
+    match result {
+        Ok(_) => None,
+        Err(_) => Some(
+            current_delay
+                .map_or(MIN_DELAY_SECONDS, |d| d * BACKOFF_MULTIPLIER)
+                .clamp(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS),
+        ),
     }
 }
 

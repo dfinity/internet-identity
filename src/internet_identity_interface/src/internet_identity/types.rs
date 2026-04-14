@@ -237,12 +237,14 @@ pub struct InternetIdentityFrontendArgs {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
+    pub oidc_configs: Option<Vec<OidcConfig>>,
 }
 
 impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
     fn from(value: &InternetIdentityInit) -> Self {
         Self {
             openid_configs: value.openid_configs.clone(),
+            oidc_configs: value.oidc_configs.clone(),
         }
     }
 }
@@ -264,6 +266,8 @@ pub struct InternetIdentityInit {
     pub related_origins: Option<Vec<String>>,
     pub new_flow_origins: Option<Vec<String>>,
     pub openid_configs: Option<Vec<OpenIdConfig>>,
+    /// Simplified OIDC configs that use discovery. Mutually exclusive with `openid_configs`.
+    pub oidc_configs: Option<Vec<OidcConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
@@ -377,6 +381,36 @@ pub struct OpenIdConfig {
     pub auth_uri: String,
     pub auth_scope: Vec<String>,
     pub fedcm_uri: Option<String>,
+    pub email_verification: Option<OpenIdEmailVerificationScheme>,
+}
+
+/// Simplified OIDC provider configuration that relies on OIDC discovery
+/// instead of requiring all provider details in the init config.
+///
+/// For dedicated providers (Google, Apple, Microsoft): `client_id` is set,
+/// `discovery_url` points to the standard `.well-known/openid-configuration` endpoint.
+///
+/// For SSO providers: `client_id` is `None`, `discovery_url` points to a custom
+/// `ii-openid-configuration` endpoint that provides `client_id` and a reference
+/// to the standard OIDC discovery endpoint.
+#[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
+pub struct OidcConfig {
+    pub name: String,
+    pub logo: String,
+    pub discovery_url: String,
+    pub client_id: Option<String>,
+    pub email_verification: Option<OpenIdEmailVerificationScheme>,
+}
+
+/// Resolved OIDC provider config returned by the `active_oidc_configs` query.
+/// Includes fields discovered from the OIDC discovery endpoint.
+#[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
+pub struct ActiveOidcConfig {
+    pub name: String,
+    pub logo: String,
+    pub discovery_url: String,
+    pub client_id: Option<String>,
+    pub issuer: Option<String>,
     pub email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 

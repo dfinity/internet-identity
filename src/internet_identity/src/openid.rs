@@ -12,8 +12,9 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OpenIdConfig,
-    OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, Timestamp, UserKey,
+    ActiveOidcConfig, AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OidcConfig,
+    OpenIdConfig, OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, Timestamp,
+    UserKey,
 };
 use serde_bytes::ByteBuf;
 use sha2::{Digest, Sha256};
@@ -255,6 +256,7 @@ struct PartialClaims {
 
 thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
+    static OIDC_CONFIGS: RefCell<Vec<OidcConfig>> = RefCell::new(vec![]);
 }
 
 pub fn setup(configs: Vec<OpenIdConfig>) {
@@ -263,6 +265,34 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
             providers.push(Box::new(generic::Provider::create(config)));
         }
     });
+}
+
+pub fn setup_oidc(configs: Vec<OidcConfig>) {
+    OIDC_CONFIGS.with_borrow_mut(|stored| {
+        *stored = configs.clone();
+    });
+    PROVIDERS.with_borrow_mut(|providers| {
+        for config in configs {
+            providers.push(Box::new(generic::DiscoverableProvider::create(config)));
+        }
+    });
+}
+
+pub fn get_active_oidc_configs() -> Vec<ActiveOidcConfig> {
+    OIDC_CONFIGS.with_borrow(|configs| {
+        configs
+            .iter()
+            .map(|config| ActiveOidcConfig {
+                name: config.name.clone(),
+                logo: config.logo.clone(),
+                discovery_url: config.discovery_url.clone(),
+                client_id: config.client_id.clone(),
+                // issuer is populated once OIDC discovery completes (via HTTP outcall)
+                issuer: None,
+                email_verification: config.email_verification,
+            })
+            .collect()
+    })
 }
 
 pub fn with_provider<F, R>(jwt: &str, callback: F) -> Result<R, OpenIDJWTVerificationError>

@@ -925,6 +925,7 @@ fn ii_canister_serves_decodable_synchronized_config() -> Result<(), RejectRespon
         decoded_config,
         InternetIdentitySynchronizedConfig {
             openid_configs: Some(openid_configs),
+            oidc_configs: None,
         }
     );
 

@@ -280,6 +280,8 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
+    // Simplified OIDC configs using discovery. Mutually exclusive with openid_configs.
+    oidc_configs : opt vec OidcConfig;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
     // Configuration to show dapps explorer or not
@@ -380,6 +382,27 @@ type OpenIdConfig = record {
     auth_uri : text;
     auth_scope : vec text;
     fedcm_uri : opt text;
+    email_verification : opt OpenIdEmailVerification;
+};
+
+// Simplified OIDC provider config that relies on discovery.
+// For dedicated providers: client_id is set, discovery_url is standard OIDC endpoint.
+// For SSO providers: client_id is null, discovery_url is custom ii-openid-configuration.
+type OidcConfig = record {
+    name : text;
+    logo : text;
+    discovery_url : text;
+    client_id : opt text;
+    email_verification : opt OpenIdEmailVerification;
+};
+
+// Resolved OIDC config with discovered fields.
+type ActiveOidcConfig = record {
+    name : text;
+    logo : text;
+    discovery_url : text;
+    client_id : opt text;
+    issuer : opt text;
     email_verification : opt OpenIdEmailVerification;
 };
 
@@ -1174,6 +1197,10 @@ service : (opt InternetIdentityInit) -> {
     // HTTP Gateway protocol
     // =====================
     http_request : (request : HttpRequest) -> (HttpResponse) query;
+
+    // OIDC Discovery
+    // ===============
+    active_oidc_configs : () -> (vec ActiveOidcConfig) query;
 
     // Internal Methods
     // ================

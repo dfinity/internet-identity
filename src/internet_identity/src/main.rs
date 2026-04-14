@@ -550,6 +550,11 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[query]
+fn active_oidc_configs() -> Vec<ActiveOidcConfig> {
+    openid::get_active_oidc_configs()
+}
+
+#[query]
 fn config() -> InternetIdentityInit {
     let archive_config = match state::archive_state() {
         ArchiveState::NotConfigured => None,
@@ -568,6 +573,7 @@ fn config() -> InternetIdentityInit {
         related_origins: persistent_state.related_origins.clone(),
         new_flow_origins: persistent_state.new_flow_origins.clone(),
         openid_configs: persistent_state.openid_configs.clone(),
+        oidc_configs: persistent_state.oidc_configs.clone(),
         analytics_config: Some(persistent_state.analytics_config.clone()),
         enable_dapps_explorer: persistent_state.enable_dapps_explorer,
         is_production: persistent_state.is_production,
@@ -625,6 +631,9 @@ fn initialize(maybe_arg: Option<InternetIdentityInit>) {
     if let Some(openid_configs) = config.openid_configs {
         openid::setup(openid_configs);
     }
+    if let Some(oidc_configs) = config.oidc_configs {
+        openid::setup_oidc(oidc_configs);
+    }
 }
 
 fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
@@ -662,9 +671,19 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.new_flow_origins = Some(new_flow_origins);
             })
         }
+        if arg.openid_configs.is_some() && arg.oidc_configs.is_some() {
+            trap("Cannot set both openid_configs and oidc_configs");
+        }
         if let Some(openid_configs) = arg.openid_configs {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_configs = Some(openid_configs);
+                persistent_state.oidc_configs = None;
+            })
+        }
+        if let Some(oidc_configs) = arg.oidc_configs {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.oidc_configs = Some(oidc_configs);
+                persistent_state.openid_configs = None;
             })
         }
         if let Some(analytics_config) = arg.analytics_config {
