@@ -182,6 +182,8 @@ const handleDelegationRequest =
       return;
     }
 
+    channelIdleStore.set(false);
+
     const result = DelegationParamsCodec.safeParse(request.params);
     if (!result.success) {
       await channel.send({
@@ -343,6 +345,23 @@ const handleLegacyAttributes =
       return;
     }
 
+    // Validate the derivation origin if provided, same as delegation handler.
+    const validationResult = await validateDerivationOrigin({
+      requestOrigin: channel.origin,
+      derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+    });
+    if (validationResult.result === "invalid") {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: INVALID_PARAMS_ERROR_CODE,
+          message: "Unverified derivation origin",
+        },
+      });
+      return;
+    }
+
     // Use the request's derivation origin if provided, else channel origin,
     // remapped to legacy domain for backwards compatibility.
     const origin = remapToLegacyDomain(
@@ -450,6 +469,23 @@ const handleIcrc3Attributes =
       return;
     }
 
+    // Validate the derivation origin if provided, same as delegation handler.
+    const validationResult = await validateDerivationOrigin({
+      requestOrigin: channel.origin,
+      derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
+    });
+    if (validationResult.result === "invalid") {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: INVALID_PARAMS_ERROR_CODE,
+          message: "Unverified derivation origin",
+        },
+      });
+      return;
+    }
+
     // Use the request's derivation origin if provided, else channel origin,
     // remapped to legacy domain for backwards compatibility.
     const origin = remapToLegacyDomain(
@@ -554,7 +590,11 @@ export const channelStore: ChannelStore = {
       );
     })().catch((error) => {
       console.error(error);
-      if (error instanceof PostMessageUnsupportedError) {
+      // Promise.any wraps errors in AggregateError
+      const errors = error instanceof AggregateError ? error.errors : [error];
+      if (
+        errors.some((e: unknown) => e instanceof PostMessageUnsupportedError)
+      ) {
         void goto("/unsupported");
         return;
       }
