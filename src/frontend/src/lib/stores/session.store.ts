@@ -33,7 +33,7 @@ type SessionStore = Readable<Session> & {
     canisterId: Principal;
     agentOptions: HttpAgentOptions;
   }) => Promise<void>;
-  reset: () => void;
+  reset: () => Promise<void>;
 };
 
 const STORAGE_KEY = "ii-session";
@@ -97,17 +97,14 @@ const readSession = async (): Promise<SessionData | undefined> => {
 };
 
 let preCreatedSession: CreatedSession | undefined = undefined;
-const nextSession = (): CreatedSession => {
-  // Consume the pre-created session by assigning it to a local variable
-  // and clearing it afterwards. This ensures that if nextSession is called
-  // again before the background creation completes, it will throw an error.
-  const session = preCreatedSession;
+const nextSession = async (): Promise<CreatedSession> => {
+  // Consume the pre-created session if available (fast synchronous path).
+  // If not yet ready (e.g. rapid consecutive resets), fall back to creating
+  // a new session on demand (slower async path).
+  const session = preCreatedSession ?? (await createSession());
   preCreatedSession = undefined;
-  if (session === undefined) {
-    throw new Error("No pre-created session available");
-  }
   void (async () => {
-    // Pre-create the next session in the background to make reset synchronous
+    // Pre-create the next session in the background
     preCreatedSession = await createSession();
   })();
   return session;
@@ -143,8 +140,8 @@ export const sessionStore: SessionStore = {
     }
     return session;
   }).subscribe,
-  reset: () => {
-    const session = nextSession();
+  reset: async () => {
+    const session = await nextSession();
     session.persist();
     const { identity, nonce, salt } = session.data;
     internalStore.update((session) => {

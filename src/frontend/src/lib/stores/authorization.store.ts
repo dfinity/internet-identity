@@ -70,45 +70,53 @@ export const authorizationStore: AuthorizationStore = {
       ...context,
       isAuthenticating: true,
     });
-    const { identityNumber, actor } = get(authenticatedStore);
-    const artificialDelayPromise = waitFor(
-      features.DUMMY_AUTH ||
-        frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
-        ? 0
-        : (artificialDelay ?? 0),
-    );
-    const accountNumber = await accountNumberMaybePromise;
-    const { user_key, expiration } = await actor
-      .prepare_account_delegation(
-        identityNumber,
-        context.effectiveOrigin,
-        accountNumber !== undefined ? [accountNumber] : [],
-        context.authRequest.sessionPublicKey,
-        context.authRequest.maxTimeToLive !== undefined
-          ? [context.authRequest.maxTimeToLive]
-          : [],
-      )
-      .then(throwCanisterError);
-    const delegationChain = await retryFor(5, () =>
-      actor
-        .get_account_delegation(
+    try {
+      const { identityNumber, actor } = get(authenticatedStore);
+      const artificialDelayPromise = waitFor(
+        features.DUMMY_AUTH ||
+          frontendCanisterConfig.dummy_auth[0]?.[0] !== undefined
+          ? 0
+          : (artificialDelay ?? 0),
+      );
+      const accountNumber = await accountNumberMaybePromise;
+      const { user_key, expiration } = await actor
+        .prepare_account_delegation(
           identityNumber,
           context.effectiveOrigin,
           accountNumber !== undefined ? [accountNumber] : [],
           context.authRequest.sessionPublicKey,
-          expiration,
+          context.authRequest.maxTimeToLive !== undefined
+            ? [context.authRequest.maxTimeToLive]
+            : [],
         )
-        .then(throwCanisterError)
-        .then(transformSignedDelegation)
-        .then((delegation) =>
-          DelegationChain.fromDelegations(
-            [delegation],
-            new Uint8Array(user_key),
+        .then(throwCanisterError);
+      const delegationChain = await retryFor(5, () =>
+        actor
+          .get_account_delegation(
+            identityNumber,
+            context.effectiveOrigin,
+            accountNumber !== undefined ? [accountNumber] : [],
+            context.authRequest.sessionPublicKey,
+            expiration,
+          )
+          .then(throwCanisterError)
+          .then(transformSignedDelegation)
+          .then((delegation) =>
+            DelegationChain.fromDelegations(
+              [delegation],
+              new Uint8Array(user_key),
+            ),
           ),
-        ),
-    );
-    await artificialDelayPromise;
-    return { requestId: context.requestId, delegationChain };
+      );
+      await artificialDelayPromise;
+      return { requestId: context.requestId, delegationChain };
+    } catch (error) {
+      internalStore.set({
+        ...context,
+        isAuthenticating: false,
+      });
+      throw error;
+    }
   },
 };
 

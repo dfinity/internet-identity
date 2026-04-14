@@ -36,7 +36,7 @@ describe("sessionStore", () => {
       agentOptions: {},
     });
     const session = get(sessionStore);
-    sessionStore.reset();
+    await sessionStore.reset();
     const session2 = get(sessionStore);
 
     // Make sure session identity is not anonymous
