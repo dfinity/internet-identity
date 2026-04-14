@@ -1,9 +1,10 @@
 <script lang="ts">
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import {
-    authorizationStore,
     authorizationContextStore,
+    authorizationStore,
   } from "$lib/stores/authorization.store";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
   import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
@@ -33,8 +34,6 @@
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
-  import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { DelegationResultSchema } from "$lib/utils/transport/utils";
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
@@ -68,9 +67,7 @@
   );
   const dapps = getDapps();
   const application = $derived(
-    dapps.find((dapp) =>
-      dapp.hasOrigin($authorizationContextStore.requestOrigin),
-    )?.name,
+    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin))?.name,
   );
   const primaryAccountName = $derived(
     application !== undefined ? $t`My ${application} account` : $t`My account`,
@@ -89,17 +86,8 @@
     defaultAccountNumber = null;
   });
 
-  const authorize = async (
-    accountNumber?: Promise<bigint | undefined> | bigint | undefined,
-  ) => {
-    const { requestId, delegationChain } =
-      await authorizationStore.authorize(accountNumber);
-    const result = DelegationResultSchema.encode(delegationChain);
-    await $establishedChannelStore.send({
-      jsonrpc: "2.0",
-      id: requestId,
-      result,
-    });
+  const authorize = (accountNumber: bigint | undefined) => {
+    authorizationStore.authorize(accountNumber);
   };
   const handleContinueDefault = async () => {
     try {
@@ -108,30 +96,28 @@
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
       const { identityNumber, actor } = $authenticationStore!;
-      const { effectiveOrigin } = $authorizationContextStore;
-      void triggerDropWaveAnimation();
-      await authorize(
+      const accountNumber =
         defaultAccountNumber === null
-          ? actor
-              .get_default_account(identityNumber, effectiveOrigin)
+          ? await actor
+              .get_default_account(
+                identityNumber,
+                $authorizationContextStore.effectiveOrigin,
+              )
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
-          : defaultAccountNumber,
-      );
+          : defaultAccountNumber;
+      void triggerDropWaveAnimation();
+      authorize(accountNumber);
     } catch (error) {
       handleError(error);
     } finally {
       isAuthenticatingDefault = false;
     }
   };
-  const handleContinueAs = async (
+  const handleContinueAs = (
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
-    try {
-      await authorize(accountNumber);
-    } catch (error) {
-      handleError(error);
-    }
+    authorize(accountNumber);
   };
   const handleEnableMultipleAccounts = async () => {
     try {
@@ -139,13 +125,18 @@
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
       }
       const { identityNumber, actor } = $authenticationStore!;
-      const { effectiveOrigin } = $authorizationContextStore;
       const values = await Promise.all([
         actor
-          .get_accounts(identityNumber, effectiveOrigin)
+          .get_accounts(
+            identityNumber,
+            $authorizationContextStore.effectiveOrigin,
+          )
           .then(throwCanisterError),
         actor
-          .get_default_account(identityNumber, effectiveOrigin)
+          .get_default_account(
+            identityNumber,
+            $authorizationContextStore.effectiveOrigin,
+          )
           .then(throwCanisterError),
       ]);
       accounts = values[0].sort((a, b) => {
@@ -373,7 +364,7 @@
 {/snippet}
 
 <div class="flex flex-1 flex-col">
-  <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
+  <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {$t`Sign in`}
   </h1>

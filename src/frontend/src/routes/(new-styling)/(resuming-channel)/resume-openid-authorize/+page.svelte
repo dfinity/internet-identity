@@ -1,25 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    authorizationContextStore,
-    authorizationStore,
-  } from "$lib/stores/authorization.store";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
   import { decodeJWT, findConfig } from "$lib/utils/openID";
   import { AuthFlow } from "$lib/flows/authFlow.svelte";
   import { t } from "$lib/stores/locale.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import {
-    AttributesParamsSchema,
-    DelegationResultSchema,
-    Icrc3AttributesParamsSchema,
-    INVALID_PARAMS_ERROR_CODE,
-    type JsonRequest,
-  } from "$lib/utils/transport/utils";
-  import { authenticatedStore } from "$lib/stores/authentication.store";
-  import { retryFor, throwCanisterError } from "$lib/utils/utils";
-  import { z } from "zod";
-  import { frontendCanisterConfig } from "$lib/globals";
   import {
     DirectOpenIdEvents,
     directOpenIdFunnel,
@@ -31,170 +17,10 @@
 
   const dapps = getDapps();
   const dapp = $derived(
-    dapps.find((dapp) =>
-      dapp.hasOrigin($authorizationContextStore.requestOrigin),
-    ),
+    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
   );
 
   let animateTransitions = $state(false);
-
-  const createAttributesListener =
-    (issuer: string) => async (request: JsonRequest) => {
-      if (request.method === "ii_attributes") {
-        await handleLegacyAttributes(issuer, request);
-      } else if (request.method === "ii-icrc3-attributes") {
-        await handleIcrc3Attributes(issuer, request);
-      }
-    };
-
-  const handleLegacyAttributes = async (
-    issuer: string,
-    request: JsonRequest,
-  ) => {
-    if (request.id === undefined) {
-      return;
-    }
-    const paramsResult = AttributesParamsSchema.safeParse(request.params);
-    if (!paramsResult.success) {
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: z.prettifyError(paramsResult.error),
-        },
-      });
-      return;
-    }
-    const implicitConsentAttributeKeys = paramsResult.data.attributes.filter(
-      (attribute) =>
-        attribute === `openid:${issuer}:name` ||
-        attribute === `openid:${issuer}:email` ||
-        attribute === `openid:${issuer}:verified_email`,
-    );
-    try {
-      const { attributes, issued_at_timestamp_ns } =
-        await $authenticatedStore.actor
-          .prepare_attributes({
-            origin: $authorizationContextStore.effectiveOrigin,
-            attribute_keys: implicitConsentAttributeKeys,
-            account_number: [],
-            identity_number: $authenticatedStore.identityNumber,
-          })
-          .then(throwCanisterError);
-      const { certified_attributes, expires_at_timestamp_ns } = await retryFor(
-        5,
-        () =>
-          $authenticatedStore.actor
-            .get_attributes({
-              origin: $authorizationContextStore.effectiveOrigin,
-              account_number: [],
-              identity_number: $authenticatedStore.identityNumber,
-              attributes,
-              issued_at_timestamp_ns,
-            })
-            .then(throwCanisterError),
-      );
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: {
-          attributes: Object.fromEntries(
-            certified_attributes.map((attribute) => [
-              attribute.key,
-              {
-                value: z.util.uint8ArrayToBase64(
-                  new Uint8Array(attribute.value),
-                ),
-                signature: z.util.uint8ArrayToBase64(
-                  new Uint8Array(attribute.signature),
-                ),
-                expiration: expires_at_timestamp_ns.toString(),
-              },
-            ]),
-          ),
-        },
-      });
-    } catch (error) {
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: 1000,
-          message: $t`Encountered an internal error while processing the request.`,
-        },
-      });
-    }
-  };
-
-  const handleIcrc3Attributes = async (
-    issuer: string,
-    request: JsonRequest,
-  ) => {
-    if (request.id === undefined) {
-      return;
-    }
-    const paramsResult = Icrc3AttributesParamsSchema.safeParse(request.params);
-    if (!paramsResult.success) {
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: z.prettifyError(paramsResult.error),
-        },
-      });
-      return;
-    }
-    const implicitConsentAttributeKeys = paramsResult.data.keys.filter(
-      (key) =>
-        key === `openid:${issuer}:name` ||
-        key === `openid:${issuer}:email` ||
-        key === `openid:${issuer}:verified_email`,
-    );
-    try {
-      const { message } = await $authenticatedStore.actor
-        .prepare_icrc3_attributes({
-          origin: $authorizationContextStore.effectiveOrigin,
-          account_number: [],
-          identity_number: $authenticatedStore.identityNumber,
-          attributes: implicitConsentAttributeKeys.map((key) => ({
-            key,
-            value: [],
-            omit_scope: false,
-          })),
-          nonce: z.util.base64ToUint8Array(paramsResult.data.nonce),
-        })
-        .then(throwCanisterError);
-      const { signature } = await retryFor(5, () =>
-        $authenticatedStore.actor
-          .get_icrc3_attributes({
-            origin: $authorizationContextStore.effectiveOrigin,
-            account_number: [],
-            identity_number: $authenticatedStore.identityNumber,
-            message,
-          })
-          .then(throwCanisterError),
-      );
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: {
-          data: z.util.uint8ArrayToBase64(new Uint8Array(message)),
-          signature: z.util.uint8ArrayToBase64(new Uint8Array(signature)),
-        },
-      });
-    } catch (error) {
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: 1000,
-          message: $t`Encountered an internal error while processing the request.`,
-        },
-      });
-    }
-  };
 
   onMount(async () => {
     const searchParams = new URLSearchParams(window.location.hash.slice(1));
@@ -225,11 +51,9 @@
       if (config === undefined) {
         return;
       }
-      // Animate transitions and background
       animateTransitions = true;
       triggerDropWaveAnimation();
 
-      // Authenticate and respond to requests
       directOpenIdFunnel.addProperties({
         openid_issuer: config.issuer,
       });
@@ -238,24 +62,11 @@
       const { name, email } = decodeJWT(jwt);
       if (authFlowResult.type === "signUp") {
         await authFlow.completeOpenIdRegistration(
-          // Prefer name, then email prefix, then fallback to a generic name
           name ?? email?.split("@")[0] ?? $t`${config.name} user`,
         );
       }
-      if (
-        dapp?.certifiedAttributes === true ||
-        frontendCanisterConfig.fetch_root_key[0] === true
-      ) {
-        const listener = createAttributesListener(config.issuer);
-        void $establishedChannelStore.addEventListener("request", listener);
-      }
-      const { delegationChain } = await authorizationStore.authorize(undefined);
+      authorizationStore.authorize(undefined);
       directOpenIdFunnel.trigger(DirectOpenIdEvents.RedirectToApp);
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: $authorizationContextStore.requestId,
-        result: DelegationResultSchema.encode(delegationChain),
-      });
     }
   });
 </script>

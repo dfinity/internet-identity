@@ -159,7 +159,7 @@ describe("isCurrentAccessMethod", () => {
 
   it("returns true for matching OpenID", () => {
     const authenticated = {
-      authMethod: { openid: { iss: "i", sub: "s" } },
+      authMethod: { openid: { iss: "i", sub: "s", metadata: [] } },
     };
     const accessMethod: AccessMethod = { openid: makeOpenId("i", "s") };
     expect(isCurrentAccessMethod(authenticated, accessMethod)).toBe(true);
@@ -167,7 +167,7 @@ describe("isCurrentAccessMethod", () => {
 
   it("returns false for mismatched OpenID", () => {
     const authenticated = {
-      authMethod: { openid: { iss: "i", sub: "s" } },
+      authMethod: { openid: { iss: "i", sub: "s", metadata: [] } },
     };
     const accessMethod: AccessMethod = { openid: makeOpenId("i", "x") };
     expect(isCurrentAccessMethod(authenticated, accessMethod)).toBe(false);
@@ -175,7 +175,7 @@ describe("isCurrentAccessMethod", () => {
 
   it("returns false for different method types", () => {
     const authenticated = {
-      authMethod: { openid: { iss: "i", sub: "s" } },
+      authMethod: { openid: { iss: "i", sub: "s", metadata: [] } },
     };
     const accessMethod: AccessMethod = { passkey: makePasskey(1) };
     expect(isCurrentAccessMethod(authenticated, accessMethod)).toBe(false);
