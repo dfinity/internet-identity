@@ -1,7 +1,7 @@
 <script lang="ts">
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import { goto } from "$app/navigation";
-  import { authorizationContextStore } from "$lib/stores/authorization.store";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
   import { toaster } from "$lib/components/utils/toaster";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
@@ -12,9 +12,7 @@
 
   const dapps = getDapps();
   const dapp = $derived(
-    dapps.find((dapp) =>
-      dapp.hasOrigin($authorizationContextStore.requestOrigin),
-    ),
+    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
   );
 
   const handleSignIn = async (identityNumber: bigint) => {
@@ -40,7 +38,7 @@
   onUpgrade={handleUpgrade}
   onError={handleError}
 >
-  <AuthorizeHeader origin={$authorizationContextStore.requestOrigin} />
+  <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {$t`Choose method`}
   </h1>

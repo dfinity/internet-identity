@@ -1,10 +1,19 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import AuthorizationChannel from "$lib/components/utils/AuthorizationChannel.svelte";
+  import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
+  import { authorizationStore } from "$lib/stores/authorization.store";
+  import { goto } from "$app/navigation";
 
   const { children }: LayoutProps = $props();
+  channelStore.establish();
+
+  $effect(() => {
+    if ($channelErrorStore !== undefined) {
+      goto(`/authorize/error?code=${$channelErrorStore}`);
+    }
+  });
 </script>
 
-<AuthorizationChannel>
+{#if $authorizationStore !== undefined}
   {@render children()}
-</AuthorizationChannel>
+{/if}

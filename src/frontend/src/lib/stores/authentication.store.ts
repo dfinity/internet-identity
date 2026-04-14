@@ -9,6 +9,7 @@ import {
 import { Principal } from "@icp-sdk/core/principal";
 import type { _SERVICE } from "$lib/generated/internet_identity_types";
 import { idlFactory as internet_identity_idl } from "$lib/generated/internet_identity_idl";
+import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
 import { createAnonymousNonce } from "$lib/utils/openID";
 
 export interface Authenticated {
@@ -20,7 +21,7 @@ export interface Authenticated {
   actor: ActorSubclass<_SERVICE>;
   authMethod:
     | { passkey: { credentialId: Uint8Array } }
-    | { openid: { iss: string; sub: string } }
+    | { openid: { iss: string; sub: string; metadata: MetadataMapV2 } }
     | { recoveryPhrase: { principal: Principal } };
 }
 

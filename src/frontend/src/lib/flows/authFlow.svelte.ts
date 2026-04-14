@@ -184,7 +184,10 @@ export class AuthFlow {
       }
     }
     try {
-      const { iss, sub, loginHint } = decodeJWT(jwt);
+      const { iss, sub, loginHint, ...restClaims } = decodeJWT(jwt);
+      const jwtMetadata: MetadataMapV2 = Object.entries(restClaims)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, { String: v! }]);
       const { identity, identityNumber } = await authenticateWithJWT({
         canisterId,
         session: get(sessionStore),
@@ -198,7 +201,7 @@ export class AuthFlow {
       await authenticationStore.set({
         identity,
         identityNumber,
-        authMethod: { openid: { iss, sub } },
+        authMethod: { openid: { iss, sub, metadata: jwtMetadata } },
       });
       const info =
         await get(authenticatedStore).actor.get_anchor_info(identityNumber);
@@ -399,11 +402,6 @@ export class AuthFlow {
       authenticationV2Funnel.trigger(
         AuthenticationV2Events.SuccessfulOpenIDRegistration,
       );
-      await authenticationStore.set({
-        identity,
-        identityNumber,
-        authMethod: { openid: { iss, sub } },
-      });
       const metadata: MetadataMapV2 = [];
       if (jwtName !== undefined) {
         metadata.push(["name", { String: jwtName }]);
@@ -424,6 +422,11 @@ export class AuthFlow {
           }
         });
       }
+      await authenticationStore.set({
+        identity,
+        identityNumber,
+        authMethod: { openid: { iss, sub, metadata } },
+      });
       if (this.#options.trackLastUsed) {
         lastUsedIdentitiesStore.addLastUsedIdentity({
           identityNumber,

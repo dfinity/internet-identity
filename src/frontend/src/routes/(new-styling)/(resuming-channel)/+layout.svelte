@@ -1,23 +1,35 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
-  import AuthorizationChannel from "$lib/components/utils/AuthorizationChannel.svelte";
+  import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
+  import { authorizationStore } from "$lib/stores/authorization.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { t } from "$lib/stores/locale.store";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
   import { CircleAlertIcon, RotateCcwIcon } from "@lucide/svelte";
   import Button from "$lib/components/ui/Button.svelte";
+  import { goto } from "$app/navigation";
 
   const pendingChannelOrigin = sessionStorage.getItem(
     "ii-pending-channel-origin",
   );
 
   const { children }: LayoutProps = $props();
+
+  if (pendingChannelOrigin !== null) {
+    channelStore.establish({ allowedOrigin: pendingChannelOrigin });
+  }
+
+  $effect(() => {
+    if ($channelErrorStore !== undefined) {
+      goto(`/authorize/error?code=${$channelErrorStore}`);
+    }
+  });
 </script>
 
 {#if pendingChannelOrigin !== null}
-  <AuthorizationChannel options={{ allowedOrigin: pendingChannelOrigin }}>
+  {#if $authorizationStore !== undefined}
     {@render children()}
-  </AuthorizationChannel>
+  {/if}
 {:else}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">

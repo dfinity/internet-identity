@@ -5,28 +5,19 @@
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
-  import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { DelegationResultSchema } from "$lib/utils/transport/utils";
 
   const COUNTDOWN_SECONDS = 5;
   let countdown = $state(COUNTDOWN_SECONDS);
   let intervalId: number | undefined;
   let redirected = $state(false);
 
-  const handleRedirect = async (): Promise<void> => {
+  const handleRedirect = (): void => {
     window.clearInterval(intervalId);
     if (redirected) {
       return;
     }
     redirected = true;
-    const { requestId, delegationChain } =
-      await authorizationStore.authorize(undefined);
-    const result = DelegationResultSchema.encode(delegationChain);
-    await $establishedChannelStore.send({
-      jsonrpc: "2.0",
-      id: requestId,
-      result,
-    });
+    authorizationStore.authorize(undefined);
   };
 
   onMount(() => {

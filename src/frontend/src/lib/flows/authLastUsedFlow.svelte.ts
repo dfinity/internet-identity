@@ -3,6 +3,7 @@ import {
   authenticateWithPasskey,
 } from "$lib/utils/authentication";
 import { canisterId } from "$lib/globals";
+import type { MetadataMapV2 } from "$lib/generated/internet_identity_types";
 import { authenticationStore } from "$lib/stores/authentication.store";
 import {
   lastUsedIdentitiesStore,
@@ -79,7 +80,10 @@ export class AuthLastUsedFlow {
           mediation: "optional",
           loginHint: lastUsedIdentity.authMethod.openid.loginHint,
         });
-        const { iss, sub } = decodeJWT(jwt);
+        const { iss, sub, ...restClaims } = decodeJWT(jwt);
+        const metadata: MetadataMapV2 = Object.entries(restClaims)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, { String: v! }]);
         this.systemOverlay = false;
         const { identity, identityNumber } = await authenticateWithJWT({
           canisterId,
@@ -89,7 +93,7 @@ export class AuthLastUsedFlow {
         await authenticationStore.set({
           identity,
           identityNumber,
-          authMethod: { openid: { iss, sub } },
+          authMethod: { openid: { iss, sub, metadata } },
         });
         lastUsedIdentitiesStore.addLastUsedIdentity(lastUsedIdentity);
         authenticationV2Funnel.addProperties({

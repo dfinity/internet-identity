@@ -4,6 +4,7 @@
     authorizationContextStore,
     authorizationStore,
   } from "$lib/stores/authorization.store";
+  import { channelIdleStore } from "$lib/stores/channelStore";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
@@ -29,8 +30,6 @@
   import { analytics } from "$lib/utils/analytics/analytics";
   import Avatar from "$lib/components/ui/Avatar.svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
-  import { DelegationResultSchema } from "$lib/utils/transport/utils";
-  import { establishedChannelStore } from "$lib/stores/channelStore";
 
   const { children }: LayoutProps = $props();
 
@@ -127,20 +126,13 @@
   const authorizeDefault = async () => {
     try {
       const { identityNumber, actor } = $authenticationStore!;
-      const { effectiveOrigin } = $authorizationContextStore;
-      const accountNumber = actor
-        .get_default_account(identityNumber, effectiveOrigin)
+      const origin = $authorizationContextStore.effectiveOrigin;
+      const accountNumber = await actor
+        .get_default_account(identityNumber, origin)
         .then(throwCanisterError)
         .then((account) => account.account_number[0]);
       void triggerDropWaveAnimation();
-      const { requestId, delegationChain } =
-        await authorizationStore.authorize(accountNumber);
-      const result = DelegationResultSchema.encode(delegationChain);
-      await $establishedChannelStore.send({
-        jsonrpc: "2.0",
-        id: requestId,
-        result,
-      });
+      authorizationStore.authorize(accountNumber);
     } catch (error) {
       handleError(error);
     }
@@ -248,7 +240,7 @@
     {/if}
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
-    {#if $authorizationContextStore.isAuthenticating}
+    {#if $channelIdleStore}
       {#await waitFor(10000)}
         <div class="flex flex-col items-center justify-center gap-4">
           <ProgressRing class="text-fg-primary size-14" />

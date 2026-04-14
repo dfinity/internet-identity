@@ -6,7 +6,7 @@
   import { XIcon } from "@lucide/svelte";
   import { t } from "$lib/stores/locale.store";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
-  import { authorizationContextStore } from "$lib/stores/authorization.store";
+  import { establishedChannelStore } from "$lib/stores/channelStore";
   import { Trans } from "$lib/components/locale";
   import { MigrationWizard } from "$lib/components/wizards/migration";
   import { handleError } from "$lib/components/utils/error";
@@ -25,9 +25,7 @@
 
   const dapps = getDapps();
   const dapp = $derived(
-    dapps.find((dapp) =>
-      dapp.hasOrigin($authorizationContextStore.requestOrigin),
-    ),
+    dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
   );
 
   const onUpgrade = async (identityNumber: bigint) => {
