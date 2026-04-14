@@ -314,6 +314,7 @@
           $authenticatedStore,
           removingAccessMethod,
         )}
+        isLastRemainingAfterRemoval={accessMethods.length === 2}
       />
     {/if}
     {#if "openid" in removingAccessMethod}
@@ -328,6 +329,7 @@
           $authenticatedStore,
           removingAccessMethod,
         )}
+        isLastRemainingAfterRemoval={accessMethods.length === 2}
       />
     {/if}
   </Dialog>

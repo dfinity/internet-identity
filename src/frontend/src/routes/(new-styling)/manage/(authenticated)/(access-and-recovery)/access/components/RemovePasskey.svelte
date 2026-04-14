@@ -10,9 +10,15 @@
     onRemove: () => Promise<void>;
     onCancel: () => void;
     isCurrentAccessMethod?: boolean;
+    isLastRemainingAfterRemoval?: boolean;
   }
 
-  const { onRemove, onCancel, isCurrentAccessMethod = false }: Props = $props();
+  const {
+    onRemove,
+    onCancel,
+    isCurrentAccessMethod = false,
+    isLastRemainingAfterRemoval = false,
+  }: Props = $props();
 
   let isRemoving = $state(false);
 
@@ -49,6 +55,14 @@
       <p>
         <Trans>It won't be removed from your device or password manager.</Trans>
       </p>
+      {#if isLastRemainingAfterRemoval}
+        <p>
+          <Trans>
+            This will leave you with only one access method. If you lose access
+            to it, you may be permanently locked out of your identity.
+          </Trans>
+        </p>
+      {/if}
       {#if isCurrentAccessMethod}
         <p>
           <Trans>

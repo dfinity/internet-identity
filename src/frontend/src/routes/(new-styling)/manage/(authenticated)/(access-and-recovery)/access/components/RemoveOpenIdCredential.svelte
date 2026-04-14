@@ -11,6 +11,7 @@
     onCancel: () => void;
     providerName: string;
     isCurrentAccessMethod?: boolean;
+    isLastRemainingAfterRemoval?: boolean;
   }
 
   const {
@@ -18,6 +19,7 @@
     onCancel,
     providerName: name,
     isCurrentAccessMethod,
+    isLastRemainingAfterRemoval = false,
   }: Props = $props();
 
   let isRemoving = $state(false);
@@ -58,6 +60,14 @@
           account.
         </Trans>
       </p>
+      {#if isLastRemainingAfterRemoval}
+        <p>
+          <Trans>
+            This will leave you with only one access method. If you lose access
+            to it, you may be permanently locked out of your identity.
+          </Trans>
+        </p>
+      {/if}
       {#if isCurrentAccessMethod}
         <p>
           <Trans>
