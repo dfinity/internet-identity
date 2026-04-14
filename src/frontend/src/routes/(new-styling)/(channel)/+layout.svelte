@@ -8,7 +8,12 @@
   channelStore.establish();
 
   $effect(() => {
-    if ($channelErrorStore !== undefined) {
+    if ($channelErrorStore === undefined) {
+      return;
+    }
+    if ($channelErrorStore === "unsupported-browser") {
+      goto("/unsupported");
+    } else {
       goto(`/authorize/error?code=${$channelErrorStore}`);
     }
   });
