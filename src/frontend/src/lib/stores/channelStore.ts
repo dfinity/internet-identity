@@ -43,17 +43,17 @@ import {
   transformSignedDelegation,
 } from "$lib/utils/utils";
 import { z } from "zod";
-import { goto } from "$app/navigation";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type ChannelError =
+export type ChannelError =
   | "unable-to-connect"
   | "connection-closed"
   | "invalid-request"
   | "unverified-origin"
+  | "unsupported-browser"
   | "delegation-failed";
 
 type ChannelStore = Readable<Channel | undefined> & {
@@ -595,7 +595,7 @@ export const channelStore: ChannelStore = {
       if (
         errors.some((e: unknown) => e instanceof PostMessageUnsupportedError)
       ) {
-        void goto("/unsupported");
+        channelErrorStore.set("unsupported-browser");
         return;
       }
       channelErrorStore.set("unable-to-connect");
