@@ -115,6 +115,9 @@ msgstr "Karena Anda saat ini masuk dengan passkey ini, Anda akan keluar."
 msgid "Authenticating..."
 msgstr "Mengautentikasi..."
 
+msgid "Authentication failed"
+msgstr ""
+
 msgid "Authentication successful"
 msgstr "Autentikasi berhasil"
 
@@ -279,9 +282,6 @@ msgstr "Edit akun"
 
 msgid "Enable multiple accounts"
 msgstr "Aktifkan banyak akun"
-
-msgid "Encountered an internal error while processing the request."
-msgstr "Terjadi kesalahan internal saat memproses permintaan."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Masukkan nama untuk identitas Anda untuk menyelesaikan peningkatan. Setelah diatur, nama tidak dapat diubah nanti."
@@ -487,9 +487,6 @@ msgstr "Tampaknya ada permintaan autentikasi yang tidak valid."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Tampaknya koneksi dengan layanan tidak dapat dibuat. Coba peramban lain; jika masalah berlanjut, hubungi dukungan."
-
-msgid "It seems like the connection with the service could not be re-established."
-msgstr "Tampaknya koneksi dengan layanan tidak dapat disambungkan kembali."
 
 msgid "It seems like the request could not be processed."
 msgstr "Tampaknya permintaan tidak dapat diproses."
@@ -855,9 +852,8 @@ msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "Ada yang salah!"
 
-msgctxt "Fallback error message when an unexpected error is caught"
-msgid "Something went wrong"
-msgstr "Sesuatu yang salah"
+msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+msgstr ""
 
 msgid "Source code"
 msgstr "Kode sumber"
@@ -940,6 +936,9 @@ msgstr "Terjadi masalah saat menyambung ke aplikasi. Coba peramban lain; jika ma
 msgid "This app has moved to the new Internet Identity"
 msgstr "Aplikasi ini telah pindah ke Internet Identity baru"
 
+msgid "This browser is not supported."
+msgstr ""
+
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Identitas ini sudah ditingkatkan ke pengalaman baru."
 
@@ -1006,9 +1005,6 @@ msgstr "Memahami Internet Identity"
 msgid "Undo"
 msgstr "Urungkan"
 
-msgid "Unexpected error"
-msgstr "Kesalahan tidak terduga"
-
 msgid "Unknown"
 msgstr "Tidak diketahui"
 
@@ -1032,6 +1028,9 @@ msgstr "Buka kunci untuk melanjutkan"
 
 msgid "Unsupported"
 msgstr "Tidak didukung"
+
+msgid "Unsupported browser"
+msgstr ""
 
 msgid "Unsupported Browser"
 msgstr "Peramban Tidak Didukung"

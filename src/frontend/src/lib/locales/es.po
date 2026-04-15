@@ -115,6 +115,9 @@ msgstr "Como has iniciado sesión con esta passkey, se cerrará la sesión."
 msgid "Authenticating..."
 msgstr "Autenticando..."
 
+msgid "Authentication failed"
+msgstr ""
+
 msgid "Authentication successful"
 msgstr "Autenticación correcta"
 
@@ -279,9 +282,6 @@ msgstr "Editar cuenta"
 
 msgid "Enable multiple accounts"
 msgstr "Activar cuentas múltiples"
-
-msgid "Encountered an internal error while processing the request."
-msgstr "Se produjo un error interno al procesar la solicitud."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Introduce un nombre para tu identidad para completar la actualización. Una vez establecido, no se podrá cambiar más adelante."
@@ -487,9 +487,6 @@ msgstr "Parece que se recibió una solicitud de autenticación inválida."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Parece que no se pudo establecer la conexión con el servicio. Prueba con otro navegador; si el problema persiste, contacta con el soporte."
-
-msgid "It seems like the connection with the service could not be re-established."
-msgstr "Parece que no se pudo restablecer la conexión con el servicio."
 
 msgid "It seems like the request could not be processed."
 msgstr "Parece que la solicitud no pudo ser procesada."
@@ -855,9 +852,8 @@ msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "¡Algo va mal!"
 
-msgctxt "Fallback error message when an unexpected error is caught"
-msgid "Something went wrong"
-msgstr "Algo salió mal"
+msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+msgstr ""
 
 msgid "Source code"
 msgstr "Código fuente"
@@ -940,6 +936,9 @@ msgstr "Hubo un problema al conectar con la aplicación. Prueba con otro navegad
 msgid "This app has moved to the new Internet Identity"
 msgstr "Esta app se ha trasladado al nuevo Internet Identity"
 
+msgid "This browser is not supported."
+msgstr ""
+
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Esta identidad ya ha sido actualizada a la nueva experiencia."
 
@@ -1006,9 +1005,6 @@ msgstr "Entiende Internet Identity"
 msgid "Undo"
 msgstr "Deshacer"
 
-msgid "Unexpected error"
-msgstr "Error inesperado"
-
 msgid "Unknown"
 msgstr "Desconocido"
 
@@ -1032,6 +1028,9 @@ msgstr "Desbloquea para continuar"
 
 msgid "Unsupported"
 msgstr "No compatible"
+
+msgid "Unsupported browser"
+msgstr ""
 
 msgid "Unsupported Browser"
 msgstr "Navegador no compatible"

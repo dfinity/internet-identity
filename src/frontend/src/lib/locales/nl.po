@@ -115,6 +115,9 @@ msgstr "Aangezien u momenteel bent ingelogd met deze passkey, wordt u uitgelogd.
 msgid "Authenticating..."
 msgstr "Authenticeren..."
 
+msgid "Authentication failed"
+msgstr ""
+
 msgid "Authentication successful"
 msgstr "Authenticatie succesvol"
 
@@ -279,9 +282,6 @@ msgstr "Account bewerken"
 
 msgid "Enable multiple accounts"
 msgstr "Meerdere accounts inschakelen"
-
-msgid "Encountered an internal error while processing the request."
-msgstr "Er is een interne fout opgetreden bij het verwerken van het verzoek."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Voer een naam in voor uw identiteit om de upgrade te voltooien. Eenmaal ingesteld, kan deze later niet meer worden gewijzigd."
@@ -487,9 +487,6 @@ msgstr "Het lijkt erop dat een ongeldige authenticatieaanvraag is ontvangen."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "Het lijkt erop dat de verbinding met de service niet tot stand kon worden gebracht. Probeer een andere browser; als het probleem aanhoudt, neem dan contact op met ondersteuning."
-
-msgid "It seems like the connection with the service could not be re-established."
-msgstr "Het lijkt erop dat de verbinding met de service niet opnieuw tot stand kon worden gebracht."
 
 msgid "It seems like the request could not be processed."
 msgstr "Het lijkt erop dat het verzoek niet kon worden verwerkt."
@@ -855,9 +852,8 @@ msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "Er klopt iets niet!"
 
-msgctxt "Fallback error message when an unexpected error is caught"
-msgid "Something went wrong"
-msgstr "Er is iets misgegaan"
+msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+msgstr ""
 
 msgid "Source code"
 msgstr "Broncode"
@@ -940,6 +936,9 @@ msgstr "Er was een probleem bij het verbinden met de applicatie. Probeer een and
 msgid "This app has moved to the new Internet Identity"
 msgstr "Deze app is overgegaan naar de nieuwe Internet Identity"
 
+msgid "This browser is not supported."
+msgstr ""
+
 msgid "This identity has already been upgraded to the new experience."
 msgstr "Deze identiteit is al geüpgraded naar de nieuwe ervaring."
 
@@ -1006,9 +1005,6 @@ msgstr "Internet Identity uitgelegd"
 msgid "Undo"
 msgstr "Ongedaan maken"
 
-msgid "Unexpected error"
-msgstr "Onverwachte fout"
-
 msgid "Unknown"
 msgstr "Onbekend"
 
@@ -1032,6 +1028,9 @@ msgstr "Ontgrendel om verder te gaan"
 
 msgid "Unsupported"
 msgstr "Niet ondersteund"
+
+msgid "Unsupported browser"
+msgstr ""
 
 msgid "Unsupported Browser"
 msgstr "Niet-ondersteunde browser"
