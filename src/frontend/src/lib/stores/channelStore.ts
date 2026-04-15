@@ -28,6 +28,7 @@ import { PostMessageTransport } from "$lib/utils/transport/postMessage";
 import { PostMessageUnsupportedError } from "$lib/utils/transport/postMessage";
 import { LegacyTransport } from "$lib/utils/transport/legacy";
 import { frontendCanisterConfig, getPrimaryOrigin } from "$lib/globals";
+import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
 import { authorizationStore } from "$lib/stores/authorization.store";
 import { findConfig } from "$lib/utils/openID";
 import { validateDerivationOrigin } from "$lib/utils/validateDerivationOrigin";
@@ -338,6 +339,24 @@ const handleLegacyAttributes =
       return;
     }
 
+    // Only serve attributes to known dapps that have opted into certified
+    // attributes, or when running in a dev environment (fetch_root_key enabled).
+    const dapp = getDapps().find((d) => d.hasOrigin(channel.origin));
+    if (
+      dapp?.certifiedAttributes !== true &&
+      frontendCanisterConfig.fetch_root_key[0] !== true
+    ) {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: INVALID_PARAMS_ERROR_CODE,
+          message: "Attributes are not available for this origin.",
+        },
+      });
+      return;
+    }
+
     // Wait for the user to authorize before serving attributes.
     await waitForAuthorization();
 
@@ -457,6 +476,24 @@ const handleIcrc3Attributes =
         error: {
           code: INVALID_PARAMS_ERROR_CODE,
           message: z.prettifyError(paramsResult.error),
+        },
+      });
+      return;
+    }
+
+    // Only serve attributes to known dapps that have opted into certified
+    // attributes, or when running in a dev environment (fetch_root_key enabled).
+    const dapp = getDapps().find((d) => d.hasOrigin(channel.origin));
+    if (
+      dapp?.certifiedAttributes !== true &&
+      frontendCanisterConfig.fetch_root_key[0] !== true
+    ) {
+      await channel.send({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: INVALID_PARAMS_ERROR_CODE,
+          message: "Attributes are not available for this origin.",
         },
       });
       return;
