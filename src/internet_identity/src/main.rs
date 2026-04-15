@@ -671,16 +671,19 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.new_flow_origins = Some(new_flow_origins);
             })
         }
-        if arg.openid_configs.is_some() && arg.oidc_configs.is_some() {
-            trap("Cannot set both openid_configs and oidc_configs");
-        }
+        // oidc_configs and openid_configs are mutually exclusive.
+        // When both are provided, openid_configs takes precedence as the proven path.
         if let Some(openid_configs) = arg.openid_configs {
+            if arg.oidc_configs.is_some() {
+                ic_cdk::println!(
+                    "Both openid_configs and oidc_configs provided; using openid_configs"
+                );
+            }
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_configs = Some(openid_configs);
                 persistent_state.oidc_configs = None;
             })
-        }
-        if let Some(oidc_configs) = arg.oidc_configs {
+        } else if let Some(oidc_configs) = arg.oidc_configs {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.oidc_configs = Some(oidc_configs);
                 persistent_state.openid_configs = None;
