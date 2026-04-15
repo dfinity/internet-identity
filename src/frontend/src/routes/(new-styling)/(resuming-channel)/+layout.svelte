@@ -25,7 +25,7 @@
   });
 </script>
 
-{#if pendingChannelOrigin !== null}
+{#if pendingChannelOrigin !== null && $channelStore !== undefined}
   {@render children()}
 {:else}
   <Dialog>
