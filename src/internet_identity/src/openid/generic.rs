@@ -35,11 +35,19 @@ use std::rc::Rc;
 #[cfg(not(test))]
 const CERTS_CALL_CYCLES: u128 = 30_000_000_000;
 
+#[cfg(not(test))]
+const DISCOVERY_CALL_CYCLES: u128 = 30_000_000_000;
+
 const HTTP_STATUS_OK: u8 = 200;
 
 // Fetch the certs every fifteen minutes, the responses are always
 // valid for a couple of hours so that should be enough margin.
 const FETCH_CERTS_INTERVAL_SECONDS: u64 = 60 * 15; // 15 minutes in seconds
+
+/// Re-fetch OIDC discovery documents every hour. Discovery metadata (issuer, jwks_uri)
+/// changes infrequently (typically only on provider-side reconfigurations), but hourly
+/// refresh keeps II responsive to such changes within a bounded window.
+const FETCH_DISCOVERY_INTERVAL_SECONDS: u64 = 60 * 60; // 1 hour
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
 // we only need it right after it's being issued to create a JWT delegation with its own expiry.
@@ -222,8 +230,6 @@ pub struct DiscoverableProvider {
     discovered_issuer: Rc<RefCell<Option<String>>>,
     certs: Rc<RefCell<Vec<Jwk>>>,
     email_verification: Option<OpenIdEmailVerificationScheme>,
-    #[allow(dead_code)] // Used for SSO config matching in follow-up work
-    config: OidcConfig,
 }
 
 impl OpenIdProvider for DiscoverableProvider {
@@ -317,46 +323,96 @@ impl OpenIdProvider for DiscoverableProvider {
     }
 }
 
+/// Shared state for a discovery task, used to communicate results
+/// between the periodic timer and the `DiscoverableProvider`.
+#[derive(Clone)]
+pub struct DiscoveryState {
+    pub discovery_url: String,
+    pub issuer_ref: Rc<RefCell<Option<String>>>,
+    pub certs_ref: Rc<RefCell<Vec<Jwk>>>,
+    pub certs_started: Rc<RefCell<bool>>,
+}
+
+thread_local! {
+    static DISCOVERY_TASKS: RefCell<Vec<DiscoveryState>> = RefCell::new(vec![]);
+}
+
 impl DiscoverableProvider {
     pub fn create(config: OidcConfig) -> DiscoverableProvider {
         let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
         let discovered_issuer: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 
-        #[cfg(not(test))]
-        {
-            let certs_ref = Rc::clone(&certs);
-            let issuer_ref = Rc::clone(&discovered_issuer);
-            let discovery_url = config.discovery_url.clone();
-            schedule_fetch_discovery(discovery_url, issuer_ref, certs_ref, Some(0));
-        }
+        DISCOVERY_TASKS.with_borrow_mut(|tasks| {
+            tasks.push(DiscoveryState {
+                discovery_url: config.discovery_url.clone(),
+                issuer_ref: Rc::clone(&discovered_issuer),
+                certs_ref: Rc::clone(&certs),
+                certs_started: Rc::new(RefCell::new(false)),
+            });
+        });
 
         DiscoverableProvider {
             client_id: config.client_id.clone(),
             discovered_issuer,
             certs,
             email_verification: config.email_verification,
-            config,
         }
     }
 }
 
-/// Validates that the discovered issuer belongs to the same domain as the discovery URL.
-fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), String> {
-    let extract_host = |url: &str| -> Result<String, String> {
-        // Simple host extraction: find "://" then take until next "/" or end
-        let after_scheme = url
-            .find("://")
-            .map(|i| &url[i + 3..])
-            .ok_or_else(|| format!("Invalid URL: {url}"))?;
-        let host = after_scheme
-            .find('/')
-            .map(|i| &after_scheme[..i])
-            .unwrap_or(after_scheme);
-        Ok(host.to_lowercase())
-    };
+/// Initializes timers for OIDC discovery. Called once from `initialize()`.
+/// Uses `set_timer_interval` for periodic refresh and an immediate first fetch.
+#[cfg(not(test))]
+pub fn init_discovery_timers() {
+    use ic_cdk::spawn;
+    use ic_cdk_timers::{set_timer, set_timer_interval};
+    use std::time::Duration;
 
-    let discovery_host = extract_host(discovery_url)?;
-    let issuer_host = extract_host(issuer)?;
+    // Immediate first fetch
+    set_timer(Duration::ZERO, || spawn(run_discovery_tasks()));
+
+    // Periodic refresh
+    set_timer_interval(
+        Duration::from_secs(FETCH_DISCOVERY_INTERVAL_SECONDS),
+        || spawn(run_discovery_tasks()),
+    );
+}
+
+#[cfg(not(test))]
+async fn run_discovery_tasks() {
+    let tasks: Vec<DiscoveryState> =
+        DISCOVERY_TASKS.with_borrow(|tasks| tasks.clone());
+
+    for task in tasks {
+        let result = fetch_discovery(task.discovery_url.clone()).await;
+        if let Ok(doc) = result {
+            if let Err(err) = validate_issuer_domain(&task.discovery_url, &doc.issuer) {
+                ic_cdk::println!("Discovery issuer validation failed: {err}");
+                continue;
+            }
+            task.issuer_ref.replace(Some(doc.issuer));
+
+            if !*task.certs_started.borrow() {
+                *task.certs_started.borrow_mut() = true;
+                schedule_fetch_certs(doc.jwks_uri, Rc::clone(&task.certs_ref), Some(0));
+            }
+        }
+    }
+}
+
+/// Validates that the discovered `issuer` belongs to the same host as the `discovery_url`.
+/// Prevents a malicious discovery endpoint from impersonating another provider.
+fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), String> {
+    let discovery_host = url::Url::parse(discovery_url)
+        .map_err(|e| format!("Invalid discovery URL: {e}"))?
+        .host_str()
+        .ok_or_else(|| format!("No host in discovery URL: {discovery_url}"))?
+        .to_lowercase();
+    let issuer_host = url::Url::parse(issuer)
+        .map_err(|e| format!("Invalid issuer URL: {e}"))?
+        .host_str()
+        .ok_or_else(|| format!("No host in issuer URL: {issuer}"))?
+        .to_lowercase();
 
     if discovery_host != issuer_host {
         return Err(format!(
@@ -364,60 +420,6 @@ fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), Strin
         ));
     }
     Ok(())
-}
-
-// Interval for re-fetching OIDC discovery documents
-const FETCH_DISCOVERY_INTERVAL_SECONDS: u64 = 60 * 60; // 1 hour
-
-#[cfg(not(test))]
-const DISCOVERY_CALL_CYCLES: u128 = 30_000_000_000;
-
-#[cfg(not(test))]
-fn schedule_fetch_discovery(
-    discovery_url: String,
-    issuer_ref: Rc<RefCell<Option<String>>>,
-    certs_ref: Rc<RefCell<Vec<Jwk>>>,
-    delay: Option<u64>,
-) {
-    use ic_cdk::spawn;
-    use ic_cdk_timers::set_timer;
-    use std::time::Duration;
-
-    set_timer(
-        Duration::from_secs(delay.unwrap_or(FETCH_DISCOVERY_INTERVAL_SECONDS)),
-        move || {
-            spawn(async move {
-                let result = fetch_discovery(discovery_url.clone()).await;
-                let next_delay =
-                    compute_next_discovery_fetch_delay(&result, delay);
-                if let Ok(doc) = result {
-                    // Validate issuer domain
-                    if let Err(err) = validate_issuer_domain(&discovery_url, &doc.issuer) {
-                        ic_cdk::println!("Discovery issuer validation failed: {err}");
-                    } else {
-                        // Store discovered issuer
-                        issuer_ref.replace(Some(doc.issuer));
-
-                        // Start JWKS fetching if not already started
-                        let jwks_uri = doc.jwks_uri;
-                        if certs_ref.borrow().is_empty() {
-                            schedule_fetch_certs(
-                                jwks_uri,
-                                Rc::clone(&certs_ref),
-                                Some(0),
-                            );
-                        }
-                    }
-                }
-                schedule_fetch_discovery(
-                    discovery_url,
-                    issuer_ref,
-                    certs_ref,
-                    next_delay,
-                );
-            });
-        },
-    );
 }
 
 #[cfg(not(test))]
@@ -457,15 +459,29 @@ async fn fetch_discovery(discovery_url: String) -> Result<DiscoveryDocument, Str
 /// Re-serializes deterministically for consensus across subnet nodes.
 #[allow(clippy::needless_pass_by_value)]
 fn transform_discovery(response: HttpResponse) -> HttpResponse {
-    if response.status != HTTP_STATUS_OK {
-        trap("Invalid discovery response status")
+    if response.status != Nat::from(HTTP_STATUS_OK) {
+        return HttpResponse {
+            status: response.status,
+            headers: vec![],
+            body: b"Invalid discovery response status".to_vec(),
+        };
     }
 
-    let doc: serde_json::Value = serde_json::from_slice(response.body.as_slice())
-        .unwrap_or_else(|_| trap("Invalid discovery JSON"));
+    let Ok(doc) = serde_json::from_slice::<serde_json::Value>(response.body.as_slice()) else {
+        return HttpResponse {
+            status: Nat::from(HTTP_STATUS_OK),
+            headers: vec![],
+            body: b"Invalid discovery JSON".to_vec(),
+        };
+    };
 
-    let body =
-        serde_json::to_vec(&doc).unwrap_or_else(|_| trap("Failed to re-serialize discovery JSON"));
+    let Ok(body) = serde_json::to_vec(&doc) else {
+        return HttpResponse {
+            status: Nat::from(HTTP_STATUS_OK),
+            headers: vec![],
+            body: b"Failed to re-serialize discovery JSON".to_vec(),
+        };
+    };
 
     HttpResponse {
         status: Nat::from(HTTP_STATUS_OK),
@@ -474,34 +490,21 @@ fn transform_discovery(response: HttpResponse) -> HttpResponse {
     }
 }
 
-/// OIDC discovery document fields we need.
+/// OIDC discovery document — only the fields needed by the backend.
 #[derive(serde::Deserialize, Clone)]
 struct DiscoveryDocument {
     issuer: String,
-    #[allow(dead_code)]
-    authorization_endpoint: String,
     jwks_uri: String,
-    #[serde(default)]
-    #[allow(dead_code)]
-    scopes_supported: Vec<String>,
 }
 
-fn compute_next_discovery_fetch_delay<T, E>(
-    result: &Result<T, E>,
-    current_delay: Option<u64>,
-) -> Option<u64> {
-    const MIN_DELAY_SECONDS: u64 = 60;
-    const MAX_DELAY_SECONDS: u64 = FETCH_DISCOVERY_INTERVAL_SECONDS;
-    const BACKOFF_MULTIPLIER: u64 = 2;
-
-    match result {
-        Ok(_) => None,
-        Err(_) => Some(
-            current_delay
-                .map_or(MIN_DELAY_SECONDS, |d| d * BACKOFF_MULTIPLIER)
-                .clamp(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS),
-        ),
-    }
+/// Returns the discovered issuer for a given discovery URL, if available.
+pub fn discovered_issuer_for(discovery_url: &str) -> Option<String> {
+    DISCOVERY_TASKS.with_borrow(|tasks| {
+        tasks
+            .iter()
+            .find(|t| t.discovery_url == discovery_url)
+            .and_then(|t| t.issuer_ref.borrow().clone())
+    })
 }
 
 fn compute_next_certs_fetch_delay<T, E>(

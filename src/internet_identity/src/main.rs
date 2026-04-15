@@ -550,8 +550,8 @@ fn stats() -> InternetIdentityStats {
 }
 
 #[query]
-fn active_oidc_configs() -> Vec<ActiveOidcConfig> {
-    openid::get_active_oidc_configs()
+fn discovered_oidc_configs() -> Vec<DiscoveredOidcConfig> {
+    openid::get_discovered_oidc_configs()
 }
 
 #[query]

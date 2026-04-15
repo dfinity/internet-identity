@@ -12,7 +12,7 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    ActiveOidcConfig, AnchorNumber, Delegation, IdRegFinishError, MetadataEntryV2, OidcConfig,
+    AnchorNumber, Delegation, DiscoveredOidcConfig, IdRegFinishError, MetadataEntryV2, OidcConfig,
     OpenIdConfig, OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, Timestamp,
     UserKey,
 };
@@ -276,19 +276,20 @@ pub fn setup_oidc(configs: Vec<OidcConfig>) {
             providers.push(Box::new(generic::DiscoverableProvider::create(config)));
         }
     });
+    #[cfg(not(test))]
+    generic::init_discovery_timers();
 }
 
-pub fn get_active_oidc_configs() -> Vec<ActiveOidcConfig> {
+pub fn get_discovered_oidc_configs() -> Vec<DiscoveredOidcConfig> {
     OIDC_CONFIGS.with_borrow(|configs| {
         configs
             .iter()
-            .map(|config| ActiveOidcConfig {
+            .map(|config| DiscoveredOidcConfig {
                 name: config.name.clone(),
                 logo: config.logo.clone(),
                 discovery_url: config.discovery_url.clone(),
                 client_id: config.client_id.clone(),
-                // issuer is populated once OIDC discovery completes (via HTTP outcall)
-                issuer: None,
+                issuer: generic::discovered_issuer_for(&config.discovery_url),
                 email_verification: config.email_verification,
             })
             .collect()

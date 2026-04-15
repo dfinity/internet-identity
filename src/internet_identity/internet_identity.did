@@ -397,7 +397,7 @@ type OidcConfig = record {
 };
 
 // Resolved OIDC config with discovered fields.
-type ActiveOidcConfig = record {
+type DiscoveredOidcConfig = record {
     name : text;
     logo : text;
     discovery_url : text;
@@ -1200,7 +1200,7 @@ service : (opt InternetIdentityInit) -> {
 
     // OIDC Discovery
     // ===============
-    active_oidc_configs : () -> (vec ActiveOidcConfig) query;
+    discovered_oidc_configs : () -> (vec DiscoveredOidcConfig) query;
 
     // Internal Methods
     // ================

@@ -130,7 +130,7 @@ fn should_clear_openid_configs_when_oidc_configs_set() {
 }
 
 #[test]
-fn should_return_active_oidc_configs() {
+fn should_return_discovered_oidc_configs() {
     let env = env();
     let config = InternetIdentityInit {
         oidc_configs: Some(vec![example_oidc_config()]),
@@ -139,24 +139,24 @@ fn should_return_active_oidc_configs() {
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 
-    let active = api::active_oidc_configs(&env, canister_id).unwrap();
-    assert_eq!(active.len(), 1);
-    assert_eq!(active[0].name, "Google");
-    assert_eq!(active[0].client_id, Some("test-client-id".into()));
+    let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
+    assert_eq!(discovered.len(), 1);
+    assert_eq!(discovered[0].name, "Google");
+    assert_eq!(discovered[0].client_id, Some("test-client-id".into()));
     assert_eq!(
-        active[0].discovery_url,
+        discovered[0].discovery_url,
         "https://accounts.google.com/.well-known/openid-configuration"
     );
     // Issuer is None because discovery hasn't run (no HTTP outcalls in tests)
-    assert_eq!(active[0].issuer, None);
+    assert_eq!(discovered[0].issuer, None);
 }
 
 #[test]
-fn should_return_empty_active_oidc_configs_when_none_configured() {
+fn should_return_empty_discovered_oidc_configs_when_none_configured() {
     let env = env();
 
     let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), None);
 
-    let active = api::active_oidc_configs(&env, canister_id).unwrap();
-    assert!(active.is_empty());
+    let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
+    assert!(discovered.is_empty());
 }

@@ -365,15 +365,15 @@ pub fn config(
     call_candid(env, canister_id, RawEffectivePrincipal::None, "config", ()).map(|(x,)| x)
 }
 
-pub fn active_oidc_configs(
+pub fn discovered_oidc_configs(
     env: &PocketIc,
     canister_id: CanisterId,
-) -> Result<Vec<types::ActiveOidcConfig>, RejectResponse> {
+) -> Result<Vec<types::DiscoveredOidcConfig>, RejectResponse> {
     call_candid(
         env,
         canister_id,
         RawEffectivePrincipal::None,
-        "active_oidc_configs",
+        "discovered_oidc_configs",
         (),
     )
     .map(|(x,)| x)

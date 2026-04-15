@@ -264,7 +264,9 @@ pub struct InternetIdentityInit {
     pub register_rate_limit: Option<RateLimitConfig>,
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
+    /// Deprecated: origins that use the new authentication flow. Mutually exclusive with `oidc_configs`.
     pub new_flow_origins: Option<Vec<String>>,
+    /// Deprecated: use `oidc_configs` instead. Mutually exclusive with `oidc_configs`.
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     /// Simplified OIDC configs that use discovery. Mutually exclusive with `openid_configs`.
     pub oidc_configs: Option<Vec<OidcConfig>>,
@@ -402,10 +404,10 @@ pub struct OidcConfig {
     pub email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
-/// Resolved OIDC provider config returned by the `active_oidc_configs` query.
+/// Resolved OIDC provider config returned by the `discovered_oidc_configs` query.
 /// Includes fields discovered from the OIDC discovery endpoint.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct ActiveOidcConfig {
+pub struct DiscoveredOidcConfig {
     pub name: String,
     pub logo: String,
     pub discovery_url: String,
