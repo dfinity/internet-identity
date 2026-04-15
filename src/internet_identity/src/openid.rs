@@ -12,7 +12,7 @@ use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdDelegationError,
 };
 use internet_identity_interface::internet_identity::types::{
-    AnchorNumber, Delegation, DiscoveredOidcConfig, IdRegFinishError, MetadataEntryV2, OidcConfig,
+    AnchorNumber, Delegation, DiscoverableOidcConfig, IdRegFinishError, MetadataEntryV2, OidcConfig,
     OpenIdConfig, OpenIdEmailVerificationScheme, PublicKey, SessionKey, SignedDelegation, Timestamp,
     UserKey,
 };
@@ -256,7 +256,7 @@ struct PartialClaims {
 
 thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
-    static OIDC_CONFIGS: RefCell<Vec<OidcConfig>> = RefCell::new(vec![]);
+    static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = RefCell::new(vec![]);
 }
 
 pub fn setup(configs: Vec<OpenIdConfig>) {
@@ -267,7 +267,7 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
     });
 }
 
-pub fn setup_oidc(configs: Vec<OidcConfig>) {
+pub fn setup_oidc(configs: Vec<DiscoverableOidcConfig>) {
     OIDC_CONFIGS.with_borrow_mut(|stored| {
         *stored = configs.clone();
     });
@@ -280,11 +280,11 @@ pub fn setup_oidc(configs: Vec<OidcConfig>) {
     generic::init_discovery_timers();
 }
 
-pub fn get_discovered_oidc_configs() -> Vec<DiscoveredOidcConfig> {
+pub fn get_discovered_oidc_configs() -> Vec<OidcConfig> {
     OIDC_CONFIGS.with_borrow(|configs| {
         configs
             .iter()
-            .map(|config| DiscoveredOidcConfig {
+            .map(|config| OidcConfig {
                 name: config.name.clone(),
                 logo: config.logo.clone(),
                 discovery_url: config.discovery_url.clone(),

@@ -9,7 +9,7 @@ use candid::{CandidType, Deserialize};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
 use internet_identity_interface::internet_identity::types::{
-    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, OidcConfig, OpenIdConfig,
+    AnalyticsConfig, CaptchaConfig, DummyAuthConfig, FrontendHostname, DiscoverableOidcConfig, OpenIdConfig,
     RateLimitConfig, Timestamp,
 };
 use std::borrow::Cow;
@@ -36,7 +36,7 @@ pub struct StorablePersistentState {
     related_origins: Option<Vec<String>>,
     new_flow_origins: Option<Vec<String>>,
     openid_configs: Option<Vec<OpenIdConfig>>,
-    oidc_configs: Option<Vec<OidcConfig>>,
+    oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     analytics_config: Option<AnalyticsConfig>,
     enable_dapps_explorer: Option<bool>,
     is_production: Option<bool>,

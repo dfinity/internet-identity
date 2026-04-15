@@ -116,7 +116,7 @@ pub struct PersistentState {
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     // Simplified OIDC configs using discovery. Mutually exclusive with openid_configs.
-    pub oidc_configs: Option<Vec<OidcConfig>>,
+    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
     pub analytics_config: Option<AnalyticsConfig>,
     // Key into the event_data BTreeMap where the 24h tracking window starts.

@@ -19,7 +19,7 @@ use identity_jose::jws::{
     VerificationInput,
 };
 use internet_identity_interface::internet_identity::types::{
-    MetadataEntryV2, OidcConfig, OpenIdConfig, OpenIdEmailVerificationScheme,
+    DiscoverableOidcConfig, MetadataEntryV2, OpenIdConfig, OpenIdEmailVerificationScheme,
 };
 use rsa::{Pkcs1v15Sign, RsaPublicKey};
 use serde::Serialize;
@@ -338,7 +338,7 @@ thread_local! {
 }
 
 impl DiscoverableProvider {
-    pub fn create(config: OidcConfig) -> DiscoverableProvider {
+    pub fn create(config: DiscoverableOidcConfig) -> DiscoverableProvider {
         let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
         let discovered_issuer: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 

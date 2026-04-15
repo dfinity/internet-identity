@@ -368,7 +368,7 @@ pub fn config(
 pub fn discovered_oidc_configs(
     env: &PocketIc,
     canister_id: CanisterId,
-) -> Result<Vec<types::DiscoveredOidcConfig>, RejectResponse> {
+) -> Result<Vec<types::OidcConfig>, RejectResponse> {
     call_candid(
         env,
         canister_id,

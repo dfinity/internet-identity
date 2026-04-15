@@ -237,7 +237,7 @@ pub struct InternetIdentityFrontendArgs {
 #[derive(Clone, Debug, CandidType, Deserialize, Default, Eq, PartialEq)]
 pub struct InternetIdentitySynchronizedConfig {
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    pub oidc_configs: Option<Vec<OidcConfig>>,
+    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
 }
 
 impl From<&InternetIdentityInit> for InternetIdentitySynchronizedConfig {
@@ -269,7 +269,7 @@ pub struct InternetIdentityInit {
     /// Deprecated: use `oidc_configs` instead. Mutually exclusive with `oidc_configs`.
     pub openid_configs: Option<Vec<OpenIdConfig>>,
     /// Simplified OIDC configs that use discovery. Mutually exclusive with `openid_configs`.
-    pub oidc_configs: Option<Vec<OidcConfig>>,
+    pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
     pub is_production: Option<bool>,
@@ -396,7 +396,7 @@ pub struct OpenIdConfig {
 /// `ii-openid-configuration` endpoint that provides `client_id` and a reference
 /// to the standard OIDC discovery endpoint.
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
-pub struct OidcConfig {
+pub struct DiscoverableOidcConfig {
     pub name: String,
     pub logo: String,
     pub discovery_url: String,
@@ -407,7 +407,7 @@ pub struct OidcConfig {
 /// Resolved OIDC provider config returned by the `discovered_oidc_configs` query.
 /// Includes fields discovered from the OIDC discovery endpoint.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
-pub struct DiscoveredOidcConfig {
+pub struct OidcConfig {
     pub name: String,
     pub logo: String,
     pub discovery_url: String,

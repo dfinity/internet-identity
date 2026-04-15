@@ -3,11 +3,11 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    InternetIdentityInit, OidcConfig, OpenIdConfig,
+    InternetIdentityInit, DiscoverableOidcConfig, OpenIdConfig,
 };
 
-fn example_oidc_config() -> OidcConfig {
-    OidcConfig {
+fn example_oidc_config() -> DiscoverableOidcConfig {
+    DiscoverableOidcConfig {
         name: "Google".into(),
         logo: String::new(),
         discovery_url: "https://accounts.google.com/.well-known/openid-configuration".into(),
