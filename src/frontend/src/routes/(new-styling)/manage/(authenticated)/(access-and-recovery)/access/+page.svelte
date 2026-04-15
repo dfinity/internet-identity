@@ -187,6 +187,7 @@
           .openid_credential_remove($authenticatedStore.identityNumber, [
             removingAccessMethod.openid.iss,
             removingAccessMethod.openid.sub,
+            removingAccessMethod.openid.aud,
           ])
           .then(throwCanisterError);
       }

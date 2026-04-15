@@ -403,7 +403,7 @@ type OidcConfig = record {
     issuer : opt text;
 };
 
-type OpenIdCredentialKey = record { Iss; Sub };
+type OpenIdCredentialKey = record { Iss; Sub; Aud };
 
 type AnalyticsConfig = variant {
     Plausible : record {

@@ -774,6 +774,70 @@ impl<M: Memory + Clone> Storage<M> {
         anchor_numbers.first().copied()
     }
 
+    /// Migrates OpenID credential keys from the legacy `(iss, sub)` format to the
+    /// new `(iss, sub, aud)` format.
+    ///
+    /// Legacy keys (decoded with empty `aud`) are popped from the index, the `aud`
+    /// is resolved from the anchor's stored `StorableOpenIdCredential`, and the entry
+    /// is re-inserted with the complete key.
+    ///
+    /// This is safe to call multiple times (idempotent) — entries already in the new
+    /// format are re-inserted unchanged.
+    pub fn migrate_openid_credential_keys(&mut self) {
+        // Drain all entries via pop_first to avoid byte-level encoding mismatches
+        // when removing legacy (array-encoded) keys.
+        let mut entries: Vec<(StorableOpenIdCredentialKey, StorableAnchorNumberList)> = Vec::new();
+        while let Some((key, value)) = self.lookup_anchor_with_openid_credential_memory.pop_first()
+        {
+            entries.push((key, value));
+        }
+
+        for (old_key, anchor_list) in entries {
+            if !old_key.is_legacy() {
+                // Already in new format, re-insert as-is
+                self.lookup_anchor_with_openid_credential_memory
+                    .insert(old_key, anchor_list);
+                continue;
+            }
+
+            // Legacy key — look up aud from the anchor's stored credential
+            let anchor_numbers: Vec<AnchorNumber> = anchor_list.clone().into();
+            let mut resolved_aud = None;
+            if let Some(&anchor_number) = anchor_numbers.first() {
+                if let Some(storable_anchor) = self.stable_anchor_memory.get(&anchor_number) {
+                    if let Some(credential) = storable_anchor
+                        .openid_credentials
+                        .iter()
+                        .find(|c| c.iss == old_key.iss && c.sub == old_key.sub)
+                    {
+                        resolved_aud = Some(credential.aud.clone());
+                    }
+                }
+            }
+
+            if let Some(aud) = resolved_aud {
+                let new_key = StorableOpenIdCredentialKey {
+                    iss: old_key.iss,
+                    sub: old_key.sub,
+                    aud,
+                };
+                self.lookup_anchor_with_openid_credential_memory
+                    .insert(new_key, anchor_list);
+            } else {
+                // Could not resolve aud — re-insert with empty aud to avoid data loss.
+                // This entry will be resolved on the next upgrade attempt.
+                ic_cdk::println!(
+                    "WARNING: Could not resolve aud for OpenID credential key (iss={}, sub={}). \
+                     Re-inserting with empty aud for retry on next upgrade.",
+                    old_key.iss,
+                    old_key.sub
+                );
+                self.lookup_anchor_with_openid_credential_memory
+                    .insert(old_key, anchor_list);
+            }
+        }
+    }
+
     pub fn lookup_anchor_with_recovery_phrase_principal(
         &self,
         key: Principal,

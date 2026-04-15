@@ -48,7 +48,7 @@ pub enum OpenIdDelegationError {
     JwtExpired,
 }
 
-pub type OpenIdCredentialKey = (Iss, Sub);
+pub type OpenIdCredentialKey = (Iss, Sub, Aud);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;

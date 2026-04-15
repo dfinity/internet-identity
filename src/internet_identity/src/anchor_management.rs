@@ -229,7 +229,7 @@ pub fn remove_openid_credential(
     key: &OpenIdCredentialKey,
 ) -> Result<Operation, AnchorError> {
     anchor.remove_openid_credential(key)?;
-    let (iss, _) = key;
+    let (iss, _, _) = key;
     Ok(Operation::RemoveOpenIdCredential { iss: iss.clone() })
 }
 
