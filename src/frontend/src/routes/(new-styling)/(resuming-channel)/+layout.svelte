@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { LayoutProps } from "./$types";
   import { channelErrorStore, channelStore } from "$lib/stores/channelStore";
-  import { authorizationStore } from "$lib/stores/authorization.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { t } from "$lib/stores/locale.store";
   import FeaturedIcon from "$lib/components/ui/FeaturedIcon.svelte";
@@ -27,9 +26,7 @@
 </script>
 
 {#if pendingChannelOrigin !== null}
-  {#if $authorizationStore !== undefined}
-    {@render children()}
-  {/if}
+  {@render children()}
 {:else}
   <Dialog>
     <FeaturedIcon size="lg" variant="error" class="mb-4 self-start">
