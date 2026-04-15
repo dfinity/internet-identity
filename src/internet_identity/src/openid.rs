@@ -321,7 +321,20 @@ where
                 effective_issuer == iss
             })
             .ok_or_else(|| {
-                OpenIDJWTVerificationError::GenericError(format!("Unsupported issuer: {}", iss))
+                // Check if there are discoverable providers still initializing
+                // (their issuer is empty until discovery completes)
+                let has_pending = providers.iter().any(|p| p.issuer().is_empty());
+                if has_pending {
+                    OpenIDJWTVerificationError::GenericError(
+                        "OIDC provider discovery is still in progress, please try again shortly"
+                            .to_string(),
+                    )
+                } else {
+                    OpenIDJWTVerificationError::GenericError(format!(
+                        "Unsupported issuer: {}",
+                        iss
+                    ))
+                }
             })
             .and_then(|provider| callback(provider.as_ref()))
     })

@@ -666,13 +666,10 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.related_origins = Some(related_origins);
             })
         }
-        if let Some(new_flow_origins) = arg.new_flow_origins {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.new_flow_origins = Some(new_flow_origins);
-            })
-        }
-        // oidc_configs and openid_configs are mutually exclusive.
-        // When both are provided, openid_configs takes precedence as the proven path.
+        // oidc_configs, openid_configs, and new_flow_origins are mutually exclusive.
+        // When openid_configs is provided alongside oidc_configs, openid_configs takes
+        // precedence as the proven path. When oidc_configs is set, new_flow_origins is
+        // cleared (and vice versa) since oidc_configs subsumes new_flow_origins.
         if let Some(openid_configs) = arg.openid_configs {
             if arg.oidc_configs.is_some() {
                 ic_cdk::println!(
@@ -687,6 +684,13 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.oidc_configs = Some(oidc_configs);
                 persistent_state.openid_configs = None;
+                persistent_state.new_flow_origins = None;
+            })
+        }
+        if let Some(new_flow_origins) = arg.new_flow_origins {
+            state::persistent_state_mut(|persistent_state| {
+                persistent_state.new_flow_origins = Some(new_flow_origins);
+                persistent_state.oidc_configs = None;
             })
         }
         if let Some(analytics_config) = arg.analytics_config {

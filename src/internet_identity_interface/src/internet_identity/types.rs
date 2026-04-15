@@ -268,7 +268,7 @@ pub struct InternetIdentityInit {
     pub new_flow_origins: Option<Vec<String>>,
     /// Deprecated: use `oidc_configs` instead. Mutually exclusive with `oidc_configs`.
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    /// Simplified OIDC configs that use discovery. Mutually exclusive with `openid_configs`.
+    /// Simplified OIDC configs that use discovery. Mutually exclusive with `openid_configs` and `new_flow_origins`.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
@@ -389,12 +389,9 @@ pub struct OpenIdConfig {
 /// Simplified OIDC provider configuration that relies on OIDC discovery
 /// instead of requiring all provider details in the init config.
 ///
-/// For dedicated providers (Google, Apple, Microsoft): `client_id` is set,
-/// `discovery_url` points to the standard `.well-known/openid-configuration` endpoint.
-///
-/// For SSO providers: `client_id` is `None`, `discovery_url` points to a custom
-/// `ii-openid-configuration` endpoint that provides `client_id` and a reference
-/// to the standard OIDC discovery endpoint.
+/// `client_id` must be set. The `discovery_url` points to the standard
+/// `.well-known/openid-configuration` endpoint from which `issuer` and
+/// `jwks_uri` are discovered automatically.
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct DiscoverableOidcConfig {
     pub name: String,

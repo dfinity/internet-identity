@@ -330,7 +330,8 @@ pub struct DiscoveryState {
     pub discovery_url: String,
     pub issuer_ref: Rc<RefCell<Option<String>>>,
     pub certs_ref: Rc<RefCell<Vec<Jwk>>>,
-    pub certs_started: Rc<RefCell<bool>>,
+    /// Tracks the last seen `jwks_uri` so cert fetching restarts when it changes.
+    pub last_jwks_uri: Rc<RefCell<Option<String>>>,
 }
 
 thread_local! {
@@ -347,7 +348,7 @@ impl DiscoverableProvider {
                 discovery_url: config.discovery_url.clone(),
                 issuer_ref: Rc::clone(&discovered_issuer),
                 certs_ref: Rc::clone(&certs),
-                certs_started: Rc::new(RefCell::new(false)),
+                last_jwks_uri: Rc::new(RefCell::new(None)),
             });
         });
 
@@ -392,8 +393,13 @@ async fn run_discovery_tasks() {
             }
             task.issuer_ref.replace(Some(doc.issuer));
 
-            if !*task.certs_started.borrow() {
-                *task.certs_started.borrow_mut() = true;
+            // Start or restart cert fetching when jwks_uri changes
+            let jwks_changed = {
+                let last = task.last_jwks_uri.borrow();
+                last.as_deref() != Some(&doc.jwks_uri)
+            };
+            if jwks_changed {
+                task.last_jwks_uri.replace(Some(doc.jwks_uri.clone()));
                 schedule_fetch_certs(doc.jwks_uri, Rc::clone(&task.certs_ref), Some(0));
             }
         }
