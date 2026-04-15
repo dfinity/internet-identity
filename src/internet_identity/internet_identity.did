@@ -386,8 +386,7 @@ type OpenIdConfig = record {
 };
 
 // Simplified OIDC provider config that relies on discovery.
-// For dedicated providers: client_id is set, discovery_url is standard OIDC endpoint.
-// For SSO providers: client_id is null, discovery_url is custom ii-openid-configuration.
+// client_id must be set. discovery_url is the standard OIDC .well-known endpoint.
 type DiscoverableOidcConfig = record {
     name : text;
     logo : text;
