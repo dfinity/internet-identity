@@ -115,6 +115,9 @@ msgstr "As you are currently signed in with this passkey, you will be signed out
 msgid "Authenticating..."
 msgstr "Authenticating..."
 
+msgid "Authentication failed"
+msgstr "Authentication failed"
+
 msgid "Authentication successful"
 msgstr "Authentication successful"
 
@@ -279,9 +282,6 @@ msgstr "Edit account"
 
 msgid "Enable multiple accounts"
 msgstr "Enable multiple accounts"
-
-msgid "Encountered an internal error while processing the request."
-msgstr "Encountered an internal error while processing the request."
 
 msgid "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
 msgstr "Enter a name for your identity to complete the upgrade. Once set, it cannot be changed later."
@@ -487,9 +487,6 @@ msgstr "It seems like an invalid authentication request was received."
 
 msgid "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
 msgstr "It seems like the connection with the service could not be established. Try a different browser; if the issue persists, contact support."
-
-msgid "It seems like the connection with the service could not be re-established."
-msgstr "It seems like the connection with the service could not be re-established."
 
 msgid "It seems like the request could not be processed."
 msgstr "It seems like the request could not be processed."
@@ -855,9 +852,8 @@ msgctxt "The user entered an incorrect value during a verification step"
 msgid "Something is wrong!"
 msgstr "Something is wrong!"
 
-msgctxt "Fallback error message when an unexpected error is caught"
-msgid "Something went wrong"
-msgstr "Something went wrong"
+msgid "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
+msgstr "Something went wrong while creating your delegation. Please try again; if the issue persists, contact support."
 
 msgid "Source code"
 msgstr "Source code"
@@ -940,6 +936,9 @@ msgstr "There was an issue connecting with the application. Try a different brow
 msgid "This app has moved to the new Internet Identity"
 msgstr "This app has moved to the new Internet Identity"
 
+msgid "This browser is not supported."
+msgstr "This browser is not supported."
+
 msgid "This identity has already been upgraded to the new experience."
 msgstr "This identity has already been upgraded to the new experience."
 
@@ -1006,9 +1005,6 @@ msgstr "Understanding Internet Identity"
 msgid "Undo"
 msgstr "Undo"
 
-msgid "Unexpected error"
-msgstr "Unexpected error"
-
 msgid "Unknown"
 msgstr "Unknown"
 
@@ -1032,6 +1028,9 @@ msgstr "Unlock to continue"
 
 msgid "Unsupported"
 msgstr "Unsupported"
+
+msgid "Unsupported browser"
+msgstr "Unsupported browser"
 
 msgid "Unsupported Browser"
 msgstr "Unsupported Browser"
