@@ -418,8 +418,7 @@ export function waitForStore<T, R>(
 ): Promise<R>;
 export function waitForStore<T, R>(
   store: Readable<T>,
-  condition: (value: T) => R | undefined = (value) =>
-    value as R | undefined,
+  condition: (value: T) => R | undefined = (value) => value as R | undefined,
 ): Promise<R> {
   return new Promise((resolve) => {
     const unsubscribe = store.subscribe((value) => {
