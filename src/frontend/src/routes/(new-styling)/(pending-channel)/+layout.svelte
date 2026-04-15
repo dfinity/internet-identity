@@ -13,4 +13,6 @@
   });
 </script>
 
-{@render children()}
+{#if $channelStore !== undefined}
+  {@render children()}
+{/if}
