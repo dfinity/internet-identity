@@ -2,38 +2,37 @@ import { derived, type Readable, writable } from "svelte/store";
 
 export type AuthorizationContext = {
   effectiveOrigin: string;
-  authorized: boolean;
+};
+
+export type Authorized = {
   accountNumber: bigint | undefined;
 };
 
-const internalStore = writable<AuthorizationContext | undefined>();
+const contextInternal = writable<AuthorizationContext | undefined>();
+const authorizedInternal = writable<Authorized | undefined>();
 
 export const authorizationStore = {
   /** Called by the channel store once the effective origin is resolved. */
   setContext: (effectiveOrigin: string): void => {
-    internalStore.set({
-      effectiveOrigin,
-      authorized: false,
-      accountNumber: undefined,
-    });
+    contextInternal.set({ effectiveOrigin });
   },
   /** Called by the UI when the user authorizes with a specific account. */
   authorize: (accountNumber: bigint | undefined): void => {
-    internalStore.update((context) => {
-      if (context === undefined) {
-        throw new Error("Authorization context has not been set yet");
-      }
-      return { ...context, authorized: true, accountNumber };
-    });
+    authorizedInternal.set({ accountNumber });
   },
-  subscribe: internalStore.subscribe,
+  subscribe: contextInternal.subscribe,
 };
 
 /** Derived store that guarantees context is available. */
 export const authorizationContextStore: Readable<AuthorizationContext> =
-  derived(internalStore, (context) => {
+  derived(contextInternal, (context) => {
     if (context === undefined) {
       throw new Error("Authorization context is not available yet");
     }
     return context;
   });
+
+/** Store that holds the authorization outcome once the user has authorized. */
+export const authorizedStore: Readable<Authorized | undefined> = {
+  subscribe: authorizedInternal.subscribe,
+};

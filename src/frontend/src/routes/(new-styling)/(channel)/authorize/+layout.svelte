@@ -3,6 +3,7 @@
   import {
     authorizationContextStore,
     authorizationStore,
+    authorizedStore,
   } from "$lib/stores/authorization.store";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
@@ -239,7 +240,7 @@
     {/if}
   </Header>
   <div class="flex flex-1 flex-col items-center justify-center">
-    {#if $authorizationContextStore.authorized}
+    {#if $authorizedStore !== undefined}
       {#await waitFor(10000)}
         <div class="flex flex-col items-center justify-center gap-4">
           <ProgressRing class="text-fg-primary size-14" />
