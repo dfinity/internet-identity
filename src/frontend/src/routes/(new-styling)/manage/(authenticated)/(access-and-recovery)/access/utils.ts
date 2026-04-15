@@ -67,7 +67,7 @@ export const toKey = (accessMethod: AccessMethod): string => {
     );
   }
   if ("openid" in accessMethod) {
-    return accessMethod.openid.iss + accessMethod.openid.sub;
+    return accessMethod.openid.iss + accessMethod.openid.sub + accessMethod.openid.aud;
   }
   throw new Error("Unknown access method type");
 };

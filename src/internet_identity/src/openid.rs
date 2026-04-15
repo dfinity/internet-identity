@@ -24,7 +24,7 @@ mod generic;
 
 pub const OPENID_SESSION_DURATION_NS: u64 = 30 * MINUTE_NS;
 
-pub type OpenIdCredentialKey = (Iss, Sub);
+pub type OpenIdCredentialKey = (Iss, Sub, Aud);
 pub type Iss = String;
 pub type Sub = String;
 pub type Aud = String;
@@ -84,7 +84,7 @@ pub struct OpenIdCredential {
 
 impl OpenIdCredential {
     pub fn key(&self) -> OpenIdCredentialKey {
-        (self.iss.clone(), self.sub.clone())
+        (self.iss.clone(), self.sub.clone(), self.aud.clone())
     }
 
     pub fn principal(&self, anchor_number: AnchorNumber) -> Principal {
@@ -396,12 +396,12 @@ pub fn replace_issuer_placeholders(template: &str, claims: &Vec<(String, String)
 /// # Arguments
 ///
 /// * `client_id`: The client id for which the `OpenIdCredential` was created
-/// * `(iss, sub)`: The key of the `OpenIdCredential` to create a `Hash` from
+/// * `(iss, sub, _aud)`: The key of the `OpenIdCredential` to create a `Hash` from
 /// * `anchor_number`: The anchor number the credential is assigned to
 #[allow(clippy::cast_possible_truncation)]
 fn calculate_delegation_seed(
     client_id: &str,
-    (iss, sub): &OpenIdCredentialKey,
+    (iss, sub, _aud): &OpenIdCredentialKey,
     anchor_number: AnchorNumber,
 ) -> Hash {
     let mut blob: Vec<u8> = vec![];

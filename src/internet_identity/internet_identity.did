@@ -405,7 +405,7 @@ type OidcConfig = record {
     email_verification : opt OpenIdEmailVerification;
 };
 
-type OpenIdCredentialKey = record { Iss; Sub };
+type OpenIdCredentialKey = record { Iss; Sub; Aud };
 
 type AnalyticsConfig = variant {
     Plausible : record {

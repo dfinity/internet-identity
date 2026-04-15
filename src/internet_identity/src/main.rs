@@ -615,6 +615,12 @@ fn post_upgrade(maybe_arg: Option<InternetIdentityInit>) {
     // load the persistent state after initializing storage as it manages the respective stable cell
     state::load_persistent_state();
 
+    // Migrate OpenID credential keys from (iss, sub) to (iss, sub, aud) format.
+    // Safe to call on every upgrade — entries already in the new format are preserved.
+    state::storage_borrow_mut(|storage| {
+        storage.migrate_openid_credential_keys();
+    });
+
     initialize(maybe_arg);
 }
 
