@@ -12,6 +12,7 @@
   import { isWebAuthnCancelError } from "$lib/utils/webAuthnErrorUtils";
   import { isOpenIdCancelError } from "$lib/utils/openID";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
+  import type { DiscoverableOidcConfig } from "$lib/globals";
   import CreateIdentity from "$lib/components/wizards/auth/views/CreateIdentity.svelte";
 
   interface Props {
@@ -93,6 +94,27 @@
     }
   };
 
+  const handleContinueWithOidc = async (
+    config: DiscoverableOidcConfig,
+  ): Promise<void | "cancelled"> => {
+    try {
+      isAuthenticating = true;
+      const result = await authFlow.continueWithOidc(config);
+      if (result.type === "signIn") {
+        await onSignIn(result.identityNumber);
+      } else if (result.name !== undefined) {
+        await onSignUp(await authFlow.completeOpenIdRegistration(result.name));
+      }
+    } catch (error) {
+      if (isOpenIdCancelError(error)) {
+        return "cancelled";
+      }
+      onError(error);
+    } finally {
+      isAuthenticating = false;
+    }
+  };
+
   const handleCompleteOpenIdRegistration = async (
     name: string,
   ): Promise<void> => {
@@ -149,6 +171,7 @@
     <PickAuthenticationMethod
       setupOrUseExistingPasskey={authFlow.setupOrUseExistingPasskey}
       continueWithOpenId={handleContinueWithOpenId}
+      continueWithOidc={handleContinueWithOidc}
     />
   {/if}
   {#if authFlow.view !== "chooseMethod"}

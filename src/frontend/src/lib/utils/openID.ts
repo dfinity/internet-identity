@@ -3,6 +3,7 @@ import type {
   OpenIdConfig,
 } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
+import { findCachedDiscoveryByIssuer } from "$lib/utils/oidcDiscovery";
 import { fromBase64URL, toBase64URL } from "$lib/utils/utils";
 import { Principal } from "@icp-sdk/core/principal";
 import {
@@ -256,7 +257,8 @@ export const issuerMatches = (
  * Find the OpenID configuration for a given issuer.
  *
  * First, it tries to find a match in the generic OpenID configurations.
- * If no match is found, it falls back to the Google configuration if the issuer matches Google's issuer.
+ * If no match is found, it checks discoverable OIDC configurations by
+ * looking up cached discovery documents.
  *
  * Not relying in the feature flag ENABLE_GENERIC_OPEN_ID means that if we enable and then disable the feature flag,
  * afterwards, the users that used the generic OpenID configurations will still be able to log in.
@@ -267,10 +269,48 @@ export const issuerMatches = (
 export const findConfig = (
   issuer: string,
   metadata: MetadataMapV2,
-): OpenIdConfig | undefined =>
-  backendCanisterConfig.openid_configs[0]?.find((config) =>
+): OpenIdConfig | undefined => {
+  // Check openid_configs first
+  const openIdMatch = backendCanisterConfig.openid_configs[0]?.find((config) =>
     issuerMatches(config.issuer, issuer, metadata),
   );
+  if (openIdMatch !== undefined) {
+    return openIdMatch;
+  }
+
+  // Fall back to oidc_configs using cached discovery data
+  const oidcConfigs = backendCanisterConfig.oidc_configs?.[0];
+  if (oidcConfigs === undefined) {
+    return undefined;
+  }
+
+  const cached = findCachedDiscoveryByIssuer(issuer);
+  if (cached === undefined) {
+    return undefined;
+  }
+
+  const oidcConfig = oidcConfigs.find(
+    (config) => config.discovery_url === cached.discoveryUrl,
+  );
+  if (oidcConfig === undefined || oidcConfig.client_id[0] === undefined) {
+    return undefined;
+  }
+
+  // Build a synthetic OpenIdConfig from the discoverable config + cached discovery
+  return {
+    auth_uri: cached.document.authorization_endpoint,
+    jwks_uri: "",
+    logo: oidcConfig.logo,
+    name: oidcConfig.name,
+    fedcm_uri: [],
+    email_verification: oidcConfig.email_verification,
+    issuer: cached.document.issuer,
+    auth_scope: cached.document.scopes_supported?.filter((s) =>
+      ["openid", "profile", "email"].includes(s),
+    ) ?? ["openid", "profile", "email"],
+    client_id: oidcConfig.client_id[0],
+  };
+};
 
 /**
  * Request JWT token through FedCM with redirect in a popup as fallback

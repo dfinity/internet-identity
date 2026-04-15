@@ -4,6 +4,7 @@
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { backendCanisterConfig } from "$lib/globals";
+  import type { DiscoverableOidcConfig } from "$lib/globals";
   import { waitFor } from "$lib/utils/utils";
   import Tooltip from "$lib/components/ui/Tooltip.svelte";
   import type { OpenIdConfig } from "$lib/generated/internet_identity_types";
@@ -12,9 +13,13 @@
   interface Props {
     setupOrUseExistingPasskey: () => void;
     continueWithOpenId: (config: OpenIdConfig) => Promise<void | "cancelled">;
+    continueWithOidc: (
+      config: DiscoverableOidcConfig,
+    ) => Promise<void | "cancelled">;
   }
 
-  const { setupOrUseExistingPasskey, continueWithOpenId }: Props = $props();
+  const { setupOrUseExistingPasskey, continueWithOpenId, continueWithOidc }:
+    Props = $props();
 
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();
@@ -31,8 +36,22 @@
     }
   };
 
+  const handleContinueWithOidc = async (config: DiscoverableOidcConfig) => {
+    const providerId = config.client_id[0] ?? config.discovery_url;
+    authenticatingProviderId = providerId;
+    const result = await continueWithOidc(config);
+    authenticatingProviderId = undefined;
+
+    if (result === "cancelled") {
+      cancelledProviderId = providerId;
+      await waitFor(4000);
+      cancelledProviderId = undefined;
+    }
+  };
+
   const supportsPasskeys = window.PublicKeyCredential !== undefined;
   const openIdProviders = backendCanisterConfig.openid_configs?.[0] ?? [];
+  const oidcProviders = backendCanisterConfig.oidc_configs?.[0] ?? [];
 </script>
 
 <div class="flex flex-col items-stretch gap-5">
@@ -60,6 +79,32 @@
             aria-label={$t`Continue with ${name}`}
           >
             {#if authenticatingProviderId === provider.client_id}
+              <ProgressRing />
+            {:else}
+              <div class="size-6">
+                {@html provider.logo}
+              </div>
+            {/if}
+          </Button>
+        </Tooltip>
+      {/each}
+      {#each oidcProviders as provider}
+        {@const name = provider.name}
+        {@const providerId = provider.client_id[0] ?? provider.discovery_url}
+        <Tooltip
+          label={$t`Interaction canceled. Please try again.`}
+          hidden={cancelledProviderId !== providerId}
+          manual
+        >
+          <Button
+            onclick={() => handleContinueWithOidc(provider)}
+            variant="secondary"
+            disabled={authenticatingProviderId !== undefined}
+            size="xl"
+            class="flex-1"
+            aria-label={$t`Continue with ${name}`}
+          >
+            {#if authenticatingProviderId === providerId}
               <ProgressRing />
             {:else}
               <div class="size-6">

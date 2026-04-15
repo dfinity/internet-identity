@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   findConfig,
   issuerMatches,
@@ -10,7 +10,19 @@ import { backendCanisterConfig } from "$lib/globals";
 vi.mock("$lib/globals", () => ({
   backendCanisterConfig: {
     openid_configs: [],
+    oidc_configs: [],
   },
+}));
+
+const mockDiscoveryCache = new Map<
+  string,
+  { discoveryUrl: string; document: { issuer: string; authorization_endpoint: string; scopes_supported?: string[] } }
+>();
+
+vi.mock("$lib/utils/oidcDiscovery", () => ({
+  findCachedDiscoveryByIssuer: vi.fn((issuer: string) =>
+    mockDiscoveryCache.get(issuer),
+  ),
 }));
 
 describe("issuerMatches", () => {
@@ -232,5 +244,129 @@ describe("findConfig", () => {
     expect(
       findConfig("https://no-such-issuer.example.com", []),
     ).toBeUndefined();
+  });
+});
+
+describe("findConfig with oidc_configs", () => {
+  beforeEach(() => {
+    backendCanisterConfig.openid_configs = [];
+    (backendCanisterConfig as Record<string, unknown>).oidc_configs = [];
+    mockDiscoveryCache.clear();
+  });
+
+  it("returns a synthetic OpenIdConfig when oidc_configs match via cached discovery", () => {
+    const discoveryUrl =
+      "https://accounts.google.com/.well-known/openid-configuration";
+    (backendCanisterConfig as Record<string, unknown>).oidc_configs = [
+      [
+        {
+          name: "Google",
+          logo: "<svg>google</svg>",
+          discovery_url: discoveryUrl,
+          client_id: ["my-client-id"],
+          email_verification: [{ Google: null }],
+        },
+      ],
+    ];
+
+    mockDiscoveryCache.set("https://accounts.google.com", {
+      discoveryUrl,
+      document: {
+        issuer: "https://accounts.google.com",
+        authorization_endpoint:
+          "https://accounts.google.com/o/oauth2/v2/auth",
+        scopes_supported: ["openid", "profile", "email"],
+      },
+    });
+
+    const result = findConfig("https://accounts.google.com", []);
+    expect(result).toBeDefined();
+    expect(result!.name).toBe("Google");
+    expect(result!.logo).toBe("<svg>google</svg>");
+    expect(result!.client_id).toBe("my-client-id");
+    expect(result!.auth_uri).toBe(
+      "https://accounts.google.com/o/oauth2/v2/auth",
+    );
+    expect(result!.issuer).toBe("https://accounts.google.com");
+    expect(result!.auth_scope).toEqual(["openid", "profile", "email"]);
+  });
+
+  it("returns undefined for oidc_configs without cached discovery", () => {
+    (backendCanisterConfig as Record<string, unknown>).oidc_configs = [
+      [
+        {
+          name: "Google",
+          logo: "<svg>google</svg>",
+          discovery_url:
+            "https://accounts.google.com/.well-known/openid-configuration",
+          client_id: ["my-client-id"],
+          email_verification: [],
+        },
+      ],
+    ];
+
+    // No cache populated
+    const result = findConfig("https://accounts.google.com", []);
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined for oidc_configs without client_id", () => {
+    const discoveryUrl =
+      "https://accounts.google.com/.well-known/openid-configuration";
+    (backendCanisterConfig as Record<string, unknown>).oidc_configs = [
+      [
+        {
+          name: "Google",
+          logo: "<svg>google</svg>",
+          discovery_url: discoveryUrl,
+          client_id: [],
+          email_verification: [],
+        },
+      ],
+    ];
+
+    mockDiscoveryCache.set("https://accounts.google.com", {
+      discoveryUrl,
+      document: {
+        issuer: "https://accounts.google.com",
+        authorization_endpoint:
+          "https://accounts.google.com/o/oauth2/v2/auth",
+      },
+    });
+
+    const result = findConfig("https://accounts.google.com", []);
+    expect(result).toBeUndefined();
+  });
+
+  it("prefers openid_configs over oidc_configs", () => {
+    const openIdCfg = createOpenIDConfig("https://accounts.google.com");
+    backendCanisterConfig.openid_configs = [[openIdCfg]];
+
+    const discoveryUrl =
+      "https://accounts.google.com/.well-known/openid-configuration";
+    (backendCanisterConfig as Record<string, unknown>).oidc_configs = [
+      [
+        {
+          name: "Google OIDC",
+          logo: "<svg>oidc</svg>",
+          discovery_url: discoveryUrl,
+          client_id: ["oidc-client-id"],
+          email_verification: [],
+        },
+      ],
+    ];
+
+    mockDiscoveryCache.set("https://accounts.google.com", {
+      discoveryUrl,
+      document: {
+        issuer: "https://accounts.google.com",
+        authorization_endpoint:
+          "https://accounts.google.com/o/oauth2/v2/auth",
+      },
+    });
+
+    // Should return the openid_configs match, not the oidc one
+    const result = findConfig("https://accounts.google.com", []);
+    expect(result).toBe(openIdCfg);
   });
 });
