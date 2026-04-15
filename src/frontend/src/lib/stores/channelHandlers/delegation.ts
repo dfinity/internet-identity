@@ -56,14 +56,6 @@ export const handleDelegationRequest =
         derivationOrigin: params.icrc95DerivationOrigin,
       });
       if (validationResult.result === "invalid") {
-        await channel.send({
-          jsonrpc: "2.0",
-          id: request.id,
-          error: {
-            code: INVALID_PARAMS_ERROR_CODE,
-            message: "Unverified derivation origin",
-          },
-        });
         onError("unverified-origin");
         return;
       }
@@ -122,14 +114,6 @@ export const handleDelegationRequest =
       });
     } catch (error) {
       console.error(error);
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: error instanceof Error ? error.message : "Delegation failed",
-        },
-      });
       onError("delegation-failed");
     }
   };

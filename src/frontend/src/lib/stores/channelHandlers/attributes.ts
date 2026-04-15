@@ -18,6 +18,7 @@ import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
+
 /**
  * Resolves the config issuer string from the current authentication state.
  * Returns `undefined` if the user did not authenticate via OpenID.
@@ -76,14 +77,6 @@ export const handleLegacyAttributes =
       dapp?.certifiedAttributes !== true &&
       frontendCanisterConfig.fetch_root_key[0] !== true
     ) {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: "Attributes are not available for this origin.",
-        },
-      });
       return;
     }
 
@@ -103,14 +96,6 @@ export const handleLegacyAttributes =
       derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
     });
     if (validationResult.result === "invalid") {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: "Unverified derivation origin",
-        },
-      });
       onError("unverified-origin");
       return;
     }
@@ -175,15 +160,6 @@ export const handleLegacyAttributes =
       });
     } catch (error) {
       console.error(error);
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: 1000,
-          message:
-            "Encountered an internal error while processing the request.",
-        },
-      });
     }
   };
 
@@ -220,14 +196,6 @@ export const handleIcrc3Attributes =
       dapp?.certifiedAttributes !== true &&
       frontendCanisterConfig.fetch_root_key[0] !== true
     ) {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: "Attributes are not available for this origin.",
-        },
-      });
       return;
     }
 
@@ -247,14 +215,6 @@ export const handleIcrc3Attributes =
       derivationOrigin: paramsResult.data.icrc95DerivationOrigin,
     });
     if (validationResult.result === "invalid") {
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: INVALID_PARAMS_ERROR_CODE,
-          message: "Unverified derivation origin",
-        },
-      });
       onError("unverified-origin");
       return;
     }
@@ -311,14 +271,5 @@ export const handleIcrc3Attributes =
       });
     } catch (error) {
       console.error(error);
-      await channel.send({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: 1000,
-          message:
-            "Encountered an internal error while processing the request.",
-        },
-      });
     }
   };
