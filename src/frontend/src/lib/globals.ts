@@ -20,6 +20,12 @@ import { fromBase64 } from "./utils/utils";
 // direct dependencies between frontend and backend, as they may be deployed independently.
 //
 // Only compatibility between the two is guaranteed, not strict synchronization.
+const OpenIdEmailVerificationIDL = IDL.Variant({
+  Google: IDL.Null,
+  Unknown: IDL.Null,
+  Microsoft: IDL.Null,
+});
+
 const backendCanisterConfigIDL = IDL.Record({
   openid_configs: IDL.Opt(
     IDL.Vec(
@@ -29,16 +35,21 @@ const backendCanisterConfigIDL = IDL.Record({
         logo: IDL.Text,
         name: IDL.Text,
         fedcm_uri: IDL.Opt(IDL.Text),
-        email_verification: IDL.Opt(
-          IDL.Variant({
-            Google: IDL.Null,
-            Unknown: IDL.Null,
-            Microsoft: IDL.Null,
-          }),
-        ),
+        email_verification: IDL.Opt(OpenIdEmailVerificationIDL),
         issuer: IDL.Text,
         auth_scope: IDL.Vec(IDL.Text),
         client_id: IDL.Text,
+      }),
+    ),
+  ),
+  oidc_configs: IDL.Opt(
+    IDL.Vec(
+      IDL.Record({
+        name: IDL.Text,
+        logo: IDL.Text,
+        discovery_url: IDL.Text,
+        client_id: IDL.Opt(IDL.Text),
+        email_verification: IDL.Opt(OpenIdEmailVerificationIDL),
       }),
     ),
   ),
@@ -60,7 +71,18 @@ export interface OpenIdConfig {
   auth_scope: Array<string>;
   client_id: string;
 }
-export type BackendCanisterConfig = { openid_configs: [] | [OpenIdConfig[]] };
+export interface DiscoverableOidcConfig {
+  name: string;
+  logo: string;
+  discovery_url: string;
+  client_id: [] | [string];
+  email_verification: [] | [OpenIdEmailVerification];
+}
+
+export type BackendCanisterConfig = {
+  openid_configs: [] | [OpenIdConfig[]];
+  oidc_configs: [] | [DiscoverableOidcConfig[]];
+};
 
 export let canisterId: Principal;
 export let frontendCanisterConfig: InternetIdentityFrontendInit;

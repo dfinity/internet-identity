@@ -34,6 +34,8 @@ import {
   decodeJWT,
   extractIssuerTemplateClaims,
 } from "$lib/utils/openID";
+import { fetchDiscoveryDocument } from "$lib/utils/oidcDiscovery";
+import type { DiscoverableOidcConfig } from "$lib/globals";
 import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
@@ -236,6 +238,62 @@ export class AuthFlow {
       }
       throw error;
     }
+  };
+
+  continueWithOidc = async (
+    config: DiscoverableOidcConfig,
+  ): Promise<
+    | {
+        identityNumber: bigint;
+        type: "signIn";
+      }
+    | {
+        name?: string;
+        type: "signUp";
+      }
+  > => {
+    const clientId = config.client_id[0];
+    if (clientId === undefined) {
+      throw new Error("OIDC config is missing client_id");
+    }
+
+    // Fetch discovery document to get authorization_endpoint
+    const discovery = await fetchDiscoveryDocument(config.discovery_url);
+
+    // Determine scopes: use discovered scopes_supported if available,
+    // otherwise default to "openid profile email"
+    const authScope =
+      discovery.scopes_supported !== undefined &&
+      discovery.scopes_supported.length > 0
+        ? discovery.scopes_supported
+            .filter((s) =>
+              ["openid", "profile", "email"].includes(s),
+            )
+            .join(" ")
+        : "openid profile email";
+
+    // Build RequestConfig from static client_id + discovered endpoint
+    const requestConfig: RequestConfig = {
+      clientId,
+      authURL: discovery.authorization_endpoint,
+      authScope,
+    };
+
+    // Reuse the existing OpenId flow with the discovered config
+    // Build a synthetic OpenIdConfig-like object for the rest of the flow
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: config.logo,
+      name: config.name,
+      fedcm_uri: [],
+      email_verification: config.email_verification,
+      issuer: discovery.issuer,
+      auth_scope: authScope.split(" "),
+      client_id: clientId,
+    };
+
+    return this.continueWithOpenId(syntheticConfig);
   };
 
   completeOpenIdRegistration = async (name: string): Promise<bigint> => {
