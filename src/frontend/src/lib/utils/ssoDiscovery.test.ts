@@ -1,0 +1,332 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  validateDomain,
+  isDomainAllowed,
+  discoverSsoConfig,
+  clearSsoDiscoveryCache,
+} from "./ssoDiscovery";
+
+const DFINITY_II_CONFIG = {
+  client_id: "dfinity-sso-client-id",
+  openid_configuration:
+    "https://dfinity.okta.com/.well-known/openid-configuration",
+};
+
+const OKTA_DISCOVERY = {
+  issuer: "https://dfinity.okta.com",
+  authorization_endpoint: "https://dfinity.okta.com/oauth2/v1/authorize",
+  scopes_supported: ["openid", "profile", "email"],
+};
+
+describe("ssoDiscovery", () => {
+  beforeEach(() => {
+    clearSsoDiscoveryCache();
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    clearSsoDiscoveryCache();
+  });
+
+  describe("validateDomain", () => {
+    it("accepts valid domains", () => {
+      expect(validateDomain("dfinity.org")).toBe("dfinity.org");
+      expect(validateDomain("example.com")).toBe("example.com");
+      expect(validateDomain("sub.domain.co.uk")).toBe("sub.domain.co.uk");
+    });
+
+    it("trims whitespace and lowercases", () => {
+      expect(validateDomain("  DFINITY.ORG  ")).toBe("dfinity.org");
+    });
+
+    it("rejects empty strings", () => {
+      expect(() => validateDomain("")).toThrow("Domain cannot be empty");
+      expect(() => validateDomain("   ")).toThrow("Domain cannot be empty");
+    });
+
+    it("rejects domains without two labels", () => {
+      expect(() => validateDomain("localhost")).toThrow(
+        "Domain must have at least two labels",
+      );
+    });
+
+    it("rejects domains with invalid characters", () => {
+      expect(() => validateDomain("exam ple.com")).toThrow(
+        "Invalid domain format",
+      );
+      expect(() => validateDomain("exam_ple.com")).toThrow(
+        "Invalid domain format",
+      );
+      expect(() => validateDomain("example.com/path")).toThrow(
+        "Invalid domain format",
+      );
+    });
+
+    it("rejects domains exceeding max length", () => {
+      const longDomain = "a".repeat(250) + ".com";
+      expect(() => validateDomain(longDomain)).toThrow("Domain too long");
+    });
+
+    it("rejects labels exceeding max length", () => {
+      const longLabel = "a".repeat(64) + ".com";
+      expect(() => validateDomain(longLabel)).toThrow(
+        "Domain label too long",
+      );
+    });
+  });
+
+  describe("isDomainAllowed", () => {
+    it("allows dfinity.org", () => {
+      expect(isDomainAllowed("dfinity.org")).toBe(true);
+    });
+
+    it("rejects non-allowlisted domains", () => {
+      expect(isDomainAllowed("example.com")).toBe(false);
+      expect(isDomainAllowed("google.com")).toBe(false);
+    });
+  });
+
+  describe("discoverSsoConfig", () => {
+    it("rejects non-allowlisted domains before making network requests", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      await expect(discoverSsoConfig("example.com")).rejects.toThrow(
+        "Domain not allowed for SSO",
+      );
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("rejects invalid domain format", async () => {
+      await expect(discoverSsoConfig("not a domain")).rejects.toThrow(
+        "Invalid domain format",
+      );
+    });
+
+    it("performs two-hop discovery for dfinity.org", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(OKTA_DISCOVERY), { status: 200 }),
+        );
+
+      const result = await discoverSsoConfig("dfinity.org");
+
+      expect(result.clientId).toBe("dfinity-sso-client-id");
+      expect(result.discovery.issuer).toBe("https://dfinity.okta.com");
+      expect(result.discovery.authorization_endpoint).toBe(
+        "https://dfinity.okta.com/oauth2/v1/authorize",
+      );
+      expect(result.discovery.scopes_supported).toEqual([
+        "openid",
+        "profile",
+        "email",
+      ]);
+    });
+
+    it("caches successful results", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(OKTA_DISCOVERY), { status: 200 }),
+        );
+
+      const first = await discoverSsoConfig("dfinity.org");
+      const second = await discoverSsoConfig("dfinity.org");
+
+      expect(first).toEqual(second);
+      // Only 2 fetches for the first call (ii-config + provider discovery)
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it("rejects ii-openid-configuration missing client_id", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            openid_configuration:
+              "https://dfinity.okta.com/.well-known/openid-configuration",
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "ii-openid-configuration missing required field: client_id",
+      );
+    });
+
+    it("rejects ii-openid-configuration missing openid_configuration", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ client_id: "some-client-id" }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "ii-openid-configuration missing required field: openid_configuration",
+      );
+    });
+
+    it("rejects non-HTTPS openid_configuration URL", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            client_id: "some-client-id",
+            openid_configuration:
+              "http://dfinity.okta.com/.well-known/openid-configuration",
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider URL must use HTTPS",
+      );
+    });
+
+    it("rejects untrusted provider domains", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            client_id: "some-client-id",
+            openid_configuration:
+              "https://evil.example.com/.well-known/openid-configuration",
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider domain not trusted",
+      );
+    });
+
+    it("rejects provider discovery with missing issuer", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              authorization_endpoint:
+                "https://dfinity.okta.com/oauth2/v1/authorize",
+            }),
+            { status: 200 },
+          ),
+        );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider discovery missing required field: issuer",
+      );
+    });
+
+    it("rejects provider discovery with non-HTTPS issuer", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              ...OKTA_DISCOVERY,
+              issuer: "http://dfinity.okta.com",
+            }),
+            { status: 200 },
+          ),
+        );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider issuer must use HTTPS",
+      );
+    });
+
+    it("rejects provider discovery with non-HTTPS authorization_endpoint", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              ...OKTA_DISCOVERY,
+              authorization_endpoint:
+                "http://dfinity.okta.com/oauth2/v1/authorize",
+            }),
+            { status: 200 },
+          ),
+        );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider authorization endpoint must use HTTPS",
+      );
+    });
+
+    it("rejects provider discovery with issuer hostname mismatch", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              ...OKTA_DISCOVERY,
+              issuer: "https://evil.example.com",
+            }),
+            { status: 200 },
+          ),
+        );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider issuer hostname mismatch",
+      );
+    });
+
+    it("handles ii-openid-configuration fetch failure with retry", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response("Service Unavailable", { status: 503 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(OKTA_DISCOVERY), { status: 200 }),
+        );
+
+      const result = await discoverSsoConfig("dfinity.org");
+      expect(result.clientId).toBe("dfinity-sso-client-id");
+      // 1 failed + 1 successful ii-config + 1 provider discovery = 3
+      expect(fetchSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it("handles non-object ii-openid-configuration response", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(JSON.stringify("not an object"), { status: 200 }),
+      );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "ii-openid-configuration response is not a valid object",
+      );
+    });
+
+    it("handles non-object provider discovery response", async () => {
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(DFINITY_II_CONFIG), { status: 200 }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify("not an object"), { status: 200 }),
+        );
+
+      await expect(discoverSsoConfig("dfinity.org")).rejects.toThrow(
+        "Provider discovery document is not a valid object",
+      );
+    });
+  });
+});
