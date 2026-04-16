@@ -47,6 +47,7 @@ const FETCH_CERTS_INTERVAL_SECONDS: u64 = 60 * 15; // 15 minutes in seconds
 /// Re-fetch OIDC discovery documents every hour. Discovery metadata (issuer, jwks_uri)
 /// changes infrequently (typically only on provider-side reconfigurations), but hourly
 /// refresh keeps II responsive to such changes within a bounded window.
+#[cfg(not(test))]
 const FETCH_DISCOVERY_INTERVAL_SECONDS: u64 = 60 * 60; // 1 hour
 
 // A JWT is only valid for a very small window, even if the JWT itself says it's valid for longer,
@@ -329,8 +330,12 @@ impl OpenIdProvider for DiscoverableProvider {
 pub struct DiscoveryState {
     pub discovery_url: String,
     pub issuer_ref: Rc<RefCell<Option<String>>>,
+    /// Only read by the periodic discovery timer (non-test builds).
+    #[allow(dead_code)]
     pub certs_ref: Rc<RefCell<Vec<Jwk>>>,
     /// Tracks the last seen `jwks_uri` so cert fetching restarts when it changes.
+    /// Only read by the periodic discovery timer (non-test builds).
+    #[allow(dead_code)]
     pub last_jwks_uri: Rc<RefCell<Option<String>>>,
 }
 
@@ -408,6 +413,7 @@ async fn run_discovery_tasks() {
 
 /// Validates that the discovered `issuer` belongs to the same host as the `discovery_url`.
 /// Prevents a malicious discovery endpoint from impersonating another provider.
+#[cfg(not(test))]
 fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), String> {
     let discovery_host = url::Url::parse(discovery_url)
         .map_err(|e| format!("Invalid discovery URL: {e}"))?
@@ -463,6 +469,7 @@ async fn fetch_discovery(discovery_url: String) -> Result<DiscoveryDocument, Str
 
 /// Transform function for OIDC discovery responses.
 /// Re-serializes deterministically for consensus across subnet nodes.
+#[cfg(not(test))]
 #[allow(clippy::needless_pass_by_value)]
 fn transform_discovery(response: HttpResponse) -> HttpResponse {
     if response.status != HTTP_STATUS_OK {
@@ -497,6 +504,7 @@ fn transform_discovery(response: HttpResponse) -> HttpResponse {
 }
 
 /// OIDC discovery document — only the fields needed by the backend.
+#[cfg(not(test))]
 #[derive(serde::Deserialize, Clone)]
 struct DiscoveryDocument {
     issuer: String,
