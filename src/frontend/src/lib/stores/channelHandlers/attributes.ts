@@ -18,7 +18,6 @@ import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 
-
 /**
  * Resolves the config issuer string from the current authentication state.
  * Returns `undefined` if the user did not authenticate via OpenID.
