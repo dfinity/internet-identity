@@ -19,7 +19,7 @@
 
 <div class="flex min-h-[100dvh] flex-col items-center justify-center px-8">
   <div
-    transition:scale={{ duration: 500, easing: cubicOut, start: 0.9 }}
+    in:scale={{ duration: 500, easing: cubicOut, start: 0.9 }}
     class="flex flex-col items-center justify-center"
   >
     {#if dapp?.logoSrc !== undefined}
@@ -30,21 +30,21 @@
             class="stroke-fg-primary/10 fill-none stroke-2"
           />
           <g
-            transition:fade|global={{
+            in:fade|global={{
               duration: 500,
               easing: cubicOut,
               delay: 500,
             }}
           >
             <path
-              transition:draw|global={{
+              in:draw|global={{
                 duration: 6000,
                 easing: cubicOut,
                 delay: 500,
               }}
               d="M 46 1 H 71 A 20 20 0 0 1 91 21 V 71 A 20 20 0 0 1 71 91 H 21 A 20 20 0 0 1 1 71 V 21 A 20 20 0 0 1 21 1 H 46"
               stroke-linecap="round"
-              class="stroke-fg-primary fill-none stroke-2"
+              class="stroke-fg-primary breathe fill-none stroke-2"
             />
           </g>
         </svg>
@@ -64,14 +64,14 @@
           class="stroke-fg-primary/10 fill-none stroke-2"
         />
         <g
-          transition:fade|global={{
+          in:fade|global={{
             duration: 500,
             easing: cubicOut,
             delay: 500,
           }}
         >
           <circle
-            transition:draw|global={{
+            in:draw|global={{
               duration: 6000,
               easing: cubicOut,
               delay: 500,
@@ -80,7 +80,7 @@
             cy="46"
             r="45"
             stroke-linecap="round"
-            class="stroke-fg-primary origin-center -rotate-90 fill-none stroke-2"
+            class="stroke-fg-primary breathe origin-center -rotate-90 fill-none stroke-2"
           />
         </g>
       </svg>
@@ -116,3 +116,19 @@
     </Dialog>
   {/await}
 </div>
+
+<style>
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.15;
+    }
+  }
+
+  .breathe {
+    animation: breathe 3s ease-in-out 6.5s infinite;
+  }
+</style>
