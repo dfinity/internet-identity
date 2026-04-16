@@ -38,8 +38,9 @@ jobs:
           done < <(jq <src/frontend/src/flows/dappsExplorer/dapps.json -cMr '.[] | .logo' )
       - name: Commit type interfaces
         uses: EndBug/add-and-commit@v9
-        # We don't want to commit automatic changes to main
-        if: ${{ github.ref != 'refs/heads/main' }}
+        # We don't want to commit automatic changes to main, and we can't
+        # push to fork PRs (read-only token).
+        if: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
         with:
           add: |
             src/frontend/generated
