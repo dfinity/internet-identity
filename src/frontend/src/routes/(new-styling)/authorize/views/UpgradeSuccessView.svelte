@@ -1,10 +1,15 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
-  import { authorizationStore } from "$lib/stores/authorization.store";
   import MigrationSuccessIllustration from "$lib/components/illustrations/MigrationSuccessIllustration.svelte";
   import { onMount } from "svelte";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+
+  interface Props {
+    onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
+  }
+
+  const { onAuthorize }: Props = $props();
 
   const COUNTDOWN_SECONDS = 5;
   let countdown = $state(COUNTDOWN_SECONDS);
@@ -17,7 +22,7 @@
       return;
     }
     redirected = true;
-    authorizationStore.authorize(undefined);
+    onAuthorize(Promise.resolve(undefined));
   };
 
   onMount(() => {

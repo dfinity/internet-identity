@@ -1,43 +1,27 @@
 <script lang="ts">
-  import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import { goto } from "$app/navigation";
   import { establishedChannelStore } from "$lib/stores/channelStore";
-  import { toaster } from "$lib/components/utils/toaster";
   import AuthorizeHeader from "$lib/components/ui/AuthorizeHeader.svelte";
   import { getDapps } from "$lib/legacy/flows/dappsExplorer/dapps";
-  import { handleError } from "$lib/components/utils/error";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import { t } from "$lib/stores/locale.store";
   import { Trans } from "$lib/components/locale";
+
+  interface Props {
+    onSignIn: (identityNumber: bigint) => Promise<void>;
+    onSignUp: (identityNumber: bigint) => Promise<void>;
+    onUpgrade: (identityNumber: bigint) => Promise<void>;
+    onError: (error: unknown) => void;
+  }
+
+  const { onSignIn, onSignUp, onUpgrade, onError }: Props = $props();
 
   const dapps = getDapps();
   const dapp = $derived(
     dapps.find((dapp) => dapp.hasOrigin($establishedChannelStore.origin)),
   );
-
-  const handleSignIn = async (identityNumber: bigint) => {
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await goto("/authorize/continue");
-  };
-  const handleSignUp = async (identityNumber: bigint) => {
-    toaster.success({
-      title: $t`You're all set. Your identity has been created.`,
-      duration: 4000,
-    });
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await goto("/authorize/continue");
-  };
-  const handleUpgrade = async () => {
-    await goto("/authorize/upgrade-success");
-  };
 </script>
 
-<AuthWizard
-  onSignIn={handleSignIn}
-  onSignUp={handleSignUp}
-  onUpgrade={handleUpgrade}
-  onError={handleError}
->
+<AuthWizard {onSignIn} {onSignUp} {onUpgrade} {onError}>
   <AuthorizeHeader origin={$establishedChannelStore.origin} />
   <h1 class="text-text-primary mb-2 self-start text-2xl font-medium">
     {$t`Choose method`}

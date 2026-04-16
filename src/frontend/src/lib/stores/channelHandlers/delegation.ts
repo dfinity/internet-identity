@@ -70,11 +70,14 @@ export const handleDelegationRequest =
 
       // Authorization is the commit point — the user may switch identities
       // freely before this. Once authorized, the UI is no longer needed.
-      const { accountNumber } = await waitForStore(authorizedStore);
+      const authorized = await waitForStore(authorizedStore);
 
       // Read the identity *after* authorization so we capture whichever
       // identity the user settled on (they may have switched mid-flow).
-      const { identityNumber, actor } = await waitForStore(authenticationStore);
+      const [accountNumber, { identityNumber, actor }] = await Promise.all([
+        authorized.accountNumber,
+        waitForStore(authenticationStore),
+      ]);
 
       const sessionPublicKey = new Uint8Array(params.publicKey.toDer());
 

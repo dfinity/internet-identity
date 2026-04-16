@@ -1,9 +1,5 @@
 <script lang="ts">
   import { lastUsedIdentitiesStore } from "$lib/stores/last-used-identities.store";
-  import {
-    authorizationContextStore,
-    authorizationStore,
-  } from "$lib/stores/authorization.store";
   import { establishedChannelStore } from "$lib/stores/channelStore";
   import { HelpCircleIcon, PlusIcon, PencilIcon } from "@lucide/svelte";
   import { handleError } from "$lib/components/utils/error";
@@ -34,6 +30,13 @@
   import EditAccount from "$lib/components/views/EditAccount.svelte";
   import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
+
+  interface Props {
+    effectiveOrigin: string;
+    onAuthorize: (accountNumber: Promise<bigint | undefined>) => void;
+  }
+
+  const { effectiveOrigin, onAuthorize }: Props = $props();
 
   const PRIMARY_ACCOUNT_NUMBER = undefined;
   const MAX_ACCOUNTS = 5;
@@ -86,28 +89,23 @@
     defaultAccountNumber = null;
   });
 
-  const authorize = (accountNumber: bigint | undefined) => {
-    authorizationStore.authorize(accountNumber);
-  };
   const handleContinueDefault = async () => {
     try {
-      isAuthenticatingDefault = true;
       if (!$isAuthenticatedStore) {
+        isAuthenticatingDefault = true;
         await authLastUsedFlow.authenticate($lastUsedIdentitiesStore.selected!);
+        isAuthenticatingDefault = false;
       }
       const { identityNumber, actor } = $authenticationStore!;
-      const accountNumber =
+      const accountNumberPromise =
         defaultAccountNumber === null
-          ? await actor
-              .get_default_account(
-                identityNumber,
-                $authorizationContextStore.effectiveOrigin,
-              )
+          ? actor
+              .get_default_account(identityNumber, effectiveOrigin)
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
-          : defaultAccountNumber;
+          : Promise.resolve(defaultAccountNumber);
       void triggerDropWaveAnimation();
-      authorize(accountNumber);
+      onAuthorize(accountNumberPromise);
     } catch (error) {
       handleError(error);
     } finally {
@@ -117,7 +115,7 @@
   const handleContinueAs = (
     accountNumber: AccountNumber | typeof PRIMARY_ACCOUNT_NUMBER,
   ) => {
-    authorize(accountNumber);
+    onAuthorize(Promise.resolve(accountNumber));
   };
   const handleEnableMultipleAccounts = async () => {
     try {
@@ -127,16 +125,10 @@
       const { identityNumber, actor } = $authenticationStore!;
       const values = await Promise.all([
         actor
-          .get_accounts(
-            identityNumber,
-            $authorizationContextStore.effectiveOrigin,
-          )
+          .get_accounts(identityNumber, effectiveOrigin)
           .then(throwCanisterError),
         actor
-          .get_default_account(
-            identityNumber,
-            $authorizationContextStore.effectiveOrigin,
-          )
+          .get_default_account(identityNumber, effectiveOrigin)
           .then(throwCanisterError),
       ]);
       accounts = values[0].sort((a, b) => {
@@ -159,18 +151,14 @@
     try {
       const { identityNumber, actor } = $authenticationStore!;
       const createdAccount = await actor
-        .create_account(
-          identityNumber,
-          $authorizationContextStore.effectiveOrigin,
-          account.name,
-        )
+        .create_account(identityNumber, effectiveOrigin, account.name)
         .then(throwCanisterError);
       if (account.isDefaultSignIn) {
         defaultAccountNumber = (
           await actor
             .set_default_account(
               identityNumber,
-              $authorizationContextStore.effectiveOrigin,
+              effectiveOrigin,
               createdAccount.account_number,
             )
             .then(throwCanisterError)
@@ -201,7 +189,7 @@
         accounts[index] = await actor
           .update_account(
             identityNumber,
-            $authorizationContextStore.effectiveOrigin,
+            effectiveOrigin,
             accounts[index].account_number,
             { name: [account.name] },
           )
@@ -223,7 +211,7 @@
         accounts[index] = await actor
           .set_default_account(
             identityNumber,
-            $authorizationContextStore.effectiveOrigin,
+            effectiveOrigin,
             accounts[index].account_number,
           )
           .then(throwCanisterError);
@@ -244,7 +232,7 @@
     const { identityNumber } = $authenticationStore;
     lastUsedIdentitiesStore.syncLastUsedAccounts(
       identityNumber,
-      $authorizationContextStore.effectiveOrigin,
+      effectiveOrigin,
       accounts,
     );
   });
@@ -377,8 +365,8 @@
       {@render accountList(accounts)}
     {:else if isMultipleAccountsEnabled && $isAuthenticatedStore}
       <!-- Display the progress ring if loading accounts takes longer than usual.
-      
-           This may happen the first time a user enables multiple accounts, 
+
+           This may happen the first time a user enables multiple accounts,
            as authentication might require an update call in case OpenID is used. -->
       <div
         class="col-start-1 row-start-1 flex min-h-18 items-center justify-center pb-6"
