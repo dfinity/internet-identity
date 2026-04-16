@@ -13,7 +13,7 @@ jobs:
         with:
           # set a PAT so that add-and-commit can trigger
           # CI runs
-          token: ${{ secrets.GIX_BOT_PAT }}
+          token: ${{ secrets.GIX_BOT_PAT || github.token }}
       - uses: ./.github/actions/bootstrap
 
       - name: Cargo fmt
