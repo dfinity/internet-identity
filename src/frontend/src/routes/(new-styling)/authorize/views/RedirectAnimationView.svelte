@@ -91,6 +91,7 @@
     <a
       href={window.location.origin}
       target="_blank"
+      rel="noopener noreferrer"
       class="text-text-secondary flex flex-row items-center gap-2 text-base"
     >
       <span>{$t`Powered by`}</span>
