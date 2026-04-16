@@ -693,6 +693,7 @@ jobs:
   # This prepares all the files necessary for a release (all flavors of Wasm, release notes).
   # On release tags, a new release is created and the assets are uploaded.
   release:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs:
       [
