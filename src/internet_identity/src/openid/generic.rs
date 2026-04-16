@@ -335,7 +335,7 @@ pub struct DiscoveryState {
 }
 
 thread_local! {
-    static DISCOVERY_TASKS: RefCell<Vec<DiscoveryState>> = RefCell::new(vec![]);
+    static DISCOVERY_TASKS: RefCell<Vec<DiscoveryState>> = const { RefCell::new(vec![]) };
 }
 
 impl DiscoverableProvider {
@@ -465,7 +465,7 @@ async fn fetch_discovery(discovery_url: String) -> Result<DiscoveryDocument, Str
 /// Re-serializes deterministically for consensus across subnet nodes.
 #[allow(clippy::needless_pass_by_value)]
 fn transform_discovery(response: HttpResponse) -> HttpResponse {
-    if response.status != Nat::from(HTTP_STATUS_OK) {
+    if response.status != HTTP_STATUS_OK {
         return HttpResponse {
             status: response.status,
             headers: vec![],

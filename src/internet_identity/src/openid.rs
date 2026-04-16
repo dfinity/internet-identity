@@ -256,7 +256,7 @@ struct PartialClaims {
 
 thread_local! {
     static PROVIDERS: RefCell<Vec<Box<dyn OpenIdProvider >>> = RefCell::new(vec![]);
-    static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = RefCell::new(vec![]);
+    static OIDC_CONFIGS: RefCell<Vec<DiscoverableOidcConfig>> = const { RefCell::new(vec![]) };
 }
 
 pub fn setup(configs: Vec<OpenIdConfig>) {
