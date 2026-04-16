@@ -2,6 +2,7 @@ name: Frontend checks and lints
 
 on:
   push:
+  pull_request:
 
 jobs:
   frontend-checks:

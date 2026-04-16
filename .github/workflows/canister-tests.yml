@@ -5,6 +5,7 @@ name: Canister tests
 
 on:
   push:
+  pull_request:
 
 jobs:
   #####################
