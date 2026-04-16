@@ -14,7 +14,8 @@
     );
     if (openIdAuthorizeState !== null) {
       const next = new URL(window.location.href);
-      next.pathname = "/resume-openid-authorize";
+      next.pathname = "/authorize";
+      next.searchParams.set("flow", "openid-resume");
       await goto(next);
       return;
     }
