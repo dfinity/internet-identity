@@ -285,7 +285,9 @@
   </div>
 {/snippet}
 
-{#if $authorizedStore !== undefined}
+{#if data.flow === "openid-init"}
+  <!-- OpenID init — nothing to render, onMount redirects to provider. -->
+{:else if $authorizedStore !== undefined}
   <!-- User has authorized — show redirect animation while delegation completes. -->
   <RedirectAnimationView />
 {:else if data.flow === "openid-resume" && openIdResumeProcessing}
