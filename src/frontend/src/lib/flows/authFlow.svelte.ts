@@ -36,6 +36,7 @@ import {
 } from "$lib/utils/openID";
 import { fetchDiscoveryDocument } from "$lib/utils/oidcDiscovery";
 import type { DiscoverableOidcConfig } from "$lib/globals";
+import type { SsoDiscoveryResult } from "$lib/utils/ssoDiscovery";
 import { nanosToMillis } from "$lib/utils/time";
 
 interface AuthFlowOptions {
@@ -49,6 +50,7 @@ export class AuthFlow {
     | "setupOrUseExistingPasskey"
     | "setupNewPasskey"
     | "setupNewIdentity"
+    | "signInWithSso"
   >("chooseMethod");
   #captcha = $state<{
     image: string;
@@ -90,6 +92,49 @@ export class AuthFlow {
       AuthenticationV2Events.ContinueWithPasskeyScreen,
     );
     this.#view = "setupOrUseExistingPasskey";
+  };
+
+  signInWithSso = (): void => {
+    this.#view = "signInWithSso";
+  };
+
+  continueWithSso = async (
+    ssoResult: SsoDiscoveryResult,
+  ): Promise<
+    | {
+        identityNumber: bigint;
+        type: "signIn";
+      }
+    | {
+        name?: string;
+        type: "signUp";
+      }
+  > => {
+    const { clientId, discovery } = ssoResult;
+
+    // Determine scopes
+    const authScope =
+      discovery.scopes_supported !== undefined &&
+      discovery.scopes_supported.length > 0
+        ? discovery.scopes_supported
+            .filter((s) => ["openid", "profile", "email"].includes(s))
+            .join(" ")
+        : "openid profile email";
+
+    // Build a synthetic OpenIdConfig from SSO discovery result
+    const syntheticConfig: OpenIdConfig = {
+      auth_uri: discovery.authorization_endpoint,
+      jwks_uri: "",
+      logo: "",
+      name: "SSO",
+      fedcm_uri: [],
+      email_verification: [],
+      issuer: discovery.issuer,
+      auth_scope: authScope.split(" "),
+      client_id: clientId,
+    };
+
+    return this.continueWithOpenId(syntheticConfig);
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import PasskeyIcon from "$lib/components/icons/PasskeyIcon.svelte";
+  import SsoIcon from "$lib/components/icons/SsoIcon.svelte";
   import Alert from "$lib/components/ui/Alert.svelte";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
   import { backendCanisterConfig } from "$lib/globals";
@@ -16,10 +17,15 @@
     continueWithOidc: (
       config: DiscoverableOidcConfig,
     ) => Promise<void | "cancelled">;
+    signInWithSso: () => void;
   }
 
-  const { setupOrUseExistingPasskey, continueWithOpenId, continueWithOidc }:
-    Props = $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithOpenId,
+    continueWithOidc,
+    signInWithSso,
+  }: Props = $props();
 
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();
@@ -52,6 +58,8 @@
   const supportsPasskeys = window.PublicKeyCredential !== undefined;
   const openIdProviders = backendCanisterConfig.openid_configs?.[0] ?? [];
   const oidcProviders = backendCanisterConfig.oidc_configs?.[0] ?? [];
+  const hasSsoProviders =
+    oidcProviders.some((config) => config.client_id[0] === undefined);
 </script>
 
 <div class="flex flex-col items-stretch gap-5">
@@ -124,6 +132,17 @@
       <PasskeyIcon />
       {$t`Continue with passkey`}
     </Button>
+    {#if hasSsoProviders}
+      <Button
+        onclick={signInWithSso}
+        disabled={authenticatingProviderId !== undefined}
+        size="xl"
+        variant={"secondary"}
+      >
+        <SsoIcon />
+        {$t`Sign in with SSO`}
+      </Button>
+    {/if}
   </div>
   <div class="border-border-tertiary border-t"></div>
   <div class="flex flex-row items-center justify-between gap-4">
