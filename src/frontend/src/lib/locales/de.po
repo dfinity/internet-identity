@@ -1004,7 +1004,7 @@ msgid "Understanding Internet Identity"
 msgstr "Internet Identity verstehen"
 
 msgid "Undo"
-msgstr "Rückgängig"
+msgstr "Rückgängig machen"
 
 msgid "Unexpected error"
 msgstr "Unerwarteter Fehler"

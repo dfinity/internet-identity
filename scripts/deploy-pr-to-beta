@@ -161,7 +161,7 @@ fi
 # is resilient to changes in matrix keys/order or GitHub's display-name formatting.
 DEPLOYMENTS=()
 if [ "$DEPLOY_BACK" = true ]; then
-    DEPLOYMENTS+=("internet_identity_production.wasm.gz:$STAGING_CANISTER_ID:docker-build-internet_identity:internet_identity_production.wasm.gz")
+    DEPLOYMENTS+=("internet_identity_backend.wasm.gz:$STAGING_CANISTER_ID:docker-build-internet_identity:internet_identity_backend.wasm.gz")
 fi
 if [ "$DEPLOY_FRONT" = true ]; then
     DEPLOYMENTS+=("internet_identity_frontend.wasm.gz:$FRONTEND_CANISTER_ID:docker-build-internet_identity_frontend:docker-build-internet_identity_frontend")

@@ -178,7 +178,7 @@ function build_canister() {
           release="${version_parts[1]}"
           if [ -n "$release" ]
           then
-              asset_name="internet_identity_production.wasm.gz"
+              asset_name="internet_identity_backend.wasm.gz"
               wasm_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name"
               wasm_hash_url="https://github.com/dfinity/internet-identity/releases/download/$release/$asset_name.sha256"
 

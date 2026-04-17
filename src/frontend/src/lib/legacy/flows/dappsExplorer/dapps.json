@@ -84,12 +84,9 @@
   },
   {
     "name": "TAGGR",
-    "website": "https://taggr.link",
-    "authOrigins": [
-      "https://taggr.link",
-      "https://6qfxa-ryaaa-aaaai-qbhsq-cai.ic0.app"
-    ],
-    "logo": "taggr_logo.webp",
+    "website": "https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io",
+    "authOrigins": ["https://6qfxa-ryaaa-aaaai-qbhsq-cai.icp0.io"],
+    "logo": "taggr_logo.svg",
     "oneLiner": "Blending forums and blogs - controlled by a DAO"
   },
   {
