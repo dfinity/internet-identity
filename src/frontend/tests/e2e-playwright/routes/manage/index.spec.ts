@@ -2,6 +2,67 @@ import { expect } from "@playwright/test";
 import { test } from "../../fixtures";
 import { II_URL } from "../../utils";
 
+test.describe("Session re-authentication", () => {
+  test("Shows re-auth dialog after session timeout and re-authenticates", async ({
+    page,
+    identities,
+    signInWithIdentity,
+    managePage,
+  }) => {
+    // Install fake timers before navigating so we can fast-forward
+    await page.clock.install();
+    await page.goto(II_URL);
+    await signInWithIdentity(page, identities[0].identityNumber);
+    await managePage.assertVisible();
+
+    // Fast-forward 25 minutes to trigger the re-auth dialog
+    await page.clock.fastForward(25 * 60 * 1000);
+
+    // Re-auth dialog should appear
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("heading", { name: "Session timed out" }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByText("Sign in again to continue where you left off."),
+    ).toBeVisible();
+
+    // Click sign in to re-authenticate
+    await dialog.getByRole("button", { name: "Sign in" }).click();
+
+    // Dialog should close after successful re-auth
+    await expect(dialog).toBeHidden();
+
+    // User should still be on the manage page
+    await managePage.assertVisible();
+  });
+
+  test("Shows re-auth dialog and allows cancelling to sign out", async ({
+    page,
+    identities,
+    signInWithIdentity,
+    managePage,
+  }) => {
+    await page.clock.install();
+    await page.goto(II_URL);
+    await signInWithIdentity(page, identities[0].identityNumber);
+    await managePage.assertVisible();
+
+    // Fast-forward 25 minutes to trigger the re-auth dialog
+    await page.clock.fastForward(25 * 60 * 1000);
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Click cancel to sign out
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+
+    // Should redirect to home page
+    await page.waitForURL(II_URL);
+  });
+});
+
 test.describe("Dashboard Navigation", () => {
   test("User can register, sign in, access the dashboard and navigate to security page", async ({
     page,

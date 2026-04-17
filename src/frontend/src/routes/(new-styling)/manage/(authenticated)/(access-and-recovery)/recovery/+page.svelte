@@ -5,7 +5,10 @@
   import InactiveRecoveryPhrase from "./components/InactiveRecoveryPhrase.svelte";
   import { getMetadataString } from "$lib/utils/openID";
   import ActiveRecoveryPhrase from "./components/ActiveRecoveryPhrase.svelte";
-  import { authenticatedStore } from "$lib/stores/authentication.store";
+  import {
+    authenticationStore,
+    authenticatedStore,
+  } from "$lib/stores/authentication.store";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import { CreateRecoveryPhraseWizard } from "$lib/components/wizards/createRecoveryPhrase";
   import {
@@ -109,16 +112,28 @@
 
     // Update auth store if we just replaced the auth method currently in use
     if (isCurrentAccessMethod) {
-      const identity = await fromMnemonicWithoutValidation(
+      const seedIdentity = await fromMnemonicWithoutValidation(
         words.join(" "),
         IC_DERIVATION_PATH,
       );
-      await authenticateWithSession({
-        session: { identity },
+      const newIdentity = await authenticateWithSession({
+        session: { identity: seedIdentity },
         // 10 minutes to match session duration of recovery flow
         expiration: 10 * 60 * 1000,
       });
+      await authenticationStore.set({
+        identityNumber: $authenticatedStore.identityNumber,
+        identity: newIdentity,
+        authMethod: {
+          recoveryPhrase: {
+            principal: seedIdentity.getPrincipal(),
+          },
+        },
+      });
     }
+
+    // Cleanup locked identity since it's no longer needed
+    lockedRecoveryPhraseIdentity = undefined;
   };
   const handleCancel = () => {
     showRecoveryPhraseSetup = undefined;

@@ -64,7 +64,7 @@ lazy_static! {
         I will look for it at {:?}, and you can specify another path with the environment variable II_WASM_PREVIOUS (note that I run from {:?}).
 
         In order to get the Wasm module, please run the following command:
-            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_test.wasm.gz -o internet_identity_previous.wasm.gz
+            curl -SL https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_production.wasm.gz -o internet_identity_previous.wasm.gz
         ", &def_path, &std::env::current_dir().map(|x| x.display().to_string()).unwrap_or_else(|_| "an unknown directory".to_string()));
         get_wasm_path("II_WASM_PREVIOUS".to_string(), &def_path).expect(&err)
     };
@@ -167,7 +167,7 @@ pub fn env() -> PocketIc {
 }
 
 pub fn install_ii_canister(env: &PocketIc, wasm: Vec<u8>) -> CanisterId {
-    install_ii_canister_with_arg(env, wasm, None)
+    install_ii_canister_with_arg(env, wasm, arg_with_captcha_disabled())
 }
 
 pub fn install_ii_canister_with_arg(
@@ -203,6 +203,19 @@ pub fn install_ii_frontend_canister(
     canister_id
 }
 
+/// Returns a default init argument with captcha disabled.
+/// This is the base for most test init arguments since the production wasm
+/// has captcha enabled by default.
+pub fn arg_with_captcha_disabled() -> Option<InternetIdentityInit> {
+    Some(InternetIdentityInit {
+        captcha_config: Some(CaptchaConfig {
+            max_unsolved_captchas: 500,
+            captcha_trigger: CaptchaTrigger::Static(StaticCaptchaTrigger::CaptchaDisabled),
+        }),
+        ..InternetIdentityInit::default()
+    })
+}
+
 pub fn arg_with_wasm_hash(wasm: Vec<u8>) -> Option<InternetIdentityInit> {
     Some(InternetIdentityInit {
         archive_config: Some(ArchiveConfig {
@@ -231,19 +244,17 @@ pub fn arg_with_captcha_enabled() -> Option<InternetIdentityInit> {
 }
 
 pub fn arg_with_rate_limit(rate_limit: RateLimitConfig) -> Option<InternetIdentityInit> {
-    Some(InternetIdentityInit {
-        register_rate_limit: Some(rate_limit),
-        ..InternetIdentityInit::default()
-    })
+    let mut arg = arg_with_captcha_disabled().unwrap();
+    arg.register_rate_limit = Some(rate_limit);
+    Some(arg)
 }
 
 pub fn arg_with_anchor_range(
     anchor_range: (AnchorNumber, AnchorNumber),
 ) -> Option<InternetIdentityInit> {
-    Some(InternetIdentityInit {
-        assigned_user_number_range: Some(anchor_range),
-        ..InternetIdentityInit::default()
-    })
+    let mut arg = arg_with_captcha_disabled().unwrap();
+    arg.assigned_user_number_range = Some(anchor_range);
+    Some(arg)
 }
 
 pub fn arg_with_dynamic_captcha() -> Option<InternetIdentityInit> {
@@ -697,6 +708,30 @@ pub fn verify_attribute(
         root_key.to_vec(),
     )
     .expect("attribute signature invalid");
+}
+
+pub fn verify_icrc3_attributes(
+    env: &PocketIc,
+    user_key: UserKey,
+    message: &[u8],
+    signature: &[u8],
+    root_key: &[u8],
+) {
+    /// Signature domain for IC sender info as specified in the IC interface specification:
+    /// https://internetcomputer.org/docs/current/references/ic-interface-spec/#request-call-http-call
+    const ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN: &[u8] = b"ic-sender-info";
+
+    let mut msg: Vec<u8> = Vec::from([(ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN.len() as u8)]);
+    msg.extend_from_slice(ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN);
+    msg.extend_from_slice(message);
+
+    env.verify_canister_signature(
+        msg,
+        signature.to_vec(),
+        user_key.into_vec(),
+        root_key.to_vec(),
+    )
+    .expect("ICRC-3 attribute signature invalid");
 }
 
 pub fn verify_id_alias_credential_via_env(

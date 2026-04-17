@@ -50,18 +50,21 @@
   let isManageIdentitiesDialogOpen = $state(false);
 
   const handleSignIn = async (identityNumber: bigint) => {
-    isAuthenticating = true;
-    if ($authenticationStore?.identityNumber !== identityNumber) {
-      // Sign in if not authenticated with this identity yet
-      sessionStore.reset();
-      await authLastUsedFlow.authenticate(
-        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
-      );
+    try {
+      isAuthenticating = true;
+      if ($authenticationStore?.identityNumber !== identityNumber) {
+        // Sign in if not authenticated with this identity yet
+        sessionStore.reset();
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+        );
+      }
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
+    } finally {
+      isIdentityPopoverOpen = false;
+      isAuthDialogOpen = false;
+      isAuthenticating = false;
     }
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    isIdentityPopoverOpen = false;
-    isAuthDialogOpen = false;
-    isAuthenticating = false;
   };
   const handleSignUp = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);

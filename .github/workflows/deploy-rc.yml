@@ -23,11 +23,11 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Find all artifacts for the production build, and filter for non-expired main artifacts
+            // Find all artifacts for the backend build, and filter for non-expired main artifacts
             const allArtifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
               owner: context.repo.owner,
               repo: context.repo.repo,
-              name: "internet_identity_production.wasm.gz",
+              name: "internet_identity_backend.wasm.gz",
             });
             const artifactsByBranch = {};
             const mainArtifacts = allArtifacts
@@ -56,7 +56,7 @@ jobs:
             await exec.exec('rm', ["artifact.zip" ]);
 
       - name: "Print shasum of found build"
-        run: shasum -a 256 ./internet_identity_production.wasm.gz
+        run: shasum -a 256 ./internet_identity_backend.wasm.gz
 
       - uses: dfinity/setup-dfx@e50c04f104ee4285ec010f10609483cf41e4d365
 
@@ -75,7 +75,7 @@ jobs:
           # Needed to surpass dfx error to use the insecure plaintext identity
           export DFX_WARNING=-mainnet_plaintext_identity
           dfx canister --network ic --wallet "$wallet" install --mode upgrade \
-            --wasm internet_identity_production.wasm.gz \
+            --wasm internet_identity_backend.wasm.gz \
             ${{ env.ii_canister_id }}
 
       - name: Send RC link to slack

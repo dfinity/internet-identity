@@ -1,14 +1,24 @@
 name: PR Review Requested
 
 on:
-  pull_request:
+  pull_request_target:
     types: [review_requested]
+
+permissions:
+  contents: read
 
 jobs:
   notify-slack:
+    if: >-
+      github.event.pull_request.author_association == 'MEMBER' ||
+      github.event.pull_request.author_association == 'OWNER' ||
+      github.event.pull_request.author_association == 'COLLABORATOR'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
       - name: Send Slack notification on PR review requested
         if: github.event.requested_reviewer.login == 'danblackadder' || github.event.requested_reviewer.login == 'aterga' || github.event.requested_reviewer.login == 'sea-snake' || github.event.requested_reviewer.login == 'lmuntaner'
         uses: ./.github/actions/slack

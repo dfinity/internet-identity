@@ -3,7 +3,6 @@ import { test } from "../../fixtures";
 import {
   authorize,
   authorizeWithUrl,
-  TEST_APP_URL,
   TEST_APP_CANONICAL_URL,
   II_URL,
   addVirtualAuthenticator,
@@ -69,6 +68,29 @@ test.describe("multiple identities", () => {
     expect(principal).not.toBe(otherPrincipal);
   });
 
+  test("Multiple accounts state resets when switching identity", async ({
+    page,
+    identities,
+    signInWithIdentity,
+  }) => {
+    await authorize(page, async (authPage) => {
+      // Sign in with identity 0 and enable multiple accounts
+      await signInWithIdentity(authPage, identities[0].identityNumber);
+      await authPage
+        .getByRole("switch", { name: "Enable multiple accounts" })
+        .setChecked(true);
+
+      // Switch to identity 1 and verify toggle is reset
+      await signInWithIdentity(authPage, identities[1].identityNumber);
+      await expect(
+        authPage.getByRole("switch", { name: "Enable multiple accounts" }),
+      ).not.toBeChecked();
+      await authPage
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+    });
+  });
+
   test("Authorize by signing in with a different passkey", async ({
     page,
     identities,
@@ -128,20 +150,6 @@ test("Authorize by creating a new identity", async ({
       .click();
   });
   expect(newIdentityPrincipal).not.toBe(initialPrincipal);
-});
-
-test("App logo appears when app is known", async ({
-  page,
-  identities,
-  signInWithIdentity,
-}) => {
-  await authorizeWithUrl(page, TEST_APP_URL, II_URL, async (authPage) => {
-    await signInWithIdentity(authPage, identities[0].identityNumber);
-    await expect(authPage.locator('img[alt*="logo"]')).toBeVisible();
-    await authPage
-      .getByRole("button", { name: "Continue", exact: true })
-      .click();
-  });
 });
 
 test("App logo doesn't appear when app is not known", async ({

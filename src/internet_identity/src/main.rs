@@ -17,8 +17,13 @@ use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use internet_identity_interface::archive::types::{BufferedEntry, Operation};
 use internet_identity_interface::http_gateway::{HttpRequest, HttpResponse};
 use internet_identity_interface::internet_identity::types::attributes::{
-    CertifiedAttributes, GetAttributesError, GetAttributesRequest, PrepareAttributeError,
-    PrepareAttributeRequest, PrepareAttributeResponse, ValidatedPrepareAttributeRequest,
+    CertifiedAttributes, GetAttributesError, GetAttributesRequest, GetIcrc3AttributeError,
+    GetIcrc3AttributeRequest, GetIcrc3AttributeResponse, ListAvailableAttributesError,
+    ListAvailableAttributesRequest, PrepareAttributeError, PrepareAttributeRequest,
+    PrepareAttributeResponse, PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
+    PrepareIcrc3AttributeResponse, ValidatedGetIcrc3AttributeRequest,
+    ValidatedListAvailableAttributesRequest, ValidatedPrepareAttributeRequest,
+    ValidatedPrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::openid::{
     OpenIdCredentialAddError, OpenIdCredentialRemoveError, OpenIdDelegationError,
@@ -1321,6 +1326,82 @@ mod attribute_sharing {
             anchor.get_attributes(attributes, account, issued_at_timestamp_ns);
 
         Ok(certified_attributes)
+    }
+
+    #[update]
+    async fn prepare_icrc3_attributes(
+        request: PrepareIcrc3AttributeRequest,
+    ) -> Result<PrepareIcrc3AttributeResponse, PrepareIcrc3AttributeError> {
+        let ValidatedPrepareIcrc3AttributeRequest {
+            identity_number,
+            origin,
+            account_number,
+            attributes,
+            nonce,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                PrepareIcrc3AttributeError::AuthorizationError(principal)
+            })?;
+
+        let account =
+            get_account_for_origin(anchor.anchor_number(), origin.clone(), account_number)
+                .map_err(PrepareIcrc3AttributeError::GetAccountError)?;
+
+        state::ensure_salt_set().await;
+
+        let issued_at_timestamp_ns = ic_cdk::api::time();
+        let message = anchor.prepare_icrc3_attributes(
+            attributes,
+            nonce,
+            origin,
+            issued_at_timestamp_ns,
+            account,
+        )?;
+
+        Ok(PrepareIcrc3AttributeResponse { message })
+    }
+
+    #[query]
+    fn get_icrc3_attributes(
+        request: GetIcrc3AttributeRequest,
+    ) -> Result<GetIcrc3AttributeResponse, GetIcrc3AttributeError> {
+        let ValidatedGetIcrc3AttributeRequest {
+            identity_number,
+            origin,
+            account_number,
+            message,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                GetIcrc3AttributeError::AuthorizationError(principal)
+            })?;
+
+        let account = get_account_for_origin(anchor.anchor_number(), origin, account_number)
+            .map_err(GetIcrc3AttributeError::GetAccountError)?;
+
+        let response = anchor.get_icrc3_attributes(account, &message)?;
+
+        Ok(response)
+    }
+
+    #[query]
+    fn list_available_attributes(
+        request: ListAvailableAttributesRequest,
+    ) -> Result<Vec<(String, Vec<u8>)>, ListAvailableAttributesError> {
+        let ValidatedListAvailableAttributesRequest {
+            identity_number,
+            attributes,
+        } = request.try_into()?;
+
+        let (anchor, _) =
+            check_authorization(identity_number).map_err(|AuthorizationError { principal }| {
+                ListAvailableAttributesError::AuthorizationError(principal)
+            })?;
+
+        Ok(anchor.list_available_attributes(attributes))
     }
 }
 

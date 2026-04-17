@@ -23,7 +23,7 @@ msgid "{application} has moved to the new Internet Identity"
 msgstr "{application} est passé à la nouvelle Internet Identity"
 
 msgid "{identityName} has been removed from this device."
-msgstr ""
+msgstr "{identityName} a été supprimée de cet appareil."
 
 msgid "{MAX_ACCOUNTS, plural, one {You have reached the maximum of # account for a single app.} other {You have reached the maximum of # accounts for a single app.}}"
 msgstr "{MAX_ACCOUNTS, plural, one {Vous avez atteint le maximum de # compte pour une seule application.} other {Vous avez atteint le maximum de # comptes pour une seule application.}}"
@@ -38,7 +38,7 @@ msgid "<0>Completely Redesigned Interface:</0> We've given Internet Identity a f
 msgstr "<0>Interface entièrement repensée :</0> Nous avons donné à Internet Identity une apparence moderne et renouvelée. Le nouveau design est intuitif et plus facile à parcourir, garantissant une expérience utilisateur plus fluide."
 
 msgid "<0>Google, Apple and Microsoft Integrations:</0> While passkeys are becoming more mature, they are not yet mainstream for everyone. We've observed a 50% drop-off rate in our registration flow, indicating a need for alternative authentication methods. To make Internet Identity accessible to an even wider audience, we've integrated with Google, Apple and Microsoft as alternative authentication options."
-msgstr "<0>Intégrations Google, Apple et Microsoft :</0> Bien que les passkeys deviennent de plus en plus courantes, elles n'ont pas encore été adoptées par tout le monde. Nous avons observé une baisse de 50 % du taux d’inscription, ce qui indique la nécessité de mettre en place d'autres méthodes d’authentification. Afin de rendre Internet Identity accessible à un public encore plus large, nous avons intégré Google, Apple et Microsoft comme options d’authentification supplémentaires."
+msgstr "<0>Intégrations Google, Apple et Microsoft :</0> Bien que les passkeys deviennent de plus en plus courantes, elles n’ont pas encore été adoptées par tout le monde. Nous avons observé une baisse de 50 % du taux d’inscription, ce qui indique la nécessité de mettre en place d’autres méthodes d’authentification. Afin de rendre Internet Identity accessible à un public encore plus large, nous avons intégré Google, Apple et Microsoft comme options d’authentification supplémentaires."
 
 msgid "<0>Learn more</0> about passkeys"
 msgstr "<0>En savoir plus</0> sur les passkeys"
@@ -47,7 +47,7 @@ msgid "<0>Never</0> enter a code from another source."
 msgstr "<0>Ne saisissez jamais</0> un code provenant d’une autre source."
 
 msgid "<0>No More Identity Numbers:</0> As explained above, discoverable passkeys mean you no longer need to remember or store an identity number. Logging in is now simpler and more streamlined."
-msgstr "<0>Plus besoin de numéro d’identité :</0> Comme expliqué ci-dessus, grâce aux passkeys découvrables, vous n'avez plus besoin de mémoriser ou de stocker un numéro d’identité. La connexion est désormais plus simple et plus fluide."
+msgstr "<0>Plus besoin de numéro d’identité :</0> Comme expliqué ci-dessus, grâce aux passkeys découvrables, vous n’avez plus besoin de mémoriser ou de stocker un numéro d’identité. La connexion est désormais plus simple et plus fluide."
 
 msgid "<0>Seamless Passkey Integration:</0> We continue to embrace passkeys as the future of secure authentication. Internet Identity 2.0 leverages the latest passkey standards for enhanced security and ease of use."
 msgstr "<0>Intégration transparente des passkeys :</0> Nous continuons à considérer les passkeys comme l’avenir de l’authentification sécurisée. Internet Identity 2.0 utilise les dernières normes en matière de passkeys pour offrir une sécurité renforcée et une utilisation simplifiée."
@@ -269,7 +269,7 @@ msgid "Easy access"
 msgstr "Accès facile"
 
 msgid "Edit"
-msgstr ""
+msgstr "Modifier"
 
 msgid "Edit {name}"
 msgstr "Modifier {name}"
@@ -384,7 +384,7 @@ msgid "I have written it down"
 msgstr "Je l’ai notée"
 
 msgid "Identities on this device"
-msgstr ""
+msgstr "Identités sur cet appareil"
 
 msgid "Identity already upgraded"
 msgstr "Identité déjà mise à niveau"
@@ -405,7 +405,7 @@ msgid "Identity number"
 msgstr "Numéro d’identité"
 
 msgid "Identity removed"
-msgstr ""
+msgstr "Identité supprimée"
 
 msgid "Identity upgraded!"
 msgstr "Identité mise à niveau !"
@@ -714,10 +714,10 @@ msgid "Remove"
 msgstr "Supprimer"
 
 msgid "Remove from this device"
-msgstr ""
+msgstr "Supprimer de cet appareil"
 
 msgid "Remove identities you don't use. You can add them back anytime by signing in again."
-msgstr ""
+msgstr "Supprimez les identités que vous n’utilisez pas. Vous pouvez les rajouter à tout moment en vous reconnectant."
 
 msgid "Remove passkey"
 msgstr "Supprimer la passkey"
@@ -797,6 +797,9 @@ msgstr "Sélectionnez <0>Ouvrir dans Safari</0> ou <1>Ouvrir dans Chrome</1>."
 msgid "Select each word in the correct order:"
 msgstr "Sélectionnez chaque mot dans le bon ordre :"
 
+msgid "Session timed out"
+msgstr "Session expirée"
+
 msgid "Set as default sign-in"
 msgstr "Définir comme connexion par défaut"
 
@@ -805,6 +808,9 @@ msgstr "Tout afficher"
 
 msgid "Sign in"
 msgstr "Se connecter"
+
+msgid "Sign in again to continue where you left off."
+msgstr "Reconnectez-vous pour reprendre là où vous vous étiez arrêté."
 
 msgid "Sign in there."
 msgstr "Se connecter ici."
@@ -822,22 +828,25 @@ msgid "Sign out"
 msgstr "Se déconnecter"
 
 msgid "Sign out and keep identity"
-msgstr ""
+msgstr "Se déconnecter et conserver l’identité"
 
 msgid "Sign out and remove from device"
-msgstr ""
+msgstr "Se déconnecter et supprimer de l’appareil"
 
 msgid "Sign out from this device"
-msgstr ""
+msgstr "Se déconnecter de cet appareil"
 
 msgid "Sign out to remove"
-msgstr ""
+msgstr "Se déconnecter pour supprimer"
 
 msgid "Signed in"
-msgstr ""
+msgstr "Connecté"
 
 msgid "Signing in securely"
 msgstr "Connexion sécurisée"
+
+msgid "Signing in..."
+msgstr "Connexion..."
 
 msgid "Simplify your sign-in"
 msgstr "Simplifiez votre connexion"
@@ -995,7 +1004,7 @@ msgid "Understanding Internet Identity"
 msgstr "Comprendre Internet Identity"
 
 msgid "Undo"
-msgstr ""
+msgstr "Annuler"
 
 msgid "Unexpected error"
 msgstr "Erreur inattendue"
@@ -1139,16 +1148,16 @@ msgid "You are upgrading ID <0>{identityNumber}</0>"
 msgstr "Vous mettez à niveau l’ID <0>{identityNumber}</0>"
 
 msgid "You can add it back anytime by signing in with the same {openIdProvider} account."
-msgstr ""
+msgstr "Vous pouvez la rajouter à tout moment en vous reconnectant avec le même compte {openIdProvider}."
 
 msgid "You can add it back anytime by signing in with the same passkey."
-msgstr ""
+msgstr "Vous pouvez la rajouter à tout moment en vous reconnectant avec la même passkey."
 
 msgid "You can continue with <0>Use existing Passkey</0> in the login process."
 msgstr "Vous pouvez continuer avec <0>Utiliser une passkey existante</0> dans le processus de connexion."
 
 msgid "You can either sign out and keep your identity saved for a faster login next time, or remove it entirely from this device."
-msgstr ""
+msgstr "Vous pouvez soit vous déconnecter et conserver votre identité enregistrée pour une connexion plus rapide la prochaine fois, soit la supprimer entièrement de cet appareil."
 
 msgid "You can recover your identity now, verify you saved it correctly."
 msgstr "Vous pouvez maintenant récupérer votre identité, vérifiez que vous l’avez correctement enregistrée."

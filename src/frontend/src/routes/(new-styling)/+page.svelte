@@ -63,20 +63,23 @@
   const selectedIdentity = $derived($lastUsedIdentitiesStore.selected);
 
   const handleSignIn = async (identityNumber: bigint) => {
-    isAuthenticating = true;
-    if ($authenticationStore?.identityNumber !== identityNumber) {
-      // Switch sign in if not authenticated with this identity yet
-      sessionStore.reset();
-      await authLastUsedFlow.authenticate(
-        $lastUsedIdentitiesStore.identities[`${identityNumber}`],
-      );
+    try {
+      isAuthenticating = true;
+      if ($authenticationStore?.identityNumber !== identityNumber) {
+        // Switch sign in if not authenticated with this identity yet
+        sessionStore.reset();
+        await authLastUsedFlow.authenticate(
+          $lastUsedIdentitiesStore.identities[`${identityNumber}`],
+        );
+      }
+      lastUsedIdentitiesStore.selectIdentity(identityNumber);
+      await preloadData(next);
+      await goto(next, { replaceState: true });
+    } finally {
+      isIdentityPopoverOpen = false;
+      isAuthDialogOpen = false;
+      isAuthenticating = false;
     }
-    lastUsedIdentitiesStore.selectIdentity(identityNumber);
-    await preloadData(next);
-    await goto(next, { replaceState: true });
-    isIdentityPopoverOpen = false;
-    isAuthDialogOpen = false;
-    isAuthenticating = false;
   };
   const handleUpgrade = async (identityNumber: bigint) => {
     await handleSignIn(identityNumber);
