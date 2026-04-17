@@ -202,7 +202,12 @@ fn create_openid_credential_and_config(
     let OpenIDRegFinishArg { jwt, salt, name: _ } = openid_registration_data;
 
     let (openid_credential, openid_config_iss) = openid::with_provider(jwt, |provider| {
-        Ok((provider.verify(jwt, salt)?, provider.issuer()))
+        // `with_provider` already skipped providers with pending discovery, so
+        // `provider.issuer()` is guaranteed to be Some here.
+        Ok((
+            provider.verify(jwt, salt)?,
+            provider.issuer().unwrap_or_default(),
+        ))
     })?;
 
     Ok((openid_credential, openid_config_iss))

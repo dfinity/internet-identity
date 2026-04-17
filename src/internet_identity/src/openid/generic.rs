@@ -116,8 +116,12 @@ pub struct Provider {
 }
 
 impl OpenIdProvider for Provider {
-    fn issuer(&self) -> String {
-        self.issuer.clone()
+    fn issuer(&self) -> Option<String> {
+        Some(self.issuer.clone())
+    }
+
+    fn client_id(&self) -> Option<String> {
+        Some(self.client_id.clone())
     }
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
@@ -142,7 +146,7 @@ impl OpenIdProvider for Provider {
         })?;
 
         // Calculate effective issuer and use it to verify the JWT claims
-        let issuer_placeholders = get_issuer_placeholders(&self.issuer());
+        let issuer_placeholders = get_issuer_placeholders(&self.issuer);
         let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
         let effective_issuer = replace_issuer_placeholders(&self.issuer, &issuer_claims);
         verify_claims(&effective_issuer, &self.client_id, &claims, salt)?;
@@ -224,25 +228,39 @@ impl Provider {
     }
 }
 
-/// OIDC provider that discovers its configuration from a discovery URL.
-/// Used with the new `OidcConfig` type.
+/// CANARY: SSO via two-hop discovery is a proof-of-concept. Only this domain is
+/// accepted as a `discovery_domain` for now. Widen this list (or move it to
+/// canister config) once the feature exits canary.
+pub const ALLOWED_DISCOVERY_DOMAINS: &[&str] = &["dfinity.org"];
+
+pub fn is_allowed_discovery_domain(domain: &str) -> bool {
+    ALLOWED_DISCOVERY_DOMAINS
+        .iter()
+        .any(|allowed| allowed.eq_ignore_ascii_case(domain))
+}
+
+/// SSO provider that resolves its configuration via two-hop discovery.
+/// Used with the `DiscoverableOidcConfig` type.
 pub struct DiscoverableProvider {
-    client_id: Option<String>,
+    discovered_client_id: Rc<RefCell<Option<String>>>,
     discovered_issuer: Rc<RefCell<Option<String>>>,
     certs: Rc<RefCell<Vec<Jwk>>>,
-    email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
 impl OpenIdProvider for DiscoverableProvider {
-    fn issuer(&self) -> String {
-        self.discovered_issuer
-            .borrow()
-            .clone()
-            .unwrap_or_default()
+    fn issuer(&self) -> Option<String> {
+        self.discovered_issuer.borrow().clone()
+    }
+
+    fn client_id(&self) -> Option<String> {
+        self.discovered_client_id.borrow().clone()
     }
 
     fn email_verification_scheme(&self) -> Option<OpenIdEmailVerificationScheme> {
-        self.email_verification
+        // SSO providers don't opt into II's hardcoded provider-specific email
+        // verification heuristics (Google `email_verified`, Microsoft `tid`).
+        // Verification is a trust decision made when the SSO domain is configured.
+        None
     }
 
     fn verify(
@@ -250,18 +268,14 @@ impl OpenIdProvider for DiscoverableProvider {
         jwt: &str,
         salt: &[u8; 32],
     ) -> Result<OpenIdCredential, OpenIDJWTVerificationError> {
-        let issuer = self
-            .discovered_issuer
-            .borrow()
-            .clone()
-            .ok_or_else(|| {
-                OpenIDJWTVerificationError::GenericError(
-                    "Provider not yet initialized (discovery pending)".to_string(),
-                )
-            })?;
-        let client_id = self.client_id.as_ref().ok_or_else(|| {
+        let issuer = self.discovered_issuer.borrow().clone().ok_or_else(|| {
             OpenIDJWTVerificationError::GenericError(
-                "Provider client_id not yet available".to_string(),
+                "Provider not yet initialized (discovery pending)".to_string(),
+            )
+        })?;
+        let client_id = self.discovered_client_id.borrow().clone().ok_or_else(|| {
+            OpenIDJWTVerificationError::GenericError(
+                "Provider client_id not yet available (discovery pending)".to_string(),
             )
         })?;
 
@@ -271,15 +285,14 @@ impl OpenIdProvider for DiscoverableProvider {
             .map_err(|_| {
                 OpenIDJWTVerificationError::GenericError("Unable to decode JWT".to_string())
             })?;
-        let claims: Claims =
-            serde_json::from_slice(validation_item.claims()).map_err(|_| {
-                OpenIDJWTVerificationError::GenericError(
-                    "Unable to decode claims or expected claims are missing".to_string(),
-                )
-            })?;
+        let claims: Claims = serde_json::from_slice(validation_item.claims()).map_err(|_| {
+            OpenIDJWTVerificationError::GenericError(
+                "Unable to decode claims or expected claims are missing".to_string(),
+            )
+        })?;
 
         // Verify claims against discovered issuer
-        verify_claims(&issuer, client_id, &claims, salt)?;
+        verify_claims(&issuer, &client_id, &claims, salt)?;
 
         // Verify JWT signature
         let kid = validation_item
@@ -324,11 +337,13 @@ impl OpenIdProvider for DiscoverableProvider {
     }
 }
 
-/// Shared state for a discovery task, used to communicate results
-/// between the periodic timer and the `DiscoverableProvider`.
+/// Shared state for a single discovery task, exchanged between the periodic
+/// timer and the owning `DiscoverableProvider`.
 #[derive(Clone)]
 pub struct DiscoveryState {
-    pub discovery_url: String,
+    pub discovery_domain: String,
+    pub client_id_ref: Rc<RefCell<Option<String>>>,
+    pub openid_configuration_ref: Rc<RefCell<Option<String>>>,
     pub issuer_ref: Rc<RefCell<Option<String>>>,
     /// Only read by the periodic discovery timer (non-test builds).
     #[allow(dead_code)]
@@ -339,6 +354,10 @@ pub struct DiscoveryState {
     pub last_jwks_uri: Rc<RefCell<Option<String>>>,
 }
 
+// TODO: `DISCOVERY_TASKS` is unbounded — a long `ALLOWED_DISCOVERY_DOMAINS` list
+// or many admin-configured SSO providers would fan out into many periodic HTTP
+// outcalls. Revisit once the canary allowlist is lifted. See reviewer comment on
+// https://github.com/dfinity/internet-identity/pull/3778#discussion_r3099150266.
 thread_local! {
     static DISCOVERY_TASKS: RefCell<Vec<DiscoveryState>> = const { RefCell::new(vec![]) };
 }
@@ -347,10 +366,14 @@ impl DiscoverableProvider {
     pub fn create(config: DiscoverableOidcConfig) -> DiscoverableProvider {
         let certs: Rc<RefCell<Vec<Jwk>>> = Rc::new(RefCell::new(vec![]));
         let discovered_issuer: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let discovered_client_id: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+        let openid_configuration: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 
         DISCOVERY_TASKS.with_borrow_mut(|tasks| {
             tasks.push(DiscoveryState {
-                discovery_url: config.discovery_url.clone(),
+                discovery_domain: config.discovery_domain.clone(),
+                client_id_ref: Rc::clone(&discovered_client_id),
+                openid_configuration_ref: Rc::clone(&openid_configuration),
                 issuer_ref: Rc::clone(&discovered_issuer),
                 certs_ref: Rc::clone(&certs),
                 last_jwks_uri: Rc::new(RefCell::new(None)),
@@ -358,10 +381,9 @@ impl DiscoverableProvider {
         });
 
         DiscoverableProvider {
-            client_id: config.client_id.clone(),
+            discovered_client_id,
             discovered_issuer,
             certs,
-            email_verification: config.email_verification,
         }
     }
 }
@@ -386,39 +408,76 @@ pub fn init_discovery_timers() {
 
 #[cfg(not(test))]
 async fn run_discovery_tasks() {
-    let tasks: Vec<DiscoveryState> =
-        DISCOVERY_TASKS.with_borrow(|tasks| tasks.clone());
+    let tasks: Vec<DiscoveryState> = DISCOVERY_TASKS.with_borrow(|tasks| tasks.clone());
 
     for task in tasks {
-        let result = fetch_discovery(task.discovery_url.clone()).await;
-        if let Ok(doc) = result {
-            if let Err(err) = validate_issuer_domain(&task.discovery_url, &doc.issuer) {
-                ic_cdk::println!("Discovery issuer validation failed: {err}");
+        // Hop 1: fetch https://{domain}/.well-known/ii-openid-configuration,
+        // which is expected to return { client_id, openid_configuration }.
+        let hop1_url = format!(
+            "https://{}/.well-known/ii-openid-configuration",
+            task.discovery_domain
+        );
+        let ii_config = match fetch_ii_openid_configuration(hop1_url.clone()).await {
+            Ok(c) => c,
+            Err(err) => {
+                ic_cdk::println!("II OpenID configuration fetch failed for {hop1_url}: {err}");
                 continue;
             }
-            task.issuer_ref.replace(Some(doc.issuer));
+        };
+        if !ii_config.openid_configuration.starts_with("https://") {
+            ic_cdk::println!(
+                "II OpenID configuration from {hop1_url} has non-https openid_configuration URL"
+            );
+            continue;
+        }
 
-            // Start or restart cert fetching when jwks_uri changes
-            let jwks_changed = {
-                let last = task.last_jwks_uri.borrow();
-                last.as_deref() != Some(&doc.jwks_uri)
-            };
-            if jwks_changed {
-                task.last_jwks_uri.replace(Some(doc.jwks_uri.clone()));
-                schedule_fetch_certs(doc.jwks_uri, Rc::clone(&task.certs_ref), Some(0));
+        // Hop 2: fetch the standard OIDC discovery document at openid_configuration.
+        let doc = match fetch_discovery(ii_config.openid_configuration.clone()).await {
+            Ok(d) => d,
+            Err(err) => {
+                ic_cdk::println!(
+                    "OIDC discovery fetch failed for {}: {err}",
+                    ii_config.openid_configuration
+                );
+                continue;
             }
+        };
+
+        // Verify that the discovered issuer's host matches the openid_configuration URL host.
+        // This is the standard OIDC-discovery self-assertion check and defends against a
+        // compromised hop-1 response that declares an unrelated issuer for its jwks_uri.
+        if let Err(err) = validate_issuer_host(&ii_config.openid_configuration, &doc.issuer) {
+            ic_cdk::println!("Discovery issuer validation failed: {err}");
+            continue;
+        }
+
+        task.client_id_ref.replace(Some(ii_config.client_id));
+        task.openid_configuration_ref
+            .replace(Some(ii_config.openid_configuration));
+        task.issuer_ref.replace(Some(doc.issuer));
+
+        // Start or restart cert fetching when jwks_uri changes
+        let jwks_changed = {
+            let last = task.last_jwks_uri.borrow();
+            last.as_deref() != Some(&doc.jwks_uri)
+        };
+        if jwks_changed {
+            task.last_jwks_uri.replace(Some(doc.jwks_uri.clone()));
+            schedule_fetch_certs(doc.jwks_uri, Rc::clone(&task.certs_ref), Some(0));
         }
     }
 }
 
-/// Validates that the discovered `issuer` belongs to the same host as the `discovery_url`.
-/// Prevents a malicious discovery endpoint from impersonating another provider.
+/// Validates that the discovered `issuer` belongs to the same host as the
+/// OpenID configuration URL (hop 2). The `discovery_domain` (hop 1) is
+/// intentionally allowed to differ — it hosts a custom SSO indirection that
+/// legitimately points at an external OIDC provider.
 #[cfg(not(test))]
-fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), String> {
-    let discovery_host = url::Url::parse(discovery_url)
-        .map_err(|e| format!("Invalid discovery URL: {e}"))?
+fn validate_issuer_host(openid_config_url: &str, issuer: &str) -> Result<(), String> {
+    let openid_config_host = url::Url::parse(openid_config_url)
+        .map_err(|e| format!("Invalid openid_configuration URL: {e}"))?
         .host_str()
-        .ok_or_else(|| format!("No host in discovery URL: {discovery_url}"))?
+        .ok_or_else(|| format!("No host in openid_configuration URL: {openid_config_url}"))?
         .to_lowercase();
     let issuer_host = url::Url::parse(issuer)
         .map_err(|e| format!("Invalid issuer URL: {e}"))?
@@ -426,12 +485,45 @@ fn validate_issuer_domain(discovery_url: &str, issuer: &str) -> Result<(), Strin
         .ok_or_else(|| format!("No host in issuer URL: {issuer}"))?
         .to_lowercase();
 
-    if discovery_host != issuer_host {
+    if openid_config_host != issuer_host {
         return Err(format!(
-            "Issuer host '{issuer_host}' does not match discovery host '{discovery_host}'"
+            "Issuer host '{issuer_host}' does not match openid_configuration host '{openid_config_host}'"
         ));
     }
     Ok(())
+}
+
+#[cfg(not(test))]
+async fn fetch_ii_openid_configuration(url: String) -> Result<IIOpenIdConfiguration, String> {
+    use ic_cdk::api::management_canister::http_request::{
+        http_request_with_closure, CanisterHttpRequestArgument, HttpMethod,
+    };
+
+    let request = CanisterHttpRequestArgument {
+        url,
+        method: HttpMethod::GET,
+        body: None,
+        max_response_bytes: None,
+        transform: None,
+        headers: vec![
+            HttpHeader {
+                name: "Accept".into(),
+                value: "application/json".into(),
+            },
+            HttpHeader {
+                name: "User-Agent".into(),
+                value: "internet_identity_canister".into(),
+            },
+        ],
+    };
+
+    let (response,) =
+        http_request_with_closure(request, DISCOVERY_CALL_CYCLES, transform_discovery)
+            .await
+            .map_err(|(_, err)| err)?;
+
+    serde_json::from_slice::<IIOpenIdConfiguration>(response.body.as_slice())
+        .map_err(|_| "Invalid ii-openid-configuration JSON".into())
 }
 
 #[cfg(not(test))]
@@ -467,7 +559,7 @@ async fn fetch_discovery(discovery_url: String) -> Result<DiscoveryDocument, Str
         .map_err(|_| "Invalid discovery JSON".into())
 }
 
-/// Transform function for OIDC discovery responses.
+/// Transform function for JSON discovery responses (both hops).
 /// Re-serializes deterministically for consensus across subnet nodes.
 #[cfg(not(test))]
 #[allow(clippy::needless_pass_by_value)]
@@ -503,6 +595,14 @@ fn transform_discovery(response: HttpResponse) -> HttpResponse {
     }
 }
 
+/// II-specific SSO indirection document served at `{domain}/.well-known/ii-openid-configuration`.
+#[cfg(not(test))]
+#[derive(serde::Deserialize, Clone)]
+struct IIOpenIdConfiguration {
+    client_id: String,
+    openid_configuration: String,
+}
+
 /// OIDC discovery document — only the fields needed by the backend.
 #[cfg(not(test))]
 #[derive(serde::Deserialize, Clone)]
@@ -511,13 +611,24 @@ struct DiscoveryDocument {
     jwks_uri: String,
 }
 
-/// Returns the discovered issuer for a given discovery URL, if available.
-pub fn discovered_issuer_for(discovery_url: &str) -> Option<String> {
+/// Returns the discovered state for a given `discovery_domain`.
+/// Returns `(client_id, openid_configuration, issuer)` — any entry may be `None`
+/// if discovery for that domain has not yet completed.
+pub fn discovered_state_for(
+    discovery_domain: &str,
+) -> (Option<String>, Option<String>, Option<String>) {
     DISCOVERY_TASKS.with_borrow(|tasks| {
         tasks
             .iter()
-            .find(|t| t.discovery_url == discovery_url)
-            .and_then(|t| t.issuer_ref.borrow().clone())
+            .find(|t| t.discovery_domain == discovery_domain)
+            .map(|t| {
+                (
+                    t.client_id_ref.borrow().clone(),
+                    t.openid_configuration_ref.borrow().clone(),
+                    t.issuer_ref.borrow().clone(),
+                )
+            })
+            .unwrap_or((None, None, None))
     })
 }
 

@@ -3,16 +3,13 @@ use canister_tests::framework::{
     env, install_ii_canister_with_arg, upgrade_ii_canister_with_arg, II_WASM,
 };
 use internet_identity_interface::internet_identity::types::{
-    InternetIdentityInit, DiscoverableOidcConfig, OpenIdConfig,
+    DiscoverableOidcConfig, InternetIdentityInit, OpenIdConfig,
 };
 
 fn example_oidc_config() -> DiscoverableOidcConfig {
     DiscoverableOidcConfig {
-        name: "Google".into(),
-        logo: String::new(),
-        discovery_url: "https://accounts.google.com/.well-known/openid-configuration".into(),
-        client_id: Some("test-client-id".into()),
-        email_verification: None,
+        // Must be on the canary allowlist in `openid::generic::ALLOWED_DISCOVERY_DOMAINS`.
+        discovery_domain: "dfinity.org".into(),
     }
 }
 
@@ -141,13 +138,11 @@ fn should_return_discovered_oidc_configs() {
 
     let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
     assert_eq!(discovered.len(), 1);
-    assert_eq!(discovered[0].name, "Google");
-    assert_eq!(discovered[0].client_id, Some("test-client-id".into()));
-    assert_eq!(
-        discovered[0].discovery_url,
-        "https://accounts.google.com/.well-known/openid-configuration"
-    );
-    // Issuer is None because discovery hasn't run (no HTTP outcalls in tests)
+    assert_eq!(discovered[0].discovery_domain, "dfinity.org");
+    // Discovery requires HTTP outcalls, which don't run in PocketIC tests,
+    // so every discovered field is `None` on init.
+    assert_eq!(discovered[0].client_id, None);
+    assert_eq!(discovered[0].openid_configuration, None);
     assert_eq!(discovered[0].issuer, None);
 }
 
@@ -159,4 +154,20 @@ fn should_return_empty_discovered_oidc_configs_when_none_configured() {
 
     let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
     assert!(discovered.is_empty());
+}
+
+/// Canary allowlist should reject any domain that isn't `dfinity.org` —
+/// the canister init traps, so installation fails.
+#[test]
+#[should_panic(expected = "canary allowlist")]
+fn should_reject_disallowed_discovery_domain() {
+    let env = env();
+    let config = InternetIdentityInit {
+        oidc_configs: Some(vec![DiscoverableOidcConfig {
+            discovery_domain: "evil.example.com".into(),
+        }]),
+        ..Default::default()
+    };
+
+    install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
 }

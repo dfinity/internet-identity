@@ -268,7 +268,8 @@ pub struct InternetIdentityInit {
     pub new_flow_origins: Option<Vec<String>>,
     /// Deprecated: use `oidc_configs` instead. Mutually exclusive with `oidc_configs`.
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    /// Simplified OIDC configs that use discovery. Mutually exclusive with `openid_configs` and `new_flow_origins`.
+    /// SSO provider configs that use two-hop discovery.
+    /// Mutually exclusive with `openid_configs` and `new_flow_origins`.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
@@ -386,31 +387,25 @@ pub struct OpenIdConfig {
     pub email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
-/// Simplified OIDC provider configuration that relies on OIDC discovery
-/// instead of requiring all provider details in the init config.
+/// SSO provider configuration that uses two-hop discovery.
 ///
-/// `client_id` must be set. The `discovery_url` points to the standard
-/// `.well-known/openid-configuration` endpoint from which `issuer` and
-/// `jwks_uri` are discovered automatically.
+/// The backend fetches `https://{discovery_domain}/.well-known/ii-openid-configuration`
+/// to obtain `{ client_id, openid_configuration }`, then fetches the standard OIDC
+/// discovery document at `openid_configuration` to resolve `issuer` and `jwks_uri`.
 #[derive(Clone, Debug, CandidType, Serialize, Deserialize, Default, Eq, PartialEq)]
 pub struct DiscoverableOidcConfig {
-    pub name: String,
-    pub logo: String,
-    pub discovery_url: String,
-    pub client_id: Option<String>,
-    pub email_verification: Option<OpenIdEmailVerificationScheme>,
+    pub discovery_domain: String,
 }
 
-/// Resolved OIDC provider config returned by the `discovered_oidc_configs` query.
-/// Includes fields discovered from the OIDC discovery endpoint.
+/// Resolved SSO provider state returned by the `discovered_oidc_configs` query.
+/// Any field other than `discovery_domain` is `None` until the two-hop discovery
+/// completes for that domain.
 #[derive(Clone, Debug, CandidType, Deserialize, Eq, PartialEq)]
 pub struct OidcConfig {
-    pub name: String,
-    pub logo: String,
-    pub discovery_url: String,
+    pub discovery_domain: String,
     pub client_id: Option<String>,
+    pub openid_configuration: Option<String>,
     pub issuer: Option<String>,
-    pub email_verification: Option<OpenIdEmailVerificationScheme>,
 }
 
 pub enum AuthorizationKey {

@@ -385,24 +385,21 @@ type OpenIdConfig = record {
     email_verification : opt OpenIdEmailVerification;
 };
 
-// Simplified OIDC provider config that relies on discovery.
-// client_id must be set. discovery_url is the standard OIDC .well-known endpoint.
+// SSO provider config that uses two-hop discovery.
+// The backend fetches https://{discovery_domain}/.well-known/ii-openid-configuration
+// for { client_id, openid_configuration } and then fetches the standard OIDC
+// discovery at openid_configuration for { issuer, jwks_uri }.
 type DiscoverableOidcConfig = record {
-    name : text;
-    logo : text;
-    discovery_url : text;
-    client_id : opt text;
-    email_verification : opt OpenIdEmailVerification;
+    discovery_domain : text;
 };
 
-// Resolved OIDC config with discovered fields.
+// Resolved SSO provider state.
+// All fields other than discovery_domain are None until discovery completes.
 type OidcConfig = record {
-    name : text;
-    logo : text;
-    discovery_url : text;
+    discovery_domain : text;
     client_id : opt text;
+    openid_configuration : opt text;
     issuer : opt text;
-    email_verification : opt OpenIdEmailVerification;
 };
 
 type OpenIdCredentialKey = record { Iss; Sub };
