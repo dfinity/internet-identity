@@ -113,15 +113,6 @@ export class AuthFlow {
   > => {
     const { clientId, discovery } = ssoResult;
 
-    // Determine scopes
-    const authScope =
-      discovery.scopes_supported !== undefined &&
-      discovery.scopes_supported.length > 0
-        ? discovery.scopes_supported
-            .filter((s) => ["openid", "profile", "email"].includes(s))
-            .join(" ")
-        : "openid profile email";
-
     // Build a synthetic OpenIdConfig from SSO discovery result
     const syntheticConfig: OpenIdConfig = {
       auth_uri: discovery.authorization_endpoint,
@@ -131,11 +122,11 @@ export class AuthFlow {
       fedcm_uri: [],
       email_verification: [],
       issuer: discovery.issuer,
-      auth_scope: authScope.split(" "),
+      auth_scope: selectAuthScopes(discovery.scopes_supported),
       client_id: clientId,
     };
 
-    return this.continueWithOpenId(syntheticConfig);
+    return await this.continueWithOpenId(syntheticConfig);
   };
 
   continueWithExistingPasskey = async (): Promise<bigint> => {
