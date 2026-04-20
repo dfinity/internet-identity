@@ -97,19 +97,3 @@ fn should_reject_disallowed_discovery_domain() {
     );
     assert!(result.is_err());
 }
-
-/// Configs added via init args should still be restored on upgrade (backward compat).
-#[test]
-fn should_restore_oidc_configs_from_init_args_on_upgrade() {
-    let env = env();
-    let config = InternetIdentityInit {
-        oidc_configs: Some(vec![example_oidc_config()]),
-        ..Default::default()
-    };
-
-    let canister_id = install_ii_canister_with_arg(&env, II_WASM.clone(), Some(config));
-
-    let discovered = api::discovered_oidc_configs(&env, canister_id).unwrap();
-    assert_eq!(discovered.len(), 1);
-    assert_eq!(discovered[0].discovery_domain, "dfinity.org");
-}

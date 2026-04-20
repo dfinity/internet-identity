@@ -269,20 +269,29 @@ struct PartialClaims {
 }
 
 /// JWT `aud` claim — per RFC 7519 may be a single string or an array of strings
-/// (Microsoft sometimes ships it as an array). We normalize by taking the first
-/// element of the array and only match against the provider's configured client id.
-#[derive(Deserialize)]
+/// (Microsoft sometimes ships it as an array). Matching treats an array as a
+/// set: any element equal to the provider's configured client id is accepted.
+#[derive(Deserialize, Clone)]
 #[serde(untagged)]
-enum AudClaim {
+pub(super) enum AudClaim {
     Single(String),
     Multiple(Vec<String>),
 }
 
 impl AudClaim {
-    fn as_str(&self) -> Option<&str> {
+    /// Returns `true` if `expected` is the single value or contained in the array.
+    pub(super) fn matches(&self, expected: &str) -> bool {
         match self {
-            AudClaim::Single(s) => Some(s.as_str()),
-            AudClaim::Multiple(v) => v.first().map(String::as_str),
+            AudClaim::Single(s) => s == expected,
+            AudClaim::Multiple(v) => v.iter().any(|s| s == expected),
+        }
+    }
+
+    /// Returns `true` if the claim carries no audience at all.
+    pub(super) fn is_empty(&self) -> bool {
+        match self {
+            AudClaim::Single(s) => s.is_empty(),
+            AudClaim::Multiple(v) => v.is_empty(),
         }
     }
 }
@@ -379,9 +388,11 @@ where
         serde_json::from_slice(validation_item.claims()).map_err(|_| {
             OpenIDJWTVerificationError::GenericError("Unable to decode claims".to_string())
         })?;
-    let aud = aud.as_str().ok_or_else(|| {
-        OpenIDJWTVerificationError::GenericError("JWT has empty aud claim".to_string())
-    })?;
+    if aud.is_empty() {
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "JWT has empty aud claim".to_string(),
+        ));
+    }
 
     PROVIDERS.with_borrow(|providers| {
         providers
@@ -397,7 +408,7 @@ where
                 let issuer_placeholders = get_issuer_placeholders(&template);
                 let issuer_claims = get_all_claims(validation_item.claims(), issuer_placeholders);
                 let effective_issuer = replace_issuer_placeholders(&template, &issuer_claims);
-                effective_issuer == iss && provider_aud == aud
+                effective_issuer == iss && aud.matches(&provider_aud)
             })
             .ok_or_else(|| {
                 // If any provider is still waiting on discovery, surface a "pending" error

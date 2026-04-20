@@ -1,5 +1,5 @@
 use super::{
-    get_all_claims, get_issuer_placeholders, replace_issuer_placeholders,
+    get_all_claims, get_issuer_placeholders, replace_issuer_placeholders, AudClaim,
     OpenIDJWTVerificationError,
 };
 use crate::openid::OpenIdCredential;
@@ -98,7 +98,7 @@ impl EmailVerifiedClaim {
 struct Claims {
     iss: String,
     sub: String,
-    aud: String,
+    aud: AudClaim,
     nonce: String,
     exp: u64,
     iat: u64,
@@ -201,7 +201,8 @@ impl OpenIdProvider for Provider {
             // https://login.microsoftonline.com/599249e6-791a-48a7-84d0-b3e858773ac2/v2.0
             iss: claims.iss,
             sub: claims.sub,
-            aud: claims.aud,
+            // `aud` is verified against `client_id` above; store the canonical value.
+            aud: self.client_id.clone(),
             last_usage_timestamp: None,
             metadata,
         })
@@ -301,6 +302,13 @@ impl OpenIdProvider for DiscoverableProvider {
                 "JWT is missing kid".to_string(),
             ))?;
         let certs = self.certs.borrow();
+        if certs.is_empty() {
+            // Distinguish a still-pending JWKS fetch from a genuine kid mismatch so
+            // the frontend can offer a retry instead of surfacing a fatal error.
+            return Err(OpenIDJWTVerificationError::GenericError(
+                "OIDC provider JWKS not yet fetched, please try again shortly".to_string(),
+            ));
+        }
         let cert = certs
             .iter()
             .find(|cert| cert.kid().is_some_and(|v| v == kid))
@@ -330,7 +338,8 @@ impl OpenIdProvider for DiscoverableProvider {
         Ok(OpenIdCredential {
             iss: claims.iss,
             sub: claims.sub,
-            aud: claims.aud,
+            // `aud` is verified against `client_id` above; store the canonical value.
+            aud: client_id,
             last_usage_timestamp: None,
             metadata,
         })
@@ -451,6 +460,15 @@ async fn run_discovery_tasks() {
             continue;
         }
 
+        // Reject malformed / non-HTTPS jwks_uri before scheduling repeated outcalls.
+        if let Err(err) = validate_https_url(&doc.jwks_uri) {
+            ic_cdk::println!(
+                "Invalid jwks_uri from {}: {err}",
+                ii_config.openid_configuration
+            );
+            continue;
+        }
+
         task.client_id_ref.replace(Some(ii_config.client_id));
         task.openid_configuration_ref
             .replace(Some(ii_config.openid_configuration));
@@ -466,6 +484,16 @@ async fn run_discovery_tasks() {
             schedule_fetch_certs(doc.jwks_uri, Rc::clone(&task.certs_ref), Some(0));
         }
     }
+}
+
+/// Ensure a URL is syntactically valid and uses `https://`.
+#[cfg(not(test))]
+fn validate_https_url(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("parse error: {e}"))?;
+    if parsed.scheme() != "https" {
+        return Err(format!("expected https scheme, got '{}'", parsed.scheme()));
+    }
+    Ok(())
 }
 
 /// Validates that the discovered `issuer` belongs to the same host as the
@@ -819,11 +847,10 @@ fn verify_claims(
             claims.iss
         )));
     }
-    if claims.aud != client_id {
-        return Err(OpenIDJWTVerificationError::GenericError(format!(
-            "Invalid audience: {}",
-            claims.aud
-        )));
+    if !claims.aud.matches(client_id) {
+        return Err(OpenIDJWTVerificationError::GenericError(
+            "Invalid audience".to_string(),
+        ));
     }
     if claims.nonce != expected_nonce {
         return Err(OpenIDJWTVerificationError::GenericError(format!(
@@ -919,6 +946,9 @@ fn should_transform_certs_to_same() {
 }
 
 #[cfg(test)]
+const TEST_AUD: &str = "45431994619-cbbfgtn7o0pp0dpfcg2l66bc4rcg7qbu.apps.googleusercontent.com";
+
+#[cfg(test)]
 fn test_data() -> (String, [u8; 32], OpenIdConfig, Claims) {
     // This JWT is for testing purposes, it's already been expired before this commit has been made,
     // additionally the audience of this JWT is a test Google client registration, not production.
@@ -935,7 +965,7 @@ fn test_data() -> (String, [u8; 32], OpenIdConfig, Claims) {
         name: "Google".to_string(),
         logo: String::new(),
         issuer: claims.iss.clone(),
-        client_id: claims.aud.clone(),
+        client_id: TEST_AUD.into(),
         jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".to_string(),
         auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
         auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
@@ -953,7 +983,7 @@ fn should_return_credential() {
     let credential = OpenIdCredential {
         iss: claims.iss,
         sub: claims.sub,
-        aud: claims.aud,
+        aud: TEST_AUD.into(),
         last_usage_timestamp: None,
         metadata: HashMap::from([
             (
@@ -1036,14 +1066,39 @@ fn should_return_error_when_invalid_issuer() {
 fn should_return_error_when_invalid_audience() {
     let (_, salt, config, claims) = test_data();
     let mut invalid_claims = claims;
-    invalid_claims.aud = "invalid-audience".into();
+    invalid_claims.aud = AudClaim::Single("invalid-audience".into());
 
     assert_eq!(
         verify_claims(&config.issuer, &config.client_id, &invalid_claims, &salt),
-        Err(OpenIDJWTVerificationError::GenericError(format!(
-            "Invalid audience: {}",
-            invalid_claims.aud
-        )))
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Invalid audience".into()
+        ))
+    );
+}
+
+#[test]
+fn should_accept_client_id_in_aud_array() {
+    let (_, salt, config, claims) = test_data();
+    let mut multi_aud = claims;
+    multi_aud.aud = AudClaim::Multiple(vec!["some-other-aud".into(), TEST_AUD.into()]);
+
+    assert_eq!(
+        verify_claims(&config.issuer, &config.client_id, &multi_aud, &salt),
+        Ok(())
+    );
+}
+
+#[test]
+fn should_reject_aud_array_without_client_id() {
+    let (_, salt, config, claims) = test_data();
+    let mut multi_aud = claims;
+    multi_aud.aud = AudClaim::Multiple(vec!["a".into(), "b".into()]);
+
+    assert_eq!(
+        verify_claims(&config.issuer, &config.client_id, &multi_aud, &salt),
+        Err(OpenIDJWTVerificationError::GenericError(
+            "Invalid audience".into()
+        ))
     );
 }
 
