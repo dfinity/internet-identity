@@ -845,6 +845,506 @@ fn should_list_all_available_attributes() {
 }
 
 #[test]
+fn icrc3_test_vectors() {
+    use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+
+    // The test vectors use a synthetic OpenID provider with a JWT signed by an RSA key
+    // generated deterministically inside the test. This keeps the produced vectors free
+    // of real personal information while still exercising the full prepare/get/verify
+    // pipeline in the canister.
+    let (env, canister_id, principal, identity_number, fake_email, fake_name) =
+        setup_icrc3_test_env_with_fake_openid();
+    let origin = "https://some-dapp.com";
+
+    // Obtain the canister signature public key (DER-encoded) once. The key is derived from
+    // the (canister_id, identity_number, origin) triple and does not change.
+    let session_public_key = ByteBuf::from("session public key");
+    let (canister_sig_key, _) = api::prepare_delegation(
+        &env,
+        canister_id,
+        principal,
+        identity_number,
+        origin,
+        &session_public_key,
+        None,
+    )
+    .unwrap();
+
+    env.advance_time(Duration::from_secs(5));
+
+    let root_key = env.root_key().unwrap();
+
+    // ---- vector definitions ----
+    // Each tuple: (label, nonce, attribute_specs)
+    let vectors: Vec<(&str, Vec<u8>, Vec<AttributeSpec>)> = vec![
+        // 1. Single email, scoped key
+        (
+            "Single email attribute with scoped key",
+            vec![0u8; 32],
+            vec![AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: false,
+            }],
+        ),
+        // 2. Single email, unscoped key (omit_scope = true)
+        (
+            "Single email attribute with unscoped key",
+            vec![0u8; 32],
+            vec![AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: true,
+            }],
+        ),
+        // 3. Single name, scoped key
+        (
+            "Single name attribute with scoped key",
+            vec![0u8; 32],
+            vec![AttributeSpec {
+                key: "openid:https://accounts.google.com:name".into(),
+                value: None,
+                omit_scope: false,
+            }],
+        ),
+        // 4. Email + name, both scoped
+        (
+            "Email and name with scoped keys",
+            vec![0u8; 32],
+            vec![
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:email".into(),
+                    value: None,
+                    omit_scope: false,
+                },
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:name".into(),
+                    value: None,
+                    omit_scope: false,
+                },
+            ],
+        ),
+        // 5. Email + name, both unscoped
+        (
+            "Email and name with unscoped keys",
+            vec![0u8; 32],
+            vec![
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:email".into(),
+                    value: None,
+                    omit_scope: true,
+                },
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:name".into(),
+                    value: None,
+                    omit_scope: true,
+                },
+            ],
+        ),
+        // 6. Mixed scoping: email unscoped, name scoped
+        (
+            "Email unscoped and name scoped",
+            vec![0u8; 32],
+            vec![
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:email".into(),
+                    value: None,
+                    omit_scope: true,
+                },
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:name".into(),
+                    value: None,
+                    omit_scope: false,
+                },
+            ],
+        ),
+        // 7. Email with explicit value validation
+        (
+            "Email with value validation",
+            vec![0u8; 32],
+            vec![AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: Some(fake_email.as_bytes().to_vec()),
+                omit_scope: false,
+            }],
+        ),
+        // 8. Single email with non-zero nonce
+        (
+            "Single email with specific nonce",
+            hex::decode("5f87b8f041d8e1121d5a7d0360a02213e4b7b3b44b25d0c7f070c7e2b694b29c")
+                .expect("failed to decode specific nonce"),
+            vec![AttributeSpec {
+                key: "openid:https://accounts.google.com:email".into(),
+                value: None,
+                omit_scope: false,
+            }],
+        ),
+        // 9. Email + name, mixed scoping, non-zero nonce
+        (
+            "Email unscoped + name scoped with specific nonce",
+            hex::decode("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                .expect("failed to decode specific nonce"),
+            vec![
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:email".into(),
+                    value: None,
+                    omit_scope: true,
+                },
+                AttributeSpec {
+                    key: "openid:https://accounts.google.com:name".into(),
+                    value: None,
+                    omit_scope: false,
+                },
+            ],
+        ),
+        // 10. Only implicit attributes (no user attributes requested).
+        // An empty attribute list is valid and produces a message containing only
+        // the three implicit entries.
+        (
+            "No user attributes, only implicit entries",
+            vec![0u8; 32],
+            vec![],
+        ),
+    ];
+
+    let mut json_vectors: Vec<String> = Vec::new();
+
+    for (label, nonce, attributes) in &vectors {
+        let prepare_request = PrepareIcrc3AttributeRequest {
+            identity_number,
+            origin: origin.to_string(),
+            account_number: None,
+            attributes: attributes.clone(),
+            nonce: nonce.clone(),
+        };
+
+        let prepare_response =
+            api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
+                .expect("failed to call prepare_icrc3_attributes")
+                .expect("prepare_icrc3_attributes error");
+
+        env.advance_time(Duration::from_secs(5));
+
+        let get_request = GetIcrc3AttributeRequest {
+            identity_number,
+            origin: origin.to_string(),
+            account_number: None,
+            message: prepare_response.message.clone(),
+        };
+
+        let get_response = api::get_icrc3_attributes(&env, canister_id, principal, get_request)
+            .expect("failed to call get_icrc3_attributes")
+            .expect("get_icrc3_attributes error");
+
+        // Build the domain-separated signed message. Uses the same constant that
+        // `verify_icrc3_attributes` relies on, so the emitted `signed_message_hex`
+        // stays in sync with the canister's verification envelope.
+        let mut signed_message: Vec<u8> = Vec::with_capacity(
+            1 + ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN.len() + prepare_response.message.len(),
+        );
+        signed_message.push(ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN.len() as u8);
+        signed_message.extend_from_slice(ICRC3_ATTRIBUTES_CERTIFICATION_DOMAIN);
+        signed_message.extend_from_slice(&prepare_response.message);
+
+        // Verify the signature.
+        verify_icrc3_attributes(
+            &env,
+            canister_sig_key.clone(),
+            &prepare_response.message,
+            &get_response.signature,
+            &root_key,
+        );
+
+        // Decode the ICRC-3 value for the human-readable representation.
+        let icrc3_value: Icrc3Value =
+            Decode!(&prepare_response.message, Icrc3Value).expect("failed to decode");
+
+        let icrc3_repr = format_icrc3_value(&icrc3_value);
+
+        // Emit a JSON object for this vector.
+        json_vectors.push(format!(
+            concat!(
+                "  {{\n",
+                "    \"label\": {:?},\n",
+                "    \"icrc3_value\": {:?},\n",
+                "    \"message_hex\": {:?},\n",
+                "    \"signed_message_hex\": {:?},\n",
+                "    \"certificate_cbor_hex\": {:?}\n",
+                "  }}",
+            ),
+            label,
+            icrc3_repr,
+            hex::encode(&prepare_response.message),
+            hex::encode(&signed_message),
+            hex::encode(&get_response.signature),
+        ));
+    }
+
+    // Print full JSON to stdout so it can be captured.
+    println!(
+        "\n--- ICRC-3 TEST VECTORS (JSON) ---\n{{\n  \"canister_sig_pk_hex\": {:?},\n  \"root_key_hex\": {:?},\n  \"origin\": {:?},\n  \"issuer\": \"https://accounts.google.com\",\n  \"email\": {:?},\n  \"name\": {:?},\n  \"vectors\": [\n{}\n  ]\n}}\n--- END TEST VECTORS ---",
+        hex::encode(&canister_sig_key),
+        hex::encode(&root_key),
+        origin,
+        fake_email,
+        fake_name,
+        json_vectors.join(",\n"),
+    );
+}
+
+/// Formats an `Icrc3Value` into a human-readable Candid-style string representation.
+fn format_icrc3_value(
+    value: &internet_identity_interface::internet_identity::types::icrc3::Icrc3Value,
+) -> String {
+    use internet_identity_interface::internet_identity::types::icrc3::Icrc3Value;
+    match value {
+        Icrc3Value::Nat(n) => format!("Nat({})", n),
+        Icrc3Value::Int(i) => format!("Int({})", i),
+        Icrc3Value::Blob(b) => format!("Blob(hex\"{}\")", hex::encode(b)),
+        Icrc3Value::Text(s) => format!("Text({:?})", s),
+        Icrc3Value::Array(items) => {
+            let inner: Vec<String> = items.iter().map(format_icrc3_value).collect();
+            format!("Array([{}])", inner.join(", "))
+        }
+        Icrc3Value::Map(entries) => {
+            let inner: Vec<String> = entries
+                .iter()
+                .map(|(k, v)| format!("{:?}: {}", k, format_icrc3_value(v)))
+                .collect();
+            format!("Map({{ {} }})", inner.join(", "))
+        }
+    }
+}
+
+/// Builds an integration-test environment whose Google OpenID credential is backed by a
+/// JWT signed by an RSA key generated deterministically inside the test (instead of Google).
+///
+/// The returned tuple mirrors `setup_icrc3_test_env` but additionally exposes the fake email
+/// and name so the caller can build `AttributeSpec`s that reference them.
+fn setup_icrc3_test_env_with_fake_openid() -> (
+    PocketIc,
+    Principal, // ii_backend_canister_id
+    Principal, // test_principal
+    u64,       // identity_number
+    String,    // fake email embedded in the JWT
+    String,    // fake name embedded in the JWT
+) {
+    use internet_identity_interface::internet_identity::types::{
+        AuthnMethod, AuthnMethodData, AuthnMethodProtection, AuthnMethodPurpose,
+        AuthnMethodSecuritySettings, PublicKeyAuthn,
+    };
+
+    let env = env();
+
+    // Synthetic values: no personal info, chosen just for the test vectors.
+    let fake_email = "alice.example@icrc3-test.invalid".to_string();
+    let fake_name = "Alice Example".to_string();
+    let fake_sub = "1000000000000000001".to_string();
+    let issuer = "https://accounts.google.com".to_string();
+    let client_id =
+        "360587991668-63bpc1gngp1s5gbo1aldal4a50c1j0bb.apps.googleusercontent.com".to_string();
+
+    // Deterministic caller: we reuse the public key from `openid_google_test_data` so the
+    // principal is the same well-known value, and we pick a fixed salt.
+    let salt: [u8; 32] = [42u8; 32];
+    let test_pubkey: [u8; 96] = [
+        48, 94, 48, 12, 6, 10, 43, 6, 1, 4, 1, 131, 184, 67, 1, 1, 3, 78, 0, 165, 1, 2, 3, 38, 32,
+        1, 33, 88, 32, 252, 182, 240, 218, 160, 61, 178, 176, 17, 228, 185, 84, 148, 45, 86, 216,
+        171, 120, 72, 246, 212, 55, 212, 167, 142, 59, 227, 0, 242, 182, 129, 211, 34, 88, 32, 158,
+        197, 96, 131, 51, 156, 176, 65, 128, 29, 75, 98, 163, 187, 104, 38, 255, 65, 92, 234, 229,
+        245, 221, 74, 40, 202, 29, 83, 162, 84, 177, 204,
+    ];
+    let test_principal = Principal::from_slice(&[
+        211, 40, 186, 145, 43, 2, 6, 17, 232, 23, 22, 44, 51, 178, 233, 163, 131, 231, 82, 174, 66,
+        201, 203, 1, 102, 109, 20, 75, 2,
+    ]);
+    let test_authn_method = AuthnMethodData {
+        authn_method: AuthnMethod::PubKey(PublicKeyAuthn {
+            pubkey: ByteBuf::from(test_pubkey.to_vec()),
+        }),
+        metadata: Default::default(),
+        security_settings: AuthnMethodSecuritySettings {
+            protection: AuthnMethodProtection::Unprotected,
+            purpose: AuthnMethodPurpose::Authentication,
+        },
+        last_authentication: None,
+    };
+
+    // Pick a test time around 2027-01-15T00:00:00Z. The JWT `iat` is this time minus 5
+    // minutes and `exp` is this time plus one hour, matching typical Google JWTs.
+    let test_time_ms: u64 = 1_800_000_000_000;
+    let iat_secs: u64 = (test_time_ms / 1_000) - 300;
+    let exp_secs: u64 = iat_secs + 3_600;
+
+    let (jwt, jwks_json) = build_fake_google_jwt_and_jwks(FakeJwtInput {
+        salt: &salt,
+        principal: &test_principal,
+        issuer: &issuer,
+        aud: &client_id,
+        sub: &fake_sub,
+        email: &fake_email,
+        name: &fake_name,
+        email_verified: true,
+        iat_secs,
+        exp_secs,
+    });
+
+    // Install canister with a Google-flavoured OpenID config whose JWKS URL we override below.
+    let mut init_args = arg_with_wasm_hash(ARCHIVE_WASM.clone()).unwrap();
+    init_args.openid_configs = Some(vec![OpenIdConfig {
+        name: "Google".into(),
+        logo: "logo".into(),
+        issuer: issuer.clone(),
+        client_id: client_id.clone(),
+        jwks_uri: "https://www.googleapis.com/oauth2/v3/certs".into(),
+        auth_uri: "https://accounts.google.com/o/oauth2/v2/auth".into(),
+        auth_scope: vec!["openid".into(), "profile".into(), "email".into()],
+        fedcm_uri: Some("https://accounts.google.com/gsi/fedcm.json".into()),
+        email_verification: None,
+    }]);
+
+    let ii_backend_canister_id = install_ii_canister_with_arg_and_cycles(
+        &env,
+        II_WASM.clone(),
+        Some(init_args),
+        1_000_000_000_000_000,
+    );
+
+    // Respond to the canister's JWKS fetch with our fake public key.
+    crate::openid::mock_certs_response(
+        &env,
+        "https://www.googleapis.com/oauth2/v3/certs",
+        &jwks_json,
+    );
+
+    deploy_archive_via_ii(&env, ii_backend_canister_id);
+
+    let identity_number =
+        crate::v2_api::authn_method_test_helpers::create_identity_with_authn_method(
+            &env,
+            ii_backend_canister_id,
+            &test_authn_method,
+        );
+
+    let time_to_advance = Duration::from_millis(test_time_ms) - Duration::from_nanos(time(&env));
+    env.advance_time(time_to_advance);
+
+    api::openid_credential_add(
+        &env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        &jwt,
+        &salt,
+    )
+    .expect("failed to add openid credential")
+    .expect("openid_credential_add error");
+
+    env.advance_time(Duration::from_secs(15));
+
+    (
+        env,
+        ii_backend_canister_id,
+        test_principal,
+        identity_number,
+        fake_email,
+        fake_name,
+    )
+}
+
+struct FakeJwtInput<'a> {
+    salt: &'a [u8; 32],
+    principal: &'a Principal,
+    issuer: &'a str,
+    aud: &'a str,
+    sub: &'a str,
+    email: &'a str,
+    name: &'a str,
+    email_verified: bool,
+    iat_secs: u64,
+    exp_secs: u64,
+}
+
+/// Generates an RSA-2048 key pair from a fixed seed, signs a synthetic JWT, and returns both
+/// the JWT (compact serialization) and a JWKS JSON document containing the matching public key.
+///
+/// The JWT `nonce` is computed as `BASE64_URL_SAFE_NO_PAD(SHA256(salt || caller_principal_bytes))`,
+/// matching the binding that II's generic OpenID provider enforces.
+fn build_fake_google_jwt_and_jwks(input: FakeJwtInput) -> (String, String) {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+    use rand_chacha::rand_core::SeedableRng;
+    use rsa::pkcs1v15::SigningKey;
+    use rsa::signature::{RandomizedSigner, SignatureEncoding};
+    use rsa::traits::PublicKeyParts;
+    use rsa::{RsaPrivateKey, RsaPublicKey};
+    use serde_json::json;
+    use sha2::{Digest, Sha256};
+
+    // Deterministic RSA keygen. 2048 bits matches Google's kid sizes. The seed is arbitrary.
+    let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(0xDEAD_BEEF_CAFE_BABE_u64);
+    let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("failed to generate test RSA key");
+    let public_key = RsaPublicKey::from(&private_key);
+
+    // Compute the nonce the canister expects:
+    //   BASE64URL_NO_PAD(SHA256(salt || caller_principal_bytes))
+    let mut hasher = Sha256::new();
+    hasher.update(input.salt);
+    hasher.update(input.principal.as_slice());
+    let nonce_hash: [u8; 32] = hasher.finalize().into();
+    let nonce = URL_SAFE_NO_PAD.encode(nonce_hash);
+
+    // Build the JWT header and claims.
+    let kid = "icrc3-test-key-1";
+    let header = json!({
+        "alg": "RS256",
+        "kid": kid,
+        "typ": "JWT",
+    });
+    let claims = json!({
+        "iss": input.issuer,
+        "azp": input.aud,
+        "aud": input.aud,
+        "sub": input.sub,
+        "email": input.email,
+        "email_verified": input.email_verified,
+        "nonce": nonce,
+        "nbf": input.iat_secs,
+        "name": input.name,
+        "given_name": input.name.split_whitespace().next().unwrap_or(""),
+        "family_name": input.name.split_whitespace().nth(1).unwrap_or(""),
+        "iat": input.iat_secs,
+        "exp": input.exp_secs,
+        "jti": "icrc3-test-vectors-jti-0001",
+    });
+
+    let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).unwrap());
+    let claims_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+    let signing_input = format!("{header_b64}.{claims_b64}");
+
+    let signing_key = SigningKey::<Sha256>::new(private_key);
+    let signature = signing_key.sign_with_rng(&mut rng, signing_input.as_bytes());
+    let signature_b64 = URL_SAFE_NO_PAD.encode(signature.to_bytes());
+
+    let jwt = format!("{signing_input}.{signature_b64}");
+
+    // Build JWKS with the matching public key.
+    let n_b64 = URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be());
+    let e_b64 = URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be());
+    let jwks = json!({
+        "keys": [{
+            "kty": "RSA",
+            "use": "sig",
+            "alg": "RS256",
+            "kid": kid,
+            "n": n_b64,
+            "e": e_b64,
+        }]
+    });
+
+    (jwt, serde_json::to_string(&jwks).unwrap())
+}
+
+#[test]
 fn should_return_error_for_unavailable_icrc3_attributes() {
     let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
     let origin = "https://some-dapp.com";
