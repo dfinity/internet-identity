@@ -305,11 +305,24 @@ export const findConfig = (
     fedcm_uri: [],
     email_verification: oidcConfig.email_verification,
     issuer: cached.document.issuer,
-    auth_scope: cached.document.scopes_supported?.filter((s) =>
-      ["openid", "profile", "email"].includes(s),
-    ) ?? ["openid", "profile", "email"],
+    auth_scope: selectAuthScopes(cached.document.scopes_supported),
     client_id: oidcConfig.client_id[0],
   };
+};
+
+/**
+ * Pick the subset of OIDC scopes we actually request from what the provider
+ * advertises. If nothing advertised (or the intersection is empty after
+ * filtering), fall back to the canonical defaults — sending an empty `scope`
+ * to the authorize endpoint would cause the request to fail.
+ */
+export const selectAuthScopes = (scopesSupported?: string[]): string[] => {
+  const defaults = ["openid", "profile", "email"];
+  if (scopesSupported === undefined) {
+    return defaults;
+  }
+  const filtered = scopesSupported.filter((s) => defaults.includes(s));
+  return filtered.length > 0 ? filtered : defaults;
 };
 
 /**

@@ -126,6 +126,57 @@ describe("oidcDiscovery", () => {
       ).rejects.toThrow("Issuer hostname mismatch");
     });
 
+    it("rejects look-alike issuer hostname (no leading dot separator)", async () => {
+      // `endsWith("accounts.google.com")` alone would accept this; the real
+      // check must require an exact match or a proper subdomain boundary.
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            issuer: "https://evilaccounts.google.com",
+            authorization_endpoint:
+              "https://accounts.google.com/o/oauth2/v2/auth",
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(
+        fetchDiscoveryDocument(GOOGLE_DISCOVERY_URL),
+      ).rejects.toThrow("Issuer hostname mismatch");
+    });
+
+    it("accepts issuer on a true subdomain of the allowed host", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            issuer: "https://sub.accounts.google.com",
+            authorization_endpoint:
+              "https://sub.accounts.google.com/o/oauth2/v2/auth",
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const result = await fetchDiscoveryDocument(GOOGLE_DISCOVERY_URL);
+      expect(result.issuer).toBe("https://sub.accounts.google.com");
+    });
+
+    it("rejects authorization_endpoint on a different host", async () => {
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            issuer: "https://accounts.google.com",
+            authorization_endpoint: "https://attacker.example/auth",
+          }),
+          { status: 200 },
+        ),
+      );
+
+      await expect(
+        fetchDiscoveryDocument(GOOGLE_DISCOVERY_URL),
+      ).rejects.toThrow("Authorization endpoint hostname mismatch");
+    });
+
     it("rejects non-HTTPS issuer", async () => {
       vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
         new Response(
@@ -230,9 +281,7 @@ describe("oidcDiscovery", () => {
       );
 
       await fetchDiscoveryDocument(GOOGLE_DISCOVERY_URL);
-      const result = findCachedDiscoveryByIssuer(
-        "https://accounts.google.com",
-      );
+      const result = findCachedDiscoveryByIssuer("https://accounts.google.com");
 
       expect(result).toBeDefined();
       expect(result!.discoveryUrl).toBe(GOOGLE_DISCOVERY_URL);
@@ -268,9 +317,7 @@ describe("oidcDiscovery", () => {
       await fetchDiscoveryDocument(GOOGLE_DISCOVERY_URL);
       await fetchDiscoveryDocument(APPLE_DISCOVERY_URL);
 
-      const google = findCachedDiscoveryByIssuer(
-        "https://accounts.google.com",
-      );
+      const google = findCachedDiscoveryByIssuer("https://accounts.google.com");
       expect(google?.discoveryUrl).toBe(GOOGLE_DISCOVERY_URL);
 
       const apple = findCachedDiscoveryByIssuer("https://appleid.apple.com");

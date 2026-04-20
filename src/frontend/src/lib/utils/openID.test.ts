@@ -3,6 +3,7 @@ import {
   findConfig,
   issuerMatches,
   extractIssuerTemplateClaims,
+  selectAuthScopes,
 } from "./openID";
 import { OpenIdConfig } from "$lib/generated/internet_identity_types";
 import { backendCanisterConfig } from "$lib/globals";
@@ -16,7 +17,14 @@ vi.mock("$lib/globals", () => ({
 
 const mockDiscoveryCache = new Map<
   string,
-  { discoveryUrl: string; document: { issuer: string; authorization_endpoint: string; scopes_supported?: string[] } }
+  {
+    discoveryUrl: string;
+    document: {
+      issuer: string;
+      authorization_endpoint: string;
+      scopes_supported?: string[];
+    };
+  }
 >();
 
 vi.mock("$lib/utils/oidcDiscovery", () => ({
@@ -273,8 +281,7 @@ describe("findConfig with oidc_configs", () => {
       discoveryUrl,
       document: {
         issuer: "https://accounts.google.com",
-        authorization_endpoint:
-          "https://accounts.google.com/o/oauth2/v2/auth",
+        authorization_endpoint: "https://accounts.google.com/o/oauth2/v2/auth",
         scopes_supported: ["openid", "profile", "email"],
       },
     });
@@ -329,8 +336,7 @@ describe("findConfig with oidc_configs", () => {
       discoveryUrl,
       document: {
         issuer: "https://accounts.google.com",
-        authorization_endpoint:
-          "https://accounts.google.com/o/oauth2/v2/auth",
+        authorization_endpoint: "https://accounts.google.com/o/oauth2/v2/auth",
       },
     });
 
@@ -360,13 +366,39 @@ describe("findConfig with oidc_configs", () => {
       discoveryUrl,
       document: {
         issuer: "https://accounts.google.com",
-        authorization_endpoint:
-          "https://accounts.google.com/o/oauth2/v2/auth",
+        authorization_endpoint: "https://accounts.google.com/o/oauth2/v2/auth",
       },
     });
 
     // Should return the openid_configs match, not the oidc one
     const result = findConfig("https://accounts.google.com", []);
     expect(result).toBe(openIdCfg);
+  });
+});
+
+describe("selectAuthScopes", () => {
+  it("returns defaults when scopes_supported is undefined", () => {
+    expect(selectAuthScopes(undefined)).toEqual(["openid", "profile", "email"]);
+  });
+
+  it("returns intersection of defaults and advertised scopes", () => {
+    expect(selectAuthScopes(["openid", "email", "offline_access"])).toEqual([
+      "openid",
+      "email",
+    ]);
+  });
+
+  it("falls back to defaults when filter leaves empty list", () => {
+    // Without a fallback the `scope` query param sent to `/authorize` would be
+    // empty, which providers reject.
+    expect(selectAuthScopes(["custom_scope_one", "custom_scope_two"])).toEqual([
+      "openid",
+      "profile",
+      "email",
+    ]);
+  });
+
+  it("falls back to defaults when scopes_supported is empty", () => {
+    expect(selectAuthScopes([])).toEqual(["openid", "profile", "email"]);
   });
 });

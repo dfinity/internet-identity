@@ -45,6 +45,14 @@ const cache = new Map<string, CacheEntry>();
 const lastFetchAttempt = new Map<string, number>();
 let activeFetches = 0;
 
+/**
+ * True if `hostname` is exactly `expected` or a proper subdomain of it.
+ * Using `endsWith(expected)` alone would incorrectly accept
+ * `evilaccounts.google.com` when `expected` is `accounts.google.com`.
+ */
+const hostnameMatchesAllowed = (hostname: string, expected: string): boolean =>
+  hostname === expected || hostname.endsWith(`.${expected}`);
+
 /** Validates that a discovery URL uses HTTPS and is on the allowlist. */
 const validateDiscoveryUrl = (url: string): URL => {
   const parsed = new URL(url);
@@ -54,9 +62,7 @@ const validateDiscoveryUrl = (url: string): URL => {
     );
   }
   if (!ALLOWED_DISCOVERY_DOMAINS.has(parsed.hostname)) {
-    throw new Error(
-      `Discovery domain not allowed: ${parsed.hostname}`,
-    );
+    throw new Error(`Discovery domain not allowed: ${parsed.hostname}`);
   }
   return parsed;
 };
@@ -83,22 +89,30 @@ const validateDocument = (
     );
   }
 
-  // Validate issuer matches expected provider domain
+  // Validate issuer matches expected provider domain (exact or true subdomain).
+  // `endsWith` alone would accept attacker hostnames like evilaccounts.google.com.
   const issuerUrl = new URL(doc.issuer);
   if (issuerUrl.protocol !== "https:") {
     throw new Error(`Issuer must use HTTPS: ${doc.issuer}`);
   }
-  if (!issuerUrl.hostname.endsWith(expectedHostname)) {
+  if (!hostnameMatchesAllowed(issuerUrl.hostname, expectedHostname)) {
     throw new Error(
-      `Issuer hostname mismatch: expected *${expectedHostname}, got ${issuerUrl.hostname}`,
+      `Issuer hostname mismatch: expected ${expectedHostname} or a subdomain, got ${issuerUrl.hostname}`,
     );
   }
 
-  // Validate authorization_endpoint uses HTTPS
+  // Validate authorization_endpoint uses HTTPS *and* is on the same trusted
+  // provider domain. A malicious discovery response could otherwise redirect
+  // the auth step to an attacker-controlled host.
   const authUrl = new URL(doc.authorization_endpoint);
   if (authUrl.protocol !== "https:") {
     throw new Error(
       `Authorization endpoint must use HTTPS: ${doc.authorization_endpoint}`,
+    );
+  }
+  if (!hostnameMatchesAllowed(authUrl.hostname, expectedHostname)) {
+    throw new Error(
+      `Authorization endpoint hostname mismatch: expected ${expectedHostname} or a subdomain, got ${authUrl.hostname}`,
     );
   }
 
@@ -175,14 +189,10 @@ const fetchWithRetry = async (
       const delay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        REQUEST_TIMEOUT_MS,
-      );
       const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(
@@ -203,6 +213,8 @@ const fetchWithRetry = async (
       ) {
         throw error;
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
   throw lastError;

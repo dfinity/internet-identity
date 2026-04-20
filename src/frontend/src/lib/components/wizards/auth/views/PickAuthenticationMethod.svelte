@@ -18,8 +18,11 @@
     ) => Promise<void | "cancelled">;
   }
 
-  const { setupOrUseExistingPasskey, continueWithOpenId, continueWithOidc }:
-    Props = $props();
+  const {
+    setupOrUseExistingPasskey,
+    continueWithOpenId,
+    continueWithOidc,
+  }: Props = $props();
 
   let authenticatingProviderId = $state<string>();
   let cancelledProviderId = $state<string>();

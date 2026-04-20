@@ -33,6 +33,7 @@ import {
   RequestConfig,
   decodeJWT,
   extractIssuerTemplateClaims,
+  selectAuthScopes,
 } from "$lib/utils/openID";
 import { fetchDiscoveryDocument } from "$lib/utils/oidcDiscovery";
 import type { DiscoverableOidcConfig } from "$lib/globals";
@@ -260,25 +261,6 @@ export class AuthFlow {
     // Fetch discovery document to get authorization_endpoint
     const discovery = await fetchDiscoveryDocument(config.discovery_url);
 
-    // Determine scopes: use discovered scopes_supported if available,
-    // otherwise default to "openid profile email"
-    const authScope =
-      discovery.scopes_supported !== undefined &&
-      discovery.scopes_supported.length > 0
-        ? discovery.scopes_supported
-            .filter((s) =>
-              ["openid", "profile", "email"].includes(s),
-            )
-            .join(" ")
-        : "openid profile email";
-
-    // Build RequestConfig from static client_id + discovered endpoint
-    const requestConfig: RequestConfig = {
-      clientId,
-      authURL: discovery.authorization_endpoint,
-      authScope,
-    };
-
     // Reuse the existing OpenId flow with the discovered config
     // Build a synthetic OpenIdConfig-like object for the rest of the flow
     const syntheticConfig: OpenIdConfig = {
@@ -289,7 +271,7 @@ export class AuthFlow {
       fedcm_uri: [],
       email_verification: config.email_verification,
       issuer: discovery.issuer,
-      auth_scope: authScope.split(" "),
+      auth_scope: selectAuthScopes(discovery.scopes_supported),
       client_id: clientId,
     };
 
