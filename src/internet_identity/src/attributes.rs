@@ -267,51 +267,77 @@ impl Anchor {
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs = BTreeMap::new();
+        let mut problems = Vec::new();
 
         for spec in &attribute_specs {
-            let Some(AttributeScope::OpenId { issuer }) = &spec.key.scope else {
-                // Only scoped attributes are supported; silently skip unscoped ones.
-                continue;
-            };
+            match &spec.key.scope {
+                Some(AttributeScope::OpenId { issuer }) => {
+                    let credential = self
+                        .openid_credentials
+                        .iter()
+                        .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()));
 
-            let Some(credential) = self
-                .openid_credentials
-                .iter()
-                .find(|c| c.config_issuer().as_deref() == Some(issuer.as_str()))
-            else {
-                continue;
-            };
+                    let Some(credential) = credential else {
+                        problems.push(format!("No credential found for issuer: {}", issuer));
+                        continue;
+                    };
 
-            let stored_value = match spec.key.attribute_name {
-                AttributeName::Email => credential.get_email(),
-                AttributeName::Name => credential.get_name(),
-                AttributeName::VerifiedEmail => credential.get_verified_email(),
-            };
+                    let stored_value = match spec.key.attribute_name {
+                        AttributeName::Email => credential.get_email(),
+                        AttributeName::Name => credential.get_name(),
+                        AttributeName::VerifiedEmail => credential.get_verified_email(),
+                    };
 
-            let Some(stored) = stored_value else {
-                continue;
-            };
+                    let Some(stored) = stored_value else {
+                        problems.push(format!(
+                            "Attribute {} not available for issuer {}",
+                            spec.key.attribute_name, issuer
+                        ));
+                        continue;
+                    };
 
-            // If a value was provided, validate it matches.
-            if let Some(ref expected_value) = spec.value {
-                if expected_value.as_slice() != stored.as_bytes() {
-                    continue;
+                    // If a value was provided, validate it matches.
+                    if let Some(ref expected_value) = spec.value {
+                        if expected_value.as_slice() != stored.as_bytes() {
+                            problems.push(format!(
+                                "Attribute value mismatch for {}: provided value does not match stored value",
+                                spec.key
+                            ));
+                            continue;
+                        }
+                    }
+
+                    // Compute the certified key.
+                    let certified_key = if spec.omit_scope {
+                        spec.key.attribute_name.to_string()
+                    } else {
+                        spec.key.to_string()
+                    };
+
+                    match certified_pairs.entry(certified_key) {
+                        std::collections::btree_map::Entry::Occupied(entry) => {
+                            problems.push(format!(
+                                "Duplicate certified attribute key '{}' derived from spec {}",
+                                entry.key(),
+                                spec.key
+                            ));
+                        }
+                        std::collections::btree_map::Entry::Vacant(entry) => {
+                            entry.insert(stored.into_bytes());
+                        }
+                    }
+                }
+                None => {
+                    problems.push(format!(
+                        "Attribute {} has no scope; only scoped attributes are supported",
+                        spec.key
+                    ));
                 }
             }
+        }
 
-            // Compute the certified key.
-            let certified_key = if spec.omit_scope {
-                spec.key.attribute_name.to_string()
-            } else {
-                spec.key.to_string()
-            };
-
-            // Skip duplicates silently.
-            if let std::collections::btree_map::Entry::Vacant(entry) =
-                certified_pairs.entry(certified_key)
-            {
-                entry.insert(stored.into_bytes());
-            }
+        if !problems.is_empty() {
+            return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), nonce);
