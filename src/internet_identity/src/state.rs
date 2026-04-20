@@ -115,7 +115,7 @@ pub struct PersistentState {
     pub new_flow_origins: Option<Vec<String>>,
     // Configurations for OpenID clients
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    // Simplified OIDC configs using discovery. Mutually exclusive with openid_configs.
+    // SSO provider configs managed via add_discoverable_oidc_config update call.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     // Configuration for Web Analytics tool
     pub analytics_config: Option<AnalyticsConfig>,

@@ -280,7 +280,8 @@ type InternetIdentityInit = record {
     new_flow_origins : opt vec text;
     // Configurations for OpenID clients
     openid_configs : opt vec OpenIdConfig;
-    // Simplified OIDC configs using discovery. Mutually exclusive with openid_configs.
+    // Deprecated in init args: use add_discoverable_oidc_config update call instead.
+    // Kept for backward compatibility and config() query output.
     oidc_configs : opt vec DiscoverableOidcConfig;
     // Configuration for Web Analytics
     analytics_config : opt opt AnalyticsConfig;
@@ -1197,6 +1198,7 @@ service : (opt InternetIdentityInit) -> {
     // OIDC Discovery
     // ===============
     discovered_oidc_configs : () -> (vec OidcConfig) query;
+    add_discoverable_oidc_config : (DiscoverableOidcConfig) -> ();
 
     // Internal Methods
     // ================

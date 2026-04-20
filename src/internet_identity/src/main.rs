@@ -554,6 +554,11 @@ fn discovered_oidc_configs() -> Vec<OidcConfig> {
     openid::get_discovered_oidc_configs()
 }
 
+#[update]
+fn add_discoverable_oidc_config(config: DiscoverableOidcConfig) {
+    openid::add_oidc_config(config);
+}
+
 #[query]
 fn config() -> InternetIdentityInit {
     let archive_config = match state::archive_state() {
@@ -666,31 +671,14 @@ fn apply_install_arg(maybe_arg: Option<InternetIdentityInit>) {
                 persistent_state.related_origins = Some(related_origins);
             })
         }
-        // oidc_configs, openid_configs, and new_flow_origins are mutually exclusive.
-        // When openid_configs is provided alongside oidc_configs, openid_configs takes
-        // precedence as the proven path. When oidc_configs is set, new_flow_origins is
-        // cleared (and vice versa) since oidc_configs subsumes new_flow_origins.
         if let Some(openid_configs) = arg.openid_configs {
-            if arg.oidc_configs.is_some() {
-                ic_cdk::println!(
-                    "Both openid_configs and oidc_configs provided; using openid_configs"
-                );
-            }
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.openid_configs = Some(openid_configs);
-                persistent_state.oidc_configs = None;
-            })
-        } else if let Some(oidc_configs) = arg.oidc_configs {
-            state::persistent_state_mut(|persistent_state| {
-                persistent_state.oidc_configs = Some(oidc_configs);
-                persistent_state.openid_configs = None;
-                persistent_state.new_flow_origins = None;
             })
         }
         if let Some(new_flow_origins) = arg.new_flow_origins {
             state::persistent_state_mut(|persistent_state| {
                 persistent_state.new_flow_origins = Some(new_flow_origins);
-                persistent_state.oidc_configs = None;
             })
         }
         if let Some(analytics_config) = arg.analytics_config {

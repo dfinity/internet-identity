@@ -301,25 +301,50 @@ pub fn setup(configs: Vec<OpenIdConfig>) {
 }
 
 pub fn setup_oidc(configs: Vec<DiscoverableOidcConfig>) {
-    // Canary-phase domain allowlist: reject configs whose domain isn't on the list.
-    for config in &configs {
-        if !generic::is_allowed_discovery_domain(&config.discovery_domain) {
-            ic_cdk::trap(&format!(
-                "discovery_domain '{}' is not on the canary allowlist",
-                config.discovery_domain
-            ));
-        }
+    for config in configs {
+        add_oidc_config_internal(config);
     }
-    OIDC_CONFIGS.with_borrow_mut(|stored| {
-        *stored = configs.clone();
-    });
-    PROVIDERS.with_borrow_mut(|providers| {
-        for config in configs {
-            providers.push(Box::new(generic::DiscoverableProvider::create(config)));
-        }
-    });
     #[cfg(not(test))]
     generic::init_discovery_timers();
+}
+
+pub fn add_oidc_config(config: DiscoverableOidcConfig) {
+    if !generic::is_allowed_discovery_domain(&config.discovery_domain) {
+        ic_cdk::trap(&format!(
+            "discovery_domain '{}' is not on the canary allowlist",
+            config.discovery_domain
+        ));
+    }
+
+    // Skip if already registered
+    let already_exists = OIDC_CONFIGS.with_borrow(|stored| {
+        stored
+            .iter()
+            .any(|c| c.discovery_domain == config.discovery_domain)
+    });
+    if already_exists {
+        return;
+    }
+
+    add_oidc_config_internal(config.clone());
+
+    // Persist to state so it survives upgrades
+    state::persistent_state_mut(|persistent_state| {
+        let configs = persistent_state.oidc_configs.get_or_insert_with(Vec::new);
+        configs.push(config);
+    });
+
+    #[cfg(not(test))]
+    generic::init_discovery_timers();
+}
+
+fn add_oidc_config_internal(config: DiscoverableOidcConfig) {
+    OIDC_CONFIGS.with_borrow_mut(|stored| {
+        stored.push(config.clone());
+    });
+    PROVIDERS.with_borrow_mut(|providers| {
+        providers.push(Box::new(generic::DiscoverableProvider::create(config)));
+    });
 }
 
 pub fn get_discovered_oidc_configs() -> Vec<OidcConfig> {

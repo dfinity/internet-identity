@@ -264,12 +264,10 @@ pub struct InternetIdentityInit {
     pub register_rate_limit: Option<RateLimitConfig>,
     pub captcha_config: Option<CaptchaConfig>,
     pub related_origins: Option<Vec<String>>,
-    /// Deprecated: origins that use the new authentication flow. Mutually exclusive with `oidc_configs`.
     pub new_flow_origins: Option<Vec<String>>,
-    /// Deprecated: use `oidc_configs` instead. Mutually exclusive with `oidc_configs`.
     pub openid_configs: Option<Vec<OpenIdConfig>>,
-    /// SSO provider configs that use two-hop discovery.
-    /// Mutually exclusive with `openid_configs` and `new_flow_origins`.
+    /// SSO provider configs managed via `add_discoverable_oidc_config` update call.
+    /// Retained in init args for backward compatibility and `config()` query output.
     pub oidc_configs: Option<Vec<DiscoverableOidcConfig>>,
     pub analytics_config: Option<Option<AnalyticsConfig>>,
     pub enable_dapps_explorer: Option<bool>,
