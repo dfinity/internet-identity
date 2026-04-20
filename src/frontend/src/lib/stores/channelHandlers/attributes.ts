@@ -200,13 +200,7 @@ export const handleIcrc3Attributes =
 
     // Wait for the user to authorize before serving attributes.
     await waitForStore(authorizedStore);
-
-    // Only OpenID users have attributes — bail if not OpenID.
     const authenticated = await waitForStore(authenticationStore);
-    const configIssuer = getConfigIssuer(authenticated);
-    if (configIssuer === undefined) {
-      return;
-    }
 
     // Validate the derivation origin if provided, same as delegation handler.
     const validationResult = await validateDerivationOrigin({
@@ -224,23 +218,21 @@ export const handleIcrc3Attributes =
       paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
     );
 
-    // Only serve attributes the user implicitly consents to (name, email,
-    // verified_email scoped to the config issuer).
-    const implicitConsentKeys = filterImplicitConsentKeys(
-      paramsResult.data.keys,
-      configIssuer,
-    );
+    // Filter to implicit consent keys if the user authenticated via OpenID.
+    // Non-OpenID users get an empty attribute list (only implicit entries).
+    const configIssuer = getConfigIssuer(authenticated);
+    const attributeKeys =
+      configIssuer !== undefined
+        ? filterImplicitConsentKeys(paramsResult.data.keys, configIssuer)
+        : [];
 
     try {
-      // Prepare and certify attributes via the canister (two-step: prepare + get).
-      // ICRC-3 uses a nonce for a single combined signature rather than
-      // per-attribute signatures.
       const { message } = await authenticated.actor
         .prepare_icrc3_attributes({
           origin,
           account_number: [],
           identity_number: authenticated.identityNumber,
-          attributes: implicitConsentKeys.map((key) => ({
+          attributes: attributeKeys.map((key) => ({
             key,
             value: [],
             omit_scope: false,
