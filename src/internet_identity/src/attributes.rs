@@ -267,6 +267,7 @@ impl Anchor {
         account: Account,
     ) -> Result<Vec<u8>, PrepareIcrc3AttributeError> {
         let mut certified_pairs: BTreeMap<String, Icrc3Value> = BTreeMap::new();
+        let mut problems = Vec::new();
 
         for spec in &attribute_specs {
             match &spec.key.scope {
@@ -299,9 +300,8 @@ impl Anchor {
                     if let Some(ref expected_value) = spec.value {
                         if expected_value.as_slice() != stored.as_bytes() {
                             problems.push(format!(
-                                "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
-                                spec.key,
-                                stored.len()
+                                "Attribute value mismatch for {}: provided value does not match stored value",
+                                spec.key
                             ));
                             continue;
                         }
@@ -323,7 +323,7 @@ impl Anchor {
                             ));
                         }
                         std::collections::btree_map::Entry::Vacant(entry) => {
-                            entry.insert(stored.into_bytes());
+                            entry.insert(Icrc3Value::Text(stored));
                         }
                     }
                 }
@@ -336,19 +336,8 @@ impl Anchor {
             }
         }
 
-            // Compute the certified key.
-            let certified_key = if spec.omit_scope {
-                spec.key.attribute_name.to_string()
-            } else {
-                spec.key.to_string()
-            };
-
-            // Skip duplicates silently.
-            if let std::collections::btree_map::Entry::Vacant(entry) =
-                certified_pairs.entry(certified_key)
-            {
-                entry.insert(Icrc3Value::Text(stored));
-            }
+        if !problems.is_empty() {
+            return Err(PrepareIcrc3AttributeError::AttributeMismatch { problems });
         }
 
         certified_pairs.insert("implicit:nonce".to_string(), Icrc3Value::Blob(nonce));
