@@ -7,7 +7,7 @@ use ic_canister_sig_creation::extract_raw_canister_sig_pk_from_der;
 use internet_identity_interface::internet_identity::types::attributes::{
     AttributeSpec, CertifiedAttribute, CertifiedAttributes, GetAttributesRequest,
     GetIcrc3AttributeError, GetIcrc3AttributeRequest, ListAvailableAttributesRequest,
-    PrepareAttributeRequest, PrepareIcrc3AttributeError, PrepareIcrc3AttributeRequest,
+    PrepareAttributeRequest, PrepareIcrc3AttributeRequest,
 };
 use internet_identity_interface::internet_identity::types::{
     GetDelegationResponse, OpenIdConfig, SignedDelegation,
@@ -841,56 +841,4 @@ fn should_list_all_available_attributes() {
         "Expected at least 2 attributes, got {}",
         result.len()
     );
-}
-
-#[test]
-fn should_return_error_for_unavailable_icrc3_attributes() {
-    let (env, canister_id, principal, identity_number) = setup_icrc3_test_env();
-    let origin = "https://some-dapp.com";
-
-    let prepare_request = PrepareIcrc3AttributeRequest {
-        identity_number,
-        origin: origin.to_string(),
-        account_number: None,
-        attributes: vec![
-            AttributeSpec {
-                key: "openid:https://accounts.google.com:email".into(),
-                value: None,
-                omit_scope: false,
-            },
-            // The test user has no verified_email
-            AttributeSpec {
-                key: "openid:https://accounts.google.com:verified_email".into(),
-                value: None,
-                omit_scope: false,
-            },
-            // Unknown issuer
-            AttributeSpec {
-                key: "openid:https://unknown-issuer.com:email".into(),
-                value: None,
-                omit_scope: false,
-            },
-        ],
-        nonce: vec![0u8; 32],
-    };
-
-    let result = api::prepare_icrc3_attributes(&env, canister_id, principal, prepare_request)
-        .expect("failed to call prepare_icrc3_attributes");
-
-    match result {
-        Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
-            assert_eq!(problems.len(), 2, "Expected 2 problems, got {:?}", problems);
-            assert!(
-                problems.iter().any(|p| p.contains("verified_email")),
-                "Expected a problem about verified_email, got {:?}",
-                problems
-            );
-            assert!(
-                problems.iter().any(|p| p.contains("unknown-issuer.com")),
-                "Expected a problem about unknown issuer, got {:?}",
-                problems
-            );
-        }
-        other => panic!("Expected AttributeMismatch error, got {:?}", other),
-    }
 }

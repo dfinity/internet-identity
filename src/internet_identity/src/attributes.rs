@@ -300,8 +300,9 @@ impl Anchor {
                     if let Some(ref expected_value) = spec.value {
                         if expected_value.as_slice() != stored.as_bytes() {
                             problems.push(format!(
-                                "Attribute value mismatch for {}: provided value does not match stored value",
-                                spec.key
+                                "Attribute value mismatch for {}: provided value does not match stored value (stored {} bytes)",
+                                spec.key,
+                                stored.len()
                             ));
                             continue;
                         }
@@ -1546,9 +1547,195 @@ mod tests {
         }
     }
 
-    // Silent omit behavior for prepare_icrc3_attributes (unavailable attributes,
-    // unknown issuers, value mismatches, scopeless attributes, duplicate keys) is
-    // verified by the integration test should_silently_omit_unavailable_icrc3_attributes.
+    mod prepare_icrc3_attributes_tests {
+        use super::*;
+        use internet_identity_interface::internet_identity::types::{
+            OpenIdConfig, OpenIdEmailVerificationScheme,
+        };
+
+        const GOOGLE_ISSUER: &str = "https://accounts.google.com";
+
+        fn setup_google_provider() {
+            crate::openid::setup(vec![OpenIdConfig {
+                name: "Google".to_string(),
+                logo: String::new(),
+                issuer: GOOGLE_ISSUER.to_string(),
+                client_id: "test-client-id".to_string(),
+                jwks_uri: String::new(),
+                auth_uri: String::new(),
+                auth_scope: vec![],
+                fedcm_uri: None,
+                email_verification: Some(OpenIdEmailVerificationScheme::Google),
+            }]);
+        }
+
+        fn google_anchor() -> Anchor {
+            let mut anchor = Anchor::new(ANCHOR_NUMBER, 0);
+            anchor.openid_credentials = vec![OpenIdCredential {
+                iss: GOOGLE_ISSUER.to_string(),
+                sub: "google-user-123".to_string(),
+                aud: "test-client-id".to_string(),
+                last_usage_timestamp: None,
+                metadata: HashMap::from([
+                    (
+                        "email".to_string(),
+                        MetadataEntryV2::String("user@example.com".to_string()),
+                    ),
+                    (
+                        "name".to_string(),
+                        MetadataEntryV2::String("Example User".to_string()),
+                    ),
+                ]),
+            }];
+            anchor
+        }
+
+        fn google_spec(
+            attr: AttributeName,
+            value: Option<&[u8]>,
+            omit_scope: bool,
+        ) -> ValidatedAttributeSpec {
+            ValidatedAttributeSpec {
+                key: AttributeKey {
+                    scope: Some(AttributeScope::OpenId {
+                        issuer: GOOGLE_ISSUER.to_string(),
+                    }),
+                    attribute_name: attr,
+                },
+                value: value.map(|v| v.to_vec()),
+                omit_scope,
+            }
+        }
+
+        #[test]
+        fn should_reject_value_mismatch() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![
+                    google_spec(AttributeName::Email, Some(b"user@example.com"), false), // correct
+                    google_spec(AttributeName::Name, Some(b"Wrong Name"), false),        // wrong
+                ],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    pretty_assert_eq!(problems.len(), 1);
+                    assert!(
+                        problems[0].contains("value mismatch"),
+                        "Expected value mismatch error, got: {}",
+                        problems[0]
+                    );
+                    assert!(problems[0].contains("name"), "Error should mention 'name'");
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_unknown_issuer() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![ValidatedAttributeSpec {
+                    key: AttributeKey {
+                        scope: Some(AttributeScope::OpenId {
+                            issuer: "https://unknown-issuer.com".to_string(),
+                        }),
+                        attribute_name: AttributeName::Email,
+                    },
+                    value: None,
+                    omit_scope: false,
+                }],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("No credential found"),
+                        "Expected 'No credential found', got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_scopeless_attribute() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            let result = anchor.prepare_icrc3_attributes(
+                vec![ValidatedAttributeSpec {
+                    key: AttributeKey {
+                        scope: None,
+                        attribute_name: AttributeName::Email,
+                    },
+                    value: None,
+                    omit_scope: false,
+                }],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("no scope"),
+                        "Expected 'no scope' error, got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+
+        #[test]
+        fn should_reject_duplicate_certified_keys() {
+            setup_google_provider();
+            let anchor = google_anchor();
+            let account = Account::new(ANCHOR_NUMBER, "https://dapp.com".to_string(), None, None);
+
+            // Two specs that both resolve to certified key "email" due to omit_scope=true
+            let result = anchor.prepare_icrc3_attributes(
+                vec![
+                    google_spec(AttributeName::Email, None, true),
+                    google_spec(AttributeName::Email, None, true),
+                ],
+                vec![0u8; 32],
+                "https://dapp.com".to_string(),
+                1_000_000_000,
+                account,
+            );
+
+            match result {
+                Err(PrepareIcrc3AttributeError::AttributeMismatch { problems }) => {
+                    assert!(
+                        problems[0].contains("Duplicate certified attribute key"),
+                        "Expected duplicate key error, got: {}",
+                        problems[0]
+                    );
+                }
+                other => panic!("Expected AttributeMismatch, got {:?}", other),
+            }
+        }
+    }
 
     mod icrc3_attribute_message_tests {
         use super::*;
