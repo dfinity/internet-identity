@@ -17,18 +17,90 @@ import { retryFor, throwCanisterError, waitForStore } from "$lib/utils/utils";
 import { z } from "zod";
 import type { ChannelError } from "$lib/stores/channelStore";
 import { get } from "svelte/store";
+import {
+  type AttributeConsentContext,
+  type AttributeGroup,
+  type AvailableAttribute,
+  attributeConsentResultStore,
+  attributeConsentStore,
+  extractAttributeName,
+} from "$lib/stores/attributeConsent.store";
+
+/** Check if a scoped key is an implicit consent key for the given issuer. */
+const isImplicitConsentKey = (key: string, configIssuer: string): boolean =>
+  key === `openid:${configIssuer}:name` ||
+  key === `openid:${configIssuer}:email` ||
+  key === `openid:${configIssuer}:verified_email`;
+
+/** Check if a key structurally looks like it could be an implicit consent key. */
+const couldBeImplicitKey = (key: string): boolean => key.startsWith("openid:");
 
 /** Filters attribute keys to only those the user implicitly consents to. */
 const filterImplicitConsentKeys = (
   keys: string[],
   configIssuer: string,
-): string[] =>
-  keys.filter(
-    (key) =>
-      key === `openid:${configIssuer}:name` ||
-      key === `openid:${configIssuer}:email` ||
-      key === `openid:${configIssuer}:verified_email`,
-  );
+): string[] => keys.filter((key) => isImplicitConsentKey(key, configIssuer));
+
+/** Resolve a single requested key against available attributes. */
+const resolveKey = (
+  requestedKey: string,
+  available: Array<[string, Uint8Array | number[]]>,
+  decoder: TextDecoder,
+): AvailableAttribute[] => {
+  const availableKeys = available.map(([key]) => key);
+  const isScoped = availableKeys.includes(requestedKey);
+
+  if (isScoped) {
+    const entry = available.find(([key]) => key === requestedKey);
+    if (entry === undefined) {
+      return [];
+    }
+    const rawValue = new Uint8Array(entry[1]);
+    return [
+      {
+        key: requestedKey,
+        displayValue: decoder.decode(rawValue),
+        rawValue,
+        omitScope: false,
+      },
+    ];
+  }
+
+  // Unscoped key — find all available keys ending with :requestedKey
+  return available
+    .filter(([key]) => key.endsWith(`:${requestedKey}`))
+    .map(([key, value]) => {
+      const rawValue = new Uint8Array(value);
+      return {
+        key,
+        displayValue: decoder.decode(rawValue),
+        rawValue,
+        omitScope: true,
+      };
+    });
+};
+
+/**
+ * Resolve requested attribute keys against the canister's available attributes.
+ * Groups results by attribute name for UI rendering.
+ * Attributes with no available values are omitted.
+ */
+const resolveAttributeGroups = (
+  requestedKeys: string[],
+  available: Array<[string, Uint8Array | number[]]>,
+): AttributeGroup[] => {
+  const decoder = new TextDecoder();
+  const groups: AttributeGroup[] = [];
+
+  for (const requestedKey of requestedKeys) {
+    const options = resolveKey(requestedKey, available, decoder);
+    if (options.length > 0) {
+      groups.push({ name: extractAttributeName(requestedKey), options });
+    }
+  }
+
+  return groups;
+};
 
 /**
  * Handle `ii_attributes` requests (the pre-ICRC-3 attribute sharing method
@@ -94,8 +166,7 @@ export const handleLegacyAttributes =
       paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
     );
 
-    // Only serve attributes the user implicitly consents to (name, email,
-    // verified_email scoped to the config issuer).
+    // Legacy attributes use implicit consent only.
     const implicitConsentKeys = filterImplicitConsentKeys(
       paramsResult.data.attributes,
       configIssuer,
@@ -155,8 +226,8 @@ export const handleLegacyAttributes =
 /**
  * Handle `ii-icrc3-attributes` requests.
  *
- * Same as `handleLegacyAttributes` but uses the ICRC-3 attribute protocol
- * with nonce-based signatures instead of per-attribute signatures.
+ * Resolves requested attribute keys against available attributes, shows a
+ * consent UI when needed, and certifies the consented attributes.
  */
 export const handleIcrc3Attributes =
   (channel: Channel, onError: (error: ChannelError) => void) =>
@@ -188,10 +259,6 @@ export const handleIcrc3Attributes =
       return;
     }
 
-    // Wait for the user to authorize before serving attributes.
-    const { accountNumberPromise } = await waitForStore(authorizedStore);
-    const authenticated = await waitForStore(authenticationStore);
-
     // Validate the derivation origin if provided, same as delegation handler.
     const validationResult = await validateDerivationOrigin({
       requestOrigin: channel.origin,
@@ -202,32 +269,85 @@ export const handleIcrc3Attributes =
       return;
     }
 
-    // Use the request's derivation origin if provided, else channel origin,
-    // remapped to legacy domain for backwards compatibility.
+    const requestedKeys = paramsResult.data.keys;
+
+    // Build the attribute specs to certify — either from implicit consent
+    // or from explicit user consent through the UI.
+    let attributeSpecs: Array<{
+      key: string;
+      value: [] | [Uint8Array];
+      omit_scope: boolean;
+    }>;
+
+    // Determine if all keys are implicit consent keys.
+    // First do a cheap structural check — if any key doesn't look implicit,
+    // we know consent is needed without waiting for the issuer.
+    // If all keys look implicit, wait for the pending OpenID issuer to
+    // confirm against the actual provider.
+    const allCouldBeImplicit =
+      requestedKeys.length > 0 &&
+      requestedKeys.every((key) => couldBeImplicitKey(key));
+
+    let allImplicit = false;
+    if (allCouldBeImplicit) {
+      const pendingIssuer = await waitForStore(pendingOpenIdIssuerStore);
+      allImplicit = requestedKeys.every((key) =>
+        isImplicitConsentKey(key, pendingIssuer),
+      );
+    }
+
+    if (requestedKeys.length === 0 || allImplicit) {
+      // No consent UI needed — use keys directly.
+      attributeSpecs = allImplicit
+        ? requestedKeys.map((key) => ({
+            key,
+            value: [] as [],
+            omit_scope: false,
+          }))
+        : [];
+    } else {
+      // Consent is needed — set a context promise so the UI can show
+      // the consent view with a loading state while we wait for auth
+      // and resolve available attributes.
+      const contextPromise = (async (): Promise<AttributeConsentContext> => {
+        await waitForStore(authorizedStore);
+        const authenticated = await waitForStore(authenticationStore);
+
+        const available = await authenticated.actor
+          .list_available_attributes({
+            identity_number: authenticated.identityNumber,
+            attributes: [requestedKeys],
+          })
+          .then(throwCanisterError);
+
+        return {
+          groups: resolveAttributeGroups(requestedKeys, available),
+          effectiveOrigin: remapToLegacyDomain(
+            paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
+          ),
+        };
+      })();
+
+      attributeConsentStore.setContext(contextPromise);
+      const context = await contextPromise;
+
+      if (context.groups.length === 0) {
+        attributeSpecs = [];
+      } else {
+        const consent = await waitForStore(attributeConsentResultStore);
+        attributeSpecs = consent.attributes.map((attr) => ({
+          key: attr.key,
+          value: [new Uint8Array(attr.rawValue)] as [Uint8Array],
+          omit_scope: attr.omitScope,
+        }));
+      }
+    }
+
     const origin = remapToLegacyDomain(
       paramsResult.data.icrc95DerivationOrigin ?? channel.origin,
     );
-
-    // Filter to implicit consent keys if this is an OpenID flow.
-    // Non-OpenID flows get an empty attribute list (only implicit entries).
-    const configIssuer = get(pendingOpenIdIssuerStore);
-    const implicitKeys =
-      configIssuer !== undefined
-        ? filterImplicitConsentKeys(paramsResult.data.keys, configIssuer)
-        : [];
-
-    // Filter to only keys that are actually available.
-    const available =
-      implicitKeys.length > 0
-        ? await authenticated.actor
-            .list_available_attributes({
-              identity_number: authenticated.identityNumber,
-              attributes: [implicitKeys],
-            })
-            .then(throwCanisterError)
-        : [];
-    const availableKeys = new Set(available.map(([key]) => key));
-    const attributeKeys = implicitKeys.filter((key) => availableKeys.has(key));
+    const { accountNumberPromise } = await waitForStore(authorizedStore);
+    const authenticated = await waitForStore(authenticationStore);
 
     try {
       const accountNumber = await accountNumberPromise;
@@ -236,11 +356,7 @@ export const handleIcrc3Attributes =
           origin,
           account_number: accountNumber !== undefined ? [accountNumber] : [],
           identity_number: authenticated.identityNumber,
-          attributes: attributeKeys.map((key) => ({
-            key,
-            value: [],
-            omit_scope: false,
-          })),
+          attributes: attributeSpecs,
           nonce: z.util.base64ToUint8Array(paramsResult.data.nonce),
         })
         .then(throwCanisterError);

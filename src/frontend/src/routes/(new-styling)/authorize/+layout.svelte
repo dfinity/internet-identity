@@ -23,7 +23,6 @@
   import { onMount } from "svelte";
   import { analytics } from "$lib/utils/analytics/analytics";
   import { throwCanisterError } from "$lib/utils/utils";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { AuthLastUsedFlow } from "$lib/flows/authLastUsedFlow.svelte";
   import { AuthWizard } from "$lib/components/wizards/auth";
   import ChannelError from "$lib/components/ui/ChannelError.svelte";
@@ -184,7 +183,6 @@
         .get_default_account(identityNumber, origin)
         .then(throwCanisterError)
         .then((account) => account.account_number[0]);
-      void triggerDropWaveAnimation();
       authorizationStore.authorize(Promise.resolve(accountNumber));
     } catch (error) {
       handleError(error);

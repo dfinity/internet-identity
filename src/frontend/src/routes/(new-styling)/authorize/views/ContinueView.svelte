@@ -28,7 +28,6 @@
   import { slide, fade, scale } from "svelte/transition";
   import Dialog from "$lib/components/ui/Dialog.svelte";
   import EditAccount from "$lib/components/views/EditAccount.svelte";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import ProgressRing from "$lib/components/ui/ProgressRing.svelte";
 
   interface Props {
@@ -105,7 +104,6 @@
               .then(throwCanisterError)
               .then((account) => account.account_number[0])
           : Promise.resolve(defaultAccountNumber);
-      void triggerDropWaveAnimation();
       onAuthorize(accountNumberPromise);
     } catch (error) {
       handleError(error);

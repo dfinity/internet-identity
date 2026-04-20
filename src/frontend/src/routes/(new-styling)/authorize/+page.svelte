@@ -25,6 +25,12 @@
   import UpgradeSuccessView from "./views/UpgradeSuccessView.svelte";
   import ContinueView from "./views/ContinueView.svelte";
   import AuthWizardView from "./views/AuthWizardView.svelte";
+  import AttributeConsentView from "./views/AttributeConsentView.svelte";
+  import {
+    type AttributeConsent,
+    attributeConsentStore,
+    attributeConsentResultStore,
+  } from "$lib/stores/attributeConsent.store";
 
   // --- OpenID resume imports ---
   import {
@@ -37,7 +43,6 @@
     DirectOpenIdEvents,
     directOpenIdFunnel,
   } from "$lib/utils/analytics/DirectOpenIdFunnel";
-  import { triggerDropWaveAnimation } from "$lib/utils/animation-dispatcher";
   import { createRedirectURL } from "$lib/utils/openID";
   import { sessionStore } from "$lib/stores/session.store";
 
@@ -87,6 +92,10 @@
 
   const handleAuthorize = (accountNumber: Promise<bigint | undefined>) => {
     authorizationStore.authorize(accountNumber);
+  };
+
+  const handleAttributeConsent = (consent: AttributeConsent) => {
+    attributeConsentStore.setConsent(consent);
   };
 
   const onUpgradeWizardSuccess = (identityNumber: bigint) => {
@@ -154,7 +163,6 @@
     }
     pendingOpenIdIssuerStore.set(config.issuer);
     openIdResumeProcessing = true;
-    triggerDropWaveAnimation();
 
     directOpenIdFunnel.addProperties({ openid_issuer: config.issuer });
     directOpenIdFunnel.trigger(DirectOpenIdEvents.CallbackFromOpenId);
@@ -267,9 +275,9 @@
 
 {#snippet panelWrapper(content: Snippet)}
   <div
-    class="grid w-full flex-1 items-center max-sm:items-stretch sm:max-w-100"
+    class="grid w-full flex-1 items-center max-sm:items-stretch sm:w-100 sm:max-w-100"
   >
-    <div class="relative col-start-1 row-start-1 flex flex-col gap-5">
+    <div class="relative col-start-1 row-start-1 flex min-w-0 flex-col gap-5">
       {#if $GUIDED_UPGRADE || $MIN_GUIDED_UPGRADE}
         {@render upgradePanel()}
       {/if}
@@ -291,11 +299,11 @@
 
 {#if data.flow === "openid-init"}
   <!-- OpenID init — nothing to render, onMount redirects to provider. -->
-{:else if $authorizedStore !== undefined}
-  <!-- User has been authorized — show redirect animation while delegation completes. -->
-  <RedirectAnimationView />
-{:else if data.flow === "openid-resume" && openIdResumeProcessing}
-  <!-- OpenID callback is being processed — show animation while auth resolves. -->
+{:else if $attributeConsentStore !== undefined && $attributeConsentResultStore === undefined && ($authorizedStore !== undefined || data.flow === "openid-resume")}
+  <!-- Consent needed (or loading) — consent view handles its own loading state. -->
+  {@render panelWrapper(attributeConsentContent)}
+{:else if $authorizedStore !== undefined || (data.flow === "openid-resume" && openIdResumeProcessing)}
+  <!-- Authorized or OpenID callback processing — show redirect animation. -->
   <RedirectAnimationView />
 {:else if upgradeSuccess && $isAuthenticatedStore}
   <!-- Migration wizard completed — show success countdown before authorizing. -->
@@ -307,6 +315,16 @@
   <!-- New user or no identity selected — show authentication methods. -->
   {@render panelWrapper(authWizardContent)}
 {/if}
+
+{#snippet attributeConsentContent()}
+  {#if $attributeConsentStore !== undefined}
+    <AttributeConsentView
+      context={$attributeConsentStore}
+      variant={data.flow === "openid-resume" ? "openid" : "normal"}
+      onConsent={handleAttributeConsent}
+    />
+  {/if}
+{/snippet}
 
 {#snippet upgradeSuccessContent()}
   <UpgradeSuccessView onAuthorize={handleAuthorize} />

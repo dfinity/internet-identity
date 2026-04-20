@@ -2,6 +2,7 @@
 @import "./styles/fixes.css";
 @import "./styles/button.css";
 @import "./styles/tabs.css";
+@import "./styles/skeleton.css";
 
 @plugin "@tailwindcss/forms";
 
