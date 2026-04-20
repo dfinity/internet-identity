@@ -297,14 +297,27 @@ export const handleIcrc3Attributes =
     }
 
     if (requestedKeys.length === 0 || allImplicit) {
-      // No consent UI needed — use keys directly.
-      attributeSpecs = allImplicit
-        ? requestedKeys.map((key) => ({
+      // No consent UI needed — filter to available keys and use directly.
+      if (allImplicit) {
+        await waitForStore(authorizedStore);
+        const authenticated = await waitForStore(authenticationStore);
+        const available = await authenticated.actor
+          .list_available_attributes({
+            identity_number: authenticated.identityNumber,
+            attributes: [requestedKeys],
+          })
+          .then(throwCanisterError);
+        const availableKeys = new Set(available.map(([key]) => key));
+        attributeSpecs = requestedKeys
+          .filter((key) => availableKeys.has(key))
+          .map((key) => ({
             key,
             value: [] as [],
             omit_scope: false,
-          }))
-        : [];
+          }));
+      } else {
+        attributeSpecs = [];
+      }
     } else {
       // Consent is needed — set a context promise so the UI can show
       // the consent view with a loading state while we wait for auth
