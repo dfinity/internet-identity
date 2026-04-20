@@ -118,7 +118,14 @@
 
   const authorizeChannel = (channel: Channel): Promise<void> =>
     new Promise<void>((resolve, reject) => {
-      handleIcrc3AttributeRequests(channel);
+      // Only handle ICRC-3 attribute requests in the default (non-OpenID) flow.
+      // The OpenID resume flow has its own handler.
+      if (
+        options === undefined ||
+        (!options.pending && !options.allowedOrigin)
+      ) {
+        handleIcrc3AttributeRequests(channel);
+      }
 
       channel.addEventListener("request", async (request) => {
         if (
