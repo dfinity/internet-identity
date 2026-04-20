@@ -153,12 +153,23 @@
         key === `openid:${issuer}:verified_email`,
     );
     try {
+      // Filter to only attributes that are actually available.
+      const available = await $authenticatedStore.actor
+        .list_available_attributes({
+          identity_number: $authenticatedStore.identityNumber,
+          attributes: [implicitConsentAttributeKeys],
+        })
+        .then(throwCanisterError);
+      const availableKeys = new Set(available.map(([key]) => key));
+      const availableAttributes = implicitConsentAttributeKeys.filter((key) =>
+        availableKeys.has(key),
+      );
       const { message } = await $authenticatedStore.actor
         .prepare_icrc3_attributes({
           origin: $authorizationContextStore.effectiveOrigin,
           account_number: [],
           identity_number: $authenticatedStore.identityNumber,
-          attributes: implicitConsentAttributeKeys.map((key) => ({
+          attributes: availableAttributes.map((key) => ({
             key,
             value: [],
             omit_scope: false,
