@@ -197,12 +197,15 @@ AUTH_HEADER="Authorization: token $GITHUB_TOKEN"
 
 echo "Fetching workflow runs for PR #$PR_NUMBER..."
 
-# Fetch the most recent workflow run for this PR (regardless of overall conclusion)
+# Get the branch name for this PR
+BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName -q '.headRefName')
+
+# Fetch the most recent workflow run for this PR's branch
 RUN_ID=$(curl -sf -H "$AUTH_HEADER" \
-    "https://api.github.com/repos/$REPO/actions/runs?event=push&per_page=100" \
-    | jq -r --arg PR "$PR_NUMBER" --arg WF "$WORKFLOW_FILE" '
+    "https://api.github.com/repos/$REPO/actions/runs?per_page=100" \
+    | jq -r --arg BRANCH "$BRANCH" --arg WF "$WORKFLOW_FILE" '
         [.workflow_runs[]
-            | select(.pull_requests[]?.number == ($PR|tonumber))
+            | select(.head_branch == $BRANCH)
             | select(.path == (".github/workflows/" + $WF))
         ]
         | sort_by(.run_number)
