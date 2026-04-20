@@ -1,18 +1,24 @@
 use crate::openid::{Aud, Iss, OpenIdCredentialKey, Sub};
 use ic_stable_structures::storable::Bound;
 use ic_stable_structures::Storable;
+use minicbor::{Decode, Encode};
 use std::borrow::Cow;
 
 /// Unbounded tuples are not supported yet in ic-stable-structures,
-/// this file implements a struct to wrap it so it can be stored.
+/// this struct wraps the `(iss, sub, aud)` key so it can be stored.
 ///
-/// Encoding uses CBOR map format `{0: iss, 1: sub, 2: aud}`.
-/// The decoder also handles legacy CBOR array format `[iss, sub]`
-/// for backward compatibility during migration.
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+/// New entries use CBOR map format `{0: iss, 1: sub, 2: aud}` (via the
+/// `#[cbor(map)]` derive). Legacy entries (written before `aud` was added
+/// to the key) use CBOR array format `[iss, sub]` and are transparently
+/// upgraded on read via `LegacyStorableOpenIdCredentialKey`.
+#[derive(Encode, Decode, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[cbor(map)]
 pub struct StorableOpenIdCredentialKey {
+    #[n(0)]
     pub iss: Iss,
+    #[n(1)]
     pub sub: Sub,
+    #[n(2)]
     pub aud: Aud,
 }
 
@@ -23,72 +29,15 @@ impl StorableOpenIdCredentialKey {
     }
 }
 
-// Encode as CBOR map: {0: iss, 1: sub, 2: aud}
-impl<C> minicbor::Encode<C> for StorableOpenIdCredentialKey {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut minicbor::Encoder<W>,
-        _ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.map(3)?;
-        e.u32(0)?.str(&self.iss)?;
-        e.u32(1)?.str(&self.sub)?;
-        e.u32(2)?.str(&self.aud)?;
-        Ok(())
-    }
-}
-
-// Decode from either:
-// - Legacy CBOR array format: [iss, sub] (aud defaults to "")
-// - New CBOR map format: {0: iss, 1: sub, 2: aud}
-impl<'b, C> minicbor::Decode<'b, C> for StorableOpenIdCredentialKey {
-    fn decode(
-        d: &mut minicbor::Decoder<'b>,
-        _ctx: &mut C,
-    ) -> Result<Self, minicbor::decode::Error> {
-        match d.datatype()? {
-            minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {
-                // Legacy array format: [iss, sub]
-                let _len = d.array()?;
-                let iss: &str = d.str()?;
-                let sub: &str = d.str()?;
-                Ok(StorableOpenIdCredentialKey {
-                    iss: iss.to_string(),
-                    sub: sub.to_string(),
-                    aud: String::new(),
-                })
-            }
-            minicbor::data::Type::Map => {
-                // New map format: {0: iss, 1: sub, 2: aud}.
-                // We only ever encode definite-length maps (`e.map(3)`), so the
-                // indefinite form is intentionally not supported here — `d.map()`
-                // returns `None` for indefinite maps, which would otherwise silently
-                // skip the loop body.
-                let len = d.map()?.ok_or_else(|| {
-                    minicbor::decode::Error::message("indefinite-length map is not supported")
-                })?;
-                let mut iss = None;
-                let mut sub = None;
-                let mut aud = None;
-                for _ in 0..len {
-                    match d.u32()? {
-                        0 => iss = Some(d.str()?.to_string()),
-                        1 => sub = Some(d.str()?.to_string()),
-                        2 => aud = Some(d.str()?.to_string()),
-                        _ => {
-                            d.skip()?;
-                        }
-                    }
-                }
-                Ok(StorableOpenIdCredentialKey {
-                    iss: iss.ok_or_else(|| minicbor::decode::Error::message("missing iss"))?,
-                    sub: sub.ok_or_else(|| minicbor::decode::Error::message("missing sub"))?,
-                    aud: aud.unwrap_or_default(),
-                })
-            }
-            other => Err(minicbor::decode::Error::type_mismatch(other)),
-        }
-    }
+/// Backward-compatible on-disk shape: pre-`aud` keys were stored as a CBOR
+/// array `[iss, sub]`. Used only on the decode path.
+#[derive(Decode)]
+#[cbor(array)]
+struct LegacyStorableOpenIdCredentialKey {
+    #[n(0)]
+    iss: Iss,
+    #[n(1)]
+    sub: Sub,
 }
 
 impl Storable for StorableOpenIdCredentialKey {
@@ -99,7 +48,22 @@ impl Storable for StorableOpenIdCredentialKey {
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        minicbor::decode(&bytes).expect("failed to decode StorableOpenIdCredentialKey")
+        // Peek at the top-level CBOR type to pick the right shape.
+        let datatype = minicbor::Decoder::new(&bytes)
+            .datatype()
+            .expect("failed to read CBOR type for StorableOpenIdCredentialKey");
+        match datatype {
+            minicbor::data::Type::Array | minicbor::data::Type::ArrayIndef => {
+                let legacy: LegacyStorableOpenIdCredentialKey = minicbor::decode(&bytes)
+                    .expect("failed to decode legacy StorableOpenIdCredentialKey");
+                StorableOpenIdCredentialKey {
+                    iss: legacy.iss,
+                    sub: legacy.sub,
+                    aud: String::new(),
+                }
+            }
+            _ => minicbor::decode(&bytes).expect("failed to decode StorableOpenIdCredentialKey"),
+        }
     }
 
     const BOUND: Bound = Bound::Unbounded;
